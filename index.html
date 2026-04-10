@@ -299,6 +299,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
     <button onclick="nav('pg-praticiens')" id="tn-praticiens">Praticiens</button>
     <button onclick="nav('pg-bilan')" id="tn-bilan">Bilan Clinique</button>
     <button onclick="nav('pg-rapport')" id="tn-rapport">Rapport</button>
+    <button onclick="nav('pg-params')" id="tn-params" style="display:none;">⚙️ Paramètres</button>
   </div>
   <div id="pwa-install-btn" style="display:none;">
     <button class="btn" id="pwa-btn" onclick="installPWA()" style="font-size:11px;padding:5px 10px;background:var(--green-d);color:var(--green);border-color:var(--green);">📲 Installer l'app</button>
@@ -920,6 +921,39 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 
   </div>
 </div><!-- /pg-bilan -->
+
+<!-- PAGE PARAMÈTRES -->
+<div class="page" id="pg-params">
+  <div style="padding:14px 20px;max-width:860px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:17px;font-weight:700;">⚙️ Paramètres</div>
+      <div style="font-size:11px;color:var(--red);background:var(--red-d);padding:4px 10px;border-radius:var(--rs);">🔐 Zone administrateur</div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div class="stitle" style="color:var(--blue);">👥 Gestion des accès praticiens</div>
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px;">Pour créer, modifier ou supprimer des comptes praticiens :</div>
+      <a href="https://supabase.com/dashboard/project/tzivizoacdyopwfzerrb/auth/users" target="_blank" style="display:inline-block;padding:8px 14px;background:var(--blue-d);color:var(--blue);border:1px solid var(--blue);border-radius:var(--rs);font-size:12px;text-decoration:none;">🔗 Ouvrir Supabase → Users</a>
+      <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
+        <div style="background:var(--bg);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
+          <div style="font-weight:600;margin-bottom:4px;">➕ Ajouter un praticien</div>
+          <div style="color:var(--mut);">Add user → Create new user → Email + mot de passe</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
+          <div style="font-weight:600;margin-bottom:4px;">🔴 Désactiver un accès</div>
+          <div style="color:var(--mut);">Cliquer sur l'utilisateur → Ban user</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="stitle" style="color:var(--blue);">💾 Mes données</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn" onclick="exportMyData()">📤 Exporter mes données (JSON)</button>
+        <span style="font-size:10px;color:var(--mut);">Sauvegarde de secours de tous vos patients.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /main -->
 </div><!-- /app -->
 
@@ -937,6 +971,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 </div>
 
 <script>
+
 
 
 
@@ -3689,7 +3724,9 @@ window.addEventListener('appinstalled', () => {
 
 
 
+
 </script>
+
 
 
 
