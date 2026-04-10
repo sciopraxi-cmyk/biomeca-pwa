@@ -939,6 +939,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 <script>
 
 
+
 // ══════════════════════════════════════════════════════
 // SUPABASE AUTH — BioMéca PWA
 // ══════════════════════════════════════════════════════
@@ -1058,13 +1059,19 @@ async function onPwaLoginSuccess() {
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
 
+  // Recalculer isAdmin depuis l'email (protection contre perte de valeur)
+  const adminEmail = 'admin@sciopraxi.fr';
+  if(pwaUser) pwaUser.isAdmin = pwaUser.email?.toLowerCase() === adminEmail;
+
   // Afficher onglet Paramètres si admin
   const paramsBtn = document.getElementById('tn-params');
-  if(paramsBtn) paramsBtn.style.display = pwaUser?.isAdmin ? '' : 'none';
+  if(paramsBtn) {
+    paramsBtn.style.display = pwaUser?.isAdmin ? '' : 'none';
+    paramsBtn.style.visibility = 'visible';
+  }
 
-  // Afficher nom dans la topbar
-  const tbName = document.getElementById('tb-name');
-  if(tbName && !patients.length) tbName.textContent = 'Aucun patient';
+  // Debug: afficher dans console
+  console.log('User:', pwaUser?.email, '| isAdmin:', pwaUser?.isAdmin);
 
   // Charger les données depuis Supabase
   await loadSupabaseData();
@@ -3681,7 +3688,9 @@ window.addEventListener('appinstalled', () => {
 
 
 
+
 </script>
+
 
 
 
