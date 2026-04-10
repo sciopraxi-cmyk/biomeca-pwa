@@ -975,6 +975,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 
 
 
+
 // ══════════════════════════════════════════════════════
 // SUPABASE AUTH — BioMéca PWA
 // ══════════════════════════════════════════════════════
@@ -1410,9 +1411,16 @@ function nav(id) {
   if (pg) pg.classList.add('active');
   const map = {
     'pg-home':'tn-home','pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-bilan':'tn-bilan','pg-rapport':'tn-rapport'
+    'pg-praticiens':'tn-praticiens','pg-bilan':'tn-bilan','pg-rapport':'tn-rapport',
+    'pg-params':'tn-params'
   };
   if (map[id]) { const b=document.getElementById(map[id]); if(b) b.classList.add('act'); }
+  // Toujours maintenir la visibilité de l'onglet Paramètres si admin
+  const paramsBtn = document.getElementById('tn-params');
+  if(paramsBtn) {
+    const isAdmin = (window.biomecaUser?.isAdmin) || (pwaUser?.isAdmin) || false;
+    paramsBtn.style.display = isAdmin ? '' : 'none';
+  }
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
@@ -3725,7 +3733,9 @@ window.addEventListener('appinstalled', () => {
 
 
 
+
 </script>
+
 
 
 
