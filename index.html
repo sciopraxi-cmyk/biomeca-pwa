@@ -484,7 +484,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
           <span class="badge bd" id="vcam-st">Inactive</span>
         </div>
         <!-- Zone vidéo -->
-        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);min-height:300px;" id="vid-wrap">
+        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);min-height:300px;aspect-ratio:16/9;" id="vid-wrap">
           <video id="vid-el" style="width:100%;display:block;max-height:60vh;object-fit:contain;background:#000;" playsinline muted></video>
           <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;display:none;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
@@ -2164,14 +2164,20 @@ async function toggleVCam() {
     const player = document.getElementById('vid-el');
     const vcanvas = document.getElementById('vid-canvas');
 
-    // MODE LIVE : video visible, canvas caché
+    // MODE LIVE : video visible + canvas transparent par-dessus pour marqueurs
     player.style.display = 'block';
-    player.style.position = '';
-    player.style.width = '100%';
-    player.style.height = '';
+    player.style.position = 'absolute';
+    player.style.top = '0'; player.style.left = '0';
+    player.style.width = '100%'; player.style.height = '100%';
     player.style.opacity = '1';
-    player.style.zIndex = '';
-    vcanvas.style.display = 'none';
+    player.style.zIndex = '0';
+    vcanvas.style.display = 'block';
+    vcanvas.style.position = 'absolute';
+    vcanvas.style.top = '0'; vcanvas.style.left = '0';
+    vcanvas.style.width = '100%'; vcanvas.style.height = '100%';
+    vcanvas.style.zIndex = '1';
+    vcanvas.style.pointerEvents = 'auto';
+    vcanvas.style.background = 'transparent';
 
     player.muted = true;
     player.playsInline = true;
@@ -2286,9 +2292,15 @@ function setupVidCanvas(player, vcanvas) {
     isVidDragging=false;
   },{passive:false});
 
+  player.onloadedmetadata=()=>{
+    vcanvas.width=player.videoWidth||640;
+    vcanvas.height=player.videoHeight||480;
+    document.getElementById('vid-info').textContent='Live · '+player.videoWidth+'×'+player.videoHeight;
+  };
   player.ontimeupdate=()=>{
     const ctx=vcanvas.getContext('2d');
-    ctx.drawImage(player,0,0,vcanvas.width,vcanvas.height);
+    // Canvas transparent — juste overlay marqueurs par-dessus la video
+    ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
     if(vAutoDetect) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
     drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
     updateAngleOverlay('vid-angles',vidMarkers,view);
