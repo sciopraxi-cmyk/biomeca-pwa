@@ -2145,7 +2145,7 @@ async function toggleVCam() {
 
   } catch(e) {
     const msg = e.name==='NotAllowedError'
-      ? '⚠ Accès caméra refusé — Préférences Système > Confidentialité > Caméra > autoriser l'app'
+      ? '⚠ Accès caméra refusé — Préférences Système > Confidentialité > Caméra > autoriser l\'app'
       : '⚠ '+e.name+' : '+e.message;
     document.getElementById('vid-info').textContent = msg;
     document.getElementById('vcam-st').textContent='Erreur'; document.getElementById('vcam-st').className='badge br';
