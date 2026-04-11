@@ -1013,6 +1013,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 
 
 
+
 // ══════════════════════════════════════════════════════
 // SUPABASE AUTH — BioMéca PWA
 // ══════════════════════════════════════════════════════
@@ -1155,21 +1156,34 @@ async function loadSupabaseData() {
   if(!pwaUser?.token) return;
 
   try {
-    // Charger patients depuis Supabase (table user_data)
     const rows = await supa.loadData(pwaUser.token, 'user_data');
     const myRow = rows.find(r => r.user_id === pwaUser.id);
     if(myRow && myRow.data) {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
       patients = d.patients || [];
       praticiens = d.praticiens || [];
+      console.log('✅ Données chargées depuis Supabase:', patients.length, 'patients');
     } else {
-      patients = [];
-      praticiens = [];
+      // Supabase vide: essayer le backup localStorage
+      const backupPt = localStorage.getItem('bm4-backup-patients');
+      const backupPr = localStorage.getItem('bm4-backup-praticiens');
+      if(backupPt) {
+        patients = JSON.parse(backupPt);
+        praticiens = JSON.parse(backupPr || '[]');
+        console.log('⚠️ Données restaurées depuis backup local:', patients.length, 'patients');
+        // Re-sauvegarder sur Supabase
+        await saveToSupabase();
+      } else {
+        patients = [];
+        praticiens = [];
+      }
     }
   } catch(e) {
-    // Fallback localStorage si Supabase indisponible
-    patients = JSON.parse(localStorage.getItem('bm4-patients-pwa') || '[]');
-    praticiens = JSON.parse(localStorage.getItem('bm4-praticiens-pwa') || '[]');
+    console.error('❌ Erreur chargement Supabase:', e);
+    // Fallback backup localStorage
+    const backupPt = localStorage.getItem('bm4-backup-patients');
+    patients = backupPt ? JSON.parse(backupPt) : [];
+    praticiens = JSON.parse(localStorage.getItem('bm4-backup-praticiens') || '[]');
   }
 
   currentPatient = null; bilanData = {};
@@ -1189,10 +1203,14 @@ async function saveToSupabase() {
       data: JSON.stringify(data),
       updated_at: new Date().toISOString()
     });
+    console.log('✅ Données sauvegardées sur Supabase');
   } catch(e) {
-    // Fallback localStorage
-    localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients));
-    localStorage.setItem('bm4-praticiens-pwa', JSON.stringify(praticiens));
+    console.error('❌ Erreur Supabase:', e);
+    // Fallback localStorage UNIQUEMENT en cas d'erreur réseau
+    try {
+      localStorage.setItem('bm4-backup-patients', JSON.stringify(patients));
+      localStorage.setItem('bm4-backup-praticiens', JSON.stringify(praticiens));
+    } catch(e2) {}
   }
 }
 
@@ -1244,19 +1262,32 @@ initPWA();
 if('serviceWorker' in navigator) {
   // Créer le SW inline via blob
   const swCode = `
+const CACHE_NAME = 'biomeca-v${Date.now()}';
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open('biomeca-v1').then(cache => {
-      return cache.addAll([location.href]);
-    })
-  );
+  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['/'])));
   self.skipWaiting();
 });
+self.addEventListener('activate', e => {
+  // Supprimer les anciens caches
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+  ));
+  self.clients.claim();
+});
 self.addEventListener('fetch', e => {
+  const url = e.request.url;
+  // Ne JAMAIS cacher les requêtes Supabase (données dynamiques)
+  if(url.includes('supabase.co') || url.includes('/auth/') || url.includes('/rest/')) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+  // Pour les autres ressources: cache first
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
-      const clone = resp.clone();
-      caches.open('biomeca-v1').then(c => c.put(e.request, clone));
+      if(resp.ok) {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
       return resp;
     }).catch(() => caches.match(e.request)))
   );
@@ -1563,7 +1594,18 @@ function launchTest(testId) {
 // ══════════════════════════════════════════════════════
 // PATIENTS
 // ══════════════════════════════════════════════════════
-function savePatients() { localStorage.setItem('bm4-patients', JSON.stringify(patients)); }
+function savePatients() {
+  if(pwaUser && pwaUser.token) {
+    // Mode PWA: sauvegarder sur Supabase
+    saveToSupabase();
+  } else if(window.biomeca && window.biomecaUser) {
+    // Mode Electron: sauvegarder via IPC
+    window.biomeca.dataSave(window.biomecaUser.accountId, 'patients', patients);
+  } else {
+    // Fallback localStorage (mode test sans connexion)
+    localStorage.setItem('bm4-patients', JSON.stringify(patients));
+  }
+}
 
 function createPatient() {
   const nom = document.getElementById('np-nom').value.trim();
@@ -1768,7 +1810,15 @@ function selectBilan(patientIdx, bilanIdx) {
   renderPatientList();
 }
 
-function savePraticiens() { localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens)); }
+function savePraticiens() {
+  if(pwaUser && pwaUser.token) {
+    saveToSupabase();
+  } else if(window.biomeca && window.biomecaUser) {
+    window.biomeca.dataSave(window.biomecaUser.accountId, 'praticiens', praticiens);
+  } else {
+    localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
+  }
+}
 
 function createPraticien() {
   const nom = document.getElementById('pr-nom').value.trim();
@@ -3934,7 +3984,9 @@ function saveEditPatient() {
 
 
 
+
 </script>
+
 
 
 
