@@ -299,7 +299,6 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
     <button onclick="nav('pg-praticiens')" id="tn-praticiens">Praticiens</button>
     <button onclick="nav('pg-bilan')" id="tn-bilan">Bilan Clinique</button>
     <button onclick="nav('pg-rapport')" id="tn-rapport">Rapport</button>
-    <button onclick="nav('pg-params')" id="tn-params" style="display:none;">⚙️ Paramètres</button>
   </div>
   <div id="pwa-install-btn" style="display:none;">
     <button class="btn" id="pwa-btn" onclick="installPWA()" style="font-size:11px;padding:5px 10px;background:var(--green-d);color:var(--green);border-color:var(--green);">📲 Installer l'app</button>
@@ -921,73 +920,6 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 
   </div>
 </div><!-- /pg-bilan -->
-
-<!-- PAGE PARAMÈTRES -->
-<div class="page" id="pg-params">
-  <div style="padding:14px 20px;max-width:860px;margin:0 auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div style="font-size:17px;font-weight:700;">⚙️ Paramètres</div>
-      <div style="font-size:11px;color:var(--red);background:var(--red-d);padding:4px 10px;border-radius:var(--rs);">🔐 Zone administrateur</div>
-    </div>
-    <div class="card" style="margin-bottom:12px;">
-      <div class="stitle" style="color:var(--blue);">👥 Gestion des accès praticiens</div>
-      <div style="font-size:12px;color:var(--mut);margin-bottom:10px;">Pour créer, modifier ou supprimer des comptes praticiens :</div>
-      <a href="https://supabase.com/dashboard/project/tzivizoacdyopwfzerrb/auth/users" target="_blank" style="display:inline-block;padding:8px 14px;background:var(--blue-d);color:var(--blue);border:1px solid var(--blue);border-radius:var(--rs);font-size:12px;text-decoration:none;">🔗 Ouvrir Supabase → Users</a>
-      <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
-        <div style="background:var(--bg);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
-          <div style="font-weight:600;margin-bottom:4px;">➕ Ajouter un praticien</div>
-          <div style="color:var(--mut);">Add user → Create new user → Email + mot de passe</div>
-        </div>
-        <div style="background:var(--bg);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
-          <div style="font-weight:600;margin-bottom:4px;">🔴 Désactiver un accès</div>
-          <div style="color:var(--mut);">Cliquer sur l'utilisateur → Ban user</div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="stitle" style="color:var(--blue);">💾 Mes données</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button class="btn" onclick="exportMyData()">📤 Exporter mes données (JSON)</button>
-        <span style="font-size:10px;color:var(--mut);">Sauvegarde de secours de tous vos patients.</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- MODAL ÉDITION PATIENT -->
-<div id="edit-patient-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:8000;align-items:center;justify-content:center;">
-  <div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:24px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div style="font-size:15px;font-weight:700;">✏️ Modifier le patient</div>
-      <button onclick="closeEditModal()" style="background:transparent;border:none;color:var(--mut);font-size:20px;cursor:pointer;">✕</button>
-    </div>
-    <input type="hidden" id="edit-pt-idx"/>
-    <div class="g2" style="gap:10px;">
-      <div><div class="field-lbl">Nom *</div><input class="inp" id="edit-nom" placeholder="Nom"/></div>
-      <div><div class="field-lbl">Prénom *</div><input class="inp" id="edit-prenom" placeholder="Prénom"/></div>
-      <div><div class="field-lbl">Date de naissance</div><input class="inp" id="edit-ddn" type="date"/></div>
-      <div><div class="field-lbl">Sport et/ou activité</div><input class="inp" id="edit-sport" placeholder="Trail, running..."/></div>
-      <div><div class="field-lbl">Métier / Profession</div><input class="inp" id="edit-metier" placeholder="Kiné, coureur..."/></div>
-      <div><div class="field-lbl">Latéralité</div>
-        <select class="inp" id="edit-lat">
-          <option value="">—</option>
-          <option value="Droitier">Droitier</option>
-          <option value="Gaucher">Gaucher</option>
-          <option value="Ambidextre">Ambidextre</option>
-        </select>
-      </div>
-      <div><div class="field-lbl">Poids (kg)</div><input class="inp" id="edit-poids" type="number" placeholder="70"/></div>
-      <div><div class="field-lbl">Taille (cm)</div><input class="inp" id="edit-taille" type="number" placeholder="175"/></div>
-      <div style="grid-column:1/-1;"><div class="field-lbl">Motif</div><input class="inp" id="edit-motif" placeholder="Motif de consultation..."/></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
-      <button class="btn" onclick="closeEditModal()" style="background:transparent;border:1px solid var(--bord);color:var(--txt);">Annuler</button>
-      <button class="btn btn-blue" onclick="saveEditPatient()">💾 Enregistrer</button>
-    </div>
-  </div>
-</div>
-
 </div><!-- /main -->
 </div><!-- /app -->
 
@@ -1005,13 +937,6 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 </div>
 
 <script>
-
-
-
-
-
-
-
 
 
 // ══════════════════════════════════════════════════════
@@ -1063,10 +988,14 @@ const supa = {
         'apikey': SUPA_KEY,
         'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
       },
       body: JSON.stringify(data)
     });
+    if(!res.ok) {
+      const err = await res.text();
+      console.error('Supabase saveData error', res.status, err);
+    }
     return res.ok;
   }
 };
@@ -1133,19 +1062,13 @@ async function onPwaLoginSuccess() {
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
 
-  // Recalculer isAdmin depuis l'email (protection contre perte de valeur)
-  const adminEmail = 'admin@sciopraxi.fr';
-  if(pwaUser) pwaUser.isAdmin = pwaUser.email?.toLowerCase() === adminEmail;
-
   // Afficher onglet Paramètres si admin
   const paramsBtn = document.getElementById('tn-params');
-  if(paramsBtn) {
-    paramsBtn.style.display = pwaUser?.isAdmin ? '' : 'none';
-    paramsBtn.style.visibility = 'visible';
-  }
+  if(paramsBtn) paramsBtn.style.display = pwaUser?.isAdmin ? '' : 'none';
 
-  // Debug: afficher dans console
-  console.log('User:', pwaUser?.email, '| isAdmin:', pwaUser?.isAdmin);
+  // Afficher nom dans la topbar
+  const tbName = document.getElementById('tb-name');
+  if(tbName && !patients.length) tbName.textContent = 'Aucun patient';
 
   // Charger les données depuis Supabase
   await loadSupabaseData();
@@ -1156,34 +1079,21 @@ async function loadSupabaseData() {
   if(!pwaUser?.token) return;
 
   try {
+    // Charger patients depuis Supabase (table user_data)
     const rows = await supa.loadData(pwaUser.token, 'user_data');
     const myRow = rows.find(r => r.user_id === pwaUser.id);
     if(myRow && myRow.data) {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
       patients = d.patients || [];
       praticiens = d.praticiens || [];
-      console.log('✅ Données chargées depuis Supabase:', patients.length, 'patients');
     } else {
-      // Supabase vide: essayer le backup localStorage
-      const backupPt = localStorage.getItem('bm4-backup-patients');
-      const backupPr = localStorage.getItem('bm4-backup-praticiens');
-      if(backupPt) {
-        patients = JSON.parse(backupPt);
-        praticiens = JSON.parse(backupPr || '[]');
-        console.log('⚠️ Données restaurées depuis backup local:', patients.length, 'patients');
-        // Re-sauvegarder sur Supabase
-        await saveToSupabase();
-      } else {
-        patients = [];
-        praticiens = [];
-      }
+      patients = [];
+      praticiens = [];
     }
   } catch(e) {
-    console.error('❌ Erreur chargement Supabase:', e);
-    // Fallback backup localStorage
-    const backupPt = localStorage.getItem('bm4-backup-patients');
-    patients = backupPt ? JSON.parse(backupPt) : [];
-    praticiens = JSON.parse(localStorage.getItem('bm4-backup-praticiens') || '[]');
+    // Fallback localStorage si Supabase indisponible
+    patients = JSON.parse(localStorage.getItem('bm4-patients-pwa') || '[]');
+    praticiens = JSON.parse(localStorage.getItem('bm4-praticiens-pwa') || '[]');
   }
 
   currentPatient = null; bilanData = {};
@@ -1198,19 +1108,18 @@ async function saveToSupabase() {
   if(!pwaUser?.token) return;
   const data = { patients, praticiens };
   try {
-    await supa.saveData(pwaUser.token, 'user_data', {
+    const ok = await supa.saveData(pwaUser.token, 'user_data', {
       user_id: pwaUser.id,
-      data: JSON.stringify(data),
+      data: data,
       updated_at: new Date().toISOString()
     });
-    console.log('✅ Données sauvegardées sur Supabase');
+    if(!ok) {
+      localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients));
+      localStorage.setItem('bm4-praticiens-pwa', JSON.stringify(praticiens));
+    }
   } catch(e) {
-    console.error('❌ Erreur Supabase:', e);
-    // Fallback localStorage UNIQUEMENT en cas d'erreur réseau
-    try {
-      localStorage.setItem('bm4-backup-patients', JSON.stringify(patients));
-      localStorage.setItem('bm4-backup-praticiens', JSON.stringify(praticiens));
-    } catch(e2) {}
+    localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients));
+    localStorage.setItem('bm4-praticiens-pwa', JSON.stringify(praticiens));
   }
 }
 
@@ -1262,32 +1171,19 @@ initPWA();
 if('serviceWorker' in navigator) {
   // Créer le SW inline via blob
   const swCode = `
-const CACHE_NAME = 'biomeca-v${Date.now()}';
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['/'])));
+  e.waitUntil(
+    caches.open('biomeca-v1').then(cache => {
+      return cache.addAll([location.href]);
+    })
+  );
   self.skipWaiting();
 });
-self.addEventListener('activate', e => {
-  // Supprimer les anciens caches
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-  ));
-  self.clients.claim();
-});
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
-  // Ne JAMAIS cacher les requêtes Supabase (données dynamiques)
-  if(url.includes('supabase.co') || url.includes('/auth/') || url.includes('/rest/')) {
-    e.respondWith(fetch(e.request));
-    return;
-  }
-  // Pour les autres ressources: cache first
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
-      if(resp.ok) {
-        const clone = resp.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-      }
+      const clone = resp.clone();
+      caches.open('biomeca-v1').then(c => c.put(e.request, clone));
       return resp;
     }).catch(() => caches.match(e.request)))
   );
@@ -1479,16 +1375,9 @@ function nav(id) {
   if (pg) pg.classList.add('active');
   const map = {
     'pg-home':'tn-home','pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-bilan':'tn-bilan','pg-rapport':'tn-rapport',
-    'pg-params':'tn-params'
+    'pg-praticiens':'tn-praticiens','pg-bilan':'tn-bilan','pg-rapport':'tn-rapport'
   };
   if (map[id]) { const b=document.getElementById(map[id]); if(b) b.classList.add('act'); }
-  // Toujours maintenir la visibilité de l'onglet Paramètres si admin
-  const paramsBtn = document.getElementById('tn-params');
-  if(paramsBtn) {
-    const isAdmin = (window.biomecaUser?.isAdmin) || (pwaUser?.isAdmin) || false;
-    paramsBtn.style.display = isAdmin ? '' : 'none';
-  }
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
@@ -1595,16 +1484,8 @@ function launchTest(testId) {
 // PATIENTS
 // ══════════════════════════════════════════════════════
 function savePatients() {
-  if(pwaUser && pwaUser.token) {
-    // Mode PWA: sauvegarder sur Supabase
-    saveToSupabase();
-  } else if(window.biomeca && window.biomecaUser) {
-    // Mode Electron: sauvegarder via IPC
-    window.biomeca.dataSave(window.biomecaUser.accountId, 'patients', patients);
-  } else {
-    // Fallback localStorage (mode test sans connexion)
-    localStorage.setItem('bm4-patients', JSON.stringify(patients));
-  }
+  localStorage.setItem('bm4-patients', JSON.stringify(patients));
+  saveToSupabase();
 }
 
 function createPatient() {
@@ -1667,157 +1548,30 @@ function deletePatient(i) {
 
 function renderPatientList() {
   const el = document.getElementById('pt-list-el');
-  if(!patients.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun patient.</div>';
-    return;
-  }
-
+  if (!patients.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun patient.</div>'; return; }
   el.innerHTML = patients.map((p,i) => {
-    const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
-    const age = p.ddn ? Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans' : '—';
-    const prat = praticiens.find(pr=>pr.id==p.pratId);
-    const bilans = p.bilans || [];
-    const isActive = currentPatient && currentPatient.id === p.id;
-
-    // Ligne principale patient
-    let html = '<div class="pt-row" id="pt-row-'+p.id+'" style="border:1px solid var(--bord);border-radius:var(--rs);margin-bottom:8px;overflow:hidden;">';
-
-    // En-tête patient cliquable
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;background:'+(isActive?'var(--blue-d)':'var(--surf')+';" onclick="togglePatientRow('+i+')">';
-    html += '<div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0;">'+init+'</div>';
-    html += '<div style="flex:1;min-width:0;">';
-    html += '<div style="font-weight:600;font-size:13px;">'+p.prenom+' '+p.nom+'</div>';
-    html += '<div style="font-size:11px;color:var(--mut);">'+age+' · '+(p.sport||'—')+(p.metier?' · '+p.metier:'')+(prat?' · '+prat.nom:'')+'</div>';
-    html += '</div>';
-    html += '<div style="display:flex;gap:5px;align-items:center;">';
-    html += '<span style="font-size:10px;color:var(--mut);">'+bilans.length+' bilan(s)</span>';
-    html += '<button onclick="event.stopPropagation();editPatient('+i+')" style="background:transparent;border:1px solid var(--bord);border-radius:5px;color:var(--mut);cursor:pointer;padding:3px 7px;font-size:10px;">✏️</button>';
-    html += '<button onclick="event.stopPropagation();deletePatient('+i+')" style="background:transparent;border:1px solid var(--red);border-radius:5px;color:var(--red);cursor:pointer;padding:3px 7px;font-size:10px;">🗑</button>';
-    html += '<span style="color:var(--mut);font-size:12px;">'+(isActive?'▲':'▼')+'</span>';
-    html += '</div></div>';
-
-    // Zone dépliable: bilans existants + créer nouveau
-    html += '<div id="pt-bilans-'+p.id+'" style="display:'+(isActive?'block':'none')+';background:var(--bg);padding:10px 12px;border-top:1px solid var(--bord);">';
-
-    // Bilans existants
-    if(bilans.length) {
-      html += '<div style="margin-bottom:8px;">';
-      bilans.forEach((b,bi) => {
-        const isActiveBilan = currentPatient?.id===p.id && currentPatient?.bilanActifId===b.id;
-        const bilanLabel = b.label || (b.type==='initial'?'Bilan initial':'Bilan de contrôle');
-        html += '<div onclick="selectBilan('+i+','+bi+')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:'+(isActiveBilan?'var(--blue-d)':'var(--surf2)')+';">';
-        html += '<span style="font-size:16px;">'+(b.type==='initial'?'📋':'🔄')+'</span>';
-        html += '<div style="flex:1;">';
-        html += '<div style="font-size:12px;font-weight:600;">'+bilanLabel+'</div>';
-        html += '<div style="font-size:10px;color:var(--mut);">'+b.date+' · '+(Object.keys(b.mesures||{}).length)+' mesure(s)</div>';
-        html += '</div>';
-        if(isActiveBilan) html += '<span style="font-size:10px;color:var(--blue);font-weight:600;">● Actif</span>';
-        html += '</div>';
-      });
-      html += '</div>';
-    }
-
-    // Créer un nouveau bilan
-    html += '<div style="border-top:1px solid var(--bord);padding-top:8px;">';
-    html += '<div style="font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;">NOUVEAU BILAN</div>';
-    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
-    html += '<button onclick="createBilan(' + i + ',\"initial\")" class="btn" style="font-size:11px;padding:5px 10px;">📋 Bilan initial</button>';
-    html += '<button onclick="createBilan(' + i + ',\"controle\")" class="btn" style="font-size:11px;padding:5px 10px;">🔄 Bilan de contrôle</button>';
-    html += '</div></div>';
-    html += '</div></div>';
-    return html;
+    const init=((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
+    const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
+    const active=currentPatient&&currentPatient.id===p.id;
+    const nb=Object.keys(p.mesures||{}).length;
+    const prat=praticiens.find(pr=>pr.id==p.pratId);
+    return `<div class="pt-row">
+      <div class="av">${init}</div>
+      <div style="flex:1;"><div style="font-size:12px;font-weight:500;">${p.prenom} ${p.nom}</div>
+      <div style="font-size:10px;color:var(--mut);">${age} · ${p.sport||'—'} · ${nb} mesure(s)${prat?' · '+prat.nom:''}</div></div>
+      <span class="${active?'badge bb':'badge bd'}">${active?'Actif':'—'}</span>
+      <button class="btn btn-blue" style="margin-left:6px;font-size:11px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Choisir</button>
+      <button class="btn" style="margin-left:3px;color:var(--red);font-size:11px;" onclick="deletePatient(${i})">✕</button>
+    </div>`;
   }).join('');
 }
 
-function togglePatientRow(i) {
-  const p = patients[i];
-  const zone = document.getElementById('pt-bilans-'+p.id);
-  const isOpen = zone.style.display !== 'none';
-  // Fermer tous les autres
-  patients.forEach(pt => {
-    const z = document.getElementById('pt-bilans-'+pt.id);
-    if(z) z.style.display = 'none';
-  });
-  if(!isOpen) {
-    zone.style.display = 'block';
-    // Sélectionner le dernier bilan si aucun actif
-    if(!currentPatient || currentPatient.id !== p.id) {
-      if(p.bilans && p.bilans.length > 0) {
-        selectBilan(i, p.bilans.length-1);
-      } else {
-        selectPatient(p);
-      }
-    }
-  }
-  renderPatientList();
-}
-
-function createBilan(patientIdx, type) {
-  const p = patients[patientIdx];
-  if(!p.bilans) p.bilans = [];
-
-  // Calculer le numéro automatique pour les bilans de contrôle
-  let label, typeKey;
-  if(type === 'initial') {
-    label = 'Bilan initial';
-    typeKey = 'initial';
-  } else {
-    // Compter les bilans de contrôle existants
-    const nbControles = p.bilans.filter(b => b.type.startsWith('controle')).length;
-    const num = nbControles + 1;
-    label = 'Bilan de contrôle ' + num;
-    typeKey = 'controle' + num;
-  }
-
-  if(!confirm('Créer un "' + label + '" pour ' + p.prenom + ' ' + p.nom + ' ?\nLes données seront vierges.')) return;
-
-  const newBilan = {
-    id: Date.now(),
-    type: typeKey,
-    label: label,
-    date: new Date().toLocaleDateString('fr-FR'),
-    mesures: {},
-    bilanData: {}
-  };
-  p.bilans.push(newBilan);
-  p.bilanActifId = newBilan.id;
-
-  // Activer ce bilan
-  selectPatient(p);
-  currentPatient.bilanActifId = newBilan.id;
-  currentPatient.mesures = {};
-  bilanData = {};
-  clearBilanFields();
-  savePatients();
-  renderPatientList();
-  nav('pg-home');
-  alert('✓ ' + label + ' créé pour ' + p.prenom + ' ' + p.nom);
-}
-
-function selectBilan(patientIdx, bilanIdx) {
-  const p = patients[patientIdx];
-  const bilan = p.bilans[bilanIdx];
-  p.bilanActifId = bilan.id;
-
-  // Charger le patient avec ce bilan
-  selectPatient(p);
-  // Charger les mesures et bilan de ce bilan
-  currentPatient.mesures = bilan.mesures || {};
-  currentPatient.bilanActifId = bilan.id;
-  bilanData = bilan.bilanData ? JSON.parse(JSON.stringify(bilan.bilanData)) : {};
-  clearBilanFields();
-  loadBilan();
-  renderPatientList();
-}
-
+// ══════════════════════════════════════════════════════
+// PRATICIENS
+// ══════════════════════════════════════════════════════
 function savePraticiens() {
-  if(pwaUser && pwaUser.token) {
-    saveToSupabase();
-  } else if(window.biomeca && window.biomecaUser) {
-    window.biomeca.dataSave(window.biomecaUser.accountId, 'praticiens', praticiens);
-  } else {
-    localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
-  }
+  localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
+  saveToSupabase();
 }
 
 function createPraticien() {
@@ -3936,63 +3690,11 @@ window.addEventListener('appinstalled', () => {
   deferredPrompt = null;
 });
 
-function editPatient(i) {
-  const p = patients[i];
-  document.getElementById('edit-pt-idx').value = i;
-  document.getElementById('edit-nom').value = p.nom || '';
-  document.getElementById('edit-prenom').value = p.prenom || '';
-  document.getElementById('edit-ddn').value = p.ddn || '';
-  document.getElementById('edit-sport').value = p.sport || '';
-  document.getElementById('edit-metier').value = p.metier || '';
-  document.getElementById('edit-lat').value = p.lat || '';
-  document.getElementById('edit-poids').value = p.poids || '';
-  document.getElementById('edit-taille').value = p.taille || '';
-  document.getElementById('edit-motif').value = p.motif || '';
-  const modal = document.getElementById('edit-patient-modal');
-  modal.style.display = 'flex';
-}
-
-function closeEditModal() {
-  document.getElementById('edit-patient-modal').style.display = 'none';
-}
-
-function saveEditPatient() {
-  const i = parseInt(document.getElementById('edit-pt-idx').value);
-  const p = patients[i];
-  const nom = document.getElementById('edit-nom').value.trim();
-  const prenom = document.getElementById('edit-prenom').value.trim();
-  if(!nom || !prenom) { alert('Nom et prénom obligatoires.'); return; }
-  p.nom = nom;
-  p.prenom = prenom;
-  p.ddn = document.getElementById('edit-ddn').value;
-  p.sport = document.getElementById('edit-sport').value;
-  p.metier = document.getElementById('edit-metier').value;
-  p.lat = document.getElementById('edit-lat').value;
-  p.poids = document.getElementById('edit-poids').value;
-  p.taille = document.getElementById('edit-taille').value;
-  p.motif = document.getElementById('edit-motif').value;
-  savePatients();
-  if(currentPatient && currentPatient.id === p.id) {
-    currentPatient = p;
-    document.getElementById('tb-av').textContent = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
-    document.getElementById('tb-name').textContent = p.prenom+' '+p.nom;
-  }
-  closeEditModal();
-  renderPatientList();
-  alert('✓ Patient mis à jour.');
-}
 
 
 
 
 </script>
-
-
-
-
-
-
-
 
 
 
