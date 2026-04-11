@@ -954,6 +954,40 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
   </div>
 </div>
 
+
+<!-- MODAL ÉDITION PATIENT -->
+<div id="edit-patient-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:8000;align-items:center;justify-content:center;">
+  <div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:24px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:15px;font-weight:700;">✏️ Modifier le patient</div>
+      <button onclick="closeEditModal()" style="background:transparent;border:none;color:var(--mut);font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <input type="hidden" id="edit-pt-idx"/>
+    <div class="g2" style="gap:10px;">
+      <div><div class="field-lbl">Nom *</div><input class="inp" id="edit-nom" placeholder="Nom"/></div>
+      <div><div class="field-lbl">Prénom *</div><input class="inp" id="edit-prenom" placeholder="Prénom"/></div>
+      <div><div class="field-lbl">Date de naissance</div><input class="inp" id="edit-ddn" type="date"/></div>
+      <div><div class="field-lbl">Sport et/ou activité</div><input class="inp" id="edit-sport" placeholder="Trail, running..."/></div>
+      <div><div class="field-lbl">Métier / Profession</div><input class="inp" id="edit-metier" placeholder="Kiné, coureur..."/></div>
+      <div><div class="field-lbl">Latéralité</div>
+        <select class="inp" id="edit-lat">
+          <option value="">—</option>
+          <option value="Droitier">Droitier</option>
+          <option value="Gaucher">Gaucher</option>
+          <option value="Ambidextre">Ambidextre</option>
+        </select>
+      </div>
+      <div><div class="field-lbl">Poids (kg)</div><input class="inp" id="edit-poids" type="number" placeholder="70"/></div>
+      <div><div class="field-lbl">Taille (cm)</div><input class="inp" id="edit-taille" type="number" placeholder="175"/></div>
+      <div style="grid-column:1/-1;"><div class="field-lbl">Motif</div><input class="inp" id="edit-motif" placeholder="Motif de consultation..."/></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button class="btn" onclick="closeEditModal()" style="background:transparent;border:1px solid var(--bord);color:var(--txt);">Annuler</button>
+      <button class="btn btn-blue" onclick="saveEditPatient()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /main -->
 </div><!-- /app -->
 
@@ -971,6 +1005,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 </div>
 
 <script>
+
+
 
 
 
@@ -1588,27 +1624,142 @@ function deletePatient(i) {
 
 function renderPatientList() {
   const el = document.getElementById('pt-list-el');
-  if (!patients.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun patient.</div>'; return; }
+  if(!patients.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun patient.</div>';
+    return;
+  }
+
+  const bilanLabels = {
+    'initial':'Bilan initial','controle1':'Contrôle 1','controle2':'Contrôle 2',
+    'controle3':'Contrôle 3','controle4':'Contrôle 4','controle5':'Contrôle 5'
+  };
+
   el.innerHTML = patients.map((p,i) => {
-    const init=((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
-    const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
-    const active=currentPatient&&currentPatient.id===p.id;
-    const nb=Object.keys(p.mesures||{}).length;
-    const prat=praticiens.find(pr=>pr.id==p.pratId);
-    return `<div class="pt-row">
-      <div class="av">${init}</div>
-      <div style="flex:1;"><div style="font-size:12px;font-weight:500;">${p.prenom} ${p.nom}</div>
-      <div style="font-size:10px;color:var(--mut);">${age} · ${p.sport||'—'} · ${nb} mesure(s)${prat?' · '+prat.nom:''}</div></div>
-      <span class="${active?'badge bb':'badge bd'}">${active?'Actif':'—'}</span>
-      <button class="btn btn-blue" style="margin-left:6px;font-size:11px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Choisir</button>
-      <button class="btn" style="margin-left:3px;color:var(--red);font-size:11px;" onclick="deletePatient(${i})">✕</button>
-    </div>`;
+    const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
+    const age = p.ddn ? Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans' : '—';
+    const prat = praticiens.find(pr=>pr.id==p.pratId);
+    const bilans = p.bilans || [];
+    const isActive = currentPatient && currentPatient.id === p.id;
+
+    // Ligne principale patient
+    let html = '<div class="pt-row" id="pt-row-'+p.id+'" style="border:1px solid var(--bord);border-radius:var(--rs);margin-bottom:8px;overflow:hidden;">';
+
+    // En-tête patient cliquable
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;background:'+(isActive?'var(--blue-d)':'var(--surf')+';" onclick="togglePatientRow('+i+')">';
+    html += '<div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0;">'+init+'</div>';
+    html += '<div style="flex:1;min-width:0;">';
+    html += '<div style="font-weight:600;font-size:13px;">'+p.prenom+' '+p.nom+'</div>';
+    html += '<div style="font-size:11px;color:var(--mut);">'+age+' · '+(p.sport||'—')+(p.metier?' · '+p.metier:'')+(prat?' · '+prat.nom:'')+'</div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:5px;align-items:center;">';
+    html += '<span style="font-size:10px;color:var(--mut);">'+bilans.length+' bilan(s)</span>';
+    html += '<button onclick="event.stopPropagation();editPatient('+i+')" style="background:transparent;border:1px solid var(--bord);border-radius:5px;color:var(--mut);cursor:pointer;padding:3px 7px;font-size:10px;">✏️</button>';
+    html += '<button onclick="event.stopPropagation();deletePatient('+i+')" style="background:transparent;border:1px solid var(--red);border-radius:5px;color:var(--red);cursor:pointer;padding:3px 7px;font-size:10px;">🗑</button>';
+    html += '<span style="color:var(--mut);font-size:12px;">'+(isActive?'▲':'▼')+'</span>';
+    html += '</div></div>';
+
+    // Zone dépliable: bilans existants + créer nouveau
+    html += '<div id="pt-bilans-'+p.id+'" style="display:'+(isActive?'block':'none')+';background:var(--bg);padding:10px 12px;border-top:1px solid var(--bord);">';
+
+    // Bilans existants
+    if(bilans.length) {
+      html += '<div style="margin-bottom:8px;">';
+      bilans.forEach((b,bi) => {
+        const isActiveBilan = currentPatient?.id===p.id && currentPatient?.bilanActifId===b.id;
+        html += '<div onclick="selectBilan('+i+','+bi+')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:'+(isActiveBilan?'var(--blue-d)':'var(--surf2)')+';">';
+        html += '<span style="font-size:16px;">'+(b.type==='initial'?'📋':'🔄')+'</span>';
+        html += '<div style="flex:1;">';
+        html += '<div style="font-size:12px;font-weight:600;">'+( bilanLabels[b.type]||b.type)+'</div>';
+        html += '<div style="font-size:10px;color:var(--mut);">'+b.date+' · '+(Object.keys(b.mesures||{}).length)+' mesure(s)</div>';
+        html += '</div>';
+        if(isActiveBilan) html += '<span style="font-size:10px;color:var(--blue);font-weight:600;">● Actif</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Créer un nouveau bilan
+    html += '<div style="border-top:1px solid var(--bord);padding-top:8px;">';
+    html += '<div style="font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;">NOUVEAU BILAN</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+    html += '<button onclick="createBilan(' + i + ',\"initial\")" class="btn" style="font-size:11px;padding:5px 10px;">📋 Bilan initial</button>';
+    ['controle1','controle2','controle3','controle4','controle5'].forEach((type,ti) => {
+      html += '<button onclick="createBilan(' + i + ',\"' + type + '\")" class="btn" style="font-size:11px;padding:5px 10px;">🔄 Contrôle ' + (ti+1) + '</button>';
+    });
+    html += '</div></div>';
+    html += '</div></div>';
+    return html;
   }).join('');
 }
 
-// ══════════════════════════════════════════════════════
-// PRATICIENS
-// ══════════════════════════════════════════════════════
+function togglePatientRow(i) {
+  const p = patients[i];
+  const zone = document.getElementById('pt-bilans-'+p.id);
+  const isOpen = zone.style.display !== 'none';
+  // Fermer tous les autres
+  patients.forEach(pt => {
+    const z = document.getElementById('pt-bilans-'+pt.id);
+    if(z) z.style.display = 'none';
+  });
+  if(!isOpen) {
+    zone.style.display = 'block';
+    // Sélectionner le dernier bilan si aucun actif
+    if(!currentPatient || currentPatient.id !== p.id) {
+      if(p.bilans && p.bilans.length > 0) {
+        selectBilan(i, p.bilans.length-1);
+      } else {
+        selectPatient(p);
+      }
+    }
+  }
+  renderPatientList();
+}
+
+function createBilan(patientIdx, type) {
+  const p = patients[patientIdx];
+  const bilanLabels = {'initial':'Bilan initial','controle1':'Contrôle 1','controle2':'Contrôle 2','controle3':'Contrôle 3','controle4':'Contrôle 4','controle5':'Contrôle 5'};
+  if(!confirm('Créer un nouveau "'+bilanLabels[type]+'" pour '+p.prenom+' '+p.nom+' ?\nLes données seront vierges.')) return;
+
+  if(!p.bilans) p.bilans = [];
+  const newBilan = {
+    id: Date.now(),
+    type,
+    date: new Date().toLocaleDateString('fr-FR'),
+    mesures: {},
+    bilanData: {}
+  };
+  p.bilans.push(newBilan);
+  p.bilanActifId = newBilan.id;
+  savePatients();
+
+  // Charger ce bilan
+  selectPatient(p);
+  currentPatient.bilanActifId = newBilan.id;
+  // Réinitialiser les mesures et le bilan
+  currentPatient.mesures = {};
+  bilanData = {};
+  clearBilanFields();
+  renderPatientList();
+  nav('pg-home');
+  alert('✓ '+bilanLabels[type]+' créé pour '+p.prenom+' '+p.nom);
+}
+
+function selectBilan(patientIdx, bilanIdx) {
+  const p = patients[patientIdx];
+  const bilan = p.bilans[bilanIdx];
+  p.bilanActifId = bilan.id;
+
+  // Charger le patient avec ce bilan
+  selectPatient(p);
+  // Charger les mesures et bilan de ce bilan
+  currentPatient.mesures = bilan.mesures || {};
+  currentPatient.bilanActifId = bilan.id;
+  bilanData = bilan.bilanData ? JSON.parse(JSON.stringify(bilan.bilanData)) : {};
+  clearBilanFields();
+  loadBilan();
+  renderPatientList();
+}
+
 function savePraticiens() { localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens)); }
 
 function createPraticien() {
@@ -3727,14 +3878,56 @@ window.addEventListener('appinstalled', () => {
   deferredPrompt = null;
 });
 
+function editPatient(i) {
+  const p = patients[i];
+  document.getElementById('edit-pt-idx').value = i;
+  document.getElementById('edit-nom').value = p.nom || '';
+  document.getElementById('edit-prenom').value = p.prenom || '';
+  document.getElementById('edit-ddn').value = p.ddn || '';
+  document.getElementById('edit-sport').value = p.sport || '';
+  document.getElementById('edit-metier').value = p.metier || '';
+  document.getElementById('edit-lat').value = p.lat || '';
+  document.getElementById('edit-poids').value = p.poids || '';
+  document.getElementById('edit-taille').value = p.taille || '';
+  document.getElementById('edit-motif').value = p.motif || '';
+  const modal = document.getElementById('edit-patient-modal');
+  modal.style.display = 'flex';
+}
 
+function closeEditModal() {
+  document.getElementById('edit-patient-modal').style.display = 'none';
+}
 
-
-
-
+function saveEditPatient() {
+  const i = parseInt(document.getElementById('edit-pt-idx').value);
+  const p = patients[i];
+  const nom = document.getElementById('edit-nom').value.trim();
+  const prenom = document.getElementById('edit-prenom').value.trim();
+  if(!nom || !prenom) { alert('Nom et prénom obligatoires.'); return; }
+  p.nom = nom;
+  p.prenom = prenom;
+  p.ddn = document.getElementById('edit-ddn').value;
+  p.sport = document.getElementById('edit-sport').value;
+  p.metier = document.getElementById('edit-metier').value;
+  p.lat = document.getElementById('edit-lat').value;
+  p.poids = document.getElementById('edit-poids').value;
+  p.taille = document.getElementById('edit-taille').value;
+  p.motif = document.getElementById('edit-motif').value;
+  savePatients();
+  if(currentPatient && currentPatient.id === p.id) {
+    currentPatient = p;
+    document.getElementById('tb-av').textContent = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
+    document.getElementById('tb-name').textContent = p.prenom+' '+p.nom;
+  }
+  closeEditModal();
+  renderPatientList();
+  alert('✓ Patient mis à jour.');
+}
 
 
 </script>
+
+
 
 
 
