@@ -484,8 +484,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
           <span class="badge bd" id="vcam-st">Inactive</span>
         </div>
         <!-- Zone vidéo -->
-        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);min-height:300px;aspect-ratio:16/9;" id="vid-wrap">
-          <video id="vid-el" style="width:100%;display:block;max-height:60vh;object-fit:contain;background:#000;" playsinline muted></video>
+        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);" id="vid-wrap">
+          <video id="vid-el" style="width:100%;display:block;object-fit:contain;background:#000;" playsinline muted></video>
           <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;display:none;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
           <!-- Badge REC -->
@@ -2180,6 +2180,8 @@ async function toggleVCam() {
     vcanvas.style.zIndex = '1';
     vcanvas.style.pointerEvents = 'auto';
     vcanvas.style.background = 'transparent';
+    // Canvas dimensions = video intrinsèque pour bonne correspondance coordonnées
+    vcanvas.width = 1280; vcanvas.height = 720;
 
     player.muted = true;
     player.playsInline = true;
@@ -2310,22 +2312,29 @@ function setupVidCanvas(player, vcanvas) {
   // Initialiser le canvas immédiatement avec dimensions par défaut
   vcanvas.width = 1280; vcanvas.height = 720;
 
-  player.onloadedmetadata=()=>{
-    vcanvas.width=player.videoWidth||1280;
-    vcanvas.height=player.videoHeight||720;
-    document.getElementById('vid-info').textContent='Live · '+player.videoWidth+'×'+player.videoHeight;
-  };
+  function syncCanvasToVideo() {
+    const rect = player.getBoundingClientRect();
+    vcanvas.width = player.videoWidth || 1280;
+    vcanvas.height = player.videoHeight || 720;
+    document.getElementById('vid-info').textContent = 'Live · '+player.videoWidth+'×'+player.videoHeight;
+  }
+  player.onloadedmetadata = syncCanvasToVideo;
+  player.onresize = syncCanvasToVideo;
 
   // RAF pour overlay marqueurs en continu (pas ontimeupdate qui est trop lent)
   // Pas de RAF — redessiner seulement sur ontimeupdate (lecture) ou sur événement utilisateur
   function doRedraw() {
     const ctx = vcanvas.getContext('2d');
     ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
+    // Dessiner marqueurs avec taille adaptée
     drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
     updateAngleOverlay('vid-angles',vidMarkers,view);
     updateResults();
+    // Debug: vérifier que ça dessine
+    if(vidMarkers.some(m=>m.x!==null)) {
+      console.log('doRedraw: marqueurs', vidMarkers.filter(m=>m.x!==null).map(m=>m.name+' '+Math.round(m.x)+','+Math.round(m.y)).join(' | '));
+    }
   }
-  // Exposer pour redrawVidCanvas
   vcanvas._doRedraw = doRedraw;
   doRedraw();
 
