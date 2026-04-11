@@ -2611,9 +2611,12 @@ function buildRapport() {
     return;
   }
   const p = currentPatient;
-  document.getElementById('rpt-sub').textContent = p.prenom+' '+p.nom+' · '+(p.sport||'—')+' · '+p.date;
+  // Lire depuis le bilan actif s'il existe, sinon fallback sur le patient
+  const _ab = p.bilans && p.activeBilanIdx!=null ? p.bilans[p.activeBilanIdx] : null;
+  const activeBilanLabel = _ab ? _ab.label + ' · ' + _ab.date : p.date;
+  document.getElementById('rpt-sub').textContent = p.prenom+' '+p.nom+' · '+(p.sport||'—')+' · '+activeBilanLabel;
 
-  const mesures = p.mesures || {};
+  const mesures = (_ab ? _ab.mesures : null) || p.mesures || {};
   let html = '';
 
   // Section mesures biomécaniques
@@ -2629,7 +2632,7 @@ function buildRapport() {
   }
 
   // Section bilan clinique (résumé)
-  const bd = p.bilanData || {};
+  const bd = (_ab ? _ab.bilanData : null) || p.bilanData || {};
   if(Object.keys(bd).length > 0) {
     html += '<div style="font-size:13px;font-weight:700;color:var(--blue);margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--bord);">📋 Bilan Clinique</div>';
     html += '<div class="card">';
@@ -2743,15 +2746,18 @@ function printReport() {
 
   // Infos patient
   const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
+  const _rptBilan = p.bilans && p.activeBilanIdx!=null ? p.bilans[p.activeBilanIdx] : null;
   document.getElementById('rp-pt-info-block').innerHTML=`
     <div class="rp-pt-item"><strong>Patient</strong>${p.prenom} ${p.nom}</div>
     <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${p.lat||'—'}</div>
     <div class="rp-pt-item"><strong>Sport</strong>${p.sport||'—'}</div>
     <div class="rp-pt-item"><strong>Poids · Taille</strong>${p.poids||'—'} kg · ${p.taille||'—'} cm</div>
     <div class="rp-pt-item"><strong>Motif</strong>${p.motif||'—'}</div>
-    <div class="rp-pt-item"><strong>Date</strong>${p.date}</div>`;
+    <div class="rp-pt-item"><strong>Bilan</strong>${_rptBilan ? _rptBilan.label+' · '+_rptBilan.date : p.date}</div>`;
 
-  const mesures=p.mesures||{};
+  // Lire depuis le bilan actif s'il existe
+  const _pab = p.bilans && p.activeBilanIdx!=null ? p.bilans[p.activeBilanIdx] : null;
+  const mesures=(_pab ? _pab.mesures : null)||p.mesures||{};
   let sectionsHTML='';
   const conclusions=[];
 
@@ -2766,8 +2772,9 @@ function printReport() {
     concluHTML=`<div class="rp-conclu"><strong style="display:block;margin-bottom:4px;">Synthèse clinique</strong>${conclusions.join('<br>')}</div>`;
   }
 
-  const bilanSection = (typeof buildBilanPrintSection === 'function' && currentPatient && currentPatient.bilanData)
-    ? buildBilanPrintSection(currentPatient.bilanData) : '';
+  const _bilanSrc = (_pab && _pab.bilanData) ? _pab.bilanData : (currentPatient.bilanData || null);
+  const bilanSection = (typeof buildBilanPrintSection === 'function' && _bilanSrc)
+    ? buildBilanPrintSection(_bilanSrc) : '';
   const fullContent = sectionsHTML + concluHTML + bilanSection;
   document.getElementById('rp-sections').innerHTML = fullContent.trim()
     ? fullContent
