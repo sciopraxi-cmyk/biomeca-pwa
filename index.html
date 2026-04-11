@@ -2071,45 +2071,93 @@ let recTimerInterval = null;
 let recStartTime = 0;
 let playbackSpeed = 1;
 
+let vidAnimId = null;
+
 async function toggleVCam() {
   if(vidStream) { stopVCam(); return; }
   const deviceId = document.getElementById('vcam-select')?.value;
   try {
     const constraints = {
       video: deviceId
-        ? {deviceId:{exact:deviceId},width:{ideal:1920},height:{ideal:1080}}
-        : {facingMode:'environment',width:{ideal:1280}},
+        ? {deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}}
+        : {width:{ideal:1280},height:{ideal:720}},
       audio: false
     };
     vidStream = await navigator.mediaDevices.getUserMedia(constraints);
     const player = document.getElementById('vid-el');
     const vcanvas = document.getElementById('vid-canvas');
-    player.srcObject = vidStream; player.play();
-    player.onloadedmetadata = () => {
-      vcanvas.width = player.videoWidth||640; vcanvas.height = player.videoHeight||360;
-      document.getElementById('vid-info').textContent = `Live · ${vcanvas.width}×${vcanvas.height}`;
-      document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
-      document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
-      document.getElementById('rec-ctrls').style.display='';
-      document.getElementById('playback-ctrls').style.display='none';
-      document.getElementById('back-to-live').style.display='none';
-      vAutoDetect=true;
-      ['btn-vauto','btn-vauto2'].forEach(id=>{ const b=document.getElementById(id); if(b){b.textContent='🔍 Auto : ON';b.className='btn btn-green';} });
-      setupVidCanvas(player, vcanvas);
-    };
+
+    // Masquer la balise video — on dessine tout dans le canvas
+    player.style.display = 'none';
+    player.srcObject = null;
+    player.src = '';
+
+    // Créer un élément video caché pour le flux live
+    let liveVid = document.getElementById('_live_vid');
+    if(!liveVid) {
+      liveVid = document.createElement('video');
+      liveVid.id = '_live_vid';
+      liveVid.style.display = 'none';
+      liveVid.playsInline = true;
+      liveVid.muted = true;
+      document.body.appendChild(liveVid);
+    }
+    liveVid.srcObject = vidStream;
+
+    await liveVid.play().catch(()=>{});
+
+    // Attendre que les dimensions soient disponibles
+    await new Promise(resolve => {
+      if(liveVid.videoWidth > 0) { resolve(); return; }
+      liveVid.onloadedmetadata = resolve;
+      setTimeout(resolve, 2000); // timeout fallback
+    });
+
+    const w = liveVid.videoWidth || 640;
+    const h = liveVid.videoHeight || 480;
+    vcanvas.width = w; vcanvas.height = h;
+
+    document.getElementById('vid-info').textContent = `Live · ${w}×${h}`;
+    document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
+    document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
+    document.getElementById('rec-ctrls').style.display='';
+    document.getElementById('playback-ctrls').style.display='none';
+    document.getElementById('back-to-live').style.display='none';
+    vAutoDetect=true;
+    ['btn-vauto','btn-vauto2'].forEach(id=>{ const b=document.getElementById(id); if(b){b.textContent='🔍 Auto : ON';b.className='btn btn-green';} });
+
+    // Boucle de dessin RAF — dessine le flux live dans le canvas
+    const view = window._currentTestView || 'face';
+    cancelAnimationFrame(vidAnimId);
+    function drawLive() {
+      if(!vidStream) return;
+      vidAnimId = requestAnimationFrame(drawLive);
+      const ctx = vcanvas.getContext('2d');
+      if(liveVid.readyState >= 2) {
+        ctx.drawImage(liveVid, 0, 0, vcanvas.width, vcanvas.height);
+      }
+      if(vAutoDetect) detectMarkersAuto(ctx, vcanvas, vidMarkers, view, ()=>{ renderMkrList(); updateResults(); });
+      drawOverlay(ctx, vcanvas, vidMarkers, selectedVidMkrIdx, view);
+      updateAngleOverlay('vid-angles', vidMarkers, view);
+    }
+    drawLive();
+    setupVidCanvas(liveVid, vcanvas);
+
   } catch(e) {
     const msg = e.name==='NotAllowedError'
-      ? '⚠ Accès caméra refusé — vérifiez les permissions macOS (Préférences Système > Confidentialité > Caméra)'
-      : '⚠ Caméra non disponible : '+e.message;
+      ? '⚠ Accès caméra refusé — Préférences Système > Confidentialité > Caméra > autoriser l'app'
+      : '⚠ '+e.name+' : '+e.message;
     document.getElementById('vid-info').textContent = msg;
     document.getElementById('vcam-st').textContent='Erreur'; document.getElementById('vcam-st').className='badge br';
-    // Lister les caméras disponibles pour aider
     enumerateCameras('vcam-select');
   }
 }
 
 function stopVCam() {
+  cancelAnimationFrame(vidAnimId); vidAnimId=null;
   if(vidStream) vidStream.getTracks().forEach(t=>t.stop()); vidStream=null;
+  const lv = document.getElementById('_live_vid');
+  if(lv) { lv.srcObject=null; lv.src=''; }
   if(isRecording) { mediaRec?.stop(); isRecording=false; }
   clearInterval(recTimerInterval);
   document.getElementById('btn-vcam').textContent='▶ Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
@@ -2119,10 +2167,12 @@ function stopVCam() {
 }
 
 function backToLive() {
+  cancelAnimationFrame(vidAnimId); vidAnimId=null;
   document.getElementById('back-to-live').style.display='none';
   document.getElementById('playback-ctrls').style.display='none';
   const player=document.getElementById('vid-el');
-  player.src=''; player.srcObject=null;
+  player.pause(); player.src=''; player.srcObject=null;
+  player.style.display='none';
   document.getElementById('vid-info').textContent='Activez caméra ou importez vidéo';
   document.getElementById('vcam-st').textContent='Inactive'; document.getElementById('vcam-st').className='badge bd';
   document.getElementById('btn-vcam').textContent='▶ Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
@@ -2144,8 +2194,11 @@ function setSpeed(s) {
 
 function loadVidFile(input) {
   const file=input.files[0]; if(!file) return;
+  cancelAnimationFrame(vidAnimId); vidAnimId=null;
+  if(vidStream) { vidStream.getTracks().forEach(t=>t.stop()); vidStream=null; }
   const player=document.getElementById('vid-el');
   const vcanvas=document.getElementById('vid-canvas');
+  player.style.display='block';
   player.srcObject=null; player.src=URL.createObjectURL(file);
   player.onloadedmetadata=()=>{
     vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
@@ -2235,15 +2288,22 @@ function toggleRec() {
     recChunks=[];
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9'
                    : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm'
-                   : 'video/mp4';
-    mediaRec = new MediaRecorder(vidStream, {mimeType});
+                   : MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4'
+                   : '';
+    mediaRec = new MediaRecorder(vidStream, mimeType ? {mimeType} : {});
     mediaRec.ondataavailable = e => { if(e.data.size>0) recChunks.push(e.data); };
     mediaRec.onstop = () => {
-      const blob = new Blob(recChunks, {type: mimeType});
+      const blob = new Blob(recChunks, {type: mimeType || 'video/webm'});
       const player = document.getElementById('vid-el');
       const vcanvas = document.getElementById('vid-canvas');
-      // Passer en mode lecture
+      // Arrêter la RAF live
+      cancelAnimationFrame(vidAnimId); vidAnimId=null;
+      // Arrêter le stream
       if(vidStream) { vidStream.getTracks().forEach(t=>t.stop()); vidStream=null; }
+      const lv = document.getElementById('_live_vid');
+      if(lv) { lv.srcObject=null; }
+      // Afficher la balise video pour la lecture
+      player.style.display='block';
       player.srcObject = null;
       player.src = URL.createObjectURL(blob);
       player.playbackRate = playbackSpeed;
