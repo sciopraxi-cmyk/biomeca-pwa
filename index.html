@@ -258,6 +258,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 
 /* Éviter le zoom sur double-tap iOS */
 * { touch-action: manipulation; }
+#vid-canvas, #ph-canvas { touch-action: none; }
 
 /* Scrolling fluide sur iOS */
 .main { -webkit-overflow-scrolling: touch; }
@@ -2257,9 +2258,33 @@ function setupVidCanvas(player, vcanvas) {
     renderMkrList(); updateResults();
   };
   vcanvas.onmouseup=()=>isVidDragging=false;
-  vcanvas.ontouchstart=e=>{e.preventDefault();const t=e.touches[0];vcanvas.onmousedown({clientX:t.clientX,clientY:t.clientY});};
-  vcanvas.ontouchmove=e=>{e.preventDefault();const t=e.touches[0];vcanvas.onmousemove({clientX:t.clientX,clientY:t.clientY});};
-  vcanvas.ontouchend=()=>vcanvas.onmouseup();
+  vcanvas.style.touchAction = 'none';
+  vcanvas.addEventListener('touchstart', e=>{
+    e.preventDefault(); e.stopPropagation();
+    const t=e.touches[0];
+    const {x,y}=canvasXY({clientX:t.clientX,clientY:t.clientY},vcanvas);
+    const hit=findMarkerAt(x,y,vidMarkers,vcanvas.width);
+    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;renderMkrList();return;}
+    const idx=selectedVidMkrIdx>=0?selectedVidMkrIdx:vidMarkers.findIndex(m=>m.x===null);
+    if(idx>=0&&idx<vidMarkers.length){
+      vidMarkers[idx].x=x; vidMarkers[idx].y=y;
+      const next=vidMarkers.findIndex((m,i)=>i>idx&&m.x===null);
+      selectedVidMkrIdx=next>=0?next:-1;
+      renderMkrList(); updateResults();
+    }
+  },{passive:false});
+  vcanvas.addEventListener('touchmove', e=>{
+    e.preventDefault(); e.stopPropagation();
+    if(!isVidDragging||selectedVidMkrIdx<0)return;
+    const t=e.touches[0];
+    const{x,y}=canvasXY({clientX:t.clientX,clientY:t.clientY},vcanvas);
+    vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
+    renderMkrList(); updateResults();
+  },{passive:false});
+  vcanvas.addEventListener('touchend', e=>{
+    e.preventDefault();
+    isVidDragging=false;
+  },{passive:false});
 
   player.ontimeupdate=()=>{
     const ctx=vcanvas.getContext('2d');
