@@ -483,9 +483,9 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
           <span class="badge bd" id="vcam-st">Inactive</span>
         </div>
         <!-- Zone vidéo -->
-        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);" id="vid-wrap">
+        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);min-height:300px;" id="vid-wrap">
           <video id="vid-el" style="width:100%;display:block;" playsinline muted></video>
-          <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;"></canvas>
+          <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;display:block;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
           <!-- Badge REC -->
           <div id="rec-badge" style="display:none;position:absolute;top:8px;left:8px;background:rgba(220,0,0,.9);color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;animation:recblink 1s infinite;">⏺ REC</div>
@@ -2071,6 +2071,22 @@ let recTimerInterval = null;
 let recStartTime = 0;
 let playbackSpeed = 1;
 
+
+function stopVCam() {
+  cancelAnimationFrame(vidAnimId); vidAnimId=null;
+  if(vidStream) vidStream.getTracks().forEach(t=>t.stop()); vidStream=null;
+  if(isRecording) { try { mediaRec?.stop(); } catch(e){} isRecording=false; }
+  clearInterval(recTimerInterval);
+  const player = document.getElementById('vid-el');
+  if(player) { player.srcObject=null; player.style.opacity=''; player.style.width=''; player.style.height=''; player.style.position=''; }
+  document.getElementById('btn-vcam').textContent='▶ Activer caméra';
+  document.getElementById('btn-vcam').className='btn btn-green';
+  document.getElementById('rec-ctrls').style.display='none';
+  document.getElementById('rec-badge').style.display='none';
+  document.getElementById('vcam-st').textContent='Inactive';
+  document.getElementById('vcam-st').className='badge bd';
+}
+
 let vidAnimId = null;
 
 async function toggleVCam() {
@@ -2078,92 +2094,78 @@ async function toggleVCam() {
   const deviceId = document.getElementById('vcam-select')?.value;
   try {
     const constraints = {
-      video: deviceId
-        ? {deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}}
-        : {width:{ideal:1280},height:{ideal:720}},
+      video: deviceId ? {deviceId:{exact:deviceId}} : {facingMode:'user'},
       audio: false
     };
     vidStream = await navigator.mediaDevices.getUserMedia(constraints);
     const player = document.getElementById('vid-el');
     const vcanvas = document.getElementById('vid-canvas');
+    const view = window._currentTestView || 'face';
 
-    // Masquer la balise video — on dessine tout dans le canvas
-    player.style.display = 'none';
-    player.srcObject = null;
-    player.src = '';
+    // Setup canvas
+    vcanvas.style.position = 'absolute';
+    vcanvas.style.top = '0'; vcanvas.style.left = '0';
+    vcanvas.style.width = '100%'; vcanvas.style.height = '100%';
+    vcanvas.style.zIndex = '2';
+    vcanvas.style.pointerEvents = 'auto';
 
-    // Créer un élément video caché pour le flux live
-    let liveVid = document.getElementById('_live_vid');
-    if(!liveVid) {
-      liveVid = document.createElement('video');
-      liveVid.id = '_live_vid';
-      liveVid.style.display = 'none';
-      liveVid.playsInline = true;
-      liveVid.muted = true;
-      document.body.appendChild(liveVid);
+    // Video quasi-invisible dans le DOM pour qu'Electron puisse la lire
+    player.muted = true;
+    player.playsInline = true;
+    player.autoplay = true;
+    player.style.position = 'absolute';
+    player.style.width = '1px';
+    player.style.height = '1px';
+    player.style.opacity = '0.001';
+    player.style.zIndex = '0';
+    player.srcObject = vidStream;
+
+    // Démarrer la RAF immédiatement — drawImage fonctionnera dès que readyState >= 2
+    cancelAnimationFrame(vidAnimId);
+    function drawLive() {
+      if(!vidStream) return;
+      vidAnimId = requestAnimationFrame(drawLive);
+      const ctx = vcanvas.getContext('2d');
+      if(player.readyState >= 2 && player.videoWidth > 0) {
+        if(vcanvas.width !== player.videoWidth) {
+          vcanvas.width = player.videoWidth;
+          vcanvas.height = player.videoHeight;
+          document.getElementById('vid-info').textContent = 'Live · '+player.videoWidth+'×'+player.videoHeight;
+        }
+        ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
+        if(vAutoDetect) detectMarkersAuto(ctx, vcanvas, vidMarkers, view, function(){ renderMkrList(); updateResults(); });
+      } else {
+        if(vcanvas.width === 0) { vcanvas.width=640; vcanvas.height=480; }
+        ctx.fillStyle='#111'; ctx.fillRect(0,0,vcanvas.width,vcanvas.height);
+        ctx.fillStyle='#4a9eff'; ctx.font='16px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('Chargement...', vcanvas.width/2, vcanvas.height/2);
+      }
+      drawOverlay(ctx, vcanvas, vidMarkers, selectedVidMkrIdx, view);
+      updateAngleOverlay('vid-angles', vidMarkers, view);
+      updateResults();
     }
-    liveVid.srcObject = vidStream;
+    drawLive();
 
-    await liveVid.play().catch(()=>{});
+    // Play non-bloquant
+    player.play().catch(e => console.warn('play:', e.message));
 
-    // Attendre que les dimensions soient disponibles
-    await new Promise(resolve => {
-      if(liveVid.videoWidth > 0) { resolve(); return; }
-      liveVid.onloadedmetadata = resolve;
-      setTimeout(resolve, 2000); // timeout fallback
-    });
-
-    const w = liveVid.videoWidth || 640;
-    const h = liveVid.videoHeight || 480;
-    vcanvas.width = w; vcanvas.height = h;
-
-    document.getElementById('vid-info').textContent = `Live · ${w}×${h}`;
     document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
     document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
     document.getElementById('rec-ctrls').style.display='';
     document.getElementById('playback-ctrls').style.display='none';
     document.getElementById('back-to-live').style.display='none';
     vAutoDetect=true;
-    ['btn-vauto','btn-vauto2'].forEach(id=>{ const b=document.getElementById(id); if(b){b.textContent='🔍 Auto : ON';b.className='btn btn-green';} });
-
-    // Boucle de dessin RAF — dessine le flux live dans le canvas
-    const view = window._currentTestView || 'face';
-    cancelAnimationFrame(vidAnimId);
-    function drawLive() {
-      if(!vidStream) return;
-      vidAnimId = requestAnimationFrame(drawLive);
-      const ctx = vcanvas.getContext('2d');
-      if(liveVid.readyState >= 2) {
-        ctx.drawImage(liveVid, 0, 0, vcanvas.width, vcanvas.height);
-      }
-      if(vAutoDetect) detectMarkersAuto(ctx, vcanvas, vidMarkers, view, ()=>{ renderMkrList(); updateResults(); });
-      drawOverlay(ctx, vcanvas, vidMarkers, selectedVidMkrIdx, view);
-      updateAngleOverlay('vid-angles', vidMarkers, view);
-    }
-    drawLive();
-    setupVidCanvas(liveVid, vcanvas);
+    ['btn-vauto','btn-vauto2'].forEach(function(id){ var b=document.getElementById(id); if(b){b.textContent='🔍 Auto : ON';b.className='btn btn-green';} });
+    setupVidCanvas(player, vcanvas);
 
   } catch(e) {
-    const msg = e.name==='NotAllowedError'
-      ? '⚠ Accès caméra refusé — Préférences Système > Confidentialité > Caméra > autoriser l\'app'
-      : '⚠ '+e.name+' : '+e.message;
+    var msg = e.name==='NotAllowedError'
+      ? '⚠ Accès caméra refusé — Préférences Système > Confidentialité > Caméra'
+      : '⚠ '+e.name+': '+e.message;
     document.getElementById('vid-info').textContent = msg;
     document.getElementById('vcam-st').textContent='Erreur'; document.getElementById('vcam-st').className='badge br';
     enumerateCameras('vcam-select');
   }
-}
-
-function stopVCam() {
-  cancelAnimationFrame(vidAnimId); vidAnimId=null;
-  if(vidStream) vidStream.getTracks().forEach(t=>t.stop()); vidStream=null;
-  const lv = document.getElementById('_live_vid');
-  if(lv) { lv.srcObject=null; lv.src=''; }
-  if(isRecording) { mediaRec?.stop(); isRecording=false; }
-  clearInterval(recTimerInterval);
-  document.getElementById('btn-vcam').textContent='▶ Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
-  document.getElementById('rec-ctrls').style.display='none';
-  document.getElementById('rec-badge').style.display='none';
-  document.getElementById('vcam-st').textContent='Inactive'; document.getElementById('vcam-st').className='badge bd';
 }
 
 function backToLive() {
@@ -2171,25 +2173,12 @@ function backToLive() {
   document.getElementById('back-to-live').style.display='none';
   document.getElementById('playback-ctrls').style.display='none';
   const player=document.getElementById('vid-el');
-  player.pause(); player.src=''; player.srcObject=null;
-  player.style.display='none';
+  if(player) { player.pause(); player.src=''; player.srcObject=null; }
   document.getElementById('vid-info').textContent='Activez caméra ou importez vidéo';
-  document.getElementById('vcam-st').textContent='Inactive'; document.getElementById('vcam-st').className='badge bd';
-  document.getElementById('btn-vcam').textContent='▶ Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
-}
-
-function setSpeed(s) {
-  playbackSpeed = s;
-  const player = document.getElementById('vid-el');
-  if(player) player.playbackRate = s;
-  ['025','05','1'].forEach(v => {
-    const b = document.getElementById('spd-'+v);
-    if(b) b.className = parseFloat(v.replace('0','0.'))=== s || (v==='1'&&s===1) ? 'btn btn-blue' : 'btn';
-  });
-  // Fix button IDs
-  document.getElementById('spd-025') && (document.getElementById('spd-025').className = s===0.25?'btn btn-blue':'btn');
-  document.getElementById('spd-05') && (document.getElementById('spd-05').className = s===0.5?'btn btn-blue':'btn');
-  document.getElementById('spd-1') && (document.getElementById('spd-1').className = s===1?'btn btn-blue':'btn');
+  document.getElementById('vcam-st').textContent='Inactive';
+  document.getElementById('vcam-st').className='badge bd';
+  document.getElementById('btn-vcam').textContent='▶ Activer caméra';
+  document.getElementById('btn-vcam').className='btn btn-green';
 }
 
 function loadVidFile(input) {
