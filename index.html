@@ -981,22 +981,30 @@ const supa = {
   },
 
   async saveData(token, table, data) {
-    // Upsert: insère ou met à jour
-    const res = await fetch(SUPA_URL + '/rest/v1/' + table, {
+    const headers = {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    };
+    // Essayer PATCH d'abord (mise à jour de la ligne existante)
+    const patch = await fetch(SUPA_URL + '/rest/v1/' + table + '?user_id=eq.' + data.user_id, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ data: data.data, updated_at: data.updated_at })
+    });
+    if(patch.ok) return true;
+    // Si la ligne n'existe pas encore, faire un POST (insertion)
+    const post = await fetch(SUPA_URL + '/rest/v1/' + table, {
       method: 'POST',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates,return=minimal'
-      },
+      headers,
       body: JSON.stringify(data)
     });
-    if(!res.ok) {
-      const err = await res.text();
-      console.error('Supabase saveData error', res.status, err);
+    if(!post.ok) {
+      const err = await post.text();
+      console.error('Supabase saveData error', post.status, err);
     }
-    return res.ok;
+    return post.ok;
   }
 };
 
