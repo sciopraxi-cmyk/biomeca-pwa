@@ -92,6 +92,9 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 .prat-row:last-child{border-bottom:none;}
 
 /* CAPTURE */
+@keyframes recblink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.kinovea-timeline { height:8px; border-radius:4px; background:var(--bord); cursor:pointer; }
+.speed-btn.active { background:var(--blue); color:#fff; }
 .cap-layout{display:grid;grid-template-columns:1fr 300px;min-height:calc(100vh - 50px);}
 .cap-main{padding:12px;overflow-y:auto;border-right:1px solid var(--bord);}
 .cap-panel{padding:12px;overflow-y:auto;background:var(--surf);}
@@ -447,6 +450,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
       <!-- MODE PHOTO -->
       <div id="mode-photo">
         <div class="cam-ctrls">
+          <select class="inp" id="cam-select" style="flex:1;max-width:220px;font-size:11px;" onchange="onCamSelectChange()"><option value="">— Choisir caméra —</option></select>
           <button class="btn btn-green" id="btn-cam" onclick="toggleCam()">Activer caméra</button>
           <button class="btn" id="btn-auto" onclick="toggleAutoLive()" style="display:none;">Auto : OFF</button>
           <span class="badge bd" id="cam-st">Inactive</span>
@@ -470,30 +474,63 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 
       <!-- MODE VIDEO -->
       <div id="mode-video" style="display:none;">
-        <div class="cam-ctrls">
-          <button class="btn btn-green" id="btn-vcam" onclick="toggleVCam()">Activer caméra</button>
-          <button class="btn btn-red" id="btn-vrec" onclick="toggleRec()" style="display:none;">⏺ Rec</button>
-          <button class="btn" id="btn-vauto" onclick="toggleVAutoDetect()" style="display:none;">Auto : OFF</button>
-          <button class="btn" onclick="document.getElementById('vid-file-in').click()">Importer</button>
+        <!-- Contrôles caméra -->
+        <div class="cam-ctrls" style="flex-wrap:wrap;">
+          <select class="inp" id="vcam-select" style="flex:1;max-width:220px;font-size:11px;" onchange="onVCamSelectChange()"><option value="">— Choisir caméra —</option></select>
+          <button class="btn btn-green" id="btn-vcam" onclick="toggleVCam()">▶ Activer caméra</button>
+          <button class="btn" onclick="document.getElementById('vid-file-in').click()">📂 Importer vidéo</button>
           <input type="file" id="vid-file-in" accept="video/*" style="display:none;" onchange="loadVidFile(this)"/>
           <span class="badge bd" id="vcam-st">Inactive</span>
         </div>
-        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);">
-          <video id="vid-el" style="width:100%;display:block;opacity:.9;" playsinline></video>
+        <!-- Zone vidéo -->
+        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);" id="vid-wrap">
+          <video id="vid-el" style="width:100%;display:block;" playsinline muted></video>
           <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
+          <!-- Badge REC -->
+          <div id="rec-badge" style="display:none;position:absolute;top:8px;left:8px;background:rgba(220,0,0,.9);color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;animation:recblink 1s infinite;">⏺ REC</div>
           <div class="angle-overlay" id="vid-angles"></div>
         </div>
-        <div class="vid-ctrls">
-          <button class="btn" id="btn-play" onclick="togglePlay()">▶</button>
-          <button class="btn" onclick="stepFrame(-1)">◀−1</button>
-          <button class="btn" onclick="stepFrame(1)">+1▶</button>
-          <span style="font-size:11px;color:var(--mut);font-family:var(--fm);" id="time-disp">0.00/0.00s</span>
-          <button class="btn btn-blue" onclick="captureFrame()" style="margin-left:auto;">📷 Capturer frame</button>
+        <!-- Contrôles enregistrement (live) -->
+        <div id="rec-ctrls" style="display:none;margin-top:6px;">
+          <div class="cam-ctrls">
+            <button class="btn btn-red" id="btn-vrec" onclick="toggleRec()">⏺ Démarrer enregistrement</button>
+            <button class="btn" id="btn-vauto" onclick="toggleVAutoDetect()">🔍 Auto : OFF</button>
+            <span style="font-size:11px;color:var(--mut);" id="rec-timer"></span>
+          </div>
         </div>
-        <input type="range" min="0" max="1000" value="0" id="timeline" oninput="seekVid(this.value)" style="width:100%;"/>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:4px;">
-          <div style="font-size:10px;color:var(--mut);">Frames (<span id="frame-count">0</span>)</div>
+        <!-- Contrôles lecture (après enregistrement / import) -->
+        <div id="playback-ctrls" style="display:none;margin-top:6px;">
+          <!-- Barre de vitesse style Kinovea -->
+          <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+            <span style="font-size:10px;color:var(--mut);margin-right:2px;">Vitesse :</span>
+            <button class="btn" id="spd-025" onclick="setSpeed(0.25)">×0.25</button>
+            <button class="btn" id="spd-05" onclick="setSpeed(0.5)">×0.5</button>
+            <button class="btn btn-blue" id="spd-1" onclick="setSpeed(1)">×1</button>
+            <div style="width:1px;background:var(--bord);height:20px;margin:0 4px;"></div>
+            <button class="btn" onclick="stepFrame(-1)" title="Reculer 1 frame">|◀</button>
+            <button class="btn" id="btn-play" onclick="togglePlay()">▶</button>
+            <button class="btn" onclick="stepFrame(1)" title="Avancer 1 frame">▶|</button>
+            <span style="font-size:11px;color:var(--mut);font-family:monospace;min-width:100px;text-align:center;" id="time-disp">0.00 / 0.00s</span>
+            <button class="btn" id="btn-vauto2" onclick="toggleVAutoDetect()" style="margin-left:auto;">🔍 Auto : OFF</button>
+            <button class="btn btn-blue" onclick="captureFrame()">📷 Capturer</button>
+          </div>
+          <!-- Timeline style Kinovea -->
+          <div style="position:relative;margin-bottom:4px;">
+            <input type="range" min="0" max="10000" value="0" id="timeline" oninput="seekVid(this.value)" style="width:100%;height:6px;cursor:pointer;"/>
+            <div id="timeline-markers" style="position:absolute;top:0;left:0;width:100%;height:6px;pointer-events:none;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mut);">
+            <span>0s</span><span id="dur-disp">—</span>
+          </div>
+        </div>
+        <!-- Retour au live -->
+        <div id="back-to-live" style="display:none;margin-top:4px;">
+          <button class="btn btn-green" onclick="backToLive()">📹 Nouvelle capture live</button>
+        </div>
+        <!-- Frames capturées -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;margin-bottom:4px;">
+          <div style="font-size:10px;color:var(--mut);">Frames capturées : <span id="frame-count">0</span></div>
           <button class="btn" onclick="resetAllFrames()" style="font-size:10px;padding:3px 8px;">Effacer tout</button>
         </div>
         <div class="frames-strip" id="frames-strip"></div>
@@ -1400,6 +1437,9 @@ function switchCaptureMode(mode) {
 }
 
 function launchTest(testId) {
+  // Énumérer les caméras disponibles
+  enumerateCameras('cam-select');
+  enumerateCameras('vcam-select');
   if (!currentPatient) { alert('Sélectionnez d\'abord un patient.'); nav('pg-patients'); return; }
   const t = TESTS[testId]; if (!t) return;
   currentTestId = testId;
@@ -1903,10 +1943,46 @@ function capturePhotoSlot(slotIdx) {
 // ══════════════════════════════════════════════════════
 // CAMÉRA LIVE (mode photo)
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// ÉNUMÉRATION CAMÉRAS
+// ══════════════════════════════════════════════════════
+async function enumerateCameras(selectId) {
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  try {
+    // Demander permission d'abord pour obtenir les labels
+    await navigator.mediaDevices.getUserMedia({video:true,audio:false}).then(s=>s.getTracks().forEach(t=>t.stop())).catch(()=>{});
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d=>d.kind==='videoinput');
+    sel.innerHTML = '<option value="">— Choisir caméra —</option>';
+    cams.forEach((d,i) => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || ('Caméra '+(i+1));
+      sel.appendChild(opt);
+    });
+    // Sélectionner auto la première caméra
+    if(cams.length > 0 && !sel.value) sel.value = cams[0].deviceId;
+  } catch(e) { console.warn('Enum cameras:', e); }
+}
+
+function onCamSelectChange() { /* Rien, la caméra s'active manuellement */ }
+function onVCamSelectChange() { /* Rien, la caméra s'active manuellement */ }
+
+// ══════════════════════════════════════════════════════
+// CAMÉRA PHOTO
+// ══════════════════════════════════════════════════════
 async function toggleCam() {
   if (camStream) { stopCam(); return; }
+  const deviceId = document.getElementById('cam-select')?.value;
   try {
-    camStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}},audio:false});
+    const constraints = {
+      video: deviceId 
+        ? {deviceId:{exact:deviceId},width:{ideal:1920},height:{ideal:1080}}
+        : {facingMode:'environment',width:{ideal:1280}},
+      audio: false
+    };
+    camStream = await navigator.mediaDevices.getUserMedia(constraints);
     const canvas = document.getElementById('ph-canvas');
     const wrap = document.getElementById('ph-wrap');
     const vEl = document.createElement('video');
@@ -1991,32 +2067,79 @@ function toggleAutoLive() {
 // ══════════════════════════════════════════════════════
 // CAMÉRA VIDÉO
 // ══════════════════════════════════════════════════════
+let recTimerInterval = null;
+let recStartTime = 0;
+let playbackSpeed = 1;
+
 async function toggleVCam() {
   if(vidStream) { stopVCam(); return; }
+  const deviceId = document.getElementById('vcam-select')?.value;
   try {
-    vidStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}},audio:false});
-    const player=document.getElementById('vid-el');
-    const vcanvas=document.getElementById('vid-canvas');
-    player.srcObject=vidStream; player.play();
-    player.onloadedmetadata=()=>{
-      vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
-      document.getElementById('vid-info').textContent=`Live ${vcanvas.width}×${vcanvas.height}`;
-      document.getElementById('btn-vrec').style.display='';
-      document.getElementById('btn-vauto').style.display='';
+    const constraints = {
+      video: deviceId
+        ? {deviceId:{exact:deviceId},width:{ideal:1920},height:{ideal:1080}}
+        : {facingMode:'environment',width:{ideal:1280}},
+      audio: false
+    };
+    vidStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const player = document.getElementById('vid-el');
+    const vcanvas = document.getElementById('vid-canvas');
+    player.srcObject = vidStream; player.play();
+    player.onloadedmetadata = () => {
+      vcanvas.width = player.videoWidth||640; vcanvas.height = player.videoHeight||360;
+      document.getElementById('vid-info').textContent = `Live · ${vcanvas.width}×${vcanvas.height}`;
       document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
       document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
-      // Auto-détect ON par défaut
-      vAutoDetect=true; document.getElementById('btn-vauto').textContent='Auto : ON'; document.getElementById('btn-vauto').className='btn btn-green';
-      setupVidCanvas(player,vcanvas);
+      document.getElementById('rec-ctrls').style.display='';
+      document.getElementById('playback-ctrls').style.display='none';
+      document.getElementById('back-to-live').style.display='none';
+      vAutoDetect=true;
+      ['btn-vauto','btn-vauto2'].forEach(id=>{ const b=document.getElementById(id); if(b){b.textContent='🔍 Auto : ON';b.className='btn btn-green';} });
+      setupVidCanvas(player, vcanvas);
     };
-  } catch(e) { document.getElementById('vid-info').textContent='⚠ Accès caméra refusé'; }
+  } catch(e) {
+    const msg = e.name==='NotAllowedError'
+      ? '⚠ Accès caméra refusé — vérifiez les permissions macOS (Préférences Système > Confidentialité > Caméra)'
+      : '⚠ Caméra non disponible : '+e.message;
+    document.getElementById('vid-info').textContent = msg;
+    document.getElementById('vcam-st').textContent='Erreur'; document.getElementById('vcam-st').className='badge br';
+    // Lister les caméras disponibles pour aider
+    enumerateCameras('vcam-select');
+  }
 }
 
 function stopVCam() {
   if(vidStream) vidStream.getTracks().forEach(t=>t.stop()); vidStream=null;
-  document.getElementById('btn-vcam').textContent='Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
-  document.getElementById('btn-vrec').style.display='none'; document.getElementById('btn-vauto').style.display='none';
+  if(isRecording) { mediaRec?.stop(); isRecording=false; }
+  clearInterval(recTimerInterval);
+  document.getElementById('btn-vcam').textContent='▶ Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
+  document.getElementById('rec-ctrls').style.display='none';
+  document.getElementById('rec-badge').style.display='none';
   document.getElementById('vcam-st').textContent='Inactive'; document.getElementById('vcam-st').className='badge bd';
+}
+
+function backToLive() {
+  document.getElementById('back-to-live').style.display='none';
+  document.getElementById('playback-ctrls').style.display='none';
+  const player=document.getElementById('vid-el');
+  player.src=''; player.srcObject=null;
+  document.getElementById('vid-info').textContent='Activez caméra ou importez vidéo';
+  document.getElementById('vcam-st').textContent='Inactive'; document.getElementById('vcam-st').className='badge bd';
+  document.getElementById('btn-vcam').textContent='▶ Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
+}
+
+function setSpeed(s) {
+  playbackSpeed = s;
+  const player = document.getElementById('vid-el');
+  if(player) player.playbackRate = s;
+  ['025','05','1'].forEach(v => {
+    const b = document.getElementById('spd-'+v);
+    if(b) b.className = parseFloat(v.replace('0','0.'))=== s || (v==='1'&&s===1) ? 'btn btn-blue' : 'btn';
+  });
+  // Fix button IDs
+  document.getElementById('spd-025') && (document.getElementById('spd-025').className = s===0.25?'btn btn-blue':'btn');
+  document.getElementById('spd-05') && (document.getElementById('spd-05').className = s===0.5?'btn btn-blue':'btn');
+  document.getElementById('spd-1') && (document.getElementById('spd-1').className = s===1?'btn btn-blue':'btn');
 }
 
 function loadVidFile(input) {
@@ -2026,10 +2149,15 @@ function loadVidFile(input) {
   player.srcObject=null; player.src=URL.createObjectURL(file);
   player.onloadedmetadata=()=>{
     vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
-    document.getElementById('vid-info').textContent=`${player.videoWidth}×${player.videoHeight} · ${player.duration.toFixed(1)}s`;
-    document.getElementById('btn-vauto').style.display='';
-    vAutoDetect=true; document.getElementById('btn-vauto').textContent='Auto : ON'; document.getElementById('btn-vauto').className='btn btn-green';
+    document.getElementById('vid-info').textContent=`${file.name} · ${player.videoWidth}×${player.videoHeight} · ${player.duration.toFixed(2)}s`;
     document.getElementById('vcam-st').textContent='Vidéo'; document.getElementById('vcam-st').className='badge bb';
+    document.getElementById('rec-ctrls').style.display='none';
+    document.getElementById('playback-ctrls').style.display='';
+    document.getElementById('back-to-live').style.display='';
+    document.getElementById('dur-disp').textContent = player.duration.toFixed(2)+'s';
+    vAutoDetect=true;
+    ['btn-vauto','btn-vauto2'].forEach(id=>{ const b=document.getElementById(id); if(b){b.textContent='🔍 Auto : ON';b.className='btn btn-green';} });
+    setSpeed(1);
     setupVidCanvas(player,vcanvas);
   };
 }
@@ -2065,43 +2193,98 @@ function setupVidCanvas(player, vcanvas) {
     if(vAutoDetect) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
     drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
     updateAngleOverlay('vid-angles',vidMarkers,view);
-    const t2=player.currentTime,d=player.duration||1;
-    document.getElementById('time-disp').textContent=`${t2.toFixed(2)}/${d.toFixed(2)}s`;
-    document.getElementById('timeline').value=Math.round(t2/d*1000);
+    const t2=player.currentTime, d=player.duration||1;
+    document.getElementById('time-disp').textContent=`${t2.toFixed(3)}s / ${d.toFixed(2)}s`;
+    document.getElementById('timeline').value=Math.round((t2/d)*10000);
+    // Marqueurs de frames capturées sur la timeline
+    renderTimelineMarkers(d);
     updateResults();
+  };
+  // Mise à jour initiale durée
+  player.onloadeddata = () => {
+    const d = player.duration||0;
+    document.getElementById('dur-disp').textContent = d.toFixed(2)+'s';
+    document.getElementById('timeline').value = 0;
   };
 }
 
 function togglePlay(){const p=document.getElementById('vid-el');if(p.paused){p.play();document.getElementById('btn-play').textContent='⏸';}else{p.pause();document.getElementById('btn-play').textContent='▶';}}
-function stepFrame(dir){const p=document.getElementById('vid-el');p.pause();p.currentTime=Math.max(0,Math.min(p.duration||0,p.currentTime+dir/30));document.getElementById('btn-play').textContent='▶';}
-function seekVid(val){const p=document.getElementById('vid-el');if(p.duration)p.currentTime=(val/1000)*p.duration;}
+function stepFrame(dir){
+  const p=document.getElementById('vid-el');
+  p.pause();
+  document.getElementById('btn-play').textContent='▶';
+  p.currentTime=Math.max(0,Math.min(p.duration||0,p.currentTime+dir/60));
+}
+function seekVid(val){
+  const p=document.getElementById('vid-el');
+  if(p.duration) p.currentTime=(val/10000)*p.duration;
+}
 
 function toggleRec() {
-  if(!vidStream){alert('Activez la caméra live.');return;}
-  if(isRecording){
-    mediaRec.stop();isRecording=false;document.getElementById('btn-vrec').textContent='⏺ Rec';
+  if(!vidStream){ alert('Activez la caméra live.'); return; }
+  if(isRecording) {
+    // Arrêter l'enregistrement
+    mediaRec.stop(); isRecording=false;
+    clearInterval(recTimerInterval);
+    document.getElementById('btn-vrec').textContent='⏺ Démarrer enregistrement';
+    document.getElementById('btn-vrec').className='btn btn-red';
+    document.getElementById('rec-badge').style.display='none';
+    document.getElementById('rec-timer').textContent='';
   } else {
+    // Démarrer l'enregistrement
     recChunks=[];
-    mediaRec=new MediaRecorder(vidStream);
-    mediaRec.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
-    mediaRec.onstop=()=>{
-      const blob=new Blob(recChunks,{type:'video/webm'});
-      const player=document.getElementById('vid-el'); const vcanvas=document.getElementById('vid-canvas');
-      player.srcObject=null; player.src=URL.createObjectURL(blob);
-      player.onloadedmetadata=()=>{
-        vcanvas.width=player.videoWidth; vcanvas.height=player.videoHeight;
-        document.getElementById('vid-info').textContent=`Enreg. · ${player.duration.toFixed(1)}s`;
-        setupVidCanvas(player,vcanvas);
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9'
+                   : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm'
+                   : 'video/mp4';
+    mediaRec = new MediaRecorder(vidStream, {mimeType});
+    mediaRec.ondataavailable = e => { if(e.data.size>0) recChunks.push(e.data); };
+    mediaRec.onstop = () => {
+      const blob = new Blob(recChunks, {type: mimeType});
+      const player = document.getElementById('vid-el');
+      const vcanvas = document.getElementById('vid-canvas');
+      // Passer en mode lecture
+      if(vidStream) { vidStream.getTracks().forEach(t=>t.stop()); vidStream=null; }
+      player.srcObject = null;
+      player.src = URL.createObjectURL(blob);
+      player.playbackRate = playbackSpeed;
+      player.onloadedmetadata = () => {
+        vcanvas.width = player.videoWidth; vcanvas.height = player.videoHeight;
+        document.getElementById('vid-info').textContent = `Enregistré · ${player.duration.toFixed(2)}s · ${player.videoWidth}×${player.videoHeight}`;
+        document.getElementById('vcam-st').textContent='Vidéo'; document.getElementById('vcam-st').className='badge bb';
+        document.getElementById('btn-vcam').textContent='▶ Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
+        document.getElementById('rec-ctrls').style.display='none';
+        document.getElementById('playback-ctrls').style.display='';
+        document.getElementById('back-to-live').style.display='';
+        document.getElementById('dur-disp').textContent = player.duration.toFixed(2)+'s';
+        setSpeed(1);
+        setupVidCanvas(player, vcanvas);
       };
     };
-    mediaRec.start();isRecording=true;document.getElementById('btn-vrec').textContent='⏹ Stop';
+    mediaRec.start(100); isRecording=true;
+    recStartTime = Date.now();
+    document.getElementById('btn-vrec').textContent='⏹ Arrêter enregistrement';
+    document.getElementById('btn-vrec').className='btn btn-red';
+    document.getElementById('rec-badge').style.display='';
+    recTimerInterval = setInterval(() => {
+      const s = ((Date.now()-recStartTime)/1000).toFixed(1);
+      document.getElementById('rec-timer').textContent = '⏱ '+s+'s';
+    }, 100);
   }
 }
 
 function toggleVAutoDetect(){
   vAutoDetect=!vAutoDetect;
-  document.getElementById('btn-vauto').textContent='Auto : '+(vAutoDetect?'ON':'OFF');
-  document.getElementById('btn-vauto').className=vAutoDetect?'btn btn-green':'btn';
+  const lbl='🔍 Auto : '+(vAutoDetect?'ON':'OFF');
+  const cls=vAutoDetect?'btn btn-green':'btn';
+  ['btn-vauto','btn-vauto2'].forEach(id=>{ const b=document.getElementById(id); if(b){b.textContent=lbl;b.className=cls;} });
+}
+
+function renderTimelineMarkers(duration) {
+  const el = document.getElementById('timeline-markers'); if(!el||!duration) return;
+  el.innerHTML = capturedFrames.map(f => {
+    const pct = (f.time/duration)*100;
+    return `<div style="position:absolute;left:${pct}%;top:-2px;width:3px;height:10px;background:#FFD700;border-radius:1px;" title="${f.time.toFixed(2)}s"></div>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════════════
@@ -2611,12 +2794,9 @@ function buildRapport() {
     return;
   }
   const p = currentPatient;
-  // Lire depuis le bilan actif s'il existe, sinon fallback sur le patient
-  const _ab = p.bilans && p.activeBilanIdx!=null ? p.bilans[p.activeBilanIdx] : null;
-  const activeBilanLabel = _ab ? _ab.label + ' · ' + _ab.date : p.date;
-  document.getElementById('rpt-sub').textContent = p.prenom+' '+p.nom+' · '+(p.sport||'—')+' · '+activeBilanLabel;
+  document.getElementById('rpt-sub').textContent = p.prenom+' '+p.nom+' · '+(p.sport||'—')+' · '+p.date;
 
-  const mesures = (_ab ? _ab.mesures : null) || p.mesures || {};
+  const mesures = p.mesures || {};
   let html = '';
 
   // Section mesures biomécaniques
@@ -2632,7 +2812,7 @@ function buildRapport() {
   }
 
   // Section bilan clinique (résumé)
-  const bd = (_ab ? _ab.bilanData : null) || p.bilanData || {};
+  const bd = p.bilanData || {};
   if(Object.keys(bd).length > 0) {
     html += '<div style="font-size:13px;font-weight:700;color:var(--blue);margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--bord);">📋 Bilan Clinique</div>';
     html += '<div class="card">';
@@ -2746,18 +2926,15 @@ function printReport() {
 
   // Infos patient
   const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
-  const _rptBilan = p.bilans && p.activeBilanIdx!=null ? p.bilans[p.activeBilanIdx] : null;
   document.getElementById('rp-pt-info-block').innerHTML=`
     <div class="rp-pt-item"><strong>Patient</strong>${p.prenom} ${p.nom}</div>
     <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${p.lat||'—'}</div>
     <div class="rp-pt-item"><strong>Sport</strong>${p.sport||'—'}</div>
     <div class="rp-pt-item"><strong>Poids · Taille</strong>${p.poids||'—'} kg · ${p.taille||'—'} cm</div>
     <div class="rp-pt-item"><strong>Motif</strong>${p.motif||'—'}</div>
-    <div class="rp-pt-item"><strong>Bilan</strong>${_rptBilan ? _rptBilan.label+' · '+_rptBilan.date : p.date}</div>`;
+    <div class="rp-pt-item"><strong>Date</strong>${p.date}</div>`;
 
-  // Lire depuis le bilan actif s'il existe
-  const _pab = p.bilans && p.activeBilanIdx!=null ? p.bilans[p.activeBilanIdx] : null;
-  const mesures=(_pab ? _pab.mesures : null)||p.mesures||{};
+  const mesures=p.mesures||{};
   let sectionsHTML='';
   const conclusions=[];
 
@@ -2772,9 +2949,8 @@ function printReport() {
     concluHTML=`<div class="rp-conclu"><strong style="display:block;margin-bottom:4px;">Synthèse clinique</strong>${conclusions.join('<br>')}</div>`;
   }
 
-  const _bilanSrc = (_pab && _pab.bilanData) ? _pab.bilanData : (currentPatient.bilanData || null);
-  const bilanSection = (typeof buildBilanPrintSection === 'function' && _bilanSrc)
-    ? buildBilanPrintSection(_bilanSrc) : '';
+  const bilanSection = (typeof buildBilanPrintSection === 'function' && currentPatient && currentPatient.bilanData)
+    ? buildBilanPrintSection(currentPatient.bilanData) : '';
   const fullContent = sectionsHTML + concluHTML + bilanSection;
   document.getElementById('rp-sections').innerHTML = fullContent.trim()
     ? fullContent
