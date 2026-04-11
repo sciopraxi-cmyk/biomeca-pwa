@@ -2166,17 +2166,9 @@ async function toggleVCam() {
     const player = document.getElementById('vid-el');
     const vcanvas = document.getElementById('vid-canvas');
 
-    // MODE LIVE : video visible + canvas transparent par-dessus pour marqueurs
-    player.style.display = 'block';
-    player.style.position = 'absolute';
-    player.style.top = '0'; player.style.left = '0';
-    player.style.width = '100%'; player.style.height = '100%';
-    player.style.opacity = '1';
-    player.style.zIndex = '0';
-    // En live : canvas caché, video visible
+    // Remettre video visible, canvas caché
+    player.style.cssText = 'width:100%;display:block;max-height:55vh;object-fit:contain;background:#000;';
     vcanvas.style.display = 'none';
-    player.style.position = '';
-    player.style.zIndex = '';
 
     player.muted = true;
     player.playsInline = true;
@@ -2213,7 +2205,7 @@ function backToLive() {
   const vcanvas=document.getElementById('vid-canvas');
   if(vcanvas) { vcanvas.style.display='none'; vcanvas._doRedraw=null; }
   const player=document.getElementById('vid-el');
-  if(player) { player.pause(); player.src=''; player.srcObject=null; player.style.display='block'; }
+  if(player) { player.pause(); player.src=''; player.srcObject=null; player.style.cssText='width:100%;display:block;max-height:55vh;object-fit:contain;background:#000;'; }
   document.getElementById('vid-info').textContent='Activez caméra ou importez vidéo';
   document.getElementById('vcam-st').textContent='Inactive';
   document.getElementById('vcam-st').className='badge bd';
@@ -2227,7 +2219,8 @@ function loadVidFile(input) {
   if(vidStream) { vidStream.getTracks().forEach(t=>t.stop()); vidStream=null; }
   const player=document.getElementById('vid-el');
   const vcanvas=document.getElementById('vid-canvas');
-  player.style.display='block';
+  player.style.cssText = 'width:100%;display:block;max-height:55vh;object-fit:contain;background:#000;';
+  vcanvas.style.display='none';
   player.srcObject=null; player.src=URL.createObjectURL(file);
   player.onloadedmetadata=()=>{
     vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
@@ -2397,7 +2390,7 @@ function toggleRec() {
       const lv = document.getElementById('_live_vid');
       if(lv) { lv.srcObject=null; }
       // Afficher la balise video pour la lecture
-      player.style.display='block';
+      player.style.cssText='width:100%;display:block;max-height:55vh;object-fit:contain;background:#000;';
       player.srcObject = null;
       player.src = URL.createObjectURL(blob);
       player.playbackRate = playbackSpeed;
