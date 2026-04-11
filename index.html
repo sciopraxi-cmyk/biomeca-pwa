@@ -484,8 +484,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
         </div>
         <!-- Zone vidéo -->
         <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);min-height:300px;" id="vid-wrap">
-          <video id="vid-el" style="width:100%;display:block;" playsinline muted></video>
-          <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;display:block;"></canvas>
+          <video id="vid-el" style="width:100%;display:block;max-height:60vh;object-fit:contain;background:#000;" playsinline muted></video>
+          <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;display:none;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
           <!-- Badge REC -->
           <div id="rec-badge" style="display:none;position:absolute;top:8px;left:8px;background:rgba(220,0,0,.9);color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;animation:recblink 1s infinite;">⏺ REC</div>
@@ -1062,6 +1062,47 @@ function clearPwaSession() {
 
 // ─── Login ───
 async function pwaLogin() {
+  // Mode Electron : utiliser l'API native
+  if(window.biomeca) {
+    const email = document.getElementById('pwa-email').value.trim();
+    const pwd = document.getElementById('pwa-pwd').value;
+    const errEl = document.getElementById('pwa-login-err');
+    const btn = document.getElementById('pwa-login-btn');
+    if(!email||!pwd){errEl.textContent='Veuillez remplir tous les champs.';errEl.style.display='block';return;}
+    btn.disabled=true; btn.textContent='Connexion...'; errEl.style.display='none';
+    try {
+      const res = await window.biomeca.login({email, password:pwd});
+      if(res.ok) {
+        const isAdmin = email.toLowerCase()==='admin@sciopraxi.fr';
+        pwaUser = {email, token:res.user.token, id:res.user.id, isAdmin};
+        savePwaSession(res.user.token, pwaUser);
+        document.getElementById('pwa-login').style.display='none';
+        document.getElementById('biomeca-app').style.display='';
+        // Charger données via Electron
+        const pts = await window.biomeca.dataLoad(res.user.id, 'patients');
+        const prs = await window.biomeca.dataLoad(res.user.id, 'praticiens');
+        patients = Array.isArray(pts) ? pts : [];
+        praticiens = Array.isArray(prs) ? prs : [];
+        currentPatient=null; bilanData={};
+        renderPatientList(); renderPratList(); populatePratSelect();
+        if(patients.length>0) selectPatient(patients[patients.length-1]);
+        const paramsBtn=document.getElementById('tn-params');
+        if(paramsBtn) paramsBtn.style.display=isAdmin?'':'none';
+        nav('pg-home');
+      } else {
+        errEl.textContent=res.error||'Email ou mot de passe incorrect.';
+        errEl.style.display='block';
+        document.getElementById('pwa-pwd').value='';
+        btn.disabled=false; btn.textContent='Se connecter';
+      }
+    } catch(e) {
+      errEl.textContent='Erreur de connexion.';
+      errEl.style.display='block';
+      btn.disabled=false; btn.textContent='Se connecter';
+    }
+    return;
+  }
+  // Mode PWA/navigateur : utiliser Supabase directement
   const email = document.getElementById('pwa-email').value.trim();
   const pwd = document.getElementById('pwa-pwd').value;
   const errEl = document.getElementById('pwa-login-err');
@@ -1525,7 +1566,12 @@ function launchTest(testId) {
 // ══════════════════════════════════════════════════════
 function savePatients() {
   localStorage.setItem('bm4-patients', JSON.stringify(patients));
-  saveToSupabase();
+  if(window.biomeca && pwaUser) {
+    window.biomeca.dataSave(pwaUser.id, 'patients', patients);
+    window.biomeca.dataSave(pwaUser.id, 'praticiens', praticiens);
+  } else {
+    saveToSupabase();
+  }
 }
 
 function createPatient() {
@@ -1717,7 +1763,12 @@ function selectBilan(patientIdx, bilanIdx) {
 // ══════════════════════════════════════════════════════
 function savePraticiens() {
   localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
-  saveToSupabase();
+  if(window.biomeca && pwaUser) {
+    window.biomeca.dataSave(pwaUser.id, 'patients', patients);
+    window.biomeca.dataSave(pwaUser.id, 'praticiens', praticiens);
+  } else {
+    saveToSupabase();
+  }
 }
 
 function createPraticien() {
@@ -2071,6 +2122,17 @@ let recTimerInterval = null;
 let recStartTime = 0;
 let playbackSpeed = 1;
 
+function setSpeed(s) {
+  playbackSpeed = s;
+  const player = document.getElementById('vid-el');
+  if(player) player.playbackRate = s;
+  const map = {'spd-025': 0.25, 'spd-05': 0.5, 'spd-1': 1};
+  Object.entries(map).forEach(([id, val]) => {
+    const b = document.getElementById(id);
+    if(b) b.className = val === s ? 'btn btn-blue' : 'btn';
+  });
+}
+
 
 function stopVCam() {
   cancelAnimationFrame(vidAnimId); vidAnimId=null;
@@ -2094,60 +2156,30 @@ async function toggleVCam() {
   const deviceId = document.getElementById('vcam-select')?.value;
   try {
     const constraints = {
-      video: deviceId ? {deviceId:{exact:deviceId}} : {facingMode:'user'},
+      video: deviceId ? {deviceId:{exact:deviceId},width:{ideal:1280}} : {width:{ideal:1280}},
       audio: false
     };
     vidStream = await navigator.mediaDevices.getUserMedia(constraints);
     const player = document.getElementById('vid-el');
     const vcanvas = document.getElementById('vid-canvas');
-    const view = window._currentTestView || 'face';
 
-    // Setup canvas
-    vcanvas.style.position = 'absolute';
-    vcanvas.style.top = '0'; vcanvas.style.left = '0';
-    vcanvas.style.width = '100%'; vcanvas.style.height = '100%';
-    vcanvas.style.zIndex = '2';
-    vcanvas.style.pointerEvents = 'auto';
+    // MODE LIVE : video visible, canvas caché
+    player.style.display = 'block';
+    player.style.position = '';
+    player.style.width = '100%';
+    player.style.height = '';
+    player.style.opacity = '1';
+    player.style.zIndex = '';
+    vcanvas.style.display = 'none';
 
-    // Video quasi-invisible dans le DOM pour qu'Electron puisse la lire
     player.muted = true;
     player.playsInline = true;
-    player.autoplay = true;
-    player.style.position = 'absolute';
-    player.style.width = '1px';
-    player.style.height = '1px';
-    player.style.opacity = '0.001';
-    player.style.zIndex = '0';
     player.srcObject = vidStream;
-
-    // Démarrer la RAF immédiatement — drawImage fonctionnera dès que readyState >= 2
-    cancelAnimationFrame(vidAnimId);
-    function drawLive() {
-      if(!vidStream) return;
-      vidAnimId = requestAnimationFrame(drawLive);
-      const ctx = vcanvas.getContext('2d');
-      if(player.readyState >= 2 && player.videoWidth > 0) {
-        if(vcanvas.width !== player.videoWidth) {
-          vcanvas.width = player.videoWidth;
-          vcanvas.height = player.videoHeight;
-          document.getElementById('vid-info').textContent = 'Live · '+player.videoWidth+'×'+player.videoHeight;
-        }
-        ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
-        if(vAutoDetect) detectMarkersAuto(ctx, vcanvas, vidMarkers, view, function(){ renderMkrList(); updateResults(); });
-      } else {
-        if(vcanvas.width === 0) { vcanvas.width=640; vcanvas.height=480; }
-        ctx.fillStyle='#111'; ctx.fillRect(0,0,vcanvas.width,vcanvas.height);
-        ctx.fillStyle='#4a9eff'; ctx.font='16px sans-serif'; ctx.textAlign='center';
-        ctx.fillText('Chargement...', vcanvas.width/2, vcanvas.height/2);
-      }
-      drawOverlay(ctx, vcanvas, vidMarkers, selectedVidMkrIdx, view);
-      updateAngleOverlay('vid-angles', vidMarkers, view);
-      updateResults();
-    }
-    drawLive();
-
-    // Play non-bloquant
     player.play().catch(e => console.warn('play:', e.message));
+
+    player.onloadedmetadata = function() {
+      document.getElementById('vid-info').textContent = 'Live · '+player.videoWidth+'×'+player.videoHeight;
+    };
 
     document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
     document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
@@ -2342,6 +2374,13 @@ function renderTimelineMarkers(duration) {
 function captureFrame() {
   const player=document.getElementById('vid-el');
   const vcanvas=document.getElementById('vid-canvas');
+  // Afficher le canvas sur l'image figée
+  player.pause();
+  vcanvas.width = player.videoWidth||640;
+  vcanvas.height = player.videoHeight||480;
+  vcanvas.style.display = 'block';
+  const ctxLive = vcanvas.getContext('2d');
+  ctxLive.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
   const view=TESTS[currentTestId]?.view||'face';
   // Créer snapshot
   const tmp=document.createElement('canvas');
