@@ -484,8 +484,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
           <span class="badge bd" id="vcam-st">Inactive</span>
         </div>
         <!-- Zone vidéo -->
-        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);" id="vid-wrap">
-          <video id="vid-el" style="width:100%;display:block;object-fit:contain;background:#000;" playsinline muted></video>
+        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);min-height:280px;" id="vid-wrap">
+          <video id="vid-el" style="width:100%;display:block;max-height:55vh;object-fit:contain;background:#000;" playsinline muted></video>
           <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;display:none;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
           <!-- Badge REC -->
@@ -2173,15 +2173,10 @@ async function toggleVCam() {
     player.style.width = '100%'; player.style.height = '100%';
     player.style.opacity = '1';
     player.style.zIndex = '0';
-    vcanvas.style.display = 'block';
-    vcanvas.style.position = 'absolute';
-    vcanvas.style.top = '0'; vcanvas.style.left = '0';
-    vcanvas.style.width = '100%'; vcanvas.style.height = '100%';
-    vcanvas.style.zIndex = '1';
-    vcanvas.style.pointerEvents = 'auto';
-    vcanvas.style.background = 'transparent';
-    // Canvas dimensions = video intrinsèque pour bonne correspondance coordonnées
-    vcanvas.width = 1280; vcanvas.height = 720;
+    // En live : canvas caché, video visible
+    vcanvas.style.display = 'none';
+    player.style.position = '';
+    player.style.zIndex = '';
 
     player.muted = true;
     player.playsInline = true;
@@ -2215,8 +2210,10 @@ function backToLive() {
   cancelAnimationFrame(vidAnimId); vidAnimId=null;
   document.getElementById('back-to-live').style.display='none';
   document.getElementById('playback-ctrls').style.display='none';
+  const vcanvas=document.getElementById('vid-canvas');
+  if(vcanvas) { vcanvas.style.display='none'; vcanvas._doRedraw=null; }
   const player=document.getElementById('vid-el');
-  if(player) { player.pause(); player.src=''; player.srcObject=null; }
+  if(player) { player.pause(); player.src=''; player.srcObject=null; player.style.display='block'; }
   document.getElementById('vid-info').textContent='Activez caméra ou importez vidéo';
   document.getElementById('vcam-st').textContent='Inactive';
   document.getElementById('vcam-st').className='badge bd';
@@ -2323,20 +2320,19 @@ function setupVidCanvas(player, vcanvas) {
 
   // RAF pour overlay marqueurs en continu (pas ontimeupdate qui est trop lent)
   // Pas de RAF — redessiner seulement sur ontimeupdate (lecture) ou sur événement utilisateur
+  // Pas de RAF — le canvas est statique (image figée)
+  // doRedraw redessine l'image figée + marqueurs
   function doRedraw() {
     const ctx = vcanvas.getContext('2d');
-    ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
-    // Dessiner marqueurs avec taille adaptée
-    drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
-    updateAngleOverlay('vid-angles',vidMarkers,view);
-    updateResults();
-    // Debug: vérifier que ça dessine
-    if(vidMarkers.some(m=>m.x!==null)) {
-      console.log('doRedraw: marqueurs', vidMarkers.filter(m=>m.x!==null).map(m=>m.name+' '+Math.round(m.x)+','+Math.round(m.y)).join(' | '));
+    // Redessiner l'image de fond si disponible
+    if(player.readyState >= 2) {
+      ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
     }
+    drawOverlay(ctx, vcanvas, vidMarkers, selectedVidMkrIdx, view);
+    updateAngleOverlay('vid-angles', vidMarkers, view);
+    updateResults();
   }
   vcanvas._doRedraw = doRedraw;
-  doRedraw();
 
   player.ontimeupdate=()=>{
     const ctx=vcanvas.getContext('2d');
@@ -2455,11 +2451,25 @@ function captureFrame() {
   player.pause();
   vcanvas.width = player.videoWidth||640;
   vcanvas.height = player.videoHeight||480;
-  vcanvas.style.display = 'block';
+  // Figer l'image dans le canvas
+  player.pause();
+  vcanvas.width = player.videoWidth || 640;
+  vcanvas.height = player.videoHeight || 480;
   const ctxLive = vcanvas.getContext('2d');
   ctxLive.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
+  // Afficher canvas, cacher video
+  player.style.display = 'none';
+  vcanvas.style.display = 'block';
+  vcanvas.style.position = '';
+  vcanvas.style.width = '100%';
+  vcanvas.style.height = 'auto';
+  vcanvas.style.zIndex = '';
+  vcanvas.style.pointerEvents = 'auto';
+  // Réinitialiser marqueurs pour placement manuel
+  // (garder les marqueurs auto si présents)
+  setupVidCanvas(player, vcanvas);
   const view=TESTS[currentTestId]?.view||'face';
-  // Créer snapshot
+  // Créer snapshot pour la frame
   const tmp=document.createElement('canvas');
   tmp.width=vcanvas.width; tmp.height=vcanvas.height;
   const ctx=tmp.getContext('2d');
