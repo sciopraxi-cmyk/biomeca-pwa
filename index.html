@@ -2292,14 +2292,31 @@ function setupVidCanvas(player, vcanvas) {
     isVidDragging=false;
   },{passive:false});
 
+  // Initialiser le canvas immédiatement avec dimensions par défaut
+  vcanvas.width = 1280; vcanvas.height = 720;
+
   player.onloadedmetadata=()=>{
-    vcanvas.width=player.videoWidth||640;
-    vcanvas.height=player.videoHeight||480;
+    vcanvas.width=player.videoWidth||1280;
+    vcanvas.height=player.videoHeight||720;
     document.getElementById('vid-info').textContent='Live · '+player.videoWidth+'×'+player.videoHeight;
   };
+
+  // RAF pour overlay marqueurs en continu (pas ontimeupdate qui est trop lent)
+  cancelAnimationFrame(vidAnimId);
+  function drawOverlayLive() {
+    if(!vidStream) return;
+    vidAnimId = requestAnimationFrame(drawOverlayLive);
+    const ctx = vcanvas.getContext('2d');
+    ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
+    if(vAutoDetect && player.readyState>=2) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
+    drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
+    updateAngleOverlay('vid-angles',vidMarkers,view);
+    updateResults();
+  }
+  drawOverlayLive();
+
   player.ontimeupdate=()=>{
     const ctx=vcanvas.getContext('2d');
-    // Canvas transparent — juste overlay marqueurs par-dessus la video
     ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
     if(vAutoDetect) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
     drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
