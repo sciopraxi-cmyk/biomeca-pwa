@@ -1012,6 +1012,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 
 
 
+
 // ══════════════════════════════════════════════════════
 // SUPABASE AUTH — BioMéca PWA
 // ══════════════════════════════════════════════════════
@@ -1629,11 +1630,6 @@ function renderPatientList() {
     return;
   }
 
-  const bilanLabels = {
-    'initial':'Bilan initial','controle1':'Contrôle 1','controle2':'Contrôle 2',
-    'controle3':'Contrôle 3','controle4':'Contrôle 4','controle5':'Contrôle 5'
-  };
-
   el.innerHTML = patients.map((p,i) => {
     const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
     const age = p.ddn ? Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans' : '—';
@@ -1666,10 +1662,11 @@ function renderPatientList() {
       html += '<div style="margin-bottom:8px;">';
       bilans.forEach((b,bi) => {
         const isActiveBilan = currentPatient?.id===p.id && currentPatient?.bilanActifId===b.id;
+        const bilanLabel = b.label || (b.type==='initial'?'Bilan initial':'Bilan de contrôle');
         html += '<div onclick="selectBilan('+i+','+bi+')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:'+(isActiveBilan?'var(--blue-d)':'var(--surf2)')+';">';
         html += '<span style="font-size:16px;">'+(b.type==='initial'?'📋':'🔄')+'</span>';
         html += '<div style="flex:1;">';
-        html += '<div style="font-size:12px;font-weight:600;">'+( bilanLabels[b.type]||b.type)+'</div>';
+        html += '<div style="font-size:12px;font-weight:600;">'+bilanLabel+'</div>';
         html += '<div style="font-size:10px;color:var(--mut);">'+b.date+' · '+(Object.keys(b.mesures||{}).length)+' mesure(s)</div>';
         html += '</div>';
         if(isActiveBilan) html += '<span style="font-size:10px;color:var(--blue);font-weight:600;">● Actif</span>';
@@ -1683,9 +1680,7 @@ function renderPatientList() {
     html += '<div style="font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;">NOUVEAU BILAN</div>';
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
     html += '<button onclick="createBilan(' + i + ',\"initial\")" class="btn" style="font-size:11px;padding:5px 10px;">📋 Bilan initial</button>';
-    ['controle1','controle2','controle3','controle4','controle5'].forEach((type,ti) => {
-      html += '<button onclick="createBilan(' + i + ',\"' + type + '\")" class="btn" style="font-size:11px;padding:5px 10px;">🔄 Contrôle ' + (ti+1) + '</button>';
-    });
+    html += '<button onclick="createBilan(' + i + ',\"controle\")" class="btn" style="font-size:11px;padding:5px 10px;">🔄 Bilan de contrôle</button>';
     html += '</div></div>';
     html += '</div></div>';
     return html;
@@ -1717,31 +1712,44 @@ function togglePatientRow(i) {
 
 function createBilan(patientIdx, type) {
   const p = patients[patientIdx];
-  const bilanLabels = {'initial':'Bilan initial','controle1':'Contrôle 1','controle2':'Contrôle 2','controle3':'Contrôle 3','controle4':'Contrôle 4','controle5':'Contrôle 5'};
-  if(!confirm('Créer un nouveau "'+bilanLabels[type]+'" pour '+p.prenom+' '+p.nom+' ?\nLes données seront vierges.')) return;
-
   if(!p.bilans) p.bilans = [];
+
+  // Calculer le numéro automatique pour les bilans de contrôle
+  let label, typeKey;
+  if(type === 'initial') {
+    label = 'Bilan initial';
+    typeKey = 'initial';
+  } else {
+    // Compter les bilans de contrôle existants
+    const nbControles = p.bilans.filter(b => b.type.startsWith('controle')).length;
+    const num = nbControles + 1;
+    label = 'Bilan de contrôle ' + num;
+    typeKey = 'controle' + num;
+  }
+
+  if(!confirm('Créer un "' + label + '" pour ' + p.prenom + ' ' + p.nom + ' ?\nLes données seront vierges.')) return;
+
   const newBilan = {
     id: Date.now(),
-    type,
+    type: typeKey,
+    label: label,
     date: new Date().toLocaleDateString('fr-FR'),
     mesures: {},
     bilanData: {}
   };
   p.bilans.push(newBilan);
   p.bilanActifId = newBilan.id;
-  savePatients();
 
-  // Charger ce bilan
+  // Activer ce bilan
   selectPatient(p);
   currentPatient.bilanActifId = newBilan.id;
-  // Réinitialiser les mesures et le bilan
   currentPatient.mesures = {};
   bilanData = {};
   clearBilanFields();
+  savePatients();
   renderPatientList();
   nav('pg-home');
-  alert('✓ '+bilanLabels[type]+' créé pour '+p.prenom+' '+p.nom);
+  alert('✓ ' + label + ' créé pour ' + p.prenom + ' ' + p.nom);
 }
 
 function selectBilan(patientIdx, bilanIdx) {
@@ -3925,7 +3933,9 @@ function saveEditPatient() {
 }
 
 
+
 </script>
+
 
 
 
