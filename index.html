@@ -2137,6 +2137,8 @@ function setSpeed(s) {
 
 function stopVCam() {
   cancelAnimationFrame(vidAnimId); vidAnimId=null;
+  const vc = document.getElementById('vid-canvas');
+  if(vc) vc._doRedraw = null;
   if(vidStream) vidStream.getTracks().forEach(t=>t.stop()); vidStream=null;
   if(isRecording) { try { mediaRec?.stop(); } catch(e){} isRecording=false; }
   clearInterval(recTimerInterval);
@@ -2244,10 +2246,10 @@ function loadVidFile(input) {
 }
 
 function redrawVidCanvas(vcanvas, view) {
+  if(vcanvas._doRedraw) { vcanvas._doRedraw(); return; }
   const ctx = vcanvas.getContext('2d');
   const player = document.getElementById('vid-el');
   ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
-  // Si vidéo en pause ou terminée, redessiner l'image
   if(player && player.readyState>=2 && (player.paused || !vidStream)) {
     ctx.drawImage(player,0,0,vcanvas.width,vcanvas.height);
   }
@@ -2315,26 +2317,22 @@ function setupVidCanvas(player, vcanvas) {
   };
 
   // RAF pour overlay marqueurs en continu (pas ontimeupdate qui est trop lent)
-  cancelAnimationFrame(vidAnimId);
-  function drawOverlayLive() {
-    if(!vidStream) return;
-    vidAnimId = requestAnimationFrame(drawOverlayLive);
+  // Pas de RAF — redessiner seulement sur ontimeupdate (lecture) ou sur événement utilisateur
+  function doRedraw() {
     const ctx = vcanvas.getContext('2d');
     ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
-    // Auto-détection seulement si pas en train de drag
-    if(vAutoDetect && player.readyState>=2 && !isVidDragging) {
-      detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
-    }
     drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
     updateAngleOverlay('vid-angles',vidMarkers,view);
     updateResults();
   }
-  drawOverlayLive();
+  // Exposer pour redrawVidCanvas
+  vcanvas._doRedraw = doRedraw;
+  doRedraw();
 
   player.ontimeupdate=()=>{
     const ctx=vcanvas.getContext('2d');
     ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
-    if(vAutoDetect) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
+    if(vAutoDetect && !isVidDragging) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
     drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
     updateAngleOverlay('vid-angles',vidMarkers,view);
     const t2=player.currentTime, d=player.duration||1;
