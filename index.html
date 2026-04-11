@@ -2243,25 +2243,38 @@ function loadVidFile(input) {
   };
 }
 
+function redrawVidCanvas(vcanvas, view) {
+  const ctx = vcanvas.getContext('2d');
+  const player = document.getElementById('vid-el');
+  ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
+  // Si vidéo en pause ou terminée, redessiner l'image
+  if(player && player.readyState>=2 && (player.paused || !vidStream)) {
+    ctx.drawImage(player,0,0,vcanvas.width,vcanvas.height);
+  }
+  drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
+  updateAngleOverlay('vid-angles',vidMarkers,view);
+  updateResults();
+}
+
 function setupVidCanvas(player, vcanvas) {
   const view = TESTS[currentTestId]?.view || 'face';
   vcanvas.onmousedown = e => {
     const {x,y}=canvasXY(e,vcanvas);
     const hit=findMarkerAt(x,y,vidMarkers,vcanvas.width);
-    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;renderMkrList();return;}
+    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;renderMkrList();redrawVidCanvas(vcanvas,view);return;}
     const idx=selectedVidMkrIdx>=0?selectedVidMkrIdx:vidMarkers.findIndex(m=>m.x===null);
     if(idx>=0&&idx<vidMarkers.length){
       vidMarkers[idx].x=x; vidMarkers[idx].y=y;
       const next=vidMarkers.findIndex((m,i)=>i>idx&&m.x===null);
       selectedVidMkrIdx=next>=0?next:-1;
-      renderMkrList(); updateResults();
+      renderMkrList(); updateResults(); redrawVidCanvas(vcanvas,view);
     }
   };
   vcanvas.onmousemove=e=>{
     if(!isVidDragging||selectedVidMkrIdx<0)return;
     const{x,y}=canvasXY(e,vcanvas);
     vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
-    renderMkrList(); updateResults();
+    renderMkrList(); updateResults(); redrawVidCanvas(vcanvas,view);
   };
   vcanvas.onmouseup=()=>isVidDragging=false;
   vcanvas.style.touchAction = 'none';
@@ -2270,13 +2283,13 @@ function setupVidCanvas(player, vcanvas) {
     const t=e.touches[0];
     const {x,y}=canvasXY({clientX:t.clientX,clientY:t.clientY},vcanvas);
     const hit=findMarkerAt(x,y,vidMarkers,vcanvas.width);
-    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;renderMkrList();return;}
+    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;renderMkrList();redrawVidCanvas(vcanvas,view);return;}
     const idx=selectedVidMkrIdx>=0?selectedVidMkrIdx:vidMarkers.findIndex(m=>m.x===null);
     if(idx>=0&&idx<vidMarkers.length){
       vidMarkers[idx].x=x; vidMarkers[idx].y=y;
       const next=vidMarkers.findIndex((m,i)=>i>idx&&m.x===null);
       selectedVidMkrIdx=next>=0?next:-1;
-      renderMkrList(); updateResults();
+      renderMkrList(); updateResults(); redrawVidCanvas(vcanvas,view);
     }
   },{passive:false});
   vcanvas.addEventListener('touchmove', e=>{
@@ -2285,7 +2298,7 @@ function setupVidCanvas(player, vcanvas) {
     const t=e.touches[0];
     const{x,y}=canvasXY({clientX:t.clientX,clientY:t.clientY},vcanvas);
     vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
-    renderMkrList(); updateResults();
+    renderMkrList(); updateResults(); redrawVidCanvas(vcanvas,view);
   },{passive:false});
   vcanvas.addEventListener('touchend', e=>{
     e.preventDefault();
@@ -2308,7 +2321,10 @@ function setupVidCanvas(player, vcanvas) {
     vidAnimId = requestAnimationFrame(drawOverlayLive);
     const ctx = vcanvas.getContext('2d');
     ctx.clearRect(0,0,vcanvas.width,vcanvas.height);
-    if(vAutoDetect && player.readyState>=2) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
+    // Auto-détection seulement si pas en train de drag
+    if(vAutoDetect && player.readyState>=2 && !isVidDragging) {
+      detectMarkersAuto(ctx,vcanvas,vidMarkers,view,()=>{renderMkrList();updateResults();});
+    }
     drawOverlay(ctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
     updateAngleOverlay('vid-angles',vidMarkers,view);
     updateResults();
