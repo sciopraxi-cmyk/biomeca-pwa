@@ -3006,28 +3006,46 @@ function validateAndSave() {
     if(t.showPhotoSlots && photoSlots.length) {
       result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG}));
     }
-    if(t.div!==undefined&&capturedFrames.length>=2){
-      const f0=capturedFrames[0],f1=capturedFrames[1];
-      result.deltaD=f1.angD!==null&&f0.angD!==null?f1.angD-f0.angD:null;
-      result.deltaG=f1.angG!==null&&f0.angG!==null?f1.angG-f0.angG:null;
-      result.pctD=result.deltaD!==null?result.deltaD/t.div:null;
-      result.pctG=result.deltaG!==null?result.deltaG/t.div:null;
+    if(t.div!==undefined){
+      // KFPPA : calcul depuis photoSlots (unipodalD et unipodalG vs bipodale)
+      const slotsD=photoSlots.filter(s=>s.side==='D');
+      const slotsG=photoSlots.filter(s=>s.side==='G');
+      const bipodal=photoSlots.find(s=>s.side==='');
+      const uniD=slotsD[0]; const uniG=slotsG[0];
+      // KFPPA = angle unipodal - angle bipodal
+      if(bipodal?.angle!=null && uniD?.angle!=null){
+        result.deltaD=uniD.angle-bipodal.angle;
+        result.pctD=result.deltaD/t.div;
+      }
+      if(bipodal?.angle!=null && uniG?.angle!=null){
+        result.deltaG=uniG.angle-bipodal.angle;
+        result.pctG=result.deltaG/t.div;
+      }
+      // Fallback sur capturedFrames
+      if(result.deltaD==null && capturedFrames.length>=2){
+        const f0=capturedFrames[0],f1=capturedFrames[1];
+        result.deltaD=f1.angD!=null&&f0.angD!=null?f1.angD-f0.angD:null;
+        result.deltaG=f1.angG!=null&&f0.angG!=null?f1.angG-f0.angG:null;
+        result.pctD=result.deltaD!=null?result.deltaD/t.div:null;
+        result.pctG=result.deltaG!=null?result.deltaG/t.div:null;
+      }
     }
-    if(t.normAm!==undefined&&capturedFrames.length>=3){
-      const a=capturedFrames;
-      // Convention: taligrade=inversion(+), plantigrade=éversion(-), digitigrade=inversion(+)
-      // Amorti = (|tal| + |plan|) / normAm  [amplitude totale taligrade→plantigrade]
-      // Propulsion = (|dig| + |plan|) / normAm [amplitude totale plantigrade→digitigrade]
-      const calcAm=(tal,plan)=>(tal!=null&&plan!=null)?Math.abs(tal-plan)/t.normAm:null;
-      const calcPr=(dig,plan)=>(dig!=null&&plan!=null)?Math.abs(dig-plan)/t.normAm:null;
-      result.amD=calcAm(a[0].angD,a[1].angD);
-      result.prD=calcPr(a[2].angD,a[1].angD);
-      result.amG=calcAm(a[0].angG,a[1].angG);
-      result.prG=calcPr(a[2].angG,a[1].angG);
-      result.phases={
-        D:{tal:a[0].angD,plan:a[1].angD,dig:a[2].angD},
-        G:{tal:a[0].angG,plan:a[1].angG,dig:a[2].angG}
-      };
+    if(t.normAm!==undefined){
+      // Amorti : lire depuis photoSlots (TalG,TalD,PlanG,PlanD,DigG,DigD)
+      const sD=photoSlots.filter(s=>s.side==='D');
+      const sG=photoSlots.filter(s=>s.side==='G');
+      const talD=sD[0]?.angle, planD=sD[1]?.angle, digD=sD[2]?.angle;
+      const talG=sG[0]?.angle, planG=sG[1]?.angle, digG=sG[2]?.angle;
+      if(talD!=null||planD!=null||digD!=null){
+        result.amD=talD!=null&&planD!=null?(talD-planD)/t.normAm:null;
+        result.prD=digD!=null&&planD!=null?(digD-planD)/t.normAm:null;
+        result.phases={...result.phases||{}, D:{tal:talD,plan:planD,dig:digD}};
+      }
+      if(talG!=null||planG!=null||digG!=null){
+        result.amG=talG!=null&&planG!=null?(talG-planG)/t.normAm:null;
+        result.prG=digG!=null&&planG!=null?(digG-planG)/t.normAm:null;
+        result.phases={...result.phases||{}, G:{tal:talG,plan:planG,dig:digG}};
+      }
     }
   } else {
     result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG}));
@@ -3112,7 +3130,19 @@ function buildTestPreview(t,data) {
 function buildSidePreview(side,t,data) {
   let pct=null,ang=null,label=side==='D'?'Côté Droit':'Côté Gauche';
   const sideC=side==='D'?'var(--blue)':'var(--green)';
-  if(t.div!==undefined){pct=side==='D'?data.pctD:data.pctG;ang=side==='D'?data.deltaD:data.deltaG;}
+  if(t.div!==undefined){
+    pct=side==='D'?data.pctD:data.pctG;
+    ang=side==='D'?data.deltaD:data.deltaG;
+    // Recalculer depuis photos si NaN/null
+    if((pct==null||isNaN(pct)) && data.photos?.length) {
+      const bipodal=data.photos.find(p=>p.side==='');
+      const uni=data.photos.find(p=>p.side===side);
+      if(bipodal?.angle!=null&&uni?.angle!=null){
+        ang=uni.angle-bipodal.angle;
+        pct=ang/t.div;
+      }
+    }
+  }
   else if(t.normDiv!==undefined||t.mlaTest){
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
@@ -3636,7 +3666,19 @@ function buildPrintSide(side, t, data) {
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
   let pct=null,ang=null;
 
-  if(t.div!==undefined){pct=side==='D'?data.pctD:data.pctG;ang=side==='D'?data.deltaD:data.deltaG;}
+  if(t.div!==undefined){
+    pct=side==='D'?data.pctD:data.pctG;
+    ang=side==='D'?data.deltaD:data.deltaG;
+    // Recalculer depuis photos si NaN/null
+    if((pct==null||isNaN(pct)) && data.photos?.length) {
+      const bipodal=data.photos.find(p=>p.side==='');
+      const uni=data.photos.find(p=>p.side===side);
+      if(bipodal?.angle!=null&&uni?.angle!=null){
+        ang=uni.angle-bipodal.angle;
+        pct=ang/t.div;
+      }
+    }
+  }
   else if(t.normDiv!==undefined||t.mlaTest){
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
