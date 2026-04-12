@@ -3541,6 +3541,8 @@ function buildPrintSection(t, data, conclusions) {
     } else if(t.normDiv!==undefined||t.mlaTest){
       const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
       const vG=(data.pctG!=null&&!isNaN(data.pctG))?Math.round(data.pctG*100):null;
+      const normStr=t.normDiv?`Norme amortisseur: ${t.normDiv}° = 100% · Att/Prop: ${t.propNorm||'—'}° · Écrasement: ${t.ecrNorm||'—'}°`:'';
+      if(normStr) lines.push(`<em style="color:#888;">${normStr}</em>`);
       if(vD!==null) lines.push(`<strong>Pied droit :</strong> Fonction amortisseur MLA = ${vD}% — ${interpretGen(data.pctD)}`);
       if(vG!==null) lines.push(`<strong>Pied gauche :</strong> Fonction amortisseur MLA = ${vG}% — ${interpretGen(data.pctG)}`);
       if(vD!==null&&vD<33) conclusions.push(`Déficience de l'arche interne droite (${vD}%) — ${t.name}`);
@@ -3550,6 +3552,7 @@ function buildPrintSection(t, data, conclusions) {
       const amG=data.amG!==null?Math.round(data.amG*100):null;
       const prD=data.prD!==null?Math.round(data.prD*100):null;
       const prG=data.prG!==null?Math.round(data.prG*100):null;
+      lines.push(`<em style="color:#888;">Norme amorti/propulsion: ${t.normAm}°=100% · Tal: Inv+${t.normAm===8?2:4}° · Plan: Év-${t.normAm===8?6:8}° · Dig: Inv+${t.normAm===8?2:4}°</em>`);
       if(amD!==null) lines.push(`<strong>Pied droit :</strong> Amorti ${amD}% · Propulsion ${prD||'—'}%`);
       if(amG!==null) lines.push(`<strong>Pied gauche :</strong> Amorti ${amG}% · Propulsion ${prG||'—'}%`);
     }
