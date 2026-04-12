@@ -2676,14 +2676,22 @@ function amProCard(side, am, pr, norm, a0, a1, a2) {
   const cAm=am!==null?clrGen(Math.abs(am)):'var(--mut)';
   const cPr=pr!==null?clrGen(Math.abs(pr)):'var(--mut)';
   const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+  const isMarche=norm===8;
+  const nTal=isMarche?'Norme: Inv +2°':'Norme: Inv +4°';
+  const nPlan=isMarche?'Norme: Év −6°':'Norme: Év −8°';
+  const nDig=isMarche?'Norme: Inv +2°':'Norme: Inv +4°';
+  const nAm=isMarche?'Norme: 8° = 100%':'Norme: 12° = 100%';
+  const nPr=isMarche?'Norme: 8° = 100%':'Norme: 12° = 100%';
+  const amDeg=am!==null?(am*norm).toFixed(1)+'°':'—';
+  const prDeg=pr!==null?(pr*norm).toFixed(1)+'°':'—';
   return `<div class="res-side-card">
     <div class="rs-title" style="color:${cl};">Pied ${side}</div>
-    <div style="font-size:9px;color:var(--mut);margin-top:4px;">🦶 Taligrade: <b>${apV(a0)}</b></div>
-    <div style="font-size:9px;color:var(--mut);">🦶 Plantigrade: <b>${apV(a1)}</b></div>
-    <div style="font-size:9px;color:var(--mut);">🦶 Digitigrade: <b>${apV(a2)}</b></div>
-    <div style="font-size:10px;color:var(--mut);margin-top:6px;">Amorti (÷${norm})</div>
+    <div style="font-size:9px;color:var(--mut);margin-top:4px;">🦶 Taligrade: <b>${apV(a0)}</b> <span style="color:var(--mut);font-size:8px;">(${nTal})</span></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Plantigrade: <b>${apV(a1)}</b> <span style="color:var(--mut);font-size:8px;">(${nPlan})</span></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Digitigrade: <b>${apV(a2)}</b> <span style="color:var(--mut);font-size:8px;">(${nDig})</span></div>
+    <div style="font-size:10px;color:var(--mut);margin-top:6px;">Amorti: <b>${amDeg}</b> <span style="font-size:8px;">(${nAm})</span></div>
     <div class="rs-pct" style="color:${cAm};">${am!==null?Math.round(Math.abs(am)*100)+'%':'—'}</div>
-    <div style="font-size:10px;color:var(--mut);margin-top:3px;">Propulsion (÷${norm})</div>
+    <div style="font-size:10px;color:var(--mut);margin-top:3px;">Propulsion: <b>${prDeg}</b> <span style="font-size:8px;">(${nPr})</span></div>
     <div class="rs-pct" style="color:${cPr};">${pr!==null?Math.round(Math.abs(pr)*100)+'%':'—'}</div>
   </div>`;
 }
