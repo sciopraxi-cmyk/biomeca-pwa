@@ -1664,31 +1664,27 @@ function renderVidPhotoGrid() {
   const t = TESTS[currentTestId]; if(!t || !t.showPhotoSlots) return;
   const el = document.getElementById('vid-photo-grid'); if(!el) return;
 
-  // Grouper par côté G et D
+  if(t.kfppaPhotos) {
+    // KFPPA : 3 photos en colonne (bipodale, unipodal G, unipodal D)
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    photoSlots.forEach((slot, i) => { html += vidPhotoSlotHTML(slot, i); });
+    html += '</div>';
+    el.innerHTML = html;
+    return;
+  }
+
   const slotsG = photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='G');
   const slotsD = photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='D');
-
   let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-
-  // Pied Gauche
-  html += '<div><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:5px;">🦵 Pied Gauche</div>';
-  html += '<div style="display:flex;flex-direction:column;gap:5px;">';
-  slotsG.forEach(slot => {
-    html += vidPhotoSlotHTML(slot, slot.idx);
-  });
+  html += '<div><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:5px;">🦵 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
+  slotsG.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
   html += '</div></div>';
-
-  // Pied Droit
-  html += '<div><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:5px;">🦵 Pied Droit</div>';
-  html += '<div style="display:flex;flex-direction:column;gap:5px;">';
-  slotsD.forEach(slot => {
-    html += vidPhotoSlotHTML(slot, slot.idx);
-  });
-  html += '</div></div>';
-
-  html += '</div>';
+  html += '<div><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:5px;">🦵 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
+  slotsD.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
+  html += '</div></div></div>';
   el.innerHTML = html;
 }
+
 
 function vidPhotoSlotHTML(slot, idx) {
   if(slot.dataUrl) {
