@@ -2128,11 +2128,11 @@ function captureFrame() {
   const dataUrl=tmp.toDataURL('image/jpeg',0.88);
 
   // Calculer angles D et G
-  const mkrD=vidMarkers.filter(m=>m.side==='D'||m.side==='');
+  const mkrD=vidMarkers.filter(m=>m.side==='D');
   const mkrG=vidMarkers.filter(m=>m.side==='G');
-  const rawD=calcAngle3(mkrD), rawG=calcAngle3(mkrG.length>=3?mkrG:mkrD);
-  const angD=computeCorrectedAngle(rawD, 'D', view, TESTS[currentTestId]?.type||"");
-  const angG=mkrG.length>=3?computeCorrectedAngle(rawG, 'G', view, TESTS[currentTestId]?.type||""):null;
+  const rawD=calcAngle3(mkrD), rawG=calcAngle3(mkrG);
+  const angD=mkrD.length>=3?computeCorrectedAngle(rawD,'D',view,TESTS[currentTestId]?.type||'',mkrD):null;
+  const angG=mkrG.length>=3?computeCorrectedAngle(rawG,'G',view,TESTS[currentTestId]?.type||'',mkrG):null;
 
   capturedFrames.push({
     time:player.currentTime||0, dataUrl, angD, angG,
