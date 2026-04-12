@@ -1431,7 +1431,9 @@ function launchTest(testId) {
       label: p.label || (t.photoLabels[i]||'Photo '+(i+1)),
       side: p.side || (t.photoSides?.[i]||''),
       dataUrl: p.dataUrl || null,
-      angle: p.angle !== undefined ? p.angle : null
+      angle: p.angle !== undefined ? p.angle : null,
+      angleD: p.angleD !== undefined ? p.angleD : null,
+      angleG: p.angleG !== undefined ? p.angleG : null
     }));
     // Compléter si slots manquants
     while(photoSlots.length < t.photoLabels.length) {
@@ -2828,7 +2830,7 @@ function validateAndSave() {
       };
     }
   } else {
-    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle}));
+    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG}));
     if(t.normDiv!==undefined){
       const sD=result.photos.filter(s=>s.side==='D');
       const sG=result.photos.filter(s=>s.side==='G');
