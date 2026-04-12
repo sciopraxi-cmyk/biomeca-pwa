@@ -2573,7 +2573,10 @@ function updateResults() {
         // Inv=+ Ev=- donc (Inv - Ev) = Inv + |Ev| si Ev<0, ou Inv - Ev si Ev>0 (pas d'éversion)
         const mobD=(invD!=null&&evD!=null)?(invD-evD)/t.normMob:null;
         const mobG=(invG!=null&&evG!=null)?(invG-evG)/t.normMob:null;
-        html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Inv: ${invD!=null?(invD>0?'+':'')+invD.toFixed(1)+'°':'—'}</div><div style="font-size:9px;color:var(--mut);">Év: ${evD!=null?(evD>0?'+':'')+evD.toFixed(1)+'°':'—'}</div><div class="rs-pct" style="color:${mobD!=null?clrGen(mobD):'var(--mut)'};">${mobD!=null?Math.round(mobD*100)+'%':'—'}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Inv: ${invG!=null?(invG>0?'+':'')+invG.toFixed(1)+'°':'—'}</div><div style="font-size:9px;color:var(--mut);">Év: ${evG!=null?(evG>0?'+':'')+evG.toFixed(1)+'°':'—'}</div><div class="rs-pct" style="color:${mobG!=null?clrGen(mobG):'var(--mut)'};">${mobG!=null?Math.round(mobG*100)+'%':'—'}</div></div></div>`;
+        const mobDdeg2=mobD!=null?(invD-evD).toFixed(1)+'°':'—';
+        const mobGdeg2=mobG!=null?(invG-evG).toFixed(1)+'°':'—';
+        const apV3=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+        html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${apV3(invD)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV3(evD)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobDdeg2}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${mobD!=null?clrGen(Math.abs(mobD)):'var(--mut)'};">${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'—'}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${apV3(invG)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV3(evG)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobGdeg2}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${mobG!=null?clrGen(Math.abs(mobG)):'var(--mut)'};">${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'—'}</div></div></div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos</div>`;
     }
     el.innerHTML=html||el.innerHTML;
@@ -2606,19 +2609,29 @@ function updateResults() {
       // Calcul par pied: RF = pointe/10 ; Mollet = (pointe-stat)/10
       const rfD=pointeD!=null?pointeD/10:null, molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/10:null;
       const rfG=pointeG!=null?pointeG/10:null, molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/10:null;
+      const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+      const rfDdeg=pointeD!=null?Math.abs(pointeD).toFixed(1)+'°':'—';
+      const rfGdeg=pointeG!=null?Math.abs(pointeG).toFixed(1)+'°':'—';
+      const molDdeg2=(pointeD!=null&&statD!=null)?Math.abs(pointeD-statD).toFixed(1)+'°':'—';
+      const molGdeg2=(pointeG!=null&&statG!=null)?Math.abs(pointeG-statG).toFixed(1)+'°':'—';
       html=`<div class="res-side">
         <div class="res-side-card">
           <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-          <div style="font-size:9px;color:var(--mut);">Stat: ${statD!=null?(statD>0?'Inv (+)':'Év (−)')+' '+Math.abs(statD).toFixed(1)+'°':'—'}</div>
-          <div style="font-size:9px;color:var(--mut);">Pointe: ${pointeD!=null?(pointeD>0?'Inv (+)':'Év (−)')+' '+Math.abs(pointeD).toFixed(1)+'°':'—'}</div>
-          <div class="rs-pct" style="color:${rfD!=null?clrGen(rfD):'var(--mut)'};">${rfD!=null?Math.round(rfD*100)+'%':'—'}</div>
-          <div style="font-size:9px;color:var(--mut);">Verr.RF · Mollet: <span style="color:${molD!=null?clrGen(molD):'var(--mut)'};">${molD!=null?Math.round(molD*100)+'%':'—'}</span></div>
+          <div style="font-size:9px;color:var(--mut);">Statique: <b>${apVv(statD)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+          <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apVv(pointeD)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
+          <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfDdeg}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+          <div class="rs-pct" style="color:${rfD!=null?clrGen(Math.abs(rfD)):'var(--mut)'};">  ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'}</div>
+          <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molDdeg2}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+          <div class="rs-pct" style="color:${molD!=null?clrGen(Math.abs(molD)):'var(--mut)'};">  ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'}</div>
         </div>
         <div class="res-side-card">
           <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-          <div style="font-size:9px;color:var(--mut);">Stat: ${statG!=null?statG.toFixed(1)+'°':'—'} / Pointe: ${pointeG!=null?pointeG.toFixed(1)+'°':'—'}</div>
-          <div class="rs-pct" style="color:${rfG!=null?clrGen(rfG):'var(--mut)'};">${rfG!=null?Math.round(rfG*100)+'%':'—'}</div>
-          <div style="font-size:9px;color:var(--mut);">Verr.RF · Mollet: <span style="color:${molG!=null?clrGen(molG):'var(--mut)'};">${molG!=null?Math.round(molG*100)+'%':'—'}</span></div>
+          <div style="font-size:9px;color:var(--mut);">Statique: <b>${apVv(statG)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+          <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apVv(pointeG)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
+          <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfGdeg}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+          <div class="rs-pct" style="color:${rfG!=null?clrGen(Math.abs(rfG)):'var(--mut)'};">  ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'}</div>
+          <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molGdeg2}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+          <div class="rs-pct" style="color:${molG!=null?clrGen(Math.abs(molG)):'var(--mut)'};">  ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'}</div>
         </div>
       </div>`;
     } else if(t.normMob!==undefined) {
