@@ -1789,21 +1789,29 @@ function resetPhotoSlots() {
 function capturePhotoSlot(slotIdx) {
   const canvas = document.getElementById('ph-canvas');
   if (!camStream) { alert('Activez la caméra.'); return; }
-  // Créer canvas temporaire avec overlay
+  const t = TESTS[currentTestId];
+  const view = t?.view || 'face';
+  const slot = photoSlots[slotIdx];
+  const side = slot.side || '';
+  // Filtrer marqueurs selon le côté (Verrouillage AP)
+  const markersForPhoto = side ? liveMarkers.filter(m=>m.side===side) : liveMarkers;
   const tmp = document.createElement('canvas');
   tmp.width = canvas.width; tmp.height = canvas.height;
   const ctx = tmp.getContext('2d');
   ctx.drawImage(canvas, 0, 0);
-  drawOverlay(ctx, tmp, liveMarkers, -1, TESTS[currentTestId]?.view||'face');
+  drawOverlay(ctx, tmp, markersForPhoto, -1, view);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
-  // Calculer l'angle pour ce slot (selon le côté)
-  const slot = photoSlots[slotIdx];
-  const side = slot.side;
-  const markers = side ? liveMarkers.filter(m=>m.side===side) : liveMarkers;
-  const rawAng = calcAngle3(markers);
-  const corrAng = computeCorrectedAngle(rawAng, side, TESTS[currentTestId]?.view||'face', TESTS[currentTestId]?.type||"");
+  const rawAng = calcAngle3(markersForPhoto);
+  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'');
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
+  // Mobilité AP : stocker angles D et G séparément
+  if(t?.mobiliteAP) {
+    const mkrD = liveMarkers.filter(m=>m.side==='D');
+    const mkrG = liveMarkers.filter(m=>m.side==='G');
+    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'');
+    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'');
+  }
   renderPhotoGrid(); updateResults();
 }
 
@@ -2469,14 +2477,29 @@ function updateResults() {
         </div>
       </div>`;
     } else if(t.normMob!==undefined) {
-      // Mobilité
-      const invAngle=photoSlots[0]?.angle, evAngle=photoSlots[1]?.angle;
-      if(invAngle!==null&&invAngle!==undefined&&evAngle!==null&&evAngle!==undefined){
-        const mob=(Math.abs(invAngle)+Math.abs(evAngle))/t.normMob;
-        const c=clrGen(mob);
-        html=`<div class="res-row"><span style="font-size:10px;color:var(--mut);">Inversion</span><span style="font-family:var(--fm);">${invAngle.toFixed(1)}°</span></div>
-          <div class="res-row"><span style="font-size:10px;color:var(--mut);">Éversion</span><span style="font-family:var(--fm);">${evAngle.toFixed(1)}°</span></div>
-          <div class="res-row" style="border:none;"><span style="font-size:10px;color:var(--mut);">Mobilité (÷${t.normMob})</span><span style="font-size:16px;font-weight:700;color:${c};font-family:var(--fm);">${Math.round(mob*100)}%</span></div>`;
+      // Mobilité AP : résultats D et G séparés
+      const p0=photoSlots[0], p1=photoSlots[1];
+      const invD=p0?.angleD, evD=p1?.angleD;
+      const invG=p0?.angleG, evG=p1?.angleG;
+      const hasD=invD!=null&&evD!=null, hasG=invG!=null&&evG!=null;
+      if(hasD||hasG){
+        const mobD=hasD?(Math.abs(invD)+Math.abs(evD))/t.normMob:null;
+        const mobG=hasG?(Math.abs(invG)+Math.abs(evG))/t.normMob:null;
+        const signLabel=(v,s)=>v==null?'—':`${v>0?'Inv':'Év'} ${v.toFixed(1)}°`;
+        html=`<div class="res-side">
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
+            <div style="font-size:9px;color:var(--mut);">Inv: ${invD!=null?invD.toFixed(1)+'°':'—'} / Év: ${evD!=null?evD.toFixed(1)+'°':'—'}</div>
+            <div class="rs-pct" style="color:${mobD!=null?clrGen(mobD):'var(--mut)'};">${mobD!=null?Math.round(mobD*100)+'%':'—'}</div>
+            <div style="font-size:9px;color:var(--mut);">Mobilité ÷${t.normMob}</div>
+          </div>
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
+            <div style="font-size:9px;color:var(--mut);">Inv: ${invG!=null?invG.toFixed(1)+'°':'—'} / Év: ${evG!=null?evG.toFixed(1)+'°':'—'}</div>
+            <div class="rs-pct" style="color:${mobG!=null?clrGen(mobG):'var(--mut)'};">${mobG!=null?Math.round(mobG*100)+'%':'—'}</div>
+            <div style="font-size:9px;color:var(--mut);">Mobilité ÷${t.normMob}</div>
+          </div>
+        </div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos (inversion + éversion)</div>`;
     }
   }
