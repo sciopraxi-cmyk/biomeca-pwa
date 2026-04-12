@@ -2672,43 +2672,35 @@ function updateResults() {
   if(t.mode==='video') {
     // KFPPA : 2 frames nécessaires
     if(t.div!==undefined) {
-      const f0=capturedFrames[0], f1=capturedFrames[1];
-      if(f0&&f1) {
-        const angD=f1.angD!==null&&f0.angD!==null ? f1.angD-f0.angD : null;
-        const angG=f1.angG!==null&&f0.angG!==null ? f1.angG-f0.angG : null;
-        const pctD=angD!==null?angD/t.div:null;
-        const pctG=angG!==null?angG/t.div:null;
-
-        // Calcul basé sur photos si disponibles (KFPPA photos)
-        let photoHtml = '';
-        if(t.kfppaPhotos && photoSlots.length >= 3) {
-          const pBip = photoSlots[0];  // Station bipodale
-          const pUniG = photoSlots[1]; // Unipodal G
-          const pUniD = photoSlots[2]; // Unipodal D
-          const paD = (pUniD.angle !== null && pBip.angleD !== null) ? pUniD.angle - pBip.angleD : null;
-          const paG = (pUniG.angle !== null && pBip.angleG !== null) ? pUniG.angle - pBip.angleG : null;
-          if(paD !== null || paG !== null) {
-            photoHtml = `<div style="font-size:10px;color:var(--mut);margin-top:4px;">📷 Photos ·
-              D: ${paD!==null?paD.toFixed(1)+'°':'—'}
-              G: ${paG!==null?paG.toFixed(1)+'°':'—'}</div>`;
-          }
-        }
-
+      const pBip=photoSlots[0], pUniG=photoSlots[1], pUniD=photoSlots[2];
+      const bipD=pBip?.angleD, bipG=pBip?.angleG;
+      const uniD=pUniD?.angle, uniG=pUniG?.angle;
+      const angD=(uniD!=null&&bipD!=null)?uniD-bipD:null;
+      const angG=(uniG!=null&&bipG!=null)?uniG-bipG:null;
+      const pctD=angD!=null?angD/t.div:null;
+      const pctG=angG!=null?angG/t.div:null;
+      if(angD!=null||angG!=null||pBip?.dataUrl||pUniG?.dataUrl||pUniD?.dataUrl){
         html=`<div class="res-side">
-          ${sideResultCard('D',angD,pctD,'kfppa',t.normeMin,t.normeMax,t.div)}
-          ${sideResultCard('G',angG,pctG,'kfppa',t.normeMin,t.normeMax,t.div)}
-        </div>
-        <div style="font-size:10px;color:var(--mut);margin-top:6px;">Norme : ${t.normeMin}°–${t.normeMax}°</div>
-        ${photoHtml}`;
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${bipD!=null?Math.abs(bipD).toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${uniD!=null?uniD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${angD!=null?angD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
+            <div class="rs-pct" style="color:${pctD!=null?clrGen(pctD):'var(--mut)'};">  ${pctD!=null?Math.round(pctD*100)+'%':'—'}</div>
+          </div>
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${bipG!=null?Math.abs(bipG).toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${uniG!=null?uniG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${angG!=null?angG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
+            <div class="rs-pct" style="color:${pctG!=null?clrGen(pctG):'var(--mut)'};">  ${pctG!=null?Math.round(pctG*100)+'%':'—'}</div>
+          </div>
+        </div>`;
       } else {
-        // Afficher l'angle en direct de la frame courante
-        const angD=calcBilateral(vidMarkers,view,'D');
-        const angG=calcBilateral(vidMarkers,view,'G');
-        html=`<div class="res-side">
-          ${quickAngleCard('D',angD)}
-          ${quickAngleCard('G',angG)}
-        </div>
-        <div style="font-size:10px;color:var(--orange);margin-top:6px;">Capturez ${2-capturedFrames.length} frame(s) supplémentaire(s) :<br>1. Repos bipodal · 2. Phase dynamique</div>`;
+        const angDlive=calcBilateral(vidMarkers,view,'D');
+        const angGlive=calcBilateral(vidMarkers,view,'G');
+        html=`<div class="res-side">${quickAngleCard('D',angDlive)}${quickAngleCard('G',angGlive)}</div>
+          <div style="font-size:10px;color:var(--orange);margin-top:6px;">Capturez 3 photos : Bipodal · Unipodal G · Unipodal D</div>`;
       }
     }
     // Amorti/Propulsion : 3 frames
