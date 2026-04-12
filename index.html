@@ -3141,10 +3141,10 @@ function buildSidePreview(side,t,data) {
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
     // Si pas de données calculées, recalculer depuis photos
-    if(pct==null && data.photos?.length) {
+    if((pct==null||isNaN(pct)) && data.photos?.length) {
       const ph=data.photos.filter(p=>p.side===side);
       const prop=ph[0]?.angle, ecr=ph[1]?.angle;
-      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||t.mlaTest?t.normDiv:20);}
+      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||20);}
     }
   }
   else if(t.normAm!==undefined){
@@ -3562,9 +3562,9 @@ function buildPrintSection(t, data, conclusions) {
       lines.push(`Norme physiologique : ${normStr}`);
       if(vD!==null&&vD>150) conclusions.push(`Valgus dynamique excessif genou droit (${vD}%) — ${t.name}`);
       if(vG!==null&&vG>150) conclusions.push(`Valgus dynamique excessif genou gauche (${vG}%) — ${t.name}`);
-    } else if(t.normDiv!==undefined){
-      const vD=data.pctD!==null?Math.round(data.pctD*100):null;
-      const vG=data.pctG!==null?Math.round(data.pctG*100):null;
+    } else if(t.normDiv!==undefined||t.mlaTest){
+      const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
+      const vG=(data.pctG!=null&&!isNaN(data.pctG))?Math.round(data.pctG*100):null;
       if(vD!==null) lines.push(`<strong>Pied droit :</strong> Fonction amortisseur MLA = ${vD}% — ${interpretGen(data.pctD)}`);
       if(vG!==null) lines.push(`<strong>Pied gauche :</strong> Fonction amortisseur MLA = ${vG}% — ${interpretGen(data.pctG)}`);
       if(vD!==null&&vD<33) conclusions.push(`Déficience de l'arche interne droite (${vD}%) — ${t.name}`);
@@ -3662,10 +3662,10 @@ function buildPrintSide(side, t, data) {
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
     // Si pas de données calculées, recalculer depuis photos
-    if(pct==null && data.photos?.length) {
+    if((pct==null||isNaN(pct)) && data.photos?.length) {
       const ph=data.photos.filter(p=>p.side===side);
       const prop=ph[0]?.angle, ecr=ph[1]?.angle;
-      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||t.mlaTest?t.normDiv:20);}
+      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||20);}
     }
   }
   else if(t.normAm!==undefined){
