@@ -479,7 +479,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
       <!-- MODE VIDEO -->
       <div id="mode-video" style="display:none;">
         <div class="cam-ctrls">
-          <button class="btn btn-green" id="btn-vcam" onclick="toggleVCam()">Activer caméra</button>
+          <select id="vcam-select" class="inp" style="font-size:12px;padding:4px 8px;max-width:200px;" onchange=""></select>
+          <button class="btn btn-green" id="btn-vcam" onclick="toggleVCam()">▶ Activer caméra</button>
           <button class="btn btn-red" id="btn-vrec" onclick="toggleRec()" style="display:none;">⏺ Rec</button>
           <button class="btn" id="btn-vauto" onclick="toggleVAutoDetect()" style="display:none;">Auto : OFF</button>
           <button class="btn" onclick="document.getElementById('vid-file-in').click()">Importer</button>
@@ -1167,6 +1168,7 @@ async function initPWA() {
   }
   // Pas de session valide: afficher le login
   document.getElementById('pwa-login').style.display = 'flex';
+  enumerateCameras('vcam-select');
 }
 
 initPWA();
@@ -1244,7 +1246,7 @@ const MORPHO_IMAGES = {
   get 'morpho-profilG'(){ return document.getElementById('imgjs-morpho-profilG')?.src||''; },
   get 'morpho-profilD'(){ return document.getElementById('imgjs-morpho-profilD')?.src||''; },
 };
-const PIEDS_IMAGE = document.getElementById('imgjs-pieds')?.src||'';
+// PIEDS_IMAGE récupéré dynamiquement depuis le DOM
 
 // ══════════════════════════════════════════════════════
 // CONFIG TESTS
@@ -1893,6 +1895,21 @@ function toggleAutoLive() {
 // ══════════════════════════════════════════════════════
 // CAMÉRA VIDÉO
 // ══════════════════════════════════════════════════════
+
+async function enumerateCameras(selectId) {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter(d => d.kind === 'videoinput');
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = cameras.map((d, i) => 
+      `<option value="${d.deviceId}">${d.label || 'Caméra ' + (i+1)}</option>`
+    ).join('');
+    if (current) sel.value = current;
+  } catch(e) { console.warn('enumerateCameras:', e); }
+}
+
 async function toggleVCam() {
   if(vidStream) { stopVCam(); return; }
   try {
@@ -3461,7 +3478,7 @@ function drawPiedsTemplate() {
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
     setupDrawCanvas(canvas);
   };
-  img.src = PIEDS_IMAGE;
+  img.src = document.getElementById('imgjs-pieds')?.src || '';
 }
 
 function drawFoot(ctx, ox, oy, mirror) {
