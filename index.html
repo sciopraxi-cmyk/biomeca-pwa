@@ -1518,6 +1518,53 @@ function savePatients() {
   saveToSupabase();
 }
 
+function editPatient(idx) {
+  const p = patients[idx];
+  if(!p) return;
+  // Pré-remplir le formulaire
+  document.getElementById('np-nom').value = p.nom||'';
+  document.getElementById('np-prenom').value = p.prenom||'';
+  document.getElementById('np-ddn').value = p.ddn||'';
+  document.getElementById('np-sport').value = p.sport||'';
+  document.getElementById('np-poids').value = p.poids||'';
+  document.getElementById('np-taille').value = p.taille||'';
+  document.getElementById('np-motif').value = p.motif||'';
+  if(document.getElementById('np-metier')) document.getElementById('np-metier').value = p.metier||'';
+  if(document.getElementById('np-lat')) document.getElementById('np-lat').value = p.lat||'Droitier';
+  // Changer le bouton créer en sauvegarder
+  const btn = document.querySelector('[onclick="createPatient()"]');
+  if(btn) {
+    btn.textContent = '💾 Sauvegarder modifications';
+    btn.setAttribute('onclick', `saveEditPatient(${idx})`);
+  }
+  nav('pg-patients');
+  // Scroller vers le formulaire
+  setTimeout(()=>document.getElementById('np-nom')?.scrollIntoView({behavior:'smooth'}),200);
+}
+
+function saveEditPatient(idx) {
+  const p = patients[idx];
+  if(!p) return;
+  const nom = document.getElementById('np-nom').value.trim();
+  const prenom = document.getElementById('np-prenom').value.trim();
+  if(!nom||!prenom){alert('Nom et prénom obligatoires.');return;}
+  p.nom = nom;
+  p.prenom = prenom;
+  p.ddn = document.getElementById('np-ddn').value;
+  p.sport = document.getElementById('np-sport').value;
+  p.poids = document.getElementById('np-poids').value;
+  p.taille = document.getElementById('np-taille').value;
+  p.motif = document.getElementById('np-motif').value;
+  if(document.getElementById('np-metier')) p.metier = document.getElementById('np-metier').value;
+  if(document.getElementById('np-lat')) p.lat = document.getElementById('np-lat').value;
+  savePatients();
+  // Rétablir le bouton créer
+  const btn = document.querySelector(`[onclick="saveEditPatient(${idx})"]`);
+  if(btn){btn.textContent='+ Créer dossier';btn.setAttribute('onclick','createPatient()');}
+  renderPatientList();
+  alert(`✓ Patient modifié : ${p.prenom} ${p.nom}`);
+}
+
 function createPatient() {
   const nom = document.getElementById('np-nom').value.trim();
   const prenom = document.getElementById('np-prenom').value.trim();
