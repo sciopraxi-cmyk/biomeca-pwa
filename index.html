@@ -1402,7 +1402,13 @@ function nav(id) {
       clearBilanFields();
       loadBilan();
       const pc = document.getElementById('pieds-canvas');
-      if(pc && !pc._baseSnapshot) { drawPiedsTemplate(); setupDrawCanvas(pc); }
+      // Ne redessiner le template que si pas de données sauvegardées
+      const hasSavedPieds = currentPatient?.bilanData?._pieds;
+      if(pc && !hasSavedPieds) { drawPiedsTemplate(); setupDrawCanvas(pc); }
+      else if(pc && hasSavedPieds) {
+        // Attendre que loadBilan restaure le canvas puis setup draw
+        setTimeout(() => setupDrawCanvas(pc), 150);
+      }
     }, 80);
   }
 
