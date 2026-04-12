@@ -1717,9 +1717,10 @@ function captureVidPhotoSlot(slotIdx) {
   const slot = photoSlots[slotIdx];
   const side = slot?.side || '';
 
-  // Filtrer les marqueurs selon le côté du slot (Verrouillage et KFPPA unipodal)
+  // Filtrer les marqueurs selon le côté du slot
+  // S'applique pour : Verrouillage, KFPPA unipodal, Amorti/Propulsion
   let markersForPhoto = vidMarkers;
-  if(side && (t?.kfppaPhotos || t?.normVerrou !== undefined)) {
+  if(side) {
     markersForPhoto = vidMarkers.filter(m => m.side === side);
   }
 
@@ -2652,16 +2653,18 @@ function quickAngleCard(side, ang) {
 }
 
 function amProCard(side, am, pr, norm, a0, a1, a2) {
-  const c=side==='D'?'#4a9eff':'#3ecf72';
+  const cl=side==='D'?'#4a9eff':'#3ecf72';
   const cAm=am!==null?clrGen(Math.abs(am)):'var(--mut)';
   const cPr=pr!==null?clrGen(Math.abs(pr)):'var(--mut)';
   const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
   return `<div class="res-side-card">
-    <div class="rs-title" style="color:${c};">Pied ${side}</div>
-    <div style="font-size:9px;color:var(--mut);">Tal: ${apV(a0)} · Plan: ${apV(a1)} · Dig: ${apV(a2)}</div>
-    <div style="font-size:10px;color:var(--mut);margin-top:4px;">Amorti</div>
+    <div class="rs-title" style="color:${cl};">Pied ${side}</div>
+    <div style="font-size:9px;color:var(--mut);margin-top:4px;">🦶 Taligrade: <b>${apV(a0)}</b></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Plantigrade: <b>${apV(a1)}</b></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Digitigrade: <b>${apV(a2)}</b></div>
+    <div style="font-size:10px;color:var(--mut);margin-top:6px;">Amorti (÷${norm})</div>
     <div class="rs-pct" style="color:${cAm};">${am!==null?Math.round(Math.abs(am)*100)+'%':'—'}</div>
-    <div style="font-size:10px;color:var(--mut);margin-top:3px;">Propulsion</div>
+    <div style="font-size:10px;color:var(--mut);margin-top:3px;">Propulsion (÷${norm})</div>
     <div class="rs-pct" style="color:${cPr};">${pr!==null?Math.round(Math.abs(pr)*100)+'%':'—'}</div>
   </div>`;
 }
