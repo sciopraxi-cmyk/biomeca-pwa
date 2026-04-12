@@ -1601,7 +1601,7 @@ function createPraticien() {
     tel:document.getElementById('pr-tel').value,
     adresse:document.getElementById('pr-adresse').value,
     email:document.getElementById('pr-email').value,
-  };
+
   praticiens.push(pr); savePraticiens();
   ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id=>{document.getElementById(id).value='';});
   renderPratList(); populatePratSelect();
@@ -2468,9 +2468,9 @@ function updateResults() {
           <div style="font-size:10px;color:var(--orange);margin-top:6px;">Capturez 3 frames : Taligrade · Plantigrade · Digitigrade</div>`;
       }
     }
-  } else {
-    // Mode photo
-    if(t.normDiv!==undefined) {
+  }
+  // Calculs basés sur photoSlots (mode photo ET video avec showPhotoSlots)
+  if(t.normDiv!==undefined) {
       // MLA - angle brut (pas 180-valeur), calcul = écrasement - propulsion
       const slotsD=photoSlots.filter(s=>s.side==='D');
       const slotsG=photoSlots.filter(s=>s.side==='G');
