@@ -1671,8 +1671,8 @@ function renderVidPhotoGrid() {
   const t = TESTS[currentTestId]; if(!t || !t.showPhotoSlots) return;
   const el = document.getElementById('vid-photo-grid'); if(!el) return;
 
-  if(t.kfppaPhotos) {
-    // KFPPA : 3 photos en colonne (bipodale, unipodal G, unipodal D)
+  if(t.kfppaPhotos || t.mobiliteAP) {
+    // KFPPA / Mobilité AP : slots en colonne simple
     let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
     photoSlots.forEach((slot, i) => { html += vidPhotoSlotHTML(slot, i); });
     html += '</div>';
