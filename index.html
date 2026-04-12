@@ -2186,9 +2186,9 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
     const tn   = markers.find(m=>m.name.startsWith('TN')||m.name==='TN');
     const cap  = markers.find(m=>m.name.startsWith('CAp')||m.name==='CAp');
     if(fmhp && tn && cap) {
-      fmhp.x = W * 0.20; fmhp.y = H * 0.65; // gauche, bas
-      tn.x   = W * 0.50; tn.y   = H * 0.30; // centre, haut (sommet)
-      cap.x  = W * 0.80; cap.y  = H * 0.65; // droite, bas
+      if(fmhp.x===null){fmhp.x=W*0.20;fmhp.y=H*0.65;}
+      if(tn.x===null){tn.x=W*0.50;tn.y=H*0.30;}
+      if(cap.x===null){cap.x=W*0.80;cap.y=H*0.65;}
     }
     if(cb) cb(); return;
   }
