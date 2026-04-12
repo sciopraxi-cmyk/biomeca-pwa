@@ -3586,7 +3586,7 @@ function buildPrintSide(side, t, data) {
         </svg>
         <div class="rp-gauge-inner">
           <div class="rp-gauge-pct" style="color:${cssC};">${pctVal!==null?pctVal+'%':'—'}</div>
-          <div class="rp-gauge-deg">${ang!==null?ang.toFixed(1)+'°':'—'}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
         </div>
       </div>
       ${ph}
