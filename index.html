@@ -2293,7 +2293,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     if(grp.length>=3){
       const ang=calcAngle3(grp);
       if(ang!==null){
-        const B=grp[1];
+        const B=grp.length>=4?grp[2]:grp[1]; // AP: sommet=CalcaSup(idx2), sinon centre
         const corrAng=computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||"");
         const r2=Math.max(16,W/24);
         const a1=Math.atan2(grp[0].y-B.y,grp[0].x-B.x),a2=Math.atan2(grp[2].y-B.y,grp[2].x-B.x);
@@ -2358,7 +2358,9 @@ function updateAngleOverlay(elId, markers, view) {
 function calcAngle3(pts) {
   const placed=pts.filter(p=>p.x!==null);
   if(placed.length<3) return null;
-  const [A,B,C]=placed;
+  // Si 4 points (AP-BI) : angle autour du Calca supérieur = points [1,2,3]
+  // Si 3 points (KFPPA, MLA) : angle autour du point central [0,1,2]
+  const [A,B,C] = placed.length>=4 ? [placed[1],placed[2],placed[3]] : placed;
   const v1={x:A.x-B.x,y:A.y-B.y},v2={x:C.x-B.x,y:C.y-B.y};
   const dot=v1.x*v2.x+v1.y*v2.y;
   const mag=Math.sqrt((v1.x**2+v1.y**2)*(v2.x**2+v2.y**2));
