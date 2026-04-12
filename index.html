@@ -1252,7 +1252,7 @@ if('serviceWorker' in navigator) {
   const swCode = `
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open('biomeca-v1').then(cache => {
+    caches.open('biomeca-v2').then(cache => {
       return cache.addAll([location.href]);
     })
   );
