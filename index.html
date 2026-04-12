@@ -3090,9 +3090,15 @@ function buildSidePreview(side,t,data) {
   let pct=null,ang=null,label=side==='D'?'Côté Droit':'Côté Gauche';
   const sideC=side==='D'?'var(--blue)':'var(--green)';
   if(t.div!==undefined){pct=side==='D'?data.pctD:data.pctG;ang=side==='D'?data.deltaD:data.deltaG;}
-  else if(t.normDiv!==undefined){
+  else if(t.normDiv!==undefined||t.mlaTest){
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
+    // Si pas de données calculées, recalculer depuis photos
+    if(pct==null && data.photos?.length) {
+      const ph=data.photos.filter(p=>p.side===side);
+      const prop=ph[0]?.angle, ecr=ph[1]?.angle;
+      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||t.mlaTest?t.normDiv:20);}
+    }
   }
   else if(t.normAm!==undefined){
     const am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
@@ -3487,7 +3493,7 @@ function buildBilanPrintSection(bd) {
 }
 
 function buildPrintSection(t, data, conclusions) {
-  const hasSides=t.div!==undefined||t.normDiv!==undefined||t.normAm!==undefined;
+  const hasSides=t.div!==undefined||t.normDiv!==undefined||t.normAm!==undefined||t.mlaTest;
   let written='', sectionHTML='';
 
   if(hasSides) {
@@ -3605,9 +3611,15 @@ function buildPrintSide(side, t, data) {
   let pct=null,ang=null;
 
   if(t.div!==undefined){pct=side==='D'?data.pctD:data.pctG;ang=side==='D'?data.deltaD:data.deltaG;}
-  else if(t.normDiv!==undefined){
+  else if(t.normDiv!==undefined||t.mlaTest){
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
+    // Si pas de données calculées, recalculer depuis photos
+    if(pct==null && data.photos?.length) {
+      const ph=data.photos.filter(p=>p.side===side);
+      const prop=ph[0]?.angle, ecr=ph[1]?.angle;
+      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||t.mlaTest?t.normDiv:20);}
+    }
   }
   else if(t.normAm!==undefined){
     const am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
@@ -3679,25 +3691,31 @@ function buildPrintSingleSide(t,data) {
 }
 
 function buildPrintPhotos(data,side,t) {
-  const photos=(data.photos||[]).filter(p=>p.side===side||(p.side===''&&side==='D'));
-  const frames=(data.frames||[]);
+  const allPhotos=data.photos||[];
+  // Filtrer par côté si side est défini, sinon prendre toutes les photos sans côté
+  const photos=side
+    ? allPhotos.filter(p=>p.side===side)
+    : allPhotos.filter(p=>!p.side);
+  const frames=data.frames||[];
   let items=[];
-  if(photos.length) items=photos.slice(0,2);
-  else {
-    // Extraire photos depuis les frames (2 premières pour amorti, ou repos+dyn pour kfppa)
-    items=frames.slice(0,2).map((f,i)=>({
+  if(photos.length) {
+    items=photos;
+  } else if(frames.length) {
+    items=frames.slice(0,3).map((f,i)=>({
       label:t.frameLabels?.[i]||'Frame '+(i+1),
       dataUrl:f.dataUrl,
       angle:side==='D'?f.angD:f.angG
     }));
   }
   if(!items.length) return '';
-  return items.map(ph=>`
-    <div class="rp-photo-wrap">
-      <div class="rp-photo-lbl">${ph.label||''}</div>
-      ${ph?.dataUrl?`<img src="${ph.dataUrl}"/>`:'<div class="rp-photo-empty">—</div>'}
-      ${ph?.angle!=null?`<div class="rp-photo-ang">${ph.angle.toFixed(1)}°</div>`:''}
-    </div>`).join('');
+  return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;justify-content:flex-start;">
+    ${items.map(ph=>ph?.dataUrl?`
+      <div style="text-align:center;flex:0 0 auto;">
+        <img src="${ph.dataUrl}" style="height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block;"/>
+        <div style="font-size:7px;color:#666;margin-top:2px;">${ph.label||''}</div>
+        ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${Number(ph.angle).toFixed(1)}°</div>`:''}
+      </div>`:'').join('')}
+  </div>`;
 }
 
 function rp_cssColor(p,genou){
