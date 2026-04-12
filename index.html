@@ -1283,17 +1283,17 @@ const TESTS = {
   // MLA : 3 marqueurs par pied, 2 photos par pied = 4 photos
   'mla-marche': {
     name:'MLA Marche', mode:'video', view:'profil',
-    note:'Vue profil · 2 photos par pied (propulsion + écrasement) · Capturer pied D puis pied G',
+    note:'Vue profil · 2 photos par pied (attaque/propulsion + écrasement)',
     markers:'mla', normDiv:20, propNorm:125, ecrNorm:145,
-    photoLabels:['Propulsion pied D','Écrasement pied D','Propulsion pied G','Écrasement pied G'],
-    photoSides:['D','D','G','G']
+    photoLabels:['Attaque/Propulsion pied D','Écrasement pied D','Attaque/Propulsion pied G','Écrasement pied G'],
+    photoSides:['D','D','G','G'], showPhotoSlots:true, mlaTest:true
   },
   'mla-course': {
     name:'MLA Course', mode:'video', view:'profil',
-    note:'Vue profil · 2 photos par pied (propulsion + écrasement) · Capturer pied D puis pied G',
+    note:'Vue profil · 2 photos par pied (attaque/propulsion + écrasement)',
     markers:'mla', normDiv:30, propNorm:120, ecrNorm:150,
-    photoLabels:['Propulsion pied D','Écrasement pied D','Propulsion pied G','Écrasement pied G'],
-    photoSides:['D','D','G','G']
+    photoLabels:['Attaque/Propulsion pied D','Écrasement pied D','Attaque/Propulsion pied G','Écrasement pied G'],
+    photoSides:['D','D','G','G'], showPhotoSlots:true, mlaTest:true
   },
   // Verrouillage : 4 marqueurs jambier+calca, vue dos, 2 photos (neutre + pointe)
   'verrou': {
@@ -1672,11 +1672,24 @@ function renderVidPhotoGrid() {
   const el = document.getElementById('vid-photo-grid'); if(!el) return;
 
   if(t.kfppaPhotos || t.mobiliteAP) {
-    // KFPPA / Mobilité AP : slots en colonne simple
     let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
     photoSlots.forEach((slot, i) => { html += vidPhotoSlotHTML(slot, i); });
     html += '</div>';
     el.innerHTML = html;
+    return;
+  }
+  if(t.mlaTest) {
+    // MLA : 2 colonnes (pied D et pied G)
+    const slotsD=photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='D');
+    const slotsG=photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='G');
+    let html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    html+='<div><div style="font-size:10px;font-weight:700;color:#4a9eff;margin-bottom:5px;">🦶 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
+    slotsD.forEach(slot=>{ html+=vidPhotoSlotHTML(slot,slot.idx); });
+    html+='</div></div>';
+    html+='<div><div style="font-size:10px;font-weight:700;color:#3ecf72;margin-bottom:5px;">🦶 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
+    slotsG.forEach(slot=>{ html+=vidPhotoSlotHTML(slot,slot.idx); });
+    html+='</div></div></div>';
+    el.innerHTML=html;
     return;
   }
 
@@ -1733,7 +1746,9 @@ function captureVidPhotoSlot(slotIdx) {
 
   // Calculer l'angle selon le côté
   const rawAng = calcAngle3(markersForPhoto);
-  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'', markersForPhoto);
+  // MLA : angle brut (pas de correction)
+  const mlaType = t?.markers==='mla' ? 'mla' : (t?.type||'');
+  const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
 
@@ -1830,7 +1845,9 @@ function capturePhotoSlot(slotIdx) {
   drawOverlay(ctx, tmp, markersForPhoto, -1, view);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const rawAng = calcAngle3(markersForPhoto);
-  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'', markersForPhoto);
+  // MLA : angle brut (pas de correction)
+  const mlaType = t?.markers==='mla' ? 'mla' : (t?.type||'');
+  const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
   if(t && t.mobiliteAP) {
@@ -2502,7 +2519,40 @@ function updateResults() {
   }
   // Résultats Mobilité/Verrouillage en mode video (photoSlots)
   if(t.mode==='video' && t.showPhotoSlots) {
-    if(t.normAm!==undefined) {
+    if(t.mlaTest) {
+      // MLA : angle brut (pas 180-angle)
+      const sD=photoSlots.filter(s=>s.side==='D');
+      const sG=photoSlots.filter(s=>s.side==='G');
+      const propD=sD[0]?.angle, ecrD=sD[1]?.angle;
+      const propG=sG[0]?.angle, ecrG=sG[1]?.angle;
+      const deltaD=(propD!=null&&ecrD!=null)?(ecrD-propD):null;
+      const deltaG=(propG!=null&&ecrG!=null)?(ecrG-propG):null;
+      const pctD=deltaD!=null?deltaD/t.normDiv:null;
+      const pctG=deltaG!=null?deltaG/t.normDiv:null;
+      const propNorm=t.propNorm, ecrNorm=t.ecrNorm, normDiv=t.normDiv;
+      const hasAny=propD!=null||ecrD!=null||propG!=null||ecrG!=null;
+      if(hasAny){
+        html=`<div class="res-side">
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propD!=null?propD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrD!=null?ecrD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Δ: <b>${deltaD!=null?deltaD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
+            <div class="rs-pct" style="color:${pctD!=null?clrGen(Math.abs(pctD)):'var(--mut)'};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
+          </div>
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propG!=null?propG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrG!=null?ecrG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Δ: <b>${deltaG!=null?deltaG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
+            <div class="rs-pct" style="color:${pctG!=null?clrGen(Math.abs(pctG)):'var(--mut)'};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
+          </div>
+        </div>`;
+      } else {
+        html=`<div style="font-size:10px;color:var(--orange);text-align:center;padding:8px;">Capturez les 4 photos MLA</div>`;
+      }
+      el.innerHTML=html||el.innerHTML; return;
+    } else if(t.normAm!==undefined) {
       const sD=photoSlots.filter(s=>s.side==='D');
       const sG=photoSlots.filter(s=>s.side==='G');
       const talD=sD[0]?.angle,planD=sD[1]?.angle,digD=sD[2]?.angle;
