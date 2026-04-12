@@ -2135,6 +2135,65 @@ function setSpeed(s) {
 }
 
 
+function setupVidCanvas(player, vcanvas) {
+  const view = TESTS[currentTestId]?.view || 'face';
+
+  function placeMarker(x, y) {
+    // Pause la video pour garder l'image figée pendant le placement
+    if(!player.paused) player.pause();
+    const idx=selectedVidMkrIdx>=0?selectedVidMkrIdx:vidMarkers.findIndex(m=>m.x===null);
+    if(idx>=0&&idx<vidMarkers.length){
+      vidMarkers[idx].x=x; vidMarkers[idx].y=y;
+      const next=vidMarkers.findIndex((m,i)=>i>idx&&m.x===null);
+      selectedVidMkrIdx=next>=0?next:-1;
+      renderMkrList(); updateResults();
+    }
+  }
+
+  vcanvas.onmousedown = e => {
+    const {x,y}=canvasXY(e,vcanvas);
+    const hit=findMarkerAt(x,y,vidMarkers,vcanvas.width);
+    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;if(!player.paused)player.pause();renderMkrList();return;}
+    placeMarker(x,y);
+  };
+  vcanvas.onmousemove=e=>{
+    if(!isVidDragging||selectedVidMkrIdx<0)return;
+    const{x,y}=canvasXY(e,vcanvas);
+    vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
+    renderMkrList(); updateResults();
+  };
+  vcanvas.onmouseup=()=>{ isVidDragging=false; };
+  vcanvas.style.touchAction='none';
+  vcanvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    const{x,y}=canvasXY({clientX:t.clientX,clientY:t.clientY},vcanvas);
+    const hit=findMarkerAt(x,y,vidMarkers,vcanvas.width);
+    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;if(!player.paused)player.pause();renderMkrList();return;}
+    placeMarker(x,y);
+  },{passive:false});
+  vcanvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(!isVidDragging||selectedVidMkrIdx<0)return;
+    const t=e.touches[0];
+    const{x,y}=canvasXY({clientX:t.clientX,clientY:t.clientY},vcanvas);
+    vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
+    renderMkrList(); updateResults();
+  },{passive:false});
+  vcanvas.addEventListener('touchend',e=>{e.preventDefault();isVidDragging=false;},{passive:false});
+
+  player.ontimeupdate=()=>{
+    const ctx=vcanvas.getContext('2d');
+    const d=player.duration||1;
+    const t2=player.currentTime;
+    document.getElementById('time-disp').textContent=t2.toFixed(3)+'s / '+d.toFixed(2)+'s';
+    document.getElementById('timeline').value=Math.round((t2/d)*10000);
+    renderTimelineMarkers(d);
+    updateResults();
+  };
+}
+
+
 function stopVCam() {
   cancelAnimationFrame(vidAnimId); vidAnimId=null;
   const vc = document.getElementById('vid-canvas');
@@ -2203,17 +2262,28 @@ async function toggleVCam() {
 
     // RAF : dessiner video + overlay dans canvas
     cancelAnimationFrame(vidAnimId);
+    let _lastManualPlace = 0;
     function drawLive() {
       if(!vidStream) return;
       vidAnimId = requestAnimationFrame(drawLive);
       if(player.readyState < 2) return;
       const ctx = vcanvas.getContext('2d');
+      // Si marqueur placé manuellement dans les 2 dernières secondes ET vidéo en pause -> ne pas effacer
+      const manualRecent = (Date.now() - _lastManualPlace) < 2000;
+      if(manualRecent && player.paused) {
+        // Juste redessiner les marqueurs par-dessus sans effacer l'image
+        drawOverlay(ctx, vcanvas, vidMarkers, selectedVidMkrIdx, view);
+        updateAngleOverlay('vid-angles', vidMarkers, view);
+        return;
+      }
       ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
       if(vAutoDetect && !isVidDragging) detectMarkersAuto(ctx,vcanvas,vidMarkers,view,function(){ renderMkrList(); updateResults(); });
       drawOverlay(ctx, vcanvas, vidMarkers, selectedVidMkrIdx, view);
       updateAngleOverlay('vid-angles', vidMarkers, view);
     }
     drawLive();
+    // Exposer _lastManualPlace pour setupVidCanvas
+    vcanvas._setManualPlace = function() { _lastManualPlace = Date.now(); player.pause(); };
     setupVidCanvas(player, vcanvas);
 
   } catch(e) {
