@@ -3083,10 +3083,9 @@ function buildRapport() {
     html += '<div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bord);">📐 Mesures Biomécaniques</div>';
     Object.entries(mesures).forEach(([testId,data]) => {
       const t = TESTS[testId]; if(!t) return;
-      html += '<div class="rpt-test-card">';
-      html += '<div style="font-size:13px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bord);">'+t.name+'</div>';
-      html += buildTestPreview(t, data);
-      html += '</div>';
+      const conclusions_tmp=[];
+      const sectionHTML=buildPrintSection(t,data,conclusions_tmp);
+      if(sectionHTML) html += '<div class="rpt-test-card" style="background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:10px;">'+sectionHTML+'</div>';
     });
   }
 
