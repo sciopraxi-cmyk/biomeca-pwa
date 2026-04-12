@@ -2636,15 +2636,17 @@ function updateResults() {
         html=`<div class="res-side">
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-            <div style="font-size:9px;color:var(--mut);">Inv: ${invD!=null?invD.toFixed(1)+'°':'—'} / Év: ${evD!=null?evD.toFixed(1)+'°':'—'}</div>
-            <div class="rs-pct" style="color:${mobD!=null?clrGen(mobD):'var(--mut)'};">${mobD!=null?Math.round(mobD*100)+'%':'—'}</div>
-            <div style="font-size:9px;color:var(--mut);">Mobilité ÷${t.normMob}</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Inversion: <b>${apV2(invD)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV2(evD)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobDdeg}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div>
+            <div class="rs-pct" style="color:${mobD!=null?clrGen(Math.abs(mobD)):'var(--mut)'};">${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'—'}</div>
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-            <div style="font-size:9px;color:var(--mut);">Inv: ${invG!=null?invG.toFixed(1)+'°':'—'} / Év: ${evG!=null?evG.toFixed(1)+'°':'—'}</div>
-            <div class="rs-pct" style="color:${mobG!=null?clrGen(mobG):'var(--mut)'};">${mobG!=null?Math.round(mobG*100)+'%':'—'}</div>
-            <div style="font-size:9px;color:var(--mut);">Mobilité ÷${t.normMob}</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Inversion: <b>${apV2(invG)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV2(evG)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobGdeg}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div>
+            <div class="rs-pct" style="color:${mobG!=null?clrGen(Math.abs(mobG)):'var(--mut)'};">${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'—'}</div>
           </div>
         </div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos (inversion + éversion)</div>`;
