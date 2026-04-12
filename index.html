@@ -1711,7 +1711,12 @@ function captureVidPhotoSlot(slotIdx) {
   const ctx = tmp.getContext('2d');
   ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
   const view = TESTS[currentTestId]?.view || 'dos';
-  drawOverlay(ctx, tmp, vidMarkers, -1, view);
+  // Pour KFPPA : photo unipodal = seulement les marqueurs du côté concerné
+  const t2 = TESTS[currentTestId];
+  const slot2 = photoSlots[slotIdx];
+  const side2 = slot2?.side || '';
+  const markersForPhoto = (t2?.kfppaPhotos && side2) ? vidMarkers.filter(m=>m.side===side2) : vidMarkers;
+  drawOverlay(ctx, tmp, markersForPhoto, -1, view);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
 
   // Calculer l'angle selon le côté du slot
