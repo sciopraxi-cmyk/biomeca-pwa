@@ -2012,7 +2012,13 @@ function setupVidCanvas(player, vcanvas) {
   vcanvas.onmousedown = e => {
     const {x,y}=canvasXY(e,vcanvas);
     const hit=findMarkerAt(x,y,vidMarkers,vcanvas.width);
-    if(hit>=0){selectedVidMkrIdx=hit;isVidDragging=true;renderMkrList();return;}
+    if(hit>=0){
+      selectedVidMkrIdx=hit;isVidDragging=true;
+      vAutoDetect=false;
+      const bv=document.getElementById('btn-vauto');
+      if(bv){bv.textContent='Auto : OFF';bv.className='btn';}
+      renderMkrList();return;
+    }
     const idx=selectedVidMkrIdx>=0?selectedVidMkrIdx:vidMarkers.findIndex(m=>m.x===null);
     if(idx>=0&&idx<vidMarkers.length){
       vidMarkers[idx].x=x; vidMarkers[idx].y=y;
