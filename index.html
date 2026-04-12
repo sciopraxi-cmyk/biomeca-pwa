@@ -3089,34 +3089,11 @@ function buildRapport() {
     });
   }
 
-  // Section bilan clinique (résumé)
+  // Section bilan clinique - même contenu que le PDF
   const bd = p.bilanData || {};
   if(Object.keys(bd).length > 0) {
-    html += '<div style="font-size:13px;font-weight:700;color:var(--blue);margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--bord);">📋 Bilan Clinique</div>';
-    html += '<div class="card">';
-    // Anamnèse
-    const sportVal = bd.sport_detail || p.sport || '—';
-    const douleurVal = bd.douleur || '—';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
-    html += '<div><div class="stitle" style="margin-bottom:3px;">Sport / Activité</div><div style="font-size:12px;">'+sportVal+'</div></div>';
-    html += '<div><div class="stitle" style="margin-bottom:3px;">Douleur</div><div style="font-size:12px;">'+douleurVal+'</div></div>';
-    if(bd.chaine_musculaire) html += '<div style="grid-column:1/-1;"><div class="stitle" style="margin-bottom:3px;">Chaîne musculaire</div><div style="font-size:12px;">'+bd.chaine_musculaire+'</div></div>';
-    html += '</div>';
-    // Morphostatique
-    const hasMorpho = bd._morpho_face||bd._morpho_face2||bd._morpho_profilG||bd._morpho_profilD;
-    if(hasMorpho) {
-      html += '<div style="display:flex;gap:6px;margin-top:6px;">';
-      ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD'].forEach(k => {
-        if(bd[k]) html += '<img src="'+bd[k]+'" style="flex:1;height:80px;object-fit:contain;border:1px solid var(--bord);border-radius:4px;"/>';
-      });
-      html += '</div>';
-    }
-    // Semelles
-    if(bd._pieds) {
-      html += '<div style="margin-top:8px;"><div class="stitle" style="margin-bottom:3px;">Plan de Semelles</div>';
-      html += '<img src="'+bd._pieds+'" style="max-width:100%;border:1px solid var(--bord);border-radius:4px;"/></div>';
-    }
-    html += '</div>';
+    const bilanHTML = buildBilanPrintSection(bd);
+    if(bilanHTML) html += '<div style="margin-top:16px;">'+bilanHTML+'</div>';
   }
 
   if(!html) html = '<div style="color:var(--mut);text-align:center;padding:20px;font-size:13px;">Aucune donnée enregistrée pour ce patient.</div>';
