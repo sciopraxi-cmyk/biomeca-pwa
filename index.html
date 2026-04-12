@@ -458,6 +458,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
           <select id="cam-select" class="inp" style="font-size:12px;padding:4px 8px;max-width:180px;"></select>
           <button class="btn btn-green" id="btn-cam" onclick="toggleCam()">▶ Activer caméra</button>
           <button class="btn" id="btn-auto" onclick="toggleAutoLive()" style="display:none;">Auto : OFF</button>
+          <button class="btn" id="btn-redetect" onclick="redetectMarkers()" style="display:none;">🎯 Détecter</button>
           <span class="badge bd" id="cam-st">Inactive</span>
         </div>
         <div class="canvas-wrap" id="ph-wrap" style="min-height:200px;display:flex;align-items:center;justify-content:center;">
@@ -1489,6 +1490,10 @@ function launchTest(testId) {
     }
   }
 
+  // Pré-remplir le sélecteur de caméra photo
+  if(testMode === 'photo') {
+    setTimeout(() => enumerateCameras('cam-select'), 300);
+  }
   nav('pg-capture');
 }
 
@@ -1834,6 +1839,7 @@ async function toggleCam() {
       wrap.style.minHeight='auto';
       document.getElementById('ph-info').textContent=`${canvas.width}×${canvas.height}`;
       document.getElementById('btn-auto').style.display='';
+      document.getElementById('btn-redetect').style.display='';
       document.getElementById('cam-st').textContent='Active'; document.getElementById('cam-st').className='badge bg';
       document.getElementById('btn-cam').textContent='⏹ Arrêter'; document.getElementById('btn-cam').className='btn btn-red';
       setupPhotoCanvas(vEl, canvas);
@@ -1904,6 +1910,17 @@ function toggleAutoLive() {
   autoLive=!autoLive;
   document.getElementById('btn-auto').textContent='Auto : '+(autoLive?'ON':'OFF');
   document.getElementById('btn-auto').className=autoLive?'btn btn-green':'btn';
+}
+
+function redetectMarkers() {
+  // Réinitialiser les positions et relancer la détection blob sur tous les marqueurs
+  liveMarkers.forEach(m => { m.x=null; m.y=null; });
+  const canvas = document.getElementById('ph-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const view = TESTS[currentTestId]?.view || 'face';
+  // Forcer la détection blob (pas le placement fixe) en passant markers avec x=null
+  detectMarkersAuto(ctx, canvas, liveMarkers, view, ()=>{ renderMkrList(); updateResults(); });
 }
 
 // ══════════════════════════════════════════════════════
@@ -2153,7 +2170,10 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
                      G: [{x:xG,y:yTop},{x:xG,y:yMid},{x:xG,y:yBot}] };
     ['D','G'].forEach(side => {
       const mkrs = markers.filter(m=>m.side===side);
-      placed[side].forEach((pos,i) => { if(mkrs[i]) { mkrs[i].x=pos.x; mkrs[i].y=pos.y; } });
+      placed[side].forEach((pos,i) => {
+        // Ne placer que si pas encore placé manuellement
+        if(mkrs[i] && mkrs[i].x===null) { mkrs[i].x=pos.x; mkrs[i].y=pos.y; }
+      });
     });
     if(cb) cb(); return;
   }
@@ -2185,7 +2205,8 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
     ['D','G'].forEach(side => {
       const xPos = side==='D' ? xD : xG;
       const mkrs = markers.filter(m=>m.side===side);
-      mkrs.forEach((m,i) => { m.x = xPos; m.y = yStart + i * yStep; });
+      // Ne placer que si pas encore placé manuellement
+      mkrs.forEach((m,i) => { if(m.x===null) { m.x = xPos; m.y = yStart + i * yStep; } });
     });
     if(cb) cb(); return;
   }
