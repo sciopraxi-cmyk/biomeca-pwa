@@ -2345,7 +2345,8 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
       if(ang!==null){
         const B=grp.length>=4?grp[2]:grp[1]; // AP: sommet=CalcaSup(idx2), sinon centre
         const grpPts=grp;
-        const corrAng=computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||"",grpPts);
+        const _mlaT=TESTS[currentTestId]?.markers==='mla'?'mla':(TESTS[currentTestId]?.type||"");
+        const corrAng=computeCorrectedAngle(ang, side, view, _mlaT, grpPts);
         const r2=Math.max(16,W/24);
         const a1=Math.atan2(grp[0].y-B.y,grp[0].x-B.x),a2=Math.atan2(grp[2].y-B.y,grp[2].x-B.x);
         const col=side==='D'?'#4a9eff':side==='G'?'#3ecf72':'#FFD700';
