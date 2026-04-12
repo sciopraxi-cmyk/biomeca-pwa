@@ -2468,6 +2468,29 @@ function updateResults() {
           <div style="font-size:10px;color:var(--orange);margin-top:6px;">Capturez 3 frames : Taligrade · Plantigrade · Digitigrade</div>`;
       }
     }
+  }
+  // Résultats Mobilité/Verrouillage en mode video (photoSlots)
+  if(t.mode==='video' && t.showPhotoSlots) {
+    if(t.normVerrou!==undefined) {
+      const sD=photoSlots.filter(s=>s.side==='D'),sG=photoSlots.filter(s=>s.side==='G');
+      const statD=sD[0]?.angle,pointeD=sD[1]?.angle,statG=sG[0]?.angle,pointeG=sG[1]?.angle;
+      const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+      if(statD!=null||pointeD!=null||statG!=null||pointeG!=null){
+        html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Stat: ${apV(statD)}</div><div style="font-size:9px;color:var(--mut);">Pointe: ${apV(pointeD)}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Stat: ${apV(statG)}</div><div style="font-size:9px;color:var(--mut);">Pointe: ${apV(pointeG)}</div></div></div>`;
+      } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 4 photos</div>`;
+    } else if(t.mobiliteAP) {
+      const p0=photoSlots[0],p1=photoSlots[1];
+      const invD=p0?.angleD,evD=p1?.angleD,invG=p0?.angleG,evG=p1?.angleG;
+      if(invD!=null||evD!=null||invG!=null||evG!=null){
+        const mobD=(invD!=null&&evD!=null)?(Math.abs(invD)+Math.abs(evD))/t.normMob:null;
+        const mobG=(invG!=null&&evG!=null)?(Math.abs(invG)+Math.abs(evG))/t.normMob:null;
+        html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Inv: ${invD!=null?(invD>0?'+':'')+invD.toFixed(1)+'°':'—'}</div><div style="font-size:9px;color:var(--mut);">Év: ${evD!=null?(evD>0?'+':'')+evD.toFixed(1)+'°':'—'}</div><div class="rs-pct" style="color:${mobD!=null?clrGen(mobD):'var(--mut)'};">${mobD!=null?Math.round(mobD*100)+'%':'—'}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Inv: ${invG!=null?(invG>0?'+':'')+invG.toFixed(1)+'°':'—'}</div><div style="font-size:9px;color:var(--mut);">Év: ${evG!=null?(evG>0?'+':'')+evG.toFixed(1)+'°':'—'}</div><div class="rs-pct" style="color:${mobG!=null?clrGen(mobG):'var(--mut)'};">${mobG!=null?Math.round(mobG*100)+'%':'—'}</div></div></div>`;
+      } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos</div>`;
+    }
+    el.innerHTML=html||el.innerHTML;
+    return;
+  }
+  if(false) {
   } else {
     // Mode photo
     if(t.normDiv!==undefined) {
