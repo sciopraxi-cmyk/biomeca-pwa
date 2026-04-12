@@ -166,6 +166,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
   #rpt-print{display:block!important;}
   #rpt-print *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 }
+body.printing .app{display:none!important;}
+body.printing #rpt-print{display:block!important;}
 #rpt-print{display:none;background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;}
 .rp-hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;border-bottom:2.5px solid #c8a96e;margin-bottom:16px;}
 .rp-logo-wrap .rp-logo{font-size:17px;font-weight:700;color:#c8a96e;}
@@ -3132,17 +3134,12 @@ function printReport() {
     ? fullContent
     : '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
 
-  // Masquer l'app, afficher la page impression
-  const appEl = document.querySelector('.app');
-  const printEl = document.getElementById('rpt-print');
-  if(appEl) appEl.style.display = 'none';
-  if(printEl) printEl.style.display = 'block';
-
+  // Lancer l'impression via CSS @media print
+  document.body.classList.add('printing');
   setTimeout(() => {
     window.print();
-    if(appEl) appEl.style.display = '';
-    if(printEl) printEl.style.display = 'none';
-  }, 500);
+    setTimeout(() => document.body.classList.remove('printing'), 100);
+  }, 300);
 }
 
 function buildBilanPrintSection(bd) {
