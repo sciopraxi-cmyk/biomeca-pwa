@@ -1712,36 +1712,46 @@ function captureVidPhotoSlot(slotIdx) {
   const player = document.getElementById('vid-el');
   const vcanvas = document.getElementById('vid-canvas');
   if(!player || !vcanvas) { alert('Activez la caméra ou importez une vidéo.'); return; }
+  const t = TESTS[currentTestId];
+  const view = t?.view || 'dos';
+  const slot = photoSlots[slotIdx];
+  const side = slot?.side || '';
+
+  // Filtrer les marqueurs selon le côté du slot (Verrouillage et KFPPA unipodal)
+  let markersForPhoto = vidMarkers;
+  if(side && (t?.kfppaPhotos || t?.normVerrou !== undefined)) {
+    markersForPhoto = vidMarkers.filter(m => m.side === side);
+  }
 
   const tmp = document.createElement('canvas');
   tmp.width = vcanvas.width; tmp.height = vcanvas.height;
   const ctx = tmp.getContext('2d');
   ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
-  const view = TESTS[currentTestId]?.view || 'dos';
-  // Pour KFPPA : photo unipodal = seulement les marqueurs du côté concerné
-  const t2 = TESTS[currentTestId];
-  const slot2 = photoSlots[slotIdx];
-  const side2 = slot2?.side || '';
-  const markersForPhoto = (t2?.kfppaPhotos && side2) ? vidMarkers.filter(m=>m.side===side2) : vidMarkers;
   drawOverlay(ctx, tmp, markersForPhoto, -1, view);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
 
-  // Calculer l'angle selon le côté du slot
-  const slot = photoSlots[slotIdx];
-  const side = slot.side || '';
-  const markers = side ? vidMarkers.filter(m=>m.side===side) : vidMarkers;
-  const rawAng = calcAngle3(markers);
-  const corrAng = computeCorrectedAngle(rawAng, side, view, TESTS[currentTestId]?.type||'');
-
+  // Calculer l'angle selon le côté
+  const rawAng = calcAngle3(markersForPhoto);
+  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'');
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
+
   // Mobilité AP : stocker angles D et G séparément
-  if(t2?.mobiliteAP) {
-    const mkrD=vidMarkers.filter(m=>m.side==='D');
-    const mkrG=vidMarkers.filter(m=>m.side==='G');
-    photoSlots[slotIdx].angleD=computeCorrectedAngle(calcAngle3(mkrD),'D',view,t2?.type||'');
-    photoSlots[slotIdx].angleG=computeCorrectedAngle(calcAngle3(mkrG),'G',view,t2?.type||'');
+  if(t?.mobiliteAP) {
+    const mkrD = vidMarkers.filter(m=>m.side==='D');
+    const mkrG = vidMarkers.filter(m=>m.side==='G');
+    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'');
+    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'');
   }
+
+  // KFPPA photo bipodale : calculer angleD et angleG séparément
+  if(t?.kfppaPhotos && !side) {
+    const mkrD = vidMarkers.filter(m=>m.side==='D');
+    const mkrG = vidMarkers.filter(m=>m.side==='G');
+    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'');
+    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'');
+  }
+
   renderVidPhotoGrid();
   updateResults();
 }
