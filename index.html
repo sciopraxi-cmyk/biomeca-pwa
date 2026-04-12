@@ -1735,6 +1735,13 @@ function captureVidPhotoSlot(slotIdx) {
 
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
+  // Mobilité AP : stocker angles D et G séparément
+  if(t2?.mobiliteAP) {
+    const mkrD=vidMarkers.filter(m=>m.side==='D');
+    const mkrG=vidMarkers.filter(m=>m.side==='G');
+    photoSlots[slotIdx].angleD=computeCorrectedAngle(calcAngle3(mkrD),'D',view,t2?.type||'');
+    photoSlots[slotIdx].angleG=computeCorrectedAngle(calcAngle3(mkrG),'G',view,t2?.type||'');
+  }
   renderVidPhotoGrid();
   updateResults();
 }
@@ -2476,7 +2483,26 @@ function updateResults() {
       const statD=sD[0]?.angle,pointeD=sD[1]?.angle,statG=sG[0]?.angle,pointeG=sG[1]?.angle;
       const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
       if(statD!=null||pointeD!=null||statG!=null||pointeG!=null){
-        html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Stat: ${apV(statD)}</div><div style="font-size:9px;color:var(--mut);">Pointe: ${apV(pointeD)}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Stat: ${apV(statG)}</div><div style="font-size:9px;color:var(--mut);">Pointe: ${apV(pointeG)}</div></div></div>`;
+        const rfD=pointeD!=null?pointeD/t.normVerrou:null;
+        const molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/t.normVerrou:null;
+        const rfG=pointeG!=null?pointeG/t.normVerrou:null;
+        const molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/t.normVerrou:null;
+        html=`<div class="res-side">
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
+            <div style="font-size:9px;color:var(--mut);">Stat: ${apV(statD)}</div>
+            <div style="font-size:9px;color:var(--mut);">Pointe: ${apV(pointeD)}</div>
+            <div class="rs-pct" style="color:${rfD!=null?clrGen(Math.abs(rfD)):'var(--mut)'};">${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'}</div>
+            <div style="font-size:9px;color:var(--mut);">RF · Mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'}</div>
+          </div>
+          <div class="res-side-card">
+            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
+            <div style="font-size:9px;color:var(--mut);">Stat: ${apV(statG)}</div>
+            <div style="font-size:9px;color:var(--mut);">Pointe: ${apV(pointeG)}</div>
+            <div class="rs-pct" style="color:${rfG!=null?clrGen(Math.abs(rfG)):'var(--mut)'};">${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'}</div>
+            <div style="font-size:9px;color:var(--mut);">RF · Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'}</div>
+          </div>
+        </div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 4 photos</div>`;
     } else if(t.mobiliteAP) {
       const p0=photoSlots[0],p1=photoSlots[1];
