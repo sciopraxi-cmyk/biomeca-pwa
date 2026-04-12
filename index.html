@@ -1798,7 +1798,6 @@ function capturePhotoSlot(slotIdx) {
   const view = t?.view || 'face';
   const slot = photoSlots[slotIdx];
   const side = slot.side || '';
-  // Filtrer marqueurs selon le côté (Verrouillage AP)
   const markersForPhoto = side ? liveMarkers.filter(m=>m.side===side) : liveMarkers;
   const tmp = document.createElement('canvas');
   tmp.width = canvas.width; tmp.height = canvas.height;
@@ -1810,14 +1809,12 @@ function capturePhotoSlot(slotIdx) {
   const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'');
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
-  // Mobilité AP : stocker angles D et G séparément
-  if(t?.mobiliteAP) {
+  if(t && t.mobiliteAP) {
     const mkrD = liveMarkers.filter(m=>m.side==='D');
     const mkrG = liveMarkers.filter(m=>m.side==='G');
-    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'');
-    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'');
+    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t.type||'');
+    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t.type||'');
   }
-  if(t&&t.mobiliteAP){const mkrD=liveMarkers.filter(m=>m.side==='D');const mkrG=liveMarkers.filter(m=>m.side==='G');photoSlots[slotIdx].angleD=computeCorrectedAngle(calcAngle3(mkrD),'D',view,t.type||'');photoSlots[slotIdx].angleG=computeCorrectedAngle(calcAngle3(mkrG),'G',view,t.type||'');}
   renderPhotoGrid(); updateResults();
 }
 
