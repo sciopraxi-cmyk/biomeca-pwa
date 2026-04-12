@@ -2499,13 +2499,15 @@ function updateResults() {
       if(capturedFrames.length>=3) {
         const a0D=capturedFrames[0].angD,a1D=capturedFrames[1].angD,a2D=capturedFrames[2].angD;
         const a0G=capturedFrames[0].angG,a1G=capturedFrames[1].angG,a2G=capturedFrames[2].angG;
-        const amD=a0D!==null&&a1D!==null?Math.abs(a0D-a1D)/t.normAm:null;
-        const prD=a2D!==null&&a1D!==null?Math.abs(a2D-a1D)/t.normAm:null;
-        const amG=a0G!==null&&a1G!==null?Math.abs(a0G-a1G)/t.normAm:null;
-        const prG=a2G!==null&&a1G!==null?Math.abs(a2G-a1G)/t.normAm:null;
+        // Amorti = (Taligrade - Plantigrade) / norme
+        // Propulsion = (Digitigrade - Plantigrade) / norme
+        const amD=a0D!==null&&a1D!==null?(a0D-a1D)/t.normAm:null;
+        const prD=a2D!==null&&a1D!==null?(a2D-a1D)/t.normAm:null;
+        const amG=a0G!==null&&a1G!==null?(a0G-a1G)/t.normAm:null;
+        const prG=a2G!==null&&a1G!==null?(a2G-a1G)/t.normAm:null;
         html=`<div class="res-side">
-          ${amProCard('D',amD,prD,t.normAm)}
-          ${amProCard('G',amG,prG,t.normAm)}
+          ${amProCard('D',amD,prD,t.normAm,a0D,a1D,a2D)}
+          ${amProCard('G',amG,prG,t.normAm,a0G,a1G,a2G)}
         </div>`;
       } else {
         const angD=calcBilateral(vidMarkers,view,'D');
@@ -2649,16 +2651,18 @@ function quickAngleCard(side, ang) {
   </div>`;
 }
 
-function amProCard(side, am, pr, norm) {
+function amProCard(side, am, pr, norm, a0, a1, a2) {
   const c=side==='D'?'#4a9eff':'#3ecf72';
-  const cAm=am!==null?clrGen(am):'var(--mut)';
-  const cPr=pr!==null?clrGen(pr):'var(--mut)';
+  const cAm=am!==null?clrGen(Math.abs(am)):'var(--mut)';
+  const cPr=pr!==null?clrGen(Math.abs(pr)):'var(--mut)';
+  const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
   return `<div class="res-side-card">
     <div class="rs-title" style="color:${c};">Pied ${side}</div>
-    <div style="font-size:10px;color:var(--mut);">Amorti</div>
-    <div class="rs-pct" style="color:${cAm};">${am!==null?Math.round(am*100)+'%':'—'}</div>
+    <div style="font-size:9px;color:var(--mut);">Tal: ${apV(a0)} · Plan: ${apV(a1)} · Dig: ${apV(a2)}</div>
+    <div style="font-size:10px;color:var(--mut);margin-top:4px;">Amorti</div>
+    <div class="rs-pct" style="color:${cAm};">${am!==null?Math.round(Math.abs(am)*100)+'%':'—'}</div>
     <div style="font-size:10px;color:var(--mut);margin-top:3px;">Propulsion</div>
-    <div class="rs-pct" style="color:${cPr};">${pr!==null?Math.round(pr*100)+'%':'—'}</div>
+    <div class="rs-pct" style="color:${cPr};">${pr!==null?Math.round(Math.abs(pr)*100)+'%':'—'}</div>
   </div>`;
 }
 
