@@ -2032,6 +2032,11 @@ function setupVidCanvas(player, vcanvas) {
     const{x,y}=canvasXY(e,vcanvas);
     vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
     renderMkrList(); updateResults();
+    // Redessiner immédiatement (important en pause)
+    const ctx2=vcanvas.getContext('2d');
+    ctx2.drawImage(player,0,0,vcanvas.width,vcanvas.height);
+    drawOverlay(ctx2,vcanvas,vidMarkers,selectedVidMkrIdx,TESTS[currentTestId]?.view||'face');
+    updateAngleOverlay('vid-angles',vidMarkers,TESTS[currentTestId]?.view||'face');
   };
   vcanvas.onmouseup=()=>isVidDragging=false;
   vcanvas.ontouchstart=e=>{e.preventDefault();const t=e.touches[0];vcanvas.onmousedown({clientX:t.clientX,clientY:t.clientY});};
