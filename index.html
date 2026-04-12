@@ -2395,15 +2395,10 @@ function calcAngle3(pts) {
 // Détecte si l'angle des points AP s'ouvre à droite (+) ou à gauche (-)
 function calcAngleSign(pts) {
   const placed=pts.filter(p=>p.x!==null);
-  if(placed.length<3) return 1;
-  const [A,B,C] = placed.length>=4 ? [placed[1],placed[2],placed[3]] : placed;
-  // Cross product Z en coordonnées écran (y vers le bas = inversé)
-  // cross > 0 en écran = calca penche à GAUCHE (car y inversé)
-  // cross < 0 en écran = calca penche à DROITE
-  const cross = (B.x-A.x)*(C.y-B.y) - (B.y-A.y)*(C.x-B.x);
-  // Pied D: penche droite (cross<0) = inversion(+) → return -cross sign
-  // Pied G: penche gauche (cross>0) = inversion(+) → return +cross sign  
-  return cross >= 0 ? 1 : -1; // cross>=0 = gauche = Inv pour G, Ev pour D
+  if(placed.length<2) return 1;
+  const top=placed[0];
+  const bot=placed.length>=4?placed[3]:placed[placed.length-1];
+  return bot.x>top.x?1:-1;
 }
 
 // Calculer l'angle corrigé selon le contexte
