@@ -1351,16 +1351,16 @@ const MARKER_TEMPLATES = {
     {name:'FMHp', color:'#ec4899', side:''},
   ],
   'ap-bi': [
-    // Droite
-    {name:'Pt4 D',  color:'#8892a4', side:'D'},
-    {name:'Pt3 D',  color:'#8892a4', side:'D'},
-    {name:'Pt2 D',  color:'#93c5fd', side:'D'},
-    {name:'Pt1 D',  color:'#f5a623', side:'D'},
+    // Droite (point 1=supérieur → 4=inférieur)
+    {name:'Milieu mollet D',          color:'#f5a623', side:'D'},
+    {name:'Jonction musculo-tend. D', color:'#93c5fd', side:'D'},
+    {name:'Calca supérieur D',        color:'#8892a4', side:'D'},
+    {name:'Calca inférieur D',        color:'#8892a4', side:'D'},
     // Gauche
-    {name:'Pt4 G',  color:'#aab0bc', side:'G'},
-    {name:'Pt3 G',  color:'#aab0bc', side:'G'},
-    {name:'Pt2 G',  color:'#b0d8ff', side:'G'},
-    {name:'Pt1 G',  color:'#ffc04a', side:'G'},
+    {name:'Milieu mollet G',          color:'#ffc04a', side:'G'},
+    {name:'Jonction musculo-tend. G', color:'#b0d8ff', side:'G'},
+    {name:'Calca supérieur G',        color:'#aab0bc', side:'G'},
+    {name:'Calca inférieur G',        color:'#aab0bc', side:'G'},
   ],
 };
 
@@ -1898,22 +1898,46 @@ function toggleAutoLive() {
 
 async function enumerateCameras(selectId) {
   try {
+    // Demander permission d'abord pour avoir les labels
+    await navigator.mediaDevices.getUserMedia({video:true}).then(s=>s.getTracks().forEach(t=>t.stop())).catch(()=>{});
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cameras = devices.filter(d => d.kind === 'videoinput');
     const sel = document.getElementById(selectId);
     if (!sel) return;
     const current = sel.value;
-    sel.innerHTML = cameras.map((d, i) => 
-      `<option value="${d.deviceId}">${d.label || 'Caméra ' + (i+1)}</option>`
-    ).join('');
-    if (current) sel.value = current;
+    sel.innerHTML = cameras.map((d, i) => {
+      // Nettoyer le label : enlever les infos techniques
+      let label = d.label || ('Caméra ' + (i+1));
+      if(label.includes('(')) label = label.split('(')[0].trim();
+      if(label.length > 30) label = label.substring(0, 30) + '…';
+      return `<option value="${d.deviceId}">${label}</option>`;
+    }).join('');
+    if (current && cameras.find(d=>d.deviceId===current)) sel.value = current;
+    // Si un stream est actif, sélectionner la caméra actuellement utilisée
+    if(vidStream) {
+      const activeTrack = vidStream.getVideoTracks()[0];
+      if(activeTrack) {
+        const settings = activeTrack.getSettings();
+        if(settings.deviceId) {
+          const opt = sel.querySelector(`option[value="${settings.deviceId}"]`);
+          if(opt) sel.value = settings.deviceId;
+        }
+      }
+    }
   } catch(e) { console.warn('enumerateCameras:', e); }
 }
 
 async function toggleVCam() {
   if(vidStream) { stopVCam(); return; }
   try {
-    vidStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}},audio:false});
+    const selCam = document.getElementById('vcam-select')?.value;
+    const constraints = {
+      audio: false,
+      video: selCam
+        ? {deviceId:{exact:selCam}, width:{ideal:1280}, height:{ideal:720}}
+        : {facingMode:'environment', width:{ideal:1280}, height:{ideal:720}}
+    };
+    vidStream=await navigator.mediaDevices.getUserMedia(constraints);
     const player=document.getElementById('vid-el');
     const vcanvas=document.getElementById('vid-canvas');
     player.srcObject=vidStream; player.play();
@@ -1924,11 +1948,12 @@ async function toggleVCam() {
       document.getElementById('btn-vauto').style.display='';
       document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
       document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
-      // Auto-détect ON par défaut
       vAutoDetect=true; document.getElementById('btn-vauto').textContent='Auto : ON'; document.getElementById('btn-vauto').className='btn btn-green';
       setupVidCanvas(player,vcanvas);
+      // Mettre à jour le sélecteur avec les vraies caméras disponibles
+      enumerateCameras('vcam-select');
     };
-  } catch(e) { document.getElementById('vid-info').textContent='⚠ Accès caméra refusé'; }
+  } catch(e) { document.getElementById('vid-info').textContent='⚠ Accès caméra refusé : '+e.message; }
 }
 
 function stopVCam() {
@@ -2095,8 +2120,64 @@ function findMarkerAt(x, y, markers, cw) {
 
 // Détection automatique des marqueurs réfléchissants
 function detectMarkersAuto(ctx, canvas, markers, view, cb) {
-  const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-  const W=canvas.width,H=canvas.height;
+  // Placement automatique intelligent selon le type de test
+  const W=canvas.width, H=canvas.height;
+  const testId = currentTestId || '';
+  const markersType = TESTS[testId]?.markers || '';
+
+  // ─── KFPPA (vue face) : lignes verticales EIAS→Rotule→Tarse
+  // Vue face : côté D de la personne = gauche de l'image, côté G = droite
+  if(markersType === 'genou-bi') {
+    const midX = W / 2;
+    // Côté D : ligne verticale à gauche de l'image (x ~25% de W)
+    const xD = W * 0.25;
+    const xG = W * 0.75;
+    // EIAS en haut (y ~20%), Rotule au centre (y ~50%), Tarse en bas (y ~80%)
+    const yTop = H * 0.20, yMid = H * 0.50, yBot = H * 0.80;
+
+    const placed = { D: [{x:xD,y:yTop},{x:xD,y:yMid},{x:xD,y:yBot}],
+                     G: [{x:xG,y:yTop},{x:xG,y:yMid},{x:xG,y:yBot}] };
+    ['D','G'].forEach(side => {
+      const mkrs = markers.filter(m=>m.side===side);
+      placed[side].forEach((pos,i) => { if(mkrs[i]) { mkrs[i].x=pos.x; mkrs[i].y=pos.y; } });
+    });
+    if(cb) cb(); return;
+  }
+
+  // ─── MLA (vue profil) : angle à sommet supérieur FMHp - TN - CAp
+  // Ordre dans le template : CAp, TN, FMHp
+  // FMHp à gauche, TN au sommet (haut centre), CAp à droite
+  if(markersType === 'mla') {
+    const fmhp = markers.find(m=>m.name.startsWith('FMHp')||m.name==='FMHp');
+    const tn   = markers.find(m=>m.name.startsWith('TN')||m.name==='TN');
+    const cap  = markers.find(m=>m.name.startsWith('CAp')||m.name==='CAp');
+    if(fmhp && tn && cap) {
+      fmhp.x = W * 0.20; fmhp.y = H * 0.65; // gauche, bas
+      tn.x   = W * 0.50; tn.y   = H * 0.30; // centre, haut (sommet)
+      cap.x  = W * 0.80; cap.y  = H * 0.65; // droite, bas
+    }
+    if(cb) cb(); return;
+  }
+
+  // ─── AP-BI (vue dos) : lignes verticales point1→4
+  // Vue dos : côté D = droite image, côté G = gauche image
+  // Point 1 (Milieu mollet) en haut, point 4 (Calca inf) en bas
+  if(markersType === 'ap-bi') {
+    const xD = W * 0.70; // droite image = côté D personne (vue dos)
+    const xG = W * 0.30; // gauche image = côté G personne (vue dos)
+    const yStep = H * 0.20;
+    const yStart = H * 0.20;
+
+    ['D','G'].forEach(side => {
+      const xPos = side==='D' ? xD : xG;
+      const mkrs = markers.filter(m=>m.side===side);
+      mkrs.forEach((m,i) => { m.x = xPos; m.y = yStart + i * yStep; });
+    });
+    if(cb) cb(); return;
+  }
+
+  // ─── Détection visuelle générique (blobs lumineux)
+  const data=ctx.getImageData(0,0,W,H).data;
   const blobs=[]; const vis=new Uint8Array(W*H);
   for(let y=2;y<H-2;y+=2){
     for(let x=2;x<W-2;x+=2){
@@ -2120,31 +2201,18 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
     }
   }
 
-  // Assigner blobs aux marqueurs selon la vue et le côté
-  const midX=canvas.width/2;
+  const midX=W/2;
   if(view==='face'||view==='dos') {
-    // Séparer blobs gauche/droite de l'image
-    // Vue face: pied droit de la personne = côté gauche image (et vice versa)
-    // Vue dos: pied droit de la personne = côté droit image
     const blobsLeft=blobs.filter(b=>b.x<midX).sort((a,b2)=>a.y-b2.y);
     const blobsRight=blobs.filter(b=>b.x>=midX).sort((a,b2)=>a.y-b2.y);
-
-    // Vue de face : pied droit de la personne est côté droit de l'image non... 
-    // La personne est de face donc sa droite est à gauche de l'image
-    // Vue dos : pied droit = côté droit image
-    let blobsD, blobsG;
-    if(view==='dos') { blobsD=blobsRight; blobsG=blobsLeft; }
-    else { blobsD=blobsLeft; blobsG=blobsRight; } // face: droite personne = gauche image... 
-    // En réalité vue face: droite = droite image (le praticien voit la personne de face)
-    // Convention : vue face → droite personne = droite image
-    blobsD=blobsRight; blobsG=blobsLeft;
-
+    // Vue dos : D=droite image / Vue face : D=gauche image
+    const blobsD = view==='dos' ? blobsRight : blobsLeft;
+    const blobsG = view==='dos' ? blobsLeft  : blobsRight;
     const unplacedD=markers.filter(m=>m.side==='D'&&m.x===null);
     const unplacedG=markers.filter(m=>m.side==='G'&&m.x===null);
     blobsD.slice(0,unplacedD.length).forEach((b,i)=>{if(unplacedD[i]){unplacedD[i].x=b.x;unplacedD[i].y=b.y;}});
     blobsG.slice(0,unplacedG.length).forEach((b,i)=>{if(unplacedG[i]){unplacedG[i].x=b.x;unplacedG[i].y=b.y;}});
   } else {
-    // Vue profil : 1 seul côté
     blobs.sort((a,b)=>a.y-b.y);
     const unplaced=markers.filter(m=>m.x===null);
     blobs.slice(0,unplaced.length).forEach((b,i)=>{if(unplaced[i]){unplaced[i].x=b.x;unplaced[i].y=b.y;}});
