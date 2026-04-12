@@ -2547,8 +2547,10 @@ function updateResults() {
       const p0=photoSlots[0],p1=photoSlots[1];
       const invD=p0?.angleD,evD=p1?.angleD,invG=p0?.angleG,evG=p1?.angleG;
       if(invD!=null||evD!=null||invG!=null||evG!=null){
-        const mobD=(invD!=null&&evD!=null)?(Math.abs(invD)+Math.abs(evD))/t.normMob:null;
-        const mobG=(invG!=null&&evG!=null)?(Math.abs(invG)+Math.abs(evG))/t.normMob:null;
+        // Mobilité = (Inversion - Éversion) / norme
+        // Inv=+ Ev=- donc (Inv - Ev) = Inv + |Ev| si Ev<0, ou Inv - Ev si Ev>0 (pas d'éversion)
+        const mobD=(invD!=null&&evD!=null)?(invD-evD)/t.normMob:null;
+        const mobG=(invG!=null&&evG!=null)?(invG-evG)/t.normMob:null;
         html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Inv: ${invD!=null?(invD>0?'+':'')+invD.toFixed(1)+'°':'—'}</div><div style="font-size:9px;color:var(--mut);">Év: ${evD!=null?(evD>0?'+':'')+evD.toFixed(1)+'°':'—'}</div><div class="rs-pct" style="color:${mobD!=null?clrGen(mobD):'var(--mut)'};">${mobD!=null?Math.round(mobD*100)+'%':'—'}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Inv: ${invG!=null?(invG>0?'+':'')+invG.toFixed(1)+'°':'—'}</div><div style="font-size:9px;color:var(--mut);">Év: ${evG!=null?(evG>0?'+':'')+evG.toFixed(1)+'°':'—'}</div><div class="rs-pct" style="color:${mobG!=null?clrGen(mobG):'var(--mut)'};">${mobG!=null?Math.round(mobG*100)+'%':'—'}</div></div></div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos</div>`;
     }
