@@ -1829,8 +1829,8 @@ function capturePhotoSlot(slotIdx) {
   if(t && t.mobiliteAP) {
     const mkrD = liveMarkers.filter(m=>m.side==='D');
     const mkrG = liveMarkers.filter(m=>m.side==='G');
-    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t.type||'');
-    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t.type||'');
+    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t.type||'',mkrD);
+    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t.type||'',mkrG);
   }
   renderPhotoGrid(); updateResults();
 }
@@ -2320,7 +2320,8 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
       const ang=calcAngle3(grp);
       if(ang!==null){
         const B=grp.length>=4?grp[2]:grp[1]; // AP: sommet=CalcaSup(idx2), sinon centre
-        const corrAng=computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||"");
+        const grpPts=grp;
+        const corrAng=computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||"",grpPts);
         const r2=Math.max(16,W/24);
         const a1=Math.atan2(grp[0].y-B.y,grp[0].x-B.x),a2=Math.atan2(grp[2].y-B.y,grp[2].x-B.x);
         const col=side==='D'?'#4a9eff':side==='G'?'#3ecf72':'#FFD700';
@@ -2384,8 +2385,6 @@ function updateAngleOverlay(elId, markers, view) {
 function calcAngle3(pts) {
   const placed=pts.filter(p=>p.x!==null);
   if(placed.length<3) return null;
-  // Si 4 points (AP-BI) : angle autour du Calca supérieur = points [1,2,3]
-  // Si 3 points (KFPPA, MLA) : angle autour du point central [0,1,2]
   const [A,B,C] = placed.length>=4 ? [placed[1],placed[2],placed[3]] : placed;
   const v1={x:A.x-B.x,y:A.y-B.y},v2={x:C.x-B.x,y:C.y-B.y};
   const dot=v1.x*v2.x+v1.y*v2.y;
@@ -2393,17 +2392,35 @@ function calcAngle3(pts) {
   return mag===0?null:Math.acos(Math.max(-1,Math.min(1,dot/mag)))*180/Math.PI;
 }
 
+// Détecte si l'angle des points AP s'ouvre à droite (+) ou à gauche (-)
+function calcAngleSign(pts) {
+  const placed=pts.filter(p=>p.x!==null);
+  if(placed.length<3) return 1;
+  const [A,B,C] = placed.length>=4 ? [placed[1],placed[2],placed[3]] : placed;
+  // Cross product Z : positif = virage gauche→droite, négatif = virage droite→gauche
+  const cross = (B.x-A.x)*(C.y-B.y) - (B.y-A.y)*(C.x-B.x);
+  return cross > 0 ? 1 : -1;
+}
+
 // Calculer l'angle corrigé selon le contexte
 // MLA: angle aigu brut (pas de correction)
 // KFPPA: 180 - angle (valgum=+, varum=-)
 // Arrière-pied: angle brut avec signe (inversion=+, éversion=-)
-function computeCorrectedAngle(rawAng, side, view, testType) {
+function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   if(rawAng===null) return null;
   if(testType==='mla') return rawAng;
   const incl = 180 - rawAng;
-  // Vue dos (tests AP) : Inversion=+ Éversion=−
-  // Côté D : inclinaison droite = inversion = + (incl déjà correct)
-  // Côté G : inclinaison gauche = inversion = + (inverser le signe)
+  // Vue dos : utiliser le cross product pour détecter le sens réel
+  // cross > 0 = calca penche à droite
+  // Pied D : droite = inversion(+), gauche = éversion(-)
+  // Pied G : droite = éversion(-), gauche = inversion(+)
+  if(view==='dos' && pts) {
+    const sign = calcAngleSign(pts);
+    // sign=+1 : angle ouvre à droite
+    if(side==='D') return sign * incl;  // D: droite=inversion(+)
+    if(side==='G') return -sign * incl; // G: droite=éversion(-), gauche=inversion(+)
+    return incl;
+  }
   if(view==='dos' && side==='G') return -incl;
   return incl;
 }
