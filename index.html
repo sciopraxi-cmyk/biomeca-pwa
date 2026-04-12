@@ -2628,9 +2628,11 @@ function updateResults() {
       const invG=p0?.angleG, evG=p1?.angleG;
       const hasD=invD!=null&&evD!=null, hasG=invG!=null&&evG!=null;
       if(hasD||hasG){
-        const mobD=hasD?(Math.abs(invD)+Math.abs(evD))/t.normMob:null;
-        const mobG=hasG?(Math.abs(invG)+Math.abs(evG))/t.normMob:null;
-        const signLabel=(v,s)=>v==null?'—':`${v>0?'Inv':'Év'} ${v.toFixed(1)}°`;
+        const mobD=hasD?(invD-evD)/t.normMob:null;
+        const mobG=hasG?(invG-evG)/t.normMob:null;
+        const mobDdeg=hasD?(invD-evD).toFixed(1)+'°':'—';
+        const mobGdeg=hasG?(invG-evG).toFixed(1)+'°':'—';
+        const apV2=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
         html=`<div class="res-side">
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
