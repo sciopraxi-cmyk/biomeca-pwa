@@ -280,7 +280,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
     </div>
     <div style="margin-bottom:20px;">
       <div style="font-size:11px;color:var(--mut);margin-bottom:5px;font-weight:500;">Mot de passe</div>
-      <input id="pwa-pwd" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')pwaLogin()"/>
+      <input id="pwa-pwd" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter'){if(typeof pwaLogin==='function')pwaLogin();else document.getElementById('pwa-login-btn').click();}"/>
     </div>
     <button onclick="pwaLogin()" id="pwa-login-btn" class="btn btn-blue" style="width:100%;padding:12px;font-size:15px;font-weight:600;">Se connecter</button>
     <div id="pwa-login-err" style="display:none;margin-top:10px;background:var(--red-d);color:var(--red);padding:8px 12px;border-radius:var(--rs);font-size:12px;text-align:center;"></div>
@@ -2527,7 +2527,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
     </div>
     <div style="margin-bottom:20px;">
       <div style="font-size:11px;color:var(--mut);margin-bottom:5px;font-weight:500;">Mot de passe</div>
-      <input id="pwa-pwd" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')pwaLogin()"/>
+      <input id="pwa-pwd" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter'){if(typeof pwaLogin==='function')pwaLogin();else document.getElementById('pwa-login-btn').click();}"/>
     </div>
     <button onclick="pwaLogin()" id="pwa-login-btn" class="btn btn-blue" style="width:100%;padding:12px;font-size:15px;font-weight:600;">Se connecter</button>
     <div id="pwa-login-err" style="display:none;margin-top:10px;background:var(--red-d);color:var(--red);padding:8px 12px;border-radius:var(--rs);font-size:12px;text-align:center;"></div>
