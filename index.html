@@ -1618,6 +1618,7 @@ function renderPatientList() {
         </div>
         <span class="${active?'badge bb':'badge bd'}">${active?'Actif':'—'}</span>
         <button class="btn btn-blue" style="font-size:11px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Choisir</button>
+        <button class="btn" style="font-size:11px;" onclick="editPatient(${i})">✏️</button>
         <button class="btn" style="color:var(--red);font-size:11px;" onclick="deletePatient(${i})">✕</button>
       </div>
       <div style="padding-left:40px;">
@@ -1667,6 +1668,59 @@ function deletePraticien(i) {
 }
 
 
+
+function editPatient(idx) {
+  const p = patients[idx];
+  if(!p) return;
+  // Remplir le formulaire de création avec les données existantes
+  document.getElementById('np-nom').value = p.nom||'';
+  document.getElementById('np-prenom').value = p.prenom||'';
+  document.getElementById('np-ddn').value = p.ddn||'';
+  document.getElementById('np-sport').value = p.sport||'';
+  if(document.getElementById('np-metier')) document.getElementById('np-metier').value = p.metier||'';
+  document.getElementById('np-lat').value = p.lat||'';
+  document.getElementById('np-poids').value = p.poids||'';
+  document.getElementById('np-taille').value = p.taille||'';
+  document.getElementById('np-motif').value = p.motif||'';
+  if(document.getElementById('np-prat')) document.getElementById('np-prat').value = p.pratId||'';
+  // Changer le bouton créer en bouton sauvegarder modification
+  const btn = document.querySelector('#pg-patients button[onclick="createPatient()"]');
+  if(btn) {
+    btn.textContent = '✓ Sauvegarder modifications';
+    btn.onclick = () => saveEditPatient(idx);
+  }
+  // Scroll vers le formulaire
+  document.getElementById('np-nom').scrollIntoView({behavior:'smooth'});
+  document.getElementById('np-nom').focus();
+}
+
+function saveEditPatient(idx) {
+  const p = patients[idx];
+  if(!p) return;
+  const nom = document.getElementById('np-nom').value.trim();
+  const prenom = document.getElementById('np-prenom').value.trim();
+  if(!nom || !prenom) { alert('Nom et prénom obligatoires.'); return; }
+  p.nom = nom;
+  p.prenom = prenom;
+  p.ddn = document.getElementById('np-ddn').value;
+  p.sport = document.getElementById('np-sport').value;
+  p.metier = document.getElementById('np-metier')?.value||'';
+  p.lat = document.getElementById('np-lat').value;
+  p.poids = document.getElementById('np-poids').value;
+  p.taille = document.getElementById('np-taille').value;
+  p.motif = document.getElementById('np-motif').value;
+  p.pratId = document.getElementById('np-prat')?.value||'';
+  savePatients();
+  if(currentPatient?.id === p.id) selectPatient(p);
+  // Réinitialiser le bouton
+  const btn = document.querySelector('#pg-patients button[onclick*="saveEditPatient"]');
+  if(btn) { btn.textContent = '+ Créer dossier'; btn.onclick = createPatient; }
+  ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille','np-motif'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  renderPatientList();
+  alert('✓ Patient modifié : '+p.prenom+' '+p.nom);
+}
 function createBilanInitial(patIdx) {
   const p = patients[patIdx];
   if(!p) return;
