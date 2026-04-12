@@ -455,7 +455,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
       <!-- MODE PHOTO -->
       <div id="mode-photo">
         <div class="cam-ctrls">
-          <button class="btn btn-green" id="btn-cam" onclick="toggleCam()">Activer caméra</button>
+          <select id="cam-select" class="inp" style="font-size:12px;padding:4px 8px;max-width:180px;"></select>
+          <button class="btn btn-green" id="btn-cam" onclick="toggleCam()">▶ Activer caméra</button>
           <button class="btn" id="btn-auto" onclick="toggleAutoLive()" style="display:none;">Auto : OFF</button>
           <span class="badge bd" id="cam-st">Inactive</span>
         </div>
@@ -1169,6 +1170,7 @@ async function initPWA() {
   // Pas de session valide: afficher le login
   document.getElementById('pwa-login').style.display = 'flex';
   enumerateCameras('vcam-select');
+  enumerateCameras('cam-select');
 }
 
 initPWA();
@@ -1811,7 +1813,10 @@ function capturePhotoSlot(slotIdx) {
 async function toggleCam() {
   if (camStream) { stopCam(); return; }
   try {
-    camStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}},audio:false});
+    const selCam = document.getElementById('cam-select')?.value;
+    camStream = await navigator.mediaDevices.getUserMedia(selCam
+      ? {video:{deviceId:{exact:selCam},width:{ideal:1280},height:{ideal:720}},audio:false}
+      : {video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},audio:false});
     const canvas = document.getElementById('ph-canvas');
     const wrap = document.getElementById('ph-wrap');
     const vEl = document.createElement('video');
