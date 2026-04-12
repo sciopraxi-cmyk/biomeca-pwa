@@ -382,7 +382,10 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 <div class="page" id="pg-patients">
   <div class="section">
     <div class="stitle">Dossiers patients</div>
-    <div class="card"><div id="pt-list-el"></div></div>
+    <div class="card"><input id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..." 
+  style="width:100%;box-sizing:border-box;margin-bottom:10px;font-size:13px;"
+  oninput="renderPatientList()">
+<div id="pt-list-el"></div></div>
     <div class="card">
       <div class="stitle">Nouveau patient</div>
       <div class="g2">
@@ -1567,20 +1570,60 @@ function deletePatient(i) {
 
 function renderPatientList() {
   const el = document.getElementById('pt-list-el');
+  const search = (document.getElementById('pt-search')?.value||'').toLowerCase().trim();
   if (!patients.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun patient.</div>'; return; }
-  el.innerHTML = patients.map((p,i) => {
+  
+  const filtered = patients.filter((p,i) => {
+    if(!search) return true;
+    const name = (p.prenom+' '+p.nom).toLowerCase();
+    return name.includes(search);
+  });
+  
+  if(!filtered.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun résultat.</div>'; return; }
+  
+  el.innerHTML = filtered.map(p => {
+    const i = patients.indexOf(p);
     const init=((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
     const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
     const active=currentPatient&&currentPatient.id===p.id;
-    const nb=Object.keys(p.mesures||{}).length;
     const prat=praticiens.find(pr=>pr.id==p.pratId);
-    return `<div class="pt-row">
-      <div class="av">${init}</div>
-      <div style="flex:1;"><div style="font-size:12px;font-weight:500;">${p.prenom} ${p.nom}</div>
-      <div style="font-size:10px;color:var(--mut);">${age} · ${p.sport||'—'} · ${nb} mesure(s)${prat?' · '+prat.nom:''}</div></div>
-      <span class="${active?'badge bb':'badge bd'}">${active?'Actif':'—'}</span>
-      <button class="btn btn-blue" style="margin-left:6px;font-size:11px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Choisir</button>
-      <button class="btn" style="margin-left:3px;color:var(--red);font-size:11px;" onclick="deletePatient(${i})">✕</button>
+    
+    // Bilans : bilan initial + bilans de contrôle
+    const bilans = p.bilans || [];
+    const hasBilanInitial = p.mesures && Object.keys(p.mesures).length > 0;
+    const nb = bilans.length + (hasBilanInitial ? 1 : 0);
+    
+    // Liste des bilans
+    const bilansList = bilans.length ? bilans.map((b,bi) => `
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);">
+        <span style="font-size:10px;flex:1;color:var(--blue);">${b.label}</span>
+        <span style="font-size:9px;color:var(--mut);">${b.date}</span>
+        <button class="btn btn-blue" style="font-size:10px;padding:2px 8px;" onclick="loadBilanFromHistory(${i},${bi})">Ouvrir</button>
+      </div>`).join('') : '';
+    
+    return `<div class="pt-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="av">${init}</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:500;">${p.prenom} ${p.nom}</div>
+          <div style="font-size:10px;color:var(--mut);">${age} · ${p.sport||'—'} · ${nb} bilan(s)${prat?' · '+prat.nom:''}</div>
+        </div>
+        <span class="${active?'badge bb':'badge bd'}">${active?'Actif':'—'}</span>
+        <button class="btn btn-blue" style="font-size:11px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Choisir</button>
+        <button class="btn" style="color:var(--red);font-size:11px;" onclick="deletePatient(${i})">✕</button>
+      </div>
+      <div style="padding-left:40px;">
+        ${hasBilanInitial ? `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);">
+          <span style="font-size:10px;flex:1;color:var(--green);">📋 Bilan initial</span>
+          <span style="font-size:9px;color:var(--mut);">${p.bilanInitialDate||''}</span>
+          <button class="btn btn-blue" style="font-size:10px;padding:2px 8px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Ouvrir</button>
+        </div>` : ''}
+        ${bilansList}
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn btn-blue" style="font-size:11px;flex:1;" onclick="createBilanInitial(${i})">📋 Bilan initial</button>
+          <button class="btn" style="font-size:11px;flex:1;" onclick="createBilanControle(${i})">🔄 Bilan de contrôle</button>
+        </div>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1615,6 +1658,50 @@ function deletePraticien(i) {
   praticiens.splice(i,1); savePraticiens(); renderPratList(); populatePratSelect();
 }
 
+
+function createBilanInitial(patIdx) {
+  const p = patients[patIdx];
+  if(!p) return;
+  selectPatient(p);
+  p.bilanInitialDate = new Date().toLocaleDateString('fr-FR');
+  savePatients();
+  renderPatientList();
+  nav('pg-home');
+}
+
+function createBilanControle(patIdx) {
+  const p = patients[patIdx];
+  if(!p) return;
+  // Sauvegarder l'état actuel du bilan comme historique
+  if(!p.bilans) p.bilans = [];
+  const num = p.bilans.length + 1;
+  const bilan = {
+    label: 'Bilan de contrôle ' + num,
+    date: new Date().toLocaleDateString('fr-FR'),
+    mesures: JSON.parse(JSON.stringify(p.mesures||{})),
+    bilanData: JSON.parse(JSON.stringify(p.bilanData||{}))
+  };
+  p.bilans.push(bilan);
+  // Réinitialiser les mesures pour le nouveau bilan
+  p.mesures = {};
+  p.bilanData = {};
+  savePatients();
+  selectPatient(p);
+  renderPatientList();
+  nav('pg-home');
+}
+
+function loadBilanFromHistory(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if(!p || !p.bilans || !p.bilans[bilanIdx]) return;
+  const bilan = p.bilans[bilanIdx];
+  // Charger les données historiques en lecture seule
+  selectPatient(p);
+  // Afficher dans le rapport
+  currentPatient.mesures = bilan.mesures;
+  currentPatient.bilanData = bilan.bilanData;
+  nav('pg-rapport');
+}
 function renderPratList() {
   const el = document.getElementById('prat-list-el');
   if (!praticiens.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun praticien.</div>'; return; }
