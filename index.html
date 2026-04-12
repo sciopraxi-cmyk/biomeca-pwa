@@ -3467,20 +3467,73 @@ function buildPrintSection(t, data, conclusions) {
     if(lines.length) written=`<div class="rp-written">${lines.join('<br>')}</div>`;
     sectionHTML+=written+'</div>';
   } else {
-    // Test sans côté (verrouillage, mobilité)
-    sectionHTML+=buildPrintSingleSide(t,data);
-    const rf=data.rfPct,mol=data.molPct,mob=data.mobPct;
+    // Tests AP : verrouillage, mobilité + photos
+    const photos = data.photos || [];
+    const photosD = photos.filter(p=>p.side==='D');
+    const photosG = photos.filter(p=>p.side==='G');
     const lines=[];
+
     if(t.normVerrou!==undefined){
-      if(rf!=null) lines.push(`<strong>Verrouillage RF :</strong> ${Math.round(rf*100)}% — ${interpretGen(rf)}`);
-      if(mol!=null) lines.push(`<strong>Force mollet :</strong> ${Math.round(mol*100)}% — ${interpretGen(mol)}`);
-      if(rf!=null&&rf<0.33) conclusions.push(`Insuffisance verrouillage arrière-pied (${Math.round(rf*100)}%) — ${t.name}`);
+      // Verrouillage AP - données depuis photos sauvegardées
+      const statD=photosD[0]?.angle, pointeD=photosD[1]?.angle;
+      const statG=photosG[0]?.angle, pointeG=photosG[1]?.angle;
+      const rfD=pointeD!=null?pointeD/t.normVerrou:null;
+      const molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/t.normVerrou:null;
+      const rfG=pointeG!=null?pointeG/t.normVerrou:null;
+      const molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/t.normVerrou:null;
+      const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+      sectionHTML+=`<div class="rp-section"><div class="rp-section-title">${t.name}</div>
+        <div class="rp-side-grid">
+          <div><strong style="color:#185FA5;">Pied Droit</strong><br>
+            Statique: ${apV(statD)} (N: 0°)<br>
+            Pointe: ${apV(pointeD)} (N: Inv +10°)<br>
+            Verrouillage RF: ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'} (N: 10°=100%)<br>
+            Force mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'} (N: 10°=100%)
+          </div>
+          <div><strong style="color:#0B6B2C;">Pied Gauche</strong><br>
+            Statique: ${apV(statG)} (N: 0°)<br>
+            Pointe: ${apV(pointeG)} (N: Inv +10°)<br>
+            Verrouillage RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'} (N: 10°=100%)<br>
+            Force mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'} (N: 10°=100%)
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          ${photos.map(p=>p.dataUrl?`<div style="text-align:center;"><img src="${p.dataUrl}" style="height:80px;border-radius:4px;border:1px solid #ccc;"><br><span style="font-size:8px;">${p.label}</span></div>`:'').join('')}
+        </div>
+      </div>`;
+      if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Insuffisance verrouillage AP droit (${Math.round(Math.abs(rfD)*100)}%) — ${t.name}`);
+      if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Insuffisance verrouillage AP gauche (${Math.round(Math.abs(rfG)*100)}%) — ${t.name}`);
     }
-    if(t.normMob!==undefined){
-      if(mob!=null) lines.push(`<strong>Mobilité arrière-pied :</strong> ${Math.round(mob*100)}% — ${interpretGen(mob)}`);
-      if(mob!=null&&mob<0.33) conclusions.push(`Mobilité arrière-pied réduite (${Math.round(mob*100)}%) — ${t.name}`);
+    else if(t.normMob!==undefined){
+      // Mobilité AP
+      const p0=photos[0], p1=photos[1];
+      const invD=p0?.angleD, evD=p1?.angleD, invG=p0?.angleG, evG=p1?.angleG;
+      const mobD=(invD!=null&&evD!=null)?(invD-evD)/t.normMob:null;
+      const mobG=(invG!=null&&evG!=null)?(invG-evG)/t.normMob:null;
+      const apV2=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+      sectionHTML+=`<div class="rp-section"><div class="rp-section-title">${t.name}</div>
+        <div class="rp-side-grid">
+          <div><strong style="color:#185FA5;">Pied Droit</strong><br>
+            Inversion: ${apV2(invD)} (N: +20°)<br>
+            Éversion: ${apV2(evD)} (N: −10°)<br>
+            Mobilité: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'°':'—'} — ${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'—'} (N: 30°=100%)
+          </div>
+          <div><strong style="color:#0B6B2C;">Pied Gauche</strong><br>
+            Inversion: ${apV2(invG)} (N: +20°)<br>
+            Éversion: ${apV2(evG)} (N: −10°)<br>
+            Mobilité: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'°':'—'} — ${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'—'} (N: 30°=100%)
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          ${photos.map(p=>p.dataUrl?`<div style="text-align:center;"><img src="${p.dataUrl}" style="height:80px;border-radius:4px;border:1px solid #ccc;"><br><span style="font-size:8px;">${p.label}</span></div>`:'').join('')}
+        </div>
+      </div>`;
+      if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP droite réduite (${Math.round(Math.abs(mobD)*100)}%) — ${t.name}`);
+      if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP gauche réduite (${Math.round(Math.abs(mobG)*100)}%) — ${t.name}`);
     }
-    if(lines.length) sectionHTML+=`<div class="rp-written">${lines.join('<br>')}</div>`;
+    else {
+      sectionHTML+=buildPrintSingleSide(t,data);
+    }
   }
   return sectionHTML;
 }
