@@ -2497,25 +2497,7 @@ function updateResults() {
     }
     // Amorti/Propulsion : 3 frames
     else if(t.normAm!==undefined) {
-      if(capturedFrames.length>=3) {
-        const a0D=capturedFrames[0].angD,a1D=capturedFrames[1].angD,a2D=capturedFrames[2].angD;
-        const a0G=capturedFrames[0].angG,a1G=capturedFrames[1].angG,a2G=capturedFrames[2].angG;
-        // Amorti = (Taligrade - Plantigrade) / norme
-        // Propulsion = (Digitigrade - Plantigrade) / norme
-        const amD=a0D!==null&&a1D!==null?(a0D-a1D)/t.normAm:null;
-        const prD=a2D!==null&&a1D!==null?(a2D-a1D)/t.normAm:null;
-        const amG=a0G!==null&&a1G!==null?(a0G-a1G)/t.normAm:null;
-        const prG=a2G!==null&&a1G!==null?(a2G-a1G)/t.normAm:null;
-        html=`<div class="res-side">
-          ${amProCard('D',amD,prD,t.normAm,a0D,a1D,a2D)}
-          ${amProCard('G',amG,prG,t.normAm,a0G,a1G,a2G)}
-        </div>`;
-      } else {
-        const angD=calcBilateral(vidMarkers,view,'D');
-        const angG=calcBilateral(vidMarkers,view,'G');
-        html=`<div class="res-side">${quickAngleCard('D',angD)}${quickAngleCard('G',angG)}</div>
-          <div style="font-size:10px;color:var(--orange);margin-top:6px;">Capturez 3 frames : Taligrade · Plantigrade · Digitigrade</div>`;
-      }
+      // Calculé via photoSlots ci-dessous
     }
   }
   // Résultats Mobilité/Verrouillage en mode video (photoSlots)
