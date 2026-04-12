@@ -1740,16 +1740,20 @@ function captureVidPhotoSlot(slotIdx) {
   if(t?.mobiliteAP) {
     const mkrD = vidMarkers.filter(m=>m.side==='D');
     const mkrG = vidMarkers.filter(m=>m.side==='G');
-    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'');
-    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'');
+    // Slot 0=Inversion(+), Slot 1=Éversion(-)
+    const invSign = slotIdx===0 ? 1 : -1;
+    photoSlots[slotIdx].angleD = invSign * Math.abs(computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'',mkrD));
+    photoSlots[slotIdx].angleG = invSign * Math.abs(computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'',mkrG));
   }
 
   // KFPPA photo bipodale : calculer angleD et angleG séparément
   if(t?.kfppaPhotos && !side) {
     const mkrD = vidMarkers.filter(m=>m.side==='D');
     const mkrG = vidMarkers.filter(m=>m.side==='G');
-    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'');
-    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'');
+    // Slot 0=Inversion(+), Slot 1=Éversion(-)
+    const invSign = slotIdx===0 ? 1 : -1;
+    photoSlots[slotIdx].angleD = invSign * Math.abs(computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'',mkrD));
+    photoSlots[slotIdx].angleG = invSign * Math.abs(computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'',mkrG));
   }
 
   renderVidPhotoGrid();
