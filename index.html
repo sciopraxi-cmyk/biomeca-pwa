@@ -1732,7 +1732,7 @@ function captureVidPhotoSlot(slotIdx) {
 
   // Calculer l'angle selon le côté
   const rawAng = calcAngle3(markersForPhoto);
-  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'');
+  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'', markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
 
@@ -1829,7 +1829,7 @@ function capturePhotoSlot(slotIdx) {
   drawOverlay(ctx, tmp, markersForPhoto, -1, view);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const rawAng = calcAngle3(markersForPhoto);
-  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'');
+  const corrAng = computeCorrectedAngle(rawAng, side, view, t?.type||'', markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
   if(t && t.mobiliteAP) {
