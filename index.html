@@ -2389,8 +2389,13 @@ function calcAngle3(pts) {
 // Arrière-pied: angle brut avec signe (inversion=+, éversion=-)
 function computeCorrectedAngle(rawAng, side, view, testType) {
   if(rawAng===null) return null;
-  if(testType==='mla') return rawAng; // Angle aigu brut pour MLA
-  return 180 - rawAng; // Pour tout le reste
+  if(testType==='mla') return rawAng;
+  const incl = 180 - rawAng;
+  // Vue dos (tests AP) : Inversion=+ Éversion=−
+  // Côté D : inclinaison droite = inversion = + (incl déjà correct)
+  // Côté G : inclinaison gauche = inversion = + (inverser le signe)
+  if(view==='dos' && side==='G') return -incl;
+  return incl;
 }
 
 function getAngleColor(ang) {
