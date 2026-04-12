@@ -1252,7 +1252,7 @@ if('serviceWorker' in navigator) {
   const swCode = `
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open('biomeca-v2').then(cache => {
+    caches.open('biomeca-v1775979388').then(cache => {
       return cache.addAll([location.href]);
     })
   );
@@ -1262,7 +1262,7 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       const clone = resp.clone();
-      caches.open('biomeca-v1').then(c => c.put(e.request, clone));
+      caches.open('biomeca-v1775979388').then(c => c.put(e.request, clone));
       return resp;
     }).catch(() => caches.match(e.request)))
   );
