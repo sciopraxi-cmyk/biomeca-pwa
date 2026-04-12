@@ -2397,9 +2397,13 @@ function calcAngleSign(pts) {
   const placed=pts.filter(p=>p.x!==null);
   if(placed.length<3) return 1;
   const [A,B,C] = placed.length>=4 ? [placed[1],placed[2],placed[3]] : placed;
-  // Cross product Z : positif = virage gauche→droite, négatif = virage droite→gauche
+  // Cross product Z en coordonnées écran (y vers le bas = inversé)
+  // cross > 0 en écran = calca penche à GAUCHE (car y inversé)
+  // cross < 0 en écran = calca penche à DROITE
   const cross = (B.x-A.x)*(C.y-B.y) - (B.y-A.y)*(C.x-B.x);
-  return cross > 0 ? 1 : -1;
+  // Pied D: penche droite (cross<0) = inversion(+) → return -cross sign
+  // Pied G: penche gauche (cross>0) = inversion(+) → return +cross sign  
+  return cross >= 0 ? 1 : -1; // cross>=0 = gauche = Inv pour G, Ev pour D
 }
 
 // Calculer l'angle corrigé selon le contexte
@@ -2416,9 +2420,11 @@ function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   // Pied G : droite = éversion(-), gauche = inversion(+)
   if(view==='dos' && pts) {
     const sign = calcAngleSign(pts);
-    // sign=+1 : angle ouvre à droite
-    if(side==='D') return sign * incl;  // D: droite=inversion(+)
-    if(side==='G') return -sign * incl; // G: droite=éversion(-), gauche=inversion(+)
+    // calcAngleSign: +1 = calca penche à gauche, -1 = calca penche à droite
+    // Pied D : penche droite(-1) = inversion(+), penche gauche(+1) = éversion(-)
+    // Pied G : penche gauche(+1) = inversion(+), penche droite(-1) = éversion(-)
+    if(side==='D') return -sign * incl; // D: droite(-1)=Inv(+) → inverser signe
+    if(side==='G') return sign * incl;  // G: gauche(+1)=Inv(+) → même signe
     return incl;
   }
   if(view==='dos' && side==='G') return -incl;
