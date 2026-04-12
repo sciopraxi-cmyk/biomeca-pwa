@@ -1731,9 +1731,9 @@ function captureVidPhotoSlot(slotIdx) {
   const side = slot?.side || '';
 
   // Filtrer les marqueurs selon le côté du slot
-  // S'applique pour : Verrouillage, KFPPA unipodal, Amorti/Propulsion
+  // Pour MLA : pas de filtrage (tous les marqueurs sont sans side)
   let markersForPhoto = vidMarkers;
-  if(side) {
+  if(side && t?.markers !== 'mla') {
     markersForPhoto = vidMarkers.filter(m => m.side === side);
   }
 
