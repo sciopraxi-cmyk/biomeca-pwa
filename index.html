@@ -2893,6 +2893,10 @@ function validateAndSave() {
 
   if(t.mode==='video'){
     result.frames=capturedFrames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl}));
+    // Pour les tests video avec encadrés photos (Mobilité, Verrouillage, MLA, Amorti)
+    if(t.showPhotoSlots && photoSlots.length) {
+      result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG}));
+    }
     if(t.div!==undefined&&capturedFrames.length>=2){
       const f0=capturedFrames[0],f1=capturedFrames[1];
       result.deltaD=f1.angD!==null&&f0.angD!==null?f1.angD-f0.angD:null;
