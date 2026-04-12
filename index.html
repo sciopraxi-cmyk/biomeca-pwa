@@ -2502,7 +2502,26 @@ function updateResults() {
   }
   // Résultats Mobilité/Verrouillage en mode video (photoSlots)
   if(t.mode==='video' && t.showPhotoSlots) {
-    if(t.normVerrou!==undefined) {
+    if(t.normAm!==undefined) {
+      const sD=photoSlots.filter(s=>s.side==='D');
+      const sG=photoSlots.filter(s=>s.side==='G');
+      const talD=sD[0]?.angle,planD=sD[1]?.angle,digD=sD[2]?.angle;
+      const talG=sG[0]?.angle,planG=sG[1]?.angle,digG=sG[2]?.angle;
+      const hasAny=talD!=null||planD!=null||digD!=null||talG!=null||planG!=null||digG!=null;
+      if(hasAny){
+        const amD=talD!=null&&planD!=null?(talD-planD)/t.normAm:null;
+        const prD=digD!=null&&planD!=null?(digD-planD)/t.normAm:null;
+        const amG=talG!=null&&planG!=null?(talG-planG)/t.normAm:null;
+        const prG=digG!=null&&planG!=null?(digG-planG)/t.normAm:null;
+        html=`<div class="res-side">
+          ${amProCard('D',amD,prD,t.normAm,talD,planD,digD)}
+          ${amProCard('G',amG,prG,t.normAm,talG,planG,digG)}
+        </div>`;
+      } else {
+        html=`<div style="font-size:10px;color:var(--orange);text-align:center;padding:8px;">Capturez les 6 photos : Tal·Plan·Dig × D+G</div>`;
+      }
+      el.innerHTML=html||el.innerHTML; return;
+    } else if(t.normVerrou!==undefined) {
       const sD=photoSlots.filter(s=>s.side==='D'),sG=photoSlots.filter(s=>s.side==='G');
       const statD=sD[0]?.angle,pointeD=sD[1]?.angle,statG=sG[0]?.angle,pointeG=sG[1]?.angle;
       const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
