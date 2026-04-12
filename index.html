@@ -1282,14 +1282,14 @@ const TESTS = {
   },
   // MLA : 3 marqueurs par pied, 2 photos par pied = 4 photos
   'mla-marche': {
-    name:'MLA Marche', mode:'photo', view:'profil',
+    name:'MLA Marche', mode:'video', view:'profil',
     note:'Vue profil · 2 photos par pied (propulsion + écrasement) · Capturer pied D puis pied G',
     markers:'mla', normDiv:20, propNorm:125, ecrNorm:145,
     photoLabels:['Propulsion pied D','Écrasement pied D','Propulsion pied G','Écrasement pied G'],
     photoSides:['D','D','G','G']
   },
   'mla-course': {
-    name:'MLA Course', mode:'photo', view:'profil',
+    name:'MLA Course', mode:'video', view:'profil',
     note:'Vue profil · 2 photos par pied (propulsion + écrasement) · Capturer pied D puis pied G',
     markers:'mla', normDiv:30, propNorm:120, ecrNorm:150,
     photoLabels:['Propulsion pied D','Écrasement pied D','Propulsion pied G','Écrasement pied G'],
@@ -1297,20 +1297,20 @@ const TESTS = {
   },
   // Verrouillage : 4 marqueurs jambier+calca, vue dos, 2 photos (neutre + pointe)
   'verrou': {
-    name:'Verrouillage AP', mode:'photo', view:'dos',
+    name:'Verrouillage AP', mode:'video', view:'dos',
     note:'Vue dos · 4 photos : statique D, statique G, pointe D, pointe G · Inversion=+ Éversion=−',
     markers:'ap-bi', normVerrou:10,
     photoLabels:['Statique bipodal D','Statique bipodal G','Pointe pieds D','Pointe pieds G'],
-    photoSides:['D','G','D','G'],
+    photoSides:['D','G','D','G'], showPhotoSlots:true,
     frameLabels:['Statique bipodal','Pointe pieds']
   },
   // Mobilité : 2 photos (inversion + éversion)
   'mobilite': {
-    name:'Mobilité AP', mode:'photo', view:'dos',
+    name:'Mobilité AP', mode:'video', view:'dos',
     note:'Vue dos · 2 photos : inversion max + éversion max · Inversion=+ / Éversion=− · D+G simultané',
     markers:'ap-bi', normMob:30,
     photoLabels:['Inversion forcée bipodal','Éversion forcée bipodal'],
-    photoSides:['',''], mobiliteAP:true,
+    photoSides:['',''], mobiliteAP:true, showPhotoSlots:true,
     frameLabels:['Inversion forcée','Éversion forcée']
   },
   // Amorti/Propulsion : 6 photos (3 phases × 2 pieds)
@@ -2486,7 +2486,8 @@ function updateResults() {
       html=`<div class="res-side">
         <div class="res-side-card">
           <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-          <div style="font-size:9px;color:var(--mut);">Stat: ${statD!=null?statD.toFixed(1)+'°':'—'} / Pointe: ${pointeD!=null?pointeD.toFixed(1)+'°':'—'}</div>
+          <div style="font-size:9px;color:var(--mut);">Stat: ${statD!=null?(statD>0?'Inv (+)':'Év (−)')+' '+Math.abs(statD).toFixed(1)+'°':'—'}</div>
+          <div style="font-size:9px;color:var(--mut);">Pointe: ${pointeD!=null?(pointeD>0?'Inv (+)':'Év (−)')+' '+Math.abs(pointeD).toFixed(1)+'°':'—'}</div>
           <div class="rs-pct" style="color:${rfD!=null?clrGen(rfD):'var(--mut)'};">${rfD!=null?Math.round(rfD*100)+'%':'—'}</div>
           <div style="font-size:9px;color:var(--mut);">Verr.RF · Mollet: <span style="color:${molD!=null?clrGen(molD):'var(--mut)'};">${molD!=null?Math.round(molD*100)+'%':'—'}</span></div>
         </div>
