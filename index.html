@@ -2538,14 +2538,14 @@ function updateResults() {
             <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
             <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propD!=null?propD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
             <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrD!=null?ecrD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Δ: <b>${deltaD!=null?deltaD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${deltaD!=null?deltaD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
             <div class="rs-pct" style="color:${pctD!=null?clrGen(Math.abs(pctD)):'var(--mut)'};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
             <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propG!=null?propG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
             <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrG!=null?ecrG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Δ: <b>${deltaG!=null?deltaG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${deltaG!=null?deltaG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
             <div class="rs-pct" style="color:${pctG!=null?clrGen(Math.abs(pctG)):'var(--mut)'};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
           </div>
         </div>`;
