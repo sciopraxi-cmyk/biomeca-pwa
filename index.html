@@ -1817,6 +1817,7 @@ function capturePhotoSlot(slotIdx) {
     photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'');
     photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'');
   }
+  if(t&&t.mobiliteAP){const mkrD=liveMarkers.filter(m=>m.side==='D');const mkrG=liveMarkers.filter(m=>m.side==='G');photoSlots[slotIdx].angleD=computeCorrectedAngle(calcAngle3(mkrD),'D',view,t.type||'');photoSlots[slotIdx].angleG=computeCorrectedAngle(calcAngle3(mkrG),'G',view,t.type||'');}
   renderPhotoGrid(); updateResults();
 }
 
