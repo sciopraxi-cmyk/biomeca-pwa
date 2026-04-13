@@ -1945,7 +1945,8 @@ function captureVidPhotoSlot(slotIdx) {
   // Calculer l'angle selon le côté
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
-  const mlaType = t?.markers==='mla' ? 'mla' : (t?.type||'');
+  // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
+  const mlaType = t?.markers==='mla' ? 'mla' : (t?.markers==='genou-bi' ? 'kfppa' : (t?.type||''));
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
@@ -2044,7 +2045,8 @@ function capturePhotoSlot(slotIdx) {
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
-  const mlaType = t?.markers==='mla' ? 'mla' : (t?.type||'');
+  // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
+  const mlaType = t?.markers==='mla' ? 'mla' : (t?.markers==='genou-bi' ? 'kfppa' : (t?.type||''));
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
@@ -2631,9 +2633,8 @@ function clrKfppa(pct) {
 function kfppaLabel(ang, side) {
   if(ang==null) return '—';
   const deg = Math.abs(ang).toFixed(1)+'°';
-  if(side==='D') return ang>0 ? 'Valgus +'+deg : 'Varus −'+deg;
-  if(side==='G') return ang>0 ? 'Varus +'+deg : 'Valgus −'+deg;
-  return deg;
+  // Convention incl : valeur positive = valgus pour les 2 côtés
+  return ang>=0 ? 'Valgus +'+deg : 'Varus −'+deg;
 }
 
 function calcAngleSign(pts) {
@@ -2663,7 +2664,9 @@ function calcAngleSign(pts) {
 function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   if(rawAng===null) return null;
   if(testType==='mla') return rawAng;
+  // KFPPA : stocker incl sans signe (signe valgus/varus calculé à l'affichage)
   const incl = 180 - rawAng;
+  if(testType==='kfppa') return incl;
   // Vue dos : utiliser le cross product pour détecter le sens réel
   // cross > 0 = calca penche à droite
   // Pied D : droite = inversion(+), gauche = éversion(-)
@@ -2715,6 +2718,7 @@ function updateResults() {
       const uniD=pUniD?.angle, uniG=pUniG?.angle;
       const angD=(uniD!=null&&bipD!=null)?uniD-bipD:null;
       const angG=(uniG!=null&&bipG!=null)?uniG-bipG:null;
+      // Pour KFPPA, angD>0 = valgus dynamique (genou plus incliné en dynamique)
       const pctD=angD!=null?angD/t.div:null;
       const pctG=angG!=null?angG/t.div:null;
       if(angD!=null||angG!=null||pBip?.dataUrl||pUniG?.dataUrl||pUniD?.dataUrl){
