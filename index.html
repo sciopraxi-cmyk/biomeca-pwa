@@ -1566,6 +1566,7 @@ function getMkrsBySet(markers, targetSet) {
 function nav(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tnav button').forEach(b => b.classList.remove('act'));
+  window.scrollTo(0, 0);
   const pg = document.getElementById(id);
   if (pg) pg.classList.add('active');
   const map = {
