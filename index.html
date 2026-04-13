@@ -3853,10 +3853,11 @@ function buildPrintSection(t, data, conclusions) {
       </div>`;
       const _mobDpct=mobD!=null?Math.round(Math.abs(mobD)*100):null;
       const _mobGpct=mobG!=null?Math.round(Math.abs(mobG)*100):null;
+      const interpretMob=(p)=>{if(p==null)return'—';const v=Math.abs(p)*100;if(v>=66)return'dans la norme — mobilité arrière-pied suffisante';if(v>=33)return'limite — mobilité arrière-pied réduite';return'hors norme — mobilité arrière-pied très limitée ou absente';};
       sectionHTML+=`<div class="rp-written">
         <em style="color:#888;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</em><br>
-        <strong>Pied droit :</strong> Inv: ${apV2(invD)} · Év: ${apV2(evD)} · Mobilité: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'°':'—'} — ${_mobDpct!=null?_mobDpct+'%':'—'} — ${mobD!=null?interpretGen(Math.abs(mobD)):'—'}<br>
-        <strong>Pied gauche :</strong> Inv: ${apV2(invG)} · Év: ${apV2(evG)} · Mobilité: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'°':'—'} — ${_mobGpct!=null?_mobGpct+'%':'—'} — ${mobG!=null?interpretGen(Math.abs(mobG)):'—'}
+        <strong>Pied droit :</strong> Inv: ${apV2(invD)} · Év: ${apV2(evD)} · Mobilité: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'°':'—'} (${_mobDpct!=null?_mobDpct+'%':'—'}) — ${interpretMob(mobD)}<br>
+        <strong>Pied gauche :</strong> Inv: ${apV2(invG)} · Év: ${apV2(evG)} · Mobilité: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'°':'—'} (${_mobGpct!=null?_mobGpct+'%':'—'}) — ${interpretMob(mobG)}
       </div>`;
       if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP droite réduite (${Math.round(Math.abs(mobD)*100)}%) — ${t.name}`);
       if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP gauche réduite (${Math.round(Math.abs(mobG)*100)}%) — ${t.name}`);
