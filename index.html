@@ -2616,6 +2616,26 @@ function calcAngle3(pts) {
 }
 
 // Détecte si l'angle des points AP s'ouvre à droite (+) ou à gauche (-)
+// Couleur spécifique KFPPA : <20%=rouge, 20-60%=orange, 60-140%=vert, 140-180%=orange, >180%=rouge
+function clrKfppa(pct) {
+  if(pct==null||isNaN(pct)) return 'var(--mut)';
+  const p=Math.abs(pct)*100;
+  if(p<20||p>180) return 'var(--red)';
+  if(p<60||p>140) return 'var(--orange)';
+  return 'var(--green)';
+}
+
+// Détecter valgus/varus pour KFPPA
+// Vue face : genou D pointe droite = valgus(+), gauche = varus(-)
+// Vue face : genou G pointe droite = varus(-), gauche = valgus(+)
+function kfppaLabel(ang, side) {
+  if(ang==null) return '—';
+  const deg = Math.abs(ang).toFixed(1)+'°';
+  if(side==='D') return ang>0 ? 'Valgus +'+deg : 'Varus −'+deg;
+  if(side==='G') return ang>0 ? 'Varus +'+deg : 'Valgus −'+deg;
+  return deg;
+}
+
 function calcAngleSign(pts) {
   const placed=pts.filter(p=>p.x!==null);
   if(placed.length<2) return 1;
@@ -2683,17 +2703,17 @@ function updateResults() {
         html=`<div class="res-side">
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${bipD!=null?Math.abs(bipD).toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${uniD!=null?uniD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${angD!=null?angD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
-            <div class="rs-pct" style="color:${pctD!=null?clrGen(pctD):'var(--mut)'};">  ${pctD!=null?Math.round(pctD*100)+'%':'—'}</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipD,'D')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
+            <div class="rs-pct" style="color:${clrKfppa(pctD)};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${bipG!=null?Math.abs(bipG).toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${uniG!=null?uniG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${angG!=null?angG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
-            <div class="rs-pct" style="color:${pctG!=null?clrGen(pctG):'var(--mut)'};">  ${pctG!=null?Math.round(pctG*100)+'%':'—'}</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipG,'G')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
+            <div class="rs-pct" style="color:${clrKfppa(pctG)};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
           </div>
         </div>`;
       } else {
