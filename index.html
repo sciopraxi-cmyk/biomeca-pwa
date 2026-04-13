@@ -2784,10 +2784,10 @@ function updateResults() {
       const talG=sG[0]?.angle,planG=sG[1]?.angle,digG=sG[2]?.angle;
       const hasAny=talD!=null||planD!=null||digD!=null||talG!=null||planG!=null||digG!=null;
       if(hasAny){
-        const amD=talD!=null&&planD!=null?(talD-planD)/t.normAm:null;
-        const prD=digD!=null&&planD!=null?(digD-planD)/t.normAm:null;
-        const amG=talG!=null&&planG!=null?(talG-planG)/t.normAm:null;
-        const prG=digG!=null&&planG!=null?(digG-planG)/t.normAm:null;
+        const amD=talD!=null&&planD!=null?Math.abs(talD-planD)/t.normAm:null;
+        const prD=digD!=null&&planD!=null?Math.abs(digD-planD)/t.normAm:null;
+        const amG=talG!=null&&planG!=null?Math.abs(talG-planG)/t.normAm:null;
+        const prG=digG!=null&&planG!=null?Math.abs(digG-planG)/t.normAm:null;
         html=`<div class="res-side">
           ${amProCard('D',amD,prD,t.normAm,talD,planD,digD)}
           ${amProCard('G',amG,prG,t.normAm,talG,planG,digG)}
@@ -2837,10 +2837,10 @@ function updateResults() {
       const talG=sG[0]?.angle,planG=sG[1]?.angle,digG=sG[2]?.angle;
       const hasAny=talD!=null||planD!=null||digD!=null||talG!=null||planG!=null||digG!=null;
       if(hasAny){
-        const amD=talD!=null&&planD!=null?(talD-planD)/t.normAm:null;
-        const prD=digD!=null&&planD!=null?(digD-planD)/t.normAm:null;
-        const amG=talG!=null&&planG!=null?(talG-planG)/t.normAm:null;
-        const prG=digG!=null&&planG!=null?(digG-planG)/t.normAm:null;
+        const amD=talD!=null&&planD!=null?Math.abs(talD-planD)/t.normAm:null;
+        const prD=digD!=null&&planD!=null?Math.abs(digD-planD)/t.normAm:null;
+        const amG=talG!=null&&planG!=null?Math.abs(talG-planG)/t.normAm:null;
+        const prG=digG!=null&&planG!=null?Math.abs(digG-planG)/t.normAm:null;
         html=`<div class="res-side">
           ${amProCard('D',amD,prD,t.normAm,talD,planD,digD)}
           ${amProCard('G',amG,prG,t.normAm,talG,planG,digG)}
@@ -3240,8 +3240,8 @@ function buildSidePreview(side,t,data) {
     if((am==null||isNaN(am)) && data.photos?.length) {
       const ph2=data.photos.filter(p=>p.side===side);
       const talV=ph2[0]?.angle, planV=ph2[1]?.angle, digV=ph2[2]?.angle;
-      if(talV!=null&&planV!=null) am=(talV-planV)/t.normAm;
-      if(digV!=null&&planV!=null) pr=(digV-planV)/t.normAm;
+      if(talV!=null&&planV!=null) am=Math.abs(talV-planV)/t.normAm;
+      if(digV!=null&&planV!=null) pr=Math.abs(digV-planV)/t.normAm;
     }
     const cAm=am!==null?clrGen(am):'var(--mut)', cPr=pr!==null?clrGen(pr):'var(--mut)';
     return `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
@@ -3846,8 +3846,8 @@ function buildPrintSide(side, t, data) {
     if((am==null||isNaN(am)) && data.photos?.length) {
       const ph2=data.photos.filter(p=>p.side===side);
       const talV=ph2[0]?.angle, planV=ph2[1]?.angle, digV=ph2[2]?.angle;
-      if(talV!=null&&planV!=null) am=(talV-planV)/t.normAm;
-      if(digV!=null&&planV!=null) pr=(digV-planV)/t.normAm;
+      if(talV!=null&&planV!=null) am=Math.abs(talV-planV)/t.normAm;
+      if(digV!=null&&planV!=null) pr=Math.abs(digV-planV)/t.normAm;
     }
     const cAm=rp_cssColor(am,false),cPr=rp_cssColor(pr,false);
     const ph=buildPrintPhotos(data,side,t);
