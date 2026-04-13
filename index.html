@@ -3179,7 +3179,16 @@ function buildRapport() {
   // Section mesures biomécaniques
   if(Object.keys(mesures).length > 0) {
     html += '<div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bord);">📐 Mesures Biomécaniques</div>';
-    Object.entries(mesures).forEach(([testId,data]) => {
+    // Ordre d'affichage forcé : KFPPA marche→course→sldj en premier, puis le reste
+const ordreAffichage=['kfppa-marche','kfppa-course','kfppa-sldj','mla-course','mla-marche','amorti-course','amorti-marche','verrouillage-ap','mobilite-ap'];
+const mesuresTriees=Object.entries(mesures).sort(([a],[b])=>{
+  const iA=ordreAffichage.indexOf(a), iB=ordreAffichage.indexOf(b);
+  if(iA===-1&&iB===-1) return 0;
+  if(iA===-1) return 1;
+  if(iB===-1) return -1;
+  return iA-iB;
+});
+mesuresTriees.forEach(([testId,data]) => {
       const t = TESTS[testId]; if(!t) return;
       const conclusions_tmp=[];
       const sectionHTML=buildPrintSection(t,data,conclusions_tmp);
