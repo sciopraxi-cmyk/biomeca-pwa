@@ -1218,11 +1218,14 @@ async function loadSupabaseData() {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
       patients = d.patients || [];
       praticiens = d.praticiens || [];
-      // Appliquer les droits depuis user_metadata Supabase
-      if(pwaUser?.user_metadata?.droits) {
-        window._userDroits = pwaUser.user_metadata.droits;
-      } else {
-        window._userDroits = 'all';
+      // Appliquer les droits depuis user_metadata Supabase (fraîches)
+      try {
+        const freshUser = await supa.getUser(pwaUser.token);
+        const freshMeta = freshUser?.user_metadata || {};
+        pwaUser.user_metadata = freshMeta;
+        window._userDroits = freshMeta.droits || 'all';
+      } catch(e) {
+        window._userDroits = pwaUser?.user_metadata?.droits || 'all';
       }
     } else {
       patients = [];
