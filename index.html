@@ -298,11 +298,9 @@ body.printing #rpt-print{display:block!important;}
     </div>
   </div>
   <div class="tnav">
-    <button onclick="nav('pg-home')" id="tn-home">Accueil</button>
     <button onclick="nav('pg-patients')" id="tn-patients">Patients</button>
     <button onclick="nav('pg-praticiens')" id="tn-praticiens">Praticiens</button>
-    <button onclick="nav('pg-bilan')" id="tn-bilan">Bilan Clinique</button>
-    <button onclick="nav('pg-rapport')" id="tn-rapport">Rapport</button>
+    <button onclick="nav('pg-params')" id="tn-params">Paramètres</button>
   </div>
   <div id="pwa-install-btn" style="display:none;">
     <button class="btn" id="pwa-btn" onclick="installPWA()" style="font-size:11px;padding:5px 10px;background:var(--green-d);color:var(--green);border-color:var(--green);">📲 Installer l'app</button>
@@ -313,7 +311,59 @@ body.printing #rpt-print{display:block!important;}
   </div>
 </div>
 <div class="main">
-<div class="page active" id="pg-home">
+<div class="page" id="pg-sport">
+  <div class="home-hdr" style="position:relative;">
+    <button onclick="nav('pg-patients')" style="position:absolute;left:0;top:0;background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
+    <h1 style="color:var(--blue);">🦶 Podologie du Sport</h1>
+    <p id="sport-sub">Sélectionnez un patient</p>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
+      <button onclick="nav('pg-bilan')" class="btn" style="background:var(--blue);color:#fff;padding:8px 18px;font-size:13px;">📋 Bilan Clinique Sportif</button>
+      <button onclick="nav('pg-rapport')" class="btn" style="background:var(--blue);color:#fff;padding:8px 18px;font-size:13px;">📄 Rapport Sportif</button>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="pg-posturo">
+  <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
+      <h2 style="margin:0;font-size:18px;color:var(--green,#2a7a4e);">🧍 Étude de la Posture</h2>
+    </div>
+    <div id="posturo-patient-info" style="background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--mut);">
+      Aucun patient sélectionné
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+      <button onclick="nav('pg-bilan-posturo')" class="btn" style="background:var(--green,#2a7a4e);color:#fff;padding:10px 20px;font-size:14px;opacity:0.55;cursor:not-allowed;" disabled>📋 Bilan Clinique Posturologique <span style="font-size:11px;">(bientôt)</span></button>
+      <button onclick="nav('pg-rapport-posturo')" class="btn" style="background:var(--green,#2a7a4e);color:#fff;padding:10px 20px;font-size:14px;opacity:0.55;cursor:not-allowed;" disabled>📄 Rapport Posturologique <span style="font-size:11px;">(bientôt)</span></button>
+    </div>
+    <div style="background:var(--card);border:1px dashed var(--bord);border-radius:10px;padding:30px;text-align:center;color:var(--mut);">
+      <div style="font-size:36px;margin-bottom:12px;">🚧</div>
+      <div style="font-size:15px;font-weight:600;">Module en construction</div>
+      <div style="font-size:13px;margin-top:6px;">Le bilan posturologique sera disponible prochainement.</div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="pg-params">
+  <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
+    <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">⚙️ Paramètres</h2>
+
+    <!-- Lien Supabase -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle">Gestion des accès</div>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">Créer ou modifier des comptes utilisateurs dans Supabase.</p>
+      <a href="https://supabase.com/dashboard/project/tzivizoacdyopwfzerrb/auth/users" target="_blank" class="btn" style="background:var(--blue);color:#fff;padding:8px 16px;font-size:13px;text-decoration:none;display:inline-block;">🔗 Ouvrir Supabase Users</a>
+    </div>
+
+    <!-- Liste praticiens avec droits -->
+    <div class="card">
+      <div class="stitle">Praticiens autorisés</div>
+      <div id="params-prat-list" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="pg-home">
   <div class="home-hdr">
     <h1>Choisir un test</h1>
     <p id="home-sub">Sélectionnez un patient puis choisissez le test</p>
@@ -383,7 +433,7 @@ body.printing #rpt-print{display:block!important;}
 
 <!-- ══ PATIENTS ══ -->
 
-<div class="page" id="pg-patients">
+<div class="page active" id="pg-patients">
   <div class="section">
     <div class="stitle">Dossiers patients</div>
     <div class="card"><input id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..." 
@@ -1216,6 +1266,7 @@ self.addEventListener('fetch', e => {
 let patients = JSON.parse(localStorage.getItem('bm4-patients')||'[]');
 let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
 let currentPatient = null;
+let currentBilanReadOnly = false;
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -1389,27 +1440,69 @@ function nav(id) {
   if (pg) pg.classList.add('active');
   const map = {
     'pg-home':'tn-home','pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-bilan':'tn-bilan','pg-rapport':'tn-rapport'
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params',
+    'pg-sport':'tn-patients','pg-posturo':'tn-patients'
   };
   if (map[id]) { const b=document.getElementById(map[id]); if(b) b.classList.add('act'); }
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
+  if(id === 'pg-params') renderParamsPratList();
+  if(id === 'pg-sport') {
+    // Mettre à jour le sous-titre avec le patient courant
+    const sub = document.getElementById('sport-sub');
+    if(sub && currentPatient) sub.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom+' · '+(currentPatient.sport||'—');
+    // Mettre à jour info posturo aussi
+    const pinfo = document.getElementById('posturo-patient-info');
+    if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom;
+  }
+  if(id === 'pg-posturo') {
+    const pinfo = document.getElementById('posturo-patient-info');
+    if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom+' · '+(currentPatient.sport||'—');
+  }
   if(id === 'pg-bilan') {
     setTimeout(() => {
       clearBilanFields();
       loadBilan();
       const pc = document.getElementById('pieds-canvas');
-      // Ne redessiner le template que si pas de données sauvegardées
       const hasSavedPieds = currentPatient?.bilanData?._pieds;
       if(pc && !hasSavedPieds) { drawPiedsTemplate(); setupDrawCanvas(pc); }
       else if(pc && hasSavedPieds) {
-        // Attendre que loadBilan restaure le canvas puis setup draw
         setTimeout(() => setupDrawCanvas(pc), 150);
       }
     }, 80);
   }
+}
 
+function renderParamsPratList() {
+  const el = document.getElementById('params-prat-list');
+  if(!el) return;
+  if(!praticiens.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--mut);">Aucun praticien enregistré.</div>';
+    return;
+  }
+  el.innerHTML = praticiens.map((pr, i) => {
+    const droits = pr.droits || 'all';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord);">
+      <div class="av" style="width:32px;height:32px;font-size:12px;">${((pr.prenom||'?')[0]+(pr.nom||'?')[0]).toUpperCase()}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:500;">${pr.prenom} ${pr.nom}</div>
+        <div style="font-size:10px;color:var(--mut);">${pr.email||'—'}</div>
+      </div>
+      <select onchange="setPraticienDroits(${i}, this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);">
+        <option value="all" ${droits==='all'?'selected':''}>Sport + Posturo</option>
+        <option value="sport" ${droits==='sport'?'selected':''}>Sport uniquement</option>
+        <option value="posturo" ${droits==='posturo'?'selected':''}>Posturo uniquement</option>
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function setPraticienDroits(pratIdx, droits) {
+  if(!praticiens[pratIdx]) return;
+  praticiens[pratIdx].droits = droits;
+  savePatients();
+  renderPatientList();
 }
 
 function switchCaptureMode(mode) {
@@ -1590,9 +1683,11 @@ function createPatient() {
 function selectPatient(p) {
   currentPatient = p;
   const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
-  document.getElementById('tb-av').textContent = init;
-  document.getElementById('tb-name').textContent = p.prenom+' '+p.nom;
-  document.getElementById('home-sub').textContent = 'Patient : '+p.prenom+' '+p.nom+' · '+(p.sport||'—');
+  if(document.getElementById('tb-av')) document.getElementById('tb-av').textContent = init;
+  if(document.getElementById('tb-name')) document.getElementById('tb-name').textContent = p.prenom+' '+p.nom;
+  if(document.getElementById('home-sub')) document.getElementById('home-sub').textContent = 'Patient : '+p.prenom+' '+p.nom+' · '+(p.sport||'—');
+  if(document.getElementById('sport-sub')) document.getElementById('sport-sub').textContent = 'Patient : '+p.prenom+' '+p.nom+' · '+(p.sport||'—');
+  if(document.getElementById('posturo-patient-info')) document.getElementById('posturo-patient-info').textContent = 'Patient : '+p.prenom+' '+p.nom+' · '+(p.sport||'—');
   bilanData = p.bilanData ? JSON.parse(JSON.stringify(p.bilanData)) : {};
   clearBilanFields();
   loadBilan();
@@ -1631,51 +1726,85 @@ function renderPatientList() {
   });
   
   if(!filtered.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun résultat.</div>'; return; }
-  
+
+  // Droits du praticien connecté
+  const pratConnecte = praticiens.find(pr => pr.id == pwaUser?.pratId) || null;
+  const droits = pratConnecte?.droits || 'all'; // 'sport', 'posturo', 'all'
+
   el.innerHTML = filtered.map(p => {
     const i = patients.indexOf(p);
     const init=((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
     const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
-    const active=currentPatient&&currentPatient.id===p.id;
     const prat=praticiens.find(pr=>pr.id==p.pratId);
+
+    // Droits : peut accéder sport / posturo
+    const canSport = droits === 'all' || droits === 'sport';
+    const canPosturo = droits === 'all' || droits === 'posturo';
+
+    // Historique bilans sportifs
+    const bilansSport = p.bilansSport || [];
+    const bilansSportHtml = bilansSport.map((b,bi) => `
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:rgba(74,158,255,0.07);border-radius:6px;margin-top:3px;">
+        <span style="font-size:11px;">🦶</span>
+        <span style="font-size:11px;flex:1;color:var(--blue);">${b.label}</span>
+        <span style="font-size:10px;color:var(--mut);">${b.date}</span>
+        <button class="btn" style="font-size:10px;padding:2px 8px;background:var(--blue);color:#fff;" onclick="ouvrirBilanSport(${i},${bi})">Ouvrir</button>
+      </div>`).join('');
+
+    // Historique bilans posturo
+    const bilansPosturo = p.bilansPosturo || [];
+    const bilansPosturoHtml = bilansPosturo.map((b,bi) => `
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:rgba(42,122,78,0.07);border-radius:6px;margin-top:3px;">
+        <span style="font-size:11px;">🧍</span>
+        <span style="font-size:11px;flex:1;color:var(--green,#2a7a4e);">${b.label}</span>
+        <span style="font-size:10px;color:var(--mut);">${b.date}</span>
+        <button class="btn" style="font-size:10px;padding:2px 8px;background:var(--green,#2a7a4e);color:#fff;" onclick="ouvrirBilanPosturo(${i},${bi})">Ouvrir</button>
+      </div>`).join('');
+
+    // Boutons création bilans
+    const btnSportInit = canSport
+      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--blue);color:#fff;flex:1;" onclick="creerBilanSport(${i},'initial')">🦶 Sportif Initial</button>`
+      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🦶 Sportif Initial</button>`;
+    const btnSportCtrl = canSport
+      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--blue);color:#fff;flex:1;" onclick="creerBilanSport(${i},'controle')">🦶 Sportif Contrôle</button>`
+      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🦶 Sportif Contrôle</button>`;
+    const btnPostInit = canPosturo
+      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--green,#2a7a4e);color:#fff;flex:1;" onclick="creerBilanPosturo(${i},'initial')">🧍 Posturo Initial</button>`
+      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🧍 Posturo Initial</button>`;
+    const btnPostCtrl = canPosturo
+      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--green,#2a7a4e);color:#fff;flex:1;" onclick="creerBilanPosturo(${i},'controle')">🧍 Posturo Contrôle</button>`
+      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🧍 Posturo Contrôle</button>`;
     
-    // Bilans : bilan initial + bilans de contrôle
-    const bilans = p.bilans || [];
-    const hasBilanInitial = p.mesures && Object.keys(p.mesures).length > 0;
-    const nb = bilans.length + (hasBilanInitial ? 1 : 0);
-    
-    // Liste des bilans
-    const bilansList = bilans.length ? bilans.map((b,bi) => `
-      <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);">
-        <span style="font-size:10px;flex:1;color:var(--blue);">${b.label}</span>
-        <span style="font-size:9px;color:var(--mut);">${b.date}</span>
-        <button class="btn btn-blue" style="font-size:10px;padding:2px 8px;" onclick="loadBilanFromHistory(${i},${bi})">Ouvrir</button>
-      </div>`).join('') : '';
-    
-    return `<div class="pt-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+    return `<div class="pt-row" style="flex-direction:column;align-items:stretch;gap:6px;padding:10px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:8px;">
         <div class="av">${init}</div>
         <div style="flex:1;">
-          <div style="font-size:12px;font-weight:500;">${p.prenom} ${p.nom}</div>
-          <div style="font-size:10px;color:var(--mut);">${age} · ${p.sport||'—'} · ${nb} bilan(s)${prat?' · '+prat.nom:''}</div>
+          <div style="font-size:13px;font-weight:600;">${p.prenom} ${p.nom}</div>
+          <div style="font-size:10px;color:var(--mut);">${age} · ${p.sport||'—'}${prat?' · '+prat.nom:''}</div>
         </div>
-        <span class="${active?'badge bb':'badge bd'}">${active?'Actif':'—'}</span>
-        <button class="btn btn-blue" style="font-size:11px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Choisir</button>
         <button class="btn" style="font-size:11px;" onclick="editPatient(${i})">✏️</button>
         <button class="btn" style="color:var(--red);font-size:11px;" onclick="deletePatient(${i})">✕</button>
       </div>
-      <div style="padding-left:40px;">
-        ${hasBilanInitial ? `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);">
-          <span style="font-size:10px;flex:1;color:var(--green);">📋 Bilan initial</span>
-          <span style="font-size:9px;color:var(--mut);">${p.bilanInitialDate||''}</span>
-          <button class="btn btn-blue" style="font-size:10px;padding:2px 8px;" onclick="selectPatient(patients[${i}]);nav('pg-home');">Ouvrir</button>
-        </div>` : ''}
-        ${bilansList}
-        <div style="display:flex;gap:6px;margin-top:6px;">
-          <button class="btn btn-blue" style="font-size:11px;flex:1;" onclick="createBilanInitial(${i})">📋 Bilan initial</button>
-          <button class="btn" style="font-size:11px;flex:1;" onclick="createBilanControle(${i})">🔄 Bilan de contrôle</button>
-        </div>
+
+      <!-- 4 boutons bilans -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+        ${btnSportInit}
+        ${btnSportCtrl}
+        ${btnPostInit}
+        ${btnPostCtrl}
       </div>
+
+      <!-- Historique bilans sportifs -->
+      ${bilansSportHtml ? `<div style="margin-top:6px;padding-left:4px;">
+        <div style="font-size:10px;color:var(--mut);margin-bottom:3px;font-weight:600;">BILANS SPORTIFS</div>
+        ${bilansSportHtml}
+      </div>` : ''}
+
+      <!-- Historique bilans posturo -->
+      ${bilansPosturoHtml ? `<div style="margin-top:6px;padding-left:4px;">
+        <div style="font-size:10px;color:var(--mut);margin-bottom:3px;font-weight:600;">BILANS POSTURAUX</div>
+        ${bilansPosturoHtml}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1800,12 +1929,91 @@ function loadBilanFromHistory(patIdx, bilanIdx) {
   const p = patients[patIdx];
   if(!p || !p.bilans || !p.bilans[bilanIdx]) return;
   const bilan = p.bilans[bilanIdx];
-  // Charger les données historiques en lecture seule
   selectPatient(p);
-  // Afficher dans le rapport
   currentPatient.mesures = bilan.mesures;
   currentPatient.bilanData = bilan.bilanData;
   nav('pg-rapport');
+}
+
+// ---- NOUVEAU SYSTÈME BILANS ----
+
+function creerBilanSport(patIdx, type) {
+  const p = patients[patIdx];
+  if(!p) return;
+  // Sauvegarder bilan courant si données existantes
+  if(p.mesures && Object.keys(p.mesures).length > 0) {
+    if(!p.bilansSport) p.bilansSport = [];
+    const num = p.bilansSport.length + 1;
+    p.bilansSport.push({
+      label: type === 'initial' ? 'Sportif Initial' : 'Sportif Contrôle ' + num,
+      type: type,
+      date: new Date().toLocaleDateString('fr-FR'),
+      mesures: JSON.parse(JSON.stringify(p.mesures||{})),
+      bilanData: JSON.parse(JSON.stringify(p.bilanData||{}))
+    });
+  }
+  // Nouveau bilan vide
+  p.mesures = {};
+  p.bilanData = {};
+  p.currentBilanType = 'sport';
+  p.currentBilanSousType = type;
+  savePatients();
+  selectPatient(p);
+  nav('pg-sport');
+}
+
+function ouvrirBilanSport(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if(!p) return;
+  const bilan = p.bilansSport?.[bilanIdx];
+  if(!bilan) {
+    // Bilan courant
+    selectPatient(p);
+    nav('pg-sport');
+    return;
+  }
+  selectPatient(p);
+  currentPatient.mesures = JSON.parse(JSON.stringify(bilan.mesures||{}));
+  currentPatient.bilanData = JSON.parse(JSON.stringify(bilan.bilanData||{}));
+  currentBilanReadOnly = true;
+  nav('pg-sport');
+}
+
+function creerBilanPosturo(patIdx, type) {
+  const p = patients[patIdx];
+  if(!p) return;
+  // Sauvegarder bilan posturo courant si données existantes
+  if(p.bilanDataPosturo && Object.keys(p.bilanDataPosturo).length > 0) {
+    if(!p.bilansPosturo) p.bilansPosturo = [];
+    const num = p.bilansPosturo.length + 1;
+    p.bilansPosturo.push({
+      label: type === 'initial' ? 'Posturo Initial' : 'Posturo Contrôle ' + num,
+      type: type,
+      date: new Date().toLocaleDateString('fr-FR'),
+      bilanDataPosturo: JSON.parse(JSON.stringify(p.bilanDataPosturo||{}))
+    });
+  }
+  p.bilanDataPosturo = {};
+  p.currentBilanType = 'posturo';
+  p.currentBilanSousType = type;
+  savePatients();
+  selectPatient(p);
+  nav('pg-posturo');
+}
+
+function ouvrirBilanPosturo(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if(!p) return;
+  const bilan = p.bilansPosturo?.[bilanIdx];
+  if(!bilan) {
+    selectPatient(p);
+    nav('pg-posturo');
+    return;
+  }
+  selectPatient(p);
+  currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
+  currentBilanReadOnly = true;
+  nav('pg-posturo');
 }
 function renderPratList() {
   const el = document.getElementById('prat-list-el');
