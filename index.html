@@ -2231,12 +2231,12 @@ function editPraticien(i) {
   const pr = praticiens[i];
   if(!pr) return;
   // Remplir le formulaire avec les données existantes
-  document.getElementById('np-prat-nom').value = pr.nom || '';
-  document.getElementById('np-prat-titre').value = pr.titre || '';
-  document.getElementById('np-prat-cabinet').value = pr.cabinet || '';
-  document.getElementById('np-prat-tel').value = pr.tel || '';
-  document.getElementById('np-prat-adresse').value = pr.adresse || '';
-  document.getElementById('np-prat-email').value = pr.email || '';
+  document.getElementById('pr-nom').value = pr.nom || '';
+  document.getElementById('pr-titre').value = pr.titre || '';
+  document.getElementById('pr-cabinet').value = pr.cabinet || '';
+  document.getElementById('pr-tel').value = pr.tel || '';
+  document.getElementById('pr-adresse').value = pr.adresse || '';
+  document.getElementById('pr-email').value = pr.email || '';
   // Changer le bouton en mode édition
   const btn = document.querySelector('#pg-praticiens button[onclick*="createPraticien"]');
   if(btn) {
@@ -2250,18 +2250,18 @@ function editPraticien(i) {
 function saveEditPraticien(i) {
   const pr = praticiens[i];
   if(!pr) return;
-  pr.nom = document.getElementById('np-prat-nom').value.trim();
-  pr.titre = document.getElementById('np-prat-titre').value.trim();
-  pr.cabinet = document.getElementById('np-prat-cabinet').value.trim();
-  pr.tel = document.getElementById('np-prat-tel').value.trim();
-  pr.adresse = document.getElementById('np-prat-adresse').value.trim();
-  pr.email = document.getElementById('np-prat-email').value.trim();
+  pr.nom = document.getElementById('pr-nom').value.trim();
+  pr.titre = document.getElementById('pr-titre').value.trim();
+  pr.cabinet = document.getElementById('pr-cabinet').value.trim();
+  pr.tel = document.getElementById('pr-tel').value.trim();
+  pr.adresse = document.getElementById('pr-adresse').value.trim();
+  pr.email = document.getElementById('pr-email').value.trim();
   savePatients();
   renderPratList();
   // Remettre le bouton en mode création
   const btn = document.querySelector('#pg-praticiens button[onclick*="saveEditPraticien"]');
   if(btn) { btn.textContent = '✓ Enregistrer le praticien'; btn.onclick = createPraticien; }
-  ['np-prat-nom','np-prat-titre','np-prat-cabinet','np-prat-tel','np-prat-adresse','np-prat-email'].forEach(id => {
+  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
 }
