@@ -3211,18 +3211,19 @@ function buildSidePreview(side,t,data) {
   let pct=null,ang=null,label=side==='D'?'Côté Droit':'Côté Gauche';
   const sideC=side==='D'?'var(--blue)':'var(--green)';
   if(t.div!==undefined){
-    // KFPPA : toujours recalculer depuis photos (angleD/G = rawAng brut)
+    // KFPPA : recalculer avec toIncl(180-rawAng si >90°) pour compatibilité
     const bipodal=data.photos?.find(p=>p.side==='');
     const uni=data.photos?.find(p=>p.side===side);
-    const bipAng=side==='D'?bipodal?.angleD:bipodal?.angleG;
-    const uniAng=uni?.angle;
+    const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
+    const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
+    const uniAng=_toIncl(uni?.angle);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
     } else {
-      // Fallback données anciennes
       pct=side==='D'?data.pctD:data.pctG;
       ang=side==='D'?data.deltaD:data.deltaG;
+      if(ang!=null) ang=_toIncl(ang)<ang?_toIncl(ang):ang;
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -3820,18 +3821,19 @@ function buildPrintSide(side, t, data) {
   let pct=null,ang=null;
 
   if(t.div!==undefined){
-    // KFPPA : toujours recalculer depuis photos (angleD/G = rawAng brut)
+    // KFPPA : recalculer avec toIncl(180-rawAng si >90°) pour compatibilité
     const bipodal=data.photos?.find(p=>p.side==='');
     const uni=data.photos?.find(p=>p.side===side);
-    const bipAng=side==='D'?bipodal?.angleD:bipodal?.angleG;
-    const uniAng=uni?.angle;
+    const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
+    const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
+    const uniAng=_toIncl(uni?.angle);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
     } else {
-      // Fallback données anciennes
       pct=side==='D'?data.pctD:data.pctG;
       ang=side==='D'?data.deltaD:data.deltaG;
+      if(ang!=null) ang=_toIncl(ang)<ang?_toIncl(ang):ang;
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
