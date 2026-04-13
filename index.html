@@ -2980,7 +2980,6 @@ function sideResultCard(side, angDelta, pct, type, nMin, nMax, div) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
       <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
-      <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;">${pct==null?'':Math.abs(pct)*100>=66?'Dans la norme - verrouillage fonctionnel':Math.abs(pct)*100>=33?'Limite':'Hors norme - mauvais verrouillage'}</div>
     </div>`;
   }
   // Mobilité AP
@@ -3009,7 +3008,7 @@ function sideResultCard(side, angDelta, pct, type, nMin, nMax, div) {
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
       <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;line-height:1.5;">
-        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'limite - mobilite reduite':'hors norme - mobilite tres limitee'}
+        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'Limite - mobilite reduite':'Hors norme - mobilite tres limitee'}
       </div>
     </div>`;
   }
@@ -3332,7 +3331,6 @@ function buildSidePreview(side,t,data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
       <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
-      <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;">${pct==null?'':Math.abs(pct)*100>=66?'Dans la norme - verrouillage fonctionnel':Math.abs(pct)*100>=33?'Limite':'Hors norme - mauvais verrouillage'}</div>
     </div>`;
   }
   // Mobilité AP
@@ -3361,7 +3359,7 @@ function buildSidePreview(side,t,data) {
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
       <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;line-height:1.5;">
-        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'limite - mobilite reduite':'hors norme - mobilite tres limitee'}
+        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'Limite - mobilite reduite':'Hors norme - mobilite tres limitee'}
       </div>
     </div>`;
   }
@@ -4000,7 +3998,6 @@ function buildPrintSide(side, t, data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
       <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
-      <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;">${pct==null?'':Math.abs(pct)*100>=66?'Dans la norme - verrouillage fonctionnel':Math.abs(pct)*100>=33?'Limite':'Hors norme - mauvais verrouillage'}</div>
     </div>`;
   }
   // Mobilité AP
@@ -4029,7 +4026,7 @@ function buildPrintSide(side, t, data) {
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
       <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;line-height:1.5;">
-        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'limite - mobilite reduite':'hors norme - mobilite tres limitee'}
+        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'Limite - mobilite reduite':'Hors norme - mobilite tres limitee'}
       </div>
     </div>`;
   }
