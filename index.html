@@ -3747,10 +3747,10 @@ function buildPrintSection(t, data, conclusions) {
       const _toI=(v)=>v==null?null:(v>90?180-v:v);
       const _bdD=_toI(_bip?.angleD), _bdG=_toI(_bip?.angleG);
       const _udD=_toI(_uD?.angle), _udG=_toI(_uG?.angle);
-      const _dD=(_bdD!=null&&_udD!=null)?_udD-_bdD:data.deltaD;
-      const _dG=(_bdG!=null&&_udG!=null)?_udG-_bdG:data.deltaG;
-      const _pD=_dD!=null?_dD/t.div:data.pctD;
-      const _pG=_dG!=null?_dG/t.div:data.pctG;
+      const _dD=(_bdD!=null&&_udD!=null)?_udD-_bdD:_toI(data.deltaD);
+      const _dG=(_bdG!=null&&_udG!=null)?_udG-_bdG:_toI(data.deltaG);
+      const _pD=_dD!=null?_dD/t.div:null;
+      const _pG=_dG!=null?_dG/t.div:null;
       const pD=_pD,pG=_pG;
       const vD=pD!=null&&!isNaN(pD)?Math.round(pD*100):null,vG=pG!=null&&!isNaN(pG)?Math.round(pG*100):null;
       const normStr=`${t.normeMin}°–${t.normeMax}°`;
