@@ -1174,7 +1174,7 @@ async function pwaLogin() {
     const data = await supa.signIn(email, pwd);
     if(data.access_token) {
       const isAdmin = email.toLowerCase() === 'admin@sciopraxi.fr';
-      pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin };
+      pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin, user_metadata: data.user?.user_metadata || {} };
       savePwaSession(data.access_token, pwaUser);
       await onPwaLoginSuccess();
     } else {
@@ -1319,7 +1319,7 @@ async function initPWA() {
       const userData = await supa.getUser(session.token);
       if(userData.id) {
         const isAdmin = session.user.email?.toLowerCase() === 'admin@sciopraxi.fr';
-        pwaUser = { ...session.user, token: session.token, isAdmin };
+        pwaUser = { ...session.user, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {} };
         await onPwaLoginSuccess();
         return;
       }
