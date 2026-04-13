@@ -3855,23 +3855,23 @@ function buildPrintSection(t, data, conclusions) {
 function buildPrintSide(side, t, data) {
   const sideC=side==='D'?'#185FA5':'#0B6B2C';
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
-  let pct=null,ang=null;
+  let pct=null,ang=null,_kfppaUniAng=null;
 
   if(t.div!==undefined){
-    // KFPPA : recalculer avec toIncl(180-rawAng si >90°) pour compatibilité
     const bipodal=data.photos?.find(p=>p.side==='');
     const uni=data.photos?.find(p=>p.side===side);
     const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
     const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
     const uniAng=_toIncl(uni?.angle);
-    console.log('KFPPA debug',side,'bipodal=',bipodal,'uni=',uni,'bipAng=',bipAng,'uniAng=',uniAng);
+    _kfppaUniAng=uniAng;
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
     } else {
       pct=side==='D'?data.pctD:data.pctG;
       ang=side==='D'?data.deltaD:data.deltaG;
-      if(ang!=null) ang=_toIncl(ang)<ang?_toIncl(ang):ang;
+      const _ti2=(v)=>v==null?null:(v>90?180-v:v);
+      if(ang!=null) ang=_ti2(ang);
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -3999,7 +3999,7 @@ function buildPrintSide(side, t, data) {
   const r=35,circ=2*Math.PI*r,fill=circ*Math.min(100,Math.max(0,pctVal||0))/100;
   const badgeCls=rp_badgeCls(pct,isGenou);
   const badgeTxt=rp_badgeTxt(pct,isGenou);
-  const ph=buildPrintPhotos(data,side,t);
+  const ph=buildPrintPhotos(data,side,t,_kfppaUniAng||undefined);
 
   return `<div class="rp-side-block rp-side-${side}">
     <div class="rp-side-title">${sideLabel}</div>
