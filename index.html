@@ -1614,9 +1614,11 @@ async function renderParamsPratList() {
     const droits = pratLocal ? (pratLocal.droits || 'all') : 'all';
     const nom = meta.nom || (pratLocal ? pratLocal.nom : '') || email.split('@')[0];
     const prenom = meta.prenom || (pratLocal ? pratLocal.prenom : '') || '';
+    const userId = u.id;
     const init = ((prenom||nom||'?')[0]).toUpperCase();
     const lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('fr-FR') : 'Jamais';
     const adminBadge = isAdmin ? '<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:4px;">Admin</span>' : '';
+    const editBtn = '<button onclick="editPraticienMeta(\''+userId+'\', \''+nom+'\', \''+prenom+'\' )" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;" title="Modifier nom/prénom">✏️</button>';
     let droitsSelect = '';
     if(isAdmin) {
       droitsSelect = '<span style="font-size:11px;color:var(--mut);">Accès total</span>';
@@ -1629,6 +1631,31 @@ async function renderParamsPratList() {
     html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);"><div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div><div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;"><div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge + '</div><div style="font-size:11px;color:var(--mut);">' + email + '</div><div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div></div>' + droitsSelect + '</div>';
   });
   el.innerHTML = html;
+}
+
+async function updateSupabaseUserMeta(userId, nom, prenom) {
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + userId, {
+      method: 'PUT',
+      headers: {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ user_metadata: { nom, prenom } })
+    });
+    const d = await r.json();
+    if(r.ok) { renderParamsPratList(); }
+    else alert('Erreur: ' + (d.message||'inconnue'));
+  } catch(e) { alert('Erreur réseau: ' + e.message); }
+}
+
+function editPraticienMeta(userId, currentNom, currentPrenom) {
+  const nom = prompt('Nom :', currentNom || '');
+  if(nom === null) return;
+  const prenom = prompt('Prénom :', currentPrenom || '');
+  if(prenom === null) return;
+  updateSupabaseUserMeta(userId, nom.toUpperCase(), prenom);
 }
 
 function setPraticienDroitsByEmail(email, droits) {
