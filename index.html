@@ -1611,29 +1611,22 @@ async function renderParamsPratList() {
     const isAdmin = email === ADMIN_EMAIL;
     const meta = u.user_metadata || {};
     const pratLocal = praticiens.find(pr => pr.email === email);
-    const droits = pratLocal?.droits || meta.droits || 'all';
-    const nom = meta.nom || pratLocal?.nom || email.split('@')[0];
-    const prenom = meta.prenom || pratLocal?.prenom || '';
+    const droits = pratLocal ? (pratLocal.droits || 'all') : 'all';
+    const nom = meta.nom || (pratLocal ? pratLocal.nom : '') || email.split('@')[0];
+    const prenom = meta.prenom || (pratLocal ? pratLocal.prenom : '') || '';
     const init = ((prenom||nom||'?')[0]).toUpperCase();
     const lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('fr-FR') : 'Jamais';
     const adminBadge = isAdmin ? '<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:4px;">Admin</span>' : '';
-    const droitsSelect = isAdmin ? '<span style="font-size:11px;color:var(--mut);">Accès total</span>' :
-      '<select onchange="setPraticienDroitsByEmail('' + email + '', this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);">' +
-      '<option value="all"' + (droits==='all'?' selected':'') + '>Sport + Posturo</option>' +
-      '<option value="sport"' + (droits==='sport'?' selected':'') + '>Sport uniquement</option>' +
-      '<option value="posturo"' + (droits==='posturo'?' selected':'') + '>Posturo uniquement</option>' +
-      '</select>';
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);">' +
-      '<div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div>' +
-      '<div style="flex:1;">' +
-        '<div style="display:flex;align-items:center;gap:6px;">' +
-          '<div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge +
-        '</div>' +
-        '<div style="font-size:11px;color:var(--mut);">' + email + '</div>' +
-        '<div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div>' +
-      '</div>' +
-      droitsSelect +
-    '</div>';
+    let droitsSelect = '';
+    if(isAdmin) {
+      droitsSelect = '<span style="font-size:11px;color:var(--mut);">Accès total</span>';
+    } else {
+      const selAll = droits === 'all' ? ' selected' : '';
+      const selSport = droits === 'sport' ? ' selected' : '';
+      const selPosturo = droits === 'posturo' ? ' selected' : '';
+      droitsSelect = '<select data-email="' + email + '" onchange="setPraticienDroitsByEmail(this.dataset.email, this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);"><option value="all"' + selAll + '>Sport + Posturo</option><option value="sport"' + selSport + '>Sport uniquement</option><option value="posturo"' + selPosturo + '>Posturo uniquement</option></select>';
+    }
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);"><div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div><div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;"><div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge + '</div><div style="font-size:11px;color:var(--mut);">' + email + '</div><div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div></div>' + droitsSelect + '</div>';
   });
   el.innerHTML = html;
 }
