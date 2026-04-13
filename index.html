@@ -1958,13 +1958,11 @@ function captureVidPhotoSlot(slotIdx) {
 
   // KFPPA photo bipodale : calculer angleD et angleG séparément
   if(t?.kfppaPhotos && !side) {
+    // Bipodal KFPPA : stocker angle brut (rawAng) côté D et G
     const mkrD = vidMarkers.filter(m=>m.side==='D');
     const mkrG = vidMarkers.filter(m=>m.side==='G');
-    // Signe anatomique réel : Inv=+ Ev=- selon direction du calca
-    // Pied D: pointe droite=Inv(+), pointe gauche=Ev(-)
-    // Pied G: pointe gauche=Inv(+), pointe droite=Ev(-)
-    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'',mkrD);
-    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'',mkrG);
+    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,'kfppa',mkrD);
+    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,'kfppa',mkrG);
   }
 
   renderVidPhotoGrid();
