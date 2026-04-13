@@ -528,7 +528,6 @@ body.printing #rpt-print{display:block!important;}
     </div>
   </div>
 </div>
-</div>
 
 <!-- ══ PRATICIENS ══ -->
 
@@ -1364,6 +1363,9 @@ let patients = JSON.parse(localStorage.getItem('bm4-patients')||'[]');
 let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
 let currentPatient = null;
 let currentBilanReadOnly = false;
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6aXZpem9hY2R5b3B3ZnplcnJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTgyNDQ0NywiZXhwIjoyMDkxNDAwNDQ3fQ.y07k2_nj-hJnG-XlhR1ULr9BlRLpGY2QXgRnM2UQ558";
+const SUPABASE_URL = "https://tzivizoacdyopwfzerrb.supabase.co";
+const ADMIN_EMAIL = "admin@sciopraxi.fr";
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -1578,28 +1580,76 @@ function nav(id) {
   }
 }
 
-function renderParamsPratList() {
+async function fetchSupabaseUsers() {
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/admin/users?per_page=100', {
+      headers: {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY
+      }
+    });
+    const d = await r.json();
+    return d.users || [];
+  } catch(e) {
+    console.error('fetchSupabaseUsers error:', e);
+    return [];
+  }
+}
+
+async function renderParamsPratList() {
   const el = document.getElementById('params-prat-list');
   if(!el) return;
-  if(!praticiens.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--mut);">Aucun praticien enregistré.</div>';
+  el.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Chargement...</div>';
+
+  const supaUsers = await fetchSupabaseUsers();
+
+  if(!supaUsers.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--mut);">Aucun utilisateur trouvé.</div>';
     return;
   }
-  el.innerHTML = praticiens.map((pr, i) => {
-    const droits = pr.droits || 'all';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord);">
-      <div class="av" style="width:32px;height:32px;font-size:12px;">${((pr.prenom||'?')[0]+(pr.nom||'?')[0]).toUpperCase()}</div>
+
+  el.innerHTML = supaUsers.map(u => {
+    const email = u.email || '—';
+    const isAdmin = email === ADMIN_EMAIL;
+    const meta = u.user_metadata || {};
+    // Chercher droits dans nos praticiens locaux par email
+    const pratLocal = praticiens.find(pr => pr.email === email);
+    const droits = pratLocal?.droits || meta.droits || 'all';
+    const pratIdx = praticiens.findIndex(pr => pr.email === email);
+    const nom = meta.nom || pratLocal?.nom || email.split('@')[0];
+    const prenom = meta.prenom || pratLocal?.prenom || '';
+    const init = ((prenom||nom||'?')[0]).toUpperCase();
+    const lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('fr-FR') : 'Jamais';
+
+    return \`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);">
+      <div class="av" style="width:36px;height:36px;font-size:13px;\${isAdmin?';background:var(--blue);':''}">\${init}</div>
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:500;">${pr.prenom} ${pr.nom}</div>
-        <div style="font-size:10px;color:var(--mut);">${pr.email||'—'}</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="font-size:13px;font-weight:500;">\${prenom} \${nom}</div>
+          \${isAdmin ? '<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:4px;">Admin</span>' : ''}
+        </div>
+        <div style="font-size:11px;color:var(--mut);">\${email}</div>
+        <div style="font-size:10px;color:var(--mut);">Dernière connexion : \${lastLogin}</div>
       </div>
-      <select onchange="setPraticienDroits(${i}, this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);">
-        <option value="all" ${droits==='all'?'selected':''}>Sport + Posturo</option>
-        <option value="sport" ${droits==='sport'?'selected':''}>Sport uniquement</option>
-        <option value="posturo" ${droits==='posturo'?'selected':''}>Posturo uniquement</option>
-      </select>
-    </div>`;
+      \${!isAdmin ? \`<select onchange="setPraticienDroitsByEmail('\${email}', this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);">
+        <option value="all" \${droits==='all'?'selected':''}>Sport + Posturo</option>
+        <option value="sport" \${droits==='sport'?'selected':''}>Sport uniquement</option>
+        <option value="posturo" \${droits==='posturo'?'selected':''}>Posturo uniquement</option>
+      </select>\` : '<span style="font-size:11px;color:var(--mut);">Accès total</span>'}
+    </div>\`;
   }).join('');
+}
+
+function setPraticienDroitsByEmail(email, droits) {
+  // Mettre à jour dans praticiens locaux
+  const pr = praticiens.find(p => p.email === email);
+  if(pr) {
+    pr.droits = droits;
+  } else {
+    praticiens.push({ id: Date.now(), email, droits });
+  }
+  savePatients();
+  renderPatientList();
 }
 
 function setPraticienDroits(pratIdx, droits) {
