@@ -3824,6 +3824,13 @@ function buildPrintSection(t, data, conclusions) {
           ${photos.map(p=>p.dataUrl?`<div style="text-align:center;"><img src="${p.dataUrl}" style="height:80px;border-radius:4px;border:1px solid #ccc;"><br><span style="font-size:8px;">${p.label}</span></div>`:'').join('')}
         </div>
       </div>`;
+      const interpretVerrou=(p)=>{if(p==null)return'—';const v=Math.abs(p)*100;if(v>=66)return'dans la norme — verrouillage arrière-pied fonctionnel';if(v>=33)return'limite — verrouillage arrière-pied à surveiller';return'hors norme — mauvais verrouillage arrière-pied';};
+      const apVv2=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+      sectionHTML+=`<div class="rp-written">
+        <em style="color:#888;">Norme : Statique 0° · Pointe Inv+10° · RF 10°=100% · Mollet 10°=100%</em><br>
+        <strong>Pied droit :</strong> Stat: ${apVv2(statD)} · Pointe: ${apVv2(pointeD)} · RF: ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'} · Mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'} — ${interpretVerrou(rfD)}<br>
+        <strong>Pied gauche :</strong> Stat: ${apVv2(statG)} · Pointe: ${apVv2(pointeG)} · RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'} · Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'} — ${interpretVerrou(rfG)}
+      </div>`;
       if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Insuffisance verrouillage AP droit (${Math.round(Math.abs(rfD)*100)}%) — ${t.name}`);
       if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Insuffisance verrouillage AP gauche (${Math.round(Math.abs(rfG)*100)}%) — ${t.name}`);
     }
