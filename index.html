@@ -3007,9 +3007,6 @@ function sideResultCard(side, angDelta, pct, type, nMin, nMax, div) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
-      <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;line-height:1.5;">
-        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'Limite - mobilite reduite':'Hors norme - mobilite tres limitee'}
-      </div>
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
@@ -3358,9 +3355,6 @@ function buildSidePreview(side,t,data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
-      <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;line-height:1.5;">
-        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'Limite - mobilite reduite':'Hors norme - mobilite tres limitee'}
-      </div>
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
@@ -3843,6 +3837,8 @@ function buildPrintSection(t, data, conclusions) {
       </div>`;
       if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Insuffisance verrouillage AP droit (${Math.round(Math.abs(rfD)*100)}%) — ${t.name}`);
       if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Insuffisance verrouillage AP gauche (${Math.round(Math.abs(rfG)*100)}%) — ${t.name}`);
+      const _rfAvg=(rfD!=null&&rfG!=null)?(rfD+rfG)/2:rfD||rfG;
+      sectionHTML+=`<div class="rp-written"><strong>Pied droit:</strong> RF: ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'-'} - Mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'-'} - ${rfD==null?'':Math.abs(rfD)*100>=66?'Dans la norme':'Hors norme - mauvais verrouillage'}<br><strong>Pied gauche:</strong> RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'-'} - Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'-'} - ${rfG==null?'':Math.abs(rfG)*100>=66?'Dans la norme':'Hors norme - mauvais verrouillage'}</div>`;
     }
     else if(t.normMob!==undefined){
       // Mobilité AP
@@ -3878,6 +3874,7 @@ function buildPrintSection(t, data, conclusions) {
       </div></div>`;
       if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP droite réduite (${Math.round(Math.abs(mobD)*100)}%) — ${t.name}`);
       if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP gauche réduite (${Math.round(Math.abs(mobG)*100)}%) — ${t.name}`);
+      sectionHTML+=`<div class="rp-written"><strong>Pied droit:</strong> Mobilite: ${_mobDpct!=null?_mobDpct+'%':'-'} - ${mobD==null?'':Math.abs(mobD)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(mobD)*100>=33?'Limite':'Hors norme - mobilite tres limitee'}<br><strong>Pied gauche:</strong> Mobilite: ${_mobGpct!=null?_mobGpct+'%':'-'} - ${mobG==null?'':Math.abs(mobG)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(mobG)*100>=33?'Limite':'Hors norme - mobilite tres limitee'}</div>`;
     }
     else {
       sectionHTML+=buildPrintSingleSide(t,data);
@@ -4025,9 +4022,6 @@ function buildPrintSide(side, t, data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
-      <div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:6px 10px;margin-top:6px;font-size:9px;color:#333;line-height:1.5;">
-        ${pct==null?'Pas de donnees':Math.abs(pct)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(pct)*100>=33?'Limite - mobilite reduite':'Hors norme - mobilite tres limitee'}
-      </div>
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
