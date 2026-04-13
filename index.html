@@ -500,11 +500,15 @@ body.printing #rpt-print{display:block!important;}
 <div class="page active" id="pg-patients">
   <div class="section">
     <div class="stitle">Dossiers patients</div>
-    <div class="card"><input id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..." 
-  style="width:100%;box-sizing:border-box;margin-bottom:10px;font-size:13px;"
-  oninput="renderPatientList()">
-<div id="pt-list-el"></div></div>
     <div class="card">
+  <div style="display:flex;gap:8px;margin-bottom:10px;">
+    <input id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..." 
+      style="flex:1;font-size:13px;" oninput="renderPatientList()">
+    <button class="btn" onclick="openNewPatientModal()" style="background:var(--blue);color:#fff;font-size:13px;white-space:nowrap;">+ Nouveau patient</button>
+  </div>
+  <div id="pt-list-el"></div>
+</div>
+    <div class="card" id="nouveau-patient-card" style="display:none;">
       <div class="stitle">Nouveau patient</div>
       <div class="g2">
         <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom *</div><input class="inp" id="np-nom" placeholder="Nom"/></div>
@@ -1858,6 +1862,48 @@ function saveEditPatient(idx) {
   alert(`✓ Patient modifié : ${p.prenom} ${p.nom}`);
 }
 
+// ── MODAL NOUVEAU PATIENT ──
+function openNewPatientModal() {
+  // Créer la modal si elle n'existe pas
+  let modal = document.getElementById('modal-new-patient');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-new-patient';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    modal.innerHTML = `
+      <div style="background:var(--card);border-radius:14px;padding:24px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="font-size:16px;font-weight:700;">Nouveau patient</div>
+          <button onclick="closeNewPatientModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">✕</button>
+        </div>
+        <div class="g2">
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom *</div><input class="inp" id="np-nom" placeholder="Nom"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prénom *</div><input class="inp" id="np-prenom" placeholder="Prénom"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance</div><input class="inp" id="np-ddn" type="date"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Sport et/ou activité</div><input class="inp" id="np-sport" placeholder="Trail, running..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Latéralité</div><select class="inp" id="np-lat"><option>Droitier</option><option>Gaucher</option></select></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Poids (kg)</div><input class="inp" id="np-poids" type="number" placeholder="70"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Taille (cm)</div><input class="inp" id="np-taille" type="number" placeholder="175"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Métier / Profession</div><input class="inp" id="np-metier" placeholder="Kiné, coureur amateur..."/></div>
+          <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien</div><select class="inp" id="np-prat"><option value="">— Choisir —</option></select></div>
+        </div>
+        <div style="margin-top:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Motif / antécédents</div><textarea class="inp" id="np-motif" rows="2" placeholder="Douleur genou, entorses..."></textarea></div>
+        <div id="np-err" style="display:none;color:var(--red);font-size:11px;margin-top:5px;padding:5px 8px;background:var(--red-d);border-radius:var(--rs);"></div>
+        <button class="btn btn-blue btn-full" style="margin-top:12px;" onclick="createPatient()">✓ Créer le dossier</button>
+      </div>`;
+    document.body.appendChild(modal);
+    // Fermer en cliquant dehors
+    modal.addEventListener('click', e => { if(e.target === modal) closeNewPatientModal(); });
+  }
+  modal.style.display = 'flex';
+  populatePratSelect();
+}
+
+function closeNewPatientModal() {
+  const modal = document.getElementById('modal-new-patient');
+  if(modal) modal.style.display = 'none';
+}
+
 function createPatient() {
   const nom = document.getElementById('np-nom').value.trim();
   const prenom = document.getElementById('np-prenom').value.trim();
@@ -1880,7 +1926,7 @@ function createPatient() {
   patients.push(p); savePatients();
   selectPatient(p);
   ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille','np-motif'].forEach(id=>{document.getElementById(id).value='';});
-  alert(`✓ Dossier créé : ${p.prenom} ${p.nom}`);
+  closeNewPatientModal();
   nav('pg-patients');
 }
 
