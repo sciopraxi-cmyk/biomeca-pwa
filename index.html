@@ -2666,6 +2666,12 @@ function computeCorrectedAngle(rawAng, side, view, testType, pts) {
     return incl;
   }
   if(view==='dos' && side==='G') return -incl;
+  // Vue face (KFPPA) : genou D pointe droite=valgus(+), genou G pointe droite=varus(-)
+  if(view==='face' && pts) {
+    const sign=calcAngleSign(pts);
+    if(side==='D') return sign*incl;
+    if(side==='G') return -sign*incl;
+  }
   return incl;
 }
 
