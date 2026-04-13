@@ -3217,6 +3217,7 @@ function buildSidePreview(side,t,data) {
     const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
     const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
     const uniAng=_toIncl(uni?.angle);
+    console.log('KFPPA debug',side,'bipodal=',bipodal,'uni=',uni,'bipAng=',bipAng,'uniAng=',uniAng);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
@@ -3827,6 +3828,7 @@ function buildPrintSide(side, t, data) {
     const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
     const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
     const uniAng=_toIncl(uni?.angle);
+    console.log('KFPPA debug',side,'bipodal=',bipodal,'uni=',uni,'bipAng=',bipAng,'uniAng=',uniAng);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
@@ -3975,7 +3977,7 @@ function buildPrintSingleSide(t,data) {
     </div>`;
 }
 
-function buildPrintPhotos(data,side,t) {
+function buildPrintPhotos(data,side,t,angleOverride) {
   const allPhotos=data.photos||[];
   // Filtrer par côté si side est défini, sinon prendre toutes les photos sans côté
   const photos=side
@@ -3998,7 +4000,7 @@ function buildPrintPhotos(data,side,t) {
       <div style="text-align:center;flex:0 0 auto;">
         <img src="${ph.dataUrl}" style="height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block;"/>
         <div style="font-size:7px;color:#666;margin-top:2px;">${ph.label||''}</div>
-        ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${Number(ph.angle).toFixed(1)}°</div>`:''}
+        ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${Number(angleOverride!=null?angleOverride:ph.angle).toFixed(1)}°</div>`:''}
       </div>`:'').join('')}
   </div>`;
 }
