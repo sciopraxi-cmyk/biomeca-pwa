@@ -2961,6 +2961,59 @@ function updateResults() {
 
 function sideResultCard(side, angDelta, pct, type, nMin, nMax, div) {
   const c=side==='D'?'#4a9eff':'#3ecf72';
+  // Verrouillage AP
+  if(t.normVerrou!==undefined){
+    const photos=data.photos||[];
+    const ph=photos.filter(p=>p.side===side);
+    const stat=ph[0]?.angle, pointe=ph[1]?.angle;
+    ang=pointe; pct=pointe!=null?pointe/t.normVerrou:null;
+    const mol=(pointe!=null&&stat!=null)?(pointe-stat)/t.normVerrou:null;
+    const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const cssVv=rp_cssColor(pct,false);
+    const r2v=35,cv=2*Math.PI*r2v,fv=pct!=null?cv*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div class="rp-gauge-photos">
+        <div class="rp-gauge"><svg width="90" height="90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="${r2v}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+          ${pct!=null?`<circle cx="40" cy="40" r="${r2v}" fill="none" stroke="${cssVv}" stroke-width="8" stroke-dasharray="${fv} ${cv}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+        </svg><div class="rp-gauge-inner">
+          <div class="rp-gauge-pct" style="color:${cssVv};">${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
+        </div></div>
+        ${buildPrintPhotos(data,side,t)}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
+      <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
+    </div>`;
+  }
+  // Mobilité AP
+  if(t.normMob!==undefined){
+    const photos=data.photos||[];
+    const p0=photos[0], p1=photos[1];
+    const invA=side==='D'?p0?.angleD:p0?.angleG;
+    const evA=side==='D'?p1?.angleD:p1?.angleG;
+    ang=(invA!=null&&evA!=null)?invA-evA:null;
+    pct=ang!=null?ang/t.normMob:null;
+    const apVm=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const cssM=rp_cssColor(pct,false);
+    const r2m=35,cm=2*Math.PI*r2m,fm=pct!=null?cm*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div class="rp-gauge-photos">
+        <div class="rp-gauge"><svg width="90" height="90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="${r2m}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+          ${pct!=null?`<circle cx="40" cy="40" r="${r2m}" fill="none" stroke="${cssM}" stroke-width="8" stroke-dasharray="${fm} ${cm}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+        </svg><div class="rp-gauge-inner">
+          <div class="rp-gauge-pct" style="color:${cssM};">${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
+        </div></div>
+        ${buildPrintPhotos(data,'',t)}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
+      <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
+    </div>`;
+  }
   const pctVal=pct!==null?Math.round(pct*100):null;
   const clr=pct!==null?clrGenou(pct):'var(--mut)';
   return `<div class="res-side-card">
@@ -3199,6 +3252,59 @@ function buildSidePreview(side,t,data) {
   } else if(t.normVerrou!==undefined||t.normMob!==undefined){
     const val=t.normVerrou!==undefined?data.rfPct:data.mobPct;
     pct=val;
+  }
+  // Verrouillage AP
+  if(t.normVerrou!==undefined){
+    const photos=data.photos||[];
+    const ph=photos.filter(p=>p.side===side);
+    const stat=ph[0]?.angle, pointe=ph[1]?.angle;
+    ang=pointe; pct=pointe!=null?pointe/t.normVerrou:null;
+    const mol=(pointe!=null&&stat!=null)?(pointe-stat)/t.normVerrou:null;
+    const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const cssVv=rp_cssColor(pct,false);
+    const r2v=35,cv=2*Math.PI*r2v,fv=pct!=null?cv*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div class="rp-gauge-photos">
+        <div class="rp-gauge"><svg width="90" height="90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="${r2v}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+          ${pct!=null?`<circle cx="40" cy="40" r="${r2v}" fill="none" stroke="${cssVv}" stroke-width="8" stroke-dasharray="${fv} ${cv}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+        </svg><div class="rp-gauge-inner">
+          <div class="rp-gauge-pct" style="color:${cssVv};">${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
+        </div></div>
+        ${buildPrintPhotos(data,side,t)}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
+      <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
+    </div>`;
+  }
+  // Mobilité AP
+  if(t.normMob!==undefined){
+    const photos=data.photos||[];
+    const p0=photos[0], p1=photos[1];
+    const invA=side==='D'?p0?.angleD:p0?.angleG;
+    const evA=side==='D'?p1?.angleD:p1?.angleG;
+    ang=(invA!=null&&evA!=null)?invA-evA:null;
+    pct=ang!=null?ang/t.normMob:null;
+    const apVm=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const cssM=rp_cssColor(pct,false);
+    const r2m=35,cm=2*Math.PI*r2m,fm=pct!=null?cm*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div class="rp-gauge-photos">
+        <div class="rp-gauge"><svg width="90" height="90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="${r2m}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+          ${pct!=null?`<circle cx="40" cy="40" r="${r2m}" fill="none" stroke="${cssM}" stroke-width="8" stroke-dasharray="${fm} ${cm}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+        </svg><div class="rp-gauge-inner">
+          <div class="rp-gauge-pct" style="color:${cssM};">${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
+        </div></div>
+        ${buildPrintPhotos(data,'',t)}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
+      <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
+    </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
   const clr=t.div?clrGenou(pct):clrGen(pct);
@@ -3580,7 +3686,7 @@ function buildBilanPrintSection(bd) {
 }
 
 function buildPrintSection(t, data, conclusions) {
-  const hasSides=t.div!==undefined||t.normDiv!==undefined||t.normAm!==undefined||t.mlaTest;
+  const hasSides=t.div!==undefined||t.normDiv!==undefined||t.normAm!==undefined||t.mlaTest||t.normVerrou!==undefined||t.normMob!==undefined;
   let written='', sectionHTML='';
 
   if(hasSides) {
@@ -3736,6 +3842,59 @@ function buildPrintSide(side, t, data) {
     </div>`;
   }
 
+  // Verrouillage AP
+  if(t.normVerrou!==undefined){
+    const photos=data.photos||[];
+    const ph=photos.filter(p=>p.side===side);
+    const stat=ph[0]?.angle, pointe=ph[1]?.angle;
+    ang=pointe; pct=pointe!=null?pointe/t.normVerrou:null;
+    const mol=(pointe!=null&&stat!=null)?(pointe-stat)/t.normVerrou:null;
+    const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const cssVv=rp_cssColor(pct,false);
+    const r2v=35,cv=2*Math.PI*r2v,fv=pct!=null?cv*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div class="rp-gauge-photos">
+        <div class="rp-gauge"><svg width="90" height="90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="${r2v}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+          ${pct!=null?`<circle cx="40" cy="40" r="${r2v}" fill="none" stroke="${cssVv}" stroke-width="8" stroke-dasharray="${fv} ${cv}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+        </svg><div class="rp-gauge-inner">
+          <div class="rp-gauge-pct" style="color:${cssVv};">${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
+        </div></div>
+        ${buildPrintPhotos(data,side,t)}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
+      <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
+    </div>`;
+  }
+  // Mobilité AP
+  if(t.normMob!==undefined){
+    const photos=data.photos||[];
+    const p0=photos[0], p1=photos[1];
+    const invA=side==='D'?p0?.angleD:p0?.angleG;
+    const evA=side==='D'?p1?.angleD:p1?.angleG;
+    ang=(invA!=null&&evA!=null)?invA-evA:null;
+    pct=ang!=null?ang/t.normMob:null;
+    const apVm=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const cssM=rp_cssColor(pct,false);
+    const r2m=35,cm=2*Math.PI*r2m,fm=pct!=null?cm*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div class="rp-gauge-photos">
+        <div class="rp-gauge"><svg width="90" height="90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="${r2m}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+          ${pct!=null?`<circle cx="40" cy="40" r="${r2m}" fill="none" stroke="${cssM}" stroke-width="8" stroke-dasharray="${fm} ${cm}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+        </svg><div class="rp-gauge-inner">
+          <div class="rp-gauge-pct" style="color:${cssM};">${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
+        </div></div>
+        ${buildPrintPhotos(data,'',t)}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
+      <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
+    </div>`;
+  }
   const pctVal=pct!==null?Math.round(pct*100):null;
   const isGenou=t.div!==undefined;
   const cssC=rp_cssColor(pct,isGenou);
