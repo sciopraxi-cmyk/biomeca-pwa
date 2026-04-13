@@ -1108,12 +1108,16 @@ const supa = {
       'Prefer': 'return=minimal'
     };
     // Essayer PATCH d'abord (mise à jour de la ligne existante)
+    const patchHeaders = Object.assign({}, headers, {'Prefer': 'return=representation,count=exact'});
     const patch = await fetch(SUPA_URL + '/rest/v1/' + table + '?user_id=eq.' + data.user_id, {
       method: 'PATCH',
-      headers,
+      headers: patchHeaders,
       body: JSON.stringify({ data: data.data, updated_at: data.updated_at })
     });
-    if(patch.ok) return true;
+    if(patch.ok) {
+      const patched = await patch.json();
+      if(patched && patched.length > 0) return true; // ligne mise à jour
+    }
     // Si la ligne n'existe pas encore, faire un POST (insertion)
     const post = await fetch(SUPA_URL + '/rest/v1/' + table, {
       method: 'POST',
