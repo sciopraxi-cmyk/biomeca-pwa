@@ -3210,16 +3210,18 @@ function buildSidePreview(side,t,data) {
   let pct=null,ang=null,label=side==='D'?'Côté Droit':'Côté Gauche';
   const sideC=side==='D'?'var(--blue)':'var(--green)';
   if(t.div!==undefined){
-    pct=side==='D'?data.pctD:data.pctG;
-    ang=side==='D'?data.deltaD:data.deltaG;
-    // Recalculer depuis photos si NaN/null
-    if((pct==null||isNaN(pct)) && data.photos?.length) {
-      const bipodal=data.photos.find(p=>p.side==='');
-      const uni=data.photos.find(p=>p.side===side);
-      if(bipodal?.angle!=null&&uni?.angle!=null){
-        ang=uni.angle-bipodal.angle;
-        pct=ang/t.div;
-      }
+    // KFPPA : toujours recalculer depuis photos (angleD/G = rawAng brut)
+    const bipodal=data.photos?.find(p=>p.side==='');
+    const uni=data.photos?.find(p=>p.side===side);
+    const bipAng=side==='D'?bipodal?.angleD:bipodal?.angleG;
+    const uniAng=uni?.angle;
+    if(bipAng!=null&&uniAng!=null){
+      ang=uniAng-bipAng;
+      pct=ang/t.div;
+    } else {
+      // Fallback données anciennes
+      pct=side==='D'?data.pctD:data.pctG;
+      ang=side==='D'?data.deltaD:data.deltaG;
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -3233,7 +3235,14 @@ function buildSidePreview(side,t,data) {
     }
   }
   else if(t.normAm!==undefined){
-    const am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
+    let am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
+    // Recalculer depuis photos si NaN/null
+    if((am==null||isNaN(am)) && data.photos?.length) {
+      const ph2=data.photos.filter(p=>p.side===side);
+      const talV=ph2[0]?.angle, planV=ph2[1]?.angle, digV=ph2[2]?.angle;
+      if(talV!=null&&planV!=null) am=(talV-planV)/t.normAm;
+      if(digV!=null&&planV!=null) pr=(digV-planV)/t.normAm;
+    }
     const cAm=am!==null?clrGen(am):'var(--mut)', cPr=pr!==null?clrGen(pr):'var(--mut)';
     return `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
       <div style="font-size:11px;font-weight:700;color:${sideC};margin-bottom:6px;">${label}</div>
@@ -3692,8 +3701,16 @@ function buildPrintSection(t, data, conclusions) {
     // Texte clinique
     const lines=[];
     if(t.div!==undefined){
-      const pD=data.pctD,pG=data.pctG;
-      const vD=pD!==null?Math.round(pD*100):null,vG=pG!==null?Math.round(pG*100):null;
+      // Recalculer depuis photos pour la synthèse
+      const _bip=data.photos?.find(p=>p.side==='');
+      const _uD=data.photos?.find(p=>p.side==='D');
+      const _uG=data.photos?.find(p=>p.side==='G');
+      const _dD=(_bip?.angleD!=null&&_uD?.angle!=null)?_uD.angle-_bip.angleD:data.deltaD;
+      const _dG=(_bip?.angleG!=null&&_uG?.angle!=null)?_uG.angle-_bip.angleG:data.deltaG;
+      const _pD=_dD!=null?_dD/t.div:data.pctD;
+      const _pG=_dG!=null?_dG/t.div:data.pctG;
+      const pD=_pD,pG=_pG;
+      const vD=pD!=null&&!isNaN(pD)?Math.round(pD*100):null,vG=pG!=null&&!isNaN(pG)?Math.round(pG*100):null;
       const normStr=`${t.normeMin}°–${t.normeMax}°`;
       if(vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${data.deltaD?.toFixed(1)||'—'}° (${vD}%) — ${interpretKfppa(pD)}`);
       if(vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${data.deltaG?.toFixed(1)||'—'}° (${vG}%) — ${interpretKfppa(pG)}`);
@@ -3799,16 +3816,18 @@ function buildPrintSide(side, t, data) {
   let pct=null,ang=null;
 
   if(t.div!==undefined){
-    pct=side==='D'?data.pctD:data.pctG;
-    ang=side==='D'?data.deltaD:data.deltaG;
-    // Recalculer depuis photos si NaN/null
-    if((pct==null||isNaN(pct)) && data.photos?.length) {
-      const bipodal=data.photos.find(p=>p.side==='');
-      const uni=data.photos.find(p=>p.side===side);
-      if(bipodal?.angle!=null&&uni?.angle!=null){
-        ang=uni.angle-bipodal.angle;
-        pct=ang/t.div;
-      }
+    // KFPPA : toujours recalculer depuis photos (angleD/G = rawAng brut)
+    const bipodal=data.photos?.find(p=>p.side==='');
+    const uni=data.photos?.find(p=>p.side===side);
+    const bipAng=side==='D'?bipodal?.angleD:bipodal?.angleG;
+    const uniAng=uni?.angle;
+    if(bipAng!=null&&uniAng!=null){
+      ang=uniAng-bipAng;
+      pct=ang/t.div;
+    } else {
+      // Fallback données anciennes
+      pct=side==='D'?data.pctD:data.pctG;
+      ang=side==='D'?data.deltaD:data.deltaG;
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -3822,7 +3841,14 @@ function buildPrintSide(side, t, data) {
     }
   }
   else if(t.normAm!==undefined){
-    const am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
+    let am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
+    // Recalculer depuis photos si NaN/null
+    if((am==null||isNaN(am)) && data.photos?.length) {
+      const ph2=data.photos.filter(p=>p.side===side);
+      const talV=ph2[0]?.angle, planV=ph2[1]?.angle, digV=ph2[2]?.angle;
+      if(talV!=null&&planV!=null) am=(talV-planV)/t.normAm;
+      if(digV!=null&&planV!=null) pr=(digV-planV)/t.normAm;
+    }
     const cAm=rp_cssColor(am,false),cPr=rp_cssColor(pr,false);
     const ph=buildPrintPhotos(data,side,t);
     const phases=data.phases?.[side];
