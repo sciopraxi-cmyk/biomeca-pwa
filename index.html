@@ -2980,7 +2980,10 @@ function sideResultCard(side, angDelta, pct, type, nMin, nMax, div) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
       <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
-      ${pct!=null?`<div style="display:block;text-align:center;margin-top:4px;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</div>`:''}
+      <div style="text-align:center;margin-top:4px;">
+        ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
+        <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Statique 0° · Pointe Inv+10° · RF 10°=100%</div>
+      </div>
     </div>`;
   }
   // Mobilité AP
@@ -3008,7 +3011,10 @@ function sideResultCard(side, angDelta, pct, type, nMin, nMax, div) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
-      ${pct!=null?`<div style="display:block;text-align:center;margin-top:4px;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</div>`:''}
+      <div style="text-align:center;margin-top:4px;">
+        ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
+        <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</div>
+      </div>
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
@@ -3330,7 +3336,10 @@ function buildSidePreview(side,t,data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
       <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
-      ${pct!=null?`<div style="display:block;text-align:center;margin-top:4px;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</div>`:''}
+      <div style="text-align:center;margin-top:4px;">
+        ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
+        <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Statique 0° · Pointe Inv+10° · RF 10°=100%</div>
+      </div>
     </div>`;
   }
   // Mobilité AP
@@ -3358,7 +3367,10 @@ function buildSidePreview(side,t,data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
-      ${pct!=null?`<div style="display:block;text-align:center;margin-top:4px;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</div>`:''}
+      <div style="text-align:center;margin-top:4px;">
+        ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
+        <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</div>
+      </div>
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
@@ -4008,7 +4020,10 @@ function buildPrintSide(side, t, data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
       <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
-      ${pct!=null?`<div style="display:block;text-align:center;margin-top:4px;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</div>`:''}
+      <div style="text-align:center;margin-top:4px;">
+        ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
+        <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Statique 0° · Pointe Inv+10° · RF 10°=100%</div>
+      </div>
     </div>`;
   }
   // Mobilité AP
@@ -4036,7 +4051,10 @@ function buildPrintSide(side, t, data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
       <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
-      ${pct!=null?`<div style="display:block;text-align:center;margin-top:4px;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</div>`:''}
+      <div style="text-align:center;margin-top:4px;">
+        ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
+        <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</div>
+      </div>
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
