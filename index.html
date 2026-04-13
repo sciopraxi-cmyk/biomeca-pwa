@@ -3239,13 +3239,49 @@ function buildSidePreview(side,t,data) {
   }
   else if(t.normAm!==undefined){
     let am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
-    // Recalculer depuis photos si NaN/null
+    let talV=data.phases?.[side]?.tal, planV=data.phases?.[side]?.plan, digV=data.phases?.[side]?.dig;
     if((am==null||isNaN(am)) && data.photos?.length) {
       const ph2=data.photos.filter(p=>p.side===side);
-      const talV=ph2[0]?.angle, planV=ph2[1]?.angle, digV=ph2[2]?.angle;
+      talV=ph2[0]?.angle; planV=ph2[1]?.angle; digV=ph2[2]?.angle;
       if(talV!=null&&planV!=null) am=Math.abs(talV-planV)/t.normAm;
       if(digV!=null&&planV!=null) pr=Math.abs(digV-planV)/t.normAm;
     }
+    const _apVa=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _cssAm=rp_cssColor(am,false), _cssPr=rp_cssColor(pr,false);
+    const _r2=35,_circ=2*Math.PI*_r2;
+    const _fillAm=am!=null?_circ*Math.min(100,Math.max(0,Math.abs(am)*100))/100:0;
+    const _fillPr=pr!=null?_circ*Math.min(100,Math.max(0,Math.abs(pr)*100))/100:0;
+    const _ph=buildPrintPhotos(data,side,t);
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div style="font-size:9px;color:#888;margin-bottom:4px;">Taligrade: ${_apVa(talV)} · Plantigrade: ${_apVa(planV)} · Digitigrade: ${_apVa(digV)}</div>
+      <div class="rp-gauge-photos">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div class="rp-gauge" style="width:80px;height:80px;">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="${_r2}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+              ${am!=null?`<circle cx="40" cy="40" r="${_r2}" fill="none" stroke="${_cssAm}" stroke-width="8" stroke-dasharray="${_fillAm} ${_circ}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+            </svg>
+            <div class="rp-gauge-inner">
+              <div class="rp-gauge-pct" style="color:${_cssAm};font-size:11px;">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</div>
+              <div class="rp-gauge-deg" style="font-size:7px;">Amorti</div>
+            </div>
+          </div>
+          <div class="rp-gauge" style="width:80px;height:80px;">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="${_r2}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+              ${pr!=null?`<circle cx="40" cy="40" r="${_r2}" fill="none" stroke="${_cssPr}" stroke-width="8" stroke-dasharray="${_fillPr} ${_circ}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+            </svg>
+            <div class="rp-gauge-inner">
+              <div class="rp-gauge-pct" style="color:${_cssPr};font-size:11px;">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</div>
+              <div class="rp-gauge-deg" style="font-size:7px;">Propuls.</div>
+            </div>
+          </div>
+        </div>
+        ${_ph}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Amorti: <b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b> · Propulsion: <b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b> (N:${t.normAm}°=100%)</div>
+    </div>`;
     const cAm=am!==null?clrGen(am):'var(--mut)', cPr=pr!==null?clrGen(pr):'var(--mut)';
     return `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
       <div style="font-size:11px;font-weight:700;color:${sideC};margin-bottom:6px;">${label}</div>
@@ -3850,13 +3886,49 @@ function buildPrintSide(side, t, data) {
   }
   else if(t.normAm!==undefined){
     let am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
-    // Recalculer depuis photos si NaN/null
+    let talV=data.phases?.[side]?.tal, planV=data.phases?.[side]?.plan, digV=data.phases?.[side]?.dig;
     if((am==null||isNaN(am)) && data.photos?.length) {
       const ph2=data.photos.filter(p=>p.side===side);
-      const talV=ph2[0]?.angle, planV=ph2[1]?.angle, digV=ph2[2]?.angle;
+      talV=ph2[0]?.angle; planV=ph2[1]?.angle; digV=ph2[2]?.angle;
       if(talV!=null&&planV!=null) am=Math.abs(talV-planV)/t.normAm;
       if(digV!=null&&planV!=null) pr=Math.abs(digV-planV)/t.normAm;
     }
+    const _apVa=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _cssAm=rp_cssColor(am,false), _cssPr=rp_cssColor(pr,false);
+    const _r2=35,_circ=2*Math.PI*_r2;
+    const _fillAm=am!=null?_circ*Math.min(100,Math.max(0,Math.abs(am)*100))/100:0;
+    const _fillPr=pr!=null?_circ*Math.min(100,Math.max(0,Math.abs(pr)*100))/100:0;
+    const _ph=buildPrintPhotos(data,side,t);
+    return `<div class="rp-side-block rp-side-${side}">
+      <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+      <div style="font-size:9px;color:#888;margin-bottom:4px;">Taligrade: ${_apVa(talV)} · Plantigrade: ${_apVa(planV)} · Digitigrade: ${_apVa(digV)}</div>
+      <div class="rp-gauge-photos">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div class="rp-gauge" style="width:80px;height:80px;">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="${_r2}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+              ${am!=null?`<circle cx="40" cy="40" r="${_r2}" fill="none" stroke="${_cssAm}" stroke-width="8" stroke-dasharray="${_fillAm} ${_circ}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+            </svg>
+            <div class="rp-gauge-inner">
+              <div class="rp-gauge-pct" style="color:${_cssAm};font-size:11px;">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</div>
+              <div class="rp-gauge-deg" style="font-size:7px;">Amorti</div>
+            </div>
+          </div>
+          <div class="rp-gauge" style="width:80px;height:80px;">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="${_r2}" fill="none" stroke="#e0e0e0" stroke-width="8" transform="rotate(-90,40,40)"/>
+              ${pr!=null?`<circle cx="40" cy="40" r="${_r2}" fill="none" stroke="${_cssPr}" stroke-width="8" stroke-dasharray="${_fillPr} ${_circ}" stroke-linecap="round" transform="rotate(-90,40,40)"/>`:''}
+            </svg>
+            <div class="rp-gauge-inner">
+              <div class="rp-gauge-pct" style="color:${_cssPr};font-size:11px;">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</div>
+              <div class="rp-gauge-deg" style="font-size:7px;">Propuls.</div>
+            </div>
+          </div>
+        </div>
+        ${_ph}
+      </div>
+      <div style="font-size:9px;margin-top:4px;">Amorti: <b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b> · Propulsion: <b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b> (N:${t.normAm}°=100%)</div>
+    </div>`;
     const cAm=rp_cssColor(am,false),cPr=rp_cssColor(pr,false);
     const ph=buildPrintPhotos(data,side,t);
     const phases=data.phases?.[side];
