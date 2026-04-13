@@ -1628,7 +1628,7 @@ async function renderParamsPratList() {
       const selPosturo = droits === 'posturo' ? ' selected' : '';
       droitsSelect = '<select data-email="' + email + '" onchange="setPraticienDroitsByEmail(this.dataset.email, this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);"><option value="all"' + selAll + '>Sport + Posturo</option><option value="sport"' + selSport + '>Sport uniquement</option><option value="posturo"' + selPosturo + '>Posturo uniquement</option></select>';
     }
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);"><div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div><div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;"><div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge + '</div><div style="font-size:11px;color:var(--mut);">' + email + '</div><div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div></div>' + droitsSelect + '</div>';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);"><div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div><div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;"><div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge + editBtn + '</div><div style="font-size:11px;color:var(--mut);">' + email + '</div><div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div></div>' + droitsSelect + '</div>';
   });
   el.innerHTML = html;
 }
