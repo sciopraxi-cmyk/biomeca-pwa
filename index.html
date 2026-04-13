@@ -528,6 +528,7 @@ body.printing #rpt-print{display:block!important;}
     </div>
   </div>
 </div>
+</div>
 
 <!-- ══ PRATICIENS ══ -->
 
@@ -1872,7 +1873,7 @@ function createPatient() {
   selectPatient(p);
   ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille','np-motif'].forEach(id=>{document.getElementById(id).value='';});
   alert(`✓ Dossier créé : ${p.prenom} ${p.nom}`);
-  nav('pg-home');
+  nav('pg-patients');
 }
 
 function selectPatient(p) {
