@@ -1152,6 +1152,36 @@ async function loadSupabaseData() {
       patients = [];
       praticiens = [];
     }
+    // Migration : anciens bilans (p.bilans[]) → p.bilansSport[]
+    let migrated = false;
+    patients.forEach(p => {
+      if(p.bilans && p.bilans.length > 0 && !p.bilansSport) {
+        p.bilansSport = p.bilans.map((b,i) => ({
+          label: b.label || ('Sportif Contrôle ' + (i+1)),
+          type: i===0 ? 'initial' : 'controle',
+          date: b.date || '',
+          mesures: b.mesures || {},
+          bilanData: b.bilanData || {}
+        }));
+        migrated = true;
+      }
+      // Migrer bilan initial (p.mesures) s'il existe et pas encore dans bilansSport
+      if(p.mesures && Object.keys(p.mesures).length > 0) {
+        if(!p.bilansSport) p.bilansSport = [];
+        const hasInitial = p.bilansSport.some(b => b.type === 'initial');
+        if(!hasInitial) {
+          p.bilansSport.unshift({
+            label: 'Sportif Initial',
+            type: 'initial',
+            date: p.bilanInitialDate || '',
+            mesures: JSON.parse(JSON.stringify(p.mesures)),
+            bilanData: JSON.parse(JSON.stringify(p.bilanData||{}))
+          });
+          migrated = true;
+        }
+      }
+    });
+    if(migrated) { console.log('Migration bilans OK'); savePatients(); }
   } catch(e) {
     // Fallback localStorage si Supabase indisponible
     patients = JSON.parse(localStorage.getItem('bm4-patients-pwa') || '[]');
