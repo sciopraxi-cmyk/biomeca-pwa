@@ -3837,8 +3837,17 @@ function buildPrintSection(t, data, conclusions) {
       </div>`;
       if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Insuffisance verrouillage AP droit (${Math.round(Math.abs(rfD)*100)}%) — ${t.name}`);
       if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Insuffisance verrouillage AP gauche (${Math.round(Math.abs(rfG)*100)}%) — ${t.name}`);
-      const _rfAvg=(rfD!=null&&rfG!=null)?(rfD+rfG)/2:rfD||rfG;
-      sectionHTML+=`<div class="rp-written"><strong>Pied droit:</strong> RF: ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'-'} - Mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'-'} - ${rfD==null?'':Math.abs(rfD)*100>=66?'Dans la norme':'Hors norme - mauvais verrouillage'}<br><strong>Pied gauche:</strong> RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'-'} - Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'-'} - ${rfG==null?'':Math.abs(rfG)*100>=66?'Dans la norme':'Hors norme - mauvais verrouillage'}</div>`;
+      // Recalculer depuis photos si rfD/rfG null
+      const _phD2=(data.photos||[]).filter(p=>p.side==='D');
+      const _phG2=(data.photos||[]).filter(p=>p.side==='G');
+      const _statD2=_phD2[0]?.angle,_pointeD2=_phD2[1]?.angle;
+      const _statG2=_phG2[0]?.angle,_pointeG2=_phG2[1]?.angle;
+      const _rfD2=_pointeD2!=null?_pointeD2/t.normVerrou:rfD;
+      const _molD2=(_pointeD2!=null&&_statD2!=null)?(_pointeD2-_statD2)/t.normVerrou:molD;
+      const _rfG2=_pointeG2!=null?_pointeG2/t.normVerrou:rfG;
+      const _molG2=(_pointeG2!=null&&_statG2!=null)?(_pointeG2-_statG2)/t.normVerrou:molG;
+      const _iV2=(p)=>p==null?'':Math.abs(p)*100>=66?'Dans la norme':'Hors norme - mauvais verrouillage';
+      sectionHTML+=`<div class="rp-written"><strong>Pied droit:</strong> RF: ${_rfD2!=null?Math.round(Math.abs(_rfD2)*100)+'%':'-'} - Mollet: ${_molD2!=null?Math.round(Math.abs(_molD2)*100)+'%':'-'} - ${_iV2(_rfD2)}<br><strong>Pied gauche:</strong> RF: ${_rfG2!=null?Math.round(Math.abs(_rfG2)*100)+'%':'-'} - Mollet: ${_molG2!=null?Math.round(Math.abs(_molG2)*100)+'%':'-'} - ${_iV2(_rfG2)}</div>`;
     }
     else if(t.normMob!==undefined){
       // Mobilité AP
