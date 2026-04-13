@@ -3418,7 +3418,12 @@ function printReport() {
   let sectionsHTML='';
   const conclusions=[];
 
-  Object.entries(mesures).forEach(([testId,data])=>{
+  const ordreRapport=['kfppa-marche','kfppa-course','kfppa-sldj','verrouillage-ap','mobilite-ap','mla-marche','mla-course','amorti-marche','amorti-course'];
+  const mesuresRapport=Object.entries(mesures).sort(([a],[b])=>{
+    const iA=ordreRapport.indexOf(a),iB=ordreRapport.indexOf(b);
+    if(iA===-1&&iB===-1)return 0; if(iA===-1)return 1; if(iB===-1)return -1; return iA-iB;
+  });
+  mesuresRapport.forEach(([testId,data])=>{
     const t=TESTS[testId]; if(!t) return;
     sectionsHTML+=buildPrintSection(t,data,conclusions);
   });
