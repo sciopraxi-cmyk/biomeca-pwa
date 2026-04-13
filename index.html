@@ -4077,6 +4077,38 @@ function buildPrintSingleSide(t,data) {
         ${phHTML}
       </div>
       ${isVerrou&&data.molPct!=null?`<div style="font-size:10px;margin-top:4px;">Force mollet : <strong style="color:${rp_cssColor(data.molPct,false)};">${Math.round(data.molPct*100)}%</strong></div>`:''}
+    </div>
+    ${(()=>{
+      const photosD=(data.photos||[]).filter(p=>p.side==='D');
+      const photosG=(data.photos||[]).filter(p=>p.side==='G');
+      if(isVerrou){
+        const statD=photosD[0]?.angle,pointeD=photosD[1]?.angle;
+        const statG=photosG[0]?.angle,pointeG=photosG[1]?.angle;
+        const rfD=pointeD!=null?pointeD/t.normVerrou:null;
+        const molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/t.normVerrou:null;
+        const rfG=pointeG!=null?pointeG/t.normVerrou:null;
+        const molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/t.normVerrou:null;
+        const iV=(p)=>{if(p==null)return'-';const v=Math.abs(p)*100;if(v>=66)return'dans la norme';if(v>=33)return'limite';return'hors norme - mauvais verrouillage';};
+        const apVs=(v)=>v==null?'-':(v>0?'Inv (+)':'Ev (-)')+' '+Math.abs(v).toFixed(1)+'deg';
+        return `<div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:8px 12px;margin-top:8px;font-size:10px;color:#333;line-height:1.6;">
+          <em style="color:#888;">Norme: Statique 0deg - Pointe Inv+10deg - RF 10deg=100%</em><br>
+          <strong>Pied droit:</strong> Stat: ${apVs(statD)} - Pointe: ${apVs(pointeD)} - RF: ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'-'} - Mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'-'} - ${iV(rfD)}<br>
+          <strong>Pied gauche:</strong> Stat: ${apVs(statG)} - Pointe: ${apVs(pointeG)} - RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'-'} - Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'-'} - ${iV(rfG)}
+        </div>`;
+      } else {
+        const p0=data.photos?.[0],p1=data.photos?.[1];
+        const invD=p0?.angleD,evD=p1?.angleD,invG=p0?.angleG,evG=p1?.angleG;
+        const mobD=(invD!=null&&evD!=null)?(invD-evD)/t.normMob:null;
+        const mobG=(invG!=null&&evG!=null)?(invG-evG)/t.normMob:null;
+        const iM=(p)=>{if(p==null)return'-';const v=Math.abs(p)*100;if(v>=66)return'dans la norme';if(v>=33)return'limite';return'hors norme - mobilite tres limitee';};
+        const apVm=(v)=>v==null?'-':(v>0?'Inv (+)':'Ev (-)')+' '+Math.abs(v).toFixed(1)+'deg';
+        return `<div style="background:#f9f9f9;border-left:3px solid #c8a96e;padding:8px 12px;margin-top:8px;font-size:10px;color:#333;line-height:1.6;">
+          <em style="color:#888;">Norme: Inv +20deg - Ev -10deg - Mobilite 30deg=100%</em><br>
+          <strong>Pied droit:</strong> Inv: ${apVm(invD)} - Ev: ${apVm(evD)} - Mobilite: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'deg':'-'} (${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'-'}) - ${iM(mobD)}<br>
+          <strong>Pied gauche:</strong> Inv: ${apVm(invG)} - Ev: ${apVm(evG)} - Mobilite: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'deg':'-'} (${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'-'}) - ${iM(mobG)}
+        </div>`;
+      }
+    })()}
     </div>`;
 }
 
