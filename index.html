@@ -2706,8 +2706,9 @@ function updateResults() {
     // KFPPA : 2 frames nécessaires
     if(t.div!==undefined) {
       const pBip=photoSlots[0], pUniG=photoSlots[1], pUniD=photoSlots[2];
-      const bipD=pBip?.angleD, bipG=pBip?.angleG;
-      const uniD=pUniD?.angle, uniG=pUniG?.angle;
+      const _ti=(v)=>v==null?null:(v>90?180-v:v);
+      const bipD=_ti(pBip?.angleD), bipG=_ti(pBip?.angleG);
+      const uniD=_ti(pUniD?.angle), uniG=_ti(pUniG?.angle);
       const angD=(uniD!=null&&bipD!=null)?uniD-bipD:null;
       const angG=(uniG!=null&&bipG!=null)?uniG-bipG:null;
       // Pour KFPPA, angD>0 = valgus dynamique (genou plus incliné en dynamique)
@@ -3705,8 +3706,11 @@ function buildPrintSection(t, data, conclusions) {
       const _bip=data.photos?.find(p=>p.side==='');
       const _uD=data.photos?.find(p=>p.side==='D');
       const _uG=data.photos?.find(p=>p.side==='G');
-      const _dD=(_bip?.angleD!=null&&_uD?.angle!=null)?_uD.angle-_bip.angleD:data.deltaD;
-      const _dG=(_bip?.angleG!=null&&_uG?.angle!=null)?_uG.angle-_bip.angleG:data.deltaG;
+      const _toI=(v)=>v==null?null:(v>90?180-v:v);
+      const _bdD=_toI(_bip?.angleD), _bdG=_toI(_bip?.angleG);
+      const _udD=_toI(_uD?.angle), _udG=_toI(_uG?.angle);
+      const _dD=(_bdD!=null&&_udD!=null)?_udD-_bdD:data.deltaD;
+      const _dG=(_bdG!=null&&_udG!=null)?_udG-_bdG:data.deltaG;
       const _pD=_dD!=null?_dD/t.div:data.pctD;
       const _pG=_dG!=null?_dG/t.div:data.pctG;
       const pD=_pD,pG=_pG;
