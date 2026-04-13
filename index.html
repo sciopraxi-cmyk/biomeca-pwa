@@ -3217,6 +3217,7 @@ function buildSidePreview(side,t,data) {
     const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
     const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
     const uniAng=_toIncl(uni?.angle);
+    console.log('KFPPA debug',side,'bipodal=',bipodal,'uni=',uni,'bipAng=',bipAng,'uniAng=',uniAng);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
@@ -3827,6 +3828,7 @@ function buildPrintSide(side, t, data) {
     const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
     const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
     const uniAng=_toIncl(uni?.angle);
+    console.log('KFPPA debug',side,'bipodal=',bipodal,'uni=',uni,'bipAng=',bipAng,'uniAng=',uniAng);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
@@ -3925,9 +3927,7 @@ function buildPrintSide(side, t, data) {
   const r=35,circ=2*Math.PI*r,fill=circ*Math.min(100,Math.max(0,pctVal||0))/100;
   const badgeCls=rp_badgeCls(pct,isGenou);
   const badgeTxt=rp_badgeTxt(pct,isGenou);
-  // Pour KFPPA : afficher uniAng (incl) comme angle sous la photo
-  const phAngleOverride=(t.div!==undefined&&uniAng!=null)?uniAng:undefined;
-  const ph=buildPrintPhotos(data,side,t,phAngleOverride);
+  const ph=buildPrintPhotos(data,side,t);
 
   return `<div class="rp-side-block rp-side-${side}">
     <div class="rp-side-title">${sideLabel}</div>
