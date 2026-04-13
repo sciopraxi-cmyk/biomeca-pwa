@@ -3833,11 +3833,11 @@ function buildPrintSection(t, data, conclusions) {
       </div>`;
       const interpretVerrou=(p)=>{if(p==null)return'-';const v=Math.abs(p)*100;if(v>=66)return'dans la norme - verrouillage fonctionnel';if(v>=33)return'limite - verrouillage a surveiller';return'hors norme - mauvais verrouillage';};
       const apVv2=(v)=>v==null?'-':(v>0?'Inv (+)':'Ev (-)')+' '+Math.abs(v).toFixed(1)+'deg';
-      sectionHTML+=`<div class="rp-written">
-        <em style="color:#888;">Norme : Statique 0deg · Pointe Inv+10deg · RF 10deg=100% · Mollet 10deg=100%</em><br>
-        <strong>Pied droit :</strong> Stat: ${apVv2(statD)} · Pointe: ${apVv2(pointeD)} · RF: ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'-'} · Mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'-'} - ${interpretVerrou(rfD)}<br>
-        <strong>Pied gauche :</strong> Stat: ${apVv2(statG)} · Pointe: ${apVv2(pointeG)} · RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'-'} · Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'-'} - ${interpretVerrou(rfG)}
-      </div>`;
+      sectionHTML=sectionHTML.slice(0,-6)+`<div class="rp-written">
+        <em style="color:#888;">Norme : Statique 0deg - Pointe Inv+10deg - RF 10deg=100% - Mollet 10deg=100%</em><br>
+        <strong>Pied droit :</strong> Stat: ${apVv2(statD)} - Pointe: ${apVv2(pointeD)} - RF: ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'-'} - Mollet: ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'-'} - ${interpretVerrou(rfD)}<br>
+        <strong>Pied gauche :</strong> Stat: ${apVv2(statG)} - Pointe: ${apVv2(pointeG)} - RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'-'} - Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'-'} - ${interpretVerrou(rfG)}
+      </div></div>`;
       if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Insuffisance verrouillage AP droit (${Math.round(Math.abs(rfD)*100)}%) — ${t.name}`);
       if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Insuffisance verrouillage AP gauche (${Math.round(Math.abs(rfG)*100)}%) — ${t.name}`);
     }
@@ -3871,8 +3871,8 @@ function buildPrintSection(t, data, conclusions) {
       sectionHTML+=`<div class="rp-written">
         <em style="color:#888;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</em><br>
         <strong>Pied droit :</strong> Inv: ${apV2(invD)} · Év: ${apV2(evD)} · Mobilité: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'°':'—'} (${_mobDpct!=null?_mobDpct+'%':'—'}) — ${interpretMob(mobD)}<br>
-        <strong>Pied gauche :</strong> Inv: ${apV2(invG)} · Év: ${apV2(evG)} · Mobilité: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'°':'—'} (${_mobGpct!=null?_mobGpct+'%':'—'}) — ${interpretMob(mobG)}
-      </div>`;
+        <strong>Pied gauche :</strong> Inv: ${apV2(invG)} - Ev: ${apV2(evG)} - Mobilite: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'deg':'-'} (${_mobGpct!=null?_mobGpct+'%':'-'}) - ${interpretMob(mobG)}
+      </div></div>`;
       if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP droite réduite (${Math.round(Math.abs(mobD)*100)}%) — ${t.name}`);
       if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP gauche réduite (${Math.round(Math.abs(mobG)*100)}%) — ${t.name}`);
     }
