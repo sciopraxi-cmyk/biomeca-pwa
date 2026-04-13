@@ -2639,8 +2639,20 @@ function kfppaLabel(ang, side) {
 function calcAngleSign(pts) {
   const placed=pts.filter(p=>p.x!==null);
   if(placed.length<2) return 1;
+  if(placed.length>=3) {
+    // Point central (Rotule pour KFPPA, CalcaSup pour AP)
+    // Détecter si le point central est à droite ou gauche de la ligne top→bot
+    const top=placed[0];   // EIAS ou Milieu mollet
+    const mid=placed[1];   // Rotule ou Jonction musculo-tend.
+    const bot=placed[placed.length-1]; // Tarse ou CalcaInf
+    // Position de mid par rapport à la ligne top→bot
+    // Produit vectoriel : (bot-top) × (mid-top)
+    // En coordonnées écran (y vers le bas), cross>0 = mid à droite
+    const cross=(bot.x-top.x)*(mid.y-top.y)-(bot.y-top.y)*(mid.x-top.x);
+    return cross<0?1:-1; // cross<0 en écran = point à droite
+  }
   const top=placed[0];
-  const bot=placed.length>=4?placed[3]:placed[placed.length-1];
+  const bot=placed[placed.length-1];
   return bot.x>top.x?1:-1;
 }
 
