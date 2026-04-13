@@ -2658,9 +2658,9 @@ function calcAngleSign(pts) {
 function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   if(rawAng===null) return null;
   if(testType==='mla') return rawAng;
-  // KFPPA : stocker incl sans signe (signe valgus/varus calculé à l'affichage)
+  // KFPPA : angle brut directement (pas de 180-rawAng)
+  if(testType==='kfppa') return rawAng;
   const incl = 180 - rawAng;
-  if(testType==='kfppa') return incl;
   // Vue dos : utiliser le cross product pour détecter le sens réel
   // cross > 0 = calca penche à droite
   // Pied D : droite = inversion(+), gauche = éversion(-)
