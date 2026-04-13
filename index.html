@@ -1214,6 +1214,12 @@ async function loadSupabaseData() {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
       patients = d.patients || [];
       praticiens = d.praticiens || [];
+      // Appliquer les droits depuis user_metadata Supabase
+      if(pwaUser?.user_metadata?.droits) {
+        window._userDroits = pwaUser.user_metadata.droits;
+      } else {
+        window._userDroits = 'all';
+      }
     } else {
       patients = [];
       praticiens = [];
@@ -1658,16 +1664,29 @@ function editPraticienMeta(userId, currentNom, currentPrenom) {
   updateSupabaseUserMeta(userId, nom.toUpperCase(), prenom);
 }
 
-function setPraticienDroitsByEmail(email, droits) {
+async function setPraticienDroitsByEmail(email, droits) {
   // Mettre à jour dans praticiens locaux
   const pr = praticiens.find(p => p.email === email);
-  if(pr) {
-    pr.droits = droits;
-  } else {
-    praticiens.push({ id: Date.now(), email, droits });
-  }
+  if(pr) { pr.droits = droits; } else { praticiens.push({ id: Date.now(), email, droits }); }
   savePatients();
   renderPatientList();
+  // Mettre à jour dans Supabase user_metadata
+  try {
+    const users = await fetchSupabaseUsers();
+    const u = users.find(u => u.email === email);
+    if(u) {
+      const meta = u.user_metadata || {};
+      await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + u.id, {
+        method: 'PUT',
+        headers: {
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ user_metadata: Object.assign({}, meta, { droits }) })
+      });
+    }
+  } catch(e) { console.error('setPraticienDroits Supabase error:', e); }
 }
 
 function setPraticienDroits(pratIdx, droits) {
@@ -1899,9 +1918,8 @@ function renderPatientList() {
   
   if(!filtered.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun résultat.</div>'; return; }
 
-  // Droits du praticien connecté
-  const pratConnecte = praticiens.find(pr => pr.id == pwaUser?.pratId) || null;
-  const droits = pratConnecte?.droits || 'all'; // 'sport', 'posturo', 'all'
+  // Droits du praticien connecté (depuis user_metadata Supabase)
+  const droits = window._userDroits || pwaUser?.user_metadata?.droits || 'all';
 
   el.innerHTML = filtered.map(p => {
     const i = patients.indexOf(p);
