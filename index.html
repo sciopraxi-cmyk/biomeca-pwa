@@ -1618,7 +1618,7 @@ async function renderParamsPratList() {
     const init = ((prenom||nom||'?')[0]).toUpperCase();
     const lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('fr-FR') : 'Jamais';
     const adminBadge = isAdmin ? '<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:4px;">Admin</span>' : '';
-    const editBtn = '<button onclick="editPraticienMeta(\''+userId+'\', \''+nom+'\', \''+prenom+'\' )" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;" title="Modifier nom/prénom">✏️</button>';
+    const editBtn = '<button data-uid="'+userId+'" data-nom="'+nom+'" data-prenom="'+prenom+'" onclick="editPraticienMeta(this.dataset.uid, this.dataset.nom, this.dataset.prenom)" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;" title="Modifier nom/prénom">✏️</button>';
     let droitsSelect = '';
     if(isAdmin) {
       droitsSelect = '<span style="font-size:11px;color:var(--mut);">Accès total</span>';
