@@ -5103,7 +5103,6 @@ function saveBilan() {
     const tmp = document.createElement('canvas');
     tmp.width = W; tmp.height = H;
     const tctx = tmp.getContext('2d');
-    // Fond transparent garanti (ne pas remplir)
     tctx.clearRect(0, 0, W, H);
     tctx.drawImage(cv, 0, 0);
     // Rendre transparents les pixels noirs (fond vide du canvas)
@@ -5114,7 +5113,12 @@ function saveBilan() {
       if(a === 0 || (r < 10 && g < 10 && b < 10)) d[i+3] = 0;
     }
     tctx.putImageData(imgData, 0, 0);
-    bilanData[key] = tmp.toDataURL('image/png');
+    // Sauvegarder à taille CSS (diviser par dpr) pour cohérence à la restauration
+    const cssW = Math.round(W/dpr), cssH = Math.round(H/dpr);
+    const out = document.createElement('canvas');
+    out.width = cssW; out.height = cssH;
+    out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, cssW, cssH);
+    bilanData[key] = out.toDataURL('image/png');
   };
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     saveCanvasDrawing(id, '_'+id.replace(/-/g,'_'));
@@ -5164,7 +5168,9 @@ function loadBilan() {
     const img = new Image();
     img.onload = () => {
       const ctx = cvs.getContext('2d');
-      ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = cvs.width/dpr, cssH = cvs.height/dpr;
+      ctx.drawImage(img, 0, 0, cssW, cssH);
     };
     img.src = bilanData[key];
   };
