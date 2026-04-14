@@ -1659,22 +1659,18 @@ function nav(id) {
           };
           img.src = bd[key];
         });
-        // Restaurer pieds - attendre que drawPiedsTemplate ait fini
+        // Restaurer pieds après drawPiedsTemplate (délai 800ms)
         if(bd._pieds) {
-          const tryRestorePieds = (attempts) => {
+          setTimeout(() => {
             const pc = document.getElementById('pieds-canvas');
-            if(!pc || !pc._baseSnapshot) {
-              if(attempts > 0) setTimeout(() => tryRestorePieds(attempts-1), 100);
-              return;
-            }
+            if(!pc) return;
             const img = new Image();
             img.onload = () => {
               const dpr = window.devicePixelRatio || 1;
               pc.getContext('2d').drawImage(img, 0, 0, pc.width/dpr, pc.height/dpr);
             };
             img.src = bd._pieds;
-          };
-          tryRestorePieds(10);
+          }, 800);
         }
       }, 500);
     }, 80);
