@@ -1532,7 +1532,8 @@ async function loadSupabaseData() {
   }
 
   currentPatient = null; bilanData = {};
-  renderPatientList();
+  // nav déclenche appendChild pour mettre toutes les pages dans .main
+  // puis renderPatientList s'exécute dans nav()
   renderPratList();
   populatePratSelect();
   if(patients.length > 0) selectPatient(patients[patients.length - 1]);
