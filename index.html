@@ -5091,44 +5091,33 @@ function saveBilan() {
     if(match) bilanData[match[1]] = el.checked;
   });
 
-  // 4. Capturer les canvas morpho et pieds (seulement le dessin, pas le fond)
-  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
+  // 4. Capturer les canvas morpho et pieds (seulement le dessin transparent)
+  const saveCanvasDrawing = (id, key) => {
     const cv = document.getElementById(id);
     if(!cv) return;
-    // Créer canvas temp transparent pour extraire juste le dessin
+    const dpr = window.devicePixelRatio || 1;
+    const W = cv.width, H = cv.height;
+    // Canvas temp à la taille réelle du canvas (avec dpr)
     const tmp = document.createElement('canvas');
-    tmp.width = cv.width; tmp.height = cv.height;
+    tmp.width = W; tmp.height = H;
     const tctx = tmp.getContext('2d');
-    // Dessiner le canvas courant sur fond transparent
+    // Fond transparent garanti (ne pas remplir)
+    tctx.clearRect(0, 0, W, H);
     tctx.drawImage(cv, 0, 0);
-    // Supprimer les pixels qui correspondent au fond blanc/noir (presque purs)
-    const imgData = tctx.getImageData(0, 0, tmp.width, tmp.height);
+    // Rendre transparents les pixels noirs (fond vide du canvas)
+    const imgData = tctx.getImageData(0, 0, W, H);
     const d = imgData.data;
     for(let i = 0; i < d.length; i += 4) {
-      const r=d[i], g=d[i+1], b=d[i+2];
-      // Si pixel est blanc (>240,>240,>240) ou noir (<15,<15,<15) → transparent
-      if((r>240 && g>240 && b>240) || (r<15 && g<15 && b<15)) {
-        d[i+3] = 0;
-      }
+      const r=d[i], g=d[i+1], b=d[i+2], a=d[i+3];
+      if(a === 0 || (r < 10 && g < 10 && b < 10)) d[i+3] = 0;
     }
     tctx.putImageData(imgData, 0, 0);
-    bilanData['_'+id.replace('-','_')] = tmp.toDataURL('image/png');
+    bilanData[key] = tmp.toDataURL('image/png');
+  };
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
+    saveCanvasDrawing(id, '_'+id.replace(/-/g,'_'));
   });
-  const pc = document.getElementById('pieds-canvas');
-  if(pc) {
-    const tmp2 = document.createElement('canvas');
-    tmp2.width = pc.width; tmp2.height = pc.height;
-    const t2ctx = tmp2.getContext('2d');
-    t2ctx.drawImage(pc, 0, 0);
-    const imgData2 = t2ctx.getImageData(0, 0, tmp2.width, tmp2.height);
-    const d2 = imgData2.data;
-    for(let i = 0; i < d2.length; i += 4) {
-      const r=d2[i], g=d2[i+1], b=d2[i+2];
-      if((r>240 && g>240 && b>240) || (r<15 && g<15 && b<15)) d2[i+3] = 0;
-    }
-    t2ctx.putImageData(imgData2, 0, 0);
-    bilanData._pieds = tmp2.toDataURL('image/png');
-  }
+  saveCanvasDrawing('pieds-canvas', '_pieds');
 
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
   savePatients();
@@ -5167,14 +5156,13 @@ function loadBilan() {
 
   // Restaurer les canvas depuis les dataURLs sauvegardées
   const restoreCanvas = (id, key) => {
-    const c = document.getElementById(id);
-    if(!c || !bilanData[key]) return;
+    const cvs = document.getElementById(id);
+    if(!cvs || !bilanData[key]) return;
+    if(!bilanData[key].startsWith('data:image/png')) return;
     const img = new Image();
     img.onload = () => {
-      const ctx = c.getContext('2d');
-      // Ne pas clearRect - garder le fond transparent
-      // Dessiner en mode 'source-over' sans effacer le fond
-      ctx.drawImage(img, 0, 0, c.width/window.devicePixelRatio, c.height/window.devicePixelRatio);
+      const ctx = cvs.getContext('2d');
+      ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
     };
     img.src = bilanData[key];
   };
