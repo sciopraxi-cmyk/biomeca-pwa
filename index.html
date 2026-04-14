@@ -5051,6 +5051,16 @@ function drawPiedsTemplate() {
     // Sauvegarder le snapshot de base
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
     setupDrawCanvas(canvas);
+    // Restaurer le dessin sauvegardé par-dessus le template
+    const savedPieds = currentPatient?.bilanData?._pieds;
+    if(savedPieds && savedPieds.startsWith('data:image/png')) {
+      const saved = new Image();
+      saved.onload = () => {
+        const dpr = window.devicePixelRatio || 1;
+        ctx.drawImage(saved, 0, 0, canvas.width/dpr, canvas.height/dpr);
+      };
+      saved.src = savedPieds;
+    }
   };
   img.src = document.getElementById('imgjs-pieds')?.src || '';
 }
