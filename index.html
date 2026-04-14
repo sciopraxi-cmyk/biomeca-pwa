@@ -1646,11 +1646,11 @@ function nav(id) {
           const keys = ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD'];
           ids.forEach((id,i) => {
             const key = keys[i];
-            if(bilanData[key] && bilanData[key].startsWith('data:image/png') && bilanData[key].length < 20000) {
+            if(bilanData[key]) {
               restoreCanvas(id, key);
             }
           });
-          if(bilanData._pieds && bilanData._pieds.startsWith('data:image/png') && bilanData._pieds.length < 20000) {
+          if(bilanData._pieds) {
             restoreCanvas('pieds-canvas', '_pieds');
           }
         }, 100);
@@ -5181,7 +5181,6 @@ function loadBilan() {
   const restoreCanvas = (id, key) => {
     const cvs = document.getElementById(id);
     if(!cvs || !bilanData[key]) return;
-    if(!bilanData[key].startsWith('data:image/png')) return;
     const img = new Image();
     img.onload = () => {
       const ctx = cvs.getContext('2d');
