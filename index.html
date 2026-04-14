@@ -5925,14 +5925,25 @@ function getBilanPosturoHTML() {
     <!-- Examen empreinte -->
     <div style="margin-bottom:14px;">
       <div style="font-weight:600;margin-bottom:6px;">• Examen empreinte et morpho plantaire :</div>
-      <div style="border:2px dashed #ccc;border-radius:8px;padding:12px;text-align:center;background:#fafafa;">
+      <div style="border:2px dashed #ccc;border-radius:8px;padding:12px;background:#fafafa;">
         <input type="file" id="po-empreinte-file" accept="image/*" style="display:none;" onchange="previewEmpreinte(this)"/>
-        <div id="po-empreinte-preview" style="margin-bottom:8px;">
+        <input type="file" id="po-empreinte-cam" accept="image/*" capture="environment" style="display:none;" onchange="previewEmpreinte(this)"/>
+        <div id="po-empreinte-preview" style="text-align:center;margin-bottom:8px;">
           <img id="po-empreinte-img" style="max-width:100%;max-height:200px;display:none;border-radius:6px;"/>
         </div>
-        <button class="btn" onclick="document.getElementById('po-empreinte-file').click()" style="font-size:12px;">
-          📷 Ajouter photo empreinte
-        </button>
+        <div id="po-empreinte-video-wrap" style="display:none;margin-bottom:8px;">
+          <video id="po-empreinte-video" autoplay playsinline style="width:100%;max-height:220px;border-radius:6px;background:#000;"></video>
+          <div style="display:flex;gap:8px;margin-top:6px;justify-content:center;">
+            <button class="btn" onclick="captureEmpreinte()" style="font-size:12px;">📸 Capturer</button>
+            <button class="btn" onclick="stopEmpreinteCamera()" style="font-size:12px;background:#888;">✕ Annuler</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+          <button class="btn" onclick="startEmpreinteCamera()" style="font-size:12px;">📷 Caméra</button>
+          <button class="btn" onclick="document.getElementById('po-empreinte-cam').click()" style="font-size:12px;">📱 Caméra mobile</button>
+          <button class="btn" onclick="document.getElementById('po-empreinte-file').click()" style="font-size:12px;">🖼 Depuis l'ordi</button>
+          <button class="btn" id="po-empreinte-del" onclick="deleteEmpreinte()" style="font-size:12px;background:#e74c3c;display:none;">🗑 Supprimer</button>
+        </div>
       </div>
     </div>
 
@@ -6028,8 +6039,8 @@ function getBilanPosturoHTML() {
       <table style="border-collapse:collapse;font-size:12px;margin-left:16px;">
         <tr>
           <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;"></th>
-          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;">G</th>
-          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;">D</th>
+          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;color:#222;">G</th>
+          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;color:#222;">D</th>
         </tr>
         <tr>
           <td style="padding:4px 12px;border:1px solid #ccc;font-weight:500;">Pied</td>
@@ -6173,6 +6184,46 @@ function getBilanPosturoHTML() {
 </div>`;
 }
 
+function startEmpreinteCamera() {
+  const wrap = document.getElementById('po-empreinte-video-wrap');
+  const video = document.getElementById('po-empreinte-video');
+  if(!wrap || !video) return;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+    .then(stream => {
+      video.srcObject = stream;
+      wrap.style.display = 'block';
+    })
+    .catch(() => navigator.mediaDevices.getUserMedia({video:true})
+      .then(stream => { video.srcObject = stream; wrap.style.display = 'block'; })
+    );
+}
+function stopEmpreinteCamera() {
+  const video = document.getElementById('po-empreinte-video');
+  const wrap = document.getElementById('po-empreinte-video-wrap');
+  if(video?.srcObject) { video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
+  if(wrap) wrap.style.display = 'none';
+}
+function captureEmpreinte() {
+  const video = document.getElementById('po-empreinte-video');
+  if(!video) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+  const img = document.getElementById('po-empreinte-img');
+  if(img) { img.src = dataUrl; img.style.display = 'block'; }
+  const del = document.getElementById('po-empreinte-del');
+  if(del) del.style.display = 'inline-block';
+  if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = dataUrl;
+  stopEmpreinteCamera();
+}
+function deleteEmpreinte() {
+  const img = document.getElementById('po-empreinte-img');
+  if(img) { img.src=''; img.style.display='none'; }
+  const del = document.getElementById('po-empreinte-del');
+  if(del) del.style.display='none';
+  if(currentPatient?.bilanDataPosturo) delete currentPatient.bilanDataPosturo._empreinte;
+}
 function previewEmpreinte(input) {
   if(!input.files || !input.files[0]) return;
   const reader = new FileReader();
