@@ -1639,22 +1639,17 @@ function nav(id) {
       // 3. Charger les données du bilan APRÈS init des canvas
       setTimeout(() => {
         loadBilan();
-        // 4. Restaurer les dessins APRÈS loadBilan (canvas déjà initialisés)
-        setTimeout(() => {
-          if(!bilanData) return;
-          const ids = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
-          const keys = ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD'];
-          ids.forEach((id,i) => {
-            const key = keys[i];
-            if(bilanData[key]) {
-              restoreCanvas(id, key);
-            }
-          });
-          if(bilanData._pieds) {
-            restoreCanvas('pieds-canvas', '_pieds');
-          }
-        }, 100);
       }, 200);
+      // 4. Restaurer les dessins avec délai plus long
+      setTimeout(() => {
+        if(!bilanData) return;
+        const ids = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
+        const keys = ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD'];
+        ids.forEach((id,i) => {
+          if(bilanData[keys[i]]) restoreCanvas(id, keys[i]);
+        });
+        if(bilanData._pieds) restoreCanvas('pieds-canvas', '_pieds');
+      }, 500);
     }, 80);
   }
 }
