@@ -5994,6 +5994,44 @@ function getBilanPosturoHTML() {
 </div>`;
 }
 
+function updateNeuroTotals() {
+  // Total nerfs crâniens
+  const ncIds = ['nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12','nc-recap'];
+  let ncG=0, ncD=0;
+  ncIds.forEach(id => {
+    if(document.getElementById(id+'-g')?.checked) ncG++;
+    if(document.getElementById(id+'-d')?.checked) ncD++;
+  });
+  const tg = document.getElementById('nc-total-g');
+  const td = document.getElementById('nc-total-d');
+  if(tg) tg.textContent = ncG;
+  if(td) td.textContent = ncD;
+
+  // Total vestibulaire
+  const vestIds = ['vest-ant','vest-lat','vest-post','prop-lent','prop-rapide','prop-golgi','prop-paccini','prop-ruffini-d','prop-ruffini-c','prop-golgi-a'];
+  let vG=0, vD=0;
+  vestIds.forEach(id => {
+    if(document.getElementById(id+'-g')?.checked) vG++;
+    if(document.getElementById(id+'-d')?.checked) vD++;
+  });
+  const vgt = document.getElementById('vest-total-g');
+  const vdt = document.getElementById('vest-total-d');
+  if(vgt) vgt.textContent = vG;
+  if(vdt) vdt.textContent = vD;
+
+  // Total cervelet
+  const cervIds = ['vermis-sharp','vermis-romberg','inter-prec','inter-coord','lat-prec','lat-coord'];
+  let cG=0, cD=0;
+  cervIds.forEach(id => {
+    if(document.getElementById(id+'-g')?.checked) cG++;
+    if(document.getElementById(id+'-d')?.checked) cD++;
+  });
+  const cgt = document.getElementById('cerv-total-g');
+  const cdt = document.getElementById('cerv-total-d');
+  if(cgt) cgt.textContent = cG;
+  if(cdt) cdt.textContent = cD;
+}
+
 function showPosturoSection(idx) {
   document.querySelectorAll('.posturo-section').forEach((s,i) => {
     s.style.display = i === idx ? '' : 'none';
@@ -6002,6 +6040,15 @@ function showPosturoSection(idx) {
     t.classList.toggle('act', i === idx);
   });
   if(idx === 1) setTimeout(initPosturoBodyCanvas, 100);
+  if(idx === 3) {
+    setTimeout(updateNeuroTotals, 100);
+    // Attacher listeners sur toutes les checkboxes neuro
+    setTimeout(() => {
+      document.querySelectorAll('#psec-3 input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', updateNeuroTotals);
+      });
+    }, 200);
+  }
   if(idx === 8) setTimeout(initPosturoFeetCanvas, 100);
 }
 
