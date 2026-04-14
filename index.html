@@ -5904,14 +5904,14 @@ function getBilanPosturoHTML() {
     <div class="stitle" style="color:#2a7a4e;margin-bottom:16px;">🦶 Investigation du système plantaire</div>
 
     <!-- Épines irritatives -->
-    <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:8px;color:#b7740a;">🌵 Présences épines irritatives d'appui plantaire</div>
       <div style="display:flex;gap:12px;margin-bottom:8px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:4px 14px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:4px 14px;color:#222;">
           <input type="radio" name="po-epines" id="po-epines-oui" value="oui"/>
           <span style="font-weight:600;color:#b7740a;">Oui</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 14px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 14px;color:#222;">
           <input type="radio" name="po-epines" id="po-epines-non" value="non"/>
           <span style="font-weight:600;color:#666;">Non</span>
         </label>
@@ -5923,7 +5923,7 @@ function getBilanPosturoHTML() {
     </div>
 
     <!-- Examen empreinte -->
-    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:10px;color:#2a7a4e;">👣 Examen empreinte et morpho plantaire</div>
       <input type="file" id="po-empreinte-file" accept="image/*" style="display:none;" onchange="previewEmpreinte(this)"/>
       <input type="file" id="po-empreinte-cam" accept="image/*" capture="environment" style="display:none;" onchange="previewEmpreinte(this)"/>
@@ -5931,10 +5931,10 @@ function getBilanPosturoHTML() {
         <img id="po-empreinte-img" style="max-width:100%;max-height:220px;display:none;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);"/>
       </div>
       <div id="po-empreinte-video-wrap" style="display:none;margin-bottom:10px;">
-        <video id="po-empreinte-video" autoplay playsinline style="width:100%;max-height:220px;border-radius:10px;background:#000;"></video>
+        <video id="po-empreinte-video" autoplay playsinline style="width:100%;max-height:220px;border-radius:10px;background:#000;color:#222;"></video>
         <div style="display:flex;gap:8px;margin-top:8px;justify-content:center;">
           <button class="btn" onclick="captureEmpreinte()" style="padding:10px 20px;font-size:13px;border-radius:8px;">📸 Capturer</button>
-          <button class="btn" onclick="stopEmpreinteCamera()" style="padding:10px 20px;font-size:13px;border-radius:8px;background:#888;">✕ Annuler</button>
+          <button class="btn" onclick="stopEmpreinteCamera()" style="padding:10px 20px;font-size:13px;border-radius:8px;background:#888;color:#222;">✕ Annuler</button>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
@@ -5954,18 +5954,18 @@ function getBilanPosturoHTML() {
     </div>
 
     <!-- Examen chaussure -->
-    <div style="background:linear-gradient(135deg,#f8f0ff,#f0e8ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#f8f0ff,#f0e8ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:8px;color:#6c3483;">👟 Examen de la chaussure</div>
       <div style="margin-bottom:8px;">
         <div style="font-weight:500;margin-bottom:6px;color:#555;">Usure :</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;color:#222;">
             <input type="checkbox" id="po-usure-interne"/> Interne
           </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;color:#222;">
             <input type="checkbox" id="po-usure-externe"/> Externe
           </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;color:#222;">
             <input type="checkbox" id="po-usure-contrefort"/> Contrefort
           </label>
         </div>
@@ -5977,18 +5977,18 @@ function getBilanPosturoHTML() {
     </div>
 
     <!-- Tactique équilibration -->
-    <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:8px;color:#2471a3;">⚖️ Tactique d'équilibration</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;color:#222;">
           <input type="radio" name="po-tactique" id="po-tact-cheville" value="cheville"/>
           <span style="font-weight:600;color:#2471a3;">🦶 Cheville</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;color:#222;">
           <input type="radio" name="po-tactique" id="po-tact-mixte" value="mixte"/>
           <span style="font-weight:600;color:#2471a3;">↕️ Mixte</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;color:#222;">
           <input type="radio" name="po-tactique" id="po-tact-hanche" value="hanche"/>
           <span style="font-weight:600;color:#2471a3;">🦴 Hanche</span>
         </label>
@@ -5996,22 +5996,22 @@ function getBilanPosturoHTML() {
     </div>
 
     <!-- Tests toniques -->
-    <div style="background:linear-gradient(135deg,#fff0f0,#ffe8e8);border-left:4px solid #e74c3c;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#fff0f0,#ffe8e8);border-left:4px solid #e74c3c;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:8px;color:#c0392b;">💪 Tests toniques</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;color:#222;">
           <input type="checkbox" id="po-test-pouces"/>
           <span>👍 Test des pouces montants</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;color:#222;">
           <input type="checkbox" id="po-test-convergence"/>
           <span>🔄 Convergence podale</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;color:#222;">
           <input type="checkbox" id="po-test-scapulaire"/>
           <span>🫁 Scapulaire de Dupas</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;color:#222;">
           <input type="checkbox" id="po-test-nucale"/>
           <span>🔃 Rotation nucale</span>
         </label>
@@ -6019,32 +6019,32 @@ function getBilanPosturoHTML() {
     </div>
 
     <!-- Recherche parasites -->
-    <div style="background:linear-gradient(135deg,#f0fff4,#e0f8e8);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#f0fff4,#e0f8e8);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:8px;color:#1e8449;">🔍 Recherche parasite(s) / entrée(s)</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;color:#222;">
           <input type="checkbox" id="po-para-plantaire"/> 🦶 Plantaire
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;color:#222;">
           <input type="checkbox" id="po-para-yeux"/> 👁️ Yeux
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;color:#222;">
           <input type="checkbox" id="po-para-buccale"/> 🦷 Buccale
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;color:#222;">
           <input type="checkbox" id="po-para-cicatrice"/> 🩹 Cicatrice
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;color:#222;">
           <input type="checkbox" id="po-para-vestibulaire"/> 👂 Vestibulaire
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;color:#222;">
           <input type="checkbox" id="po-para-viscerale"/> 🫀 Zone viscérale
         </label>
       </div>
     </div>
 
     <!-- Test stabilité monopodal -->
-    <div style="background:linear-gradient(135deg,#fffaf0,#fff5e0);border-left:4px solid #f39c12;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#fffaf0,#fff5e0);border-left:4px solid #f39c12;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:8px;color:#d68910;">🧍 Test de stabilité monopodal <span style="color:#e74c3c;">(déficit)</span></div>
       <table style="border-collapse:collapse;font-size:13px;width:auto;">
         <tr>
@@ -6071,17 +6071,17 @@ function getBilanPosturoHTML() {
     </div>
 
     <!-- Épreuve alignement -->
-    <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:4px;color:#6c3483;">🎯 Épreuve de l'alignement articulaire sous contrainte en 3 temps <span style="color:#e74c3c;">(déficit)</span></div>
       <div style="font-size:10px;font-style:italic;color:#888;margin-bottom:8px;">(réalisé si antécédent traumatique / si perte stabilité monopodal en charge) (exclusion : stratégie équilibration autour de la hanche ou mixte avancée)</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;color:#222;">
           <input type="checkbox" id="po-align-axe"/> ✅ Axe articulaire en place dans schéma corporel
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;color:#222;">
           <input type="checkbox" id="po-align-inf"/> ⬇️ Déséquilibre inférieur
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;color:#222;">
           <input type="checkbox" id="po-align-sup"/> ⬆️ Déséquilibre supérieur
         </label>
       </div>
