@@ -5901,189 +5901,188 @@ function getBilanPosturoHTML() {
 
   <div class="posturo-section" id="psec-4" style="padding:0 20px;display:none;">
   <div class="card" style="margin-bottom:16px;">
-    <div class="stitle" style="color:#2a7a4e;margin-bottom:12px;">5. Investigation du système plantaire</div>
+    <div class="stitle" style="color:#2a7a4e;margin-bottom:16px;">🦶 Investigation du système plantaire</div>
 
     <!-- Épines irritatives -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:6px;">• Présences épines irritatives d'appui plantaire :</div>
+    <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;color:#b7740a;">🌵 Présences épines irritatives d'appui plantaire</div>
       <div style="display:flex;gap:12px;margin-bottom:8px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:4px 14px;">
           <input type="radio" name="po-epines" id="po-epines-oui" value="oui"/>
-          <span>Oui</span>
+          <span style="font-weight:600;color:#b7740a;">Oui</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 14px;">
           <input type="radio" name="po-epines" id="po-epines-non" value="non"/>
-          <span>Non</span>
+          <span style="font-weight:600;color:#666;">Non</span>
         </label>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-weight:500;">Localisation :</span>
-        <input class="inp" id="po-epines-loc" placeholder="..." style="flex:1;"/>
+        <span style="font-weight:500;">📍 Localisation :</span>
+        <input class="inp" id="po-epines-loc" placeholder="Préciser..." style="flex:1;"/>
       </div>
     </div>
 
     <!-- Examen empreinte -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:6px;">• Examen empreinte et morpho plantaire :</div>
-      <div style="border:2px dashed #ccc;border-radius:8px;padding:12px;background:#fafafa;">
-        <input type="file" id="po-empreinte-file" accept="image/*" style="display:none;" onchange="previewEmpreinte(this)"/>
-        <input type="file" id="po-empreinte-cam" accept="image/*" capture="environment" style="display:none;" onchange="previewEmpreinte(this)"/>
-        <div id="po-empreinte-preview" style="text-align:center;margin-bottom:8px;">
-          <img id="po-empreinte-img" style="max-width:100%;max-height:200px;display:none;border-radius:6px;"/>
+    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:10px;color:#2a7a4e;">👣 Examen empreinte et morpho plantaire</div>
+      <input type="file" id="po-empreinte-file" accept="image/*" style="display:none;" onchange="previewEmpreinte(this)"/>
+      <input type="file" id="po-empreinte-cam" accept="image/*" capture="environment" style="display:none;" onchange="previewEmpreinte(this)"/>
+      <div id="po-empreinte-preview" style="text-align:center;margin-bottom:10px;">
+        <img id="po-empreinte-img" style="max-width:100%;max-height:220px;display:none;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);"/>
+      </div>
+      <div id="po-empreinte-video-wrap" style="display:none;margin-bottom:10px;">
+        <video id="po-empreinte-video" autoplay playsinline style="width:100%;max-height:220px;border-radius:10px;background:#000;"></video>
+        <div style="display:flex;gap:8px;margin-top:8px;justify-content:center;">
+          <button class="btn" onclick="captureEmpreinte()" style="padding:10px 20px;font-size:13px;border-radius:8px;">📸 Capturer</button>
+          <button class="btn" onclick="stopEmpreinteCamera()" style="padding:10px 20px;font-size:13px;border-radius:8px;background:#888;">✕ Annuler</button>
         </div>
-        <div id="po-empreinte-video-wrap" style="display:none;margin-bottom:8px;">
-          <video id="po-empreinte-video" autoplay playsinline style="width:100%;max-height:220px;border-radius:6px;background:#000;"></video>
-          <div style="display:flex;gap:8px;margin-top:6px;justify-content:center;">
-            <button class="btn" onclick="captureEmpreinte()" style="font-size:12px;">📸 Capturer</button>
-            <button class="btn" onclick="stopEmpreinteCamera()" style="font-size:12px;background:#888;">✕ Annuler</button>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-          <button class="btn" onclick="startEmpreinteCamera()" style="font-size:12px;">📷 Caméra</button>
-          <button class="btn" onclick="document.getElementById('po-empreinte-cam').click()" style="font-size:12px;">📱 Caméra mobile</button>
-          <button class="btn" onclick="document.getElementById('po-empreinte-file').click()" style="font-size:12px;">🖼 Depuis l'ordi</button>
-          <button class="btn" id="po-empreinte-del" onclick="deleteEmpreinte()" style="font-size:12px;background:#e74c3c;display:none;">🗑 Supprimer</button>
-        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <button onclick="startEmpreinteCamera()" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:#fff;border:2px solid #2a7a4e;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;color:#2a7a4e;">
+          <span style="font-size:24px;">📷</span>Caméra ordi
+        </button>
+        <button onclick="document.getElementById('po-empreinte-cam').click()" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:#fff;border:2px solid #3498db;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;color:#3498db;">
+          <span style="font-size:24px;">📱</span>Caméra mobile
+        </button>
+        <button onclick="document.getElementById('po-empreinte-file').click()" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:#fff;border:2px solid #8e44ad;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;color:#8e44ad;">
+          <span style="font-size:24px;">🖼️</span>Depuis l'ordi
+        </button>
+      </div>
+      <div style="text-align:center;margin-top:8px;">
+        <button id="po-empreinte-del" onclick="deleteEmpreinte()" style="display:none;padding:8px 16px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;">🗑 Supprimer la photo</button>
       </div>
     </div>
 
     <!-- Examen chaussure -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:6px;">• Examen de la chaussure :</div>
-      <div style="margin-left:16px;margin-bottom:6px;">
-        <div style="font-weight:500;margin-bottom:4px;">Usure :</div>
-        <div style="display:flex;gap:16px;">
-          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+    <div style="background:linear-gradient(135deg,#f8f0ff,#f0e8ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;color:#6c3483;">👟 Examen de la chaussure</div>
+      <div style="margin-bottom:8px;">
+        <div style="font-weight:500;margin-bottom:6px;color:#555;">Usure :</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;">
             <input type="checkbox" id="po-usure-interne"/> Interne
           </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;">
             <input type="checkbox" id="po-usure-externe"/> Externe
           </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:5px 14px;">
             <input type="checkbox" id="po-usure-contrefort"/> Contrefort
           </label>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-left:16px;">
-        <span style="font-weight:500;">Type de chaussure portées régulièrement :</span>
-        <input class="inp" id="po-chaussure-type" placeholder="..." style="flex:1;"/>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:500;color:#555;">Type porté régulièrement :</span>
+        <input class="inp" id="po-chaussure-type" placeholder="Ex: running, cuir, talon..." style="flex:1;"/>
       </div>
     </div>
 
     <!-- Tactique équilibration -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:6px;">• Tactique d'équilibration :</div>
-      <div style="display:flex;gap:16px;margin-left:16px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+    <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;color:#2471a3;">⚖️ Tactique d'équilibration</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;">
           <input type="radio" name="po-tactique" id="po-tact-cheville" value="cheville"/>
-          <span>Cheville</span>
+          <span style="font-weight:600;color:#2471a3;">🦶 Cheville</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;">
           <input type="radio" name="po-tactique" id="po-tact-mixte" value="mixte"/>
-          <span>Mixte</span>
+          <span style="font-weight:600;color:#2471a3;">↕️ Mixte</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;">
           <input type="radio" name="po-tactique" id="po-tact-hanche" value="hanche"/>
-          <span>Hanche</span>
+          <span style="font-weight:600;color:#2471a3;">🦴 Hanche</span>
         </label>
       </div>
     </div>
 
     <!-- Tests toniques -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:6px;">• Tests toniques :</div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-left:16px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-test-pouces"/> Test des pouces montants
+    <div style="background:linear-gradient(135deg,#fff0f0,#ffe8e8);border-left:4px solid #e74c3c;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;color:#c0392b;">💪 Tests toniques</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+          <input type="checkbox" id="po-test-pouces"/>
+          <span>👍 Test des pouces montants</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-test-convergence"/> Manœuvre de convergence podale
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+          <input type="checkbox" id="po-test-convergence"/>
+          <span>🔄 Convergence podale</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-test-scapulaire"/> Test scapulaire de Dupas
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+          <input type="checkbox" id="po-test-scapulaire"/>
+          <span>🫁 Scapulaire de Dupas</span>
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-test-nucale"/> Rotation nucale
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 10px;">
+          <input type="checkbox" id="po-test-nucale"/>
+          <span>🔃 Rotation nucale</span>
         </label>
       </div>
     </div>
 
     <!-- Recherche parasites -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:6px;">Recherche parasite(s)/entrée(s) :</div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-left:16px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-para-plantaire"/> Plantaire
+    <div style="background:linear-gradient(135deg,#f0fff4,#e0f8e8);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;color:#1e8449;">🔍 Recherche parasite(s) / entrée(s)</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+          <input type="checkbox" id="po-para-plantaire"/> 🦶 Plantaire
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-para-yeux"/> Yeux
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+          <input type="checkbox" id="po-para-yeux"/> 👁️ Yeux
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-para-buccale"/> Buccale
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+          <input type="checkbox" id="po-para-buccale"/> 🦷 Buccale
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-para-cicatrice"/> Cicatrice
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+          <input type="checkbox" id="po-para-cicatrice"/> 🩹 Cicatrice
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-para-vestibulaire"/> Vestibulaire
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+          <input type="checkbox" id="po-para-vestibulaire"/> 👂 Vestibulaire
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="checkbox" id="po-para-viscerale"/> Zone viscérale
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;">
+          <input type="checkbox" id="po-para-viscerale"/> 🫀 Zone viscérale
         </label>
       </div>
     </div>
 
     <!-- Test stabilité monopodal -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:8px;">• Test de stabilité monopodal <span style="color:#e74c3c;">(déficit)</span> :</div>
-      <table style="border-collapse:collapse;font-size:12px;margin-left:16px;">
+    <div style="background:linear-gradient(135deg,#fffaf0,#fff5e0);border-left:4px solid #f39c12;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;color:#d68910;">🧍 Test de stabilité monopodal <span style="color:#e74c3c;">(déficit)</span></div>
+      <table style="border-collapse:collapse;font-size:13px;width:auto;">
         <tr>
-          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;"></th>
-          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;color:#222;">G</th>
-          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;color:#222;">D</th>
+          <th style="padding:6px 20px;border:1px solid #f0c070;background:#fdebd0;color:#222;"></th>
+          <th style="padding:6px 20px;border:1px solid #f0c070;background:#fdebd0;text-align:center;color:#222;">G</th>
+          <th style="padding:6px 20px;border:1px solid #f0c070;background:#fdebd0;text-align:center;color:#222;">D</th>
         </tr>
         <tr>
-          <td style="padding:4px 12px;border:1px solid #ccc;font-weight:500;">Pied</td>
-          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
-            <input type="checkbox" id="po-mono-pied-g"/>
-          </td>
-          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
-            <input type="checkbox" id="po-mono-pied-d"/>
-          </td>
+          <td style="padding:8px 20px;border:1px solid #f0c070;font-weight:600;">🦶 Pied</td>
+          <td style="text-align:center;border:1px solid #f0c070;padding:8px 20px;"><input type="checkbox" id="po-mono-pied-g"/></td>
+          <td style="text-align:center;border:1px solid #f0c070;padding:8px 20px;"><input type="checkbox" id="po-mono-pied-d"/></td>
         </tr>
         <tr>
-          <td style="padding:4px 12px;border:1px solid #ccc;font-weight:500;">Genou</td>
-          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
-            <input type="checkbox" id="po-mono-genou-g"/>
-          </td>
-          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
-            <input type="checkbox" id="po-mono-genou-d"/>
-          </td>
+          <td style="padding:8px 20px;border:1px solid #f0c070;font-weight:600;">🦵 Genou</td>
+          <td style="text-align:center;border:1px solid #f0c070;padding:8px 20px;"><input type="checkbox" id="po-mono-genou-g"/></td>
+          <td style="text-align:center;border:1px solid #f0c070;padding:8px 20px;"><input type="checkbox" id="po-mono-genou-d"/></td>
         </tr>
         <tr>
-          <td style="padding:4px 12px;border:1px solid #ccc;font-weight:500;">Hanche</td>
-          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
-            <input type="checkbox" id="po-mono-hanche-g"/>
-          </td>
-          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
-            <input type="checkbox" id="po-mono-hanche-d"/>
-          </td>
+          <td style="padding:8px 20px;border:1px solid #f0c070;font-weight:600;">🦴 Hanche</td>
+          <td style="text-align:center;border:1px solid #f0c070;padding:8px 20px;"><input type="checkbox" id="po-mono-hanche-g"/></td>
+          <td style="text-align:center;border:1px solid #f0c070;padding:8px 20px;"><input type="checkbox" id="po-mono-hanche-d"/></td>
         </tr>
       </table>
     </div>
 
     <!-- Épreuve alignement -->
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:600;margin-bottom:6px;">• Épreuve de l'alignement articulaire sous contrainte en 3 temps <span style="color:#e74c3c;">(déficit)</span> <span style="font-size:10px;font-style:italic;font-weight:400;">(réalisé si antécédent traumatique / si perte stabilité monopodal en charge) (exclusion : stratégie équilibration autour de la hanche ou mixte avancée)</span> :</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-left:16px;">
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <input type="checkbox" id="po-align-axe"/> Axe articulaire en place dans schéma corporel
+    <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:4px;color:#6c3483;">🎯 Épreuve de l'alignement articulaire sous contrainte en 3 temps <span style="color:#e74c3c;">(déficit)</span></div>
+      <div style="font-size:10px;font-style:italic;color:#888;margin-bottom:8px;">(réalisé si antécédent traumatique / si perte stabilité monopodal en charge) (exclusion : stratégie équilibration autour de la hanche ou mixte avancée)</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <input type="checkbox" id="po-align-axe"/> ✅ Axe articulaire en place dans schéma corporel
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <input type="checkbox" id="po-align-inf"/> Déséquilibre inférieur
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <input type="checkbox" id="po-align-inf"/> ⬇️ Déséquilibre inférieur
         </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <input type="checkbox" id="po-align-sup"/> Déséquilibre supérieur
+        <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <input type="checkbox" id="po-align-sup"/> ⬆️ Déséquilibre supérieur
         </label>
       </div>
     </div>
