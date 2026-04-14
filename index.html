@@ -5118,6 +5118,10 @@ function saveBilan() {
   });
 
   // 4. Capturer les canvas morpho et pieds (seulement le dessin transparent)
+  // Effacer les anciennes données JPEG (format obsolète)
+  ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD','_pieds'].forEach(k => {
+    if(bilanData[k] && bilanData[k].startsWith('data:image/jpeg')) delete bilanData[k];
+  });
   const saveCanvasDrawing = (id, key) => {
     const cv = document.getElementById(id);
     if(!cv) return;
