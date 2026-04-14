@@ -710,8 +710,8 @@ body.printing #rpt-print{display:block!important;}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <button class="btn" id="tool-pen" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
         <button class="btn" id="tool-arrow" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
-        <button class="btn" id="tool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée">↪ Courbée</button>
-        <button class="btn" id="btn-curve-dir-morpho" onclick="toggleCurveDir('btn-curve-dir-morpho')" style="font-size:10px;padding:5px 8px;">⟳ Droite</button>
+        <button class="btn" id="tool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée (gauche)">↪ Courbée</button>
+        <button class="btn" id="btn-curve-inv-morpho" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
         <button class="btn" id="tool-circle" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
         <button class="btn" id="tool-erase" onclick="setDrawTool('erase')">🧹 Gomme</button>
         <select id="draw-color-sel" class="inp" style="width:80px;" onchange="drawColor=this.value;">
@@ -1006,8 +1006,8 @@ body.printing #rpt-print{display:block!important;}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <button class="btn" id="tool-pen2" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
         <button class="btn" id="tool-arrow2" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
-        <button class="btn" onclick="setDrawTool('arrow-curve')" title="Flèche courbée">↪ Courbée</button>
-        <button class="btn" id="btn-curve-dir-semelles" onclick="toggleCurveDir('btn-curve-dir-semelles')" style="font-size:10px;padding:5px 8px;">⟳ Droite</button>
+        <button class="btn" onclick="setDrawTool('arrow-curve')" title="Flèche courbée (gauche)">↪ Courbée</button>
+        <button class="btn" id="btn-curve-inv-semelles" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
         <button class="btn" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
         <button class="btn" id="tool-erase2" onclick="setDrawTool('erase')">🧹 Gomme</button>
         <select class="inp" style="width:80px;" onchange="drawColor=this.value;">
@@ -4951,10 +4951,16 @@ function drawArrow(ctx, x1, y1, x2, y2, color, size) {
 
 function setDrawTool(tool) {
   drawTool=tool;
+  curveDir=1; // reset direction normale
   ['pen','arrow','erase'].forEach(t=>{
     const btn=document.getElementById('tool-'+t);
     if(btn) btn.className=t===tool?'btn btn-blue':'btn';
   });
+}
+
+function setDrawToolCurveInv() {
+  drawTool='arrow-curve';
+  curveDir=-1; // direction inversée
 }
 
 function clearAllMorpho() {
@@ -5363,8 +5369,8 @@ function getBilanPosturoHTML() {
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <button class="btn" id="ptool-pen" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
         <button class="btn" id="ptool-arrow" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
-        <button class="btn" id="ptool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée">↪ Courbée</button>
-        <button class="btn" id="btn-curve-dir-posturo-body" onclick="toggleCurveDir('btn-curve-dir-posturo-body')" style="font-size:10px;padding:5px 8px;">⟳ Droite</button>
+        <button class="btn" id="ptool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée (gauche)">↪ Courbée</button>
+        <button class="btn" id="btn-curve-inv-posturo-body" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
         <button class="btn" id="ptool-circle" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
         <button class="btn" id="ptool-erase" onclick="setDrawTool('erase')">🧹 Gomme</button>
         <select id="pdraw-color-sel-body" class="inp" style="width:80px;" onchange="drawColor=this.value;">
@@ -5475,8 +5481,8 @@ function getBilanPosturoHTML() {
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <button class="btn" id="ptool-pen-feet" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
         <button class="btn" id="ptool-arrow-feet" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
-        <button class="btn" id="ptool-arrow-curve-feet" onclick="setDrawTool('arrow-curve')" title="Flèche courbée">↪ Courbée</button>
-        <button class="btn" id="btn-curve-dir-posturo-feet" onclick="toggleCurveDir('btn-curve-dir-posturo-feet')" style="font-size:10px;padding:5px 8px;">⟳ Droite</button>
+        <button class="btn" id="ptool-arrow-curve-feet" onclick="setDrawTool('arrow-curve')" title="Flèche courbée (gauche)">↪ Courbée</button>
+        <button class="btn" id="btn-curve-inv-posturo-feet" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
         <button class="btn" id="ptool-circle-feet" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
         <button class="btn" id="ptool-erase-feet" onclick="setDrawTool('erase')">🧹 Gomme</button>
         <select id="pdraw-color-sel-feet" class="inp" style="width:80px;" onchange="drawColor=this.value;">
