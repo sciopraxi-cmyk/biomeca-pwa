@@ -1646,8 +1646,7 @@ function nav(id) {
           ['morpho-face','_morpho_face'],
           ['morpho-face2','_morpho_face2'],
           ['morpho-profilG','_morpho_profilG'],
-          ['morpho-profilD','_morpho_profilD'],
-          ['pieds-canvas','_pieds']
+          ['morpho-profilD','_morpho_profilD']
         ];
         pairs.forEach(([canvasId, key]) => {
           if(!bd[key]) return;
@@ -1660,6 +1659,18 @@ function nav(id) {
           };
           img.src = bd[key];
         });
+        // Restaurer pieds APRÈS drawPiedsTemplate
+        if(bd._pieds) {
+          const pc = document.getElementById('pieds-canvas');
+          if(pc && pc._baseSnapshot) {
+            const img = new Image();
+            img.onload = () => {
+              const dpr = window.devicePixelRatio || 1;
+              pc.getContext('2d').drawImage(img, 0, 0, pc.width/dpr, pc.height/dpr);
+            };
+            img.src = bd._pieds;
+          }
+        }
       }, 500);
     }, 80);
   }
@@ -5052,15 +5063,7 @@ function drawPiedsTemplate() {
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
     setupDrawCanvas(canvas);
     // Restaurer le dessin sauvegardé par-dessus le template
-    const savedPieds = currentPatient?.bilanData?._pieds;
-    if(savedPieds && savedPieds.startsWith('data:image/png')) {
-      const saved = new Image();
-      saved.onload = () => {
-        // Dessiner à la taille naturelle de l'image sauvegardée
-        ctx.drawImage(saved, 0, 0, saved.width, saved.height);
-      };
-      saved.src = savedPieds;
-    }
+    // La restauration du dessin se fait dans nav('pg-bilan') après init
   };
   img.src = document.getElementById('imgjs-pieds')?.src || '';
 }
