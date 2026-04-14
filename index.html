@@ -6008,7 +6008,8 @@ function updateNeuroTotals() {
   if(td) td.textContent = ncD;
 
   // Total vestibulaire
-  const vestIds = ['vest-ant','vest-lat','vest-post','prop-lent','prop-rapide','prop-golgi','prop-paccini','prop-ruffini-d','prop-ruffini-c','prop-golgi-a'];
+  // Total = uniquement proprioception (pas vestibulaire)
+  const vestIds = ['prop-lent','prop-rapide','prop-golgi','prop-paccini','prop-ruffini-d','prop-ruffini-c','prop-golgi-a'];
   let vG=0, vD=0;
   vestIds.forEach(id => {
     if(document.getElementById(id+'-g')?.checked) vG++;
