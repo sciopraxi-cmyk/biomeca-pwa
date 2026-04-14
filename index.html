@@ -1637,7 +1637,24 @@ function nav(id) {
       if(pc && !hasSavedPieds) { drawPiedsTemplate(); setupDrawCanvas(pc); }
       else if(pc) { setupDrawCanvas(pc); }
       // 3. Charger les données du bilan APRÈS init des canvas
-      setTimeout(() => loadBilan(), 200);
+      setTimeout(() => {
+        loadBilan();
+        // 4. Restaurer les dessins APRÈS loadBilan (canvas déjà initialisés)
+        setTimeout(() => {
+          if(!bilanData) return;
+          const ids = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
+          const keys = ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD'];
+          ids.forEach((id,i) => {
+            const key = keys[i];
+            if(bilanData[key] && bilanData[key].startsWith('data:image/png') && bilanData[key].length < 20000) {
+              restoreCanvas(id, key);
+            }
+          });
+          if(bilanData._pieds && bilanData._pieds.startsWith('data:image/png') && bilanData._pieds.length < 20000) {
+            restoreCanvas('pieds-canvas', '_pieds');
+          }
+        }, 100);
+      }, 200);
     }, 80);
   }
 }
@@ -5177,13 +5194,7 @@ function loadBilan() {
   // Restaurer uniquement les dessins (les images de fond sont dans le DOM)
   // Les nouvelles sauvegardes contiennent juste le dessin transparent
   // Les anciennes sauvegardes (avec fond) sont ignorées car elles contiennent l'image en double
-  // Restaurer uniquement les dessins (images de fond dans le DOM)
-  // Ignorer les anciennes données > 20000 chars (contiennent le fond)
-  ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD'].forEach((key,i) => {
-    const ids = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
-    if(bilanData[key] && bilanData[key].length < 20000) restoreCanvas(ids[i], key);
-  });
-  if(bilanData._pieds && bilanData._pieds.length < 20000) restoreCanvas('pieds-canvas', '_pieds');
+  // La restauration des canvas se fait séparément après initMorphoCanvas
 }
 
 function toggleDictaphone() {
