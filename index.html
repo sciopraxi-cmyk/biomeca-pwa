@@ -5995,8 +5995,8 @@ function getBilanPosturoHTML() {
 }
 
 function updateNeuroTotals() {
-  // Total nerfs crâniens
-  const ncIds = ['nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12','nc-recap'];
+  // Total nerfs crâniens (IDs réels: nc-nc1-g, nc-recap-g)
+  const ncIds = ['nc-recap','nc-nc1','nc-nc2','nc-nc3','nc-nc4','nc-nc5','nc-nc6','nc-nc7','nc-nc8','nc-nc9','nc-nc10','nc-nc11','nc-nc12'];
   let ncG=0, ncD=0;
   ncIds.forEach(id => {
     if(document.getElementById(id+'-g')?.checked) ncG++;
