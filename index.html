@@ -1589,6 +1589,11 @@ function nav(id) {
     const pinfo = document.getElementById('posturo-patient-info');
     if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom+' · '+(currentPatient.sport||'—');
   }
+  if(id === 'pg-bilan-posturo') {
+    injectBilanPosturoPage();
+    showPosturoSection(0);
+    setTimeout(loadPosturoBilan, 50);
+  }
   if(id === 'pg-bilan') {
     setTimeout(() => {
       clearBilanFields();
@@ -2247,7 +2252,7 @@ function creerBilanPosturo(patIdx, type) {
   p.currentBilanSousType = type;
   savePatients();
   selectPatient(p);
-  nav('pg-posturo');
+  nav('pg-bilan-posturo');
 }
 
 function ouvrirBilanPosturo(patIdx, bilanIdx) {
@@ -5238,6 +5243,365 @@ window.addEventListener('appinstalled', () => {
 
 
 
+
+
+// ══════════════════════════════════════════════════════
+// BILAN POSTUROLOGIQUE — injection dynamique
+// ══════════════════════════════════════════════════════
+
+function injectBilanPosturoPage() {
+  if(document.getElementById('pg-bilan-posturo')) return;
+  const main = document.querySelector('.main');
+  if(!main) return;
+  const div = document.createElement('div');
+  div.className = 'page';
+  div.id = 'pg-bilan-posturo';
+  div.innerHTML = getBilanPosturoHTML();
+  main.appendChild(div);
+}
+
+function getBilanPosturoHTML() {
+  return `<div style="padding:0 0 40px 0;max-width:860px;margin:0 auto;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--bord);margin-bottom:16px;background:var(--bg);">
+    <button onclick="nav('pg-posturo')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;">← Posture</button>
+    <div style="font-size:15px;font-weight:700;color:#2a7a4e;">🧍 Bilan Global de la Posture</div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn" onclick="savePosturoBilan()" style="background:#2a7a4e;color:#fff;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>
+      <button class="btn" onclick="nav('pg-rapport-posturo')" style="background:var(--blue);color:#fff;font-size:12px;padding:5px 12px;">📄 Rapport</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:4px;flex-wrap:wrap;padding:0 20px;margin-bottom:20px;" id="posturo-tabs">
+    <button class="btn posturo-tab act" onclick="showPosturoSection(0)" id="ptab-0" style="font-size:11px;padding:4px 10px;">1. Anamnèse</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(1)" id="ptab-1" style="font-size:11px;padding:4px 10px;">2. Morphostatique</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(2)" id="ptab-2" style="font-size:11px;padding:4px 10px;">3. Bilan dynamique</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(3)" id="ptab-3" style="font-size:11px;padding:4px 10px;">4. Neuro-fonctionnel</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(4)" id="ptab-4" style="font-size:11px;padding:4px 10px;">5. Système plantaire</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(5)" id="ptab-5" style="font-size:11px;padding:4px 10px;">6. Vestibulaire</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(6)" id="ptab-6" style="font-size:11px;padding:4px 10px;">7. Buccal/Visuel</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(7)" id="ptab-7" style="font-size:11px;padding:4px 10px;">8. Terrain/Synthèse</button>
+    <button class="btn posturo-tab" onclick="showPosturoSection(8)" id="ptab-8" style="font-size:11px;padding:4px 10px;">9. Traitements</button>
+  </div>
+
+  <div class="posturo-section" id="psec-0" style="padding:0 20px;">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Informations patient</div>
+      <div class="g2" style="margin-top:10px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin</div><input class="inp" id="po-medecin" placeholder="Dr..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de consultation</div><input class="inp" id="po-date-consult" type="date"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Activité physique</div><input class="inp" id="po-activite" placeholder="Sport pratiqué..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Travail</div><input class="inp" id="po-travail" placeholder="Profession..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Antécédent traumatique</div><input class="inp" id="po-atcd" placeholder="Fractures, entorses..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Appareillage</div><input class="inp" id="po-appareillage" placeholder="Semelles, lunettes..."/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Examens complémentaires</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <input class="inp" id="po-examens" placeholder="Radio, IRM..." style="flex:1;"/>
+            <label style="font-size:12px;"><input type="radio" name="po-1ere-intention" value="oui"> 1ère intention : Oui</label>
+            <label style="font-size:12px;"><input type="radio" name="po-1ere-intention" value="non"> Non</label>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Activité quotidienne</div><textarea class="inp" id="po-activite-quot" rows="2" placeholder="Sédentaire, actif..."></textarea></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Motif de consultation</div><textarea class="inp" id="po-motif" rows="2" placeholder="Douleurs, inconfort..."></textarea></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Douleur</div>
+      <div style="display:flex;align-items:center;gap:16px;margin:10px 0;">
+        <label style="font-size:13px;font-weight:500;">Douleur :</label>
+        <label style="font-size:13px;"><input type="radio" name="po-douleur" value="oui"> Oui</label>
+        <label style="font-size:13px;"><input type="radio" name="po-douleur" value="non"> Non</label>
+      </div>
+      <div style="background:linear-gradient(90deg,#4CAF50,#FFEB3B,#FF9800,#F44336);border-radius:10px;padding:12px 16px;margin-top:8px;">
+        <div style="font-size:13px;font-weight:700;text-align:center;color:#222;margin-bottom:6px;">Échelle Visuelle Analogique</div>
+        <input type="range" min="0" max="10" value="0" id="po-eva" oninput="document.getElementById('po-eva-val').textContent=this.value" style="width:100%;margin:8px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#333;">
+          <span>0 Très bien</span><span>2 Bénigne</span><span>4 Modéré</span><span>6 Intense</span><span>8 Très intense</span><span>10 Max</span>
+        </div>
+        <div style="text-align:center;font-size:16px;font-weight:700;color:#222;margin-top:6px;">Score : <span id="po-eva-val">0</span>/10</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="posturo-section" id="psec-1" style="padding:0 20px;display:none;">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Bilan morphostatique — Silhouettes (dessiner)</div>
+      <div style="position:relative;margin:16px 0;text-align:center;">
+        <svg id="posturo-body-svg" viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;background:var(--card);border-radius:8px;border:1px solid var(--bord);">
+          <text x="75" y="12" text-anchor="middle" font-size="8" fill="#8892a4">Profil G</text>
+          <ellipse cx="75" cy="25" rx="11" ry="12" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="75" y1="37" x2="75" y2="82" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="75" y1="50" x2="58" y2="68" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="75" y1="50" x2="84" y2="70" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="75" y1="82" x2="66" y2="118" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="75" y1="82" x2="81" y2="120" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="66" y1="118" x2="62" y2="150" stroke="currentColor" stroke-width="1.3"/>
+          <line x1="81" y1="120" x2="79" y2="152" stroke="currentColor" stroke-width="1.3"/>
+          <text x="225" y="12" text-anchor="middle" font-size="8" fill="#8892a4">Face</text>
+          <ellipse cx="225" cy="25" rx="12" ry="12" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="225" y1="37" x2="225" y2="84" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="225" y1="50" x2="202" y2="72" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="225" y1="50" x2="248" y2="72" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="225" y1="84" x2="212" y2="122" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="225" y1="84" x2="238" y2="122" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="212" y1="122" x2="209" y2="154" stroke="currentColor" stroke-width="1.3"/>
+          <line x1="238" y1="122" x2="241" y2="154" stroke="currentColor" stroke-width="1.3"/>
+          <text x="375" y="12" text-anchor="middle" font-size="8" fill="#8892a4">Dos</text>
+          <ellipse cx="375" cy="25" rx="12" ry="12" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="375" y1="37" x2="375" y2="84" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="375" y1="50" x2="352" y2="72" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="375" y1="50" x2="398" y2="72" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="375" y1="84" x2="362" y2="122" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="375" y1="84" x2="388" y2="122" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="362" y1="122" x2="359" y2="154" stroke="currentColor" stroke-width="1.3"/>
+          <line x1="388" y1="122" x2="391" y2="154" stroke="currentColor" stroke-width="1.3"/>
+          <text x="525" y="12" text-anchor="middle" font-size="8" fill="#8892a4">Profil D</text>
+          <ellipse cx="525" cy="25" rx="11" ry="12" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="525" y1="37" x2="525" y2="82" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="525" y1="50" x2="516" y2="70" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="525" y1="50" x2="542" y2="68" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="525" y1="82" x2="519" y2="120" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="525" y1="82" x2="534" y2="118" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="519" y1="120" x2="521" y2="152" stroke="currentColor" stroke-width="1.3"/>
+          <line x1="534" y1="118" x2="538" y2="150" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+        <canvas id="posturo-body-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn" onclick="setPosturoDrawColor('red')" style="background:#e74c3c;color:#fff;font-size:11px;padding:3px 10px;">Rouge</button>
+        <button class="btn" onclick="setPosturoDrawColor('#3498db')" style="background:#3498db;color:#fff;font-size:11px;padding:3px 10px;">Bleu</button>
+        <button class="btn" onclick="setPosturoDrawColor('#2ecc71')" style="background:#2ecc71;color:#fff;font-size:11px;padding:3px 10px;">Vert</button>
+        <button class="btn" onclick="clearPosturoCanvas('posturo-body-canvas')" style="font-size:11px;padding:3px 10px;">🗑 Effacer</button>
+      </div>
+      <div class="g2" style="margin-top:16px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prédisposition du terrain</div>
+          <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+            <label style="font-size:12px;"><input type="radio" name="po-terrain-pred" value="souple"> Souple</label>
+            <label style="font-size:12px;"><input type="radio" name="po-terrain-pred" value="raide"> Raide</label>
+            <label style="font-size:12px;"><input type="radio" name="po-terrain-pred" value="tonique"> Tonique</label>
+          </div>
+        </div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Tactique d'équilibration</div>
+          <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+            <label style="font-size:12px;"><input type="radio" name="po-tactique" value="cheville"> Cheville</label>
+            <label style="font-size:12px;"><input type="radio" name="po-tactique" value="mixte"> Mixte</label>
+            <label style="font-size:12px;"><input type="radio" name="po-tactique" value="hanche"> Hanche</label>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Terrain du patient</div>
+          <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+            <label style="font-size:12px;"><input type="radio" name="po-terrain" value="1"> Postural (1)</label>
+            <label style="font-size:12px;"><input type="radio" name="po-terrain" value="2"> Chainiste-Proprioceptif-neuro-musculaire (2)</label>
+            <label style="font-size:12px;"><input type="radio" name="po-terrain" value="3"> Articulaire (3)</label>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Point de tension principal</div><input class="inp" id="po-tension-principal" placeholder="..."/></div>
+        <div style="grid-column:1/-1;">
+          <div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Compensations</div>
+          <input class="inp" id="po-comp1" placeholder="Compensation 1..." style="margin-bottom:4px;"/>
+          <input class="inp" id="po-comp2" placeholder="Compensation 2..." style="margin-bottom:4px;"/>
+          <input class="inp" id="po-comp3" placeholder="Compensation 3..."/>
+        </div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Point compensation critique</div><input class="inp" id="po-comp-critique" placeholder="..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Préférences motrices</div>
+          <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+            <label style="font-size:12px;"><input type="radio" name="po-pref-mot" value="tonique-aerien"> Tonique-Aérien</label>
+            <label style="font-size:12px;"><input type="radio" name="po-pref-mot" value="phasique-terrien"> Phasique-Terrien</label>
+          </div>
+        </div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Romberg</div><input class="inp" id="po-romberg-morpho" placeholder="Résultat..."/></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="posturo-section" id="psec-2" style="padding:0 20px;display:none;">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Bilan dynamique</div>
+      <textarea class="inp" id="po-bilan-dyn" rows="4" placeholder="Observations..." style="margin-top:10px;"></textarea>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Tests dynamiques</div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Examen de la course <em style="color:var(--mut)">(si douleur à l'effort)</em></div><input class="inp" id="po-course" placeholder="Observations..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de force extenseurs du poignet</div><input class="inp" id="po-test-poignet" placeholder="Résultat..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de force/stabilité arrière</div><input class="inp" id="po-test-stab" placeholder="Résultat..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de Flexion Antérieure</div><input class="inp" id="po-test-flex-ant" placeholder="Résultat..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de flexion Debout</div>
+          <div style="display:flex;gap:12px;margin-top:4px;">
+            <label style="font-size:12px;"><input type="radio" name="po-flex-debout" value="droite"> Droite</label>
+            <label style="font-size:12px;"><input type="radio" name="po-flex-debout" value="gauche"> Gauche</label>
+            <label style="font-size:12px;"><input type="radio" name="po-flex-debout" value="neutre"> Neutre</label>
+          </div>
+        </div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de flexion Assis</div>
+          <div style="display:flex;gap:12px;margin-top:4px;">
+            <label style="font-size:12px;"><input type="radio" name="po-flex-assis" value="droite"> Droite</label>
+            <label style="font-size:12px;"><input type="radio" name="po-flex-assis" value="gauche"> Gauche</label>
+            <label style="font-size:12px;"><input type="radio" name="po-flex-assis" value="neutre"> Neutre</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Examen en décharge — Tests mobilité</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Hanche</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-hanche" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-hanche" value="non"> Non</label></div></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Genou</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-genou" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-genou" value="non"> Non</label></div></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Pied</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-pied" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-pied" value="non"> Non</label></div></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Bassin</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-bassin" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-bassin" value="non"> Non</label></div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Examen en décubitus dorsal</div>
+      <div class="g2" style="margin-top:10px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Observation tibia/fémur</div><input class="inp" id="po-tibia-femur" placeholder="..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Longueur membres inférieurs</div><input class="inp" id="po-long-mi-dorsal" placeholder="D: ___ G: ___"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Hauteur branches pubiennes</div><input class="inp" id="po-branches-pub" placeholder="..."/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Downing test</div><input class="inp" id="po-downing" placeholder="..."/></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle" style="color:#2a7a4e;">Examen procubitus</div>
+      <div class="g2" style="margin-top:10px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Longueur membres inférieurs</div><input class="inp" id="po-long-mi-proc" placeholder="D: ___ G: ___"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Inégalité longueur</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-ineg-long" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-ineg-long" value="non"> Non</label></div></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Type</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-ineg-type" value="structurelle"> Structurelle</label><label style="font-size:12px;"><input type="radio" name="po-ineg-type" value="compensatrice"> Compensatrice</label></div></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Équilibré</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-equilibre" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-equilibre" value="non"> Non</label></div></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Scoliose</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-scoliose" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-scoliose" value="non"> Non</label></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="posturo-section" id="psec-3" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">4. Bilan neuro-fonctionnel — à venir</div></div></div>
+  <div class="posturo-section" id="psec-4" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">5. Système plantaire — à venir</div></div></div>
+  <div class="posturo-section" id="psec-5" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">6. Vestibulaire — à venir</div></div></div>
+  <div class="posturo-section" id="psec-6" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">7. Buccal/Visuel — à venir</div></div></div>
+  <div class="posturo-section" id="psec-7" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">8. Terrain/Synthèse — à venir</div></div></div>
+  <div class="posturo-section" id="psec-8" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">9. Traitements — à venir</div></div></div>
+</div>`;
+}
+
+function showPosturoSection(idx) {
+  document.querySelectorAll('.posturo-section').forEach((s,i) => {
+    s.style.display = i === idx ? '' : 'none';
+  });
+  document.querySelectorAll('.posturo-tab').forEach((t,i) => {
+    t.classList.toggle('act', i === idx);
+  });
+  if(idx === 1) setTimeout(initPosturoBodyCanvas, 100);
+}
+
+let posturoDrawColor = 'red';
+let posturoIsDrawing = false;
+let posturoLastX = 0, posturoLastY = 0;
+
+function setPosturoDrawColor(col) { posturoDrawColor = col; }
+
+function clearPosturoCanvas(id) {
+  const c = document.getElementById(id);
+  if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+
+function initPosturoBodyCanvas() {
+  const svg = document.getElementById('posturo-body-svg');
+  const canvas = document.getElementById('posturo-body-canvas');
+  if(!svg || !canvas) return;
+  const r = svg.getBoundingClientRect();
+  canvas.width = Math.round(r.width * window.devicePixelRatio);
+  canvas.height = Math.round(r.height * window.devicePixelRatio);
+  canvas.style.width = r.width + 'px';
+  canvas.style.height = r.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const getPos = (e) => {
+    const br = canvas.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return {x: cx - br.left, y: cy - br.top};
+  };
+  canvas.onmousedown = canvas.ontouchstart = (e) => { e.preventDefault(); posturoIsDrawing=true; const p=getPos(e); posturoLastX=p.x; posturoLastY=p.y; };
+  canvas.onmousemove = canvas.ontouchmove = (e) => {
+    if(!posturoIsDrawing) return; e.preventDefault();
+    const p=getPos(e);
+    ctx.beginPath(); ctx.strokeStyle=posturoDrawColor; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.moveTo(posturoLastX,posturoLastY); ctx.lineTo(p.x,p.y); ctx.stroke();
+    posturoLastX=p.x; posturoLastY=p.y;
+  };
+  canvas.onmouseup = canvas.onmouseleave = canvas.ontouchend = () => { posturoIsDrawing=false; };
+  if(currentPatient?.bilanDataPosturo?._bodyCanvas) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, r.width, r.height);
+    img.src = currentPatient.bilanDataPosturo._bodyCanvas;
+  }
+}
+
+function getPosturoRadio(name) {
+  const el = document.querySelector('input[name="'+name+'"]:checked');
+  return el ? el.value : '';
+}
+function setPosturoRadio(name, val) {
+  if(!val) return;
+  const el = document.querySelector('input[name="'+name+'"][value="'+val+'"]');
+  if(el) el.checked = true;
+}
+function getPoVal(id) { const e=document.getElementById(id); return e?e.value:''; }
+function setPoVal(id, v) { const e=document.getElementById(id); if(e) e.value=v||''; }
+
+function savePosturoBilan() {
+  if(!currentPatient) { alert('Sélectionnez un patient'); return; }
+  if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
+  const d = currentPatient.bilanDataPosturo;
+  d.medecin=getPoVal('po-medecin'); d.dateConsult=getPoVal('po-date-consult');
+  d.activite=getPoVal('po-activite'); d.travail=getPoVal('po-travail');
+  d.atcd=getPoVal('po-atcd'); d.appareillage=getPoVal('po-appareillage');
+  d.examens=getPoVal('po-examens'); d['1ereIntention']=getPosturoRadio('po-1ere-intention');
+  d.activiteQuot=getPoVal('po-activite-quot'); d.motif=getPoVal('po-motif');
+  d.douleur=getPosturoRadio('po-douleur'); d.eva=getPoVal('po-eva');
+  d.terrainPred=getPosturoRadio('po-terrain-pred'); d.tactique=getPosturoRadio('po-tactique');
+  d.terrain=getPosturoRadio('po-terrain'); d.tensionPrincipal=getPoVal('po-tension-principal');
+  d.comp1=getPoVal('po-comp1'); d.comp2=getPoVal('po-comp2'); d.comp3=getPoVal('po-comp3');
+  d.compCritique=getPoVal('po-comp-critique'); d.prefMot=getPosturoRadio('po-pref-mot');
+  d.rombergMorpho=getPoVal('po-romberg-morpho'); d.bilanDyn=getPoVal('po-bilan-dyn');
+  d.course=getPoVal('po-course'); d.testPoignet=getPoVal('po-test-poignet');
+  d.testStab=getPoVal('po-test-stab'); d.testFlexAnt=getPoVal('po-test-flex-ant');
+  d.flexDebout=getPosturoRadio('po-flex-debout'); d.flexAssis=getPosturoRadio('po-flex-assis');
+  d.mobHanche=getPosturoRadio('po-mob-hanche'); d.mobGenou=getPosturoRadio('po-mob-genou');
+  d.mobPied=getPosturoRadio('po-mob-pied'); d.mobBassin=getPosturoRadio('po-mob-bassin');
+  d.tibiaFemur=getPoVal('po-tibia-femur'); d.longMiDorsal=getPoVal('po-long-mi-dorsal');
+  d.branchesPub=getPoVal('po-branches-pub'); d.downing=getPoVal('po-downing');
+  d.longMiProc=getPoVal('po-long-mi-proc'); d.inegLong=getPosturoRadio('po-ineg-long');
+  d.inegType=getPosturoRadio('po-ineg-type'); d.equilibre=getPosturoRadio('po-equilibre');
+  d.scoliose=getPosturoRadio('po-scoliose');
+  const bc=document.getElementById('posturo-body-canvas');
+  if(bc && bc.width>0) d._bodyCanvas=bc.toDataURL('image/jpeg',0.7);
+  savePatients();
+  alert('✓ Bilan posturologique sauvegardé');
+}
+
+function loadPosturoBilan() {
+  const d = currentPatient?.bilanDataPosturo;
+  if(!d) return;
+  setPoVal('po-medecin',d.medecin); setPoVal('po-date-consult',d.dateConsult);
+  setPoVal('po-activite',d.activite); setPoVal('po-travail',d.travail);
+  setPoVal('po-atcd',d.atcd); setPoVal('po-appareillage',d.appareillage);
+  setPoVal('po-examens',d.examens); setPosturoRadio('po-1ere-intention',d['1ereIntention']);
+  setPoVal('po-activite-quot',d.activiteQuot); setPoVal('po-motif',d.motif);
+  setPosturoRadio('po-douleur',d.douleur);
+  if(d.eva!==undefined){setPoVal('po-eva',d.eva);const ev=document.getElementById('po-eva-val');if(ev)ev.textContent=d.eva;}
+  setPosturoRadio('po-terrain-pred',d.terrainPred); setPosturoRadio('po-tactique',d.tactique);
+  setPosturoRadio('po-terrain',d.terrain); setPoVal('po-tension-principal',d.tensionPrincipal);
+  setPoVal('po-comp1',d.comp1); setPoVal('po-comp2',d.comp2); setPoVal('po-comp3',d.comp3);
+  setPoVal('po-comp-critique',d.compCritique); setPosturoRadio('po-pref-mot',d.prefMot);
+  setPoVal('po-romberg-morpho',d.rombergMorpho); setPoVal('po-bilan-dyn',d.bilanDyn);
+  setPoVal('po-course',d.course); setPoVal('po-test-poignet',d.testPoignet);
+  setPoVal('po-test-stab',d.testStab); setPoVal('po-test-flex-ant',d.testFlexAnt);
+  setPosturoRadio('po-flex-debout',d.flexDebout); setPosturoRadio('po-flex-assis',d.flexAssis);
+  setPosturoRadio('po-mob-hanche',d.mobHanche); setPosturoRadio('po-mob-genou',d.mobGenou);
+  setPosturoRadio('po-mob-pied',d.mobPied); setPosturoRadio('po-mob-bassin',d.mobBassin);
+  setPoVal('po-tibia-femur',d.tibiaFemur); setPoVal('po-long-mi-dorsal',d.longMiDorsal);
+  setPoVal('po-branches-pub',d.branchesPub); setPoVal('po-downing',d.downing);
+  setPoVal('po-long-mi-proc',d.longMiProc); setPosturoRadio('po-ineg-long',d.inegLong);
+  setPosturoRadio('po-ineg-type',d.inegType); setPosturoRadio('po-equilibre',d.equilibre);
+  setPosturoRadio('po-scoliose',d.scoliose);
+}
 
 </script>
 
