@@ -5147,13 +5147,21 @@ function loadBilan() {
     };
     img.src = bilanData[key];
   };
-  // Les images morpho sont maintenant dans le DOM via <img>
-  // On ne restaure plus les anciens canvas (format obsolète)
-  // restoreCanvas('morpho-face', '_morpho_face');  // obsolète
-  // restoreCanvas('morpho-face2', '_morpho_face2');  // obsolète
-  // restoreCanvas('morpho-profilG', '_morpho_profilG');  // obsolète
-  // restoreCanvas('morpho-profilD', '_morpho_profilD');  // obsolète
-  // restoreCanvas('pieds-canvas', '_pieds');  // obsolète - images dans le DOM
+  // Restaurer uniquement les dessins (les images de fond sont dans le DOM)
+  // Les nouvelles sauvegardes contiennent juste le dessin transparent
+  // Les anciennes sauvegardes (avec fond) sont ignorées car elles contiennent l'image en double
+  const isOldFormat = (key) => {
+    const data = bilanData[key];
+    if(!data) return false;
+    // Les nouvelles sauvegardes sont très petites (juste le dessin transparent)
+    // Les anciennes sont grandes (image + dessin fusionnés) > 20000 chars
+    return data.length > 20000;
+  };
+  if(!isOldFormat('_morpho_face')) restoreCanvas('morpho-face', '_morpho_face');
+  if(!isOldFormat('_morpho_face2')) restoreCanvas('morpho-face2', '_morpho_face2');
+  if(!isOldFormat('_morpho_profilG')) restoreCanvas('morpho-profilG', '_morpho_profilG');
+  if(!isOldFormat('_morpho_profilD')) restoreCanvas('morpho-profilD', '_morpho_profilD');
+  if(!isOldFormat('_pieds')) restoreCanvas('pieds-canvas', '_pieds');
 }
 
 function toggleDictaphone() {
