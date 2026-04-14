@@ -1466,6 +1466,8 @@ async function onPwaLoginSuccess() {
 
   // Charger les données depuis Supabase
   await loadSupabaseData();
+  // Naviguer vers pg-patients pour déclencher le bon rendu
+  nav('pg-patients');
 }
 
 // ─── Chargement des données ───
@@ -2767,7 +2769,7 @@ function creerBilanPosturo(patIdx, type) {
   p.currentBilanSousType = type;
   savePatients();
   selectPatient(p);
-  nav('pg-posturo');
+  nav('pg-bilan-posturo');
 }
 
 function ouvrirBilanPosturo(patIdx, bilanIdx) {
@@ -2782,7 +2784,7 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
   selectPatient(p);
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
   currentBilanReadOnly = true;
-  nav('pg-posturo');
+  nav('pg-bilan-posturo');
 }
 function renderPratList() {
   const el = document.getElementById('prat-list-el');
