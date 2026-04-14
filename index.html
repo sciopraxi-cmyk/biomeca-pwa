@@ -5605,10 +5605,12 @@ function undoPosturoFeet() {
 }
 
 function initPosturoBodyCanvas() {
-  const imgEl = document.getElementById('posturo-body-svg');
   const canvas = document.getElementById('posturo-body-canvas');
-  if(!imgEl || !canvas) return;
-  const r = imgEl.getBoundingClientRect();
+  if(!canvas) return;
+  // Utiliser le conteneur parent pour la taille
+  const parent = canvas.parentElement;
+  if(!parent) return;
+  const r = parent.getBoundingClientRect();
   if(r.width === 0) return;
   canvas.width = Math.round(r.width * window.devicePixelRatio);
   canvas.height = Math.round(r.height * window.devicePixelRatio);
@@ -5616,28 +5618,27 @@ function initPosturoBodyCanvas() {
   canvas.style.height = r.height + 'px';
   const ctx = canvas.getContext('2d');
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  // Fond blanc
-  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,r.width,r.height);
-  // Dessiner l'image par-dessus
-  const img2 = new Image();
-  img2.onload = () => {
-    ctx.drawImage(img2, 0, 0, r.width, r.height);
+  canvas._history = [];
+  canvas._baseSnapshot = null;
+  canvas._tempSnap = null;
+  // Snapshot de base (fond transparent - les images sont dans les divs en dessous)
+  setTimeout(() => {
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
-    // Restaurer dessin sauvegardé si existant
-    if(currentPatient?.bilanDataPosturo?._bodyCanvas) {
-      const saved = new Image();
-      saved.onload = () => ctx.drawImage(saved, 0, 0, r.width, r.height);
-      saved.src = currentPatient.bilanDataPosturo._bodyCanvas;
-    }
-  };
-  img2.src = imgEl.src;
+  }, 100);
+  // Restaurer dessin sauvegardé si existant
+  if(currentPatient?.bilanDataPosturo?._bodyCanvas) {
+    const saved = new Image();
+    saved.onload = () => ctx.drawImage(saved, 0, 0, r.width, r.height);
+    saved.src = currentPatient.bilanDataPosturo._bodyCanvas;
+  }
   setupDrawCanvas(canvas, 'posturo-body-canvas');
 }
 
 function initPosturoFeetCanvas() {
-  const imgEl = document.getElementById('posturo-feet-img');
   const canvas = document.getElementById('posturo-feet-canvas');
-  if(!imgEl || !canvas) return;
+  if(!canvas) return;
+  const imgEl = document.getElementById('posturo-feet-img');
+  if(!imgEl) return;
   const r = imgEl.getBoundingClientRect();
   if(r.width === 0) return;
   canvas.width = Math.round(r.width * window.devicePixelRatio);
@@ -5646,20 +5647,17 @@ function initPosturoFeetCanvas() {
   canvas.style.height = r.height + 'px';
   const ctx = canvas.getContext('2d');
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  // Fond blanc
-  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,r.width,r.height);
-  // Dessiner l'image par-dessus
-  const img2 = new Image();
-  img2.onload = () => {
-    ctx.drawImage(img2, 0, 0, r.width, r.height);
+  canvas._history = [];
+  canvas._baseSnapshot = null;
+  canvas._tempSnap = null;
+  setTimeout(() => {
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
-    if(currentPatient?.bilanDataPosturo?._feetCanvas) {
-      const saved = new Image();
-      saved.onload = () => ctx.drawImage(saved, 0, 0, r.width, r.height);
-      saved.src = currentPatient.bilanDataPosturo._feetCanvas;
-    }
-  };
-  img2.src = imgEl.src;
+  }, 100);
+  if(currentPatient?.bilanDataPosturo?._feetCanvas) {
+    const saved = new Image();
+    saved.onload = () => ctx.drawImage(saved, 0, 0, r.width, r.height);
+    saved.src = currentPatient.bilanDataPosturo._feetCanvas;
+  }
   setupDrawCanvas(canvas, 'posturo-feet-canvas');
 }
 
