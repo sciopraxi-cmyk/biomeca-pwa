@@ -1634,7 +1634,7 @@ function nav(id) {
       // 2. Initialiser le canvas pieds
       const pc = document.getElementById('pieds-canvas');
       // Toujours dessiner le template comme fond
-      if(pc) { drawPiedsTemplate(); setupDrawCanvas(pc); }
+      if(pc) { drawPiedsTemplate(currentPatient?.bilanData?._pieds); }
       // 3. Charger les données du bilan APRÈS init des canvas
       setTimeout(() => {
         loadBilan();
@@ -5027,7 +5027,7 @@ function undoPieds() {
   }
 }
 
-function drawPiedsTemplate() {
+function drawPiedsTemplate(savedData) {
   const canvas = document.getElementById('pieds-canvas');
   if(!canvas) return;
   const ctx = canvas.getContext('2d');
