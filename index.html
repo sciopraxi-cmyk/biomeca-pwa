@@ -5899,7 +5899,186 @@ function getBilanPosturoHTML() {
   </div>
 </div>
 
-  <div class="posturo-section" id="psec-4" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">5. Système plantaire — à venir</div></div></div>
+  <div class="posturo-section" id="psec-4" style="padding:0 20px;display:none;">
+  <div class="card" style="margin-bottom:16px;">
+    <div class="stitle" style="color:#2a7a4e;margin-bottom:12px;">5. Investigation du système plantaire</div>
+
+    <!-- Épines irritatives -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">• Présences épines irritatives d'appui plantaire :</div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="radio" name="po-epines" id="po-epines-oui" value="oui"/>
+          <span>Oui</span>
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="radio" name="po-epines" id="po-epines-non" value="non"/>
+          <span>Non</span>
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:500;">Localisation :</span>
+        <input class="inp" id="po-epines-loc" placeholder="..." style="flex:1;"/>
+      </div>
+    </div>
+
+    <!-- Examen empreinte -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">• Examen empreinte et morpho plantaire :</div>
+      <div style="border:2px dashed #ccc;border-radius:8px;padding:12px;text-align:center;background:#fafafa;">
+        <input type="file" id="po-empreinte-file" accept="image/*" style="display:none;" onchange="previewEmpreinte(this)"/>
+        <div id="po-empreinte-preview" style="margin-bottom:8px;">
+          <img id="po-empreinte-img" style="max-width:100%;max-height:200px;display:none;border-radius:6px;"/>
+        </div>
+        <button class="btn" onclick="document.getElementById('po-empreinte-file').click()" style="font-size:12px;">
+          📷 Ajouter photo empreinte
+        </button>
+      </div>
+    </div>
+
+    <!-- Examen chaussure -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">• Examen de la chaussure :</div>
+      <div style="margin-left:16px;margin-bottom:6px;">
+        <div style="font-weight:500;margin-bottom:4px;">Usure :</div>
+        <div style="display:flex;gap:16px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+            <input type="checkbox" id="po-usure-interne"/> Interne
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+            <input type="checkbox" id="po-usure-externe"/> Externe
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+            <input type="checkbox" id="po-usure-contrefort"/> Contrefort
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:16px;">
+        <span style="font-weight:500;">Type de chaussure portées régulièrement :</span>
+        <input class="inp" id="po-chaussure-type" placeholder="..." style="flex:1;"/>
+      </div>
+    </div>
+
+    <!-- Tactique équilibration -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">• Tactique d'équilibration :</div>
+      <div style="display:flex;gap:16px;margin-left:16px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="radio" name="po-tactique" id="po-tact-cheville" value="cheville"/>
+          <span>Cheville</span>
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="radio" name="po-tactique" id="po-tact-mixte" value="mixte"/>
+          <span>Mixte</span>
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="radio" name="po-tactique" id="po-tact-hanche" value="hanche"/>
+          <span>Hanche</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Tests toniques -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">• Tests toniques :</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-left:16px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-test-pouces"/> Test des pouces montants
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-test-convergence"/> Manœuvre de convergence podale
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-test-scapulaire"/> Test scapulaire de Dupas
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-test-nucale"/> Rotation nucale
+        </label>
+      </div>
+    </div>
+
+    <!-- Recherche parasites -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">Recherche parasite(s)/entrée(s) :</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-left:16px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-para-plantaire"/> Plantaire
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-para-yeux"/> Yeux
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-para-buccale"/> Buccale
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-para-cicatrice"/> Cicatrice
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-para-vestibulaire"/> Vestibulaire
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="po-para-viscerale"/> Zone viscérale
+        </label>
+      </div>
+    </div>
+
+    <!-- Test stabilité monopodal -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:8px;">• Test de stabilité monopodal <span style="color:#e74c3c;">(déficit)</span> :</div>
+      <table style="border-collapse:collapse;font-size:12px;margin-left:16px;">
+        <tr>
+          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;"></th>
+          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;">G</th>
+          <th style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;text-align:center;">D</th>
+        </tr>
+        <tr>
+          <td style="padding:4px 12px;border:1px solid #ccc;font-weight:500;">Pied</td>
+          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
+            <input type="checkbox" id="po-mono-pied-g"/>
+          </td>
+          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
+            <input type="checkbox" id="po-mono-pied-d"/>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:4px 12px;border:1px solid #ccc;font-weight:500;">Genou</td>
+          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
+            <input type="checkbox" id="po-mono-genou-g"/>
+          </td>
+          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
+            <input type="checkbox" id="po-mono-genou-d"/>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:4px 12px;border:1px solid #ccc;font-weight:500;">Hanche</td>
+          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
+            <input type="checkbox" id="po-mono-hanche-g"/>
+          </td>
+          <td style="text-align:center;border:1px solid #ccc;padding:4px;">
+            <input type="checkbox" id="po-mono-hanche-d"/>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Épreuve alignement -->
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">• Épreuve de l'alignement articulaire sous contrainte en 3 temps <span style="color:#e74c3c;">(déficit)</span> <span style="font-size:10px;font-style:italic;font-weight:400;">(réalisé si antécédent traumatique / si perte stabilité monopodal en charge) (exclusion : stratégie équilibration autour de la hanche ou mixte avancée)</span> :</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-left:16px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="po-align-axe"/> Axe articulaire en place dans schéma corporel
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="po-align-inf"/> Déséquilibre inférieur
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="po-align-sup"/> Déséquilibre supérieur
+        </label>
+      </div>
+    </div>
+
+  </div>
+</div>
   <div class="posturo-section" id="psec-5" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">6. Vestibulaire — à venir</div></div></div>
   <div class="posturo-section" id="psec-6" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">7. Buccal/Visuel — à venir</div></div></div>
   <div class="posturo-section" id="psec-7" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">8. Terrain/Synthèse — à venir</div></div></div>
@@ -5994,6 +6173,16 @@ function getBilanPosturoHTML() {
 </div>`;
 }
 
+function previewEmpreinte(input) {
+  if(!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('po-empreinte-img');
+    if(img) { img.src = e.target.result; img.style.display = 'block'; }
+    if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = e.target.result;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
 function updateNeuroTotals() {
   // Total nerfs crâniens (IDs réels: nc-nc1-g, nc-recap-g)
   const ncIds = ['nc-recap','nc-nc1','nc-nc2','nc-nc3','nc-nc4','nc-nc5','nc-nc6','nc-nc7','nc-nc8','nc-nc9','nc-nc10','nc-nc11','nc-nc12'];
