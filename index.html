@@ -5161,7 +5161,29 @@ function saveBilan() {
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     saveCanvasDrawing(id, '_'+id.replace(/-/g,'_'));
   });
-  saveCanvasDrawing('pieds-canvas', '_pieds');
+  // Sauvegarder pieds: soustraire le template pour ne garder que le dessin
+  const pCanvas = document.getElementById('pieds-canvas');
+  if(pCanvas && pCanvas._baseSnapshot) {
+    const W = pCanvas.width, H = pCanvas.height;
+    const tmp = document.createElement('canvas');
+    tmp.width = W; tmp.height = H;
+    const tctx = tmp.getContext('2d');
+    tctx.drawImage(pCanvas, 0, 0);
+    const current = tctx.getImageData(0, 0, W, H);
+    const base = pCanvas._baseSnapshot;
+    const cd = current.data, bd2 = base.data;
+    // Garder seulement les pixels différents du template
+    for(let i = 0; i < cd.length; i += 4) {
+      const dr = Math.abs(cd[i]-bd2[i]), dg = Math.abs(cd[i+1]-bd2[i+1]), db = Math.abs(cd[i+2]-bd2[i+2]);
+      if(dr < 20 && dg < 20 && db < 20) cd[i+3] = 0; // pixel identique au template → transparent
+    }
+    tctx.putImageData(current, 0, 0);
+    const dpr = window.devicePixelRatio || 1;
+    const out = document.createElement('canvas');
+    out.width = Math.round(W/dpr); out.height = Math.round(H/dpr);
+    out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, out.width, out.height);
+    bilanData._pieds = out.toDataURL('image/png');
+  }
 
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
   // Mettre à jour le snapshot dans bilansSport si un bilan existant est ouvert
