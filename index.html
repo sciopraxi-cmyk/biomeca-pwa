@@ -5580,10 +5580,10 @@ function getBilanPosturoHTML() {
     <!-- ANALYSE POSTURALE STATIQUE + DYNAMIQUE -->
     <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;">
       <tr>
-        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;">ANALYSE POSTURALE STATIQUE</td>
-        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
-        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
-        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">N</td>
+        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;color:#222;">ANALYSE POSTURALE STATIQUE</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">G</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">D</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">N</td>
         <td colspan="4" style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px 6px;border:1px solid #999;color:#222;">ANALYSE POSTURALE DYNAMIQUE</td>
         <td style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
         <td style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
@@ -5631,13 +5631,13 @@ function getBilanPosturoHTML() {
       </tr>
       <!-- CRITÈRES DE FORCE -->
       <tr>
-        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;">CRITÈRES DE FORCE</td>
-        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
-        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
+        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;color:#222;">CRITÈRES DE FORCE</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">G</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">D</td>
         <td style="border:1px solid #999;"></td>
-        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;">AUTRES CRITÈRES EN DYNAMIQUE</td>
-        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
-        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
+        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;color:#222;">AUTRES CRITÈRES EN DYNAMIQUE</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">G</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">D</td>
         <td style="border:1px solid #999;"></td>
       </tr>
       <tr>
@@ -5688,34 +5688,34 @@ function getBilanPosturoHTML() {
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-n"/></td>
           </tr>
           ${['NC1','NC2'].map(nc => `<tr>
-            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Mésencéphale</td>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Mésencéphale</td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
           </tr>`).join('')}
           ${['NC3','NC4'].map(nc => `<tr>
-            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Mésencéphale</td>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Mésencéphale</td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
           </tr>`).join('')}
           ${['NC5','NC6','NC7','NC8'].map(nc => `<tr>
-            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Pont de Varole</td>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Pont de Varole</td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
           </tr>`).join('')}
           ${['NC9','NC10','NC11','NC12'].map(nc => `<tr>
-            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Bulbe rachidien</td>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Bulbe rachidien</td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
           </tr>`).join('')}
-          <tr style="background:#ddd;font-weight:700;">
+          <tr style="background:#ddd;font-weight:700;color:#222;">
             <td colspan="2" style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
             <td style="text-align:center;border:1px solid #999;" id="nc-total-g">0</td>
             <td style="text-align:center;border:1px solid #999;" id="nc-total-d">0</td>
@@ -5759,7 +5759,7 @@ function getBilanPosturoHTML() {
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n"/></td>
           </tr>`).join('')}
-          <tr style="background:#ddd;font-weight:700;">
+          <tr style="background:#ddd;font-weight:700;color:#222;">
             <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
             <td style="text-align:center;border:1px solid #999;" id="vest-total-g">0</td>
             <td style="text-align:center;border:1px solid #999;" id="vest-total-d">0</td>
@@ -5793,10 +5793,10 @@ function getBilanPosturoHTML() {
             </td>
           </tr>
           <tr>
-            <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;">INTER</td>
-            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">G</td>
-            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">D</td>
-            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">N</td>
+            <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;color:#222;">INTER</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">G</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">D</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">N</td>
           </tr>
           ${[['Précision (doigt-nez)','inter-prec'],['Coordination (mvt alternatif)','inter-coord']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
@@ -5805,10 +5805,10 @@ function getBilanPosturoHTML() {
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
           </tr>`).join('')}
           <tr>
-            <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;">LATÉRAL</td>
-            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">G</td>
-            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">D</td>
-            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">N</td>
+            <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;color:#222;">LATÉRAL</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">G</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">D</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">N</td>
           </tr>
           ${[['Précision (piano)','lat-prec'],['Coordination (Go-No Go)','lat-coord']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
@@ -5816,7 +5816,7 @@ function getBilanPosturoHTML() {
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d"/></td>
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
           </tr>`).join('')}
-          <tr style="background:#ddd;font-weight:700;">
+          <tr style="background:#ddd;font-weight:700;color:#222;">
             <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
             <td style="text-align:center;border:1px solid #999;" id="cerv-total-g">0</td>
             <td style="text-align:center;border:1px solid #999;" id="cerv-total-d">0</td>
@@ -5832,13 +5832,13 @@ function getBilanPosturoHTML() {
       <table style="border-collapse:collapse;font-size:10px;width:100%;">
         <tr><td colspan="8" style="background:#3498db;color:#fff;font-weight:700;text-align:center;padding:4px;border:1px solid #3498db;">RÉFLEXES ARCHAÏQUES</td></tr>
         <tr>
-          <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;">PRIORITAIRES</td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">O</td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+          <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;color:#222;">PRIORITAIRES</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">O</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">N</td>
           <td style="border:1px solid #ccc;"></td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">G</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">D</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">N</td>
         </tr>
         ${[
           ['RPP','#aed6f1',true],['RTP','#aed6f1',true],['MORO','#aed6f1',true],
@@ -5848,7 +5848,7 @@ function getBilanPosturoHTML() {
           const reflex = ['RTAC','GALANT','BABINSKI','PLANTAIRE','PALMAIRE','BABKIN'][i];
           const rid = reflex.toLowerCase();
           return `<tr>
-            <td style="padding:2px 4px;border:1px solid #ccc;background:${bg};">${label}</td>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:${bg};color:#222;">${label}</td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-o"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-n"/></td>
             <td style="padding:2px 4px;border:1px solid #ccc;">${reflex}</td>
@@ -5863,10 +5863,10 @@ function getBilanPosturoHTML() {
       <table style="border-collapse:collapse;font-size:10px;width:100%;">
         <tr><td colspan="4" style="background:#f0a500;color:#fff;font-weight:700;text-align:center;padding:4px;border:1px solid #f0a500;">RÉCEPTEURS TACTILES</td></tr>
         <tr>
-          <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;">PRIORITAIRES</td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
-          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+          <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;color:#222;">PRIORITAIRES</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">G</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">D</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">N</td>
         </tr>
         ${[
           ['Merkel (Toucher/pression)','#f0a500'],
@@ -5878,7 +5878,7 @@ function getBilanPosturoHTML() {
         ].map(([label,bg]) => {
           const id = label.split(' ')[0].toLowerCase();
           return `<tr>
-            <td style="padding:2px 4px;border:1px solid #ccc;background:${bg==='#f0a500'?'#fdebd0':bg};">${label}</td>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:${bg==='#f0a500'?'#fdebd0':bg};color:#222;">${label}</td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-g"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-d"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-n"/></td>
