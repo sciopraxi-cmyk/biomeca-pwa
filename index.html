@@ -5664,8 +5664,17 @@ function getBilanPosturoHTML() {
 
     <!-- HYPOTHÈSE -->
     <div style="border:1px solid #ccc;padding:8px;margin-bottom:12px;font-size:12px;">
-      <strong>HYPOTHÈSE (<span style="color:#e74c3c;">TRONC CÉRÉBRAL</span> / <span style="color:#27ae60;">CERVELET</span>) :</strong>
-      <input class="inp" id="po-hypothese" placeholder="..." style="margin-top:6px;"/>
+      <strong>HYPOTHÈSE :</strong>
+      <div style="display:flex;gap:20px;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="po-hypo-tronc" style="width:16px;height:16px;"/>
+          <span style="color:#e74c3c;font-weight:700;">TRONC CÉRÉBRAL</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="po-hypo-cervelet" style="width:16px;height:16px;"/>
+          <span style="color:#27ae60;font-weight:700;">CERVELET</span>
+        </label>
+      </div>
     </div>
 
     <!-- TABLEAU PRINCIPAL: TRONC / VESTIBULAIRE / CERVELET -->
