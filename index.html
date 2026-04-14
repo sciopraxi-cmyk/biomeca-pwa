@@ -4830,7 +4830,14 @@ function setupDrawCanvas(canvas, canvasId) {
     const rect = canvas.getBoundingClientRect();
     const scx = canvas.width/rect.width, scy = canvas.height/rect.height;
     const src2 = e.touches ? e.touches[0] : e;
-    return {x:(src2.clientX-rect.left)*scx, y:(src2.clientY-rect.top)*scy};
+    // Utiliser pageX/pageY pour tenir compte du scroll
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    const absLeft = rect.left + scrollX;
+    const absTop = rect.top + scrollY;
+    const ex = (e.touches ? e.touches[0].pageX : (e.pageX || src2.clientX + scrollX));
+    const ey = (e.touches ? e.touches[0].pageY : (e.pageY || src2.clientY + scrollY));
+    return {x:(ex - absLeft)*scx, y:(ey - absTop)*scy};
   };
 
   canvas.onmousedown = e => {
