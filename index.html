@@ -5056,8 +5056,8 @@ function drawPiedsTemplate() {
     if(savedPieds && savedPieds.startsWith('data:image/png')) {
       const saved = new Image();
       saved.onload = () => {
-        const dpr = window.devicePixelRatio || 1;
-        ctx.drawImage(saved, 0, 0, canvas.width/dpr, canvas.height/dpr);
+        // Dessiner à la taille naturelle de l'image sauvegardée
+        ctx.drawImage(saved, 0, 0, saved.width, saved.height);
       };
       saved.src = savedPieds;
     }
