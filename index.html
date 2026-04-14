@@ -5572,7 +5572,324 @@ function getBilanPosturoHTML() {
     </div>
   </div>
 
-  <div class="posturo-section" id="psec-3" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">4. Bilan neuro-fonctionnel — à venir</div></div></div>
+
+<div class="posturo-section" id="psec-3" style="padding:0 20px;display:none;">
+  <div class="card" style="margin-bottom:16px;overflow-x:auto;">
+    <div class="stitle" style="color:#2a7a4e;margin-bottom:12px;">4. Bilan neuro-fonctionnel</div>
+
+    <!-- ANALYSE POSTURALE STATIQUE + DYNAMIQUE -->
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;">
+      <tr>
+        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;">ANALYSE POSTURALE STATIQUE</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">N</td>
+        <td colspan="4" style="background:#ff0;font-weight:700;text-align:center;padding:4px 6px;border:1px solid #999;">ANALYSE POSTURALE DYNAMIQUE</td>
+        <td style="background:#ff0;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
+        <td style="background:#ff0;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
+        <td style="background:#ff0;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">N</td>
+      </tr>
+      <tr>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Épaule + basse</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-n"/></td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;">PATTERN TRONC CÉRÉBRAL (RIMS/REMI)</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-n"/></td>
+      </tr>
+      <tr>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Rotation interne épaule</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-n"/></td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;">PATTERN CERVELET (RIMS/RIMI)</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-n"/></td>
+      </tr>
+      <tr>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion du coude</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-n"/></td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;">Défaut stabilisation tête</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-n"/></td>
+      </tr>
+      <tr>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Pronation du poignet</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-n"/></td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;">Membre sup peu mobile</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-n"/></td>
+      </tr>
+      <!-- CRITÈRES DE FORCE -->
+      <tr>
+        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;">CRITÈRES DE FORCE</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
+        <td style="border:1px solid #999;"></td>
+        <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;">AUTRES CRITÈRES EN DYNAMIQUE</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
+        <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
+        <td style="border:1px solid #999;"></td>
+      </tr>
+      <tr>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles extenseurs poignet</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-d"/></td>
+        <td style="border:1px solid #ccc;"></td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion poignet et doigts</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-d"/></td>
+        <td style="border:1px solid #ccc;"></td>
+      </tr>
+      <tr>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles Fléchisseurs de hanche</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-d"/></td>
+        <td style="border:1px solid #ccc;"></td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Hyperextension genou</td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-g"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-d"/></td>
+        <td style="border:1px solid #ccc;"></td>
+      </tr>
+    </table>
+
+    <!-- HYPOTHÈSE -->
+    <div style="border:1px solid #ccc;padding:8px;margin-bottom:12px;font-size:12px;">
+      <strong>HYPOTHÈSE (<span style="color:#e74c3c;">TRONC CÉRÉBRAL</span> / <span style="color:#27ae60;">CERVELET</span>) :</strong>
+      <input class="inp" id="po-hypothese" placeholder="..." style="margin-top:6px;"/>
+    </div>
+
+    <!-- TABLEAU PRINCIPAL: TRONC / VESTIBULAIRE / CERVELET -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:12px;">
+
+      <!-- COLONNE TRONC CÉRÉBRAL (rouge) -->
+      <div style="border:2px solid #e74c3c;">
+        <div style="background:#e74c3c;color:#fff;text-align:center;font-weight:700;padding:4px;font-size:11px;">TRONC CÉRÉBRAL</div>
+        <table style="width:100%;border-collapse:collapse;font-size:10px;">
+          <tr>
+            <td colspan="2" style="background:#f8d7da;font-weight:700;padding:3px 4px;border:1px solid #e74c3c;">NERFS CRÂNIENS</td>
+            <td style="background:#f8d7da;font-weight:700;text-align:center;padding:3px;border:1px solid #e74c3c;">G</td>
+            <td style="background:#f8d7da;font-weight:700;text-align:center;padding:3px;border:1px solid #e74c3c;">D</td>
+            <td style="background:#f8d7da;font-weight:700;text-align:center;padding:3px;border:1px solid #e74c3c;">N</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:2px 4px;border:1px solid #f8d7da;">Recapillarisation</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-g"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-d"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-n"/></td>
+          </tr>
+          ${['NC1','NC2'].map(nc => `<tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Mésencéphale</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+          </tr>`).join('')}
+          ${['NC3','NC4'].map(nc => `<tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Mésencéphale</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+          </tr>`).join('')}
+          ${['NC5','NC6','NC7','NC8'].map(nc => `<tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Pont de Varole</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+          </tr>`).join('')}
+          ${['NC9','NC10','NC11','NC12'].map(nc => `<tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;">Bulbe rachidien</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+          </tr>`).join('')}
+          <tr style="background:#ddd;font-weight:700;">
+            <td colspan="2" style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
+            <td style="text-align:center;border:1px solid #999;" id="nc-total-g">0</td>
+            <td style="text-align:center;border:1px solid #999;" id="nc-total-d">0</td>
+            <td style="border:1px solid #999;"></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- COLONNE VESTIBULAIRE -->
+      <div style="border:2px solid #555;">
+        <div style="background:#555;color:#fff;text-align:center;font-style:italic;font-weight:700;padding:4px;font-size:11px;">CONFLUENCE DES DONNÉES</div>
+        <table style="width:100%;border-collapse:collapse;font-size:10px;">
+          <tr>
+            <td style="font-weight:700;padding:3px 4px;border:1px solid #ccc;">VESTIBULAIRE</td>
+            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
+            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
+            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+          </tr>
+          ${[['ROMBERG + CSC ANT','vest-ant'],['ROMBERG + CSC LAT','vest-lat'],['ROMBERG + CSC POST','vest-post']].map(([label,id]) => `<tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">${label}</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n"/></td>
+          </tr>`).join('')}
+          <tr><td colspan="4" style="background:#d4edda;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#27ae60;">PROPRIOCEPTION</td></tr>
+          <tr>
+            <td style="background:#d4edda;font-weight:700;padding:3px 4px;border:1px solid #ccc;">PRIORITAIRES</td>
+            <td style="background:#d4edda;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
+            <td style="background:#d4edda;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
+            <td style="background:#d4edda;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+          </tr>
+          ${[['FN LENT (M) E. passif','prop-lent'],['FN RAPIDE (M) E. actif','prop-rapide']].map(([label,id]) => `<tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#d4edda;">${label}</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n"/></td>
+          </tr>`).join('')}
+          ${[['GOLGI (M) force iso','prop-golgi'],['PACCINI (A) mvt précis','prop-paccini'],['RUFFINI (A) Décompression','prop-ruffini-d'],['RUFFINI (A) Compression','prop-ruffini-c'],['GOLGI (A) mvt forcé','prop-golgi-a']].map(([label,id]) => `<tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">${label}</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n"/></td>
+          </tr>`).join('')}
+          <tr style="background:#ddd;font-weight:700;">
+            <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
+            <td style="text-align:center;border:1px solid #999;" id="vest-total-g">0</td>
+            <td style="text-align:center;border:1px solid #999;" id="vest-total-d">0</td>
+            <td style="border:1px solid #999;"></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- COLONNE CERVELET (bleu) -->
+      <div style="border:2px solid #3498db;">
+        <div style="background:#3498db;color:#fff;text-align:center;font-weight:700;padding:4px;font-size:11px;">CERVELET</div>
+        <table style="width:100%;border-collapse:collapse;font-size:10px;">
+          <tr>
+            <td style="background:#d6eaf8;font-weight:700;padding:3px 4px;border:1px solid #3498db;">VERMIS</td>
+            <td style="background:#d6eaf8;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">G</td>
+            <td style="background:#d6eaf8;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">D</td>
+            <td style="background:#d6eaf8;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">N</td>
+          </tr>
+          ${[['SHARP. ROMBERG','vermis-sharp'],['ROMBERG 1 PIED','vermis-romberg']].map(([label,id]) => `<tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;">${label}</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
+          </tr>`).join('')}
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;">PROPRIO AXE <span style="font-size:9px;">X sur les parties du corps affectées</span></td>
+            <td colspan="3" style="text-align:center;border:1px solid #d6eaf8;padding:2px;">
+              <input type="checkbox" id="proprio-axe-tete" title="Tête"/> Tête
+              <input type="checkbox" id="proprio-axe-corps" title="Corps"/> Corps
+              <input type="checkbox" id="proprio-axe-bassin" title="Bassin"/> Bassin
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;">INTER</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">G</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">D</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">N</td>
+          </tr>
+          ${[['Précision (doigt-nez)','inter-prec'],['Coordination (mvt alternatif)','inter-coord']].map(([label,id]) => `<tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
+          </tr>`).join('')}
+          <tr>
+            <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;">LATÉRAL</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">G</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">D</td>
+            <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">N</td>
+          </tr>
+          ${[['Précision (piano)','lat-prec'],['Coordination (Go-No Go)','lat-coord']].map(([label,id]) => `<tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
+          </tr>`).join('')}
+          <tr style="background:#ddd;font-weight:700;">
+            <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
+            <td style="text-align:center;border:1px solid #999;" id="cerv-total-g">0</td>
+            <td style="text-align:center;border:1px solid #999;" id="cerv-total-d">0</td>
+            <td style="border:1px solid #999;"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- RÉFLEXES ARCHAÏQUES + RÉCEPTEURS TACTILES -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+      <!-- RÉFLEXES ARCHAÏQUES -->
+      <table style="border-collapse:collapse;font-size:10px;width:100%;">
+        <tr><td colspan="8" style="background:#3498db;color:#fff;font-weight:700;text-align:center;padding:4px;border:1px solid #3498db;">RÉFLEXES ARCHAÏQUES</td></tr>
+        <tr>
+          <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;">PRIORITAIRES</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">O</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+          <td style="border:1px solid #ccc;"></td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+        </tr>
+        ${[
+          ['RPP','#aed6f1',true],['RTP','#aed6f1',true],['MORO','#aed6f1',true],
+          ['PEREZ','#fff',true],['LANDAU','#fff',true],['REPTATION','#fff',true]
+        ].map(([label,bg,prio],i) => {
+          const id = label.toLowerCase().replace(/\s/g,'-');
+          const reflex = ['RTAC','GALANT','BABINSKI','PLANTAIRE','PALMAIRE','BABKIN'][i];
+          const rid = reflex.toLowerCase();
+          return `<tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:${bg};">${label}</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-o"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-n"/></td>
+            <td style="padding:2px 4px;border:1px solid #ccc;">${reflex}</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-g"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-d"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-n"/></td>
+          </tr>`;
+        }).join('')}
+      </table>
+
+      <!-- RÉCEPTEURS TACTILES -->
+      <table style="border-collapse:collapse;font-size:10px;width:100%;">
+        <tr><td colspan="4" style="background:#f0a500;color:#fff;font-weight:700;text-align:center;padding:4px;border:1px solid #f0a500;">RÉCEPTEURS TACTILES</td></tr>
+        <tr>
+          <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;">PRIORITAIRES</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
+          <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+        </tr>
+        ${[
+          ['Merkel (Toucher/pression)','#f0a500'],
+          ['Ruffini (Étirement)','#f0a500'],
+          ['Pacini (vibration)','#f0a500'],
+          ['TNL (piquer)','#f0a500'],
+          ['Meissner (caresse coton)','#fff'],
+          ['Poils (mouvement)','#fff']
+        ].map(([label,bg]) => {
+          const id = label.split(' ')[0].toLowerCase();
+          return `<tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:${bg==='#f0a500'?'#fdebd0':bg};">${label}</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-g"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-d"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-n"/></td>
+          </tr>`;
+        }).join('')}
+      </table>
+    </div>
+
+  </div>
+</div>
+
   <div class="posturo-section" id="psec-4" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">5. Système plantaire — à venir</div></div></div>
   <div class="posturo-section" id="psec-5" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">6. Vestibulaire — à venir</div></div></div>
   <div class="posturo-section" id="psec-6" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">7. Buccal/Visuel — à venir</div></div></div>
