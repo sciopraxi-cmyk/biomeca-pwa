@@ -1659,17 +1659,22 @@ function nav(id) {
           };
           img.src = bd[key];
         });
-        // Restaurer pieds APRÈS drawPiedsTemplate
+        // Restaurer pieds - attendre que drawPiedsTemplate ait fini
         if(bd._pieds) {
-          const pc = document.getElementById('pieds-canvas');
-          if(pc && pc._baseSnapshot) {
+          const tryRestorePieds = (attempts) => {
+            const pc = document.getElementById('pieds-canvas');
+            if(!pc || !pc._baseSnapshot) {
+              if(attempts > 0) setTimeout(() => tryRestorePieds(attempts-1), 100);
+              return;
+            }
             const img = new Image();
             img.onload = () => {
               const dpr = window.devicePixelRatio || 1;
               pc.getContext('2d').drawImage(img, 0, 0, pc.width/dpr, pc.height/dpr);
             };
             img.src = bd._pieds;
-          }
+          };
+          tryRestorePieds(10);
         }
       }, 500);
     }, 80);
