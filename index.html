@@ -1640,15 +1640,27 @@ function nav(id) {
       setTimeout(() => {
         loadBilan();
       }, 200);
-      // 4. Restaurer les dessins avec délai plus long
+      // 4. Restaurer les dessins directement (pas via restoreCanvas)
       setTimeout(() => {
-        if(!bilanData) return;
-        const ids = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
-        const keys = ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD'];
-        ids.forEach((id,i) => {
-          if(bilanData[keys[i]]) restoreCanvas(id, keys[i]);
+        const bd = currentPatient?.bilanData || {};
+        const pairs = [
+          ['morpho-face','_morpho_face'],
+          ['morpho-face2','_morpho_face2'],
+          ['morpho-profilG','_morpho_profilG'],
+          ['morpho-profilD','_morpho_profilD'],
+          ['pieds-canvas','_pieds']
+        ];
+        pairs.forEach(([canvasId, key]) => {
+          if(!bd[key]) return;
+          const cvs = document.getElementById(canvasId);
+          if(!cvs || cvs.width === 0) return;
+          const img = new Image();
+          img.onload = () => {
+            const dpr = window.devicePixelRatio || 1;
+            cvs.getContext('2d').drawImage(img, 0, 0, cvs.width/dpr, cvs.height/dpr);
+          };
+          img.src = bd[key];
         });
-        if(bilanData._pieds) restoreCanvas('pieds-canvas', '_pieds');
       }, 500);
     }, 80);
   }
