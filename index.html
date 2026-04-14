@@ -1659,19 +1659,7 @@ function nav(id) {
           };
           img.src = bd[key];
         });
-        // Restaurer pieds après drawPiedsTemplate (délai 800ms)
-        if(bd._pieds) {
-          setTimeout(() => {
-            const pc = document.getElementById('pieds-canvas');
-            if(!pc) return;
-            const img = new Image();
-            img.onload = () => {
-              const dpr = window.devicePixelRatio || 1;
-              pc.getContext('2d').drawImage(img, 0, 0, pc.width/dpr, pc.height/dpr);
-            };
-            img.src = bd._pieds;
-          }, 800);
-        }
+        // pieds restaurés dans drawPiedsTemplate
       }, 500);
     }, 80);
   }
