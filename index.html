@@ -1633,9 +1633,8 @@ function nav(id) {
       ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => initMorphoCanvas(id));
       // 2. Initialiser le canvas pieds
       const pc = document.getElementById('pieds-canvas');
-      const hasSavedPieds = currentPatient?.bilanData?._pieds;
-      if(pc && !hasSavedPieds) { drawPiedsTemplate(); setupDrawCanvas(pc); }
-      else if(pc) { setupDrawCanvas(pc); }
+      // Toujours dessiner le template comme fond
+      if(pc) { drawPiedsTemplate(); setupDrawCanvas(pc); }
       // 3. Charger les données du bilan APRÈS init des canvas
       setTimeout(() => {
         loadBilan();
@@ -5154,6 +5153,22 @@ function saveBilan() {
   saveCanvasDrawing('pieds-canvas', '_pieds');
 
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
+  // Mettre à jour le snapshot dans bilansSport si un bilan existant est ouvert
+  if(currentPatient.bilansSport) {
+    // Trouver le bilan qui correspond aux mesures courantes (par date ou index)
+    const idx = currentPatient.bilansSport.findIndex(b => 
+      JSON.stringify(b.mesures) === JSON.stringify(currentPatient.mesures)
+    );
+    if(idx >= 0) {
+      currentPatient.bilansSport[idx].bilanData = JSON.parse(JSON.stringify(bilanData));
+    } else {
+      // Bilan courant (pas encore dans bilansSport) - mettre à jour le dernier initial
+      const initIdx = currentPatient.bilansSport.findIndex(b => b.type === 'initial');
+      if(initIdx >= 0) {
+        currentPatient.bilansSport[initIdx].bilanData = JSON.parse(JSON.stringify(bilanData));
+      }
+    }
+  }
   savePatients();
   alert('✓ Bilan clinique sauvegardé');
 }
