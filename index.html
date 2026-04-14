@@ -1631,13 +1631,12 @@ function nav(id) {
       clearBilanFields();
       // 1. Initialiser les canvas morpho (taille + setupDrawCanvas)
       ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => initMorphoCanvas(id));
-      // 2. Initialiser le canvas pieds
-      const pc = document.getElementById('pieds-canvas');
-      // Toujours dessiner le template comme fond
-      if(pc) { drawPiedsTemplate(currentPatient?.bilanData?._pieds); }
-      // 3. Charger les données du bilan APRÈS init des canvas
+      // 2. Charger les données du bilan
       setTimeout(() => {
         loadBilan();
+        // 3. Initialiser canvas pieds APRÈS loadBilan (bilanData disponible)
+        const pc = document.getElementById('pieds-canvas');
+        if(pc) { drawPiedsTemplate(currentPatient?.bilanData?._pieds); }
       }, 200);
       // 4. Restaurer les dessins directement (pas via restoreCanvas)
       setTimeout(() => {
