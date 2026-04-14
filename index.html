@@ -1591,6 +1591,14 @@ function nav(id) {
   }
   if(id === 'pg-bilan-posturo') {
     injectBilanPosturoPage();
+    // Forcer la visibilité après injection dynamique
+    const pgPost = document.getElementById('pg-bilan-posturo');
+    if(pgPost) {
+      pgPost.classList.add('active');
+      pgPost.style.height = 'auto';
+      pgPost.style.visibility = 'visible';
+      pgPost.style.overflow = 'visible';
+    }
     showPosturoSection(0);
     setTimeout(loadPosturoBilan, 50);
   }
