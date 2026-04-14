@@ -1629,13 +1629,15 @@ function nav(id) {
   if(id === 'pg-bilan') {
     setTimeout(() => {
       clearBilanFields();
-      loadBilan();
+      // 1. Initialiser les canvas morpho (taille + setupDrawCanvas)
+      ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => initMorphoCanvas(id));
+      // 2. Initialiser le canvas pieds
       const pc = document.getElementById('pieds-canvas');
       const hasSavedPieds = currentPatient?.bilanData?._pieds;
       if(pc && !hasSavedPieds) { drawPiedsTemplate(); setupDrawCanvas(pc); }
-      else if(pc && hasSavedPieds) {
-        setTimeout(() => setupDrawCanvas(pc), 150);
-      }
+      else if(pc) { setupDrawCanvas(pc); }
+      // 3. Charger les données du bilan APRÈS init des canvas
+      setTimeout(() => loadBilan(), 200);
     }, 80);
   }
 }
