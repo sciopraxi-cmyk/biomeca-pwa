@@ -5593,18 +5593,32 @@ function getBilanPosturoHTML() {
         </div>
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">💪 Test de force extenseurs du poignet</div>
-          <input class="inp" id="po-test-poignet" placeholder="Résultat..." style="background:#f9f9f9;color:#222;"/>
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:8px;">💪 Test de force extenseurs du poignet <span style="color:#e74c3c;">(Déficit)</span></div>
+          ${[['Poignet droit','po-poignet-d'],['Poignet gauche','po-poignet-g']].map(([label,name]) => `
+          <div style="margin-bottom:6px;">
+            <div style="font-size:10px;color:#555;font-weight:500;margin-bottom:4px;">${label}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="${name}" value="pas-de-force"/> Pas de force</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="${name}" value="faible"/> Force faible</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="${name}" value="moderee"/> Force modérée</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="${name}" value="tres-fort"/> Très fort</label>
+            </div>
+          </div>`).join('')}
         </div>
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">🛡️ Test de force/stabilité arrière</div>
-          <input class="inp" id="po-test-stab" placeholder="Résultat..." style="background:#f9f9f9;color:#222;"/>
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:8px;">🛡️ Test de force/stabilité arrière</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="po-test-stab" value="forte-instabilite"/> Forte instabilité</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="po-test-stab" value="petite-instabilite"/> Petite instabilité</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #27ae60;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="po-test-stab" value="stable"/> Stable</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #27ae60;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="po-test-stab" value="tres-stable"/> Très stable</label>
+          </div>
         </div>
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
           <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">↕️ Test de Flexion Antérieure</div>
-          <input class="inp" id="po-test-flex-ant" placeholder="Résultat..." style="background:#f9f9f9;color:#222;"/>
+          <input class="inp" id="po-test-flex-ant" placeholder="Mesure de la distance doigt-sol" style="background:#f9f9f9;color:#222;"/>
         </div>
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
@@ -5641,7 +5655,7 @@ function getBilanPosturoHTML() {
 
     <!-- Examen en décharge -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;color:#b7740a;font-size:14px;margin-bottom:10px;">🦵 Examen en décharge — Tests mobilité</div>
+      <div style="font-weight:700;color:#b7740a;font-size:14px;margin-bottom:10px;">🦵 Examen en décharge — Tests mobilité <span style="color:#e74c3c;">(dysfonction)</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         ${[['🦴 Hanche','po-mob-hanche'],['🦵 Genou','po-mob-genou'],['🦶 Pied','po-mob-pied'],['🫁 Bassin','po-mob-bassin']].map(([label,name]) => `
         <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:8px 12px;">
