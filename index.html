@@ -5575,59 +5575,148 @@ function getBilanPosturoHTML() {
   </div>
 
   <div class="posturo-section" id="psec-2" style="padding:0 20px;display:none;">
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle" style="color:#2a7a4e;">Bilan dynamique</div>
-      <textarea class="inp" id="po-bilan-dyn" rows="4" placeholder="Observations..." style="margin-top:10px;"></textarea>
+
+    <!-- Bilan dynamique -->
+    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#2a7a4e;font-size:14px;margin-bottom:8px;">🏃 Bilan dynamique</div>
+      <textarea class="inp" id="po-bilan-dyn" rows="3" placeholder="Observations..." style="background:#fff;color:#222;"></textarea>
     </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle" style="color:#2a7a4e;">Tests dynamiques</div>
-      <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Examen de la course <em style="color:var(--mut)">(si douleur à l'effort)</em></div><input class="inp" id="po-course" placeholder="Observations..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de force extenseurs du poignet</div><input class="inp" id="po-test-poignet" placeholder="Résultat..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de force/stabilité arrière</div><input class="inp" id="po-test-stab" placeholder="Résultat..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de Flexion Antérieure</div><input class="inp" id="po-test-flex-ant" placeholder="Résultat..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de flexion Debout</div>
-          <div style="display:flex;gap:12px;margin-top:4px;">
-            <label style="font-size:12px;"><input type="radio" name="po-flex-debout" value="droite"> Droite</label>
-            <label style="font-size:12px;"><input type="radio" name="po-flex-debout" value="gauche"> Gauche</label>
-            <label style="font-size:12px;"><input type="radio" name="po-flex-debout" value="neutre"> Neutre</label>
+
+    <!-- Tests dynamiques -->
+    <div style="background:linear-gradient(135deg,#fff0f0,#ffe8e8);border-left:4px solid #e74c3c;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#c0392b;font-size:14px;margin-bottom:10px;">⚡ Tests dynamiques</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">🏃 Examen de la course <em style="font-weight:400;color:#888;">(si douleur à l'effort)</em></div>
+          <input class="inp" id="po-course" placeholder="Observations..." style="background:#f9f9f9;color:#222;"/>
+        </div>
+
+        <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">💪 Test de force extenseurs du poignet</div>
+          <input class="inp" id="po-test-poignet" placeholder="Résultat..." style="background:#f9f9f9;color:#222;"/>
+        </div>
+
+        <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">🛡️ Test de force/stabilité arrière</div>
+          <input class="inp" id="po-test-stab" placeholder="Résultat..." style="background:#f9f9f9;color:#222;"/>
+        </div>
+
+        <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">↕️ Test de Flexion Antérieure</div>
+          <input class="inp" id="po-test-flex-ant" placeholder="Résultat..." style="background:#f9f9f9;color:#222;"/>
+        </div>
+
+        <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🧍 Test de flexion Debout</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
+              <input type="radio" name="po-flex-debout" value="droite"/> Droite
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
+              <input type="radio" name="po-flex-debout" value="gauche"/> Gauche
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;">
+              <input type="radio" name="po-flex-debout" value="neutre"/> Neutre
+            </label>
           </div>
         </div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Test de flexion Assis</div>
-          <div style="display:flex;gap:12px;margin-top:4px;">
-            <label style="font-size:12px;"><input type="radio" name="po-flex-assis" value="droite"> Droite</label>
-            <label style="font-size:12px;"><input type="radio" name="po-flex-assis" value="gauche"> Gauche</label>
-            <label style="font-size:12px;"><input type="radio" name="po-flex-assis" value="neutre"> Neutre</label>
+
+        <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🪑 Test de flexion Assis</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
+              <input type="radio" name="po-flex-assis" value="droite"/> Droite
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
+              <input type="radio" name="po-flex-assis" value="gauche"/> Gauche
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;">
+              <input type="radio" name="po-flex-assis" value="neutre"/> Neutre
+            </label>
           </div>
         </div>
       </div>
     </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle" style="color:#2a7a4e;">Examen en décharge — Tests mobilité</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Hanche</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-hanche" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-hanche" value="non"> Non</label></div></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Genou</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-genou" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-genou" value="non"> Non</label></div></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Pied</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-pied" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-pied" value="non"> Non</label></div></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Bassin</div><div style="display:flex;gap:10px;"><label style="font-size:12px;"><input type="radio" name="po-mob-bassin" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-mob-bassin" value="non"> Non</label></div></div>
+
+    <!-- Examen en décharge -->
+    <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#b7740a;font-size:14px;margin-bottom:10px;">🦵 Examen en décharge — Tests mobilité</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        ${[['🦴 Hanche','po-mob-hanche'],['🦵 Genou','po-mob-genou'],['🦶 Pied','po-mob-pied'],['🫁 Bassin','po-mob-bassin']].map(([label,name]) => `
+        <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">${label}</div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;">
+              <input type="radio" name="${name}" value="oui"/> Oui
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;">
+              <input type="radio" name="${name}" value="non"/> Non
+            </label>
+          </div>
+        </div>`).join('')}
       </div>
     </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle" style="color:#2a7a4e;">Examen en décubitus dorsal</div>
-      <div class="g2" style="margin-top:10px;">
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Observation tibia/fémur</div><input class="inp" id="po-tibia-femur" placeholder="..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Longueur membres inférieurs</div><input class="inp" id="po-long-mi-dorsal" placeholder="D: ___ G: ___"/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Hauteur branches pubiennes</div><input class="inp" id="po-branches-pub" placeholder="..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Downing test</div><input class="inp" id="po-downing" placeholder="..."/></div>
+
+    <!-- Décubitus dorsal -->
+    <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#6c3483;font-size:14px;margin-bottom:10px;">🛏️ Examen en décubitus dorsal</div>
+      <div class="g2">
+        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">🦴 Observation tibia/fémur</div>
+          <input class="inp" id="po-tibia-femur" placeholder="..." style="background:#f9f9f9;color:#222;"/>
+        </div>
+        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">📏 Longueur membres inférieurs</div>
+          <input class="inp" id="po-long-mi-dorsal" placeholder="D: ___ G: ___" style="background:#f9f9f9;color:#222;"/>
+        </div>
+        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">📐 Hauteur branches pubiennes</div>
+          <input class="inp" id="po-branches-pub" placeholder="..." style="background:#f9f9f9;color:#222;"/>
+        </div>
+        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">🔬 Downing test</div>
+          <input class="inp" id="po-downing" placeholder="..." style="background:#f9f9f9;color:#222;"/>
+        </div>
       </div>
     </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle" style="color:#2a7a4e;">Examen procubitus</div>
-      <div class="g2" style="margin-top:10px;">
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Longueur membres inférieurs</div><input class="inp" id="po-long-mi-proc" placeholder="D: ___ G: ___"/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Inégalité longueur</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-ineg-long" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-ineg-long" value="non"> Non</label></div></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Type</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-ineg-type" value="structurelle"> Structurelle</label><label style="font-size:12px;"><input type="radio" name="po-ineg-type" value="compensatrice"> Compensatrice</label></div></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Équilibré</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-equilibre" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-equilibre" value="non"> Non</label></div></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:2px;">Scoliose</div><div style="display:flex;gap:10px;margin-top:4px;"><label style="font-size:12px;"><input type="radio" name="po-scoliose" value="oui"> Oui</label><label style="font-size:12px;"><input type="radio" name="po-scoliose" value="non"> Non</label></div></div>
+
+    <!-- Procubitus -->
+    <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#2471a3;font-size:14px;margin-bottom:10px;">🫃 Examen procubitus</div>
+      <div class="g2">
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:4px;">📏 Longueur membres inférieurs</div>
+          <input class="inp" id="po-long-mi-proc" placeholder="D: ___ G: ___" style="background:#f9f9f9;color:#222;"/>
+        </div>
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">📐 Inégalité longueur</div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-long" value="oui"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-long" value="non"/> Non</label>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">🔤 Type</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-type" value="structurelle"/> Structurelle</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-type" value="compensatrice"/> Compensatrice</label>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">⚖️ Équilibré</div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-equilibre" value="oui"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-equilibre" value="non"/> Non</label>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">🌀 Scoliose</div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-scoliose" value="oui"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-scoliose" value="non"/> Non</label>
+          </div>
+        </div>
       </div>
     </div>
   </div>
