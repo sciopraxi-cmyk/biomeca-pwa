@@ -6226,8 +6226,8 @@ function getBilanPosturoHTML() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <span style="font-weight:700;color:#222;">CLVF</span>
           <div style="display:flex;gap:8px;">
-            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-clvf" value="oui"/> Oui</label>
-            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-clvf" value="non"/> Non</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-clvf" value="oui" onchange="toggleCLVF(true)"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-clvf" value="non" onchange="toggleCLVF(false)"/> Non</label>
           </div>
         </div>
         <!-- Typage canalaire + PEVS -->
