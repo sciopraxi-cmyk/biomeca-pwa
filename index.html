@@ -5405,34 +5405,73 @@ function getBilanPosturoHTML() {
   </div>
 
   <div class="posturo-section" id="psec-0" style="padding:0 20px;">
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle" style="color:#2a7a4e;">Informations patient</div>
-      <div class="g2" style="margin-top:10px;">
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin</div><input class="inp" id="po-medecin" placeholder="Dr..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de consultation</div><input class="inp" id="po-date-consult" type="date"/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Activité physique</div><input class="inp" id="po-activite" placeholder="Sport pratiqué..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Travail</div><input class="inp" id="po-travail" placeholder="Profession..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Antécédent traumatique</div><input class="inp" id="po-atcd" placeholder="Fractures, entorses..."/></div>
-        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Appareillage</div><input class="inp" id="po-appareillage" placeholder="Semelles, lunettes..."/></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Examens complémentaires</div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <input class="inp" id="po-examens" placeholder="Radio, IRM..." style="flex:1;"/>
-            <label style="font-size:12px;"><input type="radio" name="po-1ere-intention" value="oui"> 1ère intention : Oui</label>
-            <label style="font-size:12px;"><input type="radio" name="po-1ere-intention" value="non"> Non</label>
+
+    <!-- Informations patient -->
+    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#2a7a4e;font-size:14px;margin-bottom:10px;">🧑‍⚕️ Informations patient</div>
+      <div class="g2" style="margin-top:4px;">
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">👨‍⚕️ Médecin</div>
+          <input class="inp" id="po-medecin" placeholder="Dr..." style="background:#fff;color:#222;"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">📅 Date de consultation</div>
+          <input class="inp" id="po-date-consult" type="date" style="background:#fff;color:#222;"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">🏃 Activité physique</div>
+          <input class="inp" id="po-activite" placeholder="Sport pratiqué..." style="background:#fff;color:#222;"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">💼 Travail</div>
+          <input class="inp" id="po-travail" placeholder="Profession..." style="background:#fff;color:#222;"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">🩹 Antécédent traumatique</div>
+          <input class="inp" id="po-atcd" placeholder="Fractures, entorses..." style="background:#fff;color:#222;"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">🦺 Appareillage</div>
+          <input class="inp" id="po-appareillage" placeholder="Semelles, lunettes..." style="background:#fff;color:#222;"/>
+        </div>
+        <div style="grid-column:1/-1;">
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">🔬 Examens complémentaires</div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <input class="inp" id="po-examens" placeholder="Radio, IRM..." style="flex:1;background:#fff;color:#222;"/>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #2a7a4e;border-radius:20px;padding:4px 12px;color:#222;font-size:12px;">
+                <input type="radio" name="po-1ere-intention" value="oui"/> 1ère intention : Oui
+              </label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;font-size:12px;">
+                <input type="radio" name="po-1ere-intention" value="non"/> Non
+              </label>
+            </div>
           </div>
         </div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Activité quotidienne</div><textarea class="inp" id="po-activite-quot" rows="2" placeholder="Sédentaire, actif..."></textarea></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Motif de consultation</div><textarea class="inp" id="po-motif" rows="2" placeholder="Douleurs, inconfort..."></textarea></div>
+        <div style="grid-column:1/-1;">
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">🛋️ Activité quotidienne</div>
+          <textarea class="inp" id="po-activite-quot" rows="2" placeholder="Sédentaire, actif..." style="background:#fff;color:#222;"></textarea>
+        </div>
+        <div style="grid-column:1/-1;">
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">📋 Motif de consultation</div>
+          <textarea class="inp" id="po-motif" rows="2" placeholder="Douleurs, inconfort..." style="background:#fff;color:#222;"></textarea>
+        </div>
       </div>
     </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle" style="color:#2a7a4e;">Douleur</div>
-      <div style="display:flex;align-items:center;gap:16px;margin:10px 0;">
-        <label style="font-size:13px;font-weight:500;">Douleur :</label>
-        <label style="font-size:13px;"><input type="radio" name="po-douleur" value="oui"> Oui</label>
-        <label style="font-size:13px;"><input type="radio" name="po-douleur" value="non"> Non</label>
+
+    <!-- Douleur -->
+    <div style="background:linear-gradient(135deg,#fff0f0,#ffe8e8);border-left:4px solid #e74c3c;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#c0392b;font-size:14px;margin-bottom:10px;">🩺 Douleur</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <span style="font-weight:600;color:#222;">Douleur :</span>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
+          <input type="radio" name="po-douleur" value="oui"/> Oui
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;">
+          <input type="radio" name="po-douleur" value="non"/> Non
+        </label>
       </div>
-      <div style="background:linear-gradient(90deg,#4CAF50,#FFEB3B,#FF9800,#F44336);border-radius:10px;padding:12px 16px;margin-top:8px;">
+      <div style="background:linear-gradient(90deg,#4CAF50,#FFEB3B,#FF9800,#F44336);border-radius:10px;padding:12px 16px;">
         <div style="font-size:13px;font-weight:700;text-align:center;color:#222;margin-bottom:6px;">Échelle Visuelle Analogique</div>
         <input type="range" min="0" max="10" value="0" id="po-eva" oninput="document.getElementById('po-eva-val').textContent=this.value" style="width:100%;margin:8px 0;">
         <div style="display:flex;justify-content:space-between;font-size:10px;color:#333;">
@@ -5443,7 +5482,7 @@ function getBilanPosturoHTML() {
     </div>
   </div>
 
-  <div class="posturo-section" id="psec-1" style="padding:0 20px;display:none;">
+  <div class="posturo-section"  id="psec-1" style="padding:0 20px;display:none;">
     <div class="card" style="margin-bottom:16px;">
       <div class="stitle" style="color:#2a7a4e;">Bilan morphostatique — Silhouettes (dessiner)</div>
                   <div style="position:relative;margin:16px 0;">
