@@ -6425,17 +6425,14 @@ function previewEmpreinte(input) {
   reader.readAsDataURL(input.files[0]);
 }
 function toggleCLVF(enabled) {
-  ['po-clvf-detail','po-clvf-manoeuvre'].forEach(id => {
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.style.opacity = enabled ? '1' : '0.35';
-    el.style.pointerEvents = enabled ? 'auto' : 'none';
-  });
+  const el = document.getElementById('po-clvf-detail');
+  if(!el) return;
+  el.style.opacity = enabled ? '1' : '0.35';
+  el.style.pointerEvents = enabled ? 'auto' : 'none';
   if(!enabled) {
-    ['po-canal-ant','po-canal-post','po-canal-lat',
-     'po-man-semont','po-man-epley','po-man-epley-inv','po-man-lempert'].forEach(id => {
-      const el = document.getElementById(id);
-      if(el) el.checked = false;
+    ['po-canal-ant','po-canal-post','po-canal-lat'].forEach(id => {
+      const e = document.getElementById(id);
+      if(e) e.checked = false;
     });
     document.querySelectorAll('input[name="po-pevs"]').forEach(r => r.checked = false);
   }
