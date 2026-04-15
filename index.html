@@ -6089,7 +6089,197 @@ function getBilanPosturoHTML() {
 
   </div>
 </div>
-  <div class="posturo-section" id="psec-5" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">6. Vestibulaire — à venir</div></div></div>
+  <div class="posturo-section" id="psec-5" style="padding:0 20px;display:none;">
+  <div class="card" style="margin-bottom:16px;">
+    <div class="stitle" style="color:#2a7a4e;margin-bottom:4px;">👂 Investigation du système vestibulaire</div>
+    <div style="font-size:11px;font-style:italic;color:#888;margin-bottom:16px;">(si retrouvé prioritaire sur test tonique ou Romberg)</div>
+
+    <!-- Latéralisation -->
+    <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;color:#2471a3;margin-bottom:8px;">🎯 Latéralisation du patient</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;gap:10px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="radio" name="po-later" id="po-later-oui" value="oui"/> Oui
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="radio" name="po-later" id="po-later-non" value="non"/> <span style="font-style:italic;">Non <span style="font-size:10px;">(pas d'investigation)</span></span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:500;color:#222;">:</span>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="radio" name="po-later-type" id="po-later-local" value="local"/> Local
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="radio" name="po-later-type" id="po-later-regional" value="regional"/> Régional
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="radio" name="po-later-type" id="po-later-global" value="global"/> Global
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="radio" name="po-later-type" id="po-later-d" value="D"/> D
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="radio" name="po-later-type" id="po-later-g" value="G"/> G
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tests prévention -->
+    <div style="background:linear-gradient(135deg,#fff0f0,#ffe8e8);border-left:4px solid #e74c3c;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;color:#c0392b;margin-bottom:8px;">🔴 Tests prévention</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${[['Test de Klein','po-klein'],['Test des ligaments alaires','po-ligaments'],['Test de Rancurel','po-rancurel']].map(([label,id]) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+          <span style="font-weight:500;color:#222;">- ${label}</span>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #e74c3c;border-radius:20px;padding:3px 12px;color:#222;">
+              <input type="radio" name="${id}" value="positif"/> ✅ Positif
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;">
+              <input type="radio" name="${id}" value="negatif"/> ❌ Négatif
+            </label>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Tests vestibulaires -->
+    <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;color:#6c3483;margin-bottom:8px;">🌀 Tests vestibulaires</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <span style="font-weight:500;color:#222;">- Head Shaking Test → nystagmus</span>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-headshaking" value="oui"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-headshaking" value="non"/> Non</label>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+          <span style="font-weight:500;color:#222;">- Head Impulse Test → saccade</span>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-headimpulse" value="oui"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-headimpulse" value="non"/> Non</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tests stato-kinétiques -->
+    <div style="background:linear-gradient(135deg,#f0fff4,#e0f8e8);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;color:#1e8449;margin-bottom:8px;">🚶 Tests stato-kinétiques</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;">
+          <div style="font-weight:500;color:#222;margin-bottom:6px;">- Étoile de Babinski-Weil →</div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-babinski" value="D"/> Déviation D</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-babinski" value="G"/> Déviation G</label>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;">
+          <div style="font-weight:500;color:#222;margin-bottom:6px;">- Unterburger →</div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-unterburger" value="D"/> Déviation D</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-unterburger" value="G"/> Déviation G</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vertiges / VPPB -->
+    <div style="background:linear-gradient(135deg,#fffaf0,#fff5e0);border-left:4px solid #f39c12;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;color:#d68910;margin-bottom:8px;">💫 Vertiges & VPPB</div>
+      <!-- Vertiges -->
+      <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #f0c070;border-radius:8px;padding:8px 12px;margin-bottom:8px;">
+        <span style="font-weight:500;color:#222;">Présence de vertiges / nystagmus</span>
+        <div style="display:flex;gap:8px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f39c12;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-vertiges" value="oui"/> Oui</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-vertiges" value="non"/> Non</label>
+        </div>
+      </div>
+      <!-- VPPB -->
+      <div style="background:#fff;border:1px solid #f0c070;border-radius:8px;padding:8px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-weight:500;color:#222;">VPPB <span style="font-size:10px;font-style:italic;">(si nystagmus)</span></span>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f39c12;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-vppb" id="po-vppb-oui" value="oui" onchange="document.getElementById('po-vppb-detail').style.display='flex'"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-vppb" id="po-vppb-non" value="non" onchange="document.getElementById('po-vppb-detail').style.display='none'"/> Non</label>
+          </div>
+        </div>
+        <div id="po-vppb-detail" style="display:none;flex-wrap:wrap;gap:8px;margin-top:8px;">
+          ${[['CSC D','po-csc-d'],['CSC G','po-csc-g'],['CSC Ant G','po-csc-antg'],['CSC Ant D','po-csc-antd'],['CSC Post D','po-csc-postd'],['CSC Post G','po-csc-postg']].map(([label,id]) => `
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff9e6;border:2px solid #f39c12;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="checkbox" id="${id}"/> ${label}
+          </label>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Manœuvre libératrice CLVF -->
+    <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;color:#2471a3;margin-bottom:8px;">🔬 Manœuvre libératrice</div>
+      <!-- CLVF -->
+      <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-weight:700;color:#222;">CLVF</span>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-clvf" value="oui"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-clvf" value="non"/> Non</label>
+          </div>
+        </div>
+        <!-- Typage canalaire + PEVS -->
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+          <span style="font-weight:500;color:#222;">Typage canalaire :</span>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-pevs" value="D"/> PEVS D</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-pevs" value="G"/> PEVS G</label>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="checkbox" id="po-canal-ant"/> Ant</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="checkbox" id="po-canal-post"/> Post</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="checkbox" id="po-canal-lat"/> Lat</label>
+          </div>
+        </div>
+        <!-- Manœuvre -->
+        <div>
+          <span style="font-weight:500;color:#222;margin-bottom:6px;display:block;">Manœuvre libératrice :</span>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            ${[['Semont','po-man-semont'],['Epley','po-man-epley'],['Epley inversé','po-man-epley-inv'],['Lempert','po-man-lempert']].map(([label,id]) => `
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="checkbox" id="${id}"/> ${label}
+            </label>`).join('')}
+          </div>
+        </div>
+      </div>
+      <!-- Réorientation -->
+      <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:10px 12px;">
+        <span style="font-weight:500;color:#222;margin-bottom:6px;display:block;">Réorientation :</span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+            <input type="checkbox" id="po-reor-orl"/> 🏥 ORL
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+            <input type="checkbox" id="po-reor-kine"/> 🏃 Kinésithérapeute (rééducation vestibulaire)
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Semelle compensation -->
+    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <span style="font-weight:600;color:#2a7a4e;">🦶 Mise en place d'une semelle de compensation</span>
+        <div style="display:flex;gap:8px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #2a7a4e;border-radius:20px;padding:4px 14px;color:#222;"><input type="radio" name="po-semelle-comp" value="oui"/> Oui</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 14px;color:#222;"><input type="radio" name="po-semelle-comp" value="non"/> Non</label>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
   <div class="posturo-section" id="psec-6" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">7. Buccal/Visuel — à venir</div></div></div>
   <div class="posturo-section" id="psec-7" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">8. Terrain/Synthèse — à venir</div></div></div>
   <div class="posturo-section" id="psec-8" style="padding:0 20px;display:none;">
