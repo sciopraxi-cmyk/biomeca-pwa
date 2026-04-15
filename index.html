@@ -6231,7 +6231,7 @@ function getBilanPosturoHTML() {
           </div>
         </div>
         <!-- Typage canalaire + PEVS -->
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+        <div id="po-clvf-detail" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;opacity:1;transition:opacity 0.2s;">
           <span style="font-weight:500;color:#222;">Typage canalaire :</span>
           <div style="display:flex;gap:8px;">
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-pevs" value="D"/> PEVS D</label>
@@ -6244,7 +6244,7 @@ function getBilanPosturoHTML() {
           </div>
         </div>
         <!-- Manœuvre -->
-        <div>
+        <div id="po-clvf-manoeuvre" style="opacity:1;transition:opacity 0.2s;">
           <span style="font-weight:500;color:#222;margin-bottom:6px;display:block;">Manœuvre libératrice :</span>
           <div style="display:flex;flex-wrap:wrap;gap:8px;">
             ${[['Semont','po-man-semont'],['Epley','po-man-epley'],['Epley inversé','po-man-epley-inv'],['Lempert','po-man-lempert']].map(([label,id]) => `
@@ -6423,6 +6423,22 @@ function previewEmpreinte(input) {
     if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = e.target.result;
   };
   reader.readAsDataURL(input.files[0]);
+}
+function toggleCLVF(enabled) {
+  ['po-clvf-detail','po-clvf-manoeuvre'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.style.opacity = enabled ? '1' : '0.35';
+    el.style.pointerEvents = enabled ? 'auto' : 'none';
+  });
+  if(!enabled) {
+    ['po-canal-ant','po-canal-post','po-canal-lat',
+     'po-man-semont','po-man-epley','po-man-epley-inv','po-man-lempert'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.checked = false;
+    });
+    document.querySelectorAll('input[name="po-pevs"]').forEach(r => r.checked = false);
+  }
 }
 function toggleLateralisation(enabled) {
   const opts = document.getElementById('po-later-options');
