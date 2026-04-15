@@ -6100,13 +6100,13 @@ function getBilanPosturoHTML() {
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
         <div style="display:flex;gap:10px;">
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
-            <input type="radio" name="po-later" id="po-later-oui" value="oui"/> Oui
+            <input type="radio" name="po-later" id="po-later-oui" value="oui" onchange="toggleLateralisation(true)"/> Oui
           </label>
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;">
-            <input type="radio" name="po-later" id="po-later-non" value="non"/> <span style="font-style:italic;">Non <span style="font-size:10px;">(pas d'investigation)</span></span>
+            <input type="radio" name="po-later" id="po-later-non" value="non" onchange="toggleLateralisation(false)"/> <span style="font-style:italic;">Non <span style="font-size:10px;">(pas d'investigation)</span></span>
           </label>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div id="po-later-options" style="display:flex;gap:8px;flex-wrap:wrap;opacity:1;transition:opacity 0.2s;">
           <span style="font-weight:500;color:#222;">:</span>
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
             <input type="radio" name="po-later-type" id="po-later-local" value="local"/> Local
@@ -6117,11 +6117,12 @@ function getBilanPosturoHTML() {
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
             <input type="radio" name="po-later-type" id="po-later-global" value="global"/> Global
           </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
-            <input type="radio" name="po-later-type" id="po-later-d" value="D"/> D
+          <span style="color:#ccc;font-weight:300;">|</span>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="checkbox" id="po-later-d"/> D
           </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
-            <input type="radio" name="po-later-type" id="po-later-g" value="G"/> G
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
+            <input type="checkbox" id="po-later-g"/> G
           </label>
         </div>
       </div>
@@ -6422,6 +6423,23 @@ function previewEmpreinte(input) {
     if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = e.target.result;
   };
   reader.readAsDataURL(input.files[0]);
+}
+function toggleLateralisation(enabled) {
+  const opts = document.getElementById('po-later-options');
+  if(!opts) return;
+  opts.style.opacity = enabled ? '1' : '0.35';
+  opts.style.pointerEvents = enabled ? 'auto' : 'none';
+  if(!enabled) {
+    // Décocher tout
+    ['po-later-local','po-later-regional','po-later-global'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.checked = false;
+    });
+    ['po-later-d','po-later-g'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.checked = false;
+    });
+  }
 }
 function updateNeuroTotals() {
   // Total nerfs crâniens (IDs réels: nc-nc1-g, nc-recap-g)
