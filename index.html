@@ -8129,10 +8129,31 @@ function savePosturoBilan() {
   d.flexDebout=getPosturoRadio('po-flex-debout'); d.flexAssis=getPosturoRadio('po-flex-assis');
   d.mobHanche=getPosturoRadio('po-mob-hanche'); d.mobGenou=getPosturoRadio('po-mob-genou');
   d.mobPied=getPosturoRadio('po-mob-pied'); d.mobBassin=getPosturoRadio('po-mob-bassin');
-  d.tibiaFemur=getPoVal('po-tibia-femur'); d.longMiDorsal=getPoVal('po-long-mi-dorsal');
-  d.branchesPub=getPoVal('po-branches-pub'); d.downing=getPoVal('po-downing');
-  d.longMiProc=getPoVal('po-long-mi-proc'); d.inegLong=getPosturoRadio('po-ineg-long');
-  d.inegType=getPosturoRadio('po-ineg-type'); d.equilibre=getPosturoRadio('po-equilibre');
+  // Tibia/fémur D/G
+  d.tfD=getChk2('po-tf-d'); d.tfG=getChk2('po-tf-g');
+  d.tfDFemur=getChk2('po-tf-d-femur'); d.tfDTibia=getChk2('po-tf-d-tibia');
+  d.tfGFemur=getChk2('po-tf-g-femur'); d.tfGTibia=getChk2('po-tf-g-tibia');
+  d.tfDFemurDir=document.querySelector('input[name="po-tf-d-femur-dir"]:checked')?.value||'';
+  d.tfDTibiaDir=document.querySelector('input[name="po-tf-d-tibia-dir"]:checked')?.value||'';
+  d.tfGFemurDir=document.querySelector('input[name="po-tf-g-femur-dir"]:checked')?.value||'';
+  d.tfGTibiaDir=document.querySelector('input[name="po-tf-g-tibia-dir"]:checked')?.value||'';
+  // Longueur MI dorsal
+  d.longMiDorsVal=document.querySelector('input[name="po-long-mi-dors"]:checked')?.value||'';
+  d.longMiDorsSide=document.querySelector('input[name="po-long-mi-dors-side"]:checked')?.value||'';
+  // Branches pubiennes
+  d.pubSide=document.querySelector('input[name="po-pub"]:checked')?.value||'';
+  d.pubDir=document.querySelector('input[name="po-pub-dir"]:checked')?.value||'';
+  // Downing
+  d.downingD=getChk2('po-downing-d'); d.downingG=getChk2('po-downing-g');
+  d.downingDRes=document.querySelector('input[name="po-downing-d-res"]:checked')?.value||'';
+  d.downingGRes=document.querySelector('input[name="po-downing-g-res"]:checked')?.value||'';
+  // Longueur MI procubitus
+  d.longMiProcVal=document.querySelector('input[name="po-long-mi-proc"]:checked')?.value||'';
+  d.longMiProcSide=document.querySelector('input[name="po-long-mi-proc-side"]:checked')?.value||'';
+  // Inégalité
+  d.inegDir=document.querySelector('input[name="po-ineg-dir"]:checked')?.value||'';
+  d.inegStruct=getChk2('po-ineg-struct'); d.inegComp=getChk2('po-ineg-comp');
+  d.inegLong=getPosturoRadio('po-ineg-long'); d.equilibre=getPosturoRadio('po-equilibre');
   d.scoliose=getPosturoRadio('po-scoliose');
   // Sections 4-9
   const getChk = id => document.getElementById(id)?.checked||false;
@@ -8260,10 +8281,37 @@ function loadPosturoBilan() {
   setPosturoRadio('po-flex-debout',d.flexDebout); setPosturoRadio('po-flex-assis',d.flexAssis);
   setPosturoRadio('po-mob-hanche',d.mobHanche); setPosturoRadio('po-mob-genou',d.mobGenou);
   setPosturoRadio('po-mob-pied',d.mobPied); setPosturoRadio('po-mob-bassin',d.mobBassin);
-  setPoVal('po-tibia-femur',d.tibiaFemur); setPoVal('po-long-mi-dorsal',d.longMiDorsal);
-  setPoVal('po-branches-pub',d.branchesPub); setPoVal('po-downing',d.downing);
-  setPoVal('po-long-mi-proc',d.longMiProc); setPosturoRadio('po-ineg-long',d.inegLong);
-  setPosturoRadio('po-ineg-type',d.inegType); setPosturoRadio('po-equilibre',d.equilibre);
+  // Tibia/fémur
+  setChk2('po-tf-d',d.tfD); setChk2('po-tf-g',d.tfG);
+  if(d.tfD) toggleTF('d',true);
+  if(d.tfG) toggleTF('g',true);
+  setChk2('po-tf-d-femur',d.tfDFemur); if(d.tfDFemur) toggleTFOs('d','femur',true);
+  setChk2('po-tf-d-tibia',d.tfDTibia); if(d.tfDTibia) toggleTFOs('d','tibia',true);
+  setChk2('po-tf-g-femur',d.tfGFemur); if(d.tfGFemur) toggleTFOs('g','femur',true);
+  setChk2('po-tf-g-tibia',d.tfGTibia); if(d.tfGTibia) toggleTFOs('g','tibia',true);
+  if(d.tfDFemurDir) setPosturoRadio('po-tf-d-femur-dir',d.tfDFemurDir);
+  if(d.tfDTibiaDir) setPosturoRadio('po-tf-d-tibia-dir',d.tfDTibiaDir);
+  if(d.tfGFemurDir) setPosturoRadio('po-tf-g-femur-dir',d.tfGFemurDir);
+  if(d.tfGTibiaDir) setPosturoRadio('po-tf-g-tibia-dir',d.tfGTibiaDir);
+  // Longueur MI dorsal
+  if(d.longMiDorsVal){setPosturoRadio('po-long-mi-dors',d.longMiDorsVal);toggleLongMI('dors',d.longMiDorsVal);}
+  if(d.longMiDorsSide) setPosturoRadio('po-long-mi-dors-side',d.longMiDorsSide);
+  // Branches pubiennes
+  if(d.pubSide){setPosturoRadio('po-pub',d.pubSide);togglePub(d.pubSide);}
+  if(d.pubDir) setPosturoRadio('po-pub-dir',d.pubDir);
+  // Downing
+  setChk2('po-downing-d',d.downingD); if(d.downingD) toggleDowning('d',true);
+  setChk2('po-downing-g',d.downingG); if(d.downingG) toggleDowning('g',true);
+  if(d.downingDRes) setPosturoRadio('po-downing-d-res',d.downingDRes);
+  if(d.downingGRes) setPosturoRadio('po-downing-g-res',d.downingGRes);
+  // Longueur MI procubitus
+  if(d.longMiProcVal){setPosturoRadio('po-long-mi-proc',d.longMiProcVal);toggleLongMI('proc',d.longMiProcVal);}
+  if(d.longMiProcSide) setPosturoRadio('po-long-mi-proc-side',d.longMiProcSide);
+  // Inégalité
+  setPosturoRadio('po-ineg-long',d.inegLong); if(d.inegLong==='oui') toggleIneg(true);
+  if(d.inegDir) setPosturoRadio('po-ineg-dir',d.inegDir);
+  setChk2('po-ineg-struct',d.inegStruct); setChk2('po-ineg-comp',d.inegComp);
+  setPosturoRadio('po-equilibre',d.equilibre);
   setPosturoRadio('po-scoliose',d.scoliose);
 
   // Sections 4-9
