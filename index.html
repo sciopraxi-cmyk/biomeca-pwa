@@ -2317,13 +2317,17 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
   const bilan = p.bilansPosturo?.[bilanIdx];
   if(!bilan) {
     selectPatient(p);
-    nav('pg-posturo');
+    nav('pg-bilan-posturo');
     return;
   }
   selectPatient(p);
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
-  currentBilanReadOnly = true;
-  nav('pg-posturo');
+  currentBilanReadOnly = false;
+  nav('pg-bilan-posturo');
+  setTimeout(() => {
+    loadPosturoBilan();
+    showPosturoSection(0);
+  }, 300);
 }
 function renderPratList() {
   const el = document.getElementById('prat-list-el');
