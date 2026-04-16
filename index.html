@@ -7772,11 +7772,15 @@ function undoPosturoBody() {
 
 function undoPosturoFeet() {
   const canvas = document.getElementById('posturo-feet-canvas');
-  if(!canvas || !canvas._history || canvas._history.length === 0) return;
-  canvas._history.pop();
+  if(!canvas) return;
   const ctx = canvas.getContext('2d');
-  if(canvas._history.length > 0) {
-    ctx.putImageData(canvas._history[canvas._history.length-1], 0, 0);
+  if(canvas._history && canvas._history.length > 0) {
+    canvas._history.pop();
+    if(canvas._history.length > 0) {
+      ctx.putImageData(canvas._history[canvas._history.length-1], 0, 0);
+    } else if(canvas._baseSnapshot) {
+      ctx.putImageData(canvas._baseSnapshot, 0, 0);
+    }
   } else if(canvas._baseSnapshot) {
     ctx.putImageData(canvas._baseSnapshot, 0, 0);
   }
@@ -7815,16 +7819,18 @@ function initPosturoBodyCanvas() {
 function initPosturoFeetCanvas() {
   const canvas = document.getElementById('posturo-feet-canvas');
   if(!canvas) return;
-  const imgEl = document.getElementById('posturo-feet-img');
-  if(!imgEl) return;
-  const r = imgEl.getBoundingClientRect();
+  // Utiliser le conteneur parent pour avoir toute la largeur (les 2 pieds)
+  const parent = canvas.parentElement;
+  if(!parent) return;
+  const r = parent.getBoundingClientRect();
   if(r.width === 0) return;
-  canvas.width = Math.round(r.width * window.devicePixelRatio);
-  canvas.height = Math.round(r.height * window.devicePixelRatio);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(r.width * dpr);
+  canvas.height = Math.round(r.height * dpr);
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
   const ctx = canvas.getContext('2d');
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  ctx.scale(dpr, dpr);
   canvas._history = [];
   canvas._baseSnapshot = null;
   canvas._tempSnap = null;
