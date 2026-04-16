@@ -960,8 +960,8 @@ body.printing #rpt-print{display:block!important;}
 
       <!-- Réflexes archaïques + Récepteurs tactiles -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:8px;">
-          <div style="font-size:10px;font-weight:700;margin-bottom:6px;">RÉFLEXES ARCHAÏQUES</div>
+        <div style="background:var(--surf);border:2px solid #8e44ad;border-radius:var(--rs);padding:8px;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:6px;color:#8e44ad;">🟣 RÉFLEXES ARCHAÏQUES</div>
           <div style="font-size:9px;">
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="width:40px;font-weight:500;">RPP</span><label><input type="checkbox" onchange="setBilanField('refl_rpp_O',this.checked)"/> O</label> <label><input type="checkbox" onchange="setBilanField('refl_rpp_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">RTAC</span><label><input type="checkbox" onchange="setBilanField('refl_rtac_G',this.checked)"/> G</label> <label><input type="checkbox" onchange="setBilanField('refl_rtac_D',this.checked)"/> D</label> <label><input type="checkbox" onchange="setBilanField('refl_rtac_N',this.checked)"/> N</label></div>
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="width:40px;font-weight:500;">RTP</span><label><input type="checkbox" onchange="setBilanField('refl_rtp_O',this.checked)"/> O</label> <label><input type="checkbox" onchange="setBilanField('refl_rtp_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">GALANT</span><label><input type="checkbox" onchange="setBilanField('refl_galant_G',this.checked)"/> G</label> <label><input type="checkbox" onchange="setBilanField('refl_galant_D',this.checked)"/> D</label> <label><input type="checkbox" onchange="setBilanField('refl_galant_N',this.checked)"/> N</label></div>
@@ -6006,7 +6006,7 @@ function getBilanPosturoHTML() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <!-- RÉFLEXES ARCHAÏQUES -->
       <table style="border-collapse:collapse;font-size:10px;width:100%;border-radius:10px;overflow:hidden;">
-        <tr><td colspan="8" style="background:#3498db;color:#fff;font-weight:700;text-align:center;padding:8px;border:1px solid #3498db;font-size:12px;letter-spacing:1px;">🔵 RÉFLEXES ARCHAÏQUES</td></tr>
+        <tr><td colspan="8" style="background:#8e44ad;color:#fff;font-weight:700;text-align:center;padding:8px;border:1px solid #8e44ad;font-size:12px;letter-spacing:1px;">🟣 RÉFLEXES ARCHAÏQUES</td></tr>
         <tr>
           <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;color:#222;">PRIORITAIRES</td>
           <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">O</td>
