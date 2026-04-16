@@ -6983,7 +6983,7 @@ function getBilanPosturoHTML() {
           <div style="display:flex;flex-direction:column;gap:6px;">
             ${['EVA','PE','Résine','Mouse','Autre'].map(v => `
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-              <input type="radio" name="po-materiaux" value="${v}"/> ${v}
+              <input type="checkbox" name="po-materiaux" value="${v}"/> ${v}
             </label>`).join('')}
           </div>
         </div>
@@ -6992,7 +6992,7 @@ function getBilanPosturoHTML() {
           <div style="display:flex;flex-direction:column;gap:6px;">
             ${['EVA','Microfibre','Peaucerie naturelle'].map(v => `
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-              <input type="radio" name="po-recouvrement" value="${v}"/> ${v}
+              <input type="checkbox" name="po-recouvrement" value="${v}"/> ${v}
             </label>`).join('')}
           </div>
         </div>
