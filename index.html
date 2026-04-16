@@ -7760,13 +7760,24 @@ let _posturoFeetHistory = [];
 
 function undoPosturoBody() {
   const canvas = document.getElementById('posturo-body-canvas');
-  if(!canvas || !canvas._history || canvas._history.length === 0) return;
-  canvas._history.pop();
+  if(!canvas) return;
   const ctx = canvas.getContext('2d');
-  if(canvas._history.length > 0) {
-    ctx.putImageData(canvas._history[canvas._history.length-1], 0, 0);
+  if(canvas._history && canvas._history.length > 0) {
+    canvas._history.pop();
+    const prev = canvas._history.length > 0
+      ? canvas._history[canvas._history.length-1]
+      : canvas._baseSnapshot;
+    if(prev) {
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.putImageData(prev, 0, 0);
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
   } else if(canvas._baseSnapshot) {
+    ctx.setTransform(1,0,0,1,0,0);
     ctx.putImageData(canvas._baseSnapshot, 0, 0);
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 }
 
@@ -7774,15 +7785,27 @@ function undoPosturoFeet() {
   const canvas = document.getElementById('posturo-feet-canvas');
   if(!canvas) return;
   const ctx = canvas.getContext('2d');
+  // Sauvegarder état courant avant undo pour éviter perte
   if(canvas._history && canvas._history.length > 0) {
+    // Retirer le dernier état
     canvas._history.pop();
-    if(canvas._history.length > 0) {
-      ctx.putImageData(canvas._history[canvas._history.length-1], 0, 0);
-    } else if(canvas._baseSnapshot) {
-      ctx.putImageData(canvas._baseSnapshot, 0, 0);
+    // Restaurer l'état précédent
+    const prev = canvas._history.length > 0
+      ? canvas._history[canvas._history.length-1]
+      : canvas._baseSnapshot;
+    if(prev) {
+      // Reset le transform avant putImageData
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.putImageData(prev, 0, 0);
+      // Remettre le scale DPR
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
     }
   } else if(canvas._baseSnapshot) {
+    ctx.setTransform(1,0,0,1,0,0);
     ctx.putImageData(canvas._baseSnapshot, 0, 0);
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 }
 
