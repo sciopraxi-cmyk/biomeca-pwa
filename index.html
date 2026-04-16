@@ -7810,13 +7810,17 @@ function undoPosturoFeet() {
 function initPosturoBodyCanvas() {
   const canvas = document.getElementById('posturo-body-canvas');
   if(!canvas) return;
-  // Utiliser le conteneur parent pour la taille
   const parent = canvas.parentElement;
   if(!parent) return;
   const r = parent.getBoundingClientRect();
   if(r.width === 0) return;
-  canvas.width = Math.round(r.width * window.devicePixelRatio);
-  canvas.height = Math.round(r.height * window.devicePixelRatio);
+  const dpr = window.devicePixelRatio || 1;
+  const newW = Math.round(r.width * dpr);
+  const newH = Math.round(r.height * dpr);
+  // Ne pas réinitialiser si déjà la bonne taille (évite l'écran noir)
+  if(canvas.width === newW && canvas.height === newH && canvas._baseSnapshot) return;
+  canvas.width = newW;
+  canvas.height = newH;
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
   const ctx = canvas.getContext('2d');
