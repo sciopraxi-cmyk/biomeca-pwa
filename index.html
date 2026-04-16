@@ -3752,7 +3752,6 @@ function buildRapportPosturo() {
   const prat = praticiens.find(pr => pr.id == p.pratId) || {};
   const logo = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
 
-  // Collecter les sections remplies
   const sections = [];
 
   // 1. Anamnèse
@@ -3764,115 +3763,103 @@ function buildRapportPosturo() {
   if(d.appareillage) anam.push(['Appareillage', d.appareillage]);
   if(d.examens) anam.push(['Examens complémentaires', d.examens]);
   if(d.activiteQuot) anam.push(['Activité quotidienne', d.activiteQuot]);
-  if(d.eva !== undefined && d.eva !== '') anam.push(['EVA Douleur', d.eva + '/10']);
-  if(anam.length) sections.push({titre:'1. Anamnèse', items:anam});
+  if(d.eva !== undefined && d.eva !== '') anam.push(['EVA Douleur', d.eva+'/10']);
+  if(d.douleur) anam.push(['Douleur', d.douleur]);
+  if(anam.length) sections.push({titre:'1. Anamnèse', items:anam, color:'#2a7a4e'});
 
   // 2. Morphostatique
   const morpho = [];
   if(d.comp1) morpho.push(['Compensation 1', d.comp1]);
   if(d.comp2) morpho.push(['Compensation 2', d.comp2]);
   if(d.comp3) morpho.push(['Compensation 3', d.comp3]);
-  if(d.compCritique) morpho.push(['Point compensation critique', d.compCritique]);
+  if(d.compCritique) morpho.push(['Point critique', d.compCritique]);
   if(d.prefMot) morpho.push(['Préférences motrices', d.prefMot]);
-  const rombergItems = [];
-  if(d.rombergAnt) rombergItems.push('Antériorisé');
-  if(d.rombergLat) rombergItems.push('Latéralisé '+(d.rombergLatDir||''));
-  if(d.rombergPost) rombergItems.push('Postériorisé (émotionnel)');
-  if(d.rombergOculaire) rombergItems.push('Adaptation oculaire');
-  if(d.rombergRot) rombergItems.push('Rotation '+(d.rombergRotDir||''));
-  if(rombergItems.length) morpho.push(['Romberg', rombergItems.join(', ')]);
-  if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho});
+  if(d.rombergMorpho) morpho.push(['Romberg', d.rombergMorpho]);
+  if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho, color:'#3498db'});
 
   // 3. Bilan dynamique
   const dyn = [];
   if(d.bilanDyn) dyn.push(['Observations', d.bilanDyn]);
   if(d.course) dyn.push(['Examen de la course', d.course]);
+  if(d.testFlexAnt) dyn.push(['Flexion antérieure', d.testFlexAnt+' cm']);
   if(d.flexDebout) dyn.push(['Flexion debout (Iliaque/pubis)', d.flexDebout]);
   if(d.flexAssis) dyn.push(['Flexion assis (Sacrum)', d.flexAssis]);
   if(d.testStab) dyn.push(['Stabilité arrière', d.testStab]);
-  if(d.mobHanche==='oui') dyn.push(['Dysfonction hanche', 'Oui']);
-  if(d.mobGenou==='oui') dyn.push(['Dysfonction genou', 'Oui']);
-  if(d.mobPied==='oui') dyn.push(['Dysfonction pied', 'Oui']);
-  if(d.mobBassin==='oui') dyn.push(['Dysfonction bassin', 'Oui']);
-  if(dyn.length) sections.push({titre:'3. Bilan dynamique', items:dyn});
+  if(d.mobHanche==='oui') dyn.push(['Dysfonction hanche', '✓']);
+  if(d.mobGenou==='oui') dyn.push(['Dysfonction genou', '✓']);
+  if(d.mobPied==='oui') dyn.push(['Dysfonction pied', '✓']);
+  if(d.mobBassin==='oui') dyn.push(['Dysfonction bassin', '✓']);
+  if(d.tibiaFemur) dyn.push(['Tibia/fémur', d.tibiaFemur]);
+  if(d.longMiDorsal) dyn.push(['Longueur MI dorsal', d.longMiDorsal]);
+  if(d.branchesPub) dyn.push(['Branches pubiennes', d.branchesPub]);
+  if(d.downing) dyn.push(['Downing test', d.downing]);
+  if(d.longMiProc) dyn.push(['Longueur MI procubitus', d.longMiProc]);
+  if(d.inegLong) dyn.push(['Inégalité longueur', d.inegLong]);
+  if(d.inegType) dyn.push(['Type inégalité', d.inegType]);
+  if(d.equilibre) dyn.push(['Équilibré', d.equilibre]);
+  if(d.scoliose) dyn.push(['Scoliose', d.scoliose]);
+  if(dyn.length) sections.push({titre:'3. Bilan dynamique', items:dyn, color:'#e74c3c'});
 
-  // 4. Neuro-fonctionnel
-  const neuro = [];
-  if(d.hypoTronc) neuro.push(['Hypothèse', 'Tronc cérébral']);
-  if(d.hypoCervelet) neuro.push(['Hypothèse', 'Cervelet']);
-  if(neuro.length) sections.push({titre:'4. Neuro-fonctionnel', items:neuro});
+  // Images bonhommes
+  if(d._bodyCanvas) {
+    // Récupérer les images des bonhommes
+    const faceImg = document.getElementById('imgjs-morpho-face')?.src;
+    const face2Img = document.getElementById('imgjs-morpho-face2')?.src;
+    const profilGImg = document.getElementById('imgjs-morpho-profilG')?.src;
+    const profilDImg = document.getElementById('imgjs-morpho-profilD')?.src;
+    sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
+      faceImg, face2Img, profilGImg, profilDImg, bodyCanvas: d._bodyCanvas});
+  }
 
   // 5. Système plantaire
   const plant = [];
-  if(d.epines==='oui') { plant.push(['Épines irritatives', 'Oui' + (d.epinesLoc ? ' — ' + d.epinesLoc : '')]); }
   if(d.tactique) plant.push(['Tactique équilibration', d.tactique]);
-  const parasites = ['plantaire','yeux','buccale','cicatrice','vestibulaire','viscerale']
-    .filter(k => d['para_'+k]).map(k => k);
-  if(parasites.length) plant.push(['Parasites détectés', parasites.join(', ')]);
-  if(plant.length) sections.push({titre:'5. Système plantaire', items:plant});
+  if(plant.length) sections.push({titre:'5. Système plantaire', items:plant, color:'#f0a500'});
 
-  // 6. Vestibulaire
-  const vest = [];
-  if(d.laterOui==='oui') vest.push(['Latéralisation', d.laterType || 'Oui']);
-  if(d.vertiges==='oui') vest.push(['Vertiges/nystagmus', 'Présents']);
-  if(d.vppb==='oui') vest.push(['VPPB', 'Positif']);
-  if(d.semComp) vest.push(['Semelle compensation', d.semComp]);
-  if(vest.length) sections.push({titre:'6. Investigation vestibulaire', items:vest});
+  // Image pieds
+  if(d._feetCanvas) {
+    const piedsImg = document.getElementById('imgjs-pieds')?.src;
+    sections.push({titre:'5. Plan de semelles', color:'#2a7a4e', type:'pieds',
+      piedsImg, feetCanvas: d._feetCanvas});
+  }
 
-  // 7. Buccal/Visuel
-  const bucc = [];
-  if(d.mcpOuv==='oui') bucc.push(['MCP - Ouverture bouche', 'Améliorée (ATM secondaire)']);
-  if(d.atmOrigine) bucc.push(['ATM origine', d.atmOrigine]);
-  if(d.visEntree) bucc.push(['Entrée visuelle', d.visEntree]);
-  if(bucc.length) sections.push({titre:'7. Buccal / Visuel', items:bucc});
+  // Image empreinte
+  if(d._empreinte) {
+    sections.push({titre:'5. Empreinte plantaire', color:'#2a7a4e', type:'empreinte', img: d._empreinte});
+  }
 
-  // 8. Terrain
-  const terr = [];
-  if(d.postureAnt) terr.push(['Posture', 'Antériorisation globale']);
-  if(d.posturePost) terr.push(['Posture', 'Postériorisation globale']);
-  if(d.postureLater) terr.push(['Posture', 'Latéralisation ' + (d.postureLaterDir||'')]);
-  if(d.biomecArticulaire) terr.push(['Biomécanique/Articulaire', d.biomecArticulaire]);
-  if(terr.length) sections.push({titre:'8. Terrain du patient', items:terr});
-
-  // 9. Traitements
-  const trait = [];
-  if(d.semellesDesc) trait.push(['Plan de semelles', d.semellesDesc]);
-  if(trait.length) sections.push({titre:'9. Traitements', items:trait});
-
-  // Construire le HTML du rapport
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR');
 
-  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bilan Posture</title>
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size:11px; color:#1a1a2e; background:#fff; }
-    .page { width:210mm; min-height:297mm; padding:15mm 15mm 20mm; margin:0 auto; }
-    @media print { body { margin:0; } .page { padding:10mm 15mm 15mm; } .no-print { display:none; } }
-    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:3px solid #2a7a4e; }
-    .logo { width:140px; }
-    .prat-info { text-align:right; font-size:10px; color:#555; line-height:1.6; }
-    .prat-name { font-size:13px; font-weight:700; color:#1a1a2e; }
-    .titre-rapport { text-align:center; margin-bottom:16px; }
-    .titre-rapport h1 { font-size:18px; font-weight:800; color:#2a7a4e; letter-spacing:1px; }
-    .titre-rapport .date { font-size:10px; color:#888; margin-top:2px; }
-    .patient-card { background:linear-gradient(135deg,#f0faf4,#e8f8ee); border:2px solid #2a7a4e; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
-    .patient-name { font-size:15px; font-weight:800; color:#2a7a4e; }
-    .patient-details { font-size:10px; color:#555; margin-top:3px; }
-    .patient-right { text-align:right; font-size:10px; color:#555; }
-    .section { margin-bottom:14px; break-inside:avoid; }
-    .section-title { background:#2a7a4e; color:#fff; padding:5px 12px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.5px; }
-    .section-body { border:1px solid #2a7a4e; border-top:none; border-radius:0 0 6px 6px; padding:8px 12px; }
-    .item { display:flex; padding:3px 0; border-bottom:1px solid #f0f0f0; }
-    .item:last-child { border-bottom:none; }
-    .item-label { font-weight:600; color:#2a7a4e; min-width:180px; font-size:10px; }
-    .item-value { color:#1a1a2e; flex:1; font-size:10px; }
-    .images-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
-    .img-block { text-align:center; }
-    .img-block img { max-width:100%; border-radius:6px; border:1px solid #ddd; }
-    .img-label { font-size:9px; color:#888; margin-top:3px; }
-    .footer { margin-top:20px; padding-top:8px; border-top:1px solid #ddd; text-align:center; font-size:9px; color:#aaa; }
-    .btn-print { position:fixed; top:10px; right:10px; background:#2a7a4e; color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1a1a2e;background:#fff;}
+    .page{width:210mm;min-height:297mm;padding:12mm 15mm 15mm;margin:0 auto;}
+    @media print{.no-print{display:none!important;}.page{padding:8mm 12mm 12mm;}}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid #2a7a4e;}
+    .logo{height:60px;object-fit:contain;}
+    .prat-info{text-align:right;font-size:10px;color:#555;line-height:1.7;}
+    .prat-name{font-size:13px;font-weight:700;color:#1a1a2e;}
+    .titre-rapport{text-align:center;margin-bottom:14px;}
+    .titre-rapport h1{font-size:20px;font-weight:800;color:#2a7a4e;letter-spacing:2px;text-transform:uppercase;}
+    .titre-rapport .sub{font-size:10px;color:#888;margin-top:3px;}
+    .patient-card{background:linear-gradient(135deg,#f0faf4,#e0f5ea);border:2px solid #2a7a4e;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;}
+    .patient-name{font-size:16px;font-weight:800;color:#2a7a4e;}
+    .patient-details{font-size:10px;color:#555;margin-top:4px;line-height:1.6;}
+    .patient-right{text-align:right;font-size:10px;color:#555;line-height:1.6;}
+    .section{margin-bottom:12px;break-inside:avoid;}
+    .section-title{color:#fff;padding:5px 12px;border-radius:6px 6px 0 0;font-size:11px;font-weight:700;letter-spacing:0.5px;}
+    .section-body{border-radius:0 0 6px 6px;padding:8px 12px;border-width:0 1px 1px 1px;border-style:solid;}
+    .item{display:flex;padding:3px 0;border-bottom:1px solid #f5f5f5;}
+    .item:last-child{border-bottom:none;}
+    .item-label{font-weight:600;min-width:200px;font-size:10px;}
+    .item-value{flex:1;font-size:10px;color:#333;}
+    .img-container{position:relative;text-align:center;}
+    .img-base{max-width:100%;border-radius:6px;}
+    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}
+    .footer{margin-top:16px;padding-top:8px;border-top:1px solid #eee;text-align:center;font-size:9px;color:#aaa;}
+    .btn-print{position:fixed;bottom:20px;right:20px;background:#2a7a4e;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,0.2);}
   </style></head><body>
   <button class="btn-print no-print" onclick="window.print()">🖨️ Imprimer / PDF</button>
   <div class="page">
@@ -3880,84 +3867,85 @@ function buildRapportPosturo() {
       <img class="logo" src="${logo}" alt="Sciopraxi"/>
       <div class="prat-info">
         <div class="prat-name">${prat.titre||''} ${prat.nom||''}</div>
-        ${prat.cabinet ? '<div>'+prat.cabinet+'</div>' : ''}
-        ${prat.adresse ? '<div>'+prat.adresse+'</div>' : ''}
-        ${prat.tel ? '<div>📞 '+prat.tel+'</div>' : ''}
-        ${prat.email ? '<div>✉️ '+prat.email+'</div>' : ''}
+        ${prat.cabinet?'<div>'+prat.cabinet+'</div>':''}
+        ${prat.adresse?'<div>'+prat.adresse+'</div>':''}
+        ${prat.tel?'<div>📞 '+prat.tel+'</div>':''}
+        ${prat.email?'<div>✉️ '+prat.email+'</div>':''}
       </div>
     </div>
     <div class="titre-rapport">
-      <h1>BILAN ÉTUDE DE LA POSTURE</h1>
-      <div class="date">Généré le ${dateStr}</div>
+      <h1>Bilan Étude de la Posture</h1>
+      <div class="sub">Généré le ${dateStr}</div>
     </div>
     <div class="patient-card">
       <div>
         <div class="patient-name">${p.prenom} ${p.nom}</div>
         <div class="patient-details">
-          ${p.ddn ? '📅 ' + new Date(p.ddn).toLocaleDateString('fr-FR') : ''}
-          ${p.sport ? ' · 🏃 ' + p.sport : ''}
-          ${p.metier ? ' · 💼 ' + p.metier : ''}
+          ${p.ddn?'📅 '+new Date(p.ddn).toLocaleDateString('fr-FR'):''}
+          ${p.sport?' · 🏃 '+p.sport:''}
+          ${p.metier?' · 💼 '+p.metier:''}
+          ${p.lat?' · '+p.lat:''}
         </div>
       </div>
       <div class="patient-right">
-        ${p.poids ? '⚖️ ' + p.poids + ' kg' : ''}
-        ${p.taille ? ' · 📏 ' + p.taille + ' cm' : ''}
-        ${d.dateConsult ? '<br>📋 Consultation: ' + new Date(d.dateConsult).toLocaleDateString('fr-FR') : ''}
+        ${p.poids?'⚖️ '+p.poids+' kg':''}
+        ${p.taille?' · 📏 '+p.taille+' cm':''}
+        ${d.dateConsult?'<br>📋 '+new Date(d.dateConsult).toLocaleDateString('fr-FR'):''}
+        ${d.medecin?'<br>👨‍⚕️ '+d.medecin:''}
       </div>
     </div>`;
 
-  // Sections de données
   sections.forEach(s => {
-    html += `<div class="section">
-      <div class="section-title">${s.titre}</div>
-      <div class="section-body">`;
-    s.items.forEach(([label, val]) => {
-      html += `<div class="item"><span class="item-label">${label}</span><span class="item-value">${val}</span></div>`;
-    });
-    html += `</div></div>`;
+    if(s.type === 'bonhommes') {
+      html += `<div class="section">
+        <div class="section-title" style="background:${s.color};">${s.titre}</div>
+        <div class="section-body" style="border-color:${s.color};">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;position:relative;">
+            ${['Profil D','Dos','Face','Profil G'].map((lbl,i) => `
+            <div style="text-align:center;">
+              <div style="font-size:9px;color:#888;margin-bottom:3px;">${lbl}</div>
+              <div style="position:relative;display:inline-block;width:100%;">
+                <img src="${[s.profilDImg,s.face2Img,s.faceImg,s.profilGImg][i]||''}" style="width:100%;border-radius:4px;"/>
+              </div>
+            </div>`).join('')}
+          </div>
+          <div style="margin-top:8px;text-align:center;">
+            <img src="${s.bodyCanvas}" style="max-width:100%;position:absolute;top:0;left:0;width:100%;"/>
+          </div>
+        </div>
+      </div>`;
+    } else if(s.type === 'pieds') {
+      html += `<div class="section">
+        <div class="section-title" style="background:${s.color};">${s.titre}</div>
+        <div class="section-body" style="border-color:${s.color};">
+          <div style="position:relative;text-align:center;">
+            ${s.piedsImg?'<img src="'+s.piedsImg+'" style="max-width:100%;border-radius:6px;"/>':''}
+            <img src="${s.feetCanvas}" style="position:absolute;top:0;left:0;max-width:100%;"/>
+          </div>
+        </div>
+      </div>`;
+    } else if(s.type === 'empreinte') {
+      html += `<div class="section">
+        <div class="section-title" style="background:${s.color};">${s.titre}</div>
+        <div class="section-body" style="border-color:${s.color};">
+          <div style="text-align:center;"><img src="${s.img}" style="max-height:180px;border-radius:6px;"/></div>
+        </div>
+      </div>`;
+    } else {
+      html += `<div class="section">
+        <div class="section-title" style="background:${s.color};">${s.titre}</div>
+        <div class="section-body" style="border-color:${s.color};">`;
+      s.items.forEach(([label,val]) => {
+        html += `<div class="item"><span class="item-label" style="color:${s.color};">${label}</span><span class="item-value">${val}</span></div>`;
+      });
+      html += `</div></div>`;
+    }
   });
 
-  // Images bonhommes si présentes
-  if(d._bodyCanvas) {
-    html += `<div class="section">
-      <div class="section-title">2. Morphostatique — Silhouettes</div>
-      <div class="section-body">
-        <div style="text-align:center;">
-          <img src="${d._bodyCanvas}" style="max-width:100%;border-radius:6px;"/>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  // Image pieds si présente
-  if(d._feetCanvas) {
-    const piedsImg = document.getElementById('imgjs-pieds')?.src;
-    html += `<div class="section">
-      <div class="section-title">9. Plan de semelles</div>
-      <div class="section-body">
-        <div style="text-align:center;position:relative;display:inline-block;width:100%;">
-          ${piedsImg ? '<img src="'+piedsImg+'" style="max-width:100%;"/>' : ''}
-          <img src="${d._feetCanvas}" style="position:absolute;top:0;left:0;max-width:100%;"/>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  // Image empreinte si présente
-  if(d._empreinte) {
-    html += `<div class="section">
-      <div class="section-title">5. Empreinte plantaire</div>
-      <div class="section-body"><div style="text-align:center;">
-        <img src="${d._empreinte}" style="max-height:200px;border-radius:6px;"/>
-      </div></div>
-    </div>`;
-  }
-
-  html += `<div class="footer">Bilan généré par Sciopraxi · ${dateStr}</div>
+  html += `<div class="footer">Bilan Étude de la Posture · Sciopraxi · ${dateStr}</div>
   </div></body></html>`;
 
-  // Ouvrir dans nouvelle fenêtre
-  const win = window.open('', '_blank');
+  const win = window.open('','_blank');
   win.document.write(html);
   win.document.close();
 }
