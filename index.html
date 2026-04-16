@@ -6749,7 +6749,80 @@ function getBilanPosturoHTML() {
     </div>
   </div>
 </div>
-  <div class="posturo-section" id="psec-7" style="padding:0 20px;display:none;"><div class="card"><div class="stitle" style="color:#2a7a4e;">8. Terrain/Synthèse — à venir</div></div></div>
+  <div class="posturo-section" id="psec-7" style="padding:0 20px;display:none;">
+  <div class="card" style="margin-bottom:16px;">
+    <div class="stitle" style="color:#2a7a4e;margin-bottom:16px;">🌿 Terrain du patient</div>
+
+    <!-- 1. Postural -->
+    <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;">1 – <span style="color:#3498db;">P</span>ostural</div>
+
+      <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture :</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+          <input type="checkbox" id="po-posture-ant"/> Antériorisation globale
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+          <input type="checkbox" id="po-posture-post"/> Postériorisation globale
+        </label>
+        <div>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+            <input type="checkbox" id="po-posture-later" onchange="togglePostureLater(this.checked)"/> Latéralisation globale
+          </label>
+          <div id="po-posture-later-opts" style="display:none;flex-wrap:wrap;gap:8px;margin-left:16px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="radio" name="po-posture-later-dir" value="gauche"/> 👈 Gauche
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="radio" name="po-posture-later-dir" value="droite"/> 👉 Droite
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Neuro-musculaire -->
+    <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;">2 – <span style="color:#f0a500;">N</span>euro-musculaire / <span style="color:#f0a500;">P</span>ropioceptif / <span style="color:#f0a500;">C</span>hainiste</div>
+
+      <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture en excès :</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${[
+          ['Chaine extension (PM) - Chaine de flexion (AM)','po-chaine-ext'],
+          ['Chaine de fermeture (PL)','po-chaine-ferm'],
+          ["Chaine d\'ouverture (AL)",'po-chaine-ouv'],
+          ['Chaine statique optimisée (PA)','po-chaine-stat-opt'],
+          ['Chaine statique dégradée (AP)','po-chaine-stat-deg']
+        ].map(([label,id]) => `
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+          <input type="checkbox" id="${id}"/> ${label}
+        </label>`).join('')}
+      </div>
+    </div>
+
+    <!-- 3. Biomécanique -->
+    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;">3 – <span style="color:#2a7a4e;">B</span>iomécanique / <span style="color:#f0a500;">A</span>rticulaire</div>
+      <textarea class="inp" id="po-biomec-articulaire" rows="4" placeholder="Observations biomécanique et articulaire..." style="background:#fff;color:#222;"></textarea>
+    </div>
+
+  </div>
+
+  <!-- Bilan synthèse -->
+  <div class="card" style="margin-bottom:16px;">
+    <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#2a7a4e;font-size:14px;margin-bottom:4px;">📋 Bilan synthèse</div>
+      <div style="font-size:11px;color:#555;margin-bottom:10px;">Compilation automatique des éléments positifs du bilan</div>
+      <button onclick="genererSynthese()" style="background:linear-gradient(135deg,#2a7a4e,#27ae60);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px;">
+        ✨ Générer la synthèse
+      </button>
+    </div>
+    <div id="po-synthese-result" style="display:none;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:16px;">
+      <div id="po-synthese-content" style="font-size:12px;color:#222;line-height:1.8;"></div>
+    </div>
+  </div>
+
+</div>
   <div class="posturo-section" id="psec-8" style="padding:0 20px;display:none;">
     <div class="card" style="margin-bottom:16px;">
       <div class="stitle" style="color:#2a7a4e;">Plan de semelles</div>
@@ -6891,6 +6964,95 @@ function previewEmpreinte(input) {
   };
   reader.readAsDataURL(input.files[0]);
 }
+function togglePostureLater(checked) {
+  const opts = document.getElementById('po-posture-later-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  if(!checked) document.querySelectorAll('input[name="po-posture-later-dir"]').forEach(r => r.checked = false);
+}
+
+function genererSynthese() {
+  const sections = [];
+
+  // Section 1: Anamnèse
+  const motif = document.getElementById('po-motif')?.value;
+  const eva = document.getElementById('po-eva-val')?.textContent;
+  if(motif) sections.push({titre:'🩺 Anamnèse', items:[`Motif: ${motif}`, `EVA: ${eva}/10`]});
+
+  // Section 3: Bilan dynamique
+  const dynItems = [];
+  if(document.querySelector('input[name="po-flex-debout"]:checked')?.value) dynItems.push(`Flexion debout: ${document.querySelector('input[name="po-flex-debout"]:checked').value}`);
+  if(document.querySelector('input[name="po-flex-assis"]:checked')?.value) dynItems.push(`Flexion assis: ${document.querySelector('input[name="po-flex-assis"]:checked').value}`);
+  if(document.querySelector('input[name="po-test-stab"]:checked')?.value) dynItems.push(`Stabilité arrière: ${document.querySelector('input[name="po-test-stab"]:checked').value}`);
+  ['po-mob-hanche','po-mob-genou','po-mob-pied','po-mob-bassin'].forEach(name => {
+    const v = document.querySelector(\`input[name="\${name}"]:checked\`)?.value;
+    if(v === 'oui') dynItems.push(\`Dysfonction \${name.replace('po-mob-','')}\`);
+  });
+  if(dynItems.length) sections.push({titre:'🏃 Bilan dynamique', items:dynItems});
+
+  // Section 4: Neuro-fonctionnel
+  const neuroItems = [];
+  if(document.getElementById('po-hypo-tronc')?.checked) neuroItems.push('Hypothèse: Tronc cérébral');
+  if(document.getElementById('po-hypo-cervelet')?.checked) neuroItems.push('Hypothèse: Cervelet');
+  if(neuroItems.length) sections.push({titre:'🧠 Neuro-fonctionnel', items:neuroItems});
+
+  // Section 5: Système plantaire
+  const plantItems = [];
+  if(document.querySelector('input[name="po-epines"]:checked')?.value === 'oui') plantItems.push('Épines irritatives présentes');
+  const loc = document.getElementById('po-epines-loc')?.value;
+  if(loc) plantItems.push(\`Localisation: \${loc}\`);
+  const tact = document.querySelector('input[name="po-tactique"]:checked')?.value;
+  if(tact) plantItems.push(\`Tactique équilibration: \${tact}\`);
+  ['po-para-plantaire','po-para-yeux','po-para-buccale','po-para-cicatrice','po-para-vestibulaire','po-para-viscerale'].forEach(id => {
+    if(document.getElementById(id)?.checked) plantItems.push(\`Parasite: \${id.replace('po-para-','')}\`);
+  });
+  if(plantItems.length) sections.push({titre:'🦶 Système plantaire', items:plantItems});
+
+  // Section 6: Vestibulaire
+  const vestItems = [];
+  if(document.querySelector('input[name="po-vertiges"]:checked')?.value === 'oui') vestItems.push('Présence de vertiges/nystagmus');
+  if(document.querySelector('input[name="po-vppb"]:checked')?.value === 'oui') vestItems.push('VPPB positif');
+  if(vestItems.length) sections.push({titre:'👂 Vestibulaire', items:vestItems});
+
+  // Section 7: Buccal/Visuel
+  const buccalItems = [];
+  if(document.querySelector('input[name="po-mcp-ouv"]:checked')?.value === 'oui') buccalItems.push('Amélioration ouverture bouche (ATM secondaire)');
+  const atm = document.querySelector('input[name="po-atm-origine"]:checked')?.value;
+  if(atm) buccalItems.push(\`ATM origine: \${atm}\`);
+  if(buccalItems.length) sections.push({titre:'🦷 Entrée buccale', items:buccalItems});
+
+  // Section 8: Terrain
+  const terrainItems = [];
+  if(document.getElementById('po-posture-ant')?.checked) terrainItems.push('Antériorisation globale');
+  if(document.getElementById('po-posture-post')?.checked) terrainItems.push('Postériorisation globale');
+  if(document.getElementById('po-posture-later')?.checked) {
+    const dir = document.querySelector('input[name="po-posture-later-dir"]:checked')?.value;
+    terrainItems.push(\`Latéralisation globale\${dir ? ': '+dir : ''}\`);
+  }
+  ['po-chaine-ext','po-chaine-ferm','po-chaine-ouv','po-chaine-stat-opt','po-chaine-stat-deg'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el?.checked) terrainItems.push(el.parentElement.textContent.trim());
+  });
+  const biomec = document.getElementById('po-biomec-articulaire')?.value;
+  if(biomec) terrainItems.push(\`Biomécanique: \${biomec}\`);
+  if(terrainItems.length) sections.push({titre:'🌿 Terrain', items:terrainItems});
+
+  // Afficher résultat
+  const result = document.getElementById('po-synthese-result');
+  const content = document.getElementById('po-synthese-content');
+  if(!sections.length) {
+    content.innerHTML = '<em style="color:#888;">Aucun élément positif trouvé dans le bilan.</em>';
+  } else {
+    content.innerHTML = sections.map(s =>
+      \`<div style="margin-bottom:10px;">
+        <div style="font-weight:700;color:#2a7a4e;margin-bottom:4px;">\${s.titre}</div>
+        <ul style="margin:0;padding-left:20px;">\${s.items.map(i => \`<li>\${i}</li>\`).join('')}</ul>
+      </div>\`
+    ).join('');
+  }
+  result.style.display = 'block';
+}
+
 function toggleVisLater(enabled) {
   const opts = document.getElementById('po-vis-later-opts');
   if(!opts) return;
