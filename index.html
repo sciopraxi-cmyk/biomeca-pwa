@@ -4872,11 +4872,8 @@ function setupDrawCanvas(canvas, canvasId) {
     drawing = true;
     const p = getPos(e);
     startX = p.x; startY = p.y;
-    // Sauvegarder état avant action (pour undo)
-    const snapshot = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
-    canvas._history.push(snapshot);
-    if(canvas._history.length > 25) canvas._history.shift();
-    canvas._tempSnap = snapshot;
+    // Sauvegarder snapshot temp pour preview pendant le dessin
+    canvas._tempSnap = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
   };
 
   canvas.onmousemove = e => {
@@ -4934,7 +4931,16 @@ function setupDrawCanvas(canvas, canvasId) {
     }
   };
 
-  canvas.onmouseup = () => { drawing = false; canvas._tempSnap = null; };
+  canvas.onmouseup = () => {
+    if(drawing) {
+      // Sauvegarder dans l'historique UNIQUEMENT à la fin du trait
+      const snapshot = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+      canvas._history.push(snapshot);
+      if(canvas._history.length > 30) canvas._history.shift();
+    }
+    drawing = false;
+    canvas._tempSnap = null;
+  };
   canvas.onmouseleave = () => { drawing = false; canvas._tempSnap = null; };
   canvas.ontouchstart = e => { e.preventDefault(); canvas.onmousedown({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY,preventDefault:()=>{}}); };
   canvas.ontouchmove = e => { e.preventDefault(); canvas.onmousemove({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); };
