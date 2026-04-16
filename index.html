@@ -5386,7 +5386,9 @@ window.addEventListener('appinstalled', () => {
 // ══════════════════════════════════════════════════════
 
 function injectBilanPosturoPage() {
-  if(document.getElementById('pg-bilan-posturo')) return;
+  // Toujours recréer la page pour éviter les problèmes de canvas
+  const existing = document.getElementById('pg-bilan-posturo');
+  if(existing) existing.remove();
   const main = document.querySelector('.main');
   if(!main) return;
   const div = document.createElement('div');
