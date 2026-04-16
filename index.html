@@ -7895,6 +7895,8 @@ function savePosturoBilan() {
   d.scoliose=getPosturoRadio('po-scoliose');
   const bc=document.getElementById('posturo-body-canvas');
   if(bc && bc.width>0) d._bodyCanvas=bc.toDataURL('image/jpeg',0.7);
+  const fc=document.getElementById('posturo-feet-canvas');
+  if(fc && fc.width>0) d._feetCanvas=fc.toDataURL('image/jpeg',0.7);
   savePatients();
   alert('✓ Bilan posturologique sauvegardé');
 }
