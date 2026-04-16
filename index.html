@@ -5682,21 +5682,78 @@ function getBilanPosturoHTML() {
     <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
       <div style="font-weight:700;color:#6c3483;font-size:14px;margin-bottom:10px;">🛏️ Examen en décubitus dorsal</div>
       <div class="g2">
-        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">🦴 Observation tibia/fémur</div>
-          <input class="inp" id="po-tibia-femur" placeholder="..." style="background:#f9f9f9;color:#222;"/>
+        <!-- Tibia/fémur -->
+        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">🦴 Observation tibia/fémur <span style="color:#888;font-weight:400;">(ILMI anatomique)</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            ${[['D','d'],['G','g']].map(([label,side]) => `
+            <div style="background:#f9f0ff;border:1px solid #d7bde2;border-radius:8px;padding:6px 10px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+                <input type="checkbox" id="po-tf-${side}" onchange="toggleTF('${side}',this.checked)"/>
+                <span style="font-weight:600;color:#6c3483;">${label === 'D' ? '👉 Droite' : '👈 Gauche'}</span>
+              </label>
+              <div id="po-tf-${side}-opts" style="display:none;flex-direction:column;gap:6px;">
+                ${['femur','tibia'].map(os => `
+                <div>
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+                    <input type="checkbox" id="po-tf-${side}-${os}" onchange="toggleTFOs('${side}','${os}',this.checked)"/>
+                    <span style="font-size:11px;font-weight:600;color:#222;">${os.charAt(0).toUpperCase()+os.slice(1)}</span>
+                  </label>
+                  <div id="po-tf-${side}-${os}-opts" style="display:none;gap:6px;margin-left:16px;">
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-tf-${side}-${os}-dir" value="court"/> Plus court</label>
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-tf-${side}-${os}-dir" value="long"/> Plus long</label>
+                  </div>
+                </div>`).join('')}
+              </div>
+            </div>`).join('')}
+          </div>
         </div>
-        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">📏 Longueur membres inférieurs</div>
-          <input class="inp" id="po-long-mi-dorsal" placeholder="D: ___ G: ___" style="background:#f9f9f9;color:#222;"/>
+
+        <!-- Longueur MI dorsal -->
+        <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">📏 Longueur membres inférieurs</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            ${[['Droite','d'],['Gauche','g']].map(([label,side]) => `
+            <div style="display:flex;align-items:center;gap:8px;background:#f9f0ff;border:1px solid #d7bde2;border-radius:8px;padding:6px 12px;">
+              <span style="font-weight:600;color:#6c3483;font-size:12px;">${label}</span>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-d-${side}" value="court"/> Plus court</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-d-${side}" value="long"/> Plus long</label>
+            </div>`).join('')}
+          </div>
         </div>
+
+        <!-- Hauteur branches pubiennes -->
         <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">📐 Hauteur branches pubiennes</div>
-          <input class="inp" id="po-branches-pub" placeholder="..." style="background:#f9f9f9;color:#222;"/>
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">📐 Hauteur branches pubiennes</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${[['Droite','d'],['Gauche','g']].map(([label,side]) => `
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;">
+                <input type="radio" name="po-pub" value="${side}" onchange="togglePub('${side}')"/> ${label}
+              </label>
+              <div id="po-pub-${side}-opts" style="display:none;gap:6px;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-pub-dir" value="haut"/> Plus haut</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-pub-dir" value="bas"/> Plus bas</label>
+              </div>
+            </div>`).join('')}
+          </div>
         </div>
+
+        <!-- Downing test -->
         <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:4px;">🔬 Downing test</div>
-          <input class="inp" id="po-downing" placeholder="..." style="background:#f9f9f9;color:#222;"/>
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">🔬 Downing test</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${[['Droite','d'],['Gauche','g']].map(([label,side]) => `
+            <div>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;width:fit-content;margin-bottom:4px;">
+                <input type="checkbox" id="po-downing-${side}" onchange="toggleDowning('${side}',this.checked)"/> ${label}
+              </label>
+              <div id="po-downing-${side}-opts" style="display:none;flex-direction:column;gap:4px;margin-left:16px;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-downing-${side}-res" value="post"/> Pas d'allongement (iliaque POST)</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-downing-${side}-res" value="ant"/> Pas de raccourcissement (iliaque ANT)</label>
+              </div>
+            </div>`).join('')}
+          </div>
         </div>
       </div>
     </div>
@@ -5705,22 +5762,38 @@ function getBilanPosturoHTML() {
     <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
       <div style="font-weight:700;color:#2471a3;font-size:14px;margin-bottom:10px;">🫃 Examen procubitus</div>
       <div class="g2">
-        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:4px;">📏 Longueur membres inférieurs</div>
-          <input class="inp" id="po-long-mi-proc" placeholder="D: ___ G: ___" style="background:#f9f9f9;color:#222;"/>
-        </div>
-        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">📐 Inégalité longueur</div>
-          <div style="display:flex;gap:8px;">
-            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-long" value="oui"/> Oui</label>
-            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-long" value="non"/> Non</label>
+        <!-- Longueur MI procubitus -->
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">📏 Longueur membres inférieurs</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            ${[['Droite','d'],['Gauche','g']].map(([label,side]) => `
+            <div style="display:flex;align-items:center;gap:8px;background:#eaf4ff;border:1px solid #aed6f1;border-radius:8px;padding:6px 12px;">
+              <span style="font-weight:600;color:#2471a3;font-size:12px;">${label}</span>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-p-${side}" value="court"/> Plus court</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-p-${side}" value="long"/> Plus long</label>
+            </div>`).join('')}
           </div>
         </div>
+
+        <!-- Inégalité longueur -->
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">📐 Inégalité longueur</div>
+          <div style="display:flex;gap:8px;margin-bottom:6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-long" value="oui" onchange="toggleIneg(true)"/> Oui</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-long" value="non" onchange="toggleIneg(false)"/> Non</label>
+          </div>
+          <div id="po-ineg-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-ineg-dir" value="court-d"/> Plus court à droite</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-ineg-dir" value="court-g"/> Plus court à gauche</label>
+          </div>
+        </div>
+
+        <!-- Type -->
         <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
           <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">🔤 Type</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-type" value="structurelle"/> Structurelle</label>
-            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="po-ineg-type" value="compensatrice"/> Compensatrice</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="checkbox" id="po-ineg-struct"/> Structurelle</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="checkbox" id="po-ineg-comp"/> Compensatrice</label>
           </div>
         </div>
         <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
@@ -7075,6 +7148,35 @@ function toggleVisLater(enabled) {
   if(!enabled) {
     document.querySelectorAll('input[name="po-vis-later-type"]').forEach(r => r.checked = false);
   }
+}
+function toggleTF(side, checked) {
+  const opts = document.getElementById('po-tf-'+side+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  opts.style.flexDirection = 'column';
+}
+function toggleTFOs(side, os, checked) {
+  const opts = document.getElementById('po-tf-'+side+'-'+os+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+}
+function togglePub(side) {
+  ['d','g'].forEach(function(s) {
+    const opts = document.getElementById('po-pub-'+s+'-opts');
+    if(opts) opts.style.display = s === side ? 'flex' : 'none';
+  });
+}
+function toggleDowning(side, checked) {
+  const opts = document.getElementById('po-downing-'+side+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  opts.style.flexDirection = 'column';
+}
+function toggleIneg(show) {
+  const opts = document.getElementById('po-ineg-opts');
+  if(!opts) return;
+  opts.style.display = show ? 'flex' : 'none';
+  if(!show) document.querySelectorAll('input[name="po-ineg-dir"]').forEach(function(r){ r.checked=false; });
 }
 function toggleRessaut(enabled) {
   const opts = document.getElementById('po-ressaut-opts');
