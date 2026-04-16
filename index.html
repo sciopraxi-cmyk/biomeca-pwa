@@ -7923,6 +7923,11 @@ function savePosturoBilan() {
     }
     d._feetCanvas = tmpFc.toDataURL('image/png');
   }
+  // Mettre à jour le snapshot dans bilansPosturo
+  if(currentPatient.bilansPosturo && currentPatient.bilansPosturo.length > 0) {
+    const lastIdx = currentPatient.bilansPosturo.length - 1;
+    currentPatient.bilansPosturo[lastIdx].bilanDataPosturo = JSON.parse(JSON.stringify(d));
+  }
   savePatients();
   alert('✓ Bilan posturologique sauvegardé');
 }
