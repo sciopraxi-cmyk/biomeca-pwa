@@ -6541,10 +6541,12 @@ function getBilanPosturoHTML() {
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
             <span style="font-weight:500;color:#222;font-size:12px;">- Ressaut méniscal</span>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-ressaut" value="oui"/> Oui</label>
-              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-ressaut" value="non"/> Non</label>
-              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f5eeff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="checkbox" id="po-ressaut-dte"/> Droite</label>
-              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f5eeff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="checkbox" id="po-ressaut-gauche"/> Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-ressaut" value="oui" onchange="toggleRessaut(true)"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-ressaut" value="non" onchange="toggleRessaut(false)"/> Non</label>
+              <div id="po-ressaut-opts" style="display:flex;gap:8px;opacity:1;transition:opacity 0.2s;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f5eeff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="checkbox" id="po-ressaut-dte"/> Droite</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f5eeff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="checkbox" id="po-ressaut-gauche"/> Gauche</label>
+              </div>
             </div>
           </div>
         </div>
@@ -7066,6 +7068,16 @@ function toggleVisLater(enabled) {
   opts.style.pointerEvents = enabled ? 'auto' : 'none';
   if(!enabled) {
     document.querySelectorAll('input[name="po-vis-later-type"]').forEach(r => r.checked = false);
+  }
+}
+function toggleRessaut(enabled) {
+  const opts = document.getElementById('po-ressaut-opts');
+  if(!opts) return;
+  opts.style.opacity = enabled ? '1' : '0.35';
+  opts.style.pointerEvents = enabled ? 'auto' : 'none';
+  if(!enabled) {
+    document.getElementById('po-ressaut-dte').checked = false;
+    document.getElementById('po-ressaut-gauche').checked = false;
   }
 }
 function toggleSerrage(type) {
