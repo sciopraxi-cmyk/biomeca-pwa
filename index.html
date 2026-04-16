@@ -8112,9 +8112,20 @@ function savePosturoBilan() {
   d.terrain=getPosturoRadio('po-terrain'); d.tensionPrincipal=getPoVal('po-tension-principal');
   d.comp1=getPoVal('po-comp1'); d.comp2=getPoVal('po-comp2'); d.comp3=getPoVal('po-comp3');
   d.compCritique=getPoVal('po-comp-critique'); d.prefMot=getPosturoRadio('po-pref-mot');
-  d.rombergMorpho=getPoVal('po-romberg-morpho'); d.bilanDyn=getPoVal('po-bilan-dyn');
-  d.course=getPoVal('po-course'); d.testPoignet=getPoVal('po-test-poignet');
-  d.testStab=getPoVal('po-test-stab'); d.testFlexAnt=getPoVal('po-test-flex-ant');
+  // Section 2: Romberg checkboxes
+  const getChk2 = id => document.getElementById(id)?.checked||false;
+  d.rombergAnt=getChk2('po-romberg-ant'); d.rombergLat=getChk2('po-romberg-lat');
+  d.rombergLatDir=document.querySelector('input[name="po-romberg-lat-dir"]:checked')?.value||'';
+  d.rombergPost=getChk2('po-romberg-post'); d.rombergOculaire=getChk2('po-romberg-oculaire');
+  d.rombergRot=getChk2('po-romberg-rot');
+  d.rombergRotDir=document.querySelector('input[name="po-romberg-rot-dir"]:checked')?.value||'';
+  d.bilanDyn=getPoVal('po-bilan-dyn');
+  d.course=getPoVal('po-course');
+  // Section 3: Tests poignet D/G
+  d.poignetD=document.querySelector('input[name="po-poignet-d"]:checked')?.value||'';
+  d.poignetG=document.querySelector('input[name="po-poignet-g"]:checked')?.value||'';
+  d.testStab=document.querySelector('input[name="po-test-stab"]:checked')?.value||'';
+  d.testFlexAnt=getPoVal('po-test-flex-ant');
   d.flexDebout=getPosturoRadio('po-flex-debout'); d.flexAssis=getPosturoRadio('po-flex-assis');
   d.mobHanche=getPosturoRadio('po-mob-hanche'); d.mobGenou=getPosturoRadio('po-mob-genou');
   d.mobPied=getPosturoRadio('po-mob-pied'); d.mobBassin=getPosturoRadio('po-mob-bassin');
@@ -8231,9 +8242,21 @@ function loadPosturoBilan() {
   setPosturoRadio('po-terrain',d.terrain); setPoVal('po-tension-principal',d.tensionPrincipal);
   setPoVal('po-comp1',d.comp1); setPoVal('po-comp2',d.comp2); setPoVal('po-comp3',d.comp3);
   setPoVal('po-comp-critique',d.compCritique); setPosturoRadio('po-pref-mot',d.prefMot);
-  setPoVal('po-romberg-morpho',d.rombergMorpho); setPoVal('po-bilan-dyn',d.bilanDyn);
-  setPoVal('po-course',d.course); setPoVal('po-test-poignet',d.testPoignet);
-  setPoVal('po-test-stab',d.testStab); setPoVal('po-test-flex-ant',d.testFlexAnt);
+  // Section 2: Romberg
+  const setChk2 = (id,v) => { const e=document.getElementById(id); if(e) e.checked=!!v; };
+  setChk2('po-romberg-ant',d.rombergAnt);
+  setChk2('po-romberg-lat',d.rombergLat); if(d.rombergLat) toggleRomberg('lat',true);
+  if(d.rombergLatDir) setPosturoRadio('po-romberg-lat-dir',d.rombergLatDir);
+  setChk2('po-romberg-post',d.rombergPost); setChk2('po-romberg-oculaire',d.rombergOculaire);
+  setChk2('po-romberg-rot',d.rombergRot); if(d.rombergRot) toggleRomberg('rot',true);
+  if(d.rombergRotDir) setPosturoRadio('po-romberg-rot-dir',d.rombergRotDir);
+  setPoVal('po-bilan-dyn',d.bilanDyn);
+  setPoVal('po-course',d.course);
+  // Section 3: Tests poignet
+  if(d.poignetD) setPosturoRadio('po-poignet-d',d.poignetD);
+  if(d.poignetG) setPosturoRadio('po-poignet-g',d.poignetG);
+  if(d.testStab) setPosturoRadio('po-test-stab',d.testStab);
+  setPoVal('po-test-flex-ant',d.testFlexAnt);
   setPosturoRadio('po-flex-debout',d.flexDebout); setPosturoRadio('po-flex-assis',d.flexAssis);
   setPosturoRadio('po-mob-hanche',d.mobHanche); setPosturoRadio('po-mob-genou',d.mobGenou);
   setPosturoRadio('po-mob-pied',d.mobPied); setPosturoRadio('po-mob-bassin',d.mobBassin);
