@@ -8158,10 +8158,40 @@ function savePosturoBilan() {
   // Sections 4-9
   const getChk = id => document.getElementById(id)?.checked||false;
   const getRad = name => document.querySelector('input[name="'+name+'"]:checked')?.value||'';
-  // Section 4
+  // Section 4 - Neuro fonctionnel complet
   d.hypoTronc=getChk('po-hypo-tronc'); d.hypoCervelet=getChk('po-hypo-cervelet');
+  // Nerfs crâniens
+  const ncList = ['recap','nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12'];
+  d.nc = {};
+  ncList.forEach(nc => {
+    ['g','d','n'].forEach(side => {
+      const el = document.getElementById('nc-'+nc+'-'+side);
+      if(el) d.nc[nc+'_'+side] = el.checked;
+    });
+  });
+  // Proprioception
+  const propList = ['lent','rapide','golgi','paccini','ruffini-d','ruffini-c','golgi-a'];
+  d.prop = {};
+  propList.forEach(p => {
+    ['g','d'].forEach(side => {
+      const el = document.getElementById('prop-'+p+'-'+side);
+      if(el) d.prop[p+'_'+side] = el.checked;
+    });
+  });
+  // Cervelet
+  const cervList = ['vermis-sharp','vermis-romberg','inter-prec','inter-coord','lat-prec','lat-coord'];
+  d.cerv = {};
+  cervList.forEach(cv => {
+    ['g','d'].forEach(side => {
+      const el = document.getElementById(cv+'-'+side);
+      if(el) d.cerv[cv+'_'+side] = el.checked;
+    });
+  });
   // Section 5
   d.epines=getRad('po-epines'); d.epinesLoc=getPoVal('po-epines-loc');
+  // Photo empreinte
+  const emprImg = document.getElementById('po-empreinte-img');
+  if(emprImg && emprImg.src && emprImg.src.startsWith('data:')) d._empreinte = emprImg.src;
   d.chaussureType=getPoVal('po-chaussure-type');
   d.usureInterne=getChk('po-usure-interne'); d.usureExterne=getChk('po-usure-externe'); d.usureContrefort=getChk('po-usure-contrefort');
   d.testPouces=getChk('po-test-pouces'); d.testConvergence=getChk('po-test-convergence');
@@ -8219,6 +8249,21 @@ function savePosturoBilan() {
   // Section 9
   d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv');
   ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(t => { d['test_'+t]=getRad('po-'+t); });
+  // Matériaux et recouvrement (checkboxes multiples)
+  d.materiaux = Array.from(document.querySelectorAll('input[name="po-materiaux"]:checked')).map(e=>e.value);
+  d.recouvrement = Array.from(document.querySelectorAll('input[name="po-recouvrement"]:checked')).map(e=>e.value);
+  // Circuits express
+  ['c1-ex1','c1-ex2','c1-ex3','c1-ex4','c2-ex1','c2-ex2','c2-ex3','c2-ex4'].forEach(id => {
+    d['circ_'+id.replace('-','_')] = getPoVal('po-'+id+'-libre');
+    // Sauvegarder les selects système et sous-exercice
+    const rowEl = document.getElementById('po-'+id+'-libre')?.closest('div[style*="border"]');
+    if(rowEl) {
+      const sels = rowEl.querySelectorAll('select.exo-sys');
+      const subs = rowEl.querySelectorAll('select.exo-sub');
+      d['circ_'+id.replace('-','_')+'_sys'] = Array.from(sels).map(s=>s.value);
+      d['circ_'+id.replace('-','_')+'_sub'] = Array.from(subs).map(s=>s.value);
+    }
+  });
 
   const bc=document.getElementById('posturo-body-canvas');
   if(bc && bc.width>0) {
@@ -8317,7 +8362,39 @@ function loadPosturoBilan() {
   // Sections 4-9
   const setChk = (id,v) => { const e=document.getElementById(id); if(e) e.checked=!!v; };
   setChk('po-hypo-tronc',d.hypoTronc); setChk('po-hypo-cervelet',d.hypoCervelet);
+  // Nerfs crâniens
+  if(d.nc) {
+    Object.entries(d.nc).forEach(([key,val]) => {
+      const [nc, side] = key.split('_');
+      const el = document.getElementById('nc-'+nc+'-'+side);
+      if(el) el.checked = !!val;
+    });
+    setTimeout(updateNeuroTotals, 100);
+  }
+  // Proprioception
+  if(d.prop) {
+    Object.entries(d.prop).forEach(([key,val]) => {
+      const [p, side] = key.split('_');
+      const el = document.getElementById('prop-'+p+'-'+side);
+      if(el) el.checked = !!val;
+    });
+  }
+  // Cervelet
+  if(d.cerv) {
+    Object.entries(d.cerv).forEach(([key,val]) => {
+      const [cv, side] = key.split('_');
+      const el = document.getElementById(cv+'-'+side);
+      if(el) el.checked = !!val;
+    });
+  }
   setPosturoRadio('po-epines',d.epines); setPoVal('po-epines-loc',d.epinesLoc);
+  // Restaurer photo empreinte
+  if(d._empreinte) {
+    const img = document.getElementById('po-empreinte-img');
+    const del = document.getElementById('po-empreinte-del');
+    if(img) { img.src = d._empreinte; img.style.display = 'block'; }
+    if(del) del.style.display = 'inline-block';
+  }
   setPoVal('po-chaussure-type',d.chaussureType);
   setChk('po-usure-interne',d.usureInterne); setChk('po-usure-externe',d.usureExterne); setChk('po-usure-contrefort',d.usureContrefort);
   setChk('po-test-pouces',d.testPouces); setChk('po-test-convergence',d.testConvergence);
@@ -8377,6 +8454,14 @@ function loadPosturoBilan() {
   setPoVal('po-biomec-articulaire',d.biomecArticulaire);
   setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv);
   ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(t => { setPosturoRadio('po-'+t, d['test_'+t]); });
+  // Matériaux et recouvrement
+  if(d.materiaux) document.querySelectorAll('input[name="po-materiaux"]').forEach(e => { e.checked = d.materiaux.includes(e.value); });
+  if(d.recouvrement) document.querySelectorAll('input[name="po-recouvrement"]').forEach(e => { e.checked = d.recouvrement.includes(e.value); });
+  // Circuits express
+  ['c1-ex1','c1-ex2','c1-ex3','c1-ex4','c2-ex1','c2-ex2','c2-ex3','c2-ex4'].forEach(id => {
+    const key = id.replace('-','_');
+    setPoVal('po-'+id+'-libre', d['circ_'+key]);
+  });
 }
 
 </script>
