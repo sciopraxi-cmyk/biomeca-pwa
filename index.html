@@ -7852,12 +7852,15 @@ function initPosturoFeetCanvas() {
   setTimeout(() => {
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
   }, 100);
+  setupDrawCanvas(canvas, 'posturo-feet-canvas');
+  // Restaurer le dessin par-dessus l'image des pieds (après chargement)
   if(currentPatient?.bilanDataPosturo?._feetCanvas) {
     const saved = new Image();
-    saved.onload = () => ctx.drawImage(saved, 0, 0, r.width, r.height);
+    saved.onload = () => {
+      ctx.drawImage(saved, 0, 0, r.width, r.height);
+    };
     saved.src = currentPatient.bilanDataPosturo._feetCanvas;
   }
-  setupDrawCanvas(canvas, 'posturo-feet-canvas');
 }
 
 function getPosturoRadio(name) {
@@ -7900,7 +7903,25 @@ function savePosturoBilan() {
   const bc=document.getElementById('posturo-body-canvas');
   if(bc && bc.width>0) d._bodyCanvas=bc.toDataURL('image/jpeg',0.7);
   const fc=document.getElementById('posturo-feet-canvas');
-  if(fc && fc.width>0) d._feetCanvas=fc.toDataURL('image/jpeg',0.7);
+  if(fc && fc.width>0) {
+    // Sauvegarder uniquement le dessin (PNG transparent, soustraire le fond)
+    const tmpFc = document.createElement('canvas');
+    tmpFc.width = fc.width; tmpFc.height = fc.height;
+    const tmpCtx = tmpFc.getContext('2d');
+    tmpCtx.drawImage(fc, 0, 0);
+    if(fc._baseSnapshot) {
+      const cur = tmpCtx.getImageData(0,0,fc.width,fc.height);
+      const base = fc._baseSnapshot;
+      for(let i=0;i<cur.data.length;i+=4) {
+        const dr=Math.abs(cur.data[i]-base.data[i]);
+        const dg=Math.abs(cur.data[i+1]-base.data[i+1]);
+        const db=Math.abs(cur.data[i+2]-base.data[i+2]);
+        if(dr<15 && dg<15 && db<15) cur.data[i+3]=0;
+      }
+      tmpCtx.putImageData(cur,0,0);
+    }
+    d._feetCanvas = tmpFc.toDataURL('image/png');
+  }
   savePatients();
   alert('✓ Bilan posturologique sauvegardé');
 }
