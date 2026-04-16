@@ -7736,12 +7736,17 @@ function updateNeuroTotals() {
 
 function showPosturoSection(idx) {
   document.querySelectorAll('.posturo-section').forEach((s,i) => {
-    s.style.display = i === idx ? '' : 'none';
+    s.style.display = i === idx ? 'block' : 'none';
   });
   document.querySelectorAll('.posturo-tab').forEach((t,i) => {
     t.classList.toggle('act', i === idx);
   });
-  if(idx === 1) setTimeout(initPosturoBodyCanvas, 100);
+  if(idx === 1) {
+    // Attendre que psec-1 soit visible avant d'initialiser le canvas
+    const psec1 = document.getElementById('psec-1');
+    if(psec1) psec1.style.display = '';
+    setTimeout(initPosturoBodyCanvas, 150);
+  }
   if(idx === 3) {
     setTimeout(updateNeuroTotals, 100);
     // Attacher listeners sur toutes les checkboxes neuro
