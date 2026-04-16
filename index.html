@@ -7835,7 +7835,6 @@ function initPosturoBodyCanvas() {
 function initPosturoFeetCanvas() {
   const canvas = document.getElementById('posturo-feet-canvas');
   if(!canvas) return;
-  // Utiliser le conteneur parent pour avoir toute la largeur (les 2 pieds)
   const parent = canvas.parentElement;
   if(!parent) return;
   const r = parent.getBoundingClientRect();
@@ -7850,17 +7849,21 @@ function initPosturoFeetCanvas() {
   canvas._history = [];
   canvas._baseSnapshot = null;
   canvas._tempSnap = null;
-  setTimeout(() => {
-    canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
-  }, 100);
   setupDrawCanvas(canvas, 'posturo-feet-canvas');
-  // Restaurer le dessin par-dessus l'image des pieds (après chargement)
-  if(currentPatient?.bilanDataPosturo?._feetCanvas) {
+  // Restaurer le dessin PUIS prendre le baseSnapshot
+  const savedData = currentPatient?.bilanDataPosturo?._feetCanvas;
+  if(savedData) {
     const saved = new Image();
     saved.onload = () => {
       ctx.drawImage(saved, 0, 0, r.width, r.height);
+      // BaseSnapshot = état avec dessin restauré (pour que undo ne supprime pas le dessin précédent)
+      canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
     };
-    saved.src = currentPatient.bilanDataPosturo._feetCanvas;
+    saved.src = savedData;
+  } else {
+    setTimeout(() => {
+      canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
+    }, 100);
   }
 }
 
