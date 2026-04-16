@@ -42,8 +42,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 .pt-pill span{font-size:11px;font-weight:500;}
 .main{flex:1;overflow-y:auto;}
 .page{visibility:hidden;height:0;overflow:hidden;pointer-events:none;margin:0;padding:0;}
-.page{display:none;}
-.page.active{display:block;}
+.page{visibility:hidden;height:0;overflow:hidden;pointer-events:none;position:absolute;width:100%;}
+.page.active{visibility:visible;height:auto;overflow:visible;pointer-events:auto;position:relative;}
 
 /* HOME */
 .home-hdr{padding:20px 20px 12px;border-bottom:1px solid var(--bord);}
