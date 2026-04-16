@@ -5526,7 +5526,7 @@ function getBilanPosturoHTML() {
             </div>
           </div>
         </div>
-        <canvas id="posturo-body-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"/>
+        <canvas id="posturo-body-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;background:transparent;"/>
       </div>
       <div style="background:linear-gradient(135deg,#f8f9fa,#eee);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         <button class="btn" id="ptool-pen" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
@@ -7815,12 +7815,8 @@ function initPosturoBodyCanvas() {
   const r = parent.getBoundingClientRect();
   if(r.width === 0) return;
   const dpr = window.devicePixelRatio || 1;
-  const newW = Math.round(r.width * dpr);
-  const newH = Math.round(r.height * dpr);
-  // Ne pas réinitialiser si déjà la bonne taille (évite l'écran noir)
-  if(canvas.width === newW && canvas.height === newH && canvas._baseSnapshot) return;
-  canvas.width = newW;
-  canvas.height = newH;
+  canvas.width = Math.round(r.width * dpr);
+  canvas.height = Math.round(r.height * dpr);
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
   const ctx = canvas.getContext('2d');
