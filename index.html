@@ -5712,13 +5712,14 @@ function getBilanPosturoHTML() {
         <!-- Longueur MI dorsal -->
         <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
           <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">📏 Longueur membres inférieurs</div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            ${[['Droite','d'],['Gauche','g']].map(([label,side]) => `
-            <div style="display:flex;align-items:center;gap:8px;background:#f9f0ff;border:1px solid #d7bde2;border-radius:8px;padding:6px 12px;">
-              <span style="font-weight:600;color:#6c3483;font-size:12px;">${label}</span>
-              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-d-${side}" value="court"/> Plus court</label>
-              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-d-${side}" value="long"/> Plus long</label>
-            </div>`).join('')}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-dors" value="court" onchange="toggleLongMI('dors','court')"/> Plus court</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-dors" value="long" onchange="toggleLongMI('dors','long')"/> Plus long</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-dors" value="egal" onchange="toggleLongMI('dors','egal')"/> Même longueur</label>
+          </div>
+          <div id="po-long-mi-dors-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-dors-side" value="d"/> 👉 Droite</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-dors-side" value="g"/> 👈 Gauche</label>
           </div>
         </div>
 
@@ -5765,13 +5766,14 @@ function getBilanPosturoHTML() {
         <!-- Longueur MI procubitus -->
         <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
           <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">📏 Longueur membres inférieurs</div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            ${[['Droite','d'],['Gauche','g']].map(([label,side]) => `
-            <div style="display:flex;align-items:center;gap:8px;background:#eaf4ff;border:1px solid #aed6f1;border-radius:8px;padding:6px 12px;">
-              <span style="font-weight:600;color:#2471a3;font-size:12px;">${label}</span>
-              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-p-${side}" value="court"/> Plus court</label>
-              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-p-${side}" value="long"/> Plus long</label>
-            </div>`).join('')}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-proc" value="court" onchange="toggleLongMI('proc','court')"/> Plus court</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-proc" value="long" onchange="toggleLongMI('proc','long')"/> Plus long</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-proc" value="egal" onchange="toggleLongMI('proc','egal')"/> Même longueur</label>
+          </div>
+          <div id="po-long-mi-proc-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-proc-side" value="d"/> 👉 Droite</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="po-long-mi-proc-side" value="g"/> 👈 Gauche</label>
           </div>
         </div>
 
@@ -7147,6 +7149,15 @@ function toggleVisLater(enabled) {
   opts.style.pointerEvents = enabled ? 'auto' : 'none';
   if(!enabled) {
     document.querySelectorAll('input[name="po-vis-later-type"]').forEach(r => r.checked = false);
+  }
+}
+function toggleLongMI(zone, val) {
+  const opts = document.getElementById('po-long-mi-'+zone+'-opts');
+  if(!opts) return;
+  opts.style.display = (val === 'court' || val === 'long') ? 'flex' : 'none';
+  if(val === 'egal') {
+    const name = zone === 'dors' ? 'po-long-mi-dors-side' : 'po-long-mi-proc-side';
+    document.querySelectorAll('input[name="'+name+'"]').forEach(function(r){ r.checked=false; });
   }
 }
 function toggleTF(side, checked) {
