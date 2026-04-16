@@ -7915,7 +7915,20 @@ function savePosturoBilan() {
   d.inegType=getPosturoRadio('po-ineg-type'); d.equilibre=getPosturoRadio('po-equilibre');
   d.scoliose=getPosturoRadio('po-scoliose');
   const bc=document.getElementById('posturo-body-canvas');
-  if(bc && bc.width>0) d._bodyCanvas=bc.toDataURL('image/jpeg',0.7);
+  if(bc && bc.width>0) {
+    // Sauvegarder uniquement le dessin (pixels différents du fond transparent)
+    const tmpBc = document.createElement('canvas');
+    tmpBc.width = bc.width; tmpBc.height = bc.height;
+    const tmpBctx = tmpBc.getContext('2d');
+    tmpBctx.drawImage(bc, 0, 0);
+    const imgD = tmpBctx.getImageData(0,0,bc.width,bc.height);
+    // Rendre transparents les pixels noirs (fond vide)
+    for(let i=0;i<imgD.data.length;i+=4) {
+      if(imgD.data[i]<10 && imgD.data[i+1]<10 && imgD.data[i+2]<10) imgD.data[i+3]=0;
+    }
+    tmpBctx.putImageData(imgD,0,0);
+    d._bodyCanvas = tmpBc.toDataURL('image/png');
+  }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc && fc.width>0) {
     // Sauvegarder tout le canvas en PNG (dessins cumulés)
