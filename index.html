@@ -5569,7 +5569,35 @@ function getBilanPosturoHTML() {
       </div>
       <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;">
         <div style="font-weight:700;color:#2471a3;font-size:13px;margin-bottom:8px;">🧪 Romberg</div>
-        <input class="inp" id="po-romberg-morpho" placeholder="Résultat..." style="background:#fff;color:#222;"/>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="po-romberg-ant"/> Antériorisé <span style="font-size:10px;color:#888;">(vestibulaire)</span>
+          </label>
+          <div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+              <input type="checkbox" id="po-romberg-lat" onchange="toggleRomberg('lat',this.checked)"/> Latéralisé <span style="font-size:10px;color:#888;">(vestibulaire)</span>
+            </label>
+            <div id="po-romberg-lat-opts" style="display:none;gap:8px;margin-left:16px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="po-romberg-lat-dir" value="gauche"/> 👈 Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="po-romberg-lat-dir" value="droite"/> 👉 Droite</label>
+            </div>
+          </div>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="po-romberg-post"/> Postériorisé <span style="font-size:10px;color:#888;">(émotionnel)</span>
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="po-romberg-oculaire"/> Adaptation oculaire
+          </label>
+          <div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+              <input type="checkbox" id="po-romberg-rot" onchange="toggleRomberg('rot',this.checked)"/> Rotation
+            </label>
+            <div id="po-romberg-rot-opts" style="display:none;gap:8px;margin-left:16px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="po-romberg-rot-dir" value="droite"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="po-romberg-rot-dir" value="gauche"/> 👈 Gauche</label>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -7055,6 +7083,12 @@ function previewEmpreinte(input) {
     if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = e.target.result;
   };
   reader.readAsDataURL(input.files[0]);
+}
+function toggleRomberg(type, checked) {
+  const opts = document.getElementById('po-romberg-'+type+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  if(!checked) document.querySelectorAll('input[name="po-romberg-'+type+'-dir"]').forEach(function(r){ r.checked=false; });
 }
 function togglePostureLater(checked) {
   const opts = document.getElementById('po-posture-later-opts');
