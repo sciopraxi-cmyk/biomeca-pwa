@@ -526,7 +526,7 @@ body.printing #rpt-print{display:block!important;}
           
         </div>
       </div>
-      <div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Motif / antécédents</div><textarea class="inp" id="np-motif" rows="2" placeholder="Douleur genou, entorses..."></textarea></div>
+
       <div id="np-err" style="display:none;color:var(--red);font-size:11px;margin-top:5px;padding:5px 8px;background:var(--red-d);border-radius:var(--rs);"></div>
       <button class="btn btn-blue btn-full" onclick="createPatient()">✓ Créer le dossier</button>
     </div>
@@ -5395,7 +5395,7 @@ function injectBilanPosturoPage() {
 function getBilanPosturoHTML() {
   return `<div style="padding:0 0 40px 0;max-width:860px;margin:0 auto;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--bord);margin-bottom:16px;background:var(--bg);">
-    <button onclick="nav('pg-posturo')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;">← Posture</button>
+    <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;">← Patients</button>
     <div style="font-size:15px;font-weight:700;color:#2a7a4e;">🧍 Bilan Global de la Posture</div>
     <div style="display:flex;gap:6px;">
       <button class="btn" onclick="savePosturoBilan()" style="background:#2a7a4e;color:#fff;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>
