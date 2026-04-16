@@ -8123,6 +8123,71 @@ function savePosturoBilan() {
   d.longMiProc=getPoVal('po-long-mi-proc'); d.inegLong=getPosturoRadio('po-ineg-long');
   d.inegType=getPosturoRadio('po-ineg-type'); d.equilibre=getPosturoRadio('po-equilibre');
   d.scoliose=getPosturoRadio('po-scoliose');
+  // Sections 4-9
+  const getChk = id => document.getElementById(id)?.checked||false;
+  const getRad = name => document.querySelector('input[name="'+name+'"]:checked')?.value||'';
+  // Section 4
+  d.hypoTronc=getChk('po-hypo-tronc'); d.hypoCervelet=getChk('po-hypo-cervelet');
+  // Section 5
+  d.epines=getRad('po-epines'); d.epinesLoc=getPoVal('po-epines-loc');
+  d.chaussureType=getPoVal('po-chaussure-type');
+  d.usureInterne=getChk('po-usure-interne'); d.usureExterne=getChk('po-usure-externe'); d.usureContrefort=getChk('po-usure-contrefort');
+  d.testPouces=getChk('po-test-pouces'); d.testConvergence=getChk('po-test-convergence');
+  d.testScapulaire=getChk('po-test-scapulaire'); d.testNucale=getChk('po-test-nucale');
+  d.paraPlantaire=getChk('po-para-plantaire'); d.paraYeux=getChk('po-para-yeux');
+  d.paraBuccale=getChk('po-para-buccale'); d.paraCicatrice=getChk('po-para-cicatrice');
+  d.paraVestibulaire=getChk('po-para-vestibulaire'); d.paraViscerale=getChk('po-para-viscerale');
+  d.monoPiedG=getChk('po-mono-pied-g'); d.monoPiedD=getChk('po-mono-pied-d');
+  d.monoGenouG=getChk('po-mono-genou-g'); d.monoGenouD=getChk('po-mono-genou-d');
+  d.monoHancheG=getChk('po-mono-hanche-g'); d.monoHancheD=getChk('po-mono-hanche-d');
+  d.alignAxe=getChk('po-align-axe'); d.alignInf=getChk('po-align-inf'); d.alignSup=getChk('po-align-sup');
+  // Section 6
+  d.laterOui=getRad('po-later'); d.laterType=getRad('po-later-type');
+  d.laterD=getChk('po-later-d'); d.laterG=getChk('po-later-g');
+  d.kleinRes=getRad('po-klein'); d.ligamentsRes=getRad('po-ligaments'); d.rancurelRes=getRad('po-rancurel');
+  d.headShaking=getRad('po-headshaking'); d.headImpulse=getRad('po-headimpulse');
+  d.babinski=getRad('po-babinski'); d.unterburger=getRad('po-unterburger');
+  d.vertiges=getRad('po-vertiges'); d.vppb=getRad('po-vppb');
+  d.cscD=getChk('po-csc-d'); d.cscG=getChk('po-csc-g');
+  d.cscAntG=getChk('po-csc-antg'); d.cscAntD=getChk('po-csc-antd');
+  d.cscPostD=getChk('po-csc-postd'); d.cscPostG=getChk('po-csc-postg');
+  d.clvf=getRad('po-clvf'); d.pevs=getRad('po-pevs');
+  d.canalAnt=getChk('po-canal-ant'); d.canalPost=getChk('po-canal-post'); d.canalLat=getChk('po-canal-lat');
+  d.manSemont=getChk('po-man-semont'); d.manEpley=getChk('po-man-epley');
+  d.manEpleyInv=getChk('po-man-epley-inv'); d.manLempert=getChk('po-man-lempert');
+  d.reorOrl=getChk('po-reor-orl'); d.reorKine=getChk('po-reor-kine');
+  d.semelleComp=getRad('po-semelle-comp');
+  // Section 7 Buccal
+  d.mcpOuv=getRad('po-mcp-ouv'); d.serrage=getRad('po-serrage');
+  d.aggrDents=getChk('po-aggr-dents'); d.aggrAtm=getChk('po-aggr-atm');
+  d.amelioContact=getChk('po-amelio-contact'); d.amelioTension=getChk('po-amelio-tension');
+  d.atmOrigine=getRad('po-atm-origine'); d.ouvMax=getRad('po-ouv-max');
+  d.deviation=getRad('po-deviation'); d.contractures=getRad('po-contractures');
+  d.douleurCaps=getRad('po-douleur-caps'); d.ressaut=getRad('po-ressaut');
+  d.ressautDte=getChk('po-ressaut-dte'); d.ressautGauche=getChk('po-ressaut-gauche');
+  d.reorBucDentiste=getChk('po-reor-buc-dentiste'); d.reorBucOrtho=getChk('po-reor-buc-ortho');
+  d.reorBucStomato=getChk('po-reor-buc-stomato'); d.reorBucKine=getChk('po-reor-buc-kine');
+  // Section 7 Visuel
+  d.visLater=getRad('po-vis-later'); d.visLaterType=getRad('po-vis-later-type');
+  d.testAllongement=getRad('po-test-allongement'); d.testRotNucale=getRad('po-test-rot-nucale');
+  d.visEntree=getRad('po-vis-entree');
+  d.myopie=getChk('po-myopie'); d.hypermetropie=getChk('po-hypermetropie');
+  d.presbyte=getChk('po-presbyte'); d.astigmate=getChk('po-astigmate');
+  d.oeilDirect=getRad('po-oeil-direct'); d.oeilDomin=getRad('po-oeil-domin');
+  d.maddox=getRad('po-maddox'); d.coverTest=getRad('po-cover');
+  d.heteroHUni=getPoVal('po-hetero-h-uni'); d.heteroHBi=getPoVal('po-hetero-h-bi'); d.heteroV=getPoVal('po-hetero-v');
+  d.traitOrtho=getRad('po-trait-ortho'); d.ficheEx=getRad('po-fiche-ex');
+  d.reorVisOrthoptiste=getChk('po-reor-vis-orthoptiste'); d.reorVisOphtalmo=getChk('po-reor-vis-ophtalmo'); d.reorVisOptom=getChk('po-reor-vis-optom');
+  // Section 8
+  d.postureAnt=getChk('po-posture-ant'); d.posturePost=getChk('po-posture-post');
+  d.postureLater=getChk('po-posture-later'); d.postureLaterDir=getRad('po-posture-later-dir');
+  d.chaineExt=getChk('po-chaine-ext'); d.chaineFerm=getChk('po-chaine-ferm');
+  d.chaineOuv=getChk('po-chaine-ouv'); d.chaineStatOpt=getChk('po-chaine-stat-opt'); d.chaineStatDeg=getChk('po-chaine-stat-deg');
+  d.biomecArticulaire=getPoVal('po-biomec-articulaire');
+  // Section 9
+  d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv');
+  ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(t => { d['test_'+t]=getRad('po-'+t); });
+
   const bc=document.getElementById('posturo-body-canvas');
   if(bc && bc.width>0) {
     // Sauvegarder uniquement le dessin (pixels différents du fond transparent)
@@ -8177,6 +8242,70 @@ function loadPosturoBilan() {
   setPoVal('po-long-mi-proc',d.longMiProc); setPosturoRadio('po-ineg-long',d.inegLong);
   setPosturoRadio('po-ineg-type',d.inegType); setPosturoRadio('po-equilibre',d.equilibre);
   setPosturoRadio('po-scoliose',d.scoliose);
+
+  // Sections 4-9
+  const setChk = (id,v) => { const e=document.getElementById(id); if(e) e.checked=!!v; };
+  setChk('po-hypo-tronc',d.hypoTronc); setChk('po-hypo-cervelet',d.hypoCervelet);
+  setPosturoRadio('po-epines',d.epines); setPoVal('po-epines-loc',d.epinesLoc);
+  setPoVal('po-chaussure-type',d.chaussureType);
+  setChk('po-usure-interne',d.usureInterne); setChk('po-usure-externe',d.usureExterne); setChk('po-usure-contrefort',d.usureContrefort);
+  setChk('po-test-pouces',d.testPouces); setChk('po-test-convergence',d.testConvergence);
+  setChk('po-test-scapulaire',d.testScapulaire); setChk('po-test-nucale',d.testNucale);
+  setChk('po-para-plantaire',d.paraPlantaire); setChk('po-para-yeux',d.paraYeux);
+  setChk('po-para-buccale',d.paraBuccale); setChk('po-para-cicatrice',d.paraCicatrice);
+  setChk('po-para-vestibulaire',d.paraVestibulaire); setChk('po-para-viscerale',d.paraViscerale);
+  setChk('po-mono-pied-g',d.monoPiedG); setChk('po-mono-pied-d',d.monoPiedD);
+  setChk('po-mono-genou-g',d.monoGenouG); setChk('po-mono-genou-d',d.monoGenouD);
+  setChk('po-mono-hanche-g',d.monoHancheG); setChk('po-mono-hanche-d',d.monoHancheD);
+  setChk('po-align-axe',d.alignAxe); setChk('po-align-inf',d.alignInf); setChk('po-align-sup',d.alignSup);
+  setPosturoRadio('po-later',d.laterOui); if(d.laterOui) toggleLateralisation(d.laterOui==='oui');
+  setPosturoRadio('po-later-type',d.laterType);
+  setChk('po-later-d',d.laterD); setChk('po-later-g',d.laterG);
+  setPosturoRadio('po-klein',d.kleinRes); setPosturoRadio('po-ligaments',d.ligamentsRes); setPosturoRadio('po-rancurel',d.rancurelRes);
+  setPosturoRadio('po-headshaking',d.headShaking); setPosturoRadio('po-headimpulse',d.headImpulse);
+  setPosturoRadio('po-babinski',d.babinski); setPosturoRadio('po-unterburger',d.unterburger);
+  setPosturoRadio('po-vertiges',d.vertiges); setPosturoRadio('po-vppb',d.vppb);
+  if(d.vppb==='oui'){const vd=document.getElementById('po-vppb-detail');if(vd)vd.style.display='flex';}
+  setChk('po-csc-d',d.cscD); setChk('po-csc-g',d.cscG);
+  setChk('po-csc-antg',d.cscAntG); setChk('po-csc-antd',d.cscAntD);
+  setChk('po-csc-postd',d.cscPostD); setChk('po-csc-postg',d.cscPostG);
+  setPosturoRadio('po-clvf',d.clvf); if(d.clvf) toggleCLVF(d.clvf==='oui');
+  setPosturoRadio('po-pevs',d.pevs);
+  setChk('po-canal-ant',d.canalAnt); setChk('po-canal-post',d.canalPost); setChk('po-canal-lat',d.canalLat);
+  setChk('po-man-semont',d.manSemont); setChk('po-man-epley',d.manEpley);
+  setChk('po-man-epley-inv',d.manEpleyInv); setChk('po-man-lempert',d.manLempert);
+  setChk('po-reor-orl',d.reorOrl); setChk('po-reor-kine',d.reorKine);
+  setPosturoRadio('po-semelle-comp',d.semelleComp);
+  setPosturoRadio('po-mcp-ouv',d.mcpOuv); setPosturoRadio('po-serrage',d.serrage);
+  if(d.serrage) toggleSerrage(d.serrage);
+  setChk('po-aggr-dents',d.aggrDents); setChk('po-aggr-atm',d.aggrAtm);
+  setChk('po-amelio-contact',d.amelioContact); setChk('po-amelio-tension',d.amelioTension);
+  setPosturoRadio('po-atm-origine',d.atmOrigine); setPosturoRadio('po-ouv-max',d.ouvMax);
+  setPosturoRadio('po-deviation',d.deviation); setPosturoRadio('po-contractures',d.contractures);
+  setPosturoRadio('po-douleur-caps',d.douleurCaps); setPosturoRadio('po-ressaut',d.ressaut);
+  if(d.ressaut) toggleRessaut(d.ressaut==='oui');
+  setChk('po-ressaut-dte',d.ressautDte); setChk('po-ressaut-gauche',d.ressautGauche);
+  setChk('po-reor-buc-dentiste',d.reorBucDentiste); setChk('po-reor-buc-ortho',d.reorBucOrtho);
+  setChk('po-reor-buc-stomato',d.reorBucStomato); setChk('po-reor-buc-kine',d.reorBucKine);
+  setPosturoRadio('po-vis-later',d.visLater); if(d.visLater) toggleVisLater(d.visLater==='oui');
+  setPosturoRadio('po-vis-later-type',d.visLaterType);
+  setPosturoRadio('po-test-allongement',d.testAllongement); setPosturoRadio('po-test-rot-nucale',d.testRotNucale);
+  setPosturoRadio('po-vis-entree',d.visEntree);
+  setChk('po-myopie',d.myopie); setChk('po-hypermetropie',d.hypermetropie);
+  setChk('po-presbyte',d.presbyte); setChk('po-astigmate',d.astigmate);
+  setPosturoRadio('po-oeil-direct',d.oeilDirect); setPosturoRadio('po-oeil-domin',d.oeilDomin);
+  setPosturoRadio('po-maddox',d.maddox); setPosturoRadio('po-cover',d.coverTest);
+  setPoVal('po-hetero-h-uni',d.heteroHUni); setPoVal('po-hetero-h-bi',d.heteroHBi); setPoVal('po-hetero-v',d.heteroV);
+  setPosturoRadio('po-trait-ortho',d.traitOrtho); setPosturoRadio('po-fiche-ex',d.ficheEx);
+  setChk('po-reor-vis-orthoptiste',d.reorVisOrthoptiste); setChk('po-reor-vis-ophtalmo',d.reorVisOphtalmo); setChk('po-reor-vis-optom',d.reorVisOptom);
+  setChk('po-posture-ant',d.postureAnt); setChk('po-posture-post',d.posturePost);
+  setChk('po-posture-later',d.postureLater); if(d.postureLater) togglePostureLater(true);
+  setPosturoRadio('po-posture-later-dir',d.postureLaterDir);
+  setChk('po-chaine-ext',d.chaineExt); setChk('po-chaine-ferm',d.chaineFerm);
+  setChk('po-chaine-ouv',d.chaineOuv); setChk('po-chaine-stat-opt',d.chaineStatOpt); setChk('po-chaine-stat-deg',d.chaineStatDeg);
+  setPoVal('po-biomec-articulaire',d.biomecArticulaire);
+  setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv);
+  ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(t => { setPosturoRadio('po-'+t, d['test_'+t]); });
 }
 
 </script>
