@@ -8230,6 +8230,7 @@ function savePosturoBilan() {
   d.reorBucDentiste=getChk('po-reor-buc-dentiste'); d.reorBucOrtho=getChk('po-reor-buc-ortho');
   d.reorBucStomato=getChk('po-reor-buc-stomato'); d.reorBucKine=getChk('po-reor-buc-kine');
   // Section 7 Visuel
+  d.convOculaire=getChk('po-conv-oculaire');
   d.visLater=getRad('po-vis-later'); d.visLaterType=getRad('po-vis-later-type');
   d.testAllongement=getRad('po-test-allongement'); d.testRotNucale=getRad('po-test-rot-nucale');
   d.visEntree=getRad('po-vis-entree');
@@ -8435,6 +8436,7 @@ function loadPosturoBilan() {
   setChk('po-ressaut-dte',d.ressautDte); setChk('po-ressaut-gauche',d.ressautGauche);
   setChk('po-reor-buc-dentiste',d.reorBucDentiste); setChk('po-reor-buc-ortho',d.reorBucOrtho);
   setChk('po-reor-buc-stomato',d.reorBucStomato); setChk('po-reor-buc-kine',d.reorBucKine);
+  setChk('po-conv-oculaire',d.convOculaire);
   setPosturoRadio('po-vis-later',d.visLater); if(d.visLater) toggleVisLater(d.visLater==='oui');
   setPosturoRadio('po-vis-later-type',d.visLaterType);
   setPosturoRadio('po-test-allongement',d.testAllongement); setPosturoRadio('po-test-rot-nucale',d.testRotNucale);
