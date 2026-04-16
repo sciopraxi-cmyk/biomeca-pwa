@@ -2324,6 +2324,9 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
   selectPatient(p);
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
   currentBilanReadOnly = false;
+  // Réinitialiser le canvas pour forcer recalcul taille
+  const oldCanvas = document.getElementById('posturo-body-canvas');
+  if(oldCanvas) { oldCanvas.width = 0; oldCanvas.height = 0; oldCanvas._baseSnapshot = null; oldCanvas._history = []; }
   nav('pg-bilan-posturo');
   setTimeout(() => {
     loadPosturoBilan();
