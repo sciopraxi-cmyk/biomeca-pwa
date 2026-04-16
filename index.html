@@ -7607,19 +7607,27 @@ function toggleIneg(show) {
 function updateExerciceSubMenu(selEl) {
   const data = {"systeme-visuel": ["1. Exercices avant et après la rééducation oculaire", "2. Rééducation pour un canal semi circulaire latéral", "3. Rééducation problème de fixation", "4. Rééducation problème de poursuite", "5. Rééducation oculaire de base"], "systeme-vestibulaire": ["1. Rééducation pour un canal semi circulaire latéral", "2. Rééducation pour un Moro ou un canal postérieur", "3. Rééducation pour un canal antérieur", "4. Rééducation pour les saccules", "5. Rééducation pour les utricules", "6. Rééducation du réflexe vestibulo oculaire"], "systeme-somesthesique": ["1. Stimulation du système proprioceptif"], "reeduc-pied": ["1. Rééducation du pied"], "systeme-mandibulaire": ["1. Rééducation de la mâchoire"], "reeduc-terrain": ["1. Rééducation d'un patient en excès de Schéma aérien", "2. Rééducation d'un patient en excès de Schéma terrien"], "reeduc-chaines": ["1. Rééduc d'un excès de chaîne de flexion", "2. Rééduc d'un excès de chaîne d'extension", "3. Rééduc d'un excès de chaîne de fermeture", "4. Rééduc d'un excès de chaîne d'ouverture", "5. Rééduc d'une chaîne statique en expi", "6. Rééduc d'une chaîne statique en inspi"], "reflexes-archaiques": ["1. Réflexe de peur paralysante", "2. Réflexe de MORO", "3. Réflexe tendineux de protection", "6. Réflexe Tonique Asymétrique du Cou RTAC", "8. Réflexe de Galant", "9. Réflexe de Perez", "10. Réflexe de Landau", "11. Réflexe de la reptation", "12. Réflexe de l'agrippement palmaire", "14. Réflexe de Babinski", "15. Réflexe d'Agrippement plantaire", "16. Réflexe de BABKIN"], "exercices-respi": ["1. Exercice autour du diaphragme", "2. Tempos respiratoire", "3. Respiration pour le stress"], "reeduc-posturale": ["10 Exercices chaîne posturale"], "reeduc-articulaire": ["11 Exercices chaîne articulaire"]};
   const system = selEl.value;
-  const container = selEl.parentElement;
-  let sub = selEl.nextElementSibling;
-  if(!sub || !sub.classList.contains('exo-sub')) {
-    sub = document.createElement('select');
-    sub.className = 'inp exo-sub';
-    sub.style.cssText = 'font-size:10px;background:#fff;color:#222;margin-top:2px;display:none;';
-    selEl.parentNode.insertBefore(sub, selEl.nextSibling);
+  // Trouver ou créer le wrapper pour ce select
+  let wrapper = selEl.closest('.exo-pair');
+  if(!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.className = 'exo-pair';
+    wrapper.style.cssText = 'display:flex;flex-direction:column;gap:2px;background:#f8f9fa;border:1px solid #ddd;border-radius:6px;padding:4px 6px;flex:1;min-width:120px;';
+    selEl.parentNode.insertBefore(wrapper, selEl);
+    wrapper.appendChild(selEl);
   }
+  // Supprimer l'ancien sous-menu
+  const oldSub = wrapper.querySelector('.exo-sub');
+  if(oldSub) oldSub.remove();
   const opts = data[system] || [];
-  if(!opts.length) { sub.style.display='none'; return; }
-  sub.style.display = 'block';
+  if(!opts.length) return;
+  const sub = document.createElement('select');
+  sub.className = 'inp exo-sub';
+  sub.style.cssText = 'font-size:10px;background:#fff;color:#222;';
   sub.innerHTML = '<option value="">-- Exercice --</option>' + opts.map(o => '<option value="'+o+'">'+o+'</option>').join('');
+  wrapper.appendChild(sub);
 }
+
 function toggleRessaut(enabled) {
   const opts = document.getElementById('po-ressaut-opts');
   if(!opts) return;
