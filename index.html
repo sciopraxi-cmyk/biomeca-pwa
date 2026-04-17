@@ -4212,12 +4212,12 @@ function buildRapportPosturo() {
       labels.forEach(function(lbl,i) {
         bodyHtml += '<div style="text-align:center;">';
         bodyHtml += '<div style="font-size:9px;color:#888;margin-bottom:3px;font-weight:600;">'+lbl+'</div>';
-        bodyHtml += '<img src="'+(imgs[i]||'')+'" style="width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:4px;display:block;"/>';
+        bodyHtml += '<img src="'+(imgs[i]||'')+'" style="width:100%;height:300px;object-fit:contain;border-radius:4px;display:block;"/>';
         bodyHtml += '</div>';
       });
       bodyHtml += '</div>';
       if(s.bodyCanvas) {
-        bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:16px;left:0;width:100%;height:calc(100% - 16px);object-fit:fill;pointer-events:none;"/>';
+        bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:16px;left:0;width:100%;height:calc(100% - 16px);object-fit:contain;pointer-events:none;opacity:0.95;"/>';
       }
       bodyHtml += '</div>';
       bodyHtml += '</div></div>';
