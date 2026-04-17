@@ -4182,7 +4182,7 @@ function buildRapportPosturo() {
   // 9. Traitements
   const trait = [];
   if(d.semellesDesc) trait.push(['Plan de semelles', d.semellesDesc]);
-  // Circuits express
+  // Circuits express — encadrés séparés par circuit
   const circLabels = ['Exercice 1','Exercice 2','Exercice 3','Exercice 4'];
   ['c1','c2'].forEach(function(cx, ci) {
     const circItems = [];
@@ -4199,7 +4199,7 @@ function buildRapportPosturo() {
       }
     });
     if(circItems.length) {
-      circItems.forEach(item => trait.push(['Circuit '+(ci+1)+' — '+item[0], item[1]]));
+      sections.push({titre:'9. Circuit '+(ci+1), items:circItems, color:'#16a085'});
     }
   });
   if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
