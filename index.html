@@ -1640,6 +1640,8 @@ async function adminCreateUser() {
       document.getElementById('admin-pwd').value = '';
       document.getElementById('admin-nom').value = '';
       document.getElementById('admin-prenom').value = '';
+      // Rafraîchir la liste des utilisateurs autorisés
+      setTimeout(() => renderParamsPratList(), 1000);
     } else {
       errEl.textContent = data.msg || data.error_description || 'Erreur lors de la création.';
       errEl.style.display = 'block';
