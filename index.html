@@ -8417,14 +8417,15 @@ function savePosturoBilan() {
   // Section 4 - Neuro fonctionnel complet
   d.hypoTronc=getChk('po-hypo-tronc'); d.hypoCervelet=getChk('po-hypo-cervelet');
   // Sauvegarder les données setBilanField (ps_, pd_, nc_ etc.)
-  // Sauvegarder toutes les checkboxes section 4
+  // Sauvegarder TOUTES les checkboxes de psec-3 par ID
   if(!d.neuro4) d.neuro4 = {};
   Object.assign(d.neuro4, bilanData);
-  // IDs statiques aps/apd/cf/acd
-  ["aps-epaule-g", "aps-epaule-d", "aps-epaule-n", "aps-rot-g", "aps-rot-d", "aps-rot-n", "aps-coude-g", "aps-coude-d", "aps-coude-n", "aps-pron-g", "aps-pron-d", "aps-pron-n", "apd-tronc-g", "apd-tronc-d", "apd-tronc-n", "apd-cervelet-g", "apd-cervelet-d", "apd-cervelet-n", "apd-tete-g", "apd-tete-d", "apd-tete-n", "apd-membre-g", "apd-membre-d", "apd-membre-n", "cf-ext-g", "cf-ext-d", "cf-flex-g", "cf-flex-d", "acd-flex-g", "acd-flex-d", "acd-hyper-g", "acd-hyper-d"].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) d.neuro4[id] = el.checked;
-  });
+  const psec3 = document.getElementById('psec-3');
+  if(psec3) {
+    psec3.querySelectorAll('input[type="checkbox"][id]').forEach(el => {
+      d.neuro4[el.id] = el.checked;
+    });
+  }
   // Nerfs crâniens
   const ncList = ['recap','nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12'];
   d.nc = {};
