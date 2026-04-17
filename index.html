@@ -3967,13 +3967,13 @@ function buildRapportPosturo() {
     const inter = [];
     if(n['inter-prec-g']) inter.push('Précision G'); if(n['inter-prec-d']) inter.push('Précision D');
     if(n['inter-coord-g']) inter.push('Coordination G'); if(n['inter-coord-d']) inter.push('Coordination D');
-    if(inter.length) neuro.push(['Inter-hémisphérique', inter.join(', ')]);
+    if(inter.length) neuro.push(['Cervelet intermédiaire', inter.join(', ')]);
 
     // 11. Latéral cérébral
     const lat = [];
     if(n['lat-prec-g']) lat.push('Précision G'); if(n['lat-prec-d']) lat.push('Précision D');
     if(n['lat-coord-g']) lat.push('Coordination G'); if(n['lat-coord-d']) lat.push('Coordination D');
-    if(lat.length) neuro.push(['Latéral cérébral', lat.join(', ')]);
+    if(lat.length) neuro.push(['Cervelet latéral', lat.join(', ')]);
 
     // 12. Proprioception
     const prop = [];
