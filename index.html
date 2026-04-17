@@ -522,52 +522,15 @@ const supa = {
 };
 
 // Wrapper pour appeler pwaLogin après chargement complet
-function doLogin() { pwaLogin(); }
-function doRegister() { pwaRegister(); }
-
-async function pwaLogin() {
-  const email = document.getElementById('pwa-email').value.trim();
-  const pwd = document.getElementById('pwa-pwd').value;
-  const errEl = document.getElementById('pwa-login-err');
-  const btn = document.getElementById('pwa-login-btn');
-  errEl.style.display = 'none';
-
-  if(!email || !pwd) {
-    errEl.textContent = 'Veuillez remplir tous les champs.';
-    errEl.style.display = 'block'; return;
-  }
-
-  btn.disabled = true; btn.textContent = 'Connexion...';
-
-  try {
-    const data = await supa.signIn(email, pwd);
-    if(data.access_token) {
-      const isAdmin = email.toLowerCase() === 'admin@sciopraxi.fr';
-      pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin, user_metadata: data.user?.user_metadata || {} };
-      savePwaSession(data.access_token, pwaUser);
-      await onPwaLoginSuccess();
-    } else {
-      errEl.textContent = data.error_description || data.msg || 'Email ou mot de passe incorrect.';
-      errEl.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Se connecter';
-    }
-  } catch(e) {
-    errEl.textContent = 'Erreur de connexion. Vérifiez votre connexion internet.';
-    errEl.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Se connecter';
-  }
+function doLogin() {
+  if(typeof pwaLogin === 'function') { pwaLogin(); }
+  else { window.addEventListener('load', function() { pwaLogin(); }, {once:true}); }
+}
+function doRegister() {
+  if(typeof pwaRegister === 'function') { pwaRegister(); }
+  else { window.addEventListener('load', function() { pwaRegister(); }, {once:true}); }
 }
 
-function showRegisterForm() {
-  document.getElementById('pwa-register-form').style.display = 'block';
-  document.getElementById('pwa-login-form').style.display = 'none';
-  document.getElementById('pwa-register-form').scrollIntoView({behavior:'smooth'});
-}
-function showLoginForm() {
-  document.getElementById('pwa-login-form').style.display = 'block';
-  document.getElementById('pwa-register-form').style.display = 'none';
-  document.getElementById('pwa-login-form').scrollIntoView({behavior:'smooth'});
-}
 async function pwaRegister() {
   const nom = document.getElementById('reg-nom').value.trim();
   const prenom = document.getElementById('reg-prenom').value.trim();
