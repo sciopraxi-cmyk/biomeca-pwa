@@ -4229,17 +4229,15 @@ function buildRapportPosturo() {
       bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';">';
       const labels4 = ['Profil D','Dos','Face','Profil G'];
       const imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
-      bodyHtml += '<div style="display:grid;grid-template-columns:64fr 114fr 118fr 65fr;gap:0;margin-bottom:3px;">';
-      labels4.forEach(l => bodyHtml += '<div style="text-align:center;font-size:9px;color:#888;font-weight:600;">'+l+'</div>');
+      // Largeurs proportionnelles aux images naturelles (64+114+118+65=361px total)
+      const widths4 = ['17.7%', '31.6%', '32.7%', '18.0%'];
+      bodyHtml += '<div style="display:flex;gap:0;margin-bottom:3px;">';
+      labels4.forEach((l,i) => bodyHtml += '<div style="width:'+widths4[i]+';text-align:center;font-size:9px;color:#888;font-weight:600;">'+l+'</div>');
       bodyHtml += '</div>';
-      bodyHtml += '<div style="position:relative;">';
-      // Les 4 bonhommes côte à côte
-      bodyHtml += '<div style="display:grid;grid-template-columns:64fr 114fr 118fr 65fr;gap:0;">';
-      imgs4.forEach(function(src) {
-        bodyHtml += '<img src="'+(src||'')+'" style="width:100%;height:auto;display:block;"/>';
+      bodyHtml += '<div style="position:relative;display:flex;gap:0;align-items:flex-start;">';
+      imgs4.forEach(function(src,i) {
+        bodyHtml += '<img src="'+(src||'')+'" style="width:'+widths4[i]+';height:auto;display:block;flex-shrink:0;"/>';
       });
-      bodyHtml += '</div>';
-      // Canvas des dessins en overlay
       if(s.bodyCanvas) {
         bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none;"/>';
       }
