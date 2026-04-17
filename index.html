@@ -401,9 +401,10 @@ body.printing #rpt-print{display:block!important;}
 
 <style>
 @media print {
-  .page { display: none !important; }
+  body > * { display: none !important; }
   #pg-rapport-posturo { display: block !important; }
   #pg-rapport-posturo > div:first-child { display: none !important; }
+  .rp-page { display: block !important; }
 }
 </style>
 
@@ -3834,8 +3835,70 @@ function buildRapportPosturo() {
 
   // 5. Système plantaire
   const plant = [];
+  if(d.epines==='oui') plant.push(['Épines irritatives', 'Oui'+(d.epinesLoc?' — '+d.epinesLoc:'')]);
   if(d.tactique) plant.push(['Tactique équilibration', d.tactique]);
+  if(d.chaussureType) plant.push(['Chaussure', d.chaussureType]);
+  const parasites = ['paraPlantaire','paraYeux','paraBuccale','paraCicatrice','paraVestibulaire','paraViscerale']
+    .filter(k=>d[k]).map(k=>k.replace('para','').toLowerCase());
+  if(parasites.length) plant.push(['Parasites', parasites.join(', ')]);
   if(plant.length) sections.push({titre:'5. Système plantaire', items:plant, color:'#f0a500'});
+
+  // 6. Vestibulaire
+  const vest = [];
+  if(d.laterOui==='oui') vest.push(['Latéralisation', (d.laterType||'')+(d.laterD?' Droite':d.laterG?' Gauche':'')]);
+  if(d.kleinRes) vest.push(['Test de DeKleyn', d.kleinRes]);
+  if(d.ligamentsRes) vest.push(['Test ligaments', d.ligamentsRes]);
+  if(d.rancurelRes) vest.push(['Test de Rancurel', d.rancurelRes]);
+  if(d.vertiges==='oui') vest.push(['Vertiges/nystagmus', 'Présents']);
+  if(d.vppb==='oui') vest.push(['VPPB', 'Positif']);
+  if(d.clvf) vest.push(['CLVF', d.clvf]);
+  if(d.semelleComp) vest.push(['Semelle compensation', d.semelleComp]);
+  if(vest.length) sections.push({titre:'6. Investigation vestibulaire', items:vest, color:'#8e44ad'});
+
+  // 7. Buccal/Visuel
+  const bucc = [];
+  if(d.mcpOuv==='oui') bucc.push(['MCP ouverture bouche', 'Améliorée (ATM secondaire)']);
+  if(d.serrage) bucc.push(['Serrage', d.serrage]);
+  if(d.atmOrigine) bucc.push(['ATM origine', d.atmOrigine]);
+  if(d.ouvMax) bucc.push(['Ouverture max', d.ouvMax]);
+  if(d.deviation) bucc.push(['Déviation', d.deviation]);
+  if(d.ressaut==='oui') bucc.push(['Ressaut ATM', 'Présent'+(d.ressautDte?' Droite':'')+(d.ressautGauche?' Gauche':'')]);
+  if(d.visEntree) bucc.push(['Entrée visuelle', d.visEntree]);
+  if(d.visLater==='oui') bucc.push(['Latéralisation visuelle', d.visLaterType||'Oui']);
+  if(d.myopie) bucc.push(['Myopie', 'Oui']);
+  if(d.hypermetropie) bucc.push(['Hypermétropie', 'Oui']);
+  if(d.presbyte) bucc.push(['Presbytie', 'Oui']);
+  if(d.astigmate) bucc.push(['Astigmatisme', 'Oui']);
+  if(d.maddox) bucc.push(['Maddox', d.maddox]);
+  if(bucc.length) sections.push({titre:'7. Buccal / Visuel', items:bucc, color:'#2471a3'});
+
+  // 8. Terrain/Synthèse
+  const terr = [];
+  if(d.postureAnt) terr.push(['Posture globale', 'Antériorisation']);
+  if(d.posturePost) terr.push(['Posture globale', 'Postériorisation']);
+  if(d.postureLater) terr.push(['Posture globale', 'Latéralisation '+(d.postureLaterDir||'')]);
+  if(d.chaineExt) terr.push(['Chaîne', 'Extension']);
+  if(d.chaineFerm) terr.push(['Chaîne', 'Fermeture']);
+  if(d.chaineOuv) terr.push(['Chaîne', 'Ouverture']);
+  if(d.chaineStatOpt) terr.push(['Chaîne statique', 'Optimum']);
+  if(d.chaineStatDeg) terr.push(['Chaîne statique', 'Dégradée']);
+  if(d.biomecArticulaire) terr.push(['Biomécanique', d.biomecArticulaire]);
+  if(terr.length) sections.push({titre:'8. Terrain du patient', items:terr, color:'#2a7a4e'});
+
+  // 9. Traitements
+  const trait = [];
+  if(d.semellesDesc) trait.push(['Plan de semelles', d.semellesDesc]);
+  if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
+  if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
+  if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
+  const tests = [];
+  const testLabels = ['Rotation nucale','Flexion antérieure','Extenseurs poignet','Stabilité monopodale','Force/stabilité arrière','Mobilité axe','Romberg','Morphostatique'];
+  ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(function(t,i) {
+    if(d['test_'+t]==='oui') tests.push(testLabels[i]+' ✅');
+    else if(d['test_'+t]==='non') tests.push(testLabels[i]+' ❌');
+  });
+  if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
+  if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
 
   // Image pieds
   if(d._feetCanvas) {
