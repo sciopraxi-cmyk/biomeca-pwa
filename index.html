@@ -4227,47 +4227,13 @@ function buildRapportPosturo() {
       bodyHtml += '<div class="rp-section">';
       bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
       bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';">';
-      // Utiliser les éléments DOM directement (déjà chargés)
-      const imgElems = [
-        {el: document.getElementById('imgjs-morpho-profilD'), w: 64,  h: 360},
-        {el: document.getElementById('imgjs-morpho-face2'),   w: 114, h: 360},
-        {el: document.getElementById('imgjs-morpho-face'),    w: 118, h: 360},
-        {el: document.getElementById('imgjs-morpho-profilG'), w: 65,  h: 360}
-      ];
-      const totalW = 361, cmpH = 360;
-      const cmp = document.createElement('canvas');
-      cmp.width = totalW; cmp.height = cmpH;
-      const cmpCtx = cmp.getContext('2d');
-      let xOff = 0;
-      imgElems.forEach(function(d) {
-        if(d.el && d.el.complete && d.el.naturalWidth > 0) {
-          cmpCtx.drawImage(d.el, xOff, 0, d.w, d.h);
-        }
-        xOff += d.w;
-      });
-      // Overlay dessins via _bodyCanvas sauvegardé
-      const bcSrc = s.bodyCanvas || currentPatient?.bilanDataPosturo?._bodyCanvas;
-      if(bcSrc) {
-        const ov = new Image(); ov.src = bcSrc;
-        if(ov.complete && ov.naturalWidth > 0) {
-          cmpCtx.drawImage(ov, 0, 0, totalW, cmpH);
-        } else {
-          ov.onload = function() { cmpCtx.drawImage(ov, 0, 0, totalW, cmpH); };
-        }
-      }
       const labels4 = ['Profil D','Dos','Face','Profil G'];
       bodyHtml += '<div style="display:grid;grid-template-columns:64fr 114fr 118fr 65fr;gap:0;margin-bottom:3px;">';
       labels4.forEach(l => bodyHtml += '<div style="text-align:center;font-size:9px;color:#888;font-weight:600;">'+l+'</div>');
       bodyHtml += '</div>';
-      // Délai pour laisser l'overlay se charger
-      setTimeout(function() {
-        const rapportBody = document.getElementById('rapport-posturo-body');
-        if(rapportBody) {
-          const imgEl = rapportBody.querySelector('img[data-bonhommes]');
-          if(imgEl) imgEl.src = cmp.toDataURL('image/png');
-        }
-      }, 300);
-      bodyHtml += '<img data-bonhommes="1" src="'+cmp.toDataURL('image/png')+'" style="width:100%;height:auto;border-radius:4px;"/>';
+      if(s.bodyCanvas) {
+        bodyHtml += '<img src="'+s.bodyCanvas+'" style="width:100%;height:auto;border-radius:4px;display:block;"/>';
+      }
       bodyHtml += '</div></div>';
     } else if(s.type === 'pieds') {
       bodyHtml += '<div class="rp-section">';
@@ -8652,17 +8618,28 @@ function savePosturoBilan() {
 
   const bc=document.getElementById('posturo-body-canvas');
   if(bc && bc.width>0 && bc._history && bc._history.length>0) {
-    // Sauvegarder seulement si des dessins ont été effectués
-    const tmpBc = document.createElement('canvas');
-    tmpBc.width = bc.width; tmpBc.height = bc.height;
-    const tmpBctx = tmpBc.getContext('2d');
-    tmpBctx.drawImage(bc, 0, 0);
-    const imgD = tmpBctx.getImageData(0,0,bc.width,bc.height);
-    for(let i=0;i<imgD.data.length;i+=4) {
-      if(imgD.data[i]<10 && imgD.data[i+1]<10 && imgD.data[i+2]<10) imgD.data[i+3]=0;
-    }
-    tmpBctx.putImageData(imgD,0,0);
-    d._bodyCanvas = tmpBc.toDataURL('image/png');
+    // Créer image composite: bonhommes + dessins dans les bonnes proportions
+    const imgElems = [
+      {el: document.getElementById('imgjs-morpho-profilD'), w: 64},
+      {el: document.getElementById('imgjs-morpho-face2'),   w: 114},
+      {el: document.getElementById('imgjs-morpho-face'),    w: 118},
+      {el: document.getElementById('imgjs-morpho-profilG'), w: 65}
+    ];
+    const cH = 360, cW = 361;
+    const compC = document.createElement('canvas');
+    compC.width = cW; compC.height = cH;
+    const compCtx = compC.getContext('2d');
+    let xOff = 0;
+    imgElems.forEach(function(d) {
+      if(d.el && d.el.complete && d.el.naturalWidth > 0) {
+        compCtx.drawImage(d.el, xOff, 0, d.w, cH);
+      }
+      xOff += d.w;
+    });
+    // Superposer les dessins du canvas
+    const dpr = window.devicePixelRatio || 1;
+    compCtx.drawImage(bc, 0, 0, bc.width, bc.height, 0, 0, cW, cH);
+    d._bodyCanvas = compC.toDataURL('image/png');
   }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc && fc.width>0 && fc._history && fc._history.length>0) {
