@@ -1648,28 +1648,6 @@ async function adminCreateUser() {
   btn.disabled = false; btn.textContent = "Créer l'accès";
 }
 
-async function adminLoadUsers() {
-  const listEl = document.getElementById('admin-users-list');
-  listEl.textContent = 'Chargement...';
-  try {
-    const res = await fetch(SUPA_URL + '/auth/v1/admin/users', {
-      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + pwaUser.token }
-    });
-    const data = await res.json();
-    const users = data.users || [];
-    if(!users.length) { listEl.textContent = 'Aucun utilisateur trouvé.'; return; }
-    listEl.innerHTML = users.map(u => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">
-        <div>
-          <div style="font-weight:600;color:var(--fg);">${u.email}</div>
-          <div style="font-size:11px;color:var(--mut);">Créé le ${new Date(u.created_at).toLocaleDateString('fr-FR')} · ${u.user_metadata?.acces || 'standard'}</div>
-        </div>
-        <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${u.email_confirmed_at ? '#e8f8ee' : '#fdf3e3'};color:${u.email_confirmed_at ? '#2a7a4e' : '#856404'};">${u.email_confirmed_at ? 'Confirmé' : 'En attente'}</span>
-      </div>`).join('');
-  } catch(e) {
-    listEl.textContent = 'Erreur de chargement.';
-  }
-}
 
 // Afficher panneau admin si admin
 function showAdminPanelIfNeeded() {
