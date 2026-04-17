@@ -446,6 +446,81 @@ body.printing #rpt-print{display:block!important;}
 </div>
 
 <script>
+const SUPA_URL = 'https://tzivizoacdyopwfzerrb.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6aXZpem9hY2R5b3B3ZnplcnJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MjQ0NDcsImV4cCI6MjA5MTQwMDQ0N30.P0Uw6FjUdwzrmgUFii1_AjrqNJgtEbFAPBnplAyg3gY';
+const supa = {
+  async signIn(email, password) {
+    const res = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
+      body: JSON.stringify({ email, password })
+    });
+    return res.json();
+  },
+
+  async signUp(email, password, metadata) {
+    const res = await fetch(SUPA_URL + '/auth/v1/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
+      body: JSON.stringify({ email, password, data: metadata })
+    });
+    return res.json();
+  },
+
+  async signOut(token) {
+    await fetch(SUPA_URL + '/auth/v1/logout', {
+      method: 'POST',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token }
+    });
+  },
+
+  async getUser(token) {
+    const res = await fetch(SUPA_URL + '/auth/v1/user', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token }
+    });
+    return res.json();
+  },
+
+  async loadData(token, table) {
+    const res = await fetch(SUPA_URL + '/rest/v1/' + table + '?select=*', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    });
+    if(!res.ok) return [];
+    return res.json();
+  },
+
+  async saveData(token, table, data) {
+    const headers = {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    };
+    // Essayer PATCH d'abord (mise à jour de la ligne existante)
+    const patchHeaders = Object.assign({}, headers, {'Prefer': 'return=representation,count=exact'});
+    const patch = await fetch(SUPA_URL + '/rest/v1/' + table + '?user_id=eq.' + data.user_id, {
+      method: 'PATCH',
+      headers: patchHeaders,
+      body: JSON.stringify({ data: data.data, updated_at: data.updated_at })
+    });
+    if(patch.ok) {
+      const patched = await patch.json();
+      if(patched && patched.length > 0) return true; // ligne mise à jour
+    }
+    // Si la ligne n'existe pas encore, faire un POST (insertion)
+    const post = await fetch(SUPA_URL + '/rest/v1/' + table, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data)
+    });
+    if(!post.ok) {
+      const err = await post.text();
+      console.error('Supabase saveData error', post.status, err);
+    }
+    return post.ok;
+  }
+};
+
 // Wrapper pour appeler pwaLogin après chargement complet
 function doLogin() { pwaLogin(); }
 function doRegister() { pwaRegister(); }
