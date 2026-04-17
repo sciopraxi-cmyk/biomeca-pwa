@@ -1921,8 +1921,14 @@ function editPatient(idx) {
     btn.textContent = '💾 Sauvegarder modifications';
     btn.setAttribute('onclick', `saveEditPatient(${idx})`);
   }
+  // Afficher le formulaire
+  const card = document.getElementById('nouveau-patient-card');
+  if(card) card.style.display = 'block';
   nav('pg-patients');
   // Scroller vers le formulaire
+  // Afficher le formulaire
+  const card = document.getElementById('nouveau-patient-card');
+  if(card) card.style.display = 'block';
   setTimeout(()=>document.getElementById('np-nom')?.scrollIntoView({behavior:'smooth'}),200);
 }
 
