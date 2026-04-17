@@ -4207,19 +4207,57 @@ function buildRapportPosturo() {
       bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">';
       const labels = ['Profil D','Dos','Face','Profil G'];
       const imgs = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
-      bodyHtml += '<div style="position:relative;">';
-      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">';
-      labels.forEach(function(lbl,i) {
-        bodyHtml += '<div style="text-align:center;">';
-        bodyHtml += '<div style="font-size:9px;color:#888;margin-bottom:3px;font-weight:600;">'+lbl+'</div>';
-        bodyHtml += '<img src="'+(imgs[i]||'')+'" style="width:100%;height:300px;object-fit:contain;border-radius:4px;display:block;"/>';
-        bodyHtml += '</div>';
+      // Créer une image composite unique: bonhommes côte à côte + dessins superposés
+      const compositeCanvas = document.createElement('canvas');
+      const cW = 800, cH = 400;
+      compositeCanvas.width = cW; compositeCanvas.height = cH;
+      const cCtx = compositeCanvas.getContext('2d');
+      const colW = cW / 4;
+      // Charger et dessiner les 4 bonhommes
+      let loaded = 0;
+      const finalHtml = new Promise(resolve => {
+        imgs.forEach(function(src, i) {
+          if(!src) { loaded++; if(loaded===4) resolve(); return; }
+          const img = new Image();
+          img.onload = function() {
+            cCtx.drawImage(img, i*colW, 0, colW, cH);
+            loaded++;
+            if(loaded === 4) {
+              // Superposer le canvas des dessins
+              if(s.bodyCanvas) {
+                const overlay = new Image();
+                overlay.onload = function() {
+                  cCtx.drawImage(overlay, 0, 0, cW, cH);
+                  resolve(compositeCanvas.toDataURL('image/png'));
+                };
+                overlay.src = s.bodyCanvas;
+              } else {
+                resolve(compositeCanvas.toDataURL('image/png'));
+              }
+            }
+          };
+          img.onerror = function() { loaded++; if(loaded===4) resolve(); };
+          img.src = src;
+        });
+      });
+      // Fallback synchrone si Promise pas résolue
+      imgs.forEach(function(src,i) {
+        if(!src) return;
+        const img = new Image(); img.src = src;
+        if(img.complete) cCtx.drawImage(img, i*colW, 0, colW, cH);
+      });
+      if(s.bodyCanvas) {
+        const ov = new Image(); ov.src = s.bodyCanvas;
+        if(ov.complete) cCtx.drawImage(ov, 0, 0, cW, cH);
+      }
+      const compositeSrc = compositeCanvas.toDataURL('image/png');
+      // Labels
+      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;margin-bottom:4px;">';
+      labels.forEach(function(lbl) {
+        bodyHtml += '<div style="text-align:center;font-size:9px;color:#888;font-weight:600;">'+lbl+'</div>';
       });
       bodyHtml += '</div>';
-      if(s.bodyCanvas) {
-        bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:16px;left:0;width:100%;height:calc(100% - 16px);object-fit:contain;pointer-events:none;opacity:0.95;"/>';
-      }
-      bodyHtml += '</div>';
+      bodyHtml += '<img src="'+compositeSrc+'" style="width:100%;height:auto;border-radius:4px;display:block;"/>';
       bodyHtml += '</div></div>';
     } else if(s.type === 'pieds') {
       bodyHtml += '<div class="rp-section">';
