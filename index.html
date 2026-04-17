@@ -512,6 +512,40 @@ function lpToggle() {
 </script>
 </div>
 
+<div id="modal-mon-compte" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:16px;padding:28px;width:90%;max-width:420px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="font-size:16px;font-weight:700;color:var(--blue);">👤 Mon compte</div>
+      <button onclick="closeMonCompte()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">×</button>
+    </div>
+    <!-- Avatar + nom -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <div id="mc-avatar" style="width:52px;height:52px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0;"></div>
+      <div>
+        <div id="mc-nom" style="font-size:15px;font-weight:700;color:var(--fg);"></div>
+        <div id="mc-email" style="font-size:12px;color:var(--mut);"></div>
+        <div id="mc-titre" style="font-size:12px;color:var(--mut);margin-top:2px;"></div>
+      </div>
+    </div>
+    <!-- Formule -->
+    <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Formule active</div>
+      <div id="mc-formule" style="font-size:14px;font-weight:600;color:var(--blue);"></div>
+      <div id="mc-formule-desc" style="font-size:12px;color:var(--mut);margin-top:4px;"></div>
+    </div>
+    <!-- Infos cabinet -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Informations cabinet</div>
+      <div id="mc-cabinet" style="font-size:13px;color:var(--fg);"></div>
+    </div>
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeMonCompte()" style="flex:1;background:var(--bg2);border:1px solid var(--bord);padding:10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--fg);">Fermer</button>
+      <button onclick="pwaLogout()" style="flex:1;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Se déconnecter</button>
+    </div>
+  </div>
+</div>
+
 <div class="app" id="biomeca-app" style="display:none;">
 <div class="topbar">
   <div class="logo-wrap">
@@ -519,6 +553,7 @@ function lpToggle() {
     <div>
       <div style="font-size:13px;font-weight:700;color:var(--blue);">BILANS</div>
     </div>
+  <button onclick="showMonCompte()" style="background:var(--bg2);border:1px solid var(--bord);color:var(--fg);font-size:11px;cursor:pointer;padding:5px 12px;border-radius:6px;font-weight:500;" id="btn-mon-compte">👤 Mon compte</button>
   <button onclick="pwaLogout()" style="background:none;border:none;color:var(--mut);font-size:11px;cursor:pointer;padding:4px 10px;border-radius:6px;" title="Se déconnecter">⎋ Déconnexion</button>
   </div>
   <div class="tnav">
@@ -1655,6 +1690,47 @@ function showAdminPanelIfNeeded() {
     const panel = document.getElementById('admin-panel');
     if(panel) panel.style.display = 'block';
   }
+}
+
+function showMonCompte() {
+  const modal = document.getElementById('modal-mon-compte');
+  if(!modal) return;
+  modal.style.display = 'flex';
+  // Remplir les infos
+  const meta = pwaUser?.user_metadata || {};
+  const nom = meta.nom || '';
+  const prenom = meta.prenom || '';
+  const titre = meta.titre || '';
+  const cabinet = meta.cabinet || '';
+  const email = pwaUser?.email || '';
+  const acces = meta.acces || 'standard';
+  // Avatar
+  const init = ((prenom||nom||email)[0]||'?').toUpperCase();
+  document.getElementById('mc-avatar').textContent = init;
+  document.getElementById('mc-nom').textContent = (prenom + ' ' + nom).trim() || email;
+  document.getElementById('mc-email').textContent = email;
+  document.getElementById('mc-titre').textContent = titre;
+  // Formule
+  const formules = {
+    gratuit: {label:'Gratuit (illimité)', desc:'Accès complet offert'},
+    essai: {label:'Essai 14 jours', desc:'Accès complet temporaire'},
+    postural: {label:'Bilan postural — 20€/mois', desc:'Module postural uniquement'},
+    sport: {label:'Podologie du sport — 40€/mois', desc:'Module sport + analyse cinématique'},
+    duo: {label:'Duo — 35€/mois', desc:'2 modules au choix'},
+    integral: {label:'Intégral — 70€/mois', desc:'Les 3 modules complets'}
+  };
+  const f = formules[acces] || {label: acces, desc:''};
+  document.getElementById('mc-formule').textContent = f.label;
+  document.getElementById('mc-formule-desc').textContent = f.desc;
+  // Cabinet
+  document.getElementById('mc-cabinet').innerHTML = cabinet ?
+    '<div>🏥 ' + cabinet + '</div>' :
+    '<div style="color:var(--mut);font-size:12px;">Aucun cabinet renseigné</div>';
+}
+
+function closeMonCompte() {
+  const modal = document.getElementById('modal-mon-compte');
+  if(modal) modal.style.display = 'none';
 }
 
 async function adminUpdateAcces(userId, newAcces) {
