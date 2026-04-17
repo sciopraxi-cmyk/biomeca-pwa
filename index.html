@@ -1657,6 +1657,22 @@ function showAdminPanelIfNeeded() {
   }
 }
 
+async function adminUpdateAcces(userId, newAcces) {
+  try {
+    await fetch(SUPA_URL + '/auth/v1/admin/users/' + userId, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + pwaUser.token
+      },
+      body: JSON.stringify({ user_metadata: { acces: newAcces } })
+    });
+  } catch(e) {
+    console.error('Erreur mise à jour accès:', e);
+  }
+}
+
 async function pwaLogout() {
   if(!confirm('Se déconnecter ?')) return;
   if(pwaUser?.token) {
@@ -2042,15 +2058,7 @@ async function renderParamsPratList() {
     const adminBadge = isAdmin ? '<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:4px;">Admin</span>' : '';
     const editBtn = '<button data-uid="'+userId+'" data-nom="'+nom+'" data-prenom="'+prenom+'" onclick="editPraticienMeta(this.dataset.uid, this.dataset.nom, this.dataset.prenom)" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;" title="Modifier nom/prénom">✏️</button>';
     let droitsSelect = '';
-    if(isAdmin) {
-      droitsSelect = '';
-    } else {
-      const selAll = droits === 'all' ? ' selected' : '';
-      const selSport = droits === 'sport' ? ' selected' : '';
-      const selPosturo = droits === 'posturo' ? ' selected' : '';
-      droitsSelect = '<select data-email="' + email + '" onchange="setPraticienDroitsByEmail(this.dataset.email, this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);color:var(--fg);"><option value="all"' + selAll + '>Sport + Posturo</option><option value="sport"' + selSport + '>Sport uniquement</option><option value="posturo"' + selPosturo + '>Posturo uniquement</option></select>';
-    }
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);"><div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div><div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;"><div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge + editBtn + '</div><div style="font-size:11px;color:var(--mut);">' + email + '</div><div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div><div style="font-size:10px;color:var(--mut);">Accès : <b>' + acces + '</b></div></div>' + droitsSelect + '</div>';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);"><div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div><div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;"><div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge + editBtn + '</div><div style="font-size:11px;color:var(--mut);">' + email + '</div><div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div><div style="font-size:10px;color:var(--mut);display:flex;align-items:center;gap:6px;">Accès : <select data-uid="' + userId + '" onchange="adminUpdateAcces(this.dataset.uid, this.value)" style="font-size:11px;padding:2px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);color:var(--fg);"><option value="gratuit"' + (acces==="gratuit"?" selected":"") + '>Gratuit (illimité)</option><option value="essai"' + (acces==="essai"?" selected":"") + '>Essai 14 jours</option><option value="postural"' + (acces==="postural"?" selected":"") + '>Bilan postural</option><option value="sport"' + (acces==="sport"?" selected":"") + '>Podologie du sport</option><option value="duo"' + (acces==="duo"?" selected":"") + '>Duo (2 modules)</option><option value="integral"' + (acces==="integral"?" selected":"") + '>Intégral (3 modules)</option></select></div></div>' + droitsSelect + '</div>';
   });
   el.innerHTML = html;
 }
