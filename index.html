@@ -3840,14 +3840,37 @@ function buildRapportPosturo() {
   if(d.rombergMorpho) morpho.push(['Romberg', d.rombergMorpho]);
   if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho, color:'#3498db'});
 
-  // Silhouettes bonhommes juste après section 2
+  // Silhouettes bonhommes: capturer le conteneur tel quel via canvas
   if(d._bodyCanvas) {
+    // Chercher le conteneur des bonhommes dans psec-1
+    const bodyContainer = document.querySelector('#psec-1 .posturo-body-wrap') ||
+                          document.getElementById('posturo-body-canvas')?.parentElement;
+    let compositeImg = null;
+    if(bodyContainer) {
+      try {
+        const rect = bodyContainer.getBoundingClientRect();
+        const tmpC = document.createElement('canvas');
+        tmpC.width = rect.width * window.devicePixelRatio;
+        tmpC.height = rect.height * window.devicePixelRatio;
+        const ctx = tmpC.getContext('2d');
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        // Dessiner les images de fond
+        bodyContainer.querySelectorAll('img').forEach(img => {
+          const r = img.getBoundingClientRect();
+          ctx.drawImage(img, r.left - rect.left, r.top - rect.top, r.width, r.height);
+        });
+        // Superposer le canvas des dessins
+        const bc = document.getElementById('posturo-body-canvas');
+        if(bc) ctx.drawImage(bc, 0, 0, rect.width, rect.height);
+        compositeImg = tmpC.toDataURL('image/png');
+      } catch(e) { compositeImg = null; }
+    }
     const faceImg = document.getElementById('imgjs-morpho-face')?.src;
     const face2Img = document.getElementById('imgjs-morpho-face2')?.src;
     const profilGImg = document.getElementById('imgjs-morpho-profilG')?.src;
     const profilDImg = document.getElementById('imgjs-morpho-profilD')?.src;
     sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-      faceImg, face2Img, profilGImg, profilDImg, bodyCanvas: d._bodyCanvas});
+      faceImg, face2Img, profilGImg, profilDImg, bodyCanvas: d._bodyCanvas, compositeImg});
   }
 
   // 3. Bilan dynamique
@@ -4204,60 +4227,29 @@ function buildRapportPosturo() {
       bodyHtml += '<div class="rp-section">';
       bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
       bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';">';
-      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">';
-      const labels = ['Profil D','Dos','Face','Profil G'];
-      const imgs = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
-      // Créer une image composite unique: bonhommes côte à côte + dessins superposés
-      const compositeCanvas = document.createElement('canvas');
-      const cW = 800, cH = 400;
-      compositeCanvas.width = cW; compositeCanvas.height = cH;
-      const cCtx = compositeCanvas.getContext('2d');
-      const colW = cW / 4;
-      // Charger et dessiner les 4 bonhommes
-      let loaded = 0;
-      const finalHtml = new Promise(resolve => {
-        imgs.forEach(function(src, i) {
-          if(!src) { loaded++; if(loaded===4) resolve(); return; }
-          const img = new Image();
-          img.onload = function() {
-            cCtx.drawImage(img, i*colW, 0, colW, cH);
-            loaded++;
-            if(loaded === 4) {
-              // Superposer le canvas des dessins
-              if(s.bodyCanvas) {
-                const overlay = new Image();
-                overlay.onload = function() {
-                  cCtx.drawImage(overlay, 0, 0, cW, cH);
-                  resolve(compositeCanvas.toDataURL('image/png'));
-                };
-                overlay.src = s.bodyCanvas;
-              } else {
-                resolve(compositeCanvas.toDataURL('image/png'));
-              }
-            }
-          };
-          img.onerror = function() { loaded++; if(loaded===4) resolve(); };
-          img.src = src;
-        });
-      });
-      // Fallback synchrone si Promise pas résolue
-      imgs.forEach(function(src,i) {
+      const labels4 = ['Profil D','Dos','Face','Profil G'];
+      const imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
+      bodyHtml += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:3px;">';
+      labels4.forEach(l => bodyHtml += '<div style="text-align:center;font-size:9px;color:#888;font-weight:600;">'+l+'</div>');
+      bodyHtml += '</div>';
+      // Image composite: fusionner les 4 bonhommes + overlay
+      const cmp = document.createElement('canvas');
+      cmp.width = 1200; cmp.height = 500;
+      const cmpCtx = cmp.getContext('2d');
+      imgs4.forEach(function(src, i) {
         if(!src) return;
         const img = new Image(); img.src = src;
-        if(img.complete) cCtx.drawImage(img, i*colW, 0, colW, cH);
+        if(img.complete && img.naturalWidth > 0) {
+          cmpCtx.drawImage(img, i*300, 0, 300, 500);
+        }
       });
       if(s.bodyCanvas) {
         const ov = new Image(); ov.src = s.bodyCanvas;
-        if(ov.complete) cCtx.drawImage(ov, 0, 0, cW, cH);
+        if(ov.complete && ov.naturalWidth > 0) {
+          cmpCtx.drawImage(ov, 0, 0, 1200, 500);
+        }
       }
-      const compositeSrc = compositeCanvas.toDataURL('image/png');
-      // Labels
-      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;margin-bottom:4px;">';
-      labels.forEach(function(lbl) {
-        bodyHtml += '<div style="text-align:center;font-size:9px;color:#888;font-weight:600;">'+lbl+'</div>';
-      });
-      bodyHtml += '</div>';
-      bodyHtml += '<img src="'+compositeSrc+'" style="width:100%;height:auto;border-radius:4px;display:block;"/>';
+      bodyHtml += '<img src="'+cmp.toDataURL('image/png')+'" style="width:100%;height:auto;border-radius:4px;"/>';
       bodyHtml += '</div></div>';
     } else if(s.type === 'pieds') {
       bodyHtml += '<div class="rp-section">';
