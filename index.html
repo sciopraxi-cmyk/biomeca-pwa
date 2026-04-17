@@ -1905,47 +1905,56 @@ function savePatients() {
 function editPatient(idx) {
   const p = patients[idx];
   if(!p) return;
-  nav('pg-patients');
-  const npCard = document.getElementById('nouveau-patient-card');
-  if(npCard) npCard.style.display = 'block';
-  setTimeout(() => {
-    const setV = (id, val) => { const el = document.getElementById(id); if(el) el.value = val||''; };
-    setV('np-nom', p.nom); setV('np-prenom', p.prenom); setV('np-ddn', p.ddn);
-    setV('np-sport', p.sport); setV('np-poids', p.poids); setV('np-taille', p.taille);
-    setV('np-motif', p.motif); setV('np-metier', p.metier);
-    const latEl = document.getElementById('np-lat');
-    if(latEl) latEl.value = p.lat||'Droitier';
-    const btn = document.querySelector('[onclick="openNewPatientModal()"]') ||
-                document.querySelector('[onclick="createPatient()"]');
-    if(btn) {
-      btn.textContent = '💾 Sauvegarder modifications';
-      btn.setAttribute('onclick', `saveEditPatient(${idx})`);
-    }
-    document.getElementById('np-nom')?.scrollIntoView({behavior:'smooth'});
-  }, 200);
+  // Créer une modale de modification
+  let modal = document.getElementById('edit-patient-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'edit-patient-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
+      <div style="font-weight:700;font-size:16px;color:#2a7a4e;margin-bottom:16px;">✏️ Modifier le patient</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Nom *</div><input class="inp" id="ep-nom" value="${p.nom||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Prénom *</div><input class="inp" id="ep-prenom" value="${p.prenom||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Date de naissance</div><input class="inp" type="date" id="ep-ddn" value="${p.ddn||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Latéralité</div>
+          <select class="inp" id="ep-lat">
+            <option ${(p.lat||'Droitier')==='Droitier'?'selected':''}>Droitier</option>
+            <option ${p.lat==='Gaucher'?'selected':''}>Gaucher</option>
+            <option ${p.lat==='Ambidextre'?'selected':''}>Ambidextre</option>
+          </select></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Poids (kg)</div><input class="inp" id="ep-poids" value="${p.poids||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Taille (cm)</div><input class="inp" id="ep-taille" value="${p.taille||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${p.sport||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${p.metier||''}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${p.motif||''}"/></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn" style="flex:1;background:#2a7a4e;" onclick="saveEditPatient(${idx})">💾 Sauvegarder</button>
+        <button class="btn" style="flex:1;background:#888;" onclick="document.getElementById('edit-patient-modal').remove()">Annuler</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
 function saveEditPatient(idx) {
   const p = patients[idx];
   if(!p) return;
-  const nom = document.getElementById('np-nom').value.trim();
-  const prenom = document.getElementById('np-prenom').value.trim();
+  const nom = document.getElementById('ep-nom').value.trim();
+  const prenom = document.getElementById('ep-prenom').value.trim();
   if(!nom||!prenom){alert('Nom et prénom obligatoires.');return;}
-  p.nom = nom;
-  p.prenom = prenom;
-  p.ddn = document.getElementById('np-ddn').value;
-  p.sport = document.getElementById('np-sport').value;
-  p.poids = document.getElementById('np-poids').value;
-  p.taille = document.getElementById('np-taille').value;
-  p.motif = document.getElementById('np-motif').value;
-  if(document.getElementById('np-metier')) p.metier = document.getElementById('np-metier').value;
-  if(document.getElementById('np-lat')) p.lat = document.getElementById('np-lat').value;
+  p.nom = nom; p.prenom = prenom;
+  p.ddn = document.getElementById('ep-ddn').value;
+  p.sport = document.getElementById('ep-sport').value;
+  p.poids = document.getElementById('ep-poids').value;
+  p.taille = document.getElementById('ep-taille').value;
+  p.motif = document.getElementById('ep-motif').value;
+  p.metier = document.getElementById('ep-metier').value;
+  p.lat = document.getElementById('ep-lat').value;
   savePatients();
-  // Rétablir le bouton créer
-  const btn = document.querySelector(`[onclick="saveEditPatient(${idx})"]`);
-  if(btn){btn.textContent='+ Créer dossier';btn.setAttribute('onclick','createPatient()');}
+  document.getElementById('edit-patient-modal')?.remove();
   renderPatientList();
-  alert(`✓ Patient modifié : ${p.prenom} ${p.nom}`);
 }
 
 // ── MODAL NOUVEAU PATIENT ──
