@@ -3874,6 +3874,47 @@ function buildRapportPosturo() {
       faceImg, face2Img, profilGImg, profilDImg, bodyCanvas: d._bodyCanvas});
   }
 
+  // 4. Neuro-fonctionnel
+  const neuro = [];
+  if(d.neuro4) {
+    const n = d.neuro4;
+    // Hypothèses
+    if(n['po-hypo-tronc']) neuro.push(['Hypothèse', 'Tronc cérébral']);
+    if(n['po-hypo-cervelet']) neuro.push(['Hypothèse', 'Cervelet']);
+    // Analyse posturale statique
+    const aps = [];
+    if(n['aps-epaule-g']) aps.push('Épaule G'); if(n['aps-epaule-d']) aps.push('Épaule D');
+    if(n['aps-rot-g']) aps.push('Rot.épaule G'); if(n['aps-rot-d']) aps.push('Rot.épaule D');
+    if(n['aps-coude-g']) aps.push('Flex.coude G'); if(n['aps-coude-d']) aps.push('Flex.coude D');
+    if(n['aps-pron-g']) aps.push('Pron.poignet G'); if(n['aps-pron-d']) aps.push('Pron.poignet D');
+    if(aps.length) neuro.push(['Analyse posturale statique', aps.join(', ')]);
+    // Analyse posturale dynamique
+    const apd = [];
+    if(n['apd-tronc-g']) apd.push('Pattern tronc G'); if(n['apd-tronc-d']) apd.push('Pattern tronc D');
+    if(n['apd-cervelet-g']) apd.push('Pattern cervelet G'); if(n['apd-cervelet-d']) apd.push('Pattern cervelet D');
+    if(n['apd-tete-g']) apd.push('Stab.tête G'); if(n['apd-tete-d']) apd.push('Stab.tête D');
+    if(n['apd-membre-g']) apd.push('Membre sup G'); if(n['apd-membre-d']) apd.push('Membre sup D');
+    if(apd.length) neuro.push(['Analyse posturale dynamique', apd.join(', ')]);
+    // Nerfs crâniens
+    const ncPos = [];
+    ['nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12'].forEach(nc => {
+      if(n['nc-'+nc+'-g']) ncPos.push(nc.toUpperCase()+' G');
+      if(n['nc-'+nc+'-d']) ncPos.push(nc.toUpperCase()+' D');
+    });
+    if(ncPos.length) neuro.push(['Nerfs crâniens', ncPos.join(', ')]);
+    // Réflexes archaïques
+    const refls = [];
+    ['ref-rpp','ref-rtp','ref-moro','ref-perez','ref-landau','ref-reptation'].forEach(r => {
+      if(n[r+'-o']) refls.push(r.replace('ref-','').toUpperCase()+' O');
+    });
+    ['ref-rtac','ref-galant','ref-babinski','ref-plantaire','ref-palmaire','ref-babkin'].forEach(r => {
+      if(n[r+'-g']) refls.push(r.replace('ref-','').toUpperCase()+' G');
+      if(n[r+'-d']) refls.push(r.replace('ref-','').toUpperCase()+' D');
+    });
+    if(refls.length) neuro.push(['Réflexes archaïques', refls.join(', ')]);
+  }
+  if(neuro.length) sections.push({titre:'4. Neuro-fonctionnel', items:neuro, color:'#8e44ad'});
+
   // 5. Système plantaire
   const plant = [];
   if(d.epines==='oui') plant.push(['Épines irritatives', 'Oui'+(d.epinesLoc?' — '+d.epinesLoc:'')]);
@@ -3929,6 +3970,26 @@ function buildRapportPosturo() {
   // 9. Traitements
   const trait = [];
   if(d.semellesDesc) trait.push(['Plan de semelles', d.semellesDesc]);
+  // Circuits express
+  const circLabels = ['Exercice 1','Exercice 2','Exercice 3','Exercice 4'];
+  ['c1','c2'].forEach(function(cx, ci) {
+    const circItems = [];
+    circLabels.forEach(function(lbl, i) {
+      const key = cx+'_ex'+(i+1);
+      const sys = (d['circ_'+key+'_sys']||[]).filter(Boolean);
+      const sub = (d['circ_'+key+'_sub']||[]).filter(Boolean);
+      const libre = d['circ_'+key] || '';
+      if(sys.length || sub.length || libre) {
+        let val = '';
+        sys.forEach((s,j) => { if(s) val += s + (sub[j] ? ' → '+sub[j] : '') + ' | '; });
+        if(libre) val += libre;
+        circItems.push([lbl, val.replace(/\s*\|\s*$/,'')]);
+      }
+    });
+    if(circItems.length) {
+      circItems.forEach(item => trait.push(['Circuit '+(ci+1)+' — '+item[0], item[1]]));
+    }
+  });
   if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
   if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
   if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
