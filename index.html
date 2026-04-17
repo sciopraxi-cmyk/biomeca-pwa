@@ -8198,12 +8198,31 @@ function showPosturoSection(idx) {
   }
   if(idx === 3) {
     setTimeout(updateNeuroTotals, 100);
-    // Attacher listeners sur toutes les checkboxes neuro
     setTimeout(() => {
       document.querySelectorAll('#psec-3 input[type=checkbox]').forEach(cb => {
         cb.addEventListener('change', updateNeuroTotals);
       });
     }, 200);
+    // Restaurer neuro4 maintenant que le DOM est visible
+    setTimeout(() => {
+      const dn = currentPatient?.bilanDataPosturo?.neuro4;
+      if(!dn) return;
+      Object.assign(bilanData, dn);
+      Object.entries(dn).forEach(([key, val]) => {
+        if(typeof val === 'boolean') {
+          document.querySelectorAll('#psec-3 input[type="checkbox"]').forEach(cb => {
+            const onch = cb.getAttribute('onchange') || '';
+            if(onch.includes("'"+key+"'")) cb.checked = val;
+          });
+        } else if(typeof val === 'string' && val !== '') {
+          document.querySelectorAll('#psec-3 input[type="radio"]').forEach(r => {
+            const onch = r.getAttribute('onchange') || '';
+            if(onch.includes("'"+key+"'") && r.value === val) r.checked = true;
+          });
+        }
+      });
+      updateNeuroTotals();
+    }, 300);
   }
   if(idx === 8) setTimeout(initPosturoFeetCanvas, 100);
 }
