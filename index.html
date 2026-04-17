@@ -8534,14 +8534,13 @@ function savePosturoBilan() {
   });
 
   const bc=document.getElementById('posturo-body-canvas');
-  if(bc && bc.width>0) {
-    // Sauvegarder uniquement le dessin (pixels différents du fond transparent)
+  if(bc && bc.width>0 && bc._history && bc._history.length>0) {
+    // Sauvegarder seulement si des dessins ont été effectués
     const tmpBc = document.createElement('canvas');
     tmpBc.width = bc.width; tmpBc.height = bc.height;
     const tmpBctx = tmpBc.getContext('2d');
     tmpBctx.drawImage(bc, 0, 0);
     const imgD = tmpBctx.getImageData(0,0,bc.width,bc.height);
-    // Rendre transparents les pixels noirs (fond vide)
     for(let i=0;i<imgD.data.length;i+=4) {
       if(imgD.data[i]<10 && imgD.data[i+1]<10 && imgD.data[i+2]<10) imgD.data[i+3]=0;
     }
