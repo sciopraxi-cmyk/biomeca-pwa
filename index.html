@@ -1929,6 +1929,10 @@ function editPatient(idx) {
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${p.sport||''}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${p.metier||''}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${p.motif||''}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
+          <select class="inp" id="ep-prat">
+            ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${pr.titre||''} ${pr.nom||''}</option>`).join('')}
+          </select></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px;">
         <button class="btn" style="flex:1;background:#2a7a4e;" onclick="saveEditPatient(${idx})">💾 Sauvegarder</button>
@@ -1952,6 +1956,7 @@ function saveEditPatient(idx) {
   p.motif = document.getElementById('ep-motif').value;
   p.metier = document.getElementById('ep-metier').value;
   p.lat = document.getElementById('ep-lat').value;
+  p.pratId = document.getElementById('ep-prat').value;
   savePatients();
   document.getElementById('edit-patient-modal')?.remove();
   renderPatientList();
