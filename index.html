@@ -3941,7 +3941,7 @@ function buildRapportPosturo() {
 
   // 5. Système plantaire
   const plant = [];
-  if(d.epines==='oui') plant.push(['Épines irritatives d'appui', 'Oui'+(d.epinesLoc?' — '+d.epinesLoc:'')]);
+  if(d.epines==='oui') plant.push(['Épines irritatives appui', 'Oui'+(d.epinesLoc?' — '+d.epinesLoc:'')]);
   else if(d.epines==='non') plant.push(['Épines irritatives d'appui', 'Non']);
   if(d.tactique) plant.push(['Tactique équilibration', d.tactique]);
   // Chaussure
