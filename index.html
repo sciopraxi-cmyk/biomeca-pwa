@@ -4115,20 +4115,17 @@ function buildRapportPosturo() {
   if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
   if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
 
-  // Image pieds — après section 5
+  // Empreinte plantaire après section 5
+  if(d._empreinte) {
+    const s5idx = sections.findIndex(s => s.titre && s.titre.startsWith('5.'));
+    const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
+    sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#f0a500', type:'empreinte', img: d._empreinte});
+  }
+  // Plan de semelles (pieds) à la fin dans section 9
   if(d._feetCanvas) {
     const piedsImg = document.getElementById('imgjs-pieds')?.src;
-    const s5idx = sections.findIndex(s => s.titre && s.titre.startsWith('5.'));
-    const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
-    sections.splice(insertAt5, 0, {titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
+    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
       piedsImg, feetCanvas: d._feetCanvas});
-    if(d._empreinte) {
-      sections.splice(insertAt5+1, 0, {titre:'5. Empreinte plantaire', color:'#2a7a4e', type:'empreinte', img: d._empreinte});
-    }
-  } else if(d._empreinte) {
-    const s5idx = sections.findIndex(s => s.titre && s.titre.startsWith('5.'));
-    const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
-    sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#2a7a4e', type:'empreinte', img: d._empreinte});
   }
 
   const now = new Date();
