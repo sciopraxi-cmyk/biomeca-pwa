@@ -1936,7 +1936,7 @@ function editPatient(idx) {
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${p.motif||''}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
           <select class="inp" id="ep-prat">
-            ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${pr.titre||''} ${pr.nom||''}</option>`).join('')}
+            ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${pr.nom||''} ${pr.prenom||''} — ${pr.titre||''}</option>`).join('')}
           </select></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px;">
