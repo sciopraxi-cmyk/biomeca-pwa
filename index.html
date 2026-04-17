@@ -2177,30 +2177,6 @@ function deletePraticien(i) {
 
 
 
-function editPatient(idx) {
-  const p = patients[idx];
-  if(!p) return;
-  // Remplir le formulaire de création avec les données existantes
-  document.getElementById('np-nom').value = p.nom||'';
-  document.getElementById('np-prenom').value = p.prenom||'';
-  document.getElementById('np-ddn').value = p.ddn||'';
-  document.getElementById('np-sport').value = p.sport||'';
-  if(document.getElementById('np-metier')) document.getElementById('np-metier').value = p.metier||'';
-  document.getElementById('np-lat').value = p.lat||'';
-  document.getElementById('np-poids').value = p.poids||'';
-  document.getElementById('np-taille').value = p.taille||'';
-  document.getElementById('np-motif').value = p.motif||'';
-  if(document.getElementById('np-prat')) document.getElementById('np-prat').value = p.pratId||'';
-  // Changer le bouton créer en bouton sauvegarder modification
-  const btn = document.querySelector('#pg-patients button[onclick="createPatient()"]');
-  if(btn) {
-    btn.textContent = '✓ Sauvegarder modifications';
-    btn.onclick = () => saveEditPatient(idx);
-  }
-  // Scroll vers le formulaire
-  document.getElementById('np-nom').scrollIntoView({behavior:'smooth'});
-  document.getElementById('np-nom').focus();
-}
 
 function saveEditPatient(idx) {
   const p = patients[idx];
