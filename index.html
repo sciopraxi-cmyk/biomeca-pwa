@@ -8438,7 +8438,9 @@ function savePosturoBilan() {
   // Section 4 - Neuro fonctionnel complet
   d.hypoTronc=getChk('po-hypo-tronc'); d.hypoCervelet=getChk('po-hypo-cervelet');
   // Sauvegarder les données setBilanField (ps_, pd_, nc_ etc.)
-  d.neuro4 = Object.assign({}, bilanData);
+  // Fusionner bilanData avec neuro4 existant (ne pas écraser)
+  if(!d.neuro4) d.neuro4 = {};
+  Object.assign(d.neuro4, bilanData);
   // Nerfs crâniens
   const ncList = ['recap','nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12'];
   d.nc = {};
