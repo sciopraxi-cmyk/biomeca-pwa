@@ -3790,19 +3790,39 @@ function printRapportPosturo() {
   doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Rapport Postural</title>
     <style>
-      body{font-family:Arial,sans-serif;font-size:11px;color:#222;background:#fff;margin:20px;}
-      .rp-section{margin-bottom:14px;border-radius:6px;overflow:hidden;border:1px solid #ddd;}
-      .rp-section-title{padding:6px 10px;color:#fff;font-weight:700;font-size:11px;}
-      .rp-section-body{padding:10px;}
-      .rp-row{display:flex;border-bottom:1px solid #f0f0f0;padding:4px 0;}
-      .rp-label{font-weight:600;color:#555;width:200px;flex-shrink:0;font-size:10px;}
-      .rp-val{color:#222;font-size:10px;}
-      .rp-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid #2a7a4e;}
-      .rp-logo{height:55px;object-fit:contain;}
-      .rp-prat{font-size:11px;color:#555;line-height:1.6;}
-      .rp-pt-info{background:#f9f5ee;border:1px solid #e8d9b5;border-radius:8px;padding:12px;margin-bottom:14px;}
-      img{max-width:100%;}
-      @media print{body{margin:10mm;}}
+      *{box-sizing:border-box;}
+      body{font-family:Arial,sans-serif;font-size:11px;color:#222;background:#fff;margin:15mm 15mm 15mm 15mm;}
+      /* Header */
+      .rp-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:10px;border-bottom:3px solid #2a7a4e;}
+      .rp-logo{height:50px;object-fit:contain;}
+      .rp-prat{font-size:10px;color:#555;line-height:1.6;text-align:right;}
+      .rp-prat-name{font-size:12px;font-weight:700;color:#222;}
+      /* Titre rapport */
+      .rp-title{font-size:16px;font-weight:700;color:#2a7a4e;text-align:center;margin-bottom:4px;}
+      .rp-subtitle{font-size:10px;color:#888;text-align:center;margin-bottom:14px;}
+      /* Info patient */
+      .rp-pt-info{background:#f9f5ee;border:1px solid #e8d9b5;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:10px;color:#555;}
+      .rp-pt-name{font-size:14px;font-weight:700;color:#222;margin-bottom:4px;}
+      /* Sections */
+      .rp-section{margin-bottom:12px;border-radius:6px;overflow:hidden;border:1px solid #ddd;page-break-inside:avoid;}
+      .rp-section-title{padding:6px 12px;color:#fff;font-weight:700;font-size:11px;letter-spacing:0.5px;}
+      .rp-section-body{padding:8px 12px;}
+      /* Lignes */
+      .rp-row{display:flex;border-bottom:1px solid #f0f0f0;padding:5px 0;align-items:baseline;}
+      .rp-row:last-child{border-bottom:none;}
+      .rp-label{font-weight:600;color:#555;min-width:180px;width:180px;flex-shrink:0;font-size:10px;padding-right:10px;}
+      .rp-val{color:#222;font-size:10px;flex:1;}
+      /* Bonhommes */
+      img{max-width:100%;height:auto;}
+      /* Pied de page */
+      .rp-footer{text-align:center;font-size:9px;color:#aaa;margin-top:20px;padding-top:8px;border-top:1px solid #eee;}
+      /* Print */
+      @media print{
+        body{margin:10mm;}
+        .rp-section{page-break-inside:avoid;}
+        .no-print{display:none!important;}
+        *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      }
     </style>
   </head><body>${content}</body></html>`);
   doc.close();
