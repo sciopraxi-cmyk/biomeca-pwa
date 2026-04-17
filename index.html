@@ -4229,17 +4229,20 @@ function buildRapportPosturo() {
       bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';">';
       const labels4 = ['Profil D','Dos','Face','Profil G'];
       const imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
-      // Largeurs proportionnelles aux images naturelles (64+114+118+65=361px total)
-      const widths4 = ['17.7%', '31.6%', '32.7%', '18.0%'];
-      bodyHtml += '<div style="display:flex;gap:0;margin-bottom:3px;">';
-      labels4.forEach((l,i) => bodyHtml += '<div style="width:'+widths4[i]+';text-align:center;font-size:9px;color:#888;font-weight:600;">'+l+'</div>');
-      bodyHtml += '</div>';
-      bodyHtml += '<div style="position:relative;display:flex;gap:0;align-items:flex-start;">';
-      imgs4.forEach(function(src,i) {
-        bodyHtml += '<img src="'+(src||'')+'" style="width:'+widths4[i]+';height:auto;display:block;flex-shrink:0;"/>';
+      // Reproduire exactement la structure du bilan: flex + gap:20px + flex:1
+      bodyHtml += '<div style="position:relative;margin:8px 0;">';
+      bodyHtml += '<div style="display:flex;gap:20px;background:#fff;border-radius:8px;border:1px solid #ddd;padding:16px;align-items:flex-end;">';
+      imgs4.forEach(function(src, i) {
+        bodyHtml += '<div style="flex:1;text-align:center;">';
+        bodyHtml += '<div style="font-size:9px;color:#2a7a4e;margin-bottom:4px;font-weight:600;">'+labels4[i]+'</div>';
+        bodyHtml += '<div style="background:#fff;border:1px solid #eee;border-radius:4px;padding:4px;min-height:100px;display:flex;align-items:center;justify-content:center;">';
+        bodyHtml += '<img src="'+(src||'')+'" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;"/>';
+        bodyHtml += '</div></div>';
       });
+      bodyHtml += '</div>';
+      // Overlay canvas dessins en position absolute
       if(s.bodyCanvas) {
-        bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none;"/>';
+        bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none;opacity:0.9;"/>';
       }
       bodyHtml += '</div>';
       bodyHtml += '</div></div>';
