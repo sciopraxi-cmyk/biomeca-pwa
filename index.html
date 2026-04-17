@@ -8618,28 +8618,11 @@ function savePosturoBilan() {
 
   const bc=document.getElementById('posturo-body-canvas');
   if(bc && bc.width>0 && bc._history && bc._history.length>0) {
-    // Créer image composite: bonhommes + dessins dans les bonnes proportions
-    const imgElems = [
-      {el: document.getElementById('imgjs-morpho-profilD'), w: 64},
-      {el: document.getElementById('imgjs-morpho-face2'),   w: 114},
-      {el: document.getElementById('imgjs-morpho-face'),    w: 118},
-      {el: document.getElementById('imgjs-morpho-profilG'), w: 65}
-    ];
-    const cH = 360, cW = 361;
-    const compC = document.createElement('canvas');
-    compC.width = cW; compC.height = cH;
-    const compCtx = compC.getContext('2d');
-    let xOff = 0;
-    imgElems.forEach(function(d) {
-      if(d.el && d.el.complete && d.el.naturalWidth > 0) {
-        compCtx.drawImage(d.el, xOff, 0, d.w, cH);
-      }
-      xOff += d.w;
-    });
-    // Superposer les dessins du canvas
-    const dpr = window.devicePixelRatio || 1;
-    compCtx.drawImage(bc, 0, 0, bc.width, bc.height, 0, 0, cW, cH);
-    d._bodyCanvas = compC.toDataURL('image/png');
+    // Sauvegarder uniquement le canvas des dessins en PNG transparent
+    d._bodyCanvas = bc.toDataURL('image/png');
+    // Sauvegarder aussi les dimensions CSS du canvas pour reconstruction
+    d._bodyCanvasW = parseFloat(bc.style.width) || bc.width;
+    d._bodyCanvasH = parseFloat(bc.style.height) || bc.height;
   }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc && fc.width>0 && fc._history && fc._history.length>0) {
