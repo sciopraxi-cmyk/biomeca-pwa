@@ -8586,17 +8586,32 @@ function loadPosturoBilan() {
   // Restaurer les données setBilanField
   if(d.neuro4) {
     Object.assign(bilanData, d.neuro4);
-    // Restaurer les checkboxes visuellement
-    Object.entries(d.neuro4).forEach(([key, val]) => {
-      if(typeof val === 'boolean') {
-        // Chercher la checkbox avec onchange setBilanField('key',...)
-        const allCbs = document.querySelectorAll('#psec-3 input[type="checkbox"]');
-        allCbs.forEach(cb => {
-          const onch = cb.getAttribute('onchange') || '';
-          if(onch.includes("'"+key+"'")) cb.checked = val;
-        });
-      }
-    });
+    // Restaurer après un délai pour laisser le DOM se construire
+    setTimeout(function() {
+      Object.entries(d.neuro4).forEach(function([key, val]) {
+        if(typeof val === 'boolean') {
+          // Chercher dans tout le document les checkboxes avec setBilanField
+          document.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+            const onch = cb.getAttribute('onchange') || '';
+            if(onch.includes("'"+key+"'") || onch.includes('"'+key+'"')) {
+              cb.checked = val;
+            }
+          });
+        } else if(typeof val === 'string' && val !== '') {
+          // Champs texte et radio
+          document.querySelectorAll('input, textarea, select').forEach(function(el) {
+            const onch = el.getAttribute('onchange') || '';
+            if(onch.includes("'"+key+"'") || onch.includes('"'+key+'"')) {
+              if(el.type === 'radio') {
+                if(el.value === val) el.checked = true;
+              } else {
+                el.value = val;
+              }
+            }
+          });
+        }
+      });
+    }, 500);
   }
   // Nerfs crâniens
   if(d.nc) {
