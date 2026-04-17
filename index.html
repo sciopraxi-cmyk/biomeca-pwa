@@ -3999,12 +3999,12 @@ function buildRapportPosturo() {
 
     // 14. Récepteurs tactiles
     const rect = [];
-    if(n['rect-merkel-g']) rect.push('Merkel G'); if(n['rect-merkel-d']) rect.push('Merkel D');
-    if(n['rect-ruffini-g']) rect.push('Ruffini G'); if(n['rect-ruffini-d']) rect.push('Ruffini D');
-    if(n['rect-pacini-g']) rect.push('Pacini G'); if(n['rect-pacini-d']) rect.push('Pacini D');
-    if(n['rect-tnl-g']) rect.push('TNL G'); if(n['rect-tnl-d']) rect.push('TNL D');
-    if(n['rect-meissner-g']) rect.push('Meissner G'); if(n['rect-meissner-d']) rect.push('Meissner D');
-    if(n['rect-poils-g']) rect.push('Poils G'); if(n['rect-poils-d']) rect.push('Poils D');
+    if(n['tact-merkel-g']) rect.push('Merkel G'); if(n['tact-merkel-d']) rect.push('Merkel D');
+    if(n['tact-ruffini-g']) rect.push('Ruffini G'); if(n['tact-ruffini-d']) rect.push('Ruffini D');
+    if(n['tact-pacini-g']) rect.push('Pacini G'); if(n['tact-pacini-d']) rect.push('Pacini D');
+    if(n['tact-tnl-g']) rect.push('TNL G'); if(n['tact-tnl-d']) rect.push('TNL D');
+    if(n['tact-meissner-g']) rect.push('Meissner G'); if(n['tact-meissner-d']) rect.push('Meissner D');
+    if(n['tact-poils-g']) rect.push('Poils G'); if(n['tact-poils-d']) rect.push('Poils D');
     if(rect.length) neuro.push(['Récepteurs tactiles', rect.join(', ')]);
   }
     if(neuro.length) sections.push({titre:'4. Neuro-fonctionnel', items:neuro, color:'#8e44ad'});
