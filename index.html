@@ -2085,6 +2085,7 @@ function renderPatientList() {
         <span style="font-size:11px;flex:1;color:var(--blue);">${b.label}</span>
         <span style="font-size:10px;color:var(--mut);">${b.date}</span>
         <button class="btn" style="font-size:10px;padding:2px 8px;background:var(--blue);color:#fff;" onclick="ouvrirBilanSport(${i},${bi})">Ouvrir</button>
+        <button class="btn" style="font-size:10px;padding:2px 6px;background:#e74c3c;color:#fff;" onclick="supprimerBilanSport(${i},${bi})" title="Supprimer ce bilan">✕</button>
       </div>`).join('');
 
     // Historique bilans posturo
@@ -2336,6 +2337,17 @@ function creerBilanPosturo(patIdx, type) {
   savePatients();
   selectPatient(p);
   nav('pg-bilan-posturo');
+}
+
+function supprimerBilanSport(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if(!p) return;
+  const bilan = p.bilansSport?.[bilanIdx];
+  if(!bilan) return;
+  if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
+  p.bilansSport.splice(bilanIdx, 1);
+  savePatients();
+  renderPatientList();
 }
 
 function supprimerBilanPosturo(patIdx, bilanIdx) {
