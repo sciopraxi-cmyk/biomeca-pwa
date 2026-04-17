@@ -8420,8 +8420,9 @@ function savePosturoBilan() {
   // Sauvegarder TOUTES les checkboxes de psec-3 par ID
   if(!d.neuro4) d.neuro4 = {};
   Object.assign(d.neuro4, bilanData);
+  // Sauvegarder psec-3 seulement si visible (sinon garder neuro4 existant)
   const psec3 = document.getElementById('psec-3');
-  if(psec3) {
+  if(psec3 && psec3.style.display !== 'none') {
     psec3.querySelectorAll('input[type="checkbox"][id]').forEach(el => {
       d.neuro4[el.id] = el.checked;
     });
