@@ -8354,6 +8354,8 @@ function savePosturoBilan() {
   const getRad = name => document.querySelector('input[name="'+name+'"]:checked')?.value||'';
   // Section 4 - Neuro fonctionnel complet
   d.hypoTronc=getChk('po-hypo-tronc'); d.hypoCervelet=getChk('po-hypo-cervelet');
+  // Sauvegarder les données setBilanField (ps_, pd_, nc_ etc.)
+  d.neuro4 = Object.assign({}, bilanData);
   // Nerfs crâniens
   const ncList = ['recap','nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12'];
   d.nc = {};
@@ -8557,6 +8559,21 @@ function loadPosturoBilan() {
   // Sections 4-9
   const setChk = (id,v) => { const e=document.getElementById(id); if(e) e.checked=!!v; };
   setChk('po-hypo-tronc',d.hypoTronc); setChk('po-hypo-cervelet',d.hypoCervelet);
+  // Restaurer les données setBilanField
+  if(d.neuro4) {
+    Object.assign(bilanData, d.neuro4);
+    // Restaurer les checkboxes visuellement
+    Object.entries(d.neuro4).forEach(([key, val]) => {
+      if(typeof val === 'boolean') {
+        // Chercher la checkbox avec onchange setBilanField('key',...)
+        const allCbs = document.querySelectorAll('#psec-3 input[type="checkbox"]');
+        allCbs.forEach(cb => {
+          const onch = cb.getAttribute('onchange') || '';
+          if(onch.includes("'"+key+"'")) cb.checked = val;
+        });
+      }
+    });
+  }
   // Nerfs crâniens
   if(d.nc) {
     Object.entries(d.nc).forEach(([key,val]) => {
