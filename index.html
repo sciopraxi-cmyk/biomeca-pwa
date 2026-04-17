@@ -2381,6 +2381,23 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
     loadPosturoBilan();
     showPosturoSection(0);
   }, 300);
+  // Restauration neuro4 après recréation du DOM section 4
+  setTimeout(() => {
+    const dn = currentPatient?.bilanDataPosturo?.neuro4;
+    if(!dn) return;
+    Object.entries(dn).forEach(([key, val]) => {
+      document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        const onch = cb.getAttribute('onchange') || '';
+        if(onch.includes("'"+key+"'")) cb.checked = !!val;
+      });
+      if(typeof val === 'string' && val !== '') {
+        document.querySelectorAll('input[type="radio"]').forEach(r => {
+          const onch = r.getAttribute('onchange') || '';
+          if(onch.includes("'"+key+"'") && r.value === val) r.checked = true;
+        });
+      }
+    });
+  }, 800);
 }
 function renderPratList() {
   const el = document.getElementById('prat-list-el');
