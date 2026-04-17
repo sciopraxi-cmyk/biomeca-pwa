@@ -3941,54 +3941,143 @@ function buildRapportPosturo() {
 
   // 5. Système plantaire
   const plant = [];
-  if(d.epines==='oui') plant.push(['Épines irritatives', 'Oui'+(d.epinesLoc?' — '+d.epinesLoc:'')]);
+  if(d.epines==='oui') plant.push(['Épines irritatives d'appui', 'Oui'+(d.epinesLoc?' — '+d.epinesLoc:'')]);
+  else if(d.epines==='non') plant.push(['Épines irritatives d'appui', 'Non']);
   if(d.tactique) plant.push(['Tactique équilibration', d.tactique]);
-  if(d.chaussureType) plant.push(['Chaussure', d.chaussureType]);
-  const parasites = ['paraPlantaire','paraYeux','paraBuccale','paraCicatrice','paraVestibulaire','paraViscerale']
-    .filter(k=>d[k]).map(k=>k.replace('para','').toLowerCase());
-  if(parasites.length) plant.push(['Parasites', parasites.join(', ')]);
+  // Chaussure
+  if(d.chaussureType) plant.push(['Type de chaussure', d.chaussureType]);
+  const usures = [];
+  if(d.usureInterne) usures.push('Interne');
+  if(d.usureExterne) usures.push('Externe');
+  if(d.usureContrefort) usures.push('Contrefort');
+  if(usures.length) plant.push(['Usure chaussure', usures.join(', ')]);
+  // Tests toniques
+  const tests5 = [];
+  if(d.testPouces) tests5.push('Pouces');
+  if(d.testConvergence) tests5.push('Convergence');
+  if(d.testScapulaire) tests5.push('Scapulaire');
+  if(d.testNucale) tests5.push('Nucale');
+  if(tests5.length) plant.push(['Tests toniques positifs', tests5.join(', ')]);
+  // Parasites
+  const parasites = [];
+  if(d.paraPlantaire) parasites.push('Plantaire');
+  if(d.paraYeux) parasites.push('Yeux');
+  if(d.paraBuccale) parasites.push('Buccale');
+  if(d.paraCicatrice) parasites.push('Cicatrice');
+  if(d.paraVestibulaire) parasites.push('Vestibulaire');
+  if(d.paraViscerale) parasites.push('Viscérale');
+  if(parasites.length) plant.push(['Parasites détectés', parasites.join(', ')]);
+  // Mono-appuis
+  const monos = [];
+  if(d.monoPiedG) monos.push('Pied G'); if(d.monoPiedD) monos.push('Pied D');
+  if(d.monoGenouG) monos.push('Genou G'); if(d.monoGenouD) monos.push('Genou D');
+  if(d.monoHancheG) monos.push('Hanche G'); if(d.monoHancheD) monos.push('Hanche D');
+  if(monos.length) plant.push(['Mono-appui', monos.join(', ')]);
   if(plant.length) sections.push({titre:'5. Système plantaire', items:plant, color:'#f0a500'});
 
   // 6. Vestibulaire
   const vest = [];
-  if(d.laterOui==='oui') vest.push(['Latéralisation', (d.laterType||'')+(d.laterD?' Droite':d.laterG?' Gauche':'')]);
+  if(d.laterOui==='oui') {
+    let latStr = (d.laterType||'');
+    if(d.laterD) latStr += ' Droite'; else if(d.laterG) latStr += ' Gauche';
+    vest.push(['Latéralisation', latStr]);
+  }
   if(d.kleinRes) vest.push(['Test de DeKleyn', d.kleinRes]);
   if(d.ligamentsRes) vest.push(['Test ligaments', d.ligamentsRes]);
   if(d.rancurelRes) vest.push(['Test de Rancurel', d.rancurelRes]);
+  if(d.headShaking) vest.push(['Head Shaking', d.headShaking]);
+  if(d.headImpulse) vest.push(['Head Impulse', d.headImpulse]);
+  if(d.babinski) vest.push(['Babinski-Weill', d.babinski]);
+  if(d.unterburger) vest.push(['Unterburger', d.unterburger]);
   if(d.vertiges==='oui') vest.push(['Vertiges/nystagmus', 'Présents']);
   if(d.vppb==='oui') vest.push(['VPPB', 'Positif']);
+  // CSC atteints
+  const cscs = [];
+  if(d.cscD) cscs.push('Latéral D'); if(d.cscG) cscs.push('Latéral G');
+  if(d.cscAntD) cscs.push('Antérieur D'); if(d.cscAntG) cscs.push('Antérieur G');
+  if(d.cscPostD) cscs.push('Postérieur D'); if(d.cscPostG) cscs.push('Postérieur G');
+  if(cscs.length) vest.push(['CSC atteints', cscs.join(', ')]);
   if(d.clvf) vest.push(['CLVF', d.clvf]);
+  if(d.pevs) vest.push(['PEVS', d.pevs]);
   if(d.semelleComp) vest.push(['Semelle compensation', d.semelleComp]);
+  // Réorientation
+  const reorVest = [];
+  if(d.reorOrl) reorVest.push('ORL');
+  if(d.reorKine) reorVest.push('Kiné');
+  if(reorVest.length) vest.push(['Réorientation', reorVest.join(', ')]);
   if(vest.length) sections.push({titre:'6. Investigation vestibulaire', items:vest, color:'#8e44ad'});
 
   // 7. Buccal/Visuel
   const bucc = [];
+  // Buccal
   if(d.mcpOuv==='oui') bucc.push(['MCP ouverture bouche', 'Améliorée (ATM secondaire)']);
-  if(d.serrage) bucc.push(['Serrage', d.serrage]);
+  else if(d.mcpOuv==='non') bucc.push(['MCP ouverture bouche', 'Non améliorée']);
+  if(d.serrage) {
+    let serrageStr = d.serrage;
+    if(d.serrage==='aggravation') {
+      const aggr = [];
+      if(d.aggrDents) aggr.push('Dents'); if(d.aggrAtm) aggr.push('ATM');
+      if(aggr.length) serrageStr += ' ('+aggr.join(', ')+')';
+    } else if(d.serrage==='amelioration') {
+      const amel = [];
+      if(d.amelioContact) amel.push('Contact'); if(d.amelioTension) amel.push('Tension');
+      if(amel.length) serrageStr += ' ('+amel.join(', ')+')';
+    }
+    bucc.push(['Serrage', serrageStr]);
+  }
   if(d.atmOrigine) bucc.push(['ATM origine', d.atmOrigine]);
   if(d.ouvMax) bucc.push(['Ouverture max', d.ouvMax]);
-  if(d.deviation) bucc.push(['Déviation', d.deviation]);
-  if(d.ressaut==='oui') bucc.push(['Ressaut ATM', 'Présent'+(d.ressautDte?' Droite':'')+(d.ressautGauche?' Gauche':'')]);
+  if(d.deviation) bucc.push(['Déviation mandibulaire', d.deviation]);
+  if(d.contractures) bucc.push(['Contractures', d.contractures]);
+  if(d.douleurCaps) bucc.push(['Douleur capsulaire', d.douleurCaps]);
+  if(d.ressaut==='oui') {
+    let ressautStr = 'Présent';
+    if(d.ressautDte) ressautStr += ' Droite'; if(d.ressautGauche) ressautStr += ' Gauche';
+    bucc.push(['Ressaut ATM', ressautStr]);
+  }
+  const reorBuc = [];
+  if(d.reorBucDentiste) reorBuc.push('Dentiste');
+  if(d.reorBucOrtho) reorBuc.push('Orthodontiste');
+  if(d.reorBucStomato) reorBuc.push('Stomatologue');
+  if(d.reorBucKine) reorBuc.push('Kiné');
+  if(reorBuc.length) bucc.push(['Réorientation buccale', reorBuc.join(', ')]);
+  // Visuel
   if(d.visEntree) bucc.push(['Entrée visuelle', d.visEntree]);
   if(d.visLater==='oui') bucc.push(['Latéralisation visuelle', d.visLaterType||'Oui']);
-  if(d.myopie) bucc.push(['Myopie', 'Oui']);
-  if(d.hypermetropie) bucc.push(['Hypermétropie', 'Oui']);
-  if(d.presbyte) bucc.push(['Presbytie', 'Oui']);
-  if(d.astigmate) bucc.push(['Astigmatisme', 'Oui']);
+  if(d.testAllongement) bucc.push(['Test allongement', d.testAllongement]);
+  if(d.testRotNucale) bucc.push(['Test rotation nucale', d.testRotNucale]);
+  const troubles = [];
+  if(d.myopie) troubles.push('Myopie');
+  if(d.hypermetropie) troubles.push('Hypermétropie');
+  if(d.presbyte) troubles.push('Presbytie');
+  if(d.astigmate) troubles.push('Astigmatisme');
+  if(troubles.length) bucc.push(['Troubles visuels', troubles.join(', ')]);
   if(d.maddox) bucc.push(['Maddox', d.maddox]);
+  if(d.coverTest) bucc.push(['Cover test', d.coverTest]);
+  if(d.oeilDirect) bucc.push(['Œil directeur', d.oeilDirect]);
+  const reorVis = [];
+  if(d.reorVisOrthoptiste) reorVis.push('Orthoptiste');
+  if(d.reorVisOphtalmo) reorVis.push('Ophtalmologue');
+  if(d.reorVisOptom) reorVis.push('Optométriste');
+  if(reorVis.length) bucc.push(['Réorientation visuelle', reorVis.join(', ')]);
   if(bucc.length) sections.push({titre:'7. Buccal / Visuel', items:bucc, color:'#2471a3'});
 
   // 8. Terrain/Synthèse
   const terr = [];
-  if(d.postureAnt) terr.push(['Posture globale', 'Antériorisation']);
-  if(d.posturePost) terr.push(['Posture globale', 'Postériorisation']);
-  if(d.postureLater) terr.push(['Posture globale', 'Latéralisation '+(d.postureLaterDir||'')]);
-  if(d.chaineExt) terr.push(['Chaîne', 'Extension']);
-  if(d.chaineFerm) terr.push(['Chaîne', 'Fermeture']);
-  if(d.chaineOuv) terr.push(['Chaîne', 'Ouverture']);
-  if(d.chaineStatOpt) terr.push(['Chaîne statique', 'Optimum']);
-  if(d.chaineStatDeg) terr.push(['Chaîne statique', 'Dégradée']);
-  if(d.biomecArticulaire) terr.push(['Biomécanique', d.biomecArticulaire]);
+  const postures = [];
+  if(d.postureAnt) postures.push('Antériorisation');
+  if(d.posturePost) postures.push('Postériorisation');
+  if(d.postureLater) postures.push('Latéralisation '+(d.postureLaterDir||''));
+  if(postures.length) terr.push(['Posture globale', postures.join(', ')]);
+  const chaines = [];
+  if(d.chaineExt) chaines.push('Extension');
+  if(d.chaineFerm) chaines.push('Fermeture');
+  if(d.chaineOuv) chaines.push('Ouverture');
+  if(d.chaineStatOpt) chaines.push('Statique optimum');
+  if(d.chaineStatDeg) chaines.push('Statique dégradée');
+  if(chaines.length) terr.push(['Chaînes musculaires', chaines.join(', ')]);
+  if(d.tensionPrincipal) terr.push(['Tension principale', d.tensionPrincipal]);
+  if(d.biomecArticulaire) terr.push(['Biomécanique/Articulaire', d.biomecArticulaire]);
   if(terr.length) sections.push({titre:'8. Terrain du patient', items:terr, color:'#2a7a4e'});
 
   // 9. Traitements
@@ -4031,7 +4120,7 @@ function buildRapportPosturo() {
     const piedsImg = document.getElementById('imgjs-pieds')?.src;
     const s5idx = sections.findIndex(s => s.titre && s.titre.startsWith('5.'));
     const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
-    sections.splice(insertAt5, 0, {titre:'5. Plan de semelles', color:'#2a7a4e', type:'pieds',
+    sections.splice(insertAt5, 0, {titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
       piedsImg, feetCanvas: d._feetCanvas});
     if(d._empreinte) {
       sections.splice(insertAt5+1, 0, {titre:'5. Empreinte plantaire', color:'#2a7a4e', type:'empreinte', img: d._empreinte});
