@@ -274,10 +274,10 @@ body.printing #rpt-print{display:block!important;}
 </head>
 <body>
 <!-- ÉCRAN DE CONNEXION PWA -->
-<div id="pwa-login" style="position:fixed;inset:0;background:#0b1e3d;z-index:9999;overflow-y:auto;">
+<div id="pwa-login" style="position:fixed;inset:0;background:#0b1e3d;z-index:9999;display:flex;flex-direction:column;overflow:hidden;">
 <style>
 * {box-sizing:border-box;}
-.lp-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid rgba(255,255,255,0.08);position:sticky;top:0;z-index:100;background:#0b1e3d;}
+.lp-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid rgba(255,255,255,0.08);background:#0b1e3d;flex-shrink:0;}
 .lp-nav-logo{display:flex;align-items:center;gap:10px;}
 .lp-nav-logo img{height:36px;}
 .lp-nav-logo span{font-size:16px;font-weight:700;color:#fff;}
@@ -347,6 +347,7 @@ body.printing #rpt-print{display:block!important;}
   </div>
 </div>
 
+<div style="flex:1;overflow-y:auto;">
 <div class="lp-hero">
   <h1>L'outil de référence<br>pour vos <em>bilans cliniques</em></h1>
   <p>Bilan postural, podologie du sport, podopédiatrie — des outils professionnels pensés pour optimiser votre pratique et valoriser votre expertise.</p>
@@ -409,6 +410,7 @@ body.printing #rpt-print{display:block!important;}
     <div id="pwa-login-err" style="display:none;margin-top:10px;background:rgba(226,75,74,0.15);border:1px solid rgba(226,75,74,0.3);color:#F09595;border-radius:8px;padding:10px;font-size:13px;text-align:center;"></div>
     <div style="text-align:center;margin-top:14px;font-size:11px;color:rgba(255,255,255,0.25);">Contactez votre administrateur pour un accès</div>
   </div>
+</div>
 </div>
 
 <script>
