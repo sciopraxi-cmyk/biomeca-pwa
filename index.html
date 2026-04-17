@@ -2343,9 +2343,7 @@ function supprimerBilanPosturo(patIdx, bilanIdx) {
   if(!p) return;
   const bilan = p.bilansPosturo?.[bilanIdx];
   if(!bilan) return;
-  if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ?
-
-Cette action est irréversible.')) return;
+  if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
   p.bilansPosturo.splice(bilanIdx, 1);
   savePatients();
   renderPatientList();
