@@ -1922,8 +1922,8 @@ function editPatient(idx) {
     btn.setAttribute('onclick', `saveEditPatient(${idx})`);
   }
   // Afficher le formulaire
-  const card = document.getElementById('nouveau-patient-card');
-  if(card) card.style.display = 'block';
+  const npCard = document.getElementById('nouveau-patient-card');
+  if(npCard) npCard.style.display = 'block';
   nav('pg-patients');
   // Scroller vers le formulaire
   // Afficher le formulaire
