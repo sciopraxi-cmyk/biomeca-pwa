@@ -3840,6 +3840,16 @@ function buildRapportPosturo() {
   if(d.rombergMorpho) morpho.push(['Romberg', d.rombergMorpho]);
   if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho, color:'#3498db'});
 
+  // Silhouettes bonhommes juste après section 2
+  if(d._bodyCanvas) {
+    const faceImg = document.getElementById('imgjs-morpho-face')?.src;
+    const face2Img = document.getElementById('imgjs-morpho-face2')?.src;
+    const profilGImg = document.getElementById('imgjs-morpho-profilG')?.src;
+    const profilDImg = document.getElementById('imgjs-morpho-profilD')?.src;
+    sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
+      faceImg, face2Img, profilGImg, profilDImg, bodyCanvas: d._bodyCanvas});
+  }
+
   // 3. Bilan dynamique
   const dyn = [];
   if(d.bilanDyn) dyn.push(['Observations', d.bilanDyn]);
