@@ -4207,36 +4207,18 @@ function buildRapportPosturo() {
       bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">';
       const labels = ['Profil D','Dos','Face','Profil G'];
       const imgs = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
-      // Créer 4 images composites en fusionnant bonhomme + portion du canvas
-      const composites = imgs.map(function(imgSrc, i) {
-        try {
-          const tmpC = document.createElement('canvas');
-          const baseImg = new Image();
-          baseImg.src = imgSrc;
-          const w = baseImg.naturalWidth || 300;
-          const h = baseImg.naturalHeight || 600;
-          tmpC.width = w; tmpC.height = h;
-          const ctx = tmpC.getContext('2d');
-          // Dessiner le bonhomme
-          ctx.drawImage(baseImg, 0, 0, w, h);
-          // Superposer la portion correspondante du canvas
-          if(s.bodyCanvas) {
-            const overlay = new Image();
-            overlay.src = s.bodyCanvas;
-            // Le canvas couvre 4 colonnes égales
-            const srcX = (overlay.naturalWidth / 4) * i;
-            const srcW = overlay.naturalWidth / 4;
-            ctx.drawImage(overlay, srcX, 0, srcW, overlay.naturalHeight, 0, 0, w, h);
-          }
-          return tmpC.toDataURL('image/png');
-        } catch(e) { return imgSrc; }
-      });
+      bodyHtml += '<div style="position:relative;">';
+      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">';
       labels.forEach(function(lbl,i) {
         bodyHtml += '<div style="text-align:center;">';
         bodyHtml += '<div style="font-size:9px;color:#888;margin-bottom:3px;font-weight:600;">'+lbl+'</div>';
-        bodyHtml += '<img src="'+(composites[i]||imgs[i]||'')+'" style="width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:4px;display:block;"/>';
+        bodyHtml += '<img src="'+(imgs[i]||'')+'" style="width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:4px;display:block;"/>';
         bodyHtml += '</div>';
       });
+      bodyHtml += '</div>';
+      if(s.bodyCanvas) {
+        bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:16px;left:0;width:100%;height:calc(100% - 16px);object-fit:fill;pointer-events:none;"/>';
+      }
       bodyHtml += '</div>';
       bodyHtml += '</div></div>';
     } else if(s.type === 'pieds') {
