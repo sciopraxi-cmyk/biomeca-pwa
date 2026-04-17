@@ -669,6 +669,46 @@ function lpToggle() {
       <div class="stitle">Praticiens autorisés</div>
       <div id="params-prat-list" style="margin-top:8px;"></div>
     </div>
+
+    <!-- Panneau admin: gestion accès utilisateurs -->
+    <div class="card" id="admin-panel" style="display:none;">
+      <div class="stitle">👑 Gestion des accès utilisateurs</div>
+      <div style="font-size:12px;color:var(--mut);margin-bottom:16px;">Créer, inviter ou révoquer l'accès à l'application.</div>
+
+      <!-- Créer un accès -->
+      <div style="background:var(--bg2);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:12px;">Créer un accès</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Prénom</div>
+          <input id="admin-prenom" class="inp" placeholder="Marie" style="width:100%;"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Nom</div>
+          <input id="admin-nom" class="inp" placeholder="Dupont" style="width:100%;"/></div>
+        </div>
+        <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Email *</div>
+        <input id="admin-email" type="email" class="inp" placeholder="praticien@cabinet.fr" style="width:100%;"/></div>
+        <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Mot de passe temporaire *</div>
+        <input id="admin-pwd" type="text" class="inp" placeholder="Min. 8 caractères" style="width:100%;"/></div>
+        <div style="margin-bottom:14px;"><div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Accès</div>
+        <select id="admin-acces" class="inp" style="width:100%;">
+          <option value="gratuit">Gratuit (illimité)</option>
+          <option value="essai">Essai 14 jours</option>
+          <option value="postural">Bilan postural</option>
+          <option value="sport">Podologie du sport</option>
+          <option value="duo">Duo (2 modules)</option>
+          <option value="integral">Intégral (3 modules)</option>
+        </select></div>
+        <button onclick="adminCreateUser()" id="admin-create-btn" style="background:var(--blue);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Créer l'accès</button>
+        <div id="admin-create-err" style="display:none;margin-top:8px;color:#e74c3c;font-size:12px;"></div>
+        <div id="admin-create-ok" style="display:none;margin-top:8px;color:#2ecc71;font-size:12px;"></div>
+      </div>
+
+      <!-- Liste des utilisateurs -->
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:10px;">Utilisateurs actifs</div>
+        <button onclick="adminLoadUsers()" style="background:var(--bg2);border:1px solid var(--bord);padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;margin-bottom:10px;">🔄 Actualiser</button>
+        <div id="admin-users-list" style="font-size:12px;color:var(--mut);">Cliquez sur Actualiser pour charger la liste.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1474,6 +1514,7 @@ async function pwaLogin() {
 async function onPwaLoginSuccess() {
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
+  showAdminPanelIfNeeded();
 
   // Afficher onglet Paramètres si admin
   const paramsBtn = document.getElementById('tn-params');
@@ -1576,6 +1617,71 @@ async function saveToSupabase() {
 }
 
 // ─── Déconnexion ───
+// ─── Admin: gestion utilisateurs ───
+async function adminCreateUser() {
+  const email = document.getElementById('admin-email').value.trim();
+  const pwd = document.getElementById('admin-pwd').value.trim();
+  const nom = document.getElementById('admin-nom').value.trim();
+  const prenom = document.getElementById('admin-prenom').value.trim();
+  const acces = document.getElementById('admin-acces').value;
+  const errEl = document.getElementById('admin-create-err');
+  const okEl = document.getElementById('admin-create-ok');
+  const btn = document.getElementById('admin-create-btn');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  if(!email || !pwd) { errEl.textContent = 'Email et mot de passe requis.'; errEl.style.display = 'block'; return; }
+  if(pwd.length < 8) { errEl.textContent = 'Mot de passe trop court (min. 8 caractères).'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Création...';
+  try {
+    const data = await supa.signUp(email, pwd, { nom, prenom, acces });
+    if(data.id || data.user?.id) {
+      okEl.textContent = `✓ Accès créé pour ${email} (${acces}). Un email de confirmation a été envoyé.`;
+      okEl.style.display = 'block';
+      document.getElementById('admin-email').value = '';
+      document.getElementById('admin-pwd').value = '';
+      document.getElementById('admin-nom').value = '';
+      document.getElementById('admin-prenom').value = '';
+    } else {
+      errEl.textContent = data.msg || data.error_description || 'Erreur lors de la création.';
+      errEl.style.display = 'block';
+    }
+  } catch(e) {
+    errEl.textContent = 'Erreur réseau.';
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false; btn.textContent = "Créer l'accès";
+}
+
+async function adminLoadUsers() {
+  const listEl = document.getElementById('admin-users-list');
+  listEl.textContent = 'Chargement...';
+  try {
+    const res = await fetch(SUPA_URL + '/auth/v1/admin/users', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + pwaUser.token }
+    });
+    const data = await res.json();
+    const users = data.users || [];
+    if(!users.length) { listEl.textContent = 'Aucun utilisateur trouvé.'; return; }
+    listEl.innerHTML = users.map(u => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">
+        <div>
+          <div style="font-weight:600;color:var(--fg);">${u.email}</div>
+          <div style="font-size:11px;color:var(--mut);">Créé le ${new Date(u.created_at).toLocaleDateString('fr-FR')} · ${u.user_metadata?.acces || 'standard'}</div>
+        </div>
+        <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${u.email_confirmed_at ? '#e8f8ee' : '#fdf3e3'};color:${u.email_confirmed_at ? '#2a7a4e' : '#856404'};">${u.email_confirmed_at ? 'Confirmé' : 'En attente'}</span>
+      </div>`).join('');
+  } catch(e) {
+    listEl.textContent = 'Erreur de chargement.';
+  }
+}
+
+// Afficher panneau admin si admin
+function showAdminPanelIfNeeded() {
+  if(pwaUser?.isAdmin) {
+    const panel = document.getElementById('admin-panel');
+    if(panel) panel.style.display = 'block';
+  }
+}
+
 async function pwaLogout() {
   if(!confirm('Se déconnecter ?')) return;
   if(pwaUser?.token) {
