@@ -8758,7 +8758,29 @@ function loadPosturoBilan() {
   // Circuits express
   ['c1-ex1','c1-ex2','c1-ex3','c1-ex4','c2-ex1','c2-ex2','c2-ex3','c2-ex4'].forEach(id => {
     const key = id.replace('-','_');
+    // Restaurer champ libre
     setPoVal('po-'+id+'-libre', d['circ_'+key]);
+    // Restaurer selects système et sous-exercice
+    const sysVals = d['circ_'+key+'_sys'] || [];
+    const subVals = d['circ_'+key+'_sub'] || [];
+    const libreEl = document.getElementById('po-'+id+'-libre');
+    if(!libreEl) return;
+    const row = libreEl.closest('div[style*="border"]');
+    if(!row) return;
+    const sels = row.querySelectorAll('select.exo-sys');
+    sels.forEach((sel, i) => {
+      if(sysVals[i]) {
+        sel.value = sysVals[i];
+        updateExerciceSubMenu(sel);
+        // Restaurer le sous-menu après création
+        setTimeout(() => {
+          const sub = sel.nextElementSibling;
+          if(sub && sub.classList.contains('exo-sub') && subVals[i]) {
+            sub.value = subVals[i];
+          }
+        }, 100);
+      }
+    });
   });
 }
 
