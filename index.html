@@ -523,12 +523,16 @@ const supa = {
 
 // Wrapper pour appeler pwaLogin après chargement complet
 function doLogin() {
-  if(typeof pwaLogin === 'function') { pwaLogin(); }
-  else { window.addEventListener('load', function() { pwaLogin(); }, {once:true}); }
+  if(typeof pwaLogin === 'function') { pwaLogin(); return; }
+  var t = setInterval(function() {
+    if(typeof pwaLogin === 'function') { clearInterval(t); pwaLogin(); }
+  }, 50);
 }
 function doRegister() {
-  if(typeof pwaRegister === 'function') { pwaRegister(); }
-  else { window.addEventListener('load', function() { pwaRegister(); }, {once:true}); }
+  if(typeof pwaRegister === 'function') { pwaRegister(); return; }
+  var t = setInterval(function() {
+    if(typeof pwaRegister === 'function') { clearInterval(t); pwaRegister(); }
+  }, 50);
 }
 
 async function pwaRegister() {
