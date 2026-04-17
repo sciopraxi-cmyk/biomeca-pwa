@@ -5555,6 +5555,14 @@ function drawFoot(ctx, ox, oy, mirror) {
 function setBilanField(field, value) {
   if(!bilanData) bilanData={};
   bilanData[field]=value;
+  // Stocker aussi dans bilanDataPosturo si on est dans le contexte posturo
+  const pgPosturo = document.getElementById('pg-bilan-posturo');
+  if(pgPosturo && pgPosturo.classList.contains('active')) {
+    if(!currentPatient) return;
+    if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
+    if(!currentPatient.bilanDataPosturo.neuro4) currentPatient.bilanDataPosturo.neuro4 = {};
+    currentPatient.bilanDataPosturo.neuro4[field] = value;
+  }
 }
 
 function saveBilan() {
@@ -8207,18 +8215,33 @@ function showPosturoSection(idx) {
     setTimeout(() => {
       const dn = currentPatient?.bilanDataPosturo?.neuro4;
       if(!dn) return;
+      // D'abord restaurer bilanData
       Object.assign(bilanData, dn);
-      Object.entries(dn).forEach(([key, val]) => {
-        if(typeof val === 'boolean') {
-          document.querySelectorAll('#psec-3 input[type="checkbox"]').forEach(cb => {
-            const onch = cb.getAttribute('onchange') || '';
-            if(onch.includes("'"+key+"'")) cb.checked = val;
-          });
-        } else if(typeof val === 'string' && val !== '') {
-          document.querySelectorAll('#psec-3 input[type="radio"]').forEach(r => {
-            const onch = r.getAttribute('onchange') || '';
-            if(onch.includes("'"+key+"'") && r.value === val) r.checked = true;
-          });
+      // Puis restaurer visuellement chaque élément
+      const psec3 = document.getElementById('psec-3');
+      if(!psec3) return;
+      psec3.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        const onch = cb.getAttribute('onchange') || '';
+        const match = onch.match(/setBilanField\('([^']+)'/);
+        if(match) {
+          const key = match[1];
+          if(key in dn) cb.checked = !!dn[key];
+        }
+      });
+      psec3.querySelectorAll('input[type="radio"]').forEach(r => {
+        const onch = r.getAttribute('onchange') || '';
+        const match = onch.match(/setBilanField\('([^']+)',\s*'([^']+)'/);
+        if(match) {
+          const key = match[1], val = match[2];
+          if(dn[key] === val) r.checked = true;
+        }
+      });
+      psec3.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
+        const onch = el.getAttribute('onchange') || el.getAttribute('oninput') || '';
+        const match = onch.match(/setBilanField\('([^']+)'/);
+        if(match) {
+          const key = match[1];
+          if(key in dn && dn[key] !== '') el.value = dn[key];
         }
       });
       updateNeuroTotals();
