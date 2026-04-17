@@ -399,10 +399,10 @@ body.printing #rpt-print{display:block!important;}
       <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;">Accédez à votre espace praticien</div>
     </div>
     <div style="margin-bottom:14px;"><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:5px;font-weight:500;">Adresse email</div>
-    <input id="pwa-email" type="email" class="inp" placeholder="praticien@cabinet.fr" autocomplete="email" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')document.getElementById('pwa-pass').focus()"/></div>
+    <input id="pwa-email" type="email" class="inp" placeholder="praticien@cabinet.fr" autocomplete="email" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')document.getElementById('pwa-pwd').focus()"/></div>
     <div style="margin-bottom:18px;"><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:5px;font-weight:500;">Mot de passe</div>
-    <input id="pwa-pass" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')loginUser()"/></div>
-    <button onclick="loginUser()" style="width:100%;background:#2dd4bf;color:#04342C;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">Se connecter</button>
+    <input id="pwa-pwd" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')pwaLogin()"/></div>
+    <button onclick="pwaLogin()" id="pwa-login-btn" style="width:100%;background:#2dd4bf;color:#04342C;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">Se connecter</button>
     <div id="pwa-login-err" style="display:none;margin-top:10px;background:rgba(226,75,74,0.15);border:1px solid rgba(226,75,74,0.3);color:#F09595;border-radius:8px;padding:10px;font-size:13px;text-align:center;"></div>
     <div style="text-align:center;margin-top:14px;font-size:11px;color:rgba(255,255,255,0.25);">Contactez votre administrateur pour un accès</div>
   </div>
