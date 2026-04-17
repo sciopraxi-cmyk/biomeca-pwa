@@ -8215,37 +8215,29 @@ function showPosturoSection(idx) {
     setTimeout(() => {
       const dn = currentPatient?.bilanDataPosturo?.neuro4;
       if(!dn) return;
-      // D'abord restaurer bilanData
       Object.assign(bilanData, dn);
-      // Puis restaurer visuellement chaque élément
+      // Parcourir TOUS les inputs du psec-3 et restaurer via regex
       const psec3 = document.getElementById('psec-3');
       if(!psec3) return;
-      psec3.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        const onch = cb.getAttribute('onchange') || '';
-        const match = onch.match(/setBilanField\('([^']+)'/);
-        if(match) {
-          const key = match[1];
-          if(key in dn) cb.checked = !!dn[key];
-        }
-      });
-      psec3.querySelectorAll('input[type="radio"]').forEach(r => {
-        const onch = r.getAttribute('onchange') || '';
-        const match = onch.match(/setBilanField\('([^']+)',\s*'([^']+)'/);
-        if(match) {
-          const key = match[1], val = match[2];
-          if(dn[key] === val) r.checked = true;
-        }
-      });
-      psec3.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
-        const onch = el.getAttribute('onchange') || el.getAttribute('oninput') || '';
-        const match = onch.match(/setBilanField\('([^']+)'/);
-        if(match) {
-          const key = match[1];
-          if(key in dn && dn[key] !== '') el.value = dn[key];
+      psec3.querySelectorAll('[onchange]').forEach(el => {
+        const onch = el.getAttribute('onchange');
+        // Pattern: setBilanField('key', this.checked) ou setBilanField('key', 'val')
+        const m1 = onch.match(/setBilanField\('([^']+)',\s*this\.checked/);
+        const m2 = onch.match(/setBilanField\('([^']+)',\s*'([^']+)'/);
+        const m3 = onch.match(/setBilanField\('([^']+)',\s*this\.value/);
+        if(m1) {
+          const key = m1[1];
+          if(key in dn) el.checked = !!dn[key];
+        } else if(m2) {
+          const key = m2[1], val = m2[2];
+          if(dn[key] === val) el.checked = true;
+        } else if(m3) {
+          const key = m3[1];
+          if(key in dn) el.value = dn[key];
         }
       });
       updateNeuroTotals();
-    }, 300);
+    }, 400);
   }
   if(idx === 8) setTimeout(initPosturoFeetCanvas, 100);
 }
