@@ -8548,8 +8548,8 @@ function savePosturoBilan() {
     d._bodyCanvas = tmpBc.toDataURL('image/png');
   }
   const fc=document.getElementById('posturo-feet-canvas');
-  if(fc && fc.width>0) {
-    // Sauvegarder tout le canvas en PNG (dessins cumulés)
+  if(fc && fc.width>0 && fc._history && fc._history.length>0) {
+    // Sauvegarder seulement si des dessins ont été effectués
     d._feetCanvas = fc.toDataURL('image/png');
   }
   // Mettre à jour le snapshot dans bilansPosturo
