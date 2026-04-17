@@ -1905,31 +1905,23 @@ function savePatients() {
 function editPatient(idx) {
   const p = patients[idx];
   if(!p) return;
-  // Pré-remplir le formulaire
-  document.getElementById('np-nom').value = p.nom||'';
-  document.getElementById('np-prenom').value = p.prenom||'';
-  document.getElementById('np-ddn').value = p.ddn||'';
-  document.getElementById('np-sport').value = p.sport||'';
-  document.getElementById('np-poids').value = p.poids||'';
-  document.getElementById('np-taille').value = p.taille||'';
-  document.getElementById('np-motif').value = p.motif||'';
-  if(document.getElementById('np-metier')) document.getElementById('np-metier').value = p.metier||'';
-  if(document.getElementById('np-lat')) document.getElementById('np-lat').value = p.lat||'Droitier';
-  // Changer le bouton créer en sauvegarder
-  const btn = document.querySelector('[onclick="createPatient()"]');
-  if(btn) {
-    btn.textContent = '💾 Sauvegarder modifications';
-    btn.setAttribute('onclick', `saveEditPatient(${idx})`);
-  }
-  // Afficher le formulaire
+  nav('pg-patients');
   const npCard = document.getElementById('nouveau-patient-card');
   if(npCard) npCard.style.display = 'block';
-  nav('pg-patients');
-  // Scroller vers le formulaire
-  // Afficher le formulaire
-  const card = document.getElementById('nouveau-patient-card');
-  if(card) card.style.display = 'block';
-  setTimeout(()=>document.getElementById('np-nom')?.scrollIntoView({behavior:'smooth'}),200);
+  setTimeout(() => {
+    const setV = (id, val) => { const el = document.getElementById(id); if(el) el.value = val||''; };
+    setV('np-nom', p.nom); setV('np-prenom', p.prenom); setV('np-ddn', p.ddn);
+    setV('np-sport', p.sport); setV('np-poids', p.poids); setV('np-taille', p.taille);
+    setV('np-motif', p.motif); setV('np-metier', p.metier);
+    const latEl = document.getElementById('np-lat');
+    if(latEl) latEl.value = p.lat||'Droitier';
+    const btn = document.querySelector('[onclick="createPatient()"]');
+    if(btn) {
+      btn.textContent = '💾 Sauvegarder modifications';
+      btn.setAttribute('onclick', `saveEditPatient(${idx})`);
+    }
+    document.getElementById('np-nom')?.scrollIntoView({behavior:'smooth'});
+  }, 200);
 }
 
 function saveEditPatient(idx) {
