@@ -347,7 +347,7 @@ body.printing #rpt-print{display:block!important;}
   </div>
 </div>
 
-<div style="flex:1;overflow-y:auto;">
+<div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">
 <div class="lp-hero">
   <h1>L'outil de référence<br>pour vos <em>bilans cliniques</em></h1>
   <p>Bilan postural, podologie du sport, podopédiatrie — des outils professionnels pensés pour optimiser votre pratique et valoriser votre expertise.</p>
@@ -541,7 +541,7 @@ function lpToggle() {
     <!-- Actions -->
     <div style="display:flex;gap:10px;">
       <button onclick="closeMonCompte()" style="flex:1;background:var(--bg2);border:1px solid var(--bord);padding:10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--fg);">Fermer</button>
-      <button onclick="pwaLogout()" style="flex:1;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Se déconnecter</button>
+      <button onclick="closeMonCompte();pwaLogout();" style="flex:1;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Se déconnecter</button>
     </div>
   </div>
 </div>
@@ -1545,6 +1545,7 @@ async function onPwaLoginSuccess() {
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
   showAdminPanelIfNeeded();
+  nav('pg-patients');
 
   // Afficher onglet Paramètres si admin
   const paramsBtn = document.getElementById('tn-params');
