@@ -386,6 +386,27 @@ body.printing #rpt-print{display:block!important;}
   </div>
 </div>
 
+<!-- ══ RAPPORT POSTURO ══ -->
+
+<div class="page" id="pg-rapport-posturo" style="padding:0;background:#fff;">
+  <div style="position:sticky;top:0;z-index:100;background:#fff;padding:10px 20px;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;">
+    <button onclick="nav('pg-bilan-posturo')" style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;">← Bilan</button>
+    <span style="font-weight:700;color:#2a7a4e;">📄 Rapport Postural</span>
+    <button onclick="window.print()" style="background:#2a7a4e;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:700;">🖨️ Imprimer / PDF</button>
+  </div>
+  <div id="rapport-posturo-body" style="padding:20px;max-width:860px;margin:0 auto;">
+    <div style="text-align:center;color:#888;padding:40px;">Chargement...</div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .page { display: none !important; }
+  #pg-rapport-posturo { display: block !important; }
+  #pg-rapport-posturo > div:first-child { display: none !important; }
+}
+</style>
+
 <!-- ══ PRATICIENS ══ -->
 
 <div class="page" id="pg-posturo">
@@ -3945,9 +3966,115 @@ function buildRapportPosturo() {
   html += `<div class="footer">Bilan Étude de la Posture · Sciopraxi · ${dateStr}</div>
   </div></body></html>`;
 
-  const win = window.open('','_blank');
-  win.document.write(html);
-  win.document.close();
+  // Injecter CSS dans la page
+  let existingStyle = document.getElementById('rapport-posturo-style');
+  if(!existingStyle) {
+    existingStyle = document.createElement('style');
+    existingStyle.id = 'rapport-posturo-style';
+    document.head.appendChild(existingStyle);
+  }
+  existingStyle.textContent = `
+    .rp-page { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a1a2e; }
+    .rp-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; padding-bottom:10px; border-bottom:3px solid #2a7a4e; }
+    .rp-logo { height:55px; object-fit:contain; }
+    .rp-prat { text-align:right; font-size:10px; color:#555; line-height:1.7; }
+    .rp-prat-name { font-size:13px; font-weight:700; color:#1a1a2e; }
+    .rp-title { text-align:center; margin-bottom:14px; }
+    .rp-title h1 { font-size:20px; font-weight:800; color:#2a7a4e; letter-spacing:2px; text-transform:uppercase; }
+    .rp-title .sub { font-size:10px; color:#888; margin-top:3px; }
+    .rp-patient { background:linear-gradient(135deg,#f0faf4,#e0f5ea); border:2px solid #2a7a4e; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
+    .rp-patient-name { font-size:16px; font-weight:800; color:#2a7a4e; }
+    .rp-patient-details { font-size:10px; color:#555; margin-top:4px; line-height:1.6; }
+    .rp-patient-right { text-align:right; font-size:10px; color:#555; line-height:1.6; }
+    .rp-section { margin-bottom:12px; }
+    .rp-section-title { color:#fff; padding:6px 12px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; }
+    .rp-section-body { border-radius:0 0 6px 6px; padding:8px 12px; border-width:0 1px 1px 1px; border-style:solid; }
+    .rp-item { display:flex; padding:4px 0; border-bottom:1px solid #f5f5f5; }
+    .rp-item:last-child { border-bottom:none; }
+    .rp-item-label { font-weight:600; min-width:200px; font-size:10px; }
+    .rp-item-value { flex:1; font-size:10px; color:#333; }
+    .rp-footer { margin-top:16px; padding-top:8px; border-top:1px solid #eee; text-align:center; font-size:9px; color:#aaa; }
+    @media print { #pg-rapport-posturo > div:first-child { display:none!important; } }
+  `;
+
+  // Construire le HTML du contenu
+  let bodyHtml = '<div class="rp-page">';
+
+  // Header
+  bodyHtml += '<div class="rp-header">';
+  bodyHtml += '<img class="rp-logo" src="'+logo+'" alt="Sciopraxi"/>';
+  bodyHtml += '<div class="rp-prat"><div class="rp-prat-name">'+(prat.titre||'')+' '+(prat.nom||'')+'</div>';
+  if(prat.cabinet) bodyHtml += '<div>'+prat.cabinet+'</div>';
+  if(prat.adresse) bodyHtml += '<div>'+prat.adresse+'</div>';
+  if(prat.tel) bodyHtml += '<div>📞 '+prat.tel+'</div>';
+  if(prat.email) bodyHtml += '<div>✉️ '+prat.email+'</div>';
+  bodyHtml += '</div></div>';
+
+  // Titre
+  bodyHtml += '<div class="rp-title"><h1>Bilan Étude de la Posture</h1><div class="sub">Généré le '+dateStr+'</div></div>';
+
+  // Patient
+  bodyHtml += '<div class="rp-patient">';
+  bodyHtml += '<div><div class="rp-patient-name">'+p.prenom+' '+p.nom+'</div>';
+  bodyHtml += '<div class="rp-patient-details">';
+  if(p.ddn) bodyHtml += '📅 '+new Date(p.ddn).toLocaleDateString('fr-FR');
+  if(p.sport) bodyHtml += ' · 🏃 '+p.sport;
+  if(p.metier) bodyHtml += ' · 💼 '+p.metier;
+  bodyHtml += '</div></div>';
+  bodyHtml += '<div class="rp-patient-right">';
+  if(p.poids) bodyHtml += '⚖️ '+p.poids+' kg';
+  if(p.taille) bodyHtml += ' · 📏 '+p.taille+' cm';
+  if(d.dateConsult) bodyHtml += '<br>📋 '+new Date(d.dateConsult).toLocaleDateString('fr-FR');
+  if(d.medecin) bodyHtml += '<br>👨‍⚕️ '+d.medecin;
+  bodyHtml += '</div></div>';
+
+  // Sections données
+  sections.forEach(function(s) {
+    if(s.type === 'bonhommes') {
+      bodyHtml += '<div class="rp-section">';
+      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';position:relative;">';
+      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">';
+      const labels = ['Profil D','Dos','Face','Profil G'];
+      const imgs = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
+      labels.forEach(function(lbl,i) {
+        bodyHtml += '<div style="text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">'+lbl+'</div>';
+        bodyHtml += '<img src="'+(imgs[i]||'')+'" style="width:100%;border-radius:4px;"/></div>';
+      });
+      bodyHtml += '</div>';
+      if(s.bodyCanvas) bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"/>';
+      bodyHtml += '</div></div>';
+    } else if(s.type === 'pieds') {
+      bodyHtml += '<div class="rp-section">';
+      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';text-align:center;position:relative;">';
+      if(s.piedsImg) bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:100%;border-radius:6px;"/>';
+      bodyHtml += '<img src="'+s.feetCanvas+'" style="position:absolute;top:8px;left:12px;width:calc(100% - 24px);pointer-events:none;"/>';
+      bodyHtml += '</div></div>';
+    } else if(s.type === 'empreinte') {
+      bodyHtml += '<div class="rp-section">';
+      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';text-align:center;">';
+      bodyHtml += '<img src="'+s.img+'" style="max-height:200px;border-radius:6px;"/>';
+      bodyHtml += '</div></div>';
+    } else {
+      bodyHtml += '<div class="rp-section">';
+      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';">';
+      s.items.forEach(function(item) {
+        bodyHtml += '<div class="rp-item"><span class="rp-item-label" style="color:'+s.color+';">'+item[0]+'</span><span class="rp-item-value">'+item[1]+'</span></div>';
+      });
+      bodyHtml += '</div></div>';
+    }
+  });
+
+  bodyHtml += '<div class="rp-footer">Bilan Étude de la Posture · Sciopraxi · '+dateStr+'</div>';
+  bodyHtml += '</div>';
+
+  // Injecter dans la page
+  const body = document.getElementById('rapport-posturo-body');
+  if(body) body.innerHTML = bodyHtml;
+  nav('pg-rapport-posturo');
 }
 
 function buildRapport() {
@@ -5614,7 +5741,7 @@ function getBilanPosturoHTML() {
     <div style="font-size:15px;font-weight:700;color:#2a7a4e;">🧍 Bilan Global de la Posture</div>
     <div style="display:flex;gap:6px;">
       <button class="btn" onclick="savePosturoBilan()" style="background:#2a7a4e;color:#fff;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>
-      <button class="btn" onclick="nav('pg-rapport-posturo')" style="background:var(--blue);color:#fff;font-size:12px;padding:5px 12px;">📄 Rapport</button>
+      <button class="btn" onclick="buildRapportPosturo()" style="background:var(--blue);color:#fff;font-size:12px;padding:5px 12px;">📄 Rapport</button>
     </div>
   </div>
   <div style="display:flex;gap:4px;flex-wrap:wrap;padding:0 20px;margin-bottom:20px;" id="posturo-tabs">
