@@ -8217,9 +8217,9 @@ function showPosturoSection(idx) {
       if(!dn) return;
       Object.assign(bilanData, dn);
       // Parcourir TOUS les inputs du psec-3 et restaurer via regex
-      const psec3 = document.getElementById('psec-3');
-      if(!psec3) return;
-      psec3.querySelectorAll('[onchange]').forEach(el => {
+      // Les inputs setBilanField sont dans pg-bilan-posturo (partagé avec pg-bilan)
+      const container = document.getElementById('pg-bilan-posturo') || document;
+      container.querySelectorAll('[onchange]').forEach(el => {
         const onch = el.getAttribute('onchange');
         // Pattern: setBilanField('key', this.checked) ou setBilanField('key', 'val')
         const m1 = onch.match(/setBilanField\('([^']+)',\s*this\.checked/);
