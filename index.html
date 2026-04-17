@@ -3936,6 +3936,71 @@ function buildRapportPosturo() {
       if(n[r+'-d']) refls.push(r.replace('ref-','').toUpperCase()+' D');
     });
     if(refls.length) neuro.push(['Réflexes archaïques', refls.join(', ')]);
+
+    // Critères de force
+    const force = [];
+    if(n['cf-ext-g']) force.push('Ext.poignet G'); if(n['cf-ext-d']) force.push('Ext.poignet D');
+    if(n['cf-flex-g']) force.push('Flex.hanche G'); if(n['cf-flex-d']) force.push('Flex.hanche D');
+    if(force.length) neuro.push(['Critères de force', force.join(', ')]);
+
+    // Autres critères dynamiques
+    const dynCrit = [];
+    if(n['acd-flex-g']) dynCrit.push('Flex.poignet G'); if(n['acd-flex-d']) dynCrit.push('Flex.poignet D');
+    if(n['acd-hyper-g']) dynCrit.push('Hyperext.genou G'); if(n['acd-hyper-d']) dynCrit.push('Hyperext.genou D');
+    if(dynCrit.length) neuro.push(['Autres critères dynamiques', dynCrit.join(', ')]);
+
+    // Vestibulaire (confluence)
+    const vestNeuro = [];
+    if(n['vest-ant-g']) vestNeuro.push('Antérieur G'); if(n['vest-ant-d']) vestNeuro.push('Antérieur D');
+    if(n['vest-lat-g']) vestNeuro.push('Latéral G'); if(n['vest-lat-d']) vestNeuro.push('Latéral D');
+    if(n['vest-post-g']) vestNeuro.push('Postérieur G'); if(n['vest-post-d']) vestNeuro.push('Postérieur D');
+    if(vestNeuro.length) neuro.push(['Vestibulaire (confluence)', vestNeuro.join(', ')]);
+
+    // Proprioception
+    const prop = [];
+    if(n['prop-lent-g']) prop.push('FN lent G'); if(n['prop-lent-d']) prop.push('FN lent D');
+    if(n['prop-rapide-g']) prop.push('FN rapide G'); if(n['prop-rapide-d']) prop.push('FN rapide D');
+    if(n['prop-golgi-g']) prop.push('Golgi G'); if(n['prop-golgi-d']) prop.push('Golgi D');
+    if(n['prop-paccini-g']) prop.push('Paccini G'); if(n['prop-paccini-d']) prop.push('Paccini D');
+    if(n['prop-ruffini-d-g']) prop.push('Ruffini déc G'); if(n['prop-ruffini-d-d']) prop.push('Ruffini déc D');
+    if(n['prop-ruffini-c-g']) prop.push('Ruffini comp G'); if(n['prop-ruffini-c-d']) prop.push('Ruffini comp D');
+    if(n['prop-golgi-a-g']) prop.push('Golgi-A G'); if(n['prop-golgi-a-d']) prop.push('Golgi-A D');
+    if(prop.length) neuro.push(['Proprioception', prop.join(', ')]);
+
+    // Vermis
+    const vermis = [];
+    if(n['vermis-sharp-g']) vermis.push('Sharp-Purser G'); if(n['vermis-sharp-d']) vermis.push('Sharp-Purser D');
+    if(n['vermis-romberg-g']) vermis.push('Romberg 1 pied G'); if(n['vermis-romberg-d']) vermis.push('Romberg 1 pied D');
+    if(vermis.length) neuro.push(['Vermis', vermis.join(', ')]);
+
+    // Proprio axe
+    const axe = [];
+    if(n['proprio-axe-tete']) axe.push('Tête');
+    if(n['proprio-axe-corps']) axe.push('Corps');
+    if(n['proprio-axe-bassin']) axe.push('Bassin');
+    if(axe.length) neuro.push(['Proprio axe', axe.join(', ')]);
+
+    // Inter-hémisphérique
+    const inter = [];
+    if(n['inter-prec-g']) inter.push('Précision G'); if(n['inter-prec-d']) inter.push('Précision D');
+    if(n['inter-coord-g']) inter.push('Coordination G'); if(n['inter-coord-d']) inter.push('Coordination D');
+    if(inter.length) neuro.push(['Inter-hémisphérique', inter.join(', ')]);
+
+    // Latéral
+    const lat = [];
+    if(n['lat-prec-g']) lat.push('Précision G'); if(n['lat-prec-d']) lat.push('Précision D');
+    if(n['lat-coord-g']) lat.push('Coordination G'); if(n['lat-coord-d']) lat.push('Coordination D');
+    if(lat.length) neuro.push(['Latéral cérébral', lat.join(', ')]);
+
+    // Récepteurs tactiles
+    const rect = [];
+    if(n['rect-merkel-g']) rect.push('Merkel G'); if(n['rect-merkel-d']) rect.push('Merkel D');
+    if(n['rect-ruffini-g']) rect.push('Ruffini G'); if(n['rect-ruffini-d']) rect.push('Ruffini D');
+    if(n['rect-pacini-g']) rect.push('Pacini G'); if(n['rect-pacini-d']) rect.push('Pacini D');
+    if(n['rect-tnl-g']) rect.push('TNL G'); if(n['rect-tnl-d']) rect.push('TNL D');
+    if(n['rect-meissner-g']) rect.push('Meissner G'); if(n['rect-meissner-d']) rect.push('Meissner D');
+    if(n['rect-poils-g']) rect.push('Poils G'); if(n['rect-poils-d']) rect.push('Poils D');
+    if(rect.length) neuro.push(['Récepteurs tactiles', rect.join(', ')]);
   }
   if(neuro.length) sections.push({titre:'4. Neuro-fonctionnel', items:neuro, color:'#8e44ad'});
 
