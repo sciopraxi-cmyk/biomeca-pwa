@@ -1915,7 +1915,8 @@ function editPatient(idx) {
     setV('np-motif', p.motif); setV('np-metier', p.metier);
     const latEl = document.getElementById('np-lat');
     if(latEl) latEl.value = p.lat||'Droitier';
-    const btn = document.querySelector('[onclick="createPatient()"]');
+    const btn = document.querySelector('[onclick="openNewPatientModal()"]') ||
+                document.querySelector('[onclick="createPatient()"]');
     if(btn) {
       btn.textContent = '💾 Sauvegarder modifications';
       btn.setAttribute('onclick', `saveEditPatient(${idx})`);
