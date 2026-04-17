@@ -4265,7 +4265,7 @@ function buildRapportPosturo() {
     <div class="header">
       <img class="logo" src="${logo}" alt="Sciopraxi"/>
       <div class="prat-info">
-        <div class="prat-name">${prat.titre||''} ${prat.nom||''}</div>
+        <div class="prat-name">${prat.nom||''} ${prat.prenom||''} — ${prat.titre||''}</div>
         ${prat.cabinet?'<div>'+prat.cabinet+'</div>':''}
         ${prat.adresse?'<div>'+prat.adresse+'</div>':''}
         ${prat.tel?'<div>📞 '+prat.tel+'</div>':''}
@@ -4381,7 +4381,7 @@ function buildRapportPosturo() {
   // Header
   bodyHtml += '<div class="rp-header">';
   bodyHtml += '<img class="rp-logo" src="'+logo+'" alt="Sciopraxi"/>';
-  bodyHtml += '<div class="rp-prat"><div class="rp-prat-name">'+(prat.titre||'')+' '+(prat.nom||'')+'</div>';
+  bodyHtml += '<div class="rp-prat"><div class="rp-prat-name">'+(prat.nom||'')+' '+(prat.prenom||'')+' — '+(prat.titre||'')+'</div>';
   if(prat.cabinet) bodyHtml += '<div>'+prat.cabinet+'</div>';
   if(prat.adresse) bodyHtml += '<div>'+prat.adresse+'</div>';
   if(prat.tel) bodyHtml += '<div>📞 '+prat.tel+'</div>';
