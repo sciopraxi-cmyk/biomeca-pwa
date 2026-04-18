@@ -4825,11 +4825,10 @@ const sections = [];
   }
   // Plan de semelles (pieds) à la fin dans section 9
   if(d._feetCanvas) {
-    // _feetCanvas contient image de fond + dessins, dimensions 1580x836
-    // imgjs-pieds est l'image de fond seule 520x520
-    // On utilise _feetCanvas directement - il a déjà tout
+    var piedsBaseEl = document.getElementById('imgjs-pieds');
     sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
-      piedsImg: d._feetCanvas, feetCanvas: null});
+      piedsImg: piedsBaseEl ? piedsBaseEl.src : null,
+      feetCanvas: d._feetCanvas});
   }
 
   _buildRapportBody(p, d, prat, logo, sections);
@@ -4838,6 +4837,29 @@ const sections = [];
 function _buildRapportBody(p, d, prat, logo, sections) {
   // Résoudre les images bonhommes si nécessaire
   var bonhommesSection = sections.find(function(s){ return s.type === 'bonhommes' && s.bodyCanvasData; });
+  var piedsSection = sections.find(function(s){ return s.type === 'pieds' && s.feetCanvas && s.piedsImg; });
+  
+  // Composite pieds async
+  if(piedsSection) {
+    var pImg = new Image(); var fImg = new Image(); var pLoaded = 0;
+    function doPiedsComposite() {
+      if(++pLoaded < 2) return;
+      var tmp = document.createElement('canvas');
+      tmp.width = pImg.width; tmp.height = pImg.height;
+      var ctx = tmp.getContext('2d');
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,tmp.width,tmp.height);
+      ctx.drawImage(pImg, 0, 0);
+      ctx.drawImage(fImg, 0, 0, tmp.width, tmp.height);
+      piedsSection.piedsImg = tmp.toDataURL('image/png');
+      piedsSection.feetCanvas = null;
+      if(!bonhommesSection) _doBuildRapport(p, d, prat, logo, sections);
+    }
+    pImg.onload = doPiedsComposite;
+    fImg.onload = doPiedsComposite;
+    pImg.src = piedsSection.piedsImg;
+    fImg.src = piedsSection.feetCanvas;
+  }
+  
   if(bonhommesSection) {
     var bcImg = new Image();
     bcImg.onload = function() {
@@ -4850,7 +4872,14 @@ function _buildRapportBody(p, d, prat, logo, sections) {
         var ctx = tmp.getContext('2d');
         ctx.fillStyle='#fff'; ctx.fillRect(0,0,sw,sh);
         var bgEl = document.getElementById(bgIds[i]);
-        if(bgEl && bgEl.naturalWidth>0) ctx.drawImage(bgEl,0,0,sw,sh);
+        if(bgEl && bgEl.naturalWidth>0) {
+          // Centrer l'image de fond dans le canvas en gardant le ratio
+          var bgW = bgEl.naturalWidth; var bgH = bgEl.naturalHeight;
+          var scale = Math.min(sw/bgW, sh/bgH);
+          var dx = (sw - bgW*scale)/2; var dy = (sh - bgH*scale)/2;
+          ctx.drawImage(bgEl, dx, dy, bgW*scale, bgH*scale);
+        }
+        // Superposer les dessins (slice du canvas global)
         ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
         return tmp.toDataURL('image/png');
       }
@@ -4859,7 +4888,7 @@ function _buildRapportBody(p, d, prat, logo, sections) {
       bonhommesSection.faceImg    = makeSliceComposite(2);
       bonhommesSection.profilGImg = makeSliceComposite(3);
       bonhommesSection.bodyCanvasData = null;
-      _doBuildRapport(p, d, prat, logo, sections);
+      if(!piedsSection || !piedsSection.feetCanvas) _doBuildRapport(p, d, prat, logo, sections);
     };
     bcImg.src = bonhommesSection.bodyCanvasData;
     return;
