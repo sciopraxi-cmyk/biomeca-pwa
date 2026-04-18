@@ -4396,37 +4396,73 @@ const sections = [];
   if(d.rombergMorpho) morpho.push(['Romberg', d.rombergMorpho]);
   if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho, color:'#3498db'});
 
-  // Silhouettes bonhommes: capturer le conteneur tel quel via canvas
+  // Silhouettes bonhommes: capturer chaque vue avec dessins
   if(d._bodyCanvas) {
-    // Chercher le conteneur des bonhommes dans psec-1
-    const bodyContainer = document.querySelector('#psec-1 .posturo-body-wrap') ||
-                          document.getElementById('posturo-body-canvas')?.parentElement;
-    let compositeImg = null;
-    if(bodyContainer) {
+    const bc = document.getElementById('posturo-body-canvas');
+    const bcData = bc ? bc.toDataURL('image/png') : null;
+    
+    function makeComposite(imgEl, canvasData, w, h) {
+      if(!imgEl) return null;
       try {
-        const rect = bodyContainer.getBoundingClientRect();
         const tmpC = document.createElement('canvas');
-        tmpC.width = rect.width * window.devicePixelRatio;
-        tmpC.height = rect.height * window.devicePixelRatio;
+        tmpC.width = w || 300; tmpC.height = h || 500;
         const ctx = tmpC.getContext('2d');
-        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        // Dessiner les images de fond
-        bodyContainer.querySelectorAll('img').forEach(img => {
-          const r = img.getBoundingClientRect();
-          ctx.drawImage(img, r.left - rect.left, r.top - rect.top, r.width, r.height);
-        });
-        // Superposer le canvas des dessins
-        const bc = document.getElementById('posturo-body-canvas');
-        if(bc) ctx.drawImage(bc, 0, 0, rect.width, rect.height);
-        compositeImg = tmpC.toDataURL('image/png');
-      } catch(e) { compositeImg = null; }
+        ctx.drawImage(imgEl, 0, 0, tmpC.width, tmpC.height);
+        if(canvasData) {
+          const img2 = new Image();
+          img2.src = canvasData;
+          ctx.drawImage(img2, 0, 0, tmpC.width, tmpC.height);
+        }
+        return tmpC.toDataURL('image/png');
+      } catch(e) { return imgEl.src; }
     }
-    const faceImg = document.getElementById('imgjs-morpho-face')?.src;
-    const face2Img = document.getElementById('imgjs-morpho-face2')?.src;
-    const profilGImg = document.getElementById('imgjs-morpho-profilG')?.src;
-    const profilDImg = document.getElementById('imgjs-morpho-profilD')?.src;
+    
+    const faceEl = document.getElementById('imgjs-morpho-face');
+    const face2El = document.getElementById('imgjs-morpho-face2');
+    const profilGEl = document.getElementById('imgjs-morpho-profilG');
+    const profilDEl = document.getElementById('imgjs-morpho-profilD');
+    const W = bc ? bc.width/4 : 300;
+    const H = bc ? bc.height : 500;
+    
+    // Créer canvas partiel pour chaque vue (le canvas global est divisé en 4)
+    function getCanvasSlice(canvasEl, sliceIdx, totalSlices) {
+      if(!canvasEl) return null;
+      try {
+        const sliceW = canvasEl.width / totalSlices;
+        const tmpC = document.createElement('canvas');
+        tmpC.width = sliceW; tmpC.height = canvasEl.height;
+        const ctx = tmpC.getContext('2d');
+        ctx.drawImage(canvasEl, sliceIdx*sliceW, 0, sliceW, canvasEl.height, 0, 0, sliceW, canvasEl.height);
+        return tmpC.toDataURL('image/png');
+      } catch(e) { return null; }
+    }
+    
+    const slice0 = getCanvasSlice(bc, 0, 4);
+    const slice1 = getCanvasSlice(bc, 1, 4);
+    const slice2 = getCanvasSlice(bc, 2, 4);
+    const slice3 = getCanvasSlice(bc, 3, 4);
+    
+    function composite(imgEl, sliceData) {
+      if(!imgEl) return null;
+      try {
+        const tmpC = document.createElement('canvas');
+        tmpC.width = 300; tmpC.height = 500;
+        const ctx = tmpC.getContext('2d');
+        ctx.drawImage(imgEl, 0, 0, 300, 500);
+        if(sliceData) {
+          const img2 = new Image(); img2.src = sliceData;
+          ctx.drawImage(img2, 0, 0, 300, 500);
+        }
+        return tmpC.toDataURL('image/png');
+      } catch(e) { return imgEl?.src || null; }
+    }
+    
     sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-      faceImg, face2Img, profilGImg, profilDImg, bodyCanvas: d._bodyCanvas, compositeImg});
+      profilDImg: composite(profilDEl, slice0),
+      face2Img: composite(face2El, slice1),
+      faceImg: composite(faceEl, slice2),
+      profilGImg: composite(profilGEl, slice3)
+    });
   }
 
   // 3. Bilan dynamique
