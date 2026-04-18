@@ -4492,17 +4492,16 @@ const sections = [];
         return tmp.toDataURL('image/png');
       } catch(e) { return imgEl.src; }
     }
-    // Utiliser les images morpho comme fond (elles sont disponibles synchronement)
-    // _bodyCanvas sera superposé via Promise
-    const imgIds = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
-    const morphoImgs = imgIds.map(id => document.getElementById(id));
-    sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-      bodyCanvasData: d._bodyCanvas,
-      profilDImg: morphoImgs[0]?.src || null,
-      face2Img:   morphoImgs[1]?.src || null,
-      faceImg:    morphoImgs[2]?.src || null,
-      profilGImg: morphoImgs[3]?.src || null
-    });
+    {
+      var morphoImgs = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'].map(function(id){ return document.getElementById(id); });
+      sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
+        bodyCanvasData: d._bodyCanvas,
+        profilDImg: morphoImgs[0] ? morphoImgs[0].src : null,
+        face2Img:   morphoImgs[1] ? morphoImgs[1].src : null,
+        faceImg:    morphoImgs[2] ? morphoImgs[2].src : null,
+        profilGImg: morphoImgs[3] ? morphoImgs[3].src : null
+      });
+    }
   }
 
   // 3. Bilan dynamique
