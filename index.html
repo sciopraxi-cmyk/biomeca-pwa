@@ -4872,8 +4872,11 @@ function _buildRapportBody(p, d, prat, logo, sections) {
       ctx.fillStyle='#fff'; ctx.fillRect(0,0,tmp.width,tmp.height);
       ctx.drawImage(pImg2, 0, 0);
       // Extraire la zone dessin du canvas et superposer
-      ctx.drawImage(fImg2, xOff, yOff, imgWSaved, Math.min(imgHSaved, canvasH),
-                    0, 0, tmp.width, tmp.height);
+      // Extraire zone dessins et superposer en gardant le ratio correct
+      var srcH = Math.min(imgHSaved, canvasH); // hauteur disponible dans canvas
+      var dstH = tmp.height * (srcH / imgWSaved); // hauteur destination proportionnelle
+      ctx.drawImage(fImg2, xOff, yOff, imgWSaved, srcH,
+                    0, 0, tmp.width, dstH);
       piedsSection.piedsImg = tmp.toDataURL('image/png');
       piedsSection.feetCanvas = null;
       if(!bonhommesSection) _doBuildRapport(p, d, prat, logo, sections);
