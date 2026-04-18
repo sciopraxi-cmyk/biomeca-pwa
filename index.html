@@ -4492,13 +4492,16 @@ const sections = [];
         return tmp.toDataURL('image/png');
       } catch(e) { return imgEl.src; }
     }
-    // Stocker _bodyCanvas directement - le rendu fera le slice
+    // Utiliser les images morpho comme fond (elles sont disponibles synchronement)
+    // _bodyCanvas sera superposé via Promise
+    const imgIds = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
+    const morphoImgs = imgIds.map(id => document.getElementById(id));
     sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
       bodyCanvasData: d._bodyCanvas,
-      profilDImg: document.getElementById('imgjs-morpho-profilD')?.src,
-      face2Img:   document.getElementById('imgjs-morpho-face2')?.src,
-      faceImg:    document.getElementById('imgjs-morpho-face')?.src,
-      profilGImg: document.getElementById('imgjs-morpho-profilG')?.src
+      profilDImg: morphoImgs[0]?.src || null,
+      face2Img:   morphoImgs[1]?.src || null,
+      faceImg:    morphoImgs[2]?.src || null,
+      profilGImg: morphoImgs[3]?.src || null
     });
   }
 
@@ -4822,25 +4825,11 @@ const sections = [];
   }
   // Plan de semelles (pieds) à la fin dans section 9
   if(d._feetCanvas) {
-    const piedsBase = document.getElementById('imgjs-pieds');
-    const piedsCanvas = document.getElementById('pieds-canvas') ||
-                        document.querySelector('#psec-8 canvas');
-    let piedsComposite = d._feetCanvas || piedsBase?.src || null;
-    if(piedsBase && d._feetCanvas) {
-      try {
-        const feetImg = new Image(); feetImg.src = d._feetCanvas;
-        const fw = feetImg.width || 600; const fh = feetImg.height || 280;
-        const tmp = document.createElement('canvas');
-        tmp.width = fw; tmp.height = fh;
-        const ctx = tmp.getContext('2d');
-        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,fw,fh);
-        ctx.drawImage(piedsBase, 0, 0, fw, fh);
-        ctx.drawImage(feetImg, 0, 0, fw, fh);
-        piedsComposite = tmp.toDataURL('image/png');
-      } catch(e) { piedsComposite = d._feetCanvas; }
-    }
+    // _feetCanvas contient image de fond + dessins, dimensions 1580x836
+    // imgjs-pieds est l'image de fond seule 520x520
+    // On utilise _feetCanvas directement - il a déjà tout
     sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
-      piedsImg: piedsComposite, feetCanvas: d._feetCanvas});
+      piedsImg: d._feetCanvas, feetCanvas: null});
   }
 
   const now = new Date();
@@ -4906,21 +4895,7 @@ const sections = [];
     } else if(s.type === 'pieds') {
       if(s.piedsImg) {
         bodyHtml += '<div style="text-align:center;padding:10px 0;">';
-        bodyHtml += '<canvas id="feet-composite" style="max-width:80%;border-radius:4px;"></canvas>';
-        bodyHtml += '<script>(function(){'+
-          'var fi=new Image(),pi=new Image();var loaded=0;'+
-          'function draw(){if(loaded<2)return;'+
-          'var cv=document.getElementById("feet-composite");'+
-          'cv.width=fi.width||600;cv.height=fi.height||280;'+
-          'var ctx=cv.getContext("2d");'+
-          'ctx.fillStyle="#fff";ctx.fillRect(0,0,cv.width,cv.height);'+
-          'ctx.drawImage(pi,0,0,cv.width,cv.height);'+
-          'ctx.drawImage(fi,0,0,cv.width,cv.height);}'+
-          'fi.onload=function(){loaded++;draw();};'+
-          'pi.onload=function(){loaded++;draw();};'+
-          (s.feetCanvas ? 'fi.src="'+s.feetCanvas+'";' : 'loaded++;') +
-          'pi.src="'+s.piedsImg+'";'+
-          '})();<\/script>';
+        bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:90%;border-radius:4px;display:block;margin:0 auto;"/>';
         bodyHtml += '</div>';
       }
     } else if(s.type === 'image') {
