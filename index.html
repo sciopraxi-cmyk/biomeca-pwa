@@ -4493,7 +4493,7 @@ const sections = [];
       } catch(e) { return imgEl.src; }
     }
     {
-      var bgIds3 = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
+      var bgIds3 = ['imgjs-morpho-profilG','imgjs-morpho-face','imgjs-morpho-face2','imgjs-morpho-profilD'];
       sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
         bodyCanvasData: d._bodyCanvas,
         bgIds: bgIds3,
@@ -4883,10 +4883,10 @@ function _buildRapportBody(p, d, prat, logo, sections) {
         ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
         return tmp.toDataURL('image/png');
       }
-      bonhommesSection.profilDImg = makeSliceComposite(0);
-      bonhommesSection.face2Img   = makeSliceComposite(1);
-      bonhommesSection.faceImg    = makeSliceComposite(2);
-      bonhommesSection.profilGImg = makeSliceComposite(3);
+      bonhommesSection.profilDImg = makeSliceComposite(3);
+      bonhommesSection.face2Img   = makeSliceComposite(2);
+      bonhommesSection.faceImg    = makeSliceComposite(1);
+      bonhommesSection.profilGImg = makeSliceComposite(0);
       bonhommesSection.bodyCanvasData = null;
       if(!piedsSection || !piedsSection.feetCanvas) _doBuildRapport(p, d, prat, logo, sections);
     };
@@ -4947,7 +4947,7 @@ function _doBuildRapport(p, d, prat, logo, sections) {
     bodyHtml += '<div class="section-title"><div class="section-num">'+num+'</div><div class="section-label">'+s.titre+'</div><div class="section-line"></div></div>';
     bodyHtml += '<div class="section-body">';
     if(s.type === 'bonhommes') {
-      var labels4 = ['Profil D','Dos','Face','Profil G'];
+      var labels4 = ['Profil G','Face','Dos','Profil D'];
       var imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
       bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;">';
       imgs4.forEach(function(src, i) {
@@ -4960,7 +4960,7 @@ function _doBuildRapport(p, d, prat, logo, sections) {
     } else if(s.type === 'pieds') {
       if(s.piedsImg) {
         bodyHtml += '<div style="text-align:center;padding:10px 0;">';
-        bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:90%;border-radius:4px;display:block;margin:0 auto;"/>';
+        bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:60%;border-radius:4px;display:block;margin:0 auto;"/>';
         bodyHtml += '</div>';
       }
     } else if(s.type === 'image') {
