@@ -9335,23 +9335,24 @@ function savePosturoBilan() {
   if(fc && fc.width>0 && fc._history && fc._history.length>0) {
     const piedsImgEl = document.getElementById('imgjs-pieds');
     const compC = document.createElement('canvas');
-    compC.width = fc.width;
-    compC.height = fc.height;
+    compC.width = fc.width;   // 1580
+    compC.height = fc.height; // 836
     const compCtx = compC.getContext('2d');
     if(piedsImgEl) {
-      const parentDiv = fc.parentElement;
-      const pW = parentDiv.offsetWidth || 300;
-      const pH = parentDiv.offsetHeight || 150;
-      const imgDisplayW = Math.min(pW * 0.8, 400);
-      const imgOffX = (pW - imgDisplayW) / 2;
-      const imgOffY = 8;
-      const fcScaleX = fc.width / pW;
-      const fcScaleY = fc.height / pH;
-      const dstX = imgOffX * fcScaleX;
-      const dstY = imgOffY * fcScaleY;
-      const dstW = imgDisplayW * fcScaleX;
-      const dstH = imgDisplayW * fcScaleX; // image carree, meme scale X
-      compCtx.drawImage(piedsImgEl, dstX, dstY, dstW, dstH);
+      // Dimensions fixes connues:
+      // - canvas DOM: 300x150 (attributs)
+      // - div parent: padding 8px, donc innerW = 284px
+      // - image affichee: width = min(284*0.8, 400) = 227px, carree
+      // - image centree: xOff = (300-227)/2 = 36.5px, yOff = 8px
+      // - canvas sauvegarde: 1580x836, scale = 1580/300 = 5.267
+      const domW = 300, domH = 150;
+      const scale = fc.width / domW;
+      const imgDOM = Math.min((domW - 16) * 0.8, 400); // 227px
+      const xOff = (domW - imgDOM) / 2; // 36.5px
+      const yOff = 8;
+      compCtx.drawImage(piedsImgEl,
+        xOff * scale, yOff * scale,
+        imgDOM * scale, imgDOM * scale);
     }
     compCtx.drawImage(fc, 0, 0);
     d._feetCanvas = compC.toDataURL('image/png');
