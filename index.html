@@ -9333,27 +9333,29 @@ function savePosturoBilan() {
   }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc) {
-    if(fc._history && fc._history.length > 0) {
-      // Nouveaux dessins: recréer composite fond+dessins
-      if(!fc.width || fc.width===0) { fc.width=1580; fc.height=836; }
+    const _buildFeetComposite = (canvas, callback) => {
+      if(!canvas.width || canvas.width===0) { canvas.width=1580; canvas.height=836; }
       const piedsImgEl = document.getElementById('imgjs-pieds');
       const compC = document.createElement('canvas');
-      compC.width = fc.width; compC.height = fc.height;
+      compC.width = canvas.width; compC.height = canvas.height;
       const compCtx = compC.getContext('2d');
-      if(piedsImgEl) compCtx.drawImage(piedsImgEl, 0, 0, fc.width, fc.height);
-      compCtx.drawImage(fc, 0, 0);
-      d._feetCanvas = compC.toDataURL('image/png');
+      if(piedsImgEl && piedsImgEl.naturalWidth > 0) {
+        // Centrer l'image en conservant le ratio naturel
+        const iw = piedsImgEl.naturalWidth, ih = piedsImgEl.naturalHeight;
+        const scale = Math.min(canvas.width/iw, canvas.height/ih);
+        const dw = iw*scale, dh = ih*scale;
+        const dx = (canvas.width-dw)/2, dy = (canvas.height-dh)/2;
+        compCtx.drawImage(piedsImgEl, dx, dy, dw, dh);
+      }
+      compCtx.drawImage(canvas, 0, 0);
+      callback(compC.toDataURL('image/png'));
+    };
+    if(fc._history && fc._history.length > 0) {
+      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
     } else if(!d._feetCanvas) {
-      // Pas de dessin et pas de données: sauvegarder juste le fond
-      if(!fc.width || fc.width===0) { fc.width=1580; fc.height=836; }
-      const piedsImgEl2 = document.getElementById('imgjs-pieds');
-      const compC2 = document.createElement('canvas');
-      compC2.width = fc.width; compC2.height = fc.height;
-      const compCtx2 = compC2.getContext('2d');
-      if(piedsImgEl2) compCtx2.drawImage(piedsImgEl2, 0, 0, fc.width, fc.height);
-      d._feetCanvas = compC2.toDataURL('image/png');
+      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
     }
-    // else: garder d._feetCanvas existant (déjà composite correct)
+    // else: garder d._feetCanvas existantcomposite correct)
   }
   // Mettre à jour le snapshot dans bilansPosturo
   if(currentPatient.bilansPosturo && currentPatient.bilansPosturo.length > 0) {
