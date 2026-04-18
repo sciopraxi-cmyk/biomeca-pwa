@@ -4457,16 +4457,23 @@ const sections = [];
       } catch(e) { return imgEl?.src || null; }
     }
     
-    // Utiliser directement les canvas qui contiennent déjà image + dessins
-    function canvasToImg(id) {
-      const cv = document.getElementById(id);
-      return cv ? cv.toDataURL('image/png') : null;
+    // posturo-body-canvas contient les 4 vues côte à côte
+    function sliceCanvas(canvasId, sliceIdx, totalSlices) {
+      const cv = document.getElementById(canvasId);
+      if(!cv || cv.width === 0) return null;
+      try {
+        const sw = Math.floor(cv.width / totalSlices);
+        const tmp = document.createElement('canvas');
+        tmp.width = sw; tmp.height = cv.height;
+        tmp.getContext('2d').drawImage(cv, sliceIdx*sw, 0, sw, cv.height, 0, 0, sw, cv.height);
+        return tmp.toDataURL('image/png');
+      } catch(e) { return null; }
     }
     sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-      profilDImg: canvasToImg('morpho-profilD'),
-      face2Img: canvasToImg('morpho-face2'),
-      faceImg: canvasToImg('morpho-face'),
-      profilGImg: canvasToImg('morpho-profilG')
+      profilDImg: sliceCanvas('posturo-body-canvas', 0, 4),
+      face2Img: sliceCanvas('posturo-body-canvas', 1, 4),
+      faceImg: sliceCanvas('posturo-body-canvas', 2, 4),
+      profilGImg: sliceCanvas('posturo-body-canvas', 3, 4)
     });
   }
 
@@ -4794,19 +4801,15 @@ const sections = [];
     const piedsCanvas = document.getElementById('pieds-canvas') ||
                         document.querySelector('#psec-8 canvas');
     let piedsComposite = piedsBase?.src || null;
-    // Utiliser pieds-canvas qui contient image + dessins
-    const piedsCanvasDirect = document.getElementById('pieds-canvas');
-    if(piedsCanvasDirect && piedsCanvasDirect.width > 0) {
-      piedsComposite = piedsCanvasDirect.toDataURL('image/png');
-    } else if(piedsBase && piedsCanvas) {
-      try {
-        const tmpC = document.createElement('canvas');
-        tmpC.width = 600; tmpC.height = 280;
-        const ctx = tmpC.getContext('2d');
-        ctx.drawImage(piedsBase, 0, 0, 600, 280);
-        ctx.drawImage(piedsCanvas, 0, 0, 600, 280);
-        piedsComposite = tmpC.toDataURL('image/png');
-      } catch(e) { piedsComposite = piedsBase?.src || null; }
+    // posturo-feet-canvas contient image de fond + dessins
+    const pfCanvas = document.getElementById('posturo-feet-canvas');
+    if(pfCanvas && pfCanvas.width > 0) {
+      try { piedsComposite = pfCanvas.toDataURL('image/png'); } catch(e) {}
+    } else {
+      const piedsCanvasDirect = document.getElementById('pieds-canvas');
+      if(piedsCanvasDirect && piedsCanvasDirect.width > 0) {
+        try { piedsComposite = piedsCanvasDirect.toDataURL('image/png'); } catch(e) {}
+      }
     }
     sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
       piedsImg: piedsComposite, feetCanvas: d._feetCanvas});
