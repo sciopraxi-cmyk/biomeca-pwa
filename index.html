@@ -1798,22 +1798,22 @@ function closeMonCompte() {
 
 async function adminUpdateAcces(userId, newAcces) {
   try {
-    // Utiliser service role key si disponible, sinon token admin
-    const authKey = typeof SUPABASE_SERVICE_KEY !== 'undefined' ? SUPABASE_SERVICE_KEY : pwaUser.token;
+    const trialStart = newAcces === 'essai' ? new Date().toISOString() : undefined;
+    const meta = trialStart ? { acces: newAcces, trial_start: trialStart } : { acces: newAcces };
     const r = await fetch(SUPA_URL + '/auth/v1/admin/users/' + userId, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'apikey': SUPA_KEY,
-        'Authorization': 'Bearer ' + authKey
+        'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY
       },
-      body: JSON.stringify({ user_metadata: { acces: newAcces } })
+      body: JSON.stringify({ user_metadata: meta })
     });
     const d = await r.json();
     if(d.id) {
       console.log('Accès mis à jour:', newAcces, 'pour', d.email);
     } else {
-      console.error('Erreur:', d);
+      console.error('Erreur:', JSON.stringify(d));
     }
   } catch(e) {
     console.error('Erreur mise à jour accès:', e);
