@@ -9349,12 +9349,8 @@ function savePosturoBilan() {
       }
       callback(compC.toDataURL('image/png'));
     };
-    if(fc._history && fc._history.length > 0) {
-      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
-    } else if(!d._feetCanvas) {
-      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
-    }
-    // else: garder d._feetCanvas existantcomposite correct)
+    // Toujours régénérer le composite
+    _buildFeetComposite(fc, url => { d._feetCanvas = url; });
   }
   // Mettre à jour le snapshot dans bilansPosturo
   if(currentPatient.bilansPosturo && currentPatient.bilansPosturo.length > 0) {
