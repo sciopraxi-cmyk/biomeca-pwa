@@ -4492,11 +4492,38 @@ const sections = [];
         return tmp.toDataURL('image/png');
       } catch(e) { return imgEl.src; }
     }
+    // Créer les 4 slices depuis _bodyCanvas sauvegardé
+    function makeSlice(dataUrl, sliceIdx) {
+      if(!dataUrl) return null;
+      try {
+        const img = new Image();
+        img.src = dataUrl; // déjà en mémoire - synchrone pour data URLs
+        const sw = Math.floor(img.width/4) || 395;
+        const sh = img.height || 542;
+        const tmp = document.createElement('canvas');
+        tmp.width = sw; tmp.height = sh;
+        const ctx2 = tmp.getContext('2d');
+        ctx2.drawImage(img, sliceIdx*sw, 0, sw, sh, 0, 0, sw, sh);
+        // Superposer image de fond morpho si disponible
+        const imgIds2 = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
+        const imgEl2 = document.getElementById(imgIds2[sliceIdx]);
+        if(imgEl2 && imgEl2.naturalWidth > 0) {
+          const bg = document.createElement('canvas');
+          bg.width = sw; bg.height = sh;
+          const bgCtx = bg.getContext('2d');
+          bgCtx.fillStyle='#fff'; bgCtx.fillRect(0,0,sw,sh);
+          bgCtx.drawImage(imgEl2, 0, 0, sw, sh);
+          bgCtx.drawImage(tmp, 0, 0);
+          return bg.toDataURL('image/png');
+        }
+        return tmp.toDataURL('image/png');
+      } catch(e) { return null; }
+    }
     sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-      profilDImg: compositeImgCanvas('imgjs-morpho-profilD', d._bodyCanvas, 0),
-      face2Img:   compositeImgCanvas('imgjs-morpho-face2',   d._bodyCanvas, 1),
-      faceImg:    compositeImgCanvas('imgjs-morpho-face',    d._bodyCanvas, 2),
-      profilGImg: compositeImgCanvas('imgjs-morpho-profilG', d._bodyCanvas, 3)
+      profilDImg: makeSlice(d._bodyCanvas, 0),
+      face2Img:   makeSlice(d._bodyCanvas, 1),
+      faceImg:    makeSlice(d._bodyCanvas, 2),
+      profilGImg: makeSlice(d._bodyCanvas, 3)
     });
   }
 
@@ -4823,22 +4850,19 @@ const sections = [];
     const piedsBase = document.getElementById('imgjs-pieds');
     const piedsCanvas = document.getElementById('pieds-canvas') ||
                         document.querySelector('#psec-8 canvas');
-    let piedsComposite = piedsBase?.src || null;
-    // Combiner image pieds + d._feetCanvas (dessins sauvegardés)
+    let piedsComposite = d._feetCanvas || piedsBase?.src || null;
     if(piedsBase && d._feetCanvas) {
       try {
+        const feetImg = new Image(); feetImg.src = d._feetCanvas;
+        const fw = feetImg.width || 600; const fh = feetImg.height || 280;
         const tmp = document.createElement('canvas');
-        tmp.width = 600; tmp.height = 280;
+        tmp.width = fw; tmp.height = fh;
         const ctx = tmp.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0,0,600,280);
-        ctx.drawImage(piedsBase, 0, 0, 600, 280);
-        const cv2 = new Image(); cv2.src = d._feetCanvas;
-        ctx.drawImage(cv2, 0, 0, 600, 280);
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,fw,fh);
+        ctx.drawImage(piedsBase, 0, 0, fw, fh);
+        ctx.drawImage(feetImg, 0, 0, fw, fh);
         piedsComposite = tmp.toDataURL('image/png');
-      } catch(e) {}
-    } else if(d._feetCanvas) {
-      piedsComposite = d._feetCanvas;
+      } catch(e) { piedsComposite = d._feetCanvas; }
     }
     sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
       piedsImg: piedsComposite, feetCanvas: d._feetCanvas});
