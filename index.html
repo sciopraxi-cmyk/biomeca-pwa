@@ -1760,11 +1760,13 @@ async function pwaLogout() {
   patients = []; praticiens = []; currentPatient = null; bilanData = {};
   renderPatientList();
   document.getElementById('biomeca-app').style.display = 'none';
-  document.getElementById('pwa-login').style.display = 'block';
+  document.getElementById('pwa-login').style.display = 'flex';
   document.getElementById('pwa-email').value = '';
   document.getElementById('pwa-pwd').value = '';
   document.getElementById('pwa-login-btn').disabled = false;
   document.getElementById('pwa-login-btn').textContent = 'Se connecter';
+  const mc = document.getElementById('modal-mon-compte');
+  if(mc) mc.style.display = 'none';
   nav('pg-home');
 }
 
