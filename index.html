@@ -4509,12 +4509,12 @@ const sections = [];
         });
       }
       var bgIds = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
-      var bcData = d._bodyCanvas;
+      var bcData2 = d._bodyCanvas;
       Promise.all([
-        captureSlice(bcData, 0, bgIds[0]),
-        captureSlice(bcData, 1, bgIds[1]),
-        captureSlice(bcData, 2, bgIds[2]),
-        captureSlice(bcData, 3, bgIds[3])
+        captureSlice(bcData2, 0, bgIds[0]),
+        captureSlice(bcData2, 1, bgIds[1]),
+        captureSlice(bcData2, 2, bgIds[2]),
+        captureSlice(bcData2, 3, bgIds[3])
       ]).then(function(results) {
         sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
           profilDImg: results[0],
