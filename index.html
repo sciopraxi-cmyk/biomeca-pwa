@@ -5027,9 +5027,18 @@ const sections = [];
   bodyHtml += '<div class="footer">Bilan Étude de la Posture · Sciopraxi · '+dateStr+'</div>';
   bodyHtml += '</div>';
 
-  // Injecter dans la page
+  // Injecter dans un iframe isolé pour éviter les conflits CSS
   const body = document.getElementById('rapport-posturo-body');
-  if(body) body.innerHTML = bodyHtml;
+  if(body) {
+    body.innerHTML = '';
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;height:calc(100vh - 120px);border:none;';
+    body.appendChild(iframe);
+    const idoc = iframe.contentDocument || iframe.contentWindow.document;
+    idoc.open();
+    idoc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;">' + bodyHtml + '</body></html>');
+    idoc.close();
+  }
   nav('pg-rapport-posturo');
 }
 
