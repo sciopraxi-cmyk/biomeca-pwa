@@ -4493,38 +4493,15 @@ const sections = [];
       } catch(e) { return imgEl.src; }
     }
     {
-      // Capturer les 4 vues depuis _bodyCanvas avec onload
-      function captureSlice(dataUrl, idx, bgId) {
-        return new Promise(function(resolve) {
-          if(!dataUrl) { resolve(document.getElementById(bgId)?.src || null); return; }
-          var img = new Image();
-          img.onload = function() {
-            var sw = Math.floor(img.width/4);
-            var tmp = document.createElement('canvas');
-            tmp.width = sw; tmp.height = img.height;
-            tmp.getContext('2d').drawImage(img, idx*sw, 0, sw, img.height, 0, 0, sw, img.height);
-            resolve(tmp.toDataURL('image/png'));
-          };
-          img.src = dataUrl;
-        });
-      }
-      var bgIds = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
-      var bcData2 = d._bodyCanvas;
-      Promise.all([
-        captureSlice(bcData2, 0, bgIds[0]),
-        captureSlice(bcData2, 1, bgIds[1]),
-        captureSlice(bcData2, 2, bgIds[2]),
-        captureSlice(bcData2, 3, bgIds[3])
-      ]).then(function(results) {
-        sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-          profilDImg: results[0],
-          face2Img:   results[1],
-          faceImg:    results[2],
-          profilGImg: results[3]
-        });
-        _buildRapportBody(p, d, prat, logo, sections);
+      var bgIds3 = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
+      sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
+        bodyCanvasData: d._bodyCanvas,
+        bgIds: bgIds3,
+        profilDImg: document.getElementById(bgIds3[0]) ? document.getElementById(bgIds3[0]).src : null,
+        face2Img:   document.getElementById(bgIds3[1]) ? document.getElementById(bgIds3[1]).src : null,
+        faceImg:    document.getElementById(bgIds3[2]) ? document.getElementById(bgIds3[2]).src : null,
+        profilGImg: document.getElementById(bgIds3[3]) ? document.getElementById(bgIds3[3]).src : null
       });
-      return; // sortir - le reste sera exécuté dans le callback
     }
   }
 
@@ -4859,6 +4836,38 @@ const sections = [];
 }
 
 function _buildRapportBody(p, d, prat, logo, sections) {
+  // Résoudre les images bonhommes si nécessaire
+  var bonhommesSection = sections.find(function(s){ return s.type === 'bonhommes' && s.bodyCanvasData; });
+  if(bonhommesSection) {
+    var bcImg = new Image();
+    bcImg.onload = function() {
+      var sw = Math.floor(bcImg.width/4);
+      var sh = bcImg.height;
+      var bgIds = bonhommesSection.bgIds || [];
+      function makeSliceComposite(i) {
+        var tmp = document.createElement('canvas');
+        tmp.width = sw; tmp.height = sh;
+        var ctx = tmp.getContext('2d');
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,sw,sh);
+        var bgEl = document.getElementById(bgIds[i]);
+        if(bgEl && bgEl.naturalWidth>0) ctx.drawImage(bgEl,0,0,sw,sh);
+        ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
+        return tmp.toDataURL('image/png');
+      }
+      bonhommesSection.profilDImg = makeSliceComposite(0);
+      bonhommesSection.face2Img   = makeSliceComposite(1);
+      bonhommesSection.faceImg    = makeSliceComposite(2);
+      bonhommesSection.profilGImg = makeSliceComposite(3);
+      bonhommesSection.bodyCanvasData = null;
+      _doBuildRapport(p, d, prat, logo, sections);
+    };
+    bcImg.src = bonhommesSection.bodyCanvasData;
+    return;
+  }
+  _doBuildRapport(p, d, prat, logo, sections);
+}
+
+function _doBuildRapport(p, d, prat, logo, sections) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR');
   const initiales = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
