@@ -9350,7 +9350,7 @@ function savePosturoBilan() {
       const dstX = imgOffX * fcScaleX;
       const dstY = imgOffY * fcScaleY;
       const dstW = imgDisplayW * fcScaleX;
-      const dstH = imgDisplayW * fcScaleY;
+      const dstH = imgDisplayW * fcScaleX; // image carree, meme scale X
       compCtx.drawImage(piedsImgEl, dstX, dstY, dstW, dstH);
     }
     compCtx.drawImage(fc, 0, 0);
