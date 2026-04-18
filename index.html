@@ -9375,8 +9375,38 @@ function savePosturoBilan() {
   }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc && fc.width>0 && fc._history && fc._history.length>0) {
-    // Sauvegarder seulement si des dessins ont été effectués
-    d._feetCanvas = fc.toDataURL('image/png');
+    // Sauvegarder composite fond+dessins directement
+    const piedsImg = document.getElementById('imgjs-pieds');
+    if(piedsImg && piedsImg.naturalWidth > 0) {
+      const compC = document.createElement('canvas');
+      compC.width = piedsImg.naturalWidth;
+      compC.height = piedsImg.naturalHeight;
+      const compCtx = compC.getContext('2d');
+      compCtx.drawImage(piedsImg, 0, 0);
+      // Superposer les dessins: le canvas fc couvre le div parent (avec padding)
+      // L'image est affichée dans le div à width:80% max 400px centree
+      const parentDiv = fc.parentElement;
+      const pW = parentDiv.offsetWidth;
+      const pH = parentDiv.offsetHeight;
+      const imgDisplayW = Math.min(pW * 0.8, 400);
+      const imgDisplayH = imgDisplayW; // carré
+      const imgOffX = (pW - imgDisplayW) / 2;
+      const imgOffY = parseFloat(window.getComputedStyle(parentDiv).paddingTop) || 8;
+      // Scale canvas fc vers image naturelle
+      const scaleX = compC.width / imgDisplayW;
+      const scaleY = compC.height / Math.min(imgDisplayH, pH - imgOffY);
+      // Extraire la zone image depuis fc
+      const fcScaleX = fc.width / pW;
+      const fcScaleY = fc.height / pH;
+      const srcX = imgOffX * fcScaleX;
+      const srcY = imgOffY * fcScaleY;
+      const srcW = imgDisplayW * fcScaleX;
+      const srcH = Math.min(imgDisplayH, pH - imgOffY) * fcScaleY;
+      compCtx.drawImage(fc, srcX, srcY, srcW, srcH, 0, 0, compC.width, compC.height);
+      d._feetCanvas = compC.toDataURL('image/png');
+    } else {
+      d._feetCanvas = fc.toDataURL('image/png');
+    }
   }
   // Mettre à jour le snapshot dans bilansPosturo
   if(currentPatient.bilansPosturo && currentPatient.bilansPosturo.length > 0) {
