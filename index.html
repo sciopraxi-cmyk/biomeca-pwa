@@ -4947,9 +4947,35 @@ function _doBuildRapport(p, d, prat, logo, sections) {
     } else if(s.type === 'image') {
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-height:200px;border-radius:4px;"/></div>';
     } else if(s.items) {
+      function rpFormatVal(label, val) {
+        if(!val || val==='') return '<span class="item-value">—</span>';
+        var v = String(val).toLowerCase().trim();
+        // Badges OUI/NON
+        if(v==='oui') return '<span class="tag" style="background:#dcfce7;color:#166534;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">OUI</span>';
+        if(v==='non') return '<span class="tag" style="background:#f1f5f9;color:#64748b;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">NON</span>';
+        // Badges côtés
+        if(v==='droite'||v==='droit') return '<span class="tag" style="background:#dbeafe;color:#1e40af;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">DROITE</span>';
+        if(v==='gauche') return '<span class="tag" style="background:#ede9fe;color:#5b21b6;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">GAUCHE</span>';
+        if(v==='neutre') return '<span class="tag" style="background:#f1f5f9;color:#475569;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">NEUTRE</span>';
+        // Badges positif/negatif
+        if(v==='positif') return '<span class="tag" style="background:#fef2f2;color:#991b1b;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">POSITIF</span>';
+        if(v==='negatif'||v==='négatif') return '<span class="tag" style="background:#dcfce7;color:#166534;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">NÉGATIF</span>';
+        // Badges tronc/cervelet
+        if(v.includes('tronc')) return '<span class="tag" style="background:#fef2f2;color:#991b1b;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">'+val.toUpperCase()+'</span>';
+        if(v.includes('cervelet')) return '<span class="tag" style="background:#dbeafe;color:#1e40af;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">'+val.toUpperCase()+'</span>';
+        // Badges tonique/phasique
+        if(v.includes('tonique')) return '<span class="tag" style="background:#e0f2fe;color:#075985;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">'+val.toUpperCase()+'</span>';
+        if(v.includes('phasique')) return '<span class="tag" style="background:#fef9c3;color:#854d0e;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">'+val.toUpperCase()+'</span>';
+        // Valeur numérique (cm, score)
+        if(/^\d+/.test(v)) return '<span class="item-value-hl">'+val+'</span>';
+        // Valeur checkmark
+        if(v==='✓') return '<span class="tag" style="background:#dcfce7;color:#166534;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">✓ OUI</span>';
+        // Valeur longue = texte normal
+        return '<span class="item-value">'+val+'</span>';
+      }
       s.items.forEach(function(item) {
         var label = item[0], val = item[1];
-        bodyHtml += '<div class="item"><span class="item-label">'+label+'</span><span class="item-value">'+val+'</span></div>';
+        bodyHtml += '<div class="item"><span class="item-label">'+label+'</span>'+rpFormatVal(label,val)+'</div>';
       });
     }
     bodyHtml += '</div></div>';
