@@ -9334,20 +9334,19 @@ function savePosturoBilan() {
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc) {
     const _buildFeetComposite = (canvas, callback) => {
-      if(!canvas.width || canvas.width===0) { canvas.width=1580; canvas.height=836; }
       const piedsImgEl = document.getElementById('imgjs-pieds');
+      const iw = piedsImgEl?.naturalWidth || 698;
+      const ih = piedsImgEl?.naturalHeight || 558;
+      // Canvas aux dimensions de l'image pour ne pas rogner
       const compC = document.createElement('canvas');
-      compC.width = canvas.width; compC.height = canvas.height;
+      compC.width = iw * 2; compC.height = ih * 2;
       const compCtx = compC.getContext('2d');
-      if(piedsImgEl && piedsImgEl.naturalWidth > 0) {
-        // Centrer l'image en conservant le ratio naturel
-        const iw = piedsImgEl.naturalWidth, ih = piedsImgEl.naturalHeight;
-        const scale = Math.min(canvas.width/iw, canvas.height/ih);
-        const dw = iw*scale, dh = ih*scale;
-        const dx = (canvas.width-dw)/2, dy = (canvas.height-dh)/2;
-        compCtx.drawImage(piedsImgEl, dx, dy, dw, dh);
+      // Fond: image pleine taille
+      if(piedsImgEl) compCtx.drawImage(piedsImgEl, 0, 0, compC.width, compC.height);
+      // Dessins: redimensionner le canvas dessins au même espace
+      if(canvas && canvas.width > 0) {
+        compCtx.drawImage(canvas, 0, 0, compC.width, compC.height);
       }
-      compCtx.drawImage(canvas, 0, 0);
       callback(compC.toDataURL('image/png'));
     };
     if(fc._history && fc._history.length > 0) {
