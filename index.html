@@ -9332,7 +9332,9 @@ function savePosturoBilan() {
     d._bodyCanvasH = parseFloat(bc.style.height) || bc.height;
   }
   const fc=document.getElementById('posturo-feet-canvas');
-  if(fc && fc.width>0 && fc._history && fc._history.length>0) {
+  if(fc) {
+    // S'assurer que le canvas a des dimensions (même si section non visible)
+    if(!fc.width || fc.width===0) { fc.width=1580; fc.height=836; }
     const piedsImgEl = document.getElementById('imgjs-pieds');
     const compC = document.createElement('canvas');
     compC.width = fc.width;   // 1580
