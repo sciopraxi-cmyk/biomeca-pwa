@@ -9375,8 +9375,13 @@ function savePosturoBilan() {
       }
       callback(compC.toDataURL('image/jpeg', 0.5));
     };
-    // Toujours régénérer le composite
-    _buildFeetComposite(fc, url => { d._feetCanvas = url; });
+    // Si nouveaux dessins -> régénérer, sinon garder l'existant
+    if(fc._history && fc._history.length > 0) {
+      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
+    } else if(!d._feetCanvas) {
+      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
+    }
+    // else: garder d._feetCanvas existant intact
   }
   // Mettre à jour le snapshot dans bilansPosturo
   if(currentPatient.bilansPosturo && currentPatient.bilansPosturo.length > 0) {
