@@ -4920,11 +4920,11 @@ function buildRapportPosturo() {
     document.head.appendChild(existingStyle);
   }
   existingStyle.textContent = `
-    .rp-page { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a1a2e; }
-    .rp-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; padding-bottom:10px; border-bottom:3px solid #2a7a4e; }
-    .rp-logo { height:55px; object-fit:contain; }
+    .page { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a1a2e; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; padding-bottom:10px; border-bottom:3px solid #2a7a4e; }
+    .logo { height:55px; object-fit:contain; }
     .rp-prat { text-align:right; font-size:10px; color:#555; line-height:1.7; }
-    .rp-prat-name { font-size:13px; font-weight:700; color:#1a1a2e; }
+    .prat-name { font-size:13px; font-weight:700; color:#1a1a2e; }
     .rp-title { text-align:center; margin-bottom:14px; }
     .rp-title h1 { font-size:20px; font-weight:800; color:#2a7a4e; letter-spacing:2px; text-transform:uppercase; }
     .rp-title .sub { font-size:10px; color:#888; margin-top:3px; }
@@ -4933,23 +4933,23 @@ function buildRapportPosturo() {
     .rp-patient-details { font-size:10px; color:#555; margin-top:4px; line-height:1.6; }
     .rp-patient-right { text-align:right; font-size:10px; color:#555; line-height:1.6; }
     .rp-section { margin-bottom:12px; }
-    .rp-section-title { color:#fff; padding:6px 12px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; }
-    .rp-section-body { border-radius:0 0 6px 6px; padding:8px 12px; border-width:0 1px 1px 1px; border-style:solid; }
+    .section-title { color:#fff; padding:6px 12px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; }
+    .section-body { border-radius:0 0 6px 6px; padding:8px 12px; border-width:0 1px 1px 1px; border-style:solid; }
     .rp-item { display:flex; padding:4px 0; border-bottom:1px solid #f5f5f5; }
     .rp-item:last-child { border-bottom:none; }
-    .rp-item-label { font-weight:600; min-width:200px; font-size:10px; }
-    .rp-item-value { flex:1; font-size:10px; color:#333; }
+    .item-label { font-weight:600; min-width:200px; font-size:10px; }
+    .item-value { flex:1; font-size:10px; color:#333; }
     .rp-footer { margin-top:16px; padding-top:8px; border-top:1px solid #eee; text-align:center; font-size:9px; color:#aaa; }
     @media print { #pg-rapport-posturo > div:first-child { display:none!important; } }
   `;
 
   // Construire le HTML du contenu
-  let bodyHtml = '<div class="rp-page">';
+  let bodyHtml = '<div class="page">';
 
   // Header
-  bodyHtml += '<div class="rp-header">';
-  bodyHtml += '<img class="rp-logo" src="'+logo+'" alt="Sciopraxi"/>';
-  bodyHtml += '<div class="rp-prat"><div class="rp-prat-name">'+(prat.nom||'')+' '+(prat.prenom||'')+' — '+(prat.titre||'')+'</div>';
+  bodyHtml += '<div class="header">';
+  bodyHtml += '<img class="logo" src="'+logo+'" alt="Sciopraxi"/>';
+  bodyHtml += '<div class="prat-info"><div class="prat-name">'+(prat.nom||'')+' '+(prat.prenom||'')+' — '+(prat.titre||'')+'</div>';
   if(prat.cabinet) bodyHtml += '<div>'+prat.cabinet+'</div>';
   if(prat.adresse) bodyHtml += '<div>'+prat.adresse+'</div>';
   if(prat.tel) bodyHtml += '<div>📞 '+prat.tel+'</div>';
@@ -4977,9 +4977,9 @@ function buildRapportPosturo() {
   // Sections données
   sections.forEach(function(s) {
     if(s.type === 'bonhommes') {
-      bodyHtml += '<div class="rp-section">';
-      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';">';
+      bodyHtml += '<div class="section">';
+      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';">';
       const labels4 = ['Profil D','Dos','Face','Profil G'];
       const imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
       // Reproduire exactement la structure du bilan: flex + gap:20px + flex:1
@@ -5000,30 +5000,30 @@ function buildRapportPosturo() {
       bodyHtml += '</div>';
       bodyHtml += '</div></div>';
     } else if(s.type === 'pieds') {
-      bodyHtml += '<div class="rp-section">';
-      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';text-align:center;position:relative;">';
+      bodyHtml += '<div class="section">';
+      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';text-align:center;position:relative;">';
       if(s.piedsImg) bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:100%;border-radius:6px;"/>';
       bodyHtml += '<img src="'+s.feetCanvas+'" style="position:absolute;top:8px;left:12px;width:calc(100% - 24px);pointer-events:none;"/>';
       bodyHtml += '</div></div>';
     } else if(s.type === 'empreinte') {
-      bodyHtml += '<div class="rp-section">';
-      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';text-align:center;">';
+      bodyHtml += '<div class="section">';
+      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';text-align:center;">';
       bodyHtml += '<img src="'+s.img+'" style="max-height:200px;border-radius:6px;"/>';
       bodyHtml += '</div></div>';
     } else {
-      bodyHtml += '<div class="rp-section">';
-      bodyHtml += '<div class="rp-section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="rp-section-body" style="border-color:'+s.color+';">';
+      bodyHtml += '<div class="section">';
+      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
+      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';">';
       s.items.forEach(function(item) {
-        bodyHtml += '<div class="rp-item"><span class="rp-item-label" style="color:'+s.color+';">'+item[0]+'</span><span class="rp-item-value">'+item[1]+'</span></div>';
+        bodyHtml += '<div class="item"><span class="item-label" style="color:'+s.color+';">'+item[0]+'</span><span class="item-value">'+item[1]+'</span></div>';
       });
       bodyHtml += '</div></div>';
     }
   });
 
-  bodyHtml += '<div class="rp-footer">Bilan Étude de la Posture · Sciopraxi · '+dateStr+'</div>';
+  bodyHtml += '<div class="footer">Bilan Étude de la Posture · Sciopraxi · '+dateStr+'</div>';
   bodyHtml += '</div>';
 
   // Injecter dans la page
