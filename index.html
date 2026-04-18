@@ -407,7 +407,11 @@ body.printing #rpt-print{display:block!important;}
     <input id="pwa-pwd" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')pwaLogin()"/></div>
     <button onclick="pwaLogin()" id="pwa-login-btn" style="width:100%;background:#2dd4bf;color:#04342C;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">Se connecter</button>
     <div id="pwa-login-err" style="display:none;margin-top:10px;background:rgba(226,75,74,0.15);border:1px solid rgba(226,75,74,0.3);color:#F09595;border-radius:8px;padding:10px;font-size:13px;text-align:center;"></div>
-    <div style="text-align:center;margin-top:14px;font-size:12px;color:rgba(255,255,255,0.3);">Pas encore de compte ? <span onclick="showRegisterForm()" style="color:#2dd4bf;cursor:pointer;">Créer un compte</span></div>
+    <div style="text-align:center;margin-top:10px;font-size:12px;color:rgba(255,255,255,0.3);">
+      <span onclick="showForgotPassword()" style="color:#2dd4bf;cursor:pointer;">Mot de passe oublié ?</span>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:12px;color:rgba(255,255,255,0.3);">Pas encore de compte ? <span onclick="showRegisterForm()" style="color:#2dd4bf;cursor:pointer;">Créer un compte</span></div>
+    <div id="forgot-msg" style="display:none;margin-top:8px;background:rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.3);color:#2dd4bf;border-radius:8px;padding:10px;font-size:12px;text-align:center;"></div>
   </div>
 
   <div id="pwa-register-form" style="display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:32px;max-width:400px;margin:0 auto 40px;">
@@ -539,6 +543,13 @@ function lpToggle() {
       <div id="mc-cabinet" style="font-size:13px;color:var(--fg);"></div>
     </div>
     <!-- Actions -->
+    <!-- Changer mot de passe -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Changer le mot de passe</div>
+      <input id="mc-new-pwd" type="password" class="inp" placeholder="Nouveau mot de passe" style="width:100%;margin-bottom:8px;font-size:13px;"/>
+      <button onclick="changePassword()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:9px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Modifier le mot de passe</button>
+      <div id="mc-pwd-msg" style="display:none;margin-top:6px;font-size:12px;text-align:center;"></div>
+    </div>
     <div style="display:flex;gap:10px;">
       <button onclick="closeMonCompte()" style="flex:1;background:var(--bg2);border:1px solid var(--bord);padding:10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--fg);">Fermer</button>
       <button onclick="closeMonCompte();pwaLogout();" style="flex:1;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Se déconnecter</button>
@@ -1568,6 +1579,13 @@ async function onPwaLoginSuccess() {
   const tbName = document.getElementById('tb-name');
   if(tbName && !patients.length) tbName.textContent = 'Aucun patient';
 
+  // Recharger user_metadata frais depuis Supabase
+  try {
+    const freshUser = await supa.getUser(pwaUser.token);
+    if(freshUser?.user_metadata) {
+      pwaUser.user_metadata = freshUser.user_metadata;
+    }
+  } catch(e) {}
   // Charger les données depuis Supabase
   await loadSupabaseData();
 }
@@ -1706,6 +1724,37 @@ function showAdminPanelIfNeeded() {
   }
 }
 
+async function changePassword() {
+  const pwd = document.getElementById('mc-new-pwd').value;
+  const msg = document.getElementById('mc-pwd-msg');
+  if(!pwd || pwd.length < 8) {
+    msg.textContent = 'Minimum 8 caractères.';
+    msg.style.color = '#e74c3c';
+    msg.style.display = 'block'; return;
+  }
+  try {
+    const r = await fetch(SUPA_URL + '/auth/v1/user', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+pwaUser.token},
+      body: JSON.stringify({ password: pwd })
+    });
+    const d = await r.json();
+    if(d.id) {
+      msg.textContent = '✓ Mot de passe modifié avec succès.';
+      msg.style.color = '#2ecc71';
+      document.getElementById('mc-new-pwd').value = '';
+    } else {
+      msg.textContent = d.msg || 'Erreur lors de la modification.';
+      msg.style.color = '#e74c3c';
+    }
+    msg.style.display = 'block';
+  } catch(e) {
+    msg.textContent = 'Erreur réseau.';
+    msg.style.color = '#e74c3c';
+    msg.style.display = 'block';
+  }
+}
+
 function showMonCompte() {
   const modal = document.getElementById('modal-mon-compte');
   if(!modal) return;
@@ -1749,15 +1798,23 @@ function closeMonCompte() {
 
 async function adminUpdateAcces(userId, newAcces) {
   try {
-    await fetch(SUPA_URL + '/auth/v1/admin/users/' + userId, {
+    // Utiliser service role key si disponible, sinon token admin
+    const authKey = typeof SUPABASE_SERVICE_KEY !== 'undefined' ? SUPABASE_SERVICE_KEY : pwaUser.token;
+    const r = await fetch(SUPA_URL + '/auth/v1/admin/users/' + userId, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'apikey': SUPA_KEY,
-        'Authorization': 'Bearer ' + pwaUser.token
+        'Authorization': 'Bearer ' + authKey
       },
       body: JSON.stringify({ user_metadata: { acces: newAcces } })
     });
+    const d = await r.json();
+    if(d.id) {
+      console.log('Accès mis à jour:', newAcces, 'pour', d.email);
+    } else {
+      console.error('Erreur:', d);
+    }
   } catch(e) {
     console.error('Erreur mise à jour accès:', e);
   }
