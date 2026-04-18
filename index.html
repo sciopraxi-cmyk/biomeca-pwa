@@ -4807,7 +4807,6 @@ const sections = [];
   });
   if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
   if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
-  if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
   const tests = [];
   const testLabels = ['Rotation nucale','Flexion antérieure','Extenseurs poignet','Stabilité monopodale','Force/stabilité arrière','Mobilité axe','Romberg','Morphostatique'];
   ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(function(t,i) {
@@ -4815,6 +4814,7 @@ const sections = [];
     else if(d['test_'+t]==='non') tests.push(testLabels[i]+' ❌');
   });
   if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
+  if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
   if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
 
   // Empreinte plantaire après section 5
