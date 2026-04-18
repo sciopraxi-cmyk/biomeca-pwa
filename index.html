@@ -4493,14 +4493,38 @@ const sections = [];
       } catch(e) { return imgEl.src; }
     }
     {
-      var morphoImgs = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'].map(function(id){ return document.getElementById(id); });
-      sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-        bodyCanvasData: d._bodyCanvas,
-        profilDImg: morphoImgs[0] ? morphoImgs[0].src : null,
-        face2Img:   morphoImgs[1] ? morphoImgs[1].src : null,
-        faceImg:    morphoImgs[2] ? morphoImgs[2].src : null,
-        profilGImg: morphoImgs[3] ? morphoImgs[3].src : null
+      // Capturer les 4 vues depuis _bodyCanvas avec onload
+      function captureSlice(dataUrl, idx, bgId) {
+        return new Promise(function(resolve) {
+          if(!dataUrl) { resolve(document.getElementById(bgId)?.src || null); return; }
+          var img = new Image();
+          img.onload = function() {
+            var sw = Math.floor(img.width/4);
+            var tmp = document.createElement('canvas');
+            tmp.width = sw; tmp.height = img.height;
+            tmp.getContext('2d').drawImage(img, idx*sw, 0, sw, img.height, 0, 0, sw, img.height);
+            resolve(tmp.toDataURL('image/png'));
+          };
+          img.src = dataUrl;
+        });
+      }
+      var bgIds = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
+      var bcData = d._bodyCanvas;
+      Promise.all([
+        captureSlice(bcData, 0, bgIds[0]),
+        captureSlice(bcData, 1, bgIds[1]),
+        captureSlice(bcData, 2, bgIds[2]),
+        captureSlice(bcData, 3, bgIds[3])
+      ]).then(function(results) {
+        sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
+          profilDImg: results[0],
+          face2Img:   results[1],
+          faceImg:    results[2],
+          profilGImg: results[3]
+        });
+        _buildRapportBody(p, d, prat, logo, sections);
       });
+      return; // sortir - le reste sera exécuté dans le callback
     }
   }
 
@@ -4831,6 +4855,10 @@ const sections = [];
       piedsImg: d._feetCanvas, feetCanvas: null});
   }
 
+  _buildRapportBody(p, d, prat, logo, sections);
+}
+
+function _buildRapportBody(p, d, prat, logo, sections) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR');
   const initiales = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
@@ -4925,6 +4953,7 @@ const sections = [];
     idoc.close();
   }
   nav('pg-rapport-posturo');
+
 }
 
 function buildRapport() {
