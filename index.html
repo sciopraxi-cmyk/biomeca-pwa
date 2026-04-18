@@ -4841,23 +4841,31 @@ function _buildRapportBody(p, d, prat, logo, sections) {
   
   // Composite pieds async
   if(piedsSection) {
-    var pImg = new Image(); var fImg = new Image(); var pLoaded = 0;
+    var pImg2 = new Image(); var fImg2 = new Image(); var pLoaded2 = 0;
     function doPiedsComposite() {
-      if(++pLoaded < 2) return;
+      if(++pLoaded2 < 2) return;
+      // imgjs-pieds = 520x520, feet-canvas = 300x150
+      // Le canvas pieds est affiché à l'intérieur de l'image 520x520
+      // On crée un composite à la taille de l'image de fond
       var tmp = document.createElement('canvas');
-      tmp.width = pImg.width; tmp.height = pImg.height;
+      tmp.width = pImg2.width; tmp.height = pImg2.height;
       var ctx = tmp.getContext('2d');
       ctx.fillStyle='#fff'; ctx.fillRect(0,0,tmp.width,tmp.height);
-      ctx.drawImage(pImg, 0, 0);
-      ctx.drawImage(fImg, 0, 0, tmp.width, tmp.height);
+      ctx.drawImage(pImg2, 0, 0);
+      // Le canvas feet est superposé centré dans l'image de fond
+      var fw = fImg2.width; var fh = fImg2.height;
+      var scale = Math.min(tmp.width/fw, tmp.height/fh);
+      var dx = (tmp.width - fw*scale)/2;
+      var dy = (tmp.height - fh*scale)/2;
+      ctx.drawImage(fImg2, dx, dy, fw*scale, fh*scale);
       piedsSection.piedsImg = tmp.toDataURL('image/png');
       piedsSection.feetCanvas = null;
       if(!bonhommesSection) _doBuildRapport(p, d, prat, logo, sections);
     }
-    pImg.onload = doPiedsComposite;
-    fImg.onload = doPiedsComposite;
-    pImg.src = piedsSection.piedsImg;
-    fImg.src = piedsSection.feetCanvas;
+    pImg2.onload = doPiedsComposite;
+    fImg2.onload = doPiedsComposite;
+    pImg2.src = piedsSection.piedsImg;
+    fImg2.src = piedsSection.feetCanvas;
   }
   
   if(bonhommesSection) {
@@ -4873,13 +4881,12 @@ function _buildRapportBody(p, d, prat, logo, sections) {
         ctx.fillStyle='#fff'; ctx.fillRect(0,0,sw,sh);
         var bgEl = document.getElementById(bgIds[i]);
         if(bgEl && bgEl.naturalWidth>0) {
-          // Centrer l'image de fond dans le canvas en gardant le ratio
+          // Image petite centrée dans le slice - même position que dans l'app
           var bgW = bgEl.naturalWidth; var bgH = bgEl.naturalHeight;
-          var scale = Math.min(sw/bgW, sh/bgH);
-          var dx = (sw - bgW*scale)/2; var dy = (sh - bgH*scale)/2;
-          ctx.drawImage(bgEl, dx, dy, bgW*scale, bgH*scale);
+          var dx = (sw - bgW)/2; var dy = (sh - bgH)/2;
+          ctx.drawImage(bgEl, dx, dy, bgW, bgH);
         }
-        // Superposer les dessins (slice du canvas global)
+        // Superposer les dessins - le canvas global a exactement la même taille
         ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
         return tmp.toDataURL('image/png');
       }
