@@ -4904,7 +4904,7 @@ const sections = [];
         <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
         <div class="section-body">`;
       s.items.forEach(([label,val]) => {
-        bodyHtml += `<div class="item"><span class="item-label" style="color:${s.color};">${label}</span><span class="item-value">${val}</span></div>`;
+        bodyHtml += `<div class="item"><span class="item-label">${label}</span><span class="item-value">${val}</span></div>`;
       });
       bodyHtml += `</div></div>`;
     }
