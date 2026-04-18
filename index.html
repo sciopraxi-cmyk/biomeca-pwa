@@ -4864,7 +4864,7 @@ function buildRapportPosturo() {
 
   sections.forEach(s => {
     if(s.type === 'bonhommes') {
-      html += `<div class="section">
+      bodyHtml += `<div class="section">
         <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
         <div class="section-body">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;position:relative;">
@@ -4882,7 +4882,7 @@ function buildRapportPosturo() {
         </div>
       </div>`;
     } else if(s.type === 'pieds') {
-      html += `<div class="section">
+      bodyHtml += `<div class="section">
         <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
         <div class="section-body">
           <div style="position:relative;text-align:center;">
@@ -4892,24 +4892,24 @@ function buildRapportPosturo() {
         </div>
       </div>`;
     } else if(s.type === 'empreinte') {
-      html += `<div class="section">
+      bodyHtml += `<div class="section">
         <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
         <div class="section-body">
           <div style="text-align:center;"><img src="${s.img}" style="max-height:180px;border-radius:6px;"/></div>
         </div>
       </div>`;
     } else {
-      html += `<div class="section">
+      bodyHtml += `<div class="section">
         <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
         <div class="section-body">`;
       s.items.forEach(([label,val]) => {
-        html += `<div class="item"><span class="item-label" style="color:${s.color};">${label}</span><span class="item-value">${val}</span></div>`;
+        bodyHtml += `<div class="item"><span class="item-label" style="color:${s.color};">${label}</span><span class="item-value">${val}</span></div>`;
       });
-      html += `</div></div>`;
+      bodyHtml += `</div></div>`;
     }
   });
 
-  html += `<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · ${p.prenom} ${p.nom} · ${dateStr}</div></div>
+  bodyHtml += `<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · ${p.prenom} ${p.nom} · ${dateStr}</div></div>
   </div></body></html>`;
 
   // Injecter CSS dans la page
