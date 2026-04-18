@@ -4756,275 +4756,79 @@ const sections = [];
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR');
+  const initiales = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
+  const age = p.ddn ? Math.floor((Date.now()-new Date(p.ddn))/31557600000) : '';
 
-  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bilan Posture</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}
-    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}
-    @media print{.no-print{display:none!important;}.rp-page{padding:0;}}
+  let bodyHtml = '<style>\n    *{margin:0;padding:0;box-sizing:border-box;}\n    body{font-family:\'Helvetica Neue\',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}\n    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}\n    @media print{.no-print{display:none!important;}.rp-page{padding:0;}}\n    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;}\n    .logo{height:44px;object-fit:contain;filter:brightness(0) invert(1);}\n    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}\n    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}\n    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}\n    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}\n    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}\n    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;}\n    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}\n    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}\n    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}\n    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}\n    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}\n    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}\n    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}\n    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}\n    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}\n    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}\n    .section{margin:0;break-inside:avoid;padding:0 24px;}\n    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}\n    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}\n    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .section-line{flex:1;height:1px;background:#eaeaea;}\n    .section-body{padding:0;}\n    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}\n    .item:last-child{border-bottom:none;}\n    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;}\n    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}\n    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;}\n    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}\n    .tag-navy{background:#e8edf5;color:#0e1f38;}\n    .tag-ok{background:#ecfdf5;color:#065f46;}\n    .tag-warn{background:#fffbeb;color:#92400e;}\n    .tag-alert{background:#fef2f2;color:#991b1b;}\n    .img-container{position:relative;text-align:center;}\n    .img-base{max-width:100%;border-radius:4px;}\n    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}\n    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}\n    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}\n    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}\n  </style>';
 
-    /* HEADER */
-    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}
-    .logo{height:44px;object-fit:contain;filter:brightness(0) invert(1);}
-    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}
-    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}
-
-    /* BAND */
-    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}
-    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}
-    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}
-
-    /* PATIENT */
-    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:0;}
-    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}
-    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}
-    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}
-    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
-    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}
-    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}
-
-    /* METRICS */
-    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}
-    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}
-    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}
-    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
-
-    /* SECTIONS */
-    .section{margin:0;break-inside:avoid;padding:0 24px;}
-    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}
-    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0.5px;}
-    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}
-    .section-line{flex:1;height:1px;background:#eaeaea;}
-    .section-body{padding:0;}
-
-    /* ROWS */
-    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}
-    .item:last-child{border-bottom:none;}
-    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;padding-top:1px;}
-    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}
-    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;line-height:1.4;}
-
-    /* TAGS */
-    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}
-    .tag-navy{background:#e8edf5;color:#0e1f38;}
-    .tag-ok{background:#ecfdf5;color:#065f46;}
-    .tag-warn{background:#fffbeb;color:#92400e;}
-    .tag-alert{background:#fef2f2;color:#991b1b;}
-
-    /* IMAGES */
-    .img-container{position:relative;text-align:center;}
-    .img-base{max-width:100%;border-radius:4px;}
-    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}
-
-    /* FOOTER */
-    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
-    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}
-    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}
-
-    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}
-  </style></head><body>
-  <button class="btn-print no-print" onclick="window.print()">🖨️ Imprimer / PDF</button>
-  <div class="rp-page">
-    <div class="header">
-      <img class="logo" src="${logo}" alt="Sciopraxi"/>
-      <div class="prat-info">
-        <div class="prat-name">${prat.nom||''} ${prat.prenom||''} — ${prat.titre||''}</div>
-        ${prat.cabinet?'<div>'+prat.cabinet+'</div>':''}
-        ${prat.adresse?'<div>'+prat.adresse+'</div>':''}
-        ${prat.tel?'<div>'+prat.tel+'</div>':''}
-        ${prat.email?'<div>'+prat.email+'</div>':''}
-      </div>
-    </div>
-    <div class="titre-rapport">
-      <h1>Bilan Étude de la Posture</h1>
-      <div class="sub">Généré le ${dateStr}</div>
-    </div>
-    <div class="patient-card">
-      <div class="patient-avatar">${(p.prenom||'?')[0]}${(p.nom||'?')[0]}</div>
-      <div style="flex:1;">
-        <div class="patient-name">${p.prenom} ${p.nom}</div>
-        <div class="patient-details">
-          ${p.ddn?'Né(e) le '+new Date(p.ddn).toLocaleDateString('fr-FR'):''}
-          ${d.dateConsult?' · Bilan du '+new Date(d.dateConsult).toLocaleDateString('fr-FR'):''}
-          ${d.medecin?' · '+d.medecin:''}
-        </div>
-        <div class="patient-right">
-          ${p.sport?'<span class="pt-chip">'+p.sport+'</span>':''}
-          ${p.metier?'<span class="pt-chip">'+p.metier+'</span>':''}
-          ${p.lat?'<span class="pt-chip">'+p.lat+'</span>':''}
-          ${d.eva?'<span class="pt-chip pt-chip-alert">EVA '+d.eva+'/10</span>':''}
-        </div>
-      </div>
-      <div class="patient-metrics">
-        ${p.poids?'<div class="metric"><div class="metric-val">'+p.poids+'</div><div class="metric-lbl">kg</div></div>':''}
-        ${p.taille?'<div class="metric"><div class="metric-val">'+p.taille+'</div><div class="metric-lbl">cm</div></div>':''}
-        ${p.ddn?'<div class="metric"><div class="metric-val">'+Math.floor((Date.now()-new Date(p.ddn))/31557600000)+'</div><div class="metric-lbl">ans</div></div>':''}
-      </div>
-    </div>`;
-
-  sections.forEach(s => {
-    if(s.type === 'bonhommes') {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;position:relative;">
-            ${['Profil D','Dos','Face','Profil G'].map((lbl,i) => `
-            <div style="text-align:center;">
-              <div style="font-size:9px;color:#888;margin-bottom:3px;">${lbl}</div>
-              <div style="position:relative;display:inline-block;width:100%;">
-                <img src="${[s.profilDImg,s.face2Img,s.faceImg,s.profilGImg][i]||''}" style="width:100%;border-radius:4px;"/>
-              </div>
-            </div>`).join('')}
-          </div>
-          <div style="margin-top:8px;text-align:center;">
-            <img src="${s.bodyCanvas}" style="max-width:100%;position:absolute;top:0;left:0;width:100%;"/>
-          </div>
-        </div>
-      </div>`;
-    } else if(s.type === 'pieds') {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">
-          <div style="position:relative;text-align:center;">
-            ${s.piedsImg?'<img src="'+s.piedsImg+'" style="max-width:100%;border-radius:6px;"/>':''}
-            <img src="${s.feetCanvas}" style="position:absolute;top:0;left:0;max-width:100%;"/>
-          </div>
-        </div>
-      </div>`;
-    } else if(s.type === 'empreinte') {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">
-          <div style="text-align:center;"><img src="${s.img}" style="max-height:180px;border-radius:6px;"/></div>
-        </div>
-      </div>`;
-    } else {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">`;
-      s.items.forEach(([label,val]) => {
-        bodyHtml += `<div class="item"><span class="item-label" style="color:${s.color};">${label}</span><span class="item-value">${val}</span></div>`;
-      });
-      bodyHtml += `</div></div>`;
-    }
-  });
-
-  bodyHtml += `<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · ${p.prenom} ${p.nom} · ${dateStr}</div></div>
-  </div></body></html>`;
-
-  // Injecter CSS dans la page
-  let existingStyle = document.getElementById('rapport-posturo-style');
-  if(!existingStyle) {
-    existingStyle = document.createElement('style');
-    existingStyle.id = 'rapport-posturo-style';
-    document.head.appendChild(existingStyle);
-  }
-  existingStyle.textContent = `
-    .page { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a1a2e; }
-    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; padding-bottom:10px; border-bottom:3px solid #2a7a4e; }
-    .logo { height:55px; object-fit:contain; }
-    .rp-prat { text-align:right; font-size:10px; color:#555; line-height:1.7; }
-    .prat-name { font-size:13px; font-weight:700; color:#1a1a2e; }
-    .rp-title { text-align:center; margin-bottom:14px; }
-    .rp-title h1 { font-size:20px; font-weight:800; color:#2a7a4e; letter-spacing:2px; text-transform:uppercase; }
-    .rp-title .sub { font-size:10px; color:#888; margin-top:3px; }
-    .rp-patient { background:linear-gradient(135deg,#f0faf4,#e0f5ea); border:2px solid #2a7a4e; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
-    .rp-patient-name { font-size:16px; font-weight:800; color:#2a7a4e; }
-    .rp-patient-details { font-size:10px; color:#555; margin-top:4px; line-height:1.6; }
-    .rp-patient-right { text-align:right; font-size:10px; color:#555; line-height:1.6; }
-    .rp-section { margin-bottom:12px; }
-    .section-title { color:#fff; padding:6px 12px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; }
-    .section-body { border-radius:0 0 6px 6px; padding:8px 12px; border-width:0 1px 1px 1px; border-style:solid; }
-    .rp-item { display:flex; padding:4px 0; border-bottom:1px solid #f5f5f5; }
-    .rp-item:last-child { border-bottom:none; }
-    .item-label { font-weight:600; min-width:200px; font-size:10px; }
-    .item-value { flex:1; font-size:10px; color:#333; }
-    .rp-footer { margin-top:16px; padding-top:8px; border-top:1px solid #eee; text-align:center; font-size:9px; color:#aaa; }
-    @media print { #pg-rapport-posturo > div:first-child { display:none!important; } }
-  `;
-
-  // Construire le HTML du contenu
+  // HEADER
   bodyHtml += '<div class="rp-page">';
-
-  // Header
   bodyHtml += '<div class="header">';
   bodyHtml += '<img class="logo" src="'+logo+'" alt="Sciopraxi"/>';
   bodyHtml += '<div class="prat-info"><div class="prat-name">'+(prat.nom||'')+' '+(prat.prenom||'')+' — '+(prat.titre||'')+'</div>';
   if(prat.cabinet) bodyHtml += '<div>'+prat.cabinet+'</div>';
   if(prat.adresse) bodyHtml += '<div>'+prat.adresse+'</div>';
-  if(prat.tel) bodyHtml += '<div>📞 '+prat.tel+'</div>';
-  if(prat.email) bodyHtml += '<div>✉️ '+prat.email+'</div>';
+  if(prat.tel) bodyHtml += '<div>'+prat.tel+'</div>';
+  if(prat.email) bodyHtml += '<div>'+prat.email+'</div>';
   bodyHtml += '</div></div>';
 
-  // Titre
-  bodyHtml += '<div class="section-title"><h1>Bilan Étude de la Posture</h1><div class="sub">Généré le '+dateStr+'</div></div>';
+  // BANDEAU TITRE
+  bodyHtml += '<div class="titre-rapport"><h1>Bilan Étude de la Posture</h1><div class="sub">Généré le '+dateStr+'</div></div>';
 
-  // Patient
+  // PATIENT
   bodyHtml += '<div class="patient-card">';
-  bodyHtml += '<div><div class="patient-name">'+p.prenom+' '+p.nom+'</div>';
+  bodyHtml += '<div class="patient-avatar">'+initiales+'</div>';
+  bodyHtml += '<div style="flex:1;">';
+  bodyHtml += '<div class="patient-name">'+p.prenom+' '+p.nom+'</div>';
   bodyHtml += '<div class="patient-details">';
-  if(p.ddn) bodyHtml += '📅 '+new Date(p.ddn).toLocaleDateString('fr-FR');
-  if(p.sport) bodyHtml += ' · 🏃 '+p.sport;
-  if(p.metier) bodyHtml += ' · 💼 '+p.metier;
-  bodyHtml += '</div></div>';
+  if(p.ddn) bodyHtml += 'Né(e) le '+new Date(p.ddn).toLocaleDateString('fr-FR');
+  if(d.dateConsult) bodyHtml += ' · Bilan du '+new Date(d.dateConsult).toLocaleDateString('fr-FR');
+  if(d.medecin) bodyHtml += ' · '+d.medecin;
+  bodyHtml += '</div>';
   bodyHtml += '<div class="patient-right">';
-  if(p.poids) bodyHtml += '⚖️ '+p.poids+' kg';
-  if(p.taille) bodyHtml += ' · 📏 '+p.taille+' cm';
-  if(d.dateConsult) bodyHtml += '<br>📋 '+new Date(d.dateConsult).toLocaleDateString('fr-FR');
-  if(d.medecin) bodyHtml += '<br>👨‍⚕️ '+d.medecin;
+  if(p.sport) bodyHtml += '<span class="pt-chip">'+p.sport+'</span>';
+  if(p.metier) bodyHtml += '<span class="pt-chip">'+p.metier+'</span>';
+  if(p.lat) bodyHtml += '<span class="pt-chip">'+p.lat+'</span>';
+  if(d.eva) bodyHtml += '<span class="pt-chip pt-chip-alert">EVA '+d.eva+'/10</span>';
+  bodyHtml += '</div></div>';
+  bodyHtml += '<div class="patient-metrics">';
+  if(age) bodyHtml += '<div class="metric"><div class="metric-val">'+age+'</div><div class="metric-lbl">ans</div></div>';
+  if(p.poids) bodyHtml += '<div class="metric"><div class="metric-val">'+p.poids+'</div><div class="metric-lbl">kg</div></div>';
+  if(p.taille) bodyHtml += '<div class="metric"><div class="metric-val">'+p.taille+'</div><div class="metric-lbl">cm</div></div>';
   bodyHtml += '</div></div>';
 
-  // Sections données
-  sections.forEach(function(s) {
+  // SECTIONS
+  sections.forEach(function(s, sidx) {
+    var num = (sidx+1 < 10 ? '0'+(sidx+1) : ''+(sidx+1));
+    bodyHtml += '<div class="section">';
+    bodyHtml += '<div class="section-title"><div class="section-num">'+num+'</div><div class="section-label">'+s.titre+'</div><div class="section-line"></div></div>';
+    bodyHtml += '<div class="section-body">';
     if(s.type === 'bonhommes') {
-      bodyHtml += '<div class="section">';
-      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';">';
-      const labels4 = ['Profil D','Dos','Face','Profil G'];
-      const imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
-      // Reproduire exactement la structure du bilan: flex + gap:20px + flex:1
-      bodyHtml += '<div style="position:relative;margin:8px 0;">';
-      bodyHtml += '<div style="display:flex;gap:20px;background:#fff;border-radius:8px;border:1px solid #ddd;padding:16px;align-items:flex-end;">';
+      var labels4 = ['Profil D','Dos','Face','Profil G'];
+      var imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
+      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;">';
       imgs4.forEach(function(src, i) {
-        bodyHtml += '<div style="flex:1;text-align:center;">';
-        bodyHtml += '<div style="font-size:9px;color:#2a7a4e;margin-bottom:4px;font-weight:600;">'+labels4[i]+'</div>';
-        bodyHtml += '<div style="background:#fff;border:1px solid #eee;border-radius:4px;padding:4px;min-height:100px;display:flex;align-items:center;justify-content:center;">';
-        bodyHtml += '<img src="'+(src||'')+'" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;"/>';
-        bodyHtml += '</div></div>';
+        bodyHtml += '<div style="text-align:center;">';
+        bodyHtml += '<div style="font-size:9px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">'+labels4[i]+'</div>';
+        if(src) bodyHtml += '<img src="'+src+'" style="max-width:100%;border-radius:4px;"/>';
+        bodyHtml += '</div>';
       });
       bodyHtml += '</div>';
-      // Overlay canvas dessins en position absolute
-      if(s.bodyCanvas) {
-        bodyHtml += '<img src="'+s.bodyCanvas+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;pointer-events:none;opacity:0.9;"/>';
-      }
-      bodyHtml += '</div>';
-      bodyHtml += '</div></div>';
     } else if(s.type === 'pieds') {
-      bodyHtml += '<div class="section">';
-      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';text-align:center;position:relative;">';
-      if(s.piedsImg) bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:100%;border-radius:6px;"/>';
-      bodyHtml += '<img src="'+s.feetCanvas+'" style="position:absolute;top:8px;left:12px;width:calc(100% - 24px);pointer-events:none;"/>';
-      bodyHtml += '</div></div>';
-    } else if(s.type === 'empreinte') {
-      bodyHtml += '<div class="section">';
-      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';text-align:center;">';
-      bodyHtml += '<img src="'+s.img+'" style="max-height:200px;border-radius:6px;"/>';
-      bodyHtml += '</div></div>';
-    } else {
-      bodyHtml += '<div class="section">';
-      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';">';
+      if(s.piedsImg) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.piedsImg+'" style="max-width:80%;border-radius:4px;"/></div>';
+    } else if(s.type === 'image') {
+      if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-height:200px;border-radius:4px;"/></div>';
+    } else if(s.items) {
       s.items.forEach(function(item) {
-        bodyHtml += '<div class="item"><span class="item-label" style="color:'+s.color+';">'+item[0]+'</span><span class="item-value">'+item[1]+'</span></div>';
+        var label = item[0], val = item[1];
+        bodyHtml += '<div class="item"><span class="item-label">'+label+'</span><span class="item-value">'+val+'</span></div>';
       });
-      bodyHtml += '</div></div>';
     }
+    bodyHtml += '</div></div>';
   });
 
-  bodyHtml += '<div class="footer">Bilan Étude de la Posture · Sciopraxi · '+dateStr+'</div>';
+  // FOOTER
+  bodyHtml += '<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · '+p.prenom+' '+p.nom+' · '+dateStr+'</div></div>';
   bodyHtml += '</div>';
 
   // Injecter dans un iframe isolé pour éviter les conflits CSS
