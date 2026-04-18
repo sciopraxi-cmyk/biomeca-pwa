@@ -9339,7 +9339,7 @@ function savePosturoBilan() {
       const ih = piedsImgEl?.naturalHeight || 558;
       // Canvas aux dimensions de l'image pour ne pas rogner
       const compC = document.createElement('canvas');
-      compC.width = iw * 2; compC.height = ih * 2;
+      compC.width = iw; compC.height = ih;
       const compCtx = compC.getContext('2d');
       // Fond: image pleine taille
       if(piedsImgEl) compCtx.drawImage(piedsImgEl, 0, 0, compC.width, compC.height);
@@ -9347,7 +9347,7 @@ function savePosturoBilan() {
       if(canvas && canvas.width > 0) {
         compCtx.drawImage(canvas, 0, 0, compC.width, compC.height);
       }
-      callback(compC.toDataURL('image/png'));
+      callback(compC.toDataURL('image/jpeg', 0.5));
     };
     // Toujours régénérer le composite
     _buildFeetComposite(fc, url => { d._feetCanvas = url; });
