@@ -4865,7 +4865,7 @@ function _buildRapportBody(p, d, prat, logo, sections) {
       bonhommesSection.faceImg    = makeSliceComposite(2);
       bonhommesSection.profilGImg = makeSliceComposite(0);
       bonhommesSection.bodyCanvasData = null;
-      if(!piedsSection || !piedsSection.feetCanvas) _doBuildRapport(p, d, prat, logo, sections);
+      _doBuildRapport(p, d, prat, logo, sections);
     };
     bcImg.src = bonhommesSection.bodyCanvasData;
     return;
