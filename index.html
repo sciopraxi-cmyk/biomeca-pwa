@@ -9335,7 +9335,7 @@ function savePosturoBilan() {
   if(fc && fc.width>0 && fc._history && fc._history.length>0) {
     // Sauvegarder composite fond+dessins directement
     const piedsImg = document.getElementById('imgjs-pieds');
-    if(piedsImg && piedsImg.naturalWidth > 0) {
+    if(piedsImg && piedsImg.src) {
       const compC = document.createElement('canvas');
       compC.width = piedsImg.naturalWidth;
       compC.height = piedsImg.naturalHeight;
