@@ -2578,94 +2578,123 @@ function renderPatientList() {
   const el = document.getElementById('pt-list-el');
   const search = (document.getElementById('pt-search')?.value||'').toLowerCase().trim();
   if (!patients.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun patient.</div>'; return; }
-  
-  const filtered = patients.filter((p,i) => {
+  const filtered = patients.filter(p => {
     if(!search) return true;
-    const name = (p.prenom+' '+p.nom).toLowerCase();
-    return name.includes(search);
+    return (p.prenom+' '+p.nom).toLowerCase().includes(search);
   });
-  
   if(!filtered.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun résultat.</div>'; return; }
 
-  // Droits du praticien connecté (depuis user_metadata Supabase)
   const droits = window._userDroits || pwaUser?.user_metadata?.droits || 'all';
+  const canSport = droits === 'all' || droits === 'sport';
+  const canPosturo = droits === 'all' || droits === 'posturo';
 
   el.innerHTML = filtered.map(p => {
     const i = patients.indexOf(p);
-    const init=((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
-    const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
-    const prat=praticiens.find(pr=>pr.id==p.pratId);
+    const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
+    const age = p.ddn ? Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans' : '—';
+    const prat = praticiens.find(pr=>pr.id==p.pratId);
 
-    // Droits : peut accéder sport / posturo
-    const canSport = droits === 'all' || droits === 'sport';
-    const canPosturo = droits === 'all' || droits === 'posturo';
-
-    // Historique bilans sportifs
+    // Bilans existants
     const bilansSport = p.bilansSport || [];
-    const bilansSportHtml = bilansSport.map((b,bi) => `
-      <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:rgba(74,158,255,0.07);border-radius:6px;margin-top:3px;">
-        <span style="font-size:11px;">🦶</span>
-        <span style="font-size:11px;flex:1;color:var(--blue);">${b.label}</span>
-        <span style="font-size:10px;color:var(--mut);">${b.date}</span>
-        <button class="btn" style="font-size:10px;padding:2px 8px;background:var(--blue);color:#fff;" onclick="ouvrirBilanSport(${i},${bi})">Ouvrir</button>
-        <button class="btn" style="font-size:10px;padding:2px 6px;background:#e74c3c;color:#fff;" onclick="supprimerBilanSport(${i},${bi})" title="Supprimer ce bilan">✕</button>
-      </div>`).join('');
-
-    // Historique bilans posturo
     const bilansPosturo = p.bilansPosturo || [];
-    const bilansPosturoHtml = bilansPosturo.map((b,bi) => `
-      <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:rgba(42,122,78,0.07);border-radius:6px;margin-top:3px;">
-        <span style="font-size:11px;">🧍</span>
-        <span style="font-size:11px;flex:1;color:var(--green,#2a7a4e);">${b.label}</span>
-        <span style="font-size:10px;color:var(--mut);">${b.date}</span>
-        <button class="btn" style="font-size:10px;padding:2px 8px;background:var(--green,#2a7a4e);color:#fff;" onclick="ouvrirBilanPosturo(${i},${bi})">Ouvrir</button>
-        <button class="btn" style="font-size:10px;padding:2px 6px;background:#e74c3c;color:#fff;" onclick="supprimerBilanPosturo(${i},${bi})" title="Supprimer ce bilan">✕</button>
-      </div>`).join('');
 
-    // Boutons création bilans
-    const btnSportInit = canSport
-      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--blue);color:#fff;flex:1;" onclick="creerBilanSport(${i},'initial')">🦶 Sportif Initial</button>`
-      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🦶 Sportif Initial</button>`;
-    const btnSportCtrl = canSport
-      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--blue);color:#fff;flex:1;" onclick="creerBilanSport(${i},'controle')">🦶 Sportif Contrôle</button>`
-      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🦶 Sportif Contrôle</button>`;
-    const btnPostInit = canPosturo
-      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--green,#2a7a4e);color:#fff;flex:1;" onclick="creerBilanPosturo(${i},'initial')">🧍 Posturo Initial</button>`
-      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🧍 Posturo Initial</button>`;
-    const btnPostCtrl = canPosturo
-      ? `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--green,#2a7a4e);color:#fff;flex:1;" onclick="creerBilanPosturo(${i},'controle')">🧍 Posturo Contrôle</button>`
-      : `<button class="btn" style="font-size:11px;padding:5px 10px;background:var(--bord);color:var(--mut);flex:1;cursor:not-allowed;" disabled>🧍 Posturo Contrôle</button>`;
-    
-    return `<div class="pt-row" style="flex-direction:column;align-items:stretch;gap:6px;padding:10px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="av">${init}</div>
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:600;">${p.prenom} ${p.nom}</div>
-          <div style="font-size:10px;color:var(--mut);">${age} · ${p.sport||'—'}${prat?' · '+prat.nom:''}</div>
+    const bilansSportHtml = bilansSport.length ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans sportifs</div>
+        ${bilansSport.map((b,bi) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(55,138,221,0.06);border:1px solid rgba(55,138,221,0.15);border-radius:8px;margin-bottom:5px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#378ADD;flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
+          <button onclick="ouvrirBilanSport(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">Ouvrir</button>
+          <button onclick="supprimerBilanSport(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
+        </div>`).join('')}
+      </div>` : '';
+
+    const bilansPosturoHtml = bilansPosturo.length ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans posturaux</div>
+        ${bilansPosturo.map((b,bi) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(45,212,191,0.06);border:1px solid rgba(45,212,191,0.15);border-radius:8px;margin-bottom:5px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#2dd4bf;flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
+          <button onclick="ouvrirBilanPosturo(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">Ouvrir</button>
+          <button onclick="supprimerBilanPosturo(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
+        </div>`).join('')}
+      </div>` : '';
+
+    // Modules bilans
+    const modPosturo = `
+      <div style="border-radius:12px;overflow:hidden;background:#0d4a32;border:1px solid #1a7a52;">
+        <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(45,212,191,0.35),transparent);"></div>
+          <span style="font-size:42px;position:relative;z-index:1;">🧍</span>
         </div>
-        <button class="btn" style="font-size:11px;" onclick="editPatient(${i})">✏️</button>
-        <button class="btn" style="color:var(--red);font-size:11px;" onclick="deletePatient(${i})">✕</button>
+        <div style="padding:10px 12px;">
+          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;">Bilan postural</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Étude posture · 9 sections</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            ${canPosturo
+              ? `<button onclick="creerBilanPosturo(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#2dd4bf;color:#04342C;">Initial</button>
+                 <button onclick="creerBilanPosturo(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#0d4a32;">Contrôle</button>`
+              : `<button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.3);grid-column:1/-1;">Non disponible</button>`}
+          </div>
+        </div>
+      </div>`;
+
+    const modSport = `
+      <div style="border-radius:12px;overflow:hidden;background:#0d2e5c;border:1px solid #1a4a8a;">
+        <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,0.35),transparent);"></div>
+          <span style="font-size:42px;position:relative;z-index:1;">🏃</span>
+        </div>
+        <div style="padding:10px 12px;">
+          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;">Podologie du sport</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Analyse cinématique</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            ${canSport
+              ? `<button onclick="creerBilanSport(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#378ADD;color:#fff;">Initial</button>
+                 <button onclick="creerBilanSport(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#0d2e5c;">Contrôle</button>`
+              : `<button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.3);grid-column:1/-1;">Non disponible</button>`}
+          </div>
+        </div>
+      </div>`;
+
+    const modPodo = `
+      <div style="border-radius:12px;overflow:hidden;background:#2d1060;border:1px solid #4a1a9a;opacity:0.7;">
+        <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,0.4),transparent);"></div>
+          <span style="font-size:42px;position:relative;z-index:1;">👶</span>
+        </div>
+        <div style="padding:10px 12px;">
+          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;">Podopédiatrie</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:6px;">Bilan pédiatrique</div>
+          <div style="display:inline-block;font-size:9px;background:rgba(167,139,250,0.2);color:#CCC8F8;border:1px solid rgba(167,139,250,0.4);padding:2px 7px;border-radius:8px;margin-bottom:6px;font-weight:600;">Prochainement</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            <button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(167,139,250,0.3);color:#fff;opacity:0.5;">Initial</button>
+            <button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:#fff;color:#2d1060;opacity:0.5;">Contrôle</button>
+          </div>
+        </div>
+      </div>`;
+
+    return `
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:${bilansSport.length||bilansPosturo.length?'12px 12px 0 0':'12px'};">
+        <div class="av" style="width:44px;height:44px;flex-shrink:0;">${init}</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:#fff;">${p.prenom} ${p.nom}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">${age} · ${p.sport||'—'}${prat?' · '+prat.nom:''}</div>
+        </div>
+        <button onclick="editPatient(${i})" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
+        <button onclick="deletePatient(${i})" style="background:rgba(240,64,96,0.08);border:1px solid rgba(240,64,96,0.2);color:#f04060;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✕</button>
       </div>
-
-      <!-- 4 boutons bilans -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
-        ${btnSportInit}
-        ${btnSportCtrl}
-        ${btnPostInit}
-        ${btnPostCtrl}
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-top:none;border-radius:0 0 12px 12px;padding:14px;">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:${bilansSport.length||bilansPosturo.length?'4px':'0'};">
+          ${modPosturo}${modSport}${modPodo}
+        </div>
+        ${bilansPosturoHtml}${bilansSportHtml}
       </div>
-
-      <!-- Historique bilans sportifs -->
-      ${bilansSportHtml ? `<div style="margin-top:6px;padding-left:4px;">
-        <div style="font-size:10px;color:var(--mut);margin-bottom:3px;font-weight:600;">BILANS SPORTIFS</div>
-        ${bilansSportHtml}
-      </div>` : ''}
-
-      <!-- Historique bilans posturo -->
-      ${bilansPosturoHtml ? `<div style="margin-top:6px;padding-left:4px;">
-        <div style="font-size:10px;color:var(--mut);margin-bottom:3px;font-weight:600;">BILANS POSTURAUX</div>
-        ${bilansPosturoHtml}
-      </div>` : ''}
     </div>`;
   }).join('');
 }
