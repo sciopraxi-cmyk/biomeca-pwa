@@ -4371,158 +4371,497 @@ function buildRapportPosturo() {
   const logo = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
 
     let bodyHtml = '<style>\n    *{margin:0;padding:0;box-sizing:border-box;}\n    body{font-family:\'Helvetica Neue\',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}\n    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}\n    @media print{.no-print{display:none!important;}.rp-page{padding:0;}}\n\n    /* HEADER */\n    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .logo{height:44px;object-fit:contain;filter:brightness(0) invert(1);}\n    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}\n    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}\n\n    /* BAND */\n    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}\n    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}\n\n    /* PATIENT */\n    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:0;}\n    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}\n    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}\n    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}\n    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}\n    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}\n    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}\n\n    /* METRICS */\n    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}\n    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}\n    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}\n    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}\n\n    /* SECTIONS */\n    .section{margin:0;break-inside:avoid;padding:0 24px;}\n    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}\n    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0.5px;}\n    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .section-line{flex:1;height:1px;background:#eaeaea;}\n    .section-body{padding:0;}\n\n    /* ROWS */\n    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}\n    .item:last-child{border-bottom:none;}\n    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;padding-top:1px;}\n    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}\n    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;line-height:1.4;}\n\n    /* TAGS */\n    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}\n    .tag-navy{background:#e8edf5;color:#0e1f38;}\n    .tag-ok{background:#ecfdf5;color:#065f46;}\n    .tag-warn{background:#fffbeb;color:#92400e;}\n    .tag-alert{background:#fef2f2;color:#991b1b;}\n\n    /* IMAGES */\n    .img-container{position:relative;text-align:center;}\n    .img-base{max-width:100%;border-radius:4px;}\n    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}\n\n    /* FOOTER */\n    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}\n    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}\n\n    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}\n  </style>';
+const sections = [];
 
+  // 1. Anamnèse
+  const anam = [];
+  if(d.motif) anam.push(['Motif de consultation', d.motif]);
+  if(d.activite) anam.push(['Activité physique', d.activite]);
+  if(d.travail) anam.push(['Travail', d.travail]);
+  if(d.atcd) anam.push(['Antécédents traumatiques', d.atcd]);
+  if(d.appareillage) anam.push(['Appareillage', d.appareillage]);
+  if(d.examens) anam.push(['Examens complémentaires', d.examens]);
+  if(d.activiteQuot) anam.push(['Activité quotidienne', d.activiteQuot]);
+  if(d.eva !== undefined && d.eva !== '') anam.push(['EVA Douleur', d.eva+'/10']);
+  if(d.douleur) anam.push(['Douleur', d.douleur]);
+  if(anam.length) sections.push({titre:'1. Anamnèse', items:anam, color:'#2a7a4e'});
 
+  // 2. Morphostatique
+  const morpho = [];
+  if(d.comp1) morpho.push(['Compensation 1', d.comp1]);
+  if(d.comp2) morpho.push(['Compensation 2', d.comp2]);
+  if(d.comp3) morpho.push(['Compensation 3', d.comp3]);
+  if(d.compCritique) morpho.push(['Point critique', d.compCritique]);
+  if(d.prefMot) morpho.push(['Préférences motrices', d.prefMot]);
+  if(d.rombergMorpho) morpho.push(['Romberg', d.rombergMorpho]);
+  if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho, color:'#3498db'});
 
+  // Silhouettes bonhommes: capturer le conteneur tel quel via canvas
+  if(d._bodyCanvas) {
+    // Chercher le conteneur des bonhommes dans psec-1
+    const bodyContainer = document.querySelector('#psec-1 .posturo-body-wrap') ||
+                          document.getElementById('posturo-body-canvas')?.parentElement;
+    let compositeImg = null;
+    if(bodyContainer) {
+      try {
+        const rect = bodyContainer.getBoundingClientRect();
+        const tmpC = document.createElement('canvas');
+        tmpC.width = rect.width * window.devicePixelRatio;
+        tmpC.height = rect.height * window.devicePixelRatio;
+        const ctx = tmpC.getContext('2d');
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        // Dessiner les images de fond
+        bodyContainer.querySelectorAll('img').forEach(img => {
+          const r = img.getBoundingClientRect();
+          ctx.drawImage(img, r.left - rect.left, r.top - rect.top, r.width, r.height);
+        });
+        // Superposer le canvas des dessins
+        const bc = document.getElementById('posturo-body-canvas');
+        if(bc) ctx.drawImage(bc, 0, 0, rect.width, rect.height);
+        compositeImg = tmpC.toDataURL('image/png');
+      } catch(e) { compositeImg = null; }
+    }
+    const faceImg = document.getElementById('imgjs-morpho-face')?.src;
+    const face2Img = document.getElementById('imgjs-morpho-face2')?.src;
+    const profilGImg = document.getElementById('imgjs-morpho-profilG')?.src;
+    const profilDImg = document.getElementById('imgjs-morpho-profilD')?.src;
+    sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
+      faceImg, face2Img, profilGImg, profilDImg, bodyCanvas: d._bodyCanvas, compositeImg});
+  }
 
+  // 3. Bilan dynamique
+  const dyn = [];
+  if(d.bilanDyn) dyn.push(['Observations', d.bilanDyn]);
+  if(d.course) dyn.push(['Examen de la course', d.course]);
+  if(d.testFlexAnt) dyn.push(['Flexion antérieure', d.testFlexAnt+' cm']);
+  if(d.flexDebout) dyn.push(['Flexion debout (Iliaque/pubis)', d.flexDebout]);
+  if(d.flexAssis) dyn.push(['Flexion assis (Sacrum)', d.flexAssis]);
+  if(d.testStab) dyn.push(['Stabilité arrière', d.testStab]);
+  if(d.mobHanche==='oui') dyn.push(['Dysfonction hanche', '✓']);
+  if(d.mobGenou==='oui') dyn.push(['Dysfonction genou', '✓']);
+  if(d.mobPied==='oui') dyn.push(['Dysfonction pied', '✓']);
+  if(d.mobBassin==='oui') dyn.push(['Dysfonction bassin', '✓']);
+  if(d.tibiaFemur) dyn.push(['Tibia/fémur', d.tibiaFemur]);
+  if(d.longMiDorsal) dyn.push(['Longueur MI dorsal', d.longMiDorsal]);
+  if(d.branchesPub) dyn.push(['Branches pubiennes', d.branchesPub]);
+  if(d.downing) dyn.push(['Downing test', d.downing]);
+  if(d.longMiProc) dyn.push(['Longueur MI procubitus', d.longMiProc]);
+  if(d.inegLong) dyn.push(['Inégalité longueur', d.inegLong]);
+  if(d.inegType) dyn.push(['Type inégalité', d.inegType]);
+  if(d.equilibre) dyn.push(['Équilibré', d.equilibre]);
+  if(d.scoliose) dyn.push(['Scoliose', d.scoliose]);
+  if(dyn.length) sections.push({titre:'3. Bilan dynamique', items:dyn, color:'#e74c3c'});
 
-  sections.forEach(s => {
+  // Images bonhommes
 
-    if(s.type === 'bonhommes') {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;position:relative;">
-            ${['Profil D','Dos','Face','Profil G'].map((lbl,i) => `
-            <div style="text-align:center;">
-              <div style="font-size:9px;color:#888;margin-bottom:3px;">${lbl}</div>
-              <div style="position:relative;display:inline-block;width:100%;">
-                <img src="${[s.profilDImg,s.face2Img,s.faceImg,s.profilGImg][i]||''}" style="width:100%;border-radius:4px;"/>
-              </div>
-            </div>`).join('')}
-          </div>
-          <div style="margin-top:8px;text-align:center;">
-            <img src="${s.bodyCanvas}" style="max-width:100%;position:absolute;top:0;left:0;width:100%;"/>
-          </div>
-        </div>
-      </div>`;
-    } else if(s.type === 'pieds') {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">
-          <div style="position:relative;text-align:center;">
-            ${s.piedsImg?'<img src="'+s.piedsImg+'" style="max-width:100%;border-radius:6px;"/>':''}
-            <img src="${s.feetCanvas}" style="position:absolute;top:0;left:0;max-width:100%;"/>
-          </div>
-        </div>
-      </div>`;
-    } else if(s.type === 'empreinte') {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">
-          <div style="text-align:center;"><img src="${s.img}" style="max-height:180px;border-radius:6px;"/></div>
-        </div>
-      </div>`;
-    } else {
-      bodyHtml += `<div class="section">
-        <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
-        <div class="section-body">`;
-      s.items.forEach(([label,val]) => {
-        bodyHtml += `<div class="item"><span class="item-label">${label}</span><span class="item-value">${val}</span></div>`;
-      });
-      bodyHtml += `</div></div>`;
+    // 4. Neuro-fonctionnel
+  const neuro = [];
+  if(d.neuro4) {
+    const n = d.neuro4;
+
+    // 1. Analyse posturale statique
+    const aps = [];
+    if(n['aps-epaule-g']) aps.push('Épaule G'); if(n['aps-epaule-d']) aps.push('Épaule D');
+    if(n['aps-rot-g']) aps.push('Rot.épaule G'); if(n['aps-rot-d']) aps.push('Rot.épaule D');
+    if(n['aps-coude-g']) aps.push('Flex.coude G'); if(n['aps-coude-d']) aps.push('Flex.coude D');
+    if(n['aps-pron-g']) aps.push('Pron.poignet G'); if(n['aps-pron-d']) aps.push('Pron.poignet D');
+    if(aps.length) neuro.push(['Analyse posturale statique', aps.join(', ')]);
+
+    // 2. Critères de force
+    const force = [];
+    if(n['cf-ext-g']) force.push('Ext.poignet G'); if(n['cf-ext-d']) force.push('Ext.poignet D');
+    if(n['cf-flex-g']) force.push('Flex.hanche G'); if(n['cf-flex-d']) force.push('Flex.hanche D');
+    if(force.length) neuro.push(['Critères de force', force.join(', ')]);
+
+    // 3. Analyse posturale dynamique
+    const apd = [];
+    if(n['apd-tronc-g']) apd.push('Pattern tronc G'); if(n['apd-tronc-d']) apd.push('Pattern tronc D');
+    if(n['apd-cervelet-g']) apd.push('Pattern cervelet G'); if(n['apd-cervelet-d']) apd.push('Pattern cervelet D');
+    if(n['apd-tete-g']) apd.push('Stab.tête G'); if(n['apd-tete-d']) apd.push('Stab.tête D');
+    if(n['apd-membre-g']) apd.push('Membre sup G'); if(n['apd-membre-d']) apd.push('Membre sup D');
+    if(apd.length) neuro.push(['Analyse posturale dynamique', apd.join(', ')]);
+
+    // 4. Autres critères dynamiques
+    const dynCrit = [];
+    if(n['acd-flex-g']) dynCrit.push('Flex.poignet G'); if(n['acd-flex-d']) dynCrit.push('Flex.poignet D');
+    if(n['acd-hyper-g']) dynCrit.push('Hyperext.genou G'); if(n['acd-hyper-d']) dynCrit.push('Hyperext.genou D');
+    if(dynCrit.length) neuro.push(['Autres critères dynamiques', dynCrit.join(', ')]);
+
+    // 5. Hypothèses
+    if(n['po-hypo-tronc']) neuro.push(['Hypothèse', 'Tronc cérébral']);
+    if(n['po-hypo-cervelet']) neuro.push(['Hypothèse', 'Cervelet']);
+
+    // 6. Nerfs crâniens
+    const ncPos = [];
+    ['nc1','nc2','nc3','nc4','nc5','nc6','nc7','nc8','nc9','nc10','nc11','nc12'].forEach(nc => {
+      if(n['nc-'+nc+'-g']) ncPos.push(nc.toUpperCase()+' G');
+      if(n['nc-'+nc+'-d']) ncPos.push(nc.toUpperCase()+' D');
+    });
+    if(ncPos.length) neuro.push(['Nerfs crâniens', ncPos.join(', ')]);
+
+    // 7. Vestibulaire (confluence)
+    const vestNeuro = [];
+    if(n['vest-ant-g']) vestNeuro.push('Antérieur G'); if(n['vest-ant-d']) vestNeuro.push('Antérieur D');
+    if(n['vest-lat-g']) vestNeuro.push('Latéral G'); if(n['vest-lat-d']) vestNeuro.push('Latéral D');
+    if(n['vest-post-g']) vestNeuro.push('Postérieur G'); if(n['vest-post-d']) vestNeuro.push('Postérieur D');
+    if(vestNeuro.length) neuro.push(['Vestibulaire (confluence)', vestNeuro.join(', ')]);
+
+    // 8. Vermis
+    const vermis = [];
+    if(n['vermis-sharp-g']) vermis.push('Sharp-Purser G'); if(n['vermis-sharp-d']) vermis.push('Sharp-Purser D');
+    if(n['vermis-romberg-g']) vermis.push('Romberg 1 pied G'); if(n['vermis-romberg-d']) vermis.push('Romberg 1 pied D');
+    if(vermis.length) neuro.push(['Vermis', vermis.join(', ')]);
+
+    // 9. Proprio axe
+    const axe = [];
+    if(n['proprio-axe-tete']) axe.push('Tête');
+    if(n['proprio-axe-corps']) axe.push('Corps');
+    if(n['proprio-axe-bassin']) axe.push('Bassin');
+    if(axe.length) neuro.push(['Proprio axe', axe.join(', ')]);
+
+    // 10. Inter-hémisphérique
+    const inter = [];
+    if(n['inter-prec-g']) inter.push('Précision G'); if(n['inter-prec-d']) inter.push('Précision D');
+    if(n['inter-coord-g']) inter.push('Coordination G'); if(n['inter-coord-d']) inter.push('Coordination D');
+    if(inter.length) neuro.push(['Cervelet intermédiaire', inter.join(', ')]);
+
+    // 11. Latéral cérébral
+    const lat = [];
+    if(n['lat-prec-g']) lat.push('Précision G'); if(n['lat-prec-d']) lat.push('Précision D');
+    if(n['lat-coord-g']) lat.push('Coordination G'); if(n['lat-coord-d']) lat.push('Coordination D');
+    if(lat.length) neuro.push(['Cervelet latéral', lat.join(', ')]);
+
+    // 12. Proprioception
+    const prop = [];
+    if(n['prop-lent-g']) prop.push('FN lent G'); if(n['prop-lent-d']) prop.push('FN lent D');
+    if(n['prop-rapide-g']) prop.push('FN rapide G'); if(n['prop-rapide-d']) prop.push('FN rapide D');
+    if(n['prop-golgi-g']) prop.push('Golgi G'); if(n['prop-golgi-d']) prop.push('Golgi D');
+    if(n['prop-paccini-g']) prop.push('Paccini G'); if(n['prop-paccini-d']) prop.push('Paccini D');
+    if(n['prop-ruffini-d-g']) prop.push('Ruffini déc G'); if(n['prop-ruffini-d-d']) prop.push('Ruffini déc D');
+    if(n['prop-ruffini-c-g']) prop.push('Ruffini comp G'); if(n['prop-ruffini-c-d']) prop.push('Ruffini comp D');
+    if(n['prop-golgi-a-g']) prop.push('Golgi-A G'); if(n['prop-golgi-a-d']) prop.push('Golgi-A D');
+    if(prop.length) neuro.push(['Proprioception', prop.join(', ')]);
+
+    // 13. Réflexes archaïques
+    const refls = [];
+    ['ref-rpp','ref-rtp','ref-moro','ref-perez','ref-landau','ref-reptation'].forEach(r => {
+      if(n[r+'-o']) refls.push(r.replace('ref-','').toUpperCase()+' O');
+    });
+    ['ref-rtac','ref-galant','ref-babinski','ref-plantaire','ref-palmaire','ref-babkin'].forEach(r => {
+      if(n[r+'-g']) refls.push(r.replace('ref-','').toUpperCase()+' G');
+      if(n[r+'-d']) refls.push(r.replace('ref-','').toUpperCase()+' D');
+    });
+    if(refls.length) neuro.push(['Réflexes archaïques', refls.join(', ')]);
+
+    // 14. Récepteurs tactiles
+    const rect = [];
+    if(n['tact-merkel-g']) rect.push('Merkel G'); if(n['tact-merkel-d']) rect.push('Merkel D');
+    if(n['tact-ruffini-g']) rect.push('Ruffini G'); if(n['tact-ruffini-d']) rect.push('Ruffini D');
+    if(n['tact-pacini-g']) rect.push('Pacini G'); if(n['tact-pacini-d']) rect.push('Pacini D');
+    if(n['tact-tnl-g']) rect.push('TNL G'); if(n['tact-tnl-d']) rect.push('TNL D');
+    if(n['tact-meissner-g']) rect.push('Meissner G'); if(n['tact-meissner-d']) rect.push('Meissner D');
+    if(n['tact-poils-g']) rect.push('Poils G'); if(n['tact-poils-d']) rect.push('Poils D');
+    if(rect.length) neuro.push(['Récepteurs tactiles', rect.join(', ')]);
+  }
+    if(neuro.length) sections.push({titre:'4. Neuro-fonctionnel', items:neuro, color:'#8e44ad'});
+
+  // 5. Système plantaire
+  const plant = [];
+  if(d.epines==='oui') plant.push(['Épines irritatives appui', 'Oui'+(d.epinesLoc?' — '+d.epinesLoc:'')]);
+  else if(d.epines==='non') plant.push(['Épines irritatives', 'Non']);
+  if(d.tactique) plant.push(['Tactique équilibration', d.tactique]);
+  // Chaussure
+  if(d.chaussureType) plant.push(['Type de chaussure', d.chaussureType]);
+  const usures = [];
+  if(d.usureInterne) usures.push('Interne');
+  if(d.usureExterne) usures.push('Externe');
+  if(d.usureContrefort) usures.push('Contrefort');
+  if(usures.length) plant.push(['Usure chaussure', usures.join(', ')]);
+  // Tests toniques
+  const tests5 = [];
+  if(d.testPouces) tests5.push('Pouces');
+  if(d.testConvergence) tests5.push('Convergence');
+  if(d.testScapulaire) tests5.push('Scapulaire');
+  if(d.testNucale) tests5.push('Nucale');
+  if(tests5.length) plant.push(['Tests toniques positifs', tests5.join(', ')]);
+  // Parasites
+  const parasites = [];
+  if(d.paraPlantaire) parasites.push('Plantaire');
+  if(d.paraYeux) parasites.push('Yeux');
+  if(d.paraBuccale) parasites.push('Buccale');
+  if(d.paraCicatrice) parasites.push('Cicatrice');
+  if(d.paraVestibulaire) parasites.push('Vestibulaire');
+  if(d.paraViscerale) parasites.push('Viscérale');
+  if(parasites.length) plant.push(['Parasites détectés', parasites.join(', ')]);
+  // Mono-appuis
+  const monos = [];
+  if(d.monoPiedG) monos.push('Pied G'); if(d.monoPiedD) monos.push('Pied D');
+  if(d.monoGenouG) monos.push('Genou G'); if(d.monoGenouD) monos.push('Genou D');
+  if(d.monoHancheG) monos.push('Hanche G'); if(d.monoHancheD) monos.push('Hanche D');
+  if(monos.length) plant.push(['Mono-appui', monos.join(', ')]);
+  if(plant.length) sections.push({titre:'5. Système plantaire', items:plant, color:'#f0a500'});
+
+  // 6. Vestibulaire
+  const vest = [];
+  if(d.laterOui==='oui') {
+    let latStr = (d.laterType||'');
+    if(d.laterD) latStr += ' Droite'; else if(d.laterG) latStr += ' Gauche';
+    vest.push(['Latéralisation', latStr]);
+  }
+  if(d.kleinRes) vest.push(['Test de DeKleyn', d.kleinRes]);
+  if(d.ligamentsRes) vest.push(['Test ligaments', d.ligamentsRes]);
+  if(d.rancurelRes) vest.push(['Test de Rancurel', d.rancurelRes]);
+  if(d.headShaking) vest.push(['Head Shaking', d.headShaking]);
+  if(d.headImpulse) vest.push(['Head Impulse', d.headImpulse]);
+  if(d.babinski) vest.push(['Babinski-Weill', d.babinski]);
+  if(d.unterburger) vest.push(['Unterburger', d.unterburger]);
+  if(d.vertiges==='oui') vest.push(['Vertiges/nystagmus', 'Présents']);
+  if(d.vppb==='oui') vest.push(['VPPB', 'Positif']);
+  // CSC atteints
+  const cscs = [];
+  if(d.cscD) cscs.push('Latéral D'); if(d.cscG) cscs.push('Latéral G');
+  if(d.cscAntD) cscs.push('Antérieur D'); if(d.cscAntG) cscs.push('Antérieur G');
+  if(d.cscPostD) cscs.push('Postérieur D'); if(d.cscPostG) cscs.push('Postérieur G');
+  if(cscs.length) vest.push(['CSC atteints', cscs.join(', ')]);
+  if(d.clvf) vest.push(['CLVF', d.clvf]);
+  if(d.pevs) vest.push(['PEVS', d.pevs]);
+  if(d.semelleComp) vest.push(['Semelle compensation', d.semelleComp]);
+  // Réorientation
+  const reorVest = [];
+  if(d.reorOrl) reorVest.push('ORL');
+  if(d.reorKine) reorVest.push('Kiné');
+  if(reorVest.length) vest.push(['Réorientation', reorVest.join(', ')]);
+  if(vest.length) sections.push({titre:'6. Investigation vestibulaire', items:vest, color:'#8e44ad'});
+
+  // 7. Buccal/Visuel
+  const bucc = [];
+  // Buccal
+  if(d.mcpOuv==='oui') bucc.push(['MCP ouverture bouche', 'Améliorée (ATM secondaire)']);
+  else if(d.mcpOuv==='non') bucc.push(['MCP ouverture bouche', 'Non améliorée']);
+  if(d.serrage) {
+    let serrageStr = d.serrage;
+    if(d.serrage==='aggravation') {
+      const aggr = [];
+      if(d.aggrDents) aggr.push('Dents'); if(d.aggrAtm) aggr.push('ATM');
+      if(aggr.length) serrageStr += ' ('+aggr.join(', ')+')';
+    } else if(d.serrage==='amelioration') {
+      const amel = [];
+      if(d.amelioContact) amel.push('Contact'); if(d.amelioTension) amel.push('Tension');
+      if(amel.length) serrageStr += ' ('+amel.join(', ')+')';
+    }
+    bucc.push(['Serrage', serrageStr]);
+  }
+  if(d.atmOrigine) bucc.push(['ATM origine', d.atmOrigine]);
+  if(d.ouvMax) bucc.push(['Ouverture max', d.ouvMax]);
+  if(d.deviation) bucc.push(['Déviation mandibulaire', d.deviation]);
+  if(d.contractures) bucc.push(['Contractures', d.contractures]);
+  if(d.douleurCaps) bucc.push(['Douleur capsulaire', d.douleurCaps]);
+  if(d.ressaut==='oui') {
+    let ressautStr = 'Présent';
+    if(d.ressautDte) ressautStr += ' Droite'; if(d.ressautGauche) ressautStr += ' Gauche';
+    bucc.push(['Ressaut ATM', ressautStr]);
+  }
+  const reorBuc = [];
+  if(d.reorBucDentiste) reorBuc.push('Dentiste');
+  if(d.reorBucOrtho) reorBuc.push('Orthodontiste');
+  if(d.reorBucStomato) reorBuc.push('Stomatologue');
+  if(d.reorBucKine) reorBuc.push('Kiné');
+  if(reorBuc.length) bucc.push(['Réorientation buccale', reorBuc.join(', ')]);
+  // Visuel
+  if(d.visEntree) bucc.push(['Entrée visuelle', d.visEntree]);
+  if(d.visLater==='oui') bucc.push(['Latéralisation visuelle', d.visLaterType||'Oui']);
+  if(d.testAllongement) bucc.push(['Test allongement', d.testAllongement]);
+  if(d.testRotNucale) bucc.push(['Test rotation nucale', d.testRotNucale]);
+  const troubles = [];
+  if(d.myopie) troubles.push('Myopie');
+  if(d.hypermetropie) troubles.push('Hypermétropie');
+  if(d.presbyte) troubles.push('Presbytie');
+  if(d.astigmate) troubles.push('Astigmatisme');
+  if(troubles.length) bucc.push(['Troubles visuels', troubles.join(', ')]);
+  if(d.maddox) bucc.push(['Maddox', d.maddox]);
+  if(d.coverTest) bucc.push(['Cover test', d.coverTest]);
+  if(d.oeilDirect) bucc.push(['Œil directeur', d.oeilDirect]);
+  const reorVis = [];
+  if(d.reorVisOrthoptiste) reorVis.push('Orthoptiste');
+  if(d.reorVisOphtalmo) reorVis.push('Ophtalmologue');
+  if(d.reorVisOptom) reorVis.push('Optométriste');
+  if(reorVis.length) bucc.push(['Réorientation visuelle', reorVis.join(', ')]);
+  if(bucc.length) sections.push({titre:'7. Buccal / Visuel', items:bucc, color:'#2471a3'});
+
+  // 8. Terrain/Synthèse
+  const terr = [];
+  const postures = [];
+  if(d.postureAnt) postures.push('Antériorisation');
+  if(d.posturePost) postures.push('Postériorisation');
+  if(d.postureLater) postures.push('Latéralisation '+(d.postureLaterDir||''));
+  if(postures.length) terr.push(['Posture globale', postures.join(', ')]);
+  const chaines = [];
+  if(d.chaineExt) chaines.push('Extension');
+  if(d.chaineFerm) chaines.push('Fermeture');
+  if(d.chaineOuv) chaines.push('Ouverture');
+  if(d.chaineStatOpt) chaines.push('Statique optimum');
+  if(d.chaineStatDeg) chaines.push('Statique dégradée');
+  if(chaines.length) terr.push(['Chaînes musculaires', chaines.join(', ')]);
+  if(d.tensionPrincipal) terr.push(['Tension principale', d.tensionPrincipal]);
+  if(d.biomecArticulaire) terr.push(['Biomécanique/Articulaire', d.biomecArticulaire]);
+  if(terr.length) sections.push({titre:'8. Terrain du patient', items:terr, color:'#2a7a4e'});
+
+  // 9. Traitements
+  const trait = [];
+  if(d.semellesDesc) trait.push(['Plan de semelles', d.semellesDesc]);
+  // Circuits express — encadrés séparés par circuit
+  const circLabels = ['Exercice 1','Exercice 2','Exercice 3','Exercice 4'];
+  ['c1','c2'].forEach(function(cx, ci) {
+    const circItems = [];
+    circLabels.forEach(function(lbl, i) {
+      const key = cx+'_ex'+(i+1);
+      const sys = (d['circ_'+key+'_sys']||[]).filter(Boolean);
+      const sub = (d['circ_'+key+'_sub']||[]).filter(Boolean);
+      const libre = d['circ_'+key] || '';
+      if(sys.length || sub.length || libre) {
+        let val = '';
+        sys.forEach((s,j) => { if(s) val += s + (sub[j] ? ' → '+sub[j] : '') + ' | '; });
+        if(libre) val += libre;
+        circItems.push([lbl, val.replace(/\s*\|\s*$/,'')]);
+      }
+    });
+    if(circItems.length) {
+      sections.push({titre:'9. Circuit '+(ci+1), items:circItems, color:'#16a085'});
     }
   });
+  if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
+  if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
+  if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
+  const tests = [];
+  const testLabels = ['Rotation nucale','Flexion antérieure','Extenseurs poignet','Stabilité monopodale','Force/stabilité arrière','Mobilité axe','Romberg','Morphostatique'];
+  ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(function(t,i) {
+    if(d['test_'+t]==='oui') tests.push(testLabels[i]+' ✅');
+    else if(d['test_'+t]==='non') tests.push(testLabels[i]+' ❌');
+  });
+  if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
+  if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
 
-  bodyHtml += `<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · ${p.prenom} ${p.nom} · ${dateStr}</div></div>
-  </div></body></html>`;
-
-  // Injecter CSS dans la page
-  let existingStyle = document.getElementById('rapport-posturo-style');
-  if(!existingStyle) {
-    existingStyle = document.createElement('style');
-    existingStyle.id = 'rapport-posturo-style';
-    document.head.appendChild(existingStyle);
+  // Empreinte plantaire après section 5
+  if(d._empreinte) {
+    const s5idx = sections.findIndex(s => s.titre && s.titre.startsWith('5.'));
+    const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
+    sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#f0a500', type:'empreinte', img: d._empreinte});
   }
-  existingStyle.textContent = `
-    .page { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a1a2e; }
-    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; padding-bottom:10px; border-bottom:3px solid #2a7a4e; }
-    .logo { height:55px; object-fit:contain; }
-    .rp-prat { text-align:right; font-size:10px; color:#555; line-height:1.7; }
-    .prat-name { font-size:13px; font-weight:700; color:#1a1a2e; }
-    .rp-title { text-align:center; margin-bottom:14px; }
-    .rp-title h1 { font-size:20px; font-weight:800; color:#2a7a4e; letter-spacing:2px; text-transform:uppercase; }
-    .rp-title .sub { font-size:10px; color:#888; margin-top:3px; }
-    .rp-patient { background:linear-gradient(135deg,#f0faf4,#e0f5ea); border:2px solid #2a7a4e; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
-    .rp-patient-name { font-size:16px; font-weight:800; color:#2a7a4e; }
-    .rp-patient-details { font-size:10px; color:#555; margin-top:4px; line-height:1.6; }
-    .rp-patient-right { text-align:right; font-size:10px; color:#555; line-height:1.6; }
-    .rp-section { margin-bottom:12px; }
-    .section-title { color:#fff; padding:6px 12px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; }
-    .section-body { border-radius:0 0 6px 6px; padding:8px 12px; border-width:0 1px 1px 1px; border-style:solid; }
-    .rp-item { display:flex; padding:4px 0; border-bottom:1px solid #f5f5f5; }
-    .rp-item:last-child { border-bottom:none; }
-    .item-label { font-weight:600; min-width:200px; font-size:10px; }
-    .item-value { flex:1; font-size:10px; color:#333; }
-    .rp-footer { margin-top:16px; padding-top:8px; border-top:1px solid #eee; text-align:center; font-size:9px; color:#aaa; }
-    @media print { #pg-rapport-posturo > div:first-child { display:none!important; } }
-  `;
-
-  // Construire le HTML du contenu
-  bodyHtml += '<div class="rp-page">';
-
-  // Header
-  bodyHtml += '<div class="header">';
-  bodyHtml += '<img class="logo" src="'+logo+'" alt="Sciopraxi"/>';
-  bodyHtml += '<div class="prat-info"><div class="prat-name">'+(prat.nom||'')+' '+(prat.prenom||'')+' — '+(prat.titre||'')+'</div>';
-  if(prat.cabinet) bodyHtml += '<div>'+prat.cabinet+'</div>';
-  if(prat.adresse) bodyHtml += '<div>'+prat.adresse+'</div>';
-  if(prat.tel) bodyHtml += '<div>📞 '+prat.tel+'</div>';
-  if(prat.email) bodyHtml += '<div>✉️ '+prat.email+'</div>';
-  bodyHtml += '</div></div>';
-
-  // Titre
-  bodyHtml += '<div class="section-title"><h1>Bilan Étude de la Posture</h1><div class="sub">Généré le '+dateStr+'</div></div>';
-
-  // Patient
-  bodyHtml += '<div class="patient-card">';
-  bodyHtml += '<div><div class="patient-name">'+p.prenom+' '+p.nom+'</div>';
-  bodyHtml += '<div class="patient-details">';
-  if(p.ddn) bodyHtml += '📅 '+new Date(p.ddn).toLocaleDateString('fr-FR');
-  if(p.sport) bodyHtml += ' · 🏃 '+p.sport;
-  if(p.metier) bodyHtml += ' · 💼 '+p.metier;
-  bodyHtml += '</div></div>';
-  bodyHtml += '<div class="patient-right">';
-  if(p.poids) bodyHtml += '⚖️ '+p.poids+' kg';
-  if(p.taille) bodyHtml += ' · 📏 '+p.taille+' cm';
-  if(d.dateConsult) bodyHtml += '<br>📋 '+new Date(d.dateConsult).toLocaleDateString('fr-FR');
-  if(d.medecin) bodyHtml += '<br>👨‍⚕️ '+d.medecin;
-  bodyHtml += '</div></div>';
-
-  // Sections données
-  sections.forEach(function(s) {
-    if(s.type === 'bonhommes') {
-      bodyHtml += '<div class="section">';
-      bodyHtml += '<div class="section-title" style="background:'+s.color+';">'+s.titre+'</div>';
-      bodyHtml += '<div class="section-body" style="border-color:'+s.color+';">';
-      const labels4 = ['Profil D','Dos','Face','Profil G'];
-      const imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
-      // Reproduire exactement la structure du bilan: flex + gap:20px + flex:1
-      bodyHtml += '<div style="position:relative;margin:8px 0;">';
-      bodyHtml += '<div style="display:flex;gap:20px;background:#fff;border-radius:8px;border:1px solid #ddd;padding:16px;align-items:flex-end;">';
-      imgs4.forEach(function(src, i) {
-        bodyHtml += '<div style="flex:1;text-align:center;">';
-        bodyHtml += '<div style="font-size:9px;color:#2a7a4e;margin-bottom:4px;font-weight:600;">'+labels4[i]+'</div>';
-        bodyHtml += '<div style="background:#fff;border:1px solid #eee;border-radius:4px;padding:4px;min-height:100px;display:flex;align-items:center;justify-content:center;">';
-        bodyHtml += '<img src="'+(src||'')+'" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;"/>';
-        bodyHtml += '</div></div>';
-      });
-      bodyHtml += '</div>';
-
-  // Injecter dans un iframe isolé pour éviter les conflits CSS
-  const body = document.getElementById('rapport-posturo-body');
-  if(body) {
-    body.innerHTML = '';
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'width:100%;height:calc(100vh - 120px);border:none;';
-    body.appendChild(iframe);
-    const idoc = iframe.contentDocument || iframe.contentWindow.document;
-    idoc.open();
-    idoc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;">' + bodyHtml + '</body></html>');
-    idoc.close();
+  // Plan de semelles (pieds) à la fin dans section 9
+  if(d._feetCanvas) {
+    const piedsImg = document.getElementById('imgjs-pieds')?.src;
+    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
+      piedsImg, feetCanvas: d._feetCanvas});
   }
-  nav('pg-rapport-posturo');
-}
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR');
+
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bilan Posture</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}
+    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}
+    @media print{.no-print{display:none!important;}.rp-page{padding:0;}}
+
+    /* HEADER */
+    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}
+    .logo{height:44px;object-fit:contain;filter:brightness(0) invert(1);}
+    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}
+    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}
+
+    /* BAND */
+    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}
+    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}
+    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}
+
+    /* PATIENT */
+    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:0;}
+    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}
+    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}
+    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}
+    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}
+    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}
+
+    /* METRICS */
+    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}
+    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}
+    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}
+    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+
+    /* SECTIONS */
+    .section{margin:0;break-inside:avoid;padding:0 24px;}
+    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}
+    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0.5px;}
+    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}
+    .section-line{flex:1;height:1px;background:#eaeaea;}
+    .section-body{padding:0;}
+
+    /* ROWS */
+    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}
+    .item:last-child{border-bottom:none;}
+    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;padding-top:1px;}
+    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}
+    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;line-height:1.4;}
+
+    /* TAGS */
+    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}
+    .tag-navy{background:#e8edf5;color:#0e1f38;}
+    .tag-ok{background:#ecfdf5;color:#065f46;}
+    .tag-warn{background:#fffbeb;color:#92400e;}
+    .tag-alert{background:#fef2f2;color:#991b1b;}
+
+    /* IMAGES */
+    .img-container{position:relative;text-align:center;}
+    .img-base{max-width:100%;border-radius:4px;}
+    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}
+
+    /* FOOTER */
+    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
+    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}
+    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}
+
+    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}
+  </style></head><body>
+  <button class="btn-print no-print" onclick="window.print()">🖨️ Imprimer / PDF</button>
+  <div class="rp-page">
+    <div class="header">
+      <img class="logo" src="${logo}" alt="Sciopraxi"/>
+      <div class="prat-info">
+        <div class="prat-name">${prat.nom||''} ${prat.prenom||''} — ${prat.titre||''}</div>
+        ${prat.cabinet?'<div>'+prat.cabinet+'</div>':''}
+        ${prat.adresse?'<div>'+prat.adresse+'</div>':''}
+        ${prat.tel?'<div>'+prat.tel+'</div>':''}
+        ${prat.email?'<div>'+prat.email+'</div>':''}
+      </div>
+    </div>
+    <div class="titre-rapport">
+      <h1>Bilan Étude de la Posture</h1>
+      <div class="sub">Généré le ${dateStr}</div>
+    </div>
+    <div class="patient-card">
+      <div class="patient-avatar">${(p.prenom||'?')[0]}${(p.nom||'?')[0]}</div>
+      <div style="flex:1;">
+        <div class="patient-name">${p.prenom} ${p.nom}</div>
+        <div class="patient-details">
+          ${p.ddn?'Né(e) le '+new Date(p.ddn).toLocaleDateString('fr-FR'):''}
+          ${d.dateConsult?' · Bilan du '+new Date(d.dateConsult).toLocaleDateString('fr-FR'):''}
+          ${d.medecin?' · '+d.medecin:''}
+        </div>
+        <div class="patient-right">
+          ${p.sport?'<span class="pt-chip">'+p.sport+'</span>':''}
+          ${p.metier?'<span class="pt-chip">'+p.metier+'</span>':''}
+          ${p.lat?'<span class="pt-chip">'+p.lat+'</span>':''}
+          ${d.eva?'<span class="pt-chip pt-chip-alert">EVA '+d.eva+'/10</span>':''}
+        </div>
+      </div>
+      <div class="patient-metrics">
+        ${p.poids?'<div class="metric"><div class="metric-val">'+p.poids+'</div><div class="metric-lbl">kg</div></div>':''}
+        ${p.taille?'<div class="metric"><div class="metric-val">'+p.taille+'</div><div class="metric-lbl">cm</div></div>':''}
+        ${p.ddn?'<div class="metric"><div class="metric-val">'+Math.floor((Date.now()-new Date(p.ddn))/31557600000)+'</div><div class="metric-lbl">ans</div></div>':''}
+      </div>
+    </div>`;
 
   sections.forEach(s => {
     if(s.type === 'bonhommes') {
@@ -4565,7 +4904,7 @@ function buildRapportPosturo() {
         <div class="section-title"><div class="section-num">${sections.indexOf(s)+1<10?'0'+(sections.indexOf(s)+1):sections.indexOf(s)+1}</div><div class="section-label">${s.titre}</div><div class="section-line"></div></div>
         <div class="section-body">`;
       s.items.forEach(([label,val]) => {
-        bodyHtml += `<div class="item"><span class="item-label">${label}</span><span class="item-value">${val}</span></div>`;
+        bodyHtml += `<div class="item"><span class="item-label" style="color:${s.color};">${label}</span><span class="item-value">${val}</span></div>`;
       });
       bodyHtml += `</div></div>`;
     }
@@ -4683,12 +5022,12 @@ function buildRapportPosturo() {
       });
       bodyHtml += '</div></div>';
     }
-  })
+  });
 
   bodyHtml += '<div class="footer">Bilan Étude de la Posture · Sciopraxi · '+dateStr+'</div>';
   bodyHtml += '</div>';
 
-  // Injecter dans un iframe  // Injecter dans un iframe isolé pour éviter les conflits CSS
+  // Injecter dans un iframe isolé pour éviter les conflits CSS
   const body = document.getElementById('rapport-posturo-body');
   if(body) {
     body.innerHTML = '';
