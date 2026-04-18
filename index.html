@@ -1771,7 +1771,17 @@ function checkTrialStatus() {
     if(b) b.style.display = 'none';
     return;
   }
+  // Si pas de trial_start, on considère que l'essai commence maintenant
   const trialStart = meta.trial_start ? new Date(meta.trial_start) : new Date();
+  // Si pas de trial_start défini, mettre à jour dans Supabase
+  if(!meta.trial_start && pwaUser?.token) {
+    const ts = new Date().toISOString();
+    meta.trial_start = ts;
+    fetch(SUPA_URL+'/auth/v1/user', {method:'PUT',
+      headers:{'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+pwaUser.token},
+      body:JSON.stringify({data:{...meta, trial_start:ts}})
+    }).catch(()=>{});
+  }
   const diffDays = Math.floor((new Date() - trialStart) / 86400000);
   const remaining = 14 - diffDays;
   const banner = document.getElementById('trial-banner');
