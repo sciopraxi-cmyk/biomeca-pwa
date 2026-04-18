@@ -4493,7 +4493,7 @@ const sections = [];
       } catch(e) { return imgEl.src; }
     }
     {
-      var bgIds3 = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
+      var bgIds3 = ['imgjs-morpho-profilG','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilD'];
       sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
         bodyCanvasData: d._bodyCanvas,
         bgIds: bgIds3,
@@ -4890,10 +4890,10 @@ function _buildRapportBody(p, d, prat, logo, sections) {
         ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
         return tmp.toDataURL('image/png');
       }
-      bonhommesSection.profilDImg = makeSliceComposite(0);
+      bonhommesSection.profilDImg = makeSliceComposite(3);
       bonhommesSection.face2Img   = makeSliceComposite(1);
       bonhommesSection.faceImg    = makeSliceComposite(2);
-      bonhommesSection.profilGImg = makeSliceComposite(3);
+      bonhommesSection.profilGImg = makeSliceComposite(0);
       bonhommesSection.bodyCanvasData = null;
       if(!piedsSection || !piedsSection.feetCanvas) _doBuildRapport(p, d, prat, logo, sections);
     };
