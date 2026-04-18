@@ -9334,8 +9334,10 @@ function savePosturoBilan() {
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc && fc.width>0 && fc._history && fc._history.length>0) {
     // Sauvegarder composite fond+dessins directement
-    const piedsImg = document.getElementById('imgjs-pieds');
-    if(piedsImg && piedsImg.src) {
+    const piedsImgEl = document.getElementById('imgjs-pieds');
+    if(piedsImgEl && piedsImgEl.src) {
+      const piedsImg = new Image();
+      piedsImg.onload = function() {
       const compC = document.createElement('canvas');
       compC.width = piedsImg.naturalWidth;
       compC.height = piedsImg.naturalHeight;
@@ -9362,6 +9364,9 @@ function savePosturoBilan() {
       const srcH = Math.min(imgDisplayH, pH - imgOffY) * fcScaleY;
       compCtx.drawImage(fc, srcX, srcY, srcW, srcH, 0, 0, compC.width, compC.height);
       d._feetCanvas = compC.toDataURL('image/png');
+      }; // fin onload
+      piedsImg.src = piedsImgEl.src;
+      return; // le reste sera fait dans onload
     } else {
       d._feetCanvas = fc.toDataURL('image/png');
     }
