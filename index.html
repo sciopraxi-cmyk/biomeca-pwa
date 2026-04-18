@@ -4957,17 +4957,17 @@ function buildRapportPosturo() {
   bodyHtml += '</div></div>';
 
   // Titre
-  bodyHtml += '<div class="rp-title"><h1>Bilan Étude de la Posture</h1><div class="sub">Généré le '+dateStr+'</div></div>';
+  bodyHtml += '<div class="section-title"><h1>Bilan Étude de la Posture</h1><div class="sub">Généré le '+dateStr+'</div></div>';
 
   // Patient
-  bodyHtml += '<div class="rp-patient">';
-  bodyHtml += '<div><div class="rp-patient-name">'+p.prenom+' '+p.nom+'</div>';
-  bodyHtml += '<div class="rp-patient-details">';
+  bodyHtml += '<div class="patient-card">';
+  bodyHtml += '<div><div class="patient-name">'+p.prenom+' '+p.nom+'</div>';
+  bodyHtml += '<div class="patient-details">';
   if(p.ddn) bodyHtml += '📅 '+new Date(p.ddn).toLocaleDateString('fr-FR');
   if(p.sport) bodyHtml += ' · 🏃 '+p.sport;
   if(p.metier) bodyHtml += ' · 💼 '+p.metier;
   bodyHtml += '</div></div>';
-  bodyHtml += '<div class="rp-patient-right">';
+  bodyHtml += '<div class="patient-right">';
   if(p.poids) bodyHtml += '⚖️ '+p.poids+' kg';
   if(p.taille) bodyHtml += ' · 📏 '+p.taille+' cm';
   if(d.dateConsult) bodyHtml += '<br>📋 '+new Date(d.dateConsult).toLocaleDateString('fr-FR');
