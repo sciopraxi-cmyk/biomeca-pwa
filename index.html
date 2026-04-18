@@ -4844,19 +4844,29 @@ function _buildRapportBody(p, d, prat, logo, sections) {
     var pImg2 = new Image(); var fImg2 = new Image(); var pLoaded2 = 0;
     function doPiedsComposite() {
       if(++pLoaded2 < 2) return;
+      // Canvas DOM: 300x150, padding parent: 8px, donc inner width = 284px
+      // Image width: min(284*0.8, 400) = 227px (carré 227x227)
+      // Scale canvas sauvegardé: cW/300
+      // Image dans canvas: imgW = 227 * scale, centree
+      // xOff = (cW - imgW) / 2
+      // yOff = padding * scale = 8 * scale (padding top du div)
       var cW = fImg2.width || 1580;
       var cH = fImg2.height || 836;
       var scale = cW / 300;
-      var imgW = Math.min(300*0.8, 400) * scale;
+      var innerW = 300 - 2*8; // 284px (300 - padding gauche/droite)
+      var imgW = Math.min(innerW * 0.8, 400) * scale; // ~1196px
+      var imgH = imgW; // carré (520x520 src)
       var xOff = (cW - imgW) / 2;
+      var yOff = 8 * scale; // padding top
       var tmp = document.createElement('canvas');
       tmp.width = pImg2.width || 520;
       tmp.height = pImg2.height || 520;
       var ctx = tmp.getContext('2d');
       ctx.fillStyle='#fff'; ctx.fillRect(0,0,tmp.width,tmp.height);
       ctx.drawImage(pImg2, 0, 0, tmp.width, tmp.height);
-      var dstH = tmp.height * cH / imgW;
-      ctx.drawImage(fImg2, xOff, 0, imgW, cH, 0, 0, tmp.width, dstH);
+      var srcH = Math.min(imgH, cH - yOff);
+      var dstH = tmp.height * srcH / imgW;
+      ctx.drawImage(fImg2, xOff, yOff, imgW, srcH, 0, 0, tmp.width, dstH);
       piedsSection.piedsImg = tmp.toDataURL('image/png');
       piedsSection.feetCanvas = null;
       if(!bonhommesSection) _doBuildRapport(p, d, prat, logo, sections);
