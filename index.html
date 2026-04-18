@@ -4825,10 +4825,9 @@ const sections = [];
   }
   // Plan de semelles (pieds) à la fin dans section 9
   if(d._feetCanvas) {
-    var piedsBaseEl = document.getElementById('imgjs-pieds');
-    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
-      piedsImg: piedsBaseEl ? piedsBaseEl.src : null,
-      feetCanvas: d._feetCanvas});
+    // _feetCanvas contient déjà le composite fond+dessins
+    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img',
+      img: d._feetCanvas});
   }
 
   _buildRapportBody(p, d, prat, logo, sections);
@@ -4837,52 +4836,7 @@ const sections = [];
 function _buildRapportBody(p, d, prat, logo, sections) {
   // Résoudre les images bonhommes si nécessaire
   var bonhommesSection = sections.find(function(s){ return s.type === 'bonhommes' && s.bodyCanvasData; });
-  var piedsSection = sections.find(function(s){ return s.type === 'pieds' && s.feetCanvas && s.piedsImg; });
-  
-  // Composite pieds async
-  if(piedsSection) {
-    var pImg2 = new Image(); var fImg2 = new Image(); var pLoaded2 = 0;
-    function doPiedsComposite() {
-      if(++pLoaded2 < 2) return;
-      // Canvas DOM 300x150, div padding 8px, image width:80% max 400px centree
-      // Image naturelle: 520x520 (carre)
-      // Dans le div (300px large, padding 8px): innerW = 284px
-      // imgW_dom = min(284*0.8, 400) = 227px, imgH_dom = 227px (carre)
-      // Mais le canvas DOM fait seulement 150px de haut!
-      // L'image de 227px deborde en bas (visible: 150-8=142px sur 227px)
-      // Scale: cW/300
-      // Dans _feetCanvas (1580px large):
-      //   imgW_saved = 227 * scale = ~1196px
-      //   xOff = (1580 - 1196) / 2 = ~192px
-      //   yOff_dom = 8px (padding) -> yOff_saved = 8 * scale = ~42px
-      //   imgH_saved = 1196px mais on n'a que cH - yOff = 836-42 = 794px visible
-      // Mapping: zone source [xOff, yOff, imgW, 794] -> dest [0,0, 520, 520*794/1196] = [0,0,520,345]
-      // Mais l'image fait 520px de haut! Le bas est coupe
-      // Solution: etirer 794px source sur 520px destination (deformation acceptable)
-      var cW = fImg2.width || 1580;
-      var cH = fImg2.height || 836;
-      var scale = cW / 300;
-      var innerW = 300 - 2*8;
-      var imgW = Math.min(innerW * 0.8, 400) * scale;
-      var xOff = (cW - imgW) / 2;
-      var yOff = 8 * scale;
-      var srcH = cH - yOff;
-      var tmp = document.createElement('canvas');
-      tmp.width = pImg2.width || 520;
-      tmp.height = pImg2.height || 520;
-      var ctx = tmp.getContext('2d');
-      ctx.fillStyle='#fff'; ctx.fillRect(0,0,tmp.width,tmp.height);
-      ctx.drawImage(pImg2, 0, 0, tmp.width, tmp.height);
-      ctx.drawImage(fImg2, xOff, yOff, imgW, srcH, 0, 0, tmp.width, tmp.height);
-      piedsSection.piedsImg = tmp.toDataURL('image/png');
-      piedsSection.feetCanvas = null;
-      if(!bonhommesSection) _doBuildRapport(p, d, prat, logo, sections);
-    }
-    pImg2.onload = doPiedsComposite;
-    fImg2.onload = doPiedsComposite;
-    pImg2.src = piedsSection.piedsImg;
-    fImg2.src = piedsSection.feetCanvas;
-  }
+
   
   if(bonhommesSection) {
     var bcImg = new Image();
@@ -4986,6 +4940,10 @@ function _doBuildRapport(p, d, prat, logo, sections) {
         bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:60%;border-radius:4px;display:block;margin:0 auto;"/>';
         bodyHtml += '</div>';
       }
+    } else if(s.type === 'img') {
+      if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-width:70%;border-radius:4px;display:block;margin:0 auto;"/></div>';
+    } else if(s.type === 'empreinte') {
+      if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-width:70%;border-radius:4px;display:block;margin:0 auto;"/></div>';
     } else if(s.type === 'image') {
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-height:200px;border-radius:4px;"/></div>';
     } else if(s.items) {
