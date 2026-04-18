@@ -9349,6 +9349,7 @@ function savePosturoBilan() {
       }
       callback(compC.toDataURL('image/png'));
     };
+    d._feetCanvas = null; // forcer régénération
     if(fc._history && fc._history.length > 0) {
       _buildFeetComposite(fc, url => { d._feetCanvas = url; });
     } else if(!d._feetCanvas) {
