@@ -4785,9 +4785,22 @@ const sections = [];
   }
   // Plan de semelles (pieds) à la fin dans section 9
   if(d._feetCanvas) {
-    const piedsImg = document.getElementById('imgjs-pieds')?.src;
+    const piedsBase = document.getElementById('imgjs-pieds');
+    const piedsCanvas = document.getElementById('pieds-canvas') ||
+                        document.querySelector('#psec-8 canvas');
+    let piedsComposite = piedsBase?.src || null;
+    if(piedsBase && piedsCanvas) {
+      try {
+        const tmpC = document.createElement('canvas');
+        tmpC.width = 600; tmpC.height = 800;
+        const ctx = tmpC.getContext('2d');
+        ctx.drawImage(piedsBase, 0, 0, 600, 800);
+        ctx.drawImage(piedsCanvas, 0, 0, 600, 800);
+        piedsComposite = tmpC.toDataURL('image/png');
+      } catch(e) { piedsComposite = piedsBase?.src || null; }
+    }
     sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'pieds',
-      piedsImg, feetCanvas: d._feetCanvas});
+      piedsImg: piedsComposite, feetCanvas: d._feetCanvas});
   }
 
   const now = new Date();
