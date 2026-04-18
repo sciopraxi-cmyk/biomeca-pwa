@@ -4823,6 +4823,17 @@ const sections = [];
     const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
     sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#f0a500', type:'empreinte', img: d._empreinte});
   }
+  // Synthèse section 8
+  if(d._synthese && d._synthese.length > 0) {
+    const synItems = [];
+    d._synthese.forEach(function(s) {
+      s.items.forEach(function(item) {
+        synItems.push([s.titre.replace(/^[^\w]+/,''), item]);
+      });
+    });
+    if(synItems.length) sections.push({titre:'8. Synthèse clinique', items:synItems, color:'#2a7a4e'});
+  }
+
   // Plan de semelles (pieds) à la fin dans section 9
   if(d._feetCanvas) {
     // _feetCanvas contient déjà le composite fond+dessins
@@ -8839,6 +8850,11 @@ function genererSynthese() {
     content.innerHTML = html;
   }
   result.style.display = 'block';
+  // Sauvegarder la synthèse dans bilanDataPosturo
+  if(currentPatient) {
+    if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
+    currentPatient.bilanDataPosturo._synthese = sections;
+  }
 }
 
 function toggleVisLater(enabled) {
