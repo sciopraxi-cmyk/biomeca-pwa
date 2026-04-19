@@ -4406,7 +4406,7 @@ function printRapportPosturo() {
 .mm-btn-cancel { width:100%;padding:10px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:none;border-radius:10px;font-size:13px;cursor:pointer;margin-top:8px; }
 </style>
 
-<div id="modal-modules">
+<div id="modal-modules" style="display:none;">
   <div class="mm-box">
     <div class="mm-title" id="mm-title">Choisissez vos modules</div>
     <div class="mm-sub" id="mm-sub"></div>
@@ -9953,6 +9953,7 @@ function choisirOffre(planIdx) {
   var modal = document.getElementById('modal-modules');
   var mmModal = document.getElementById('modal-modules');
   if(!mmModal) { lancerPaiement(planIdx, plan.fixed); return; }
+  modal.style.display = 'flex';
   document.getElementById('mm-title').textContent = 'Offre ' + plan.name;
   document.getElementById('mm-sub').textContent = plan.choose === 1 ? 'Choisissez 1 module' : 'Choisissez ' + plan.choose + ' modules';
 
