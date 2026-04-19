@@ -538,11 +538,11 @@ function choisirOffre(planIdx) {
     return;
   }
   _selectedModules = plan.fixed.slice();
-  var modal = document.getElementById('modal-modules');
+  var modal = document.getElementById('modal-modules-lp');
   if(!modal) { _lancerPaiementLP(planIdx, plan.fixed); return; }
-  document.getElementById('mm-title').textContent = 'Offre ' + plan.name;
-  document.getElementById('mm-sub').textContent = plan.choose === 1 ? 'Choisissez 1 module' : 'Choisissez ' + plan.choose + ' modules';
-  var container = document.getElementById('mm-modules');
+  document.getElementById('mm-title-lp').textContent = 'Offre ' + plan.name;
+  document.getElementById('mm-sub-lp').textContent = plan.choose === 1 ? 'Choisissez 1 module' : 'Choisissez ' + plan.choose + ' modules';
+  var container = document.getElementById('mm-modules-lp');
   container.innerHTML = '';
   plan.fixed.forEach(function(fid) {
     var mod = _modules.find(function(m){ return m.id === fid; });
@@ -586,12 +586,12 @@ function _toggleModuleLP(id, maxChoose, div) {
 function _updateOkBtnLP(maxChoose) {
   var plan = _plans[_currentPlanIdx];
   var choosable = _selectedModules.filter(function(m){ return plan.fixed.indexOf(m)===-1; });
-  var btn = document.getElementById('mm-btn-ok');
+  var btn = document.getElementById('mm-btn-ok-lp');
   if(btn) { btn.disabled = choosable.length !== maxChoose; btn.style.opacity = btn.disabled ? '0.4' : '1'; }
 }
 
-function confirmerModules() {
-  document.getElementById('modal-modules').style.display = 'none';
+function confirmerModulesLP() {
+  document.getElementById('modal-modules-lp').style.display = 'none';
   _lancerPaiementLP(_currentPlanIdx, _selectedModules);
 }
 
@@ -665,6 +665,29 @@ function _lancerPaiementLP(planIdx, modules) {
       <button onclick="closeMonCompte()" style="flex:1;background:var(--bg2);border:1px solid var(--bord);padding:10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--fg);">Fermer</button>
       <button onclick="closeMonCompte();pwaLogout();" style="flex:1;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Se déconnecter</button>
     </div>
+  </div>
+</div>
+
+<style>
+#modal-modules-lp { position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:none;align-items:center;justify-content:center; }
+.mm-box { background:#0e1f38;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:90%;max-width:440px; }
+.mm-title { font-size:18px;font-weight:700;color:#fff;margin-bottom:4px; }
+.mm-sub { font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:20px; }
+.mm-mod { display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;margin-bottom:8px;cursor:pointer;border:1.5px solid rgba(255,255,255,0.1);color:#fff;font-size:13px; }
+.mm-fixed { background:rgba(45,212,191,0.08);border-color:rgba(45,212,191,0.3);cursor:default; }
+.mm-choice { background:rgba(255,255,255,0.04); }
+.mm-choice:hover { border-color:rgba(45,212,191,0.5);background:rgba(45,212,191,0.05); }
+.mm-selected { border-color:#2dd4bf!important;background:rgba(45,212,191,0.12)!important; }
+.mm-btn-ok { width:100%;padding:12px;background:#2dd4bf;color:#04342C;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px; }
+.mm-btn-cancel { width:100%;padding:10px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:none;border-radius:10px;font-size:13px;cursor:pointer;margin-top:8px; }
+</style>
+<div id="modal-modules-lp">
+  <div class="mm-box">
+    <div class="mm-title" id="mm-title-lp">Choisissez vos modules</div>
+    <div class="mm-sub" id="mm-sub-lp"></div>
+    <div id="mm-modules-lp"></div>
+    <button class="mm-btn-ok" id="mm-btn-ok-lp" onclick="confirmerModulesLP()">Continuer vers le paiement →</button>
+    <button class="mm-btn-cancel" onclick="document.getElementById('modal-modules-lp').style.display='none'">Annuler</button>
   </div>
 </div>
 
