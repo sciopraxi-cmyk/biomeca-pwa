@@ -9144,6 +9144,7 @@ function showPosturoSection(idx) {
   document.querySelectorAll('.posturo-tab').forEach((t,i) => {
     t.classList.toggle('act', i === idx);
   });
+  if(typeof _injectMicButtons==='function') setTimeout(_injectMicButtons, 200);
   if(idx === 1) {
     // Attendre que psec-1 soit visible avant d'initialiser le canvas
     const psec1 = document.getElementById('psec-1');
@@ -9744,6 +9745,110 @@ function loadPosturoBilan() {
     });
   });
 }
+// ===== DICTAPHONE SYSTEM =====
+var _micRecognition = null;
+var _micActive = false;
+var _micTargetId = null;
+
+function _injectMicButtons() {
+  var poIds = ['po-motif','po-atcd','po-appareillage','po-examens','po-activite',
+    'po-travail','po-activite-quot','po-tension-principal','po-comp1','po-comp2',
+    'po-comp3','po-comp-critique','po-bilan-dyn','po-course','po-test-flex-ant',
+    'po-epines-loc','po-chaussure-type','po-hetero-h-uni','po-hetero-h-bi',
+    'po-hetero-v','po-biomec-articulaire','po-semelles-desc'];
+  poIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if(!el || el._micInjected) return;
+    el._micInjected = true;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = 'Dicter dans ce champ';
+    btn.innerHTML = '&#127908;';
+    btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:50%;opacity:0.6;vertical-align:middle;';
+    btn.onclick = (function(fieldId, b) {
+      return function() { startDictation(fieldId, b); };
+    })(id, btn);
+    el.parentNode.insertBefore(btn, el.nextSibling);
+  });
+}
+
+function startDictation(targetId, btn) {
+  if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert("Reconnaissance vocale non supportee. Utilisez Chrome ou Edge.");
+    return;
+  }
+  if(_micActive && _micTargetId === targetId) {
+    _stopMic(btn);
+    return;
+  }
+  if(_micActive) _stopMic(null);
+  _micTargetId = targetId;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  _micRecognition = new SR();
+  _micRecognition.lang = 'fr-FR';
+  _micRecognition.continuous = true;
+  _micRecognition.interimResults = false;
+  _micRecognition.maxAlternatives = 1;
+  _micRecognition.onresult = function(e) {
+    var el = document.getElementById(targetId);
+    if(!el) return;
+    for(var i = e.resultIndex; i < e.results.length; i++) {
+      if(e.results[i].isFinal) {
+        el.value += e.results[i][0].transcript + ' ';
+        el.dispatchEvent(new Event('input'));
+      }
+    }
+  };
+  _micRecognition.onerror = function(e) { _stopMic(btn); };
+  _micRecognition.onend = function() {
+    if(_micActive) { try { _micRecognition.start(); } catch(e) {} }
+  };
+  _micActive = true;
+  if(btn) { btn.style.opacity='1'; btn.style.background='#fee2e2'; }
+  var fb = document.getElementById('mic-float');
+  if(fb) { fb.style.background='#dc2626'; fb.textContent='\u23F9'; }
+  try { _micRecognition.start(); } catch(e) {}
+}
+
+function _stopMic(btn) {
+  _micActive = false;
+  if(_micRecognition) { try { _micRecognition.stop(); } catch(e) {} _micRecognition = null; }
+  document.querySelectorAll('._mic-active').forEach(function(b) {
+    b.style.opacity='0.6'; b.style.background='none'; b.classList.remove('_mic-active');
+  });
+  if(btn) { btn.style.opacity='0.6'; btn.style.background='none'; }
+  var fb = document.getElementById('mic-float');
+  if(fb) { fb.style.background='#0e1f38'; fb.textContent='\u1F3A4'; }
+  _micTargetId = null;
+}
+
+function toggleFloatMic() {
+  if(_micActive) { _stopMic(null); return; }
+  var focused = document.activeElement;
+  var targetId = null;
+  if(focused && (focused.tagName==='INPUT'||focused.tagName==='TEXTAREA') && focused.id) {
+    targetId = focused.id;
+  } else {
+    var inputs = document.querySelectorAll('input[type="text"], textarea');
+    for(var i=0; i<inputs.length; i++) {
+      if(inputs[i].id && inputs[i].offsetParent !== null) { targetId = inputs[i].id; break; }
+    }
+  }
+  if(!targetId) { alert("Cliquez dans un champ de texte d'abord."); return; }
+  startDictation(targetId, null);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Bouton flottant
+  var floatBtn = document.createElement('button');
+  floatBtn.id = 'mic-float';
+  floatBtn.innerHTML = '&#127908;';
+  floatBtn.onclick = toggleFloatMic;
+  floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;width:52px;height:52px;border-radius:50%;background:#0e1f38;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  document.body.appendChild(floatBtn);
+  setTimeout(_injectMicButtons, 800);
+});
+
 
 </script>
 
