@@ -514,6 +514,105 @@ function lpToggle() {
     if(el) el.textContent = lpAnnual ? p.a : p.m;
   });
 }
+
+var _modules = [
+  {id:'postural', name:'Postural', icon:'🧍', desc:'Bilan postural complet'},
+  {id:'podopedia', name:'Podopédia', icon:'🦶', desc:'Bilan podologique'},
+  {id:'podo_sport', name:'Podo Sport', icon:'⚡', desc:'Analyse sportive'}
+];
+var _plans = [
+  {name:'Essentiel', idx:0, fixed:[], choose:1, pool:['postural','podopedia']},
+  {name:'Sport', idx:1, fixed:['podo_sport'], choose:0, pool:[]},
+  {name:'Duo', idx:2, fixed:[], choose:2, pool:['postural','podopedia']},
+  {name:'Duo Sport', idx:3, fixed:['podo_sport'], choose:1, pool:['postural','podopedia']},
+  {name:'Intégral', idx:4, fixed:['postural','podopedia','podo_sport'], choose:0, pool:[]}
+];
+var _currentPlanIdx = 0;
+var _selectedModules = [];
+
+function choisirOffre(planIdx) {
+  var plan = _plans[planIdx];
+  _currentPlanIdx = planIdx;
+  if(plan.choose === 0) {
+    _lancerPaiementLP(planIdx, plan.fixed);
+    return;
+  }
+  _selectedModules = plan.fixed.slice();
+  var modal = document.getElementById('modal-modules');
+  if(!modal) { _lancerPaiementLP(planIdx, plan.fixed); return; }
+  document.getElementById('mm-title').textContent = 'Offre ' + plan.name;
+  document.getElementById('mm-sub').textContent = plan.choose === 1 ? 'Choisissez 1 module' : 'Choisissez ' + plan.choose + ' modules';
+  var container = document.getElementById('mm-modules');
+  container.innerHTML = '';
+  plan.fixed.forEach(function(fid) {
+    var mod = _modules.find(function(m){ return m.id === fid; });
+    if(!mod) return;
+    var div = document.createElement('div');
+    div.className = 'mm-mod mm-fixed';
+    div.innerHTML = mod.icon + ' <strong>' + mod.name + '</strong> <span style="color:#2dd4bf;font-size:11px;">inclus</span>';
+    container.appendChild(div);
+  });
+  plan.pool.forEach(function(pid) {
+    var mod = _modules.find(function(m){ return m.id === pid; });
+    if(!mod) return;
+    var div = document.createElement('div');
+    div.className = 'mm-mod mm-choice';
+    div.dataset.id = pid;
+    div.innerHTML = mod.icon + ' <strong>' + mod.name + '</strong><div style="font-size:11px;color:rgba(255,255,255,0.5);">' + mod.desc + '</div>';
+    div.onclick = (function(pid2, div2) {
+      return function() { _toggleModuleLP(pid2, plan.choose, div2); };
+    })(pid, div);
+    container.appendChild(div);
+  });
+  _updateOkBtnLP(plan.choose);
+  modal.style.display = 'flex';
+}
+
+function _toggleModuleLP(id, maxChoose, div) {
+  var plan = _plans[_currentPlanIdx];
+  var idx = _selectedModules.indexOf(id);
+  var choosable = _selectedModules.filter(function(m){ return plan.fixed.indexOf(m)===-1; });
+  if(idx !== -1) {
+    _selectedModules.splice(idx,1);
+    div.classList.remove('mm-selected');
+  } else {
+    if(choosable.length >= maxChoose) return;
+    _selectedModules.push(id);
+    div.classList.add('mm-selected');
+  }
+  _updateOkBtnLP(maxChoose);
+}
+
+function _updateOkBtnLP(maxChoose) {
+  var plan = _plans[_currentPlanIdx];
+  var choosable = _selectedModules.filter(function(m){ return plan.fixed.indexOf(m)===-1; });
+  var btn = document.getElementById('mm-btn-ok');
+  if(btn) { btn.disabled = choosable.length !== maxChoose; btn.style.opacity = btn.disabled ? '0.4' : '1'; }
+}
+
+function confirmerModules() {
+  document.getElementById('modal-modules').style.display = 'none';
+  _lancerPaiementLP(_currentPlanIdx, _selectedModules);
+}
+
+function _lancerPaiementLP(planIdx, modules) {
+  var mensuel = [
+    'https://buy.stripe.com/test_cNibJ24ma8Z6a7xgFBfAc00',
+    'https://buy.stripe.com/eVq14o9GufnubbBfBxfAc03',
+    'https://buy.stripe.com/fZueVe8Cq1wEa7x751fAc05',
+    'https://buy.stripe.com/3cIcN67ym6QYa7x1KHfAc07',
+    'https://buy.stripe.com/4gM6oIbOCcbifrR1KHfAc09'
+  ];
+  var annuel = [
+    'https://buy.stripe.com/4gMcN6dWK3EMgvV1KHfAc0l',
+    'https://buy.stripe.com/8x24gAcSG6QY3J91KHfAc0m',
+    'https://buy.stripe.com/3cIaEYaKycbi3J90GDfAc0n',
+    'https://buy.stripe.com/aFaeVeg4SfnucfFgFBfAc0o',
+    'https://buy.stripe.com/9B68wQdWK2AI2F5extfAc0p'
+  ];
+  var url = lpAnnual ? annuel[planIdx] : mensuel[planIdx];
+  window.location.href = url;
+}
 </script>
 </div>
 
