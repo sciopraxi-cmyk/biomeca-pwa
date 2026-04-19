@@ -271,6 +271,7 @@ body.printing #rpt-print{display:block!important;}
 .main { -webkit-overflow-scrolling: touch; }
 
 </style>
+<script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
 <!-- ÉCRAN DE CONNEXION PWA -->
@@ -380,11 +381,11 @@ body.printing #rpt-print{display:block!important;}
     <span class="lp-save" id="lp-save" style="display:none;">2 mois offerts</span>
   </div>
   <div class="lp-pricing">
-    <div class="lp-pc"><div class="lp-plan">Essentiel</div><div class="lp-price"><span id="lpp1">30</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">1 module au choix</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">ou Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Rapports PDF</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec">Choisir</button></div>
-    <div class="lp-pc"><div class="lp-plan">Sport</div><div class="lp-price"><span id="lpp2">40</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo sport + analyse ciné.</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tb">Ciné.</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. complète</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec">Choisir</button></div>
-    <div class="lp-pc pop"><div class="lp-pop-badge">Le plus choisi</div><div class="lp-plan">Duo</div><div class="lp-price"><span id="lpp3">50</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Postural + Podopédiatrie</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>2 modules inclus</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-main">Choisir</button></div>
-    <div class="lp-pc"><div class="lp-plan">Duo Sport</div><div class="lp-price"><span id="lpp4">60</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo Sport + Postural ou Podopédia</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tg">+ 1 module</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. incluse</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec">Choisir</button></div>
-    <div class="lp-pc"><div class="lp-plan">Intégral</div><div class="lp-price"><span id="lpp5">70</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Les 3 modules complets</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tb">Sport</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Tout inclus</li><li>Multi-praticiens</li><li>Support prioritaire</li></ul><button class="lp-pc-btn lp-pb-sec">Choisir</button></div>
+    <div class="lp-pc"><div class="lp-plan">Essentiel</div><div class="lp-price"><span id="lpp1">30</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">1 module au choix</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">ou Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Rapports PDF</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(0)">Choisir</button></div>
+    <div class="lp-pc"><div class="lp-plan">Sport</div><div class="lp-price"><span id="lpp2">40</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo sport + analyse ciné.</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tb">Ciné.</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. complète</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(1)">Choisir</button></div>
+    <div class="lp-pc pop"><div class="lp-pop-badge">Le plus choisi</div><div class="lp-plan">Duo</div><div class="lp-price"><span id="lpp3">50</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Postural + Podopédiatrie</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>2 modules inclus</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-main" onclick="choisirOffre(2)">Choisir</button></div>
+    <div class="lp-pc"><div class="lp-plan">Duo Sport</div><div class="lp-price"><span id="lpp4">60</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo Sport + Postural ou Podopédia</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tg">+ 1 module</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. incluse</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(3)">Choisir</button></div>
+    <div class="lp-pc"><div class="lp-plan">Intégral</div><div class="lp-price"><span id="lpp5">70</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Les 3 modules complets</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tb">Sport</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Tout inclus</li><li>Multi-praticiens</li><li>Support prioritaire</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(4)">Choisir</button></div>
   </div>
 
   <div class="lp-cta">
@@ -4355,7 +4356,32 @@ function printRapportPosturo() {
         *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
       }
     </style>
-  </head><body>${content}</body></html>`);
+  </head><body>${content}
+<style>
+#modal-modules { position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:none;align-items:center;justify-content:center; }
+.mm-box { background:#0e1f38;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:90%;max-width:440px; }
+.mm-title { font-size:18px;font-weight:700;color:#fff;margin-bottom:4px; }
+.mm-sub { font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:20px; }
+.mm-mod { display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;margin-bottom:8px;cursor:pointer;border:1.5px solid rgba(255,255,255,0.1);color:#fff;font-size:13px; }
+.mm-fixed { background:rgba(45,212,191,0.08);border-color:rgba(45,212,191,0.3);cursor:default; }
+.mm-choice { background:rgba(255,255,255,0.04); }
+.mm-choice:hover { border-color:rgba(45,212,191,0.5);background:rgba(45,212,191,0.05); }
+.mm-selected { border-color:#2dd4bf!important;background:rgba(45,212,191,0.12)!important; }
+.mm-btn-ok { width:100%;padding:12px;background:#2dd4bf;color:#04342C;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px; }
+.mm-btn-cancel { width:100%;padding:10px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:none;border-radius:10px;font-size:13px;cursor:pointer;margin-top:8px; }
+</style>
+
+<div id="modal-modules">
+  <div class="mm-box">
+    <div class="mm-title" id="mm-title">Choisissez vos modules</div>
+    <div class="mm-sub" id="mm-sub"></div>
+    <div id="mm-modules"></div>
+    <button class="mm-btn-ok" id="mm-btn-ok" onclick="confirmerModules()">Continuer vers le paiement →</button>
+    <button class="mm-btn-cancel" onclick="document.getElementById('modal-modules').style.display='none'">Annuler</button>
+  </div>
+</div>
+
+</body></html>`);
   doc.close();
   setTimeout(() => {
     iframe.contentWindow.focus();
@@ -9847,6 +9873,137 @@ document.addEventListener('DOMContentLoaded', function() {
   floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;width:52px;height:52px;border-radius:50%;background:#0e1f38;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
   document.body.appendChild(floatBtn);
   setTimeout(_injectMicButtons, 800);
+});
+
+// ===== STRIPE + MODULES =====
+var _stripeInstance = null;
+function getStripe() {
+  if(!_stripeInstance) _stripeInstance = Stripe('pk_live_51ITNlQIW0WGPcWsGk3UiD3cR7yw8QdNFw3JLaZM6bunA30jzipPZdR8nvrtJJ0QK6qGN3LZCcOYhwYyWqRkXhjYW00u5Kdl22X');
+  return _stripeInstance;
+}
+
+var _stripePrices = {
+  mensuel: ['price_1TNy2bIW0WGPcWsGcNjbZ1GS','price_1TNy52IW0WGPcWsGRNeaxypm','price_1TNyFDIW0WGPcWsGC9k5YBUM','price_1TNyHiIW0WGPcWsGtHHZg2mL','price_1TNyMLIW0WGPcWsGw82sj05L'],
+  annuel:  ['price_1TNy2bIW0WGPcWsGEmnVmgoF','price_1TNy77IW0WGPcWsGWtY2clMG','price_1TNyCNIW0WGPcWsGMAIFJaRw','price_1TNyKOIW0WGPcWsGBuxALYu9','price_1TNyOnIW0WGPcWsGmULzOQ7W']
+};
+var _licencePriceId = 'price_1TNyQeIW0WGPcWsGQNMYXnb3';
+
+var _modules = [
+  {id:'postural', name:'Postural', icon:'🧍', desc:'Bilan postural complet'},
+  {id:'podopedia', name:'Podopédia', icon:'🦶', desc:'Bilan podologique'},
+  {id:'podo_sport', name:'Podo Sport', icon:'⚡', desc:'Analyse sportive'}
+];
+
+var _plans = [
+  {name:'Essentiel',   idx:0, fixed:[],           choose:1, pool:['postural','podopedia']},
+  {name:'Sport',       idx:1, fixed:['podo_sport'], choose:0, pool:[]},
+  {name:'Duo',         idx:2, fixed:[],            choose:2, pool:['postural','podopedia']},
+  {name:'Duo Sport',   idx:3, fixed:['podo_sport'], choose:1, pool:['postural','podopedia']},
+  {name:'Intégral',    idx:4, fixed:['postural','podopedia','podo_sport'], choose:0, pool:[]}
+];
+
+var _currentPlanIdx = 0;
+var _selectedModules = [];
+
+function choisirOffre(planIdx) {
+  var plan = _plans[planIdx];
+  _currentPlanIdx = planIdx;
+
+  if(plan.choose === 0) {
+    lancerPaiement(planIdx, plan.fixed);
+    return;
+  }
+
+  _selectedModules = plan.fixed.slice();
+  var modal = document.getElementById('modal-modules');
+  document.getElementById('mm-title').textContent = 'Offre ' + plan.name;
+  document.getElementById('mm-sub').textContent = plan.choose === 1 ? 'Choisissez 1 module' : 'Choisissez ' + plan.choose + ' modules';
+
+  var container = document.getElementById('mm-modules');
+  container.innerHTML = '';
+
+  // Modules fixes
+  plan.fixed.forEach(function(fid) {
+    var mod = _modules.find(function(m){ return m.id === fid; });
+    if(!mod) return;
+    var div = document.createElement('div');
+    div.className = 'mm-mod mm-fixed';
+    div.innerHTML = mod.icon + ' <strong>' + mod.name + '</strong> <span style="color:#2dd4bf;font-size:11px;">inclus</span>';
+    container.appendChild(div);
+  });
+
+  // Modules à choisir
+  plan.pool.forEach(function(pid) {
+    var mod = _modules.find(function(m){ return m.id === pid; });
+    if(!mod) return;
+    var div = document.createElement('div');
+    div.className = 'mm-mod mm-choice';
+    div.dataset.id = pid;
+    div.innerHTML = mod.icon + ' <strong>' + mod.name + '</strong><div style="font-size:11px;color:rgba(255,255,255,0.5);">' + mod.desc + '</div>';
+    div.onclick = function() { toggleModule(pid, plan.choose, div); };
+    container.appendChild(div);
+  });
+
+  _updateOkBtn(plan.choose);
+  modal.style.display = 'flex';
+}
+
+function toggleModule(id, maxChoose, div) {
+  var idx = _selectedModules.indexOf(id);
+  var plan = _plans[_currentPlanIdx];
+  var choosable = _selectedModules.filter(function(m){ return plan.fixed.indexOf(m) === -1; });
+
+  if(idx !== -1) {
+    _selectedModules.splice(idx, 1);
+    div.classList.remove('mm-selected');
+  } else {
+    if(choosable.length >= maxChoose) return;
+    _selectedModules.push(id);
+    div.classList.add('mm-selected');
+  }
+  _updateOkBtn(maxChoose);
+}
+
+function _updateOkBtn(maxChoose) {
+  var plan = _plans[_currentPlanIdx];
+  var choosable = _selectedModules.filter(function(m){ return plan.fixed.indexOf(m) === -1; });
+  var btn = document.getElementById('mm-btn-ok');
+  btn.disabled = choosable.length !== maxChoose;
+  btn.style.opacity = btn.disabled ? '0.4' : '1';
+}
+
+function confirmerModules() {
+  document.getElementById('modal-modules').style.display = 'none';
+  lancerPaiement(_currentPlanIdx, _selectedModules);
+}
+
+async function lancerPaiement(planIdx, modules) {
+  var priceId = lpAnnual ? _stripePrices.annuel[planIdx] : _stripePrices.mensuel[planIdx];
+  var modulesStr = modules.join(',');
+  try {
+    var stripe = getStripe();
+    var result = await stripe.redirectToCheckout({
+      lineItems: [
+        { price: priceId, quantity: 1 },
+        { price: _licencePriceId, quantity: 1 }
+      ],
+      mode: 'subscription',
+      successUrl: window.location.origin + window.location.pathname + '?payment=success&modules=' + modulesStr,
+      cancelUrl: window.location.origin + window.location.pathname + '?payment=cancel',
+    });
+    if(result.error) alert('Erreur: ' + result.error.message);
+  } catch(e) {
+    alert('Erreur de paiement. Veuillez réessayer.');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  var params = new URLSearchParams(window.location.search);
+  if(params.get('payment') === 'success') {
+    alert('Paiement réussi ! Bienvenue sur Sciopraxi. Vous allez recevoir un email de confirmation.');
+  } else if(params.get('payment') === 'cancel') {
+    alert('Paiement annulé. Vous pouvez réessayer à tout moment.');
+  }
 });
 
 
