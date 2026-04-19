@@ -4772,7 +4772,8 @@ const sections = [];
   if(d.postureLater) postures.push('Latéralisation '+(d.postureLaterDir||''));
   if(postures.length) terr.push(['Posture globale', postures.join(', ')]);
   const chaines = [];
-  if(d.chaineExt) chaines.push('Extension');
+  if(d.chaineExt) chaines.push('Chaîne extension (PM)');
+  if(d.chaineFlexion) chaines.push('Chaîne flexion (AM)');
   if(d.chaineFerm) chaines.push('Fermeture');
   if(d.chaineOuv) chaines.push('Ouverture');
   if(d.chaineStatOpt) chaines.push('Statique optimum');
@@ -8204,7 +8205,8 @@ function getBilanPosturoHTML() {
       <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture en excès :</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${[
-          ['Chaine extension (PM) - Chaine de flexion (AM)','po-chaine-ext'],
+          ['Chaine extension (PM)','po-chaine-ext'],
+          ['Chaine de flexion (AM)','po-chaine-flex'],
           ['Chaine de fermeture (PL)','po-chaine-ferm'],
           ["Chaine d\'ouverture (AL)",'po-chaine-ouv'],
           ['Chaine statique optimisée (PA)','po-chaine-stat-opt'],
@@ -9455,7 +9457,7 @@ function savePosturoBilan() {
   // Section 8
   d.postureAnt=getChk('po-posture-ant'); d.posturePost=getChk('po-posture-post');
   d.postureLater=getChk('po-posture-later'); d.postureLaterDir=getRad('po-posture-later-dir');
-  d.chaineExt=getChk('po-chaine-ext'); d.chaineFerm=getChk('po-chaine-ferm');
+  d.chaineExt=getChk('po-chaine-ext'); d.chaineFlexion=getChk('po-chaine-flex'); d.chaineFerm=getChk('po-chaine-ferm');
   d.chaineOuv=getChk('po-chaine-ouv'); d.chaineStatOpt=getChk('po-chaine-stat-opt'); d.chaineStatDeg=getChk('po-chaine-stat-deg');
   d.biomecArticulaire=getPoVal('po-biomec-articulaire');
   // Section 9
