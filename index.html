@@ -8771,6 +8771,26 @@ function genererSynthese() {
   const eva = document.getElementById('po-eva-val')?.textContent;
   if(motif) sections.push({titre:'🩺 Anamnèse', items:['Motif: '+motif, 'EVA: '+eva+'/10']});
 
+  // Morphostatique
+  const morphoItems = [];
+  const prefMot = document.querySelector('input[name="po-pref-mot"]:checked')?.value;
+  if(prefMot) morphoItems.push('Préférences motrices: '+prefMot);
+  const rombergAnt = document.getElementById('po-romberg-ant')?.checked;
+  const rombergLat = document.getElementById('po-romberg-lat')?.checked;
+  const rombergLatDir = document.querySelector('input[name="po-romberg-lat-dir"]:checked')?.value;
+  const rombergPost = document.getElementById('po-romberg-post')?.checked;
+  const rombergOcul = document.getElementById('po-romberg-oculaire')?.checked;
+  const rombergRot = document.getElementById('po-romberg-rot')?.checked;
+  const rombergRotDir = document.querySelector('input[name="po-romberg-rot-dir"]:checked')?.value;
+  const romParts = [];
+  if(rombergAnt) romParts.push('Antérieur');
+  if(rombergLat) romParts.push('Latéral'+(rombergLatDir?' '+rombergLatDir:''));
+  if(rombergPost) romParts.push('Postérieur');
+  if(rombergOcul) romParts.push('Oculaire');
+  if(rombergRot) romParts.push('Rotation'+(rombergRotDir?' '+rombergRotDir:''));
+  if(romParts.length) morphoItems.push('Romberg: '+romParts.join(', '));
+  if(morphoItems.length) sections.push({titre:'🧍 Morphostatique', items:morphoItems});
+
   // Bilan dynamique
   const dynItems = [];
   const flexDebout = document.querySelector('input[name="po-flex-debout"]:checked')?.value;
