@@ -7377,9 +7377,9 @@ function getBilanPosturoHTML() {
           <tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;color:#222;">PROPRIO AXE <span style="font-size:9px;">X sur les parties du corps affectées</span></td>
             <td colspan="3" style="text-align:center;border:1px solid #d6eaf8;padding:2px;">
-              <input type="checkbox" id="proprio-axe-tete" title="Tête"/> Tête
-              <input type="checkbox" id="proprio-axe-corps" title="Corps"/> Corps
-              <input type="checkbox" id="proprio-axe-bassin" title="Bassin"/> Bassin
+              <input type="checkbox" id="proprio-axe-tete" onchange="setBilanField('proprio-axe-tete',this.checked)" title="Tête"/> Tête
+              <input type="checkbox" id="proprio-axe-corps" onchange="setBilanField('proprio-axe-corps',this.checked)" title="Corps"/> Corps
+              <input type="checkbox" id="proprio-axe-bassin" onchange="setBilanField('proprio-axe-bassin',this.checked)" title="Bassin"/> Bassin
             </td>
           </tr>
           <tr>
@@ -8868,7 +8868,12 @@ function genererSynthese() {
     if(n['cerv_gono_G']) cerv.push('Gono G'); if(n['cerv_gono_D']) cerv.push('Gono D');
     if(n['cerv_prec_dg_G']) cerv.push('Préc.doigt G'); if(n['cerv_prec_dg_D']) cerv.push('Préc.doigt D');
     if(n['vermis_1pied']) cerv.push('Vermis 1 pied');
-    if(n['vermis_sharp']) cerv.push('Vermis sharp');
+    if(n['vermis_sharp']) cerv.push('Sharp Romberg');
+    const axe = [];
+    if(n['proprio-axe-tete']) axe.push('Tête');
+    if(n['proprio-axe-corps']) axe.push('Corps');
+    if(n['proprio-axe-bassin']) axe.push('Bassin');
+    if(axe.length) cerv.push('Proprio axe: '+axe.join('+'));
     if(cerv.length) neuroItems.push('Cervelet: '+cerv.join(', '));
 
     // Réflexes archaïques
