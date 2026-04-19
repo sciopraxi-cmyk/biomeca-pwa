@@ -8845,56 +8845,56 @@ function genererSynthese() {
 
     // Vestibulaire
     const vest = [];
-    if(n['sbf-vest_csc_ant_G']) vest.push('CSC ant G'); if(n['sbf-vest_csc_ant_D']) vest.push('CSC ant D');
-    if(n['sbf-vest_csc_lat_G']) vest.push('CSC lat G'); if(n['sbf-vest_csc_lat_D']) vest.push('CSC lat D');
-    if(n['sbf-vest_csc_post_G']) vest.push('CSC post G'); if(n['sbf-vest_csc_post_D']) vest.push('CSC post D');
+    if(n['vest_csc_ant_G']) vest.push('CSC ant G'); if(n['vest_csc_ant_D']) vest.push('CSC ant D');
+    if(n['vest_csc_lat_G']) vest.push('CSC lat G'); if(n['vest_csc_lat_D']) vest.push('CSC lat D');
+    if(n['vest_csc_post_G']) vest.push('CSC post G'); if(n['vest_csc_post_D']) vest.push('CSC post D');
     if(vest.length) neuroItems.push('Vestibulaire: '+vest.join(', '));
 
     // Proprioception
     const prop = [];
-    if(n['sbf-prop_golgi_G']) prop.push('Golgi G'); if(n['sbf-prop_golgi_D']) prop.push('Golgi D');
-    if(n['sbf-prop_golgi_a_G']) prop.push('Golgi A G'); if(n['sbf-prop_golgi_a_D']) prop.push('Golgi A D');
-    if(n['sbf-prop_ruffini_com_G']) prop.push('Ruffini com G'); if(n['sbf-prop_ruffini_com_D']) prop.push('Ruffini com D');
-    if(n['sbf-prop_ruffini_dec_G']) prop.push('Ruffini dec G'); if(n['sbf-prop_ruffini_dec_D']) prop.push('Ruffini dec D');
-    if(n['sbf-prop_paccini_G']) prop.push('Paccini G'); if(n['sbf-prop_paccini_D']) prop.push('Paccini D');
-    if(n['sbf-prop_fn_lent_G']) prop.push('FN lent G'); if(n['sbf-prop_fn_lent_D']) prop.push('FN lent D');
-    if(n['sbf-prop_fn_rapide_G']) prop.push('FN rapide G'); if(n['sbf-prop_fn_rapide_D']) prop.push('FN rapide D');
+    if(n['prop_golgi_G']) prop.push('Golgi G'); if(n['prop_golgi_D']) prop.push('Golgi D');
+    if(n['prop_golgi_a_G']) prop.push('Golgi A G'); if(n['prop_golgi_a_D']) prop.push('Golgi A D');
+    if(n['prop_ruffini_com_G']) prop.push('Ruffini com G'); if(n['prop_ruffini_com_D']) prop.push('Ruffini com D');
+    if(n['prop_ruffini_dec_G']) prop.push('Ruffini dec G'); if(n['prop_ruffini_dec_D']) prop.push('Ruffini dec D');
+    if(n['prop_paccini_G']) prop.push('Paccini G'); if(n['prop_paccini_D']) prop.push('Paccini D');
+    if(n['prop_fn_lent_G']) prop.push('FN lent G'); if(n['prop_fn_lent_D']) prop.push('FN lent D');
+    if(n['prop_fn_rapide_G']) prop.push('FN rapide G'); if(n['prop_fn_rapide_D']) prop.push('FN rapide D');
     if(prop.length) neuroItems.push('Proprioception: '+prop.join(', '));
 
     // Cervelet
     const cerv = [];
-    if(n['sbf-cerv_coord_G']) cerv.push('Coordination G'); if(n['sbf-cerv_coord_D']) cerv.push('Coordination D');
-    if(n['sbf-cerv_piano_G']) cerv.push('Piano G'); if(n['sbf-cerv_piano_D']) cerv.push('Piano D');
-    if(n['sbf-cerv_gono_G']) cerv.push('Gono G'); if(n['sbf-cerv_gono_D']) cerv.push('Gono D');
-    if(n['sbf-cerv_prec_dg_G']) cerv.push('Préc.doigt G'); if(n['sbf-cerv_prec_dg_D']) cerv.push('Préc.doigt D');
-    if(n['sbf-vermis_1pied']) cerv.push('Vermis 1 pied');
-    if(n['sbf-vermis_sharp']) cerv.push('Vermis sharp');
+    if(n['cerv_coord_G']) cerv.push('Coordination G'); if(n['cerv_coord_D']) cerv.push('Coordination D');
+    if(n['cerv_piano_G']) cerv.push('Piano G'); if(n['cerv_piano_D']) cerv.push('Piano D');
+    if(n['cerv_gono_G']) cerv.push('Gono G'); if(n['cerv_gono_D']) cerv.push('Gono D');
+    if(n['cerv_prec_dg_G']) cerv.push('Préc.doigt G'); if(n['cerv_prec_dg_D']) cerv.push('Préc.doigt D');
+    if(n['vermis_1pied']) cerv.push('Vermis 1 pied');
+    if(n['vermis_sharp']) cerv.push('Vermis sharp');
     if(cerv.length) neuroItems.push('Cervelet: '+cerv.join(', '));
 
     // Réflexes archaïques
     const refl = [];
-    if(n['sbf-refl_moro_O']) refl.push('Moro +');
-    if(n['sbf-refl_babinski_G']) refl.push('Babinski G'); if(n['sbf-refl_babinski_D']) refl.push('Babinski D');
-    if(n['sbf-refl_galant_G']) refl.push('Galant G'); if(n['sbf-refl_galant_D']) refl.push('Galant D');
-    if(n['sbf-refl_palmaire_G']) refl.push('Palmaire G'); if(n['sbf-refl_palmaire_D']) refl.push('Palmaire D');
-    if(n['sbf-refl_plantaire_G']) refl.push('Plantaire G'); if(n['sbf-refl_plantaire_D']) refl.push('Plantaire D');
-    if(n['sbf-refl_babkin_G']) refl.push('Babkin G'); if(n['sbf-refl_babkin_D']) refl.push('Babkin D');
-    if(n['sbf-refl_rpp_O']) refl.push('RPP +');
-    if(n['sbf-refl_rtp_O']) refl.push('RTP +');
-    if(n['sbf-refl_rtac_G']) refl.push('RTac G'); if(n['sbf-refl_rtac_D']) refl.push('RTac D');
-    if(n['sbf-refl_reptation_O']) refl.push('Reptation +');
-    if(n['sbf-refl_landau_O']) refl.push('Landau +');
-    if(n['sbf-refl_perez_O']) refl.push('Pérez +');
+    if(n['refl_moro_O']) refl.push('Moro +');
+    if(n['refl_babinski_G']) refl.push('Babinski G'); if(n['refl_babinski_D']) refl.push('Babinski D');
+    if(n['refl_galant_G']) refl.push('Galant G'); if(n['refl_galant_D']) refl.push('Galant D');
+    if(n['refl_palmaire_G']) refl.push('Palmaire G'); if(n['refl_palmaire_D']) refl.push('Palmaire D');
+    if(n['refl_plantaire_G']) refl.push('Plantaire G'); if(n['refl_plantaire_D']) refl.push('Plantaire D');
+    if(n['refl_babkin_G']) refl.push('Babkin G'); if(n['refl_babkin_D']) refl.push('Babkin D');
+    if(n['refl_rpp_O']) refl.push('RPP +');
+    if(n['refl_rtp_O']) refl.push('RTP +');
+    if(n['refl_rtac_G']) refl.push('RTac G'); if(n['refl_rtac_D']) refl.push('RTac D');
+    if(n['refl_reptation_O']) refl.push('Reptation +');
+    if(n['refl_landau_O']) refl.push('Landau +');
+    if(n['refl_perez_O']) refl.push('Pérez +');
     if(refl.length) neuroItems.push('Réflexes archaïques: '+refl.join(', '));
 
     // Récepteurs tactiles
     const rect = [];
-    if(n['sbf-rect_meissner_G']) rect.push('Meissner G'); if(n['sbf-rect_meissner_D']) rect.push('Meissner D');
-    if(n['sbf-rect_merkel_G']) rect.push('Merkel G'); if(n['sbf-rect_merkel_D']) rect.push('Merkel D');
-    if(n['sbf-rect_pacini_G']) rect.push('Pacini G'); if(n['sbf-rect_pacini_D']) rect.push('Pacini D');
-    if(n['sbf-rect_ruffini_G']) rect.push('Ruffini G'); if(n['sbf-rect_ruffini_D']) rect.push('Ruffini D');
-    if(n['sbf-rect_tnl_G']) rect.push('TNL G'); if(n['sbf-rect_tnl_D']) rect.push('TNL D');
-    if(n['sbf-rect_poils_G']) rect.push('Poils G'); if(n['sbf-rect_poils_D']) rect.push('Poils D');
+    if(n['rect_meissner_G']) rect.push('Meissner G'); if(n['rect_meissner_D']) rect.push('Meissner D');
+    if(n['rect_merkel_G']) rect.push('Merkel G'); if(n['rect_merkel_D']) rect.push('Merkel D');
+    if(n['rect_pacini_G']) rect.push('Pacini G'); if(n['rect_pacini_D']) rect.push('Pacini D');
+    if(n['rect_ruffini_G']) rect.push('Ruffini G'); if(n['rect_ruffini_D']) rect.push('Ruffini D');
+    if(n['rect_tnl_G']) rect.push('TNL G'); if(n['rect_tnl_D']) rect.push('TNL D');
+    if(n['rect_poils_G']) rect.push('Poils G'); if(n['rect_poils_D']) rect.push('Poils D');
     if(rect.length) neuroItems.push('Récepteurs tactiles: '+rect.join(', '));
   }
   if(neuroItems.length) sections.push({titre:'🧠 Neuro-fonctionnel', items:neuroItems});
