@@ -9952,6 +9952,7 @@ function choisirOffre(planIdx) {
   _selectedModules = plan.fixed.slice();
   var modal = document.getElementById('modal-modules');
   var mmModal = document.getElementById('modal-modules');
+  console.log('modal found:', mmModal, 'plan.choose:', plan.choose);
   if(!mmModal) { lancerPaiement(planIdx, plan.fixed); return; }
   modal.style.display = 'flex';
   document.getElementById('mm-title').textContent = 'Offre ' + plan.name;
