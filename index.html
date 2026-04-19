@@ -4355,7 +4355,200 @@ function printRapportPosturo() {
         *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
       }
     </style>
-  </head><body>${content}</body></html>`);
+  </head><body>${content}
+<style>
+.mic-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  opacity: 0.6;
+  vertical-align: middle;
+}
+.mic-btn:hover { opacity: 1; background: #f0f0f0; }
+.mic-btn.recording { 
+  opacity: 1;
+  animation: pulse-mic 1s infinite;
+  background: #fee2e2;
+}
+@keyframes pulse-mic {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+#mic-float {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #0e1f38;
+  color: #fff;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 9999;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#mic-float:hover { background: #1a3a6e; transform: scale(1.1); }
+#mic-float.recording { background: #dc2626; animation: pulse-mic 1s infinite; }
+#mic-toast {
+  position: fixed;
+  bottom: 140px;
+  right: 14px;
+  background: #0e1f38;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  display: none;
+  z-index: 9999;
+  max-width: 200px;
+}
+</style>
+
+<div id="mic-toast">🎤 En écoute...</div>
+<button id="mic-float" onclick="toggleFloatMic()" title="Dictaphone global">🎤</button>
+
+<script>
+// ===== DICTAPHONE SYSTEM =====
+// Injection automatique des boutons mic sur tous les champs po-*
+function _injectMicButtons() {
+  const poIds = ['po-motif','po-atcd','po-appareillage','po-examens','po-activite',
+    'po-travail','po-activite-quot','po-tension-principal','po-comp1','po-comp2',
+    'po-comp3','po-comp-critique','po-bilan-dyn','po-course','po-test-flex-ant',
+    'po-epines-loc','po-chaussure-type','po-hetero-h-uni','po-hetero-h-bi',
+    'po-hetero-v','po-biomec-articulaire','po-semelles-desc'];
+  poIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if(!el || el._micInjected) return;
+    el._micInjected = true;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mic-btn';
+    btn.title = 'Dicter dans ce champ';
+    btn.innerHTML = '🎤';
+    btn.onclick = function() { startDictation(id, btn); };
+    el.parentNode.insertBefore(btn, el.nextSibling);
+  });
+}
+// Injecter après chargement et après navigation
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(_injectMicButtons, 500);
+});
+// Hook sur nav() pour réinjecter après changement de section
+var _origNav = typeof nav === 'function' ? nav : null;
+var _micRecognition = null;
+var _micActive = false;
+var _micTargetId = null;
+var _micFloatMode = false;
+
+function _initSpeech(targetId, btn) {
+  if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Votre navigateur ne supporte pas la reconnaissance vocale. Utilisez Chrome ou Edge.');
+    return null;
+  }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = new SR();
+  rec.lang = 'fr-FR';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+
+  rec.onresult = function(e) {
+    var el = document.getElementById(targetId);
+    if(!el) return;
+    var interim = '';
+    var final = '';
+    for(var i = e.resultIndex; i < e.results.length; i++) {
+      if(e.results[i].isFinal) {
+        final += e.results[i][0].transcript + ' ';
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    if(final) {
+      el.value += final;
+      el.dispatchEvent(new Event('input'));
+    }
+  };
+
+  rec.onerror = function(e) {
+    console.log('Speech error:', e.error);
+    _stopMic(btn);
+  };
+
+  rec.onend = function() {
+    if(_micActive) {
+      try { rec.start(); } catch(e) {}
+    }
+  };
+  return rec;
+}
+
+function startDictation(targetId, btn) {
+  if(_micActive && _micTargetId === targetId) {
+    _stopMic(btn);
+    return;
+  }
+  if(_micActive) _stopMic(document.querySelector('.mic-btn.recording'));
+  
+  _micTargetId = targetId;
+  _micFloatMode = false;
+  _micRecognition = _initSpeech(targetId, btn);
+  if(!_micRecognition) return;
+  
+  _micActive = true;
+  if(btn) btn.classList.add('recording');
+  document.getElementById('mic-float').classList.add('recording');
+  document.getElementById('mic-toast').style.display = 'block';
+  document.getElementById('mic-toast').textContent = '🎤 Dictée en cours...';
+  
+  try { _micRecognition.start(); } catch(e) {}
+}
+
+function _stopMic(btn) {
+  _micActive = false;
+  if(_micRecognition) { try { _micRecognition.stop(); } catch(e) {} _micRecognition = null; }
+  document.querySelectorAll('.mic-btn.recording').forEach(b => b.classList.remove('recording'));
+  document.getElementById('mic-float').classList.remove('recording');
+  document.getElementById('mic-toast').style.display = 'none';
+  _micTargetId = null;
+}
+
+function toggleFloatMic() {
+  if(_micActive && _micFloatMode) {
+    _stopMic(null);
+    return;
+  }
+  // Trouver le champ actif ou le premier visible
+  var focused = document.activeElement;
+  var targetId = null;
+  if(focused && (focused.tagName==='INPUT'||focused.tagName==='TEXTAREA') && focused.id) {
+    targetId = focused.id;
+  } else {
+    // Chercher le premier champ visible dans la section active
+    var inputs = document.querySelectorAll('.posturo-section:not([style*="display:none"]) input[type="text"], .posturo-section:not([style*="display:none"]) textarea');
+    if(inputs.length > 0) targetId = inputs[0].id;
+  }
+  if(!targetId) {
+    alert('Cliquez d\'abord dans un champ de texte puis appuyez sur le dictaphone.');
+    return;
+  }
+  _micFloatMode = true;
+  startDictation(targetId, null);
+  document.getElementById('mic-toast').textContent = '🎤 Dictée → ' + targetId.replace('po-','');
+}
+</script>
+
+</body></html>`);
   doc.close();
   setTimeout(() => {
     iframe.contentWindow.focus();
@@ -9144,6 +9337,7 @@ function showPosturoSection(idx) {
   document.querySelectorAll('.posturo-tab').forEach((t,i) => {
     t.classList.toggle('act', i === idx);
   });
+  setTimeout(_injectMicButtons, 200);
   if(idx === 1) {
     // Attendre que psec-1 soit visible avant d'initialiser le canvas
     const psec1 = document.getElementById('psec-1');
