@@ -4490,7 +4490,14 @@ function printRapportPosturo() {
         *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
       }
     </style>
-  </head><body>${content}
+  </head><body>${content}    <div class="mm-sub" id="mm-sub"></div>
+    <div id="mm-modules"></div>
+    <button class="mm-btn-ok" id="mm-btn-ok" onclick="confirmerModules()">Continuer vers le paiement →</button>
+    <button class="mm-btn-cancel" onclick="document.getElementById('modal-modules').style.display='none'">Annuler</button>
+  </div>
+</div>
+
+
 <style>
 #modal-modules { position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:20000;display:none;align-items:center;justify-content:center; }
 .mm-box { background:#0e1f38;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:90%;max-width:440px; }
@@ -4508,12 +4515,6 @@ function printRapportPosturo() {
 <div id="modal-modules" style="display:none;">
   <div class="mm-box">
     <div class="mm-title" id="mm-title">Choisissez vos modules</div>
-    <div class="mm-sub" id="mm-sub"></div>
-    <div id="mm-modules"></div>
-    <button class="mm-btn-ok" id="mm-btn-ok" onclick="confirmerModules()">Continuer vers le paiement →</button>
-    <button class="mm-btn-cancel" onclick="document.getElementById('modal-modules').style.display='none'">Annuler</button>
-  </div>
-</div>
 
 </body></html>`);
   doc.close();
