@@ -8814,10 +8814,35 @@ function genererSynthese() {
   });
   if(dynItems.length) sections.push({titre:'🏃 Bilan dynamique', items:dynItems});
 
-  // Neuro-fonctionnel
+  // Neuro-fonctionnel (depuis d.neuro4 sauvegardé)
   const neuroItems = [];
-  if(document.getElementById('po-hypo-tronc')?.checked) neuroItems.push('Hypothèse: Tronc cérébral');
-  if(document.getElementById('po-hypo-cervelet')?.checked) neuroItems.push('Hypothèse: Cervelet');
+  if(currentPatient?.bilanDataPosturo?.neuro4) {
+    const n = currentPatient.bilanDataPosturo.neuro4;
+    const aps = [];
+    if(n['aps-epaule-g']) aps.push('Épaule G'); if(n['aps-epaule-d']) aps.push('Épaule D');
+    if(n['aps-rot-g']) aps.push('Rot.épaule G'); if(n['aps-rot-d']) aps.push('Rot.épaule D');
+    if(n['aps-coude-g']) aps.push('Flex.coude G'); if(n['aps-coude-d']) aps.push('Flex.coude D');
+    if(n['aps-pron-g']) aps.push('Pron.poignet G'); if(n['aps-pron-d']) aps.push('Pron.poignet D');
+    if(aps.length) neuroItems.push('APS: '+aps.join(', '));
+    const force = [];
+    if(n['cf-ext-g']) force.push('Ext.poignet G'); if(n['cf-ext-d']) force.push('Ext.poignet D');
+    if(n['cf-flex-g']) force.push('Flex.hanche G'); if(n['cf-flex-d']) force.push('Flex.hanche D');
+    if(force.length) neuroItems.push('Critères force: '+force.join(', '));
+    const apd = [];
+    if(n['apd-tronc-g']) apd.push('Tronc G'); if(n['apd-tronc-d']) apd.push('Tronc D');
+    if(n['apd-cervelet-g']) apd.push('Cervelet G'); if(n['apd-cervelet-d']) apd.push('Cervelet D');
+    if(n['apd-tete-g']) apd.push('Stab.tête G'); if(n['apd-tete-d']) apd.push('Stab.tête D');
+    if(n['apd-membre-g']) apd.push('Membre sup G'); if(n['apd-membre-d']) apd.push('Membre sup D');
+    if(apd.length) neuroItems.push('APD: '+apd.join(', '));
+    const dynCrit = [];
+    if(n['acd-flex-g']) dynCrit.push('Flex.poignet G'); if(n['acd-flex-d']) dynCrit.push('Flex.poignet D');
+    if(n['acd-hyper-g']) dynCrit.push('Hyperext.genou G'); if(n['acd-hyper-d']) dynCrit.push('Hyperext.genou D');
+    if(dynCrit.length) neuroItems.push('Critères dyn: '+dynCrit.join(', '));
+    const hypo = [];
+    if(n['po-hypo-tronc']) hypo.push('Tronc cérébral');
+    if(n['po-hypo-cervelet']) hypo.push('Cervelet');
+    if(hypo.length) neuroItems.push('Hypothèse: '+hypo.join(', '));
+  }
   if(neuroItems.length) sections.push({titre:'🧠 Neuro-fonctionnel', items:neuroItems});
 
   // Système plantaire
