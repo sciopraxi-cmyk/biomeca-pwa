@@ -4443,8 +4443,7 @@ function _injectMicButtons() {
 document.addEventListener('DOMContentLoaded', function() {
   setTimeout(_injectMicButtons, 500);
 });
-// Hook sur nav() pour réinjecter après changement de section
-var _origNav = typeof nav === 'function' ? nav : null;
+// Boutons mic réinjectés à chaque changement de section (voir showPosturoSection)
 var _micRecognition = null;
 var _micActive = false;
 var _micTargetId = null;
