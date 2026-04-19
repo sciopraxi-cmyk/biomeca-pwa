@@ -8773,6 +8773,14 @@ function genererSynthese() {
 
   // Morphostatique
   const morphoItems = [];
+  const comp1 = document.getElementById('po-comp1')?.value;
+  const comp2 = document.getElementById('po-comp2')?.value;
+  const comp3 = document.getElementById('po-comp3')?.value;
+  const compCrit = document.getElementById('po-comp-critique')?.value;
+  if(comp1) morphoItems.push('Compensation 1: '+comp1);
+  if(comp2) morphoItems.push('Compensation 2: '+comp2);
+  if(comp3) morphoItems.push('Compensation 3: '+comp3);
+  if(compCrit) morphoItems.push('Point critique: '+compCrit);
   const prefMot = document.querySelector('input[name="po-pref-mot"]:checked')?.value;
   if(prefMot) morphoItems.push('Préférences motrices: '+prefMot);
   const rombergAnt = document.getElementById('po-romberg-ant')?.checked;
