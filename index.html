@@ -532,11 +532,22 @@ function lpToggle() {
         <div id="mc-titre" style="font-size:12px;color:var(--mut);margin-top:2px;"></div>
       </div>
     </div>
-    <!-- Formule -->
+    <!-- Abonnement -->
     <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:16px;">
-      <div style="font-size:11px;color:var(--mut);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Formule active</div>
+      <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Mon abonnement</div>
       <div id="mc-formule" style="font-size:14px;font-weight:600;color:var(--blue);"></div>
       <div id="mc-formule-desc" style="font-size:12px;color:var(--mut);margin-top:4px;"></div>
+      <div id="mc-licence-status" style="margin-top:8px;font-size:12px;"></div>
+      <div id="mc-engagement" style="margin-top:4px;font-size:12px;color:var(--mut);"></div>
+      <div id="mc-renouvellement" style="margin-top:4px;font-size:12px;color:var(--mut);"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button onclick="gererAbonnement()" style="flex:1;background:var(--blue);color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">⚙️ Gérer l'abonnement</button>
+        <button onclick="changerFormule()" style="flex:1;background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:8px;border-radius:8px;font-size:12px;cursor:pointer;">🔄 Changer de formule</button>
+      </div>
+      <div id="mc-resilier-wrap" style="margin-top:8px;display:none;">
+        <button onclick="resilierAbonnement()" style="width:100%;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:8px;border-radius:8px;font-size:12px;cursor:pointer;">❌ Résilier l'abonnement</button>
+        <div id="mc-resilier-msg" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center;"></div>
+      </div>
     </div>
     <!-- Infos cabinet -->
     <div style="margin-bottom:16px;">
@@ -1775,6 +1786,7 @@ function showMonCompte() {
   const modal = document.getElementById('modal-mon-compte');
   if(!modal) return;
   modal.style.display = 'flex';
+  loadAbonnementInfo();
   // Remplir les infos
   const meta = pwaUser?.user_metadata || {};
   const nom = meta.nom || '';
@@ -10078,6 +10090,121 @@ window.addEventListener('DOMContentLoaded', async function() {
     alert('Paiement annulé. Vous pouvez réessayer à tout moment.');
   }
 });
+
+// ===== GESTION ABONNEMENT =====
+var _stripePortalUrl = 'https://billing.stripe.com/p/login/bIYeVebOC8Z6cfFcMM';
+
+async function loadAbonnementInfo() {
+  if(!pwaUser || !pwaUser.token || !pwaUser.email) return;
+  try {
+    var userRecord = await supa.getUserRecord(pwaUser.token, pwaUser.email);
+    if(!userRecord) return;
+
+    // Licence
+    var licenceEl = document.getElementById('mc-licence-status');
+    if(licenceEl) {
+      if(userRecord.licence_payee) {
+        licenceEl.innerHTML = '<span style="color:#2a7a4e;font-weight:600;">✅ Licence activée</span>';
+      } else {
+        licenceEl.innerHTML = '<span style="color:#e74c3c;">⚠️ Licence non activée</span>';
+      }
+    }
+
+    // Formule
+    var formuleEl = document.getElementById('mc-formule');
+    var descEl = document.getElementById('mc-formule-desc');
+    var engagementEl = document.getElementById('mc-engagement');
+    var renouvEl = document.getElementById('mc-renouvellement');
+    var resilierWrap = document.getElementById('mc-resilier-wrap');
+    var resilierMsg = document.getElementById('mc-resilier-msg');
+
+    if(userRecord.formule) {
+      if(formuleEl) formuleEl.textContent = userRecord.formule;
+    } else {
+      if(formuleEl) formuleEl.textContent = 'Aucune formule active';
+    }
+
+    if(userRecord.engagement) {
+      var engTxt = userRecord.engagement === '12_mois' ? 'Engagement 12 mois' : 'Sans engagement';
+      if(engagementEl) engagementEl.textContent = '📋 ' + engTxt;
+
+      // Date début abonnement
+      if(userRecord.date_debut_abonnement) {
+        var debut = new Date(userRecord.date_debut_abonnement);
+        var maintenant = new Date();
+        var moisEcoules = (maintenant.getFullYear() - debut.getFullYear()) * 12 + (maintenant.getMonth() - debut.getMonth());
+
+        if(userRecord.engagement === '12_mois') {
+          var moisRestants = 12 - moisEcoules;
+          if(moisRestants > 0) {
+            if(engagementEl) engagementEl.textContent += ' — ' + moisRestants + ' mois restants';
+            if(resilierWrap) {
+              resilierWrap.style.display = 'block';
+              if(resilierMsg) resilierMsg.textContent = '⚠️ Résiliation impossible avant le ' + new Date(debut.setMonth(debut.getMonth()+12)).toLocaleDateString('fr-FR');
+            }
+          } else {
+            if(resilierWrap) resilierWrap.style.display = 'block';
+            if(resilierMsg) resilierMsg.textContent = 'Résiliation effective à la prochaine date anniversaire';
+          }
+        } else {
+          // Sans engagement
+          if(resilierWrap) resilierWrap.style.display = 'block';
+          if(resilierMsg) resilierMsg.textContent = 'Résiliation effective à la prochaine date anniversaire';
+        }
+
+        // Prochain renouvellement
+        var prochainRenouv = new Date(userRecord.date_debut_abonnement);
+        while(prochainRenouv <= maintenant) {
+          prochainRenouv.setMonth(prochainRenouv.getMonth() + 1);
+        }
+        if(renouvEl) renouvEl.textContent = '🔄 Prochain renouvellement : ' + prochainRenouv.toLocaleDateString('fr-FR');
+      }
+    }
+  } catch(e) {
+    console.log('Erreur chargement abonnement:', e);
+  }
+}
+
+function gererAbonnement() {
+  window.open(_stripePortalUrl, '_blank');
+}
+
+function changerFormule() {
+  closeMonCompte();
+  // Scroller vers la section tarifs de la landing page
+  var lpSection = document.getElementById('lp-tarifs');
+  if(lpSection) {
+    lpSection.scrollIntoView({behavior:'smooth'});
+  } else {
+    nav('pg-landing');
+  }
+}
+
+async function resilierAbonnement() {
+  if(!pwaUser || !pwaUser.token || !pwaUser.email) return;
+  try {
+    var userRecord = await supa.getUserRecord(pwaUser.token, pwaUser.email);
+    if(!userRecord) return;
+
+    // Vérifier engagement 12 mois
+    if(userRecord.engagement === '12_mois' && userRecord.date_debut_abonnement) {
+      var debut = new Date(userRecord.date_debut_abonnement);
+      var maintenant = new Date();
+      var moisEcoules = (maintenant.getFullYear() - debut.getFullYear()) * 12 + (maintenant.getMonth() - debut.getMonth());
+      if(moisEcoules < 12) {
+        var moisRestants = 12 - moisEcoules;
+        alert('⚠️ Résiliation impossible\n\nVotre abonnement avec engagement de 12 mois ne peut pas être résilié avant ' + moisRestants + ' mois.\n\nDate de fin d\'engagement : ' + new Date(new Date(userRecord.date_debut_abonnement).setMonth(new Date(userRecord.date_debut_abonnement).getMonth()+12)).toLocaleDateString('fr-FR'));
+        return;
+      }
+    }
+
+    if(confirm('Êtes-vous sûr de vouloir résilier votre abonnement ?\n\nLa résiliation sera effective à la prochaine date anniversaire.')) {
+      window.open(_stripePortalUrl, '_blank');
+    }
+  } catch(e) {
+    alert('Erreur. Veuillez contacter le support.');
+  }
+}
 
 
 </script>
