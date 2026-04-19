@@ -10039,52 +10039,7 @@ var _plans = [
 var _currentPlanIdx = 0;
 var _selectedModules = [];
 
-function choisirOffre(planIdx) {
-  var plan = _plans[planIdx];
-  _currentPlanIdx = planIdx;
 
-  if(plan.choose === 0) {
-    lancerPaiement(planIdx, plan.fixed);
-    return;
-  }
-
-  _selectedModules = plan.fixed.slice();
-  var modal = document.getElementById('modal-modules');
-  var mmModal = document.getElementById('modal-modules');
-  console.log('modal found:', mmModal, 'plan.choose:', plan.choose);
-  if(!mmModal) { lancerPaiement(planIdx, plan.fixed); return; }
-  modal.style.display = 'flex';
-  document.getElementById('mm-title').textContent = 'Offre ' + plan.name;
-  document.getElementById('mm-sub').textContent = plan.choose === 1 ? 'Choisissez 1 module' : 'Choisissez ' + plan.choose + ' modules';
-
-  var container = document.getElementById('mm-modules');
-  container.innerHTML = '';
-
-  // Modules fixes
-  plan.fixed.forEach(function(fid) {
-    var mod = _modules.find(function(m){ return m.id === fid; });
-    if(!mod) return;
-    var div = document.createElement('div');
-    div.className = 'mm-mod mm-fixed';
-    div.innerHTML = mod.icon + ' <strong>' + mod.name + '</strong> <span style="color:#2dd4bf;font-size:11px;">inclus</span>';
-    container.appendChild(div);
-  });
-
-  // Modules à choisir
-  plan.pool.forEach(function(pid) {
-    var mod = _modules.find(function(m){ return m.id === pid; });
-    if(!mod) return;
-    var div = document.createElement('div');
-    div.className = 'mm-mod mm-choice';
-    div.dataset.id = pid;
-    div.innerHTML = mod.icon + ' <strong>' + mod.name + '</strong><div style="font-size:11px;color:rgba(255,255,255,0.5);">' + mod.desc + '</div>';
-    div.onclick = function() { toggleModule(pid, plan.choose, div); };
-    container.appendChild(div);
-  });
-
-  _updateOkBtn(plan.choose);
-  modal.style.display = 'flex';
-}
 
 function toggleModule(id, maxChoose, div) {
   var idx = _selectedModules.indexOf(id);
