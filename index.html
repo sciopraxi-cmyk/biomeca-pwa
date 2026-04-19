@@ -10246,18 +10246,14 @@ async function loadAbonnementInfo() {
 }
 
 function gererAbonnement() {
-  window.open(_stripePortalUrl, '_blank');
+  var email = pwaUser?.email || '';
+  var url = _stripePortalUrl + (email ? '?prefilled_email=' + encodeURIComponent(email) : '');
+  window.open(url, '_blank');
 }
 
 function changerFormule() {
   closeMonCompte();
-  // Scroller vers la section tarifs de la landing page
-  var lpSection = document.getElementById('lp-tarifs');
-  if(lpSection) {
-    lpSection.scrollIntoView({behavior:'smooth'});
-  } else {
-    nav('pg-landing');
-  }
+  window.open(window.location.origin + window.location.pathname + '?tarifs=1', '_blank');
 }
 
 async function resilierAbonnement() {
