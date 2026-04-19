@@ -10019,9 +10019,20 @@ async function lancerPaiement(planIdx, modules) {
     'https://buy.stripe.com/fZu4gA19Ydfm5RhdtpfAc0a'
   ];
   // Liens SANS licence (clients existants changeant de formule)
-  // TODO: remplacer par les vrais liens Stripe sans licence
-  var mensuelSansLicence = mensuelAvecLicence;
-  var annuelSansLicence = annuelAvecLicence;
+  var mensuelSansLicence = [
+    'https://buy.stripe.com/eVqdRa3i64IQa7xahdfAc0b',
+    'https://buy.stripe.com/28E28s8Cq2AI4Nd60XfAc0d',
+    'https://buy.stripe.com/aFa5kE6ui1wE3J9cplfAc0f',
+    'https://buy.stripe.com/eVqaEY19Y8Z6bbBblhfAc0h',
+    'https://buy.stripe.com/7sYaEY6ui1wE1B1blhfAc0j'
+  ];
+  var annuelSansLicence = [
+    'https://buy.stripe.com/eVqbJ2dWK5MU0wXcplfAc0c',
+    'https://buy.stripe.com/28E5kE5qe3EM7ZpextfAc0e',
+    'https://buy.stripe.com/7sYdRa3i68Z60wX1KHfAc0g',
+    'https://buy.stripe.com/00waEYf0O0sA5RhextfAc0i',
+    'https://buy.stripe.com/8x28wQcSG3EMgvVextfAc0k'
+  ];
 
   // Vérifier si l'utilisateur a déjà payé la licence
   var licenceDejaPaye = false;
