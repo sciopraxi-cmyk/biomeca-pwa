@@ -1593,7 +1593,7 @@ const supa = {
   },
 
   async getUserRecord(token, email) {
-    const res = await fetch(SUPA_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email) + '&select=*', {
+    const res = await fetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email) + '&select=*', {
       headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token }
     });
     if(!res.ok) return null;
@@ -1602,7 +1602,7 @@ const supa = {
   },
 
   async updateLicence(token, email) {
-    const res = await fetch(SUPA_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email), {
+    const res = await fetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email), {
       method: 'PATCH',
       headers: {
         'apikey': SUPA_KEY,
