@@ -1459,6 +1459,29 @@ const supa = {
     return res.json();
   },
 
+  async getUserRecord(token, email) {
+    const res = await fetch(SUPA_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email) + '&select=*', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token }
+    });
+    if(!res.ok) return null;
+    const rows = await res.json();
+    return rows && rows.length > 0 ? rows[0] : null;
+  },
+
+  async updateLicence(token, email) {
+    const res = await fetch(SUPA_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email), {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ licence_payee: true })
+    });
+    return res.ok;
+  },
+
   async loadData(token, table) {
     const res = await fetch(SUPA_URL + '/rest/v1/' + table + '?select=*', {
       headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
@@ -9916,6 +9939,8 @@ function choisirOffre(planIdx) {
 
   _selectedModules = plan.fixed.slice();
   var modal = document.getElementById('modal-modules');
+  var mmModal = document.getElementById('modal-modules');
+  if(!mmModal) { lancerPaiement(planIdx, plan.fixed); return; }
   document.getElementById('mm-title').textContent = 'Offre ' + plan.name;
   document.getElementById('mm-sub').textContent = plan.choose === 1 ? 'Choisissez 1 module' : 'Choisissez ' + plan.choose + ' modules';
 
@@ -9978,30 +10003,67 @@ function confirmerModules() {
 }
 
 async function lancerPaiement(planIdx, modules) {
-  var priceId = lpAnnual ? _stripePrices.annuel[planIdx] : _stripePrices.mensuel[planIdx];
-  var modulesStr = modules.join(',');
-  try {
-    var stripe = getStripe();
-    var result = await stripe.redirectToCheckout({
-      lineItems: [
-        { price: priceId, quantity: 1 },
-        { price: _licencePriceId, quantity: 1 }
-      ],
-      mode: 'subscription',
-      successUrl: window.location.origin + window.location.pathname + '?payment=success&modules=' + modulesStr,
-      cancelUrl: window.location.origin + window.location.pathname + '?payment=cancel',
-    });
-    if(result.error) alert('Erreur: ' + result.error.message);
-  } catch(e) {
-    alert('Erreur de paiement. Veuillez réessayer.');
+  // Liens AVEC licence (nouveaux clients)
+  var mensuelAvecLicence = [
+    'https://buy.stripe.com/bJeeVebOC4IQdjJ4WTfAc01',
+    'https://buy.stripe.com/eVq14o9GufnubbBfBxfAc03',
+    'https://buy.stripe.com/fZueVe8Cq1wEa7x751fAc05',
+    'https://buy.stripe.com/3cIcN67ym6QYa7x1KHfAc07',
+    'https://buy.stripe.com/4gM6oIbOCcbifrR1KHfAc09'
+  ];
+  var annuelAvecLicence = [
+    'https://buy.stripe.com/6oU28sdWKb7edjJ3SPfAc02',
+    'https://buy.stripe.com/9B69AUf0Ofnu0wX2OLfAc04',
+    'https://buy.stripe.com/6oU5kE05Ua3adjJdtpfAc06',
+    'https://buy.stripe.com/28E3cwcSGb7e6VlfBxfAc08',
+    'https://buy.stripe.com/fZu4gA19Ydfm5RhdtpfAc0a'
+  ];
+  // Liens SANS licence (clients existants changeant de formule)
+  // TODO: remplacer par les vrais liens Stripe sans licence
+  var mensuelSansLicence = mensuelAvecLicence;
+  var annuelSansLicence = annuelAvecLicence;
+
+  // Vérifier si l'utilisateur a déjà payé la licence
+  var licenceDejaPaye = false;
+  if(pwaUser && pwaUser.token && pwaUser.email) {
+    try {
+      var userRecord = await supa.getUserRecord(pwaUser.token, pwaUser.email);
+      if(userRecord && userRecord.licence_payee === true) {
+        licenceDejaPaye = true;
+      }
+    } catch(e) {
+      console.log('Erreur vérification licence:', e);
+    }
   }
+
+  var url;
+  if(licenceDejaPaye) {
+    url = lpAnnual ? annuelSansLicence[planIdx] : mensuelSansLicence[planIdx];
+  } else {
+    url = lpAnnual ? annuelAvecLicence[planIdx] : mensuelAvecLicence[planIdx];
+  }
+  window.location.href = url;
 }
 
-window.addEventListener('DOMContentLoaded', function() {
+window.addEventListener('DOMContentLoaded', async function() {
   var params = new URLSearchParams(window.location.search);
   if(params.get('payment') === 'success') {
-    alert('Paiement réussi ! Bienvenue sur Sciopraxi. Vous allez recevoir un email de confirmation.');
+    // Marquer la licence comme payée si l'utilisateur est connecté
+    if(pwaUser && pwaUser.token && pwaUser.email) {
+      try {
+        await supa.updateLicence(pwaUser.token, pwaUser.email);
+        console.log('Licence marquée comme payée');
+      } catch(e) {
+        console.log('Erreur mise à jour licence:', e);
+      }
+    }
+    // Nettoyer l'URL
+    window.history.replaceState({}, '', window.location.pathname);
+    setTimeout(function() {
+      alert('✅ Paiement réussi ! Bienvenue sur Sciopraxi.\nVous allez recevoir un email de confirmation.');
+    }, 500);
   } else if(params.get('payment') === 'cancel') {
+    window.history.replaceState({}, '', window.location.pathname);
     alert('Paiement annulé. Vous pouvez réessayer à tout moment.');
   }
 });
