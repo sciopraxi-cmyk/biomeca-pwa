@@ -4788,6 +4788,15 @@ const sections = [];
   if(d.semellesDesc) trait.push(['Plan de semelles', d.semellesDesc]);
   // Circuits express — encadrés séparés par circuit
   const circLabels = ['Exercice 1','Exercice 2','Exercice 3','Exercice 4'];
+  if(d._synthese && d._synthese.length > 0) {
+    const synItems = [];
+    d._synthese.forEach(function(s) {
+      const titre = s.titre.replace(/^[^\w]+/,'');
+      synItems.push([titre, s.items.join(' · ')]);
+    });
+    if(synItems.length) sections.push({titre:'8. Synthèse clinique', items:synItems, color:'#2a7a4e'});
+  }
+
   ['c1','c2'].forEach(function(cx, ci) {
     const circItems = [];
     circLabels.forEach(function(lbl, i) {
@@ -4825,15 +4834,6 @@ const sections = [];
     sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#f0a500', type:'empreinte', img: d._empreinte});
   }
   // Synthèse section 8
-  if(d._synthese && d._synthese.length > 0) {
-    const synItems = [];
-    d._synthese.forEach(function(s) {
-      const titre = s.titre.replace(/^[^\w]+/,'');
-      synItems.push([titre, s.items.join(' · ')]);
-    });
-    if(synItems.length) sections.push({titre:'8. Synthèse clinique', items:synItems, color:'#2a7a4e'});
-  }
-
   // Plan de semelles (pieds) à la fin dans section 9
   if(d._feetCanvas) {
     // _feetCanvas contient déjà le composite fond+dessins
