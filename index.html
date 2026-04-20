@@ -2008,7 +2008,10 @@ function checkTrialStatus() {
 }
 
 async function pwaLogout() {
-  if(!confirm('Se déconnecter ?')) return;
+  if(!sessionStorage.getItem('skip_logout_confirm')) {
+    if(!confirm('Se déconnecter ?')) return;
+  }
+  sessionStorage.removeItem('skip_logout_confirm');
   if(pwaUser?.token) {
     try { await supa.signOut(pwaUser.token); } catch(e) {}
   }
@@ -2018,6 +2021,14 @@ async function pwaLogout() {
   renderPatientList();
   document.getElementById('biomeca-app').style.display = 'none';
   document.getElementById('pwa-login').style.display = 'flex';
+  // Scroll vers tarifs si demandé
+  if(sessionStorage.getItem('scroll_tarifs')) {
+    sessionStorage.removeItem('scroll_tarifs');
+    setTimeout(function() {
+      var el = document.getElementById('lp-tarifs');
+      if(el) el.scrollIntoView({behavior:'smooth'});
+    }, 300);
+  }
   document.getElementById('pwa-email').value = '';
   document.getElementById('pwa-pwd').value = '';
   document.getElementById('pwa-login-btn').disabled = false;
@@ -10254,11 +10265,9 @@ function gererAbonnement() {
 function changerFormule() {
   if(confirm('Pour changer de formule, vous allez être déconnecté et redirigé vers les tarifs. Continuer ?')) {
     closeMonCompte();
+    sessionStorage.setItem('scroll_tarifs', '1');
+    sessionStorage.setItem('skip_logout_confirm', '1');
     pwaLogout();
-    setTimeout(function() {
-      var el = document.getElementById('lp-tarifs');
-      if(el) el.scrollIntoView({behavior:'smooth'});
-    }, 300);
   }
 }
 
