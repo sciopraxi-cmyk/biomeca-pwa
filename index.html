@@ -10252,8 +10252,14 @@ function gererAbonnement() {
 }
 
 function changerFormule() {
-  closeMonCompte();
-  window.open(window.location.origin + window.location.pathname + '?tarifs=1', '_blank');
+  if(confirm('Pour changer de formule, vous allez être déconnecté et redirigé vers les tarifs. Continuer ?')) {
+    closeMonCompte();
+    pwaLogout();
+    setTimeout(function() {
+      var el = document.getElementById('lp-tarifs');
+      if(el) el.scrollIntoView({behavior:'smooth'});
+    }, 300);
+  }
 }
 
 async function resilierAbonnement() {
