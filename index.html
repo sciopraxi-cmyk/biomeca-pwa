@@ -10150,6 +10150,12 @@ async function lancerPaiement(planIdx, modules) {
 
 window.addEventListener('DOMContentLoaded', async function() {
   var params = new URLSearchParams(window.location.search);
+  if(params.get('mode') === 'tarifs') {
+    setTimeout(function() {
+      var el = document.getElementById('lp-tarifs');
+      if(el) el.scrollIntoView({behavior:'smooth'});
+    }, 500);
+  }
   if(params.get('payment') === 'success') {
     // Marquer la licence comme payée si l'utilisateur est connecté
     if(pwaUser && pwaUser.token && pwaUser.email) {
@@ -10253,14 +10259,7 @@ function gererAbonnement() {
 
 function changerFormule() {
   closeMonCompte();
-  var lpSection = document.getElementById('lp-tarifs');
-  if(lpSection) {
-    // Afficher la landing page si cachée
-    var lpDiv = document.getElementById('pg-landing') || document.querySelector('.lp-wrap');
-    lpSection.scrollIntoView({behavior:'smooth'});
-  } else {
-    window.scrollTo({top: 0, behavior: 'smooth'});
-  }
+  window.open(window.location.href.split('?')[0] + '?mode=tarifs', '_blank');
 }
 
 async function resilierAbonnement() {
