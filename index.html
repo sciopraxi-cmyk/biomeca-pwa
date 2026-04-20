@@ -969,6 +969,8 @@ function _lancerPaiementLP(planIdx, modules) {
     <input style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:10px;" id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..." 
       style="flex:1;font-size:13px;" oninput="renderPatientList()">
     <button class="btn" onclick="openNewPatientModal()" style="background:#2dd4bf;color:#04342C;font-size:13px;white-space:nowrap;">+ Nouveau patient</button>
+    <button class="btn" onclick="document.getElementById('doctolib-csv-input').click()" style="background:#0e4d91;color:#fff;font-size:13px;white-space:nowrap;">📥 Import Doctolib</button>
+    <input type="file" id="doctolib-csv-input" accept=".csv" style="display:none;" onchange="importDoctolibCSV(this)">
   </div>
   <div id="pt-list-el"></div>
 </div>
@@ -2599,6 +2601,8 @@ function editPatient(idx) {
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Taille (cm)</div><input class="inp" id="ep-taille" value="${p.taille||''}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${p.sport||''}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${p.metier||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${p.email||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${p.tel||''}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${p.motif||''}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
           <select class="inp" id="ep-prat">
@@ -2627,6 +2631,8 @@ function saveEditPatient(idx) {
   p.motif = document.getElementById('ep-motif').value;
   p.metier = document.getElementById('ep-metier').value;
   p.lat = document.getElementById('ep-lat').value;
+  p.email = document.getElementById('ep-email')?.value||'';
+  p.tel = document.getElementById('ep-tel')?.value||'';
   p.pratId = document.getElementById('ep-prat').value;
   savePatients();
   document.getElementById('edit-patient-modal')?.remove();
@@ -10295,6 +10301,100 @@ async function resilierAbonnement() {
   } catch(e) {
     alert('Erreur. Veuillez contacter le support.');
   }
+}
+
+// ===== IMPORT DOCTOLIB CSV =====
+function importDoctolibCSV(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').filter(l => l.trim());
+    if(lines.length < 2) { alert('Fichier CSV vide ou invalide.'); return; }
+    
+    // Détecter les colonnes (Doctolib utilise ; ou ,)
+    const sep = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/['"]/g,''));
+    
+    // Mapper les colonnes Doctolib
+    const colMap = {
+      nom: headers.findIndex(h => h.includes('nom') && !h.includes('prénom') && !h.includes('prenom')),
+      prenom: headers.findIndex(h => h.includes('prénom') || h.includes('prenom') || h.includes('first')),
+      ddn: headers.findIndex(h => h.includes('naissance') || h.includes('birth') || h.includes('dob')),
+      email: headers.findIndex(h => h.includes('email') || h.includes('mail')),
+      tel: headers.findIndex(h => h.includes('téléphone') || h.includes('telephone') || h.includes('phone') || h.includes('mobile')),
+      sexe: headers.findIndex(h => h.includes('sexe') || h.includes('genre') || h.includes('gender')),
+    };
+    
+    console.log('Headers:', headers);
+    console.log('ColMap:', colMap);
+    
+    let imported = 0, skipped = 0;
+    const newPatients = [];
+    
+    for(let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(sep).map(c => c.trim().replace(/^["']|["']$/g,''));
+      if(cols.length < 2) continue;
+      
+      const nom = colMap.nom >= 0 ? cols[colMap.nom] : '';
+      const prenom = colMap.prenom >= 0 ? cols[colMap.prenom] : '';
+      
+      if(!nom && !prenom) { skipped++; continue; }
+      
+      // Vérifier doublon
+      const exists = patients.some(p => 
+        p.nom?.toLowerCase() === nom.toLowerCase() && 
+        p.prenom?.toLowerCase() === prenom.toLowerCase()
+      );
+      if(exists) { skipped++; continue; }
+      
+      // Formater la date
+      let ddn = colMap.ddn >= 0 ? cols[colMap.ddn] : '';
+      if(ddn) {
+        // Convertir DD/MM/YYYY en YYYY-MM-DD
+        const parts = ddn.split(/[\/\-\.]/);
+        if(parts.length === 3) {
+          if(parts[2].length === 4) ddn = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
+          else if(parts[0].length === 4) ddn = parts[0]+'-'+parts[1].padStart(2,'0')+'-'+parts[2].padStart(2,'0');
+        }
+      }
+      
+      const patient = {
+        id: Date.now() + Math.random(),
+        nom: nom,
+        prenom: prenom,
+        ddn: ddn,
+        email: colMap.email >= 0 ? cols[colMap.email] : '',
+        tel: colMap.tel >= 0 ? cols[colMap.tel] : '',
+        poids: '',
+        taille: '',
+        sport: '',
+        motif: '',
+        metier: '',
+        lat: 'Droitier',
+        pratId: pwaUser?.pratId || '',
+        bilans: [],
+        bilanDataPosturo: {}
+      };
+      
+      newPatients.push(patient);
+      imported++;
+    }
+    
+    if(newPatients.length > 0) {
+      patients.push(...newPatients);
+      savePatients();
+      renderPatientList();
+      alert('✅ Import réussi !\n' + imported + ' patient(s) importé(s)\n' + skipped + ' ignoré(s) (doublons ou lignes vides)');
+    } else {
+      alert('Aucun nouveau patient à importer.\n' + skipped + ' ligne(s) ignorée(s).');
+    }
+    
+    // Reset input
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
 }
 
 
