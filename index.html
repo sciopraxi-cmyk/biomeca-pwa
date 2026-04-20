@@ -4539,17 +4539,6 @@ function printRapportPosturo() {
   <div class="mm-box">
     <div class="mm-title" id="mm-title">Choisissez vos modules</div>
 
-
-<div id="modal-tarifs" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:20000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;">
-  <div style="background:#0e1f38;border-radius:16px;padding:28px;width:100%;max-width:960px;margin:auto;position:relative;">
-    <button onclick="document.getElementById('modal-tarifs').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;">×</button>
-    <h2 style="color:#fff;text-align:center;margin-bottom:8px;font-size:20px;">Changer de formule</h2>
-    <p style="color:rgba(255,255,255,0.5);text-align:center;margin-bottom:20px;font-size:13px;">Sélectionnez votre nouvelle formule</p>
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;" id="modal-tarifs-grid"></div>
-    <p style="color:rgba(255,255,255,0.3);text-align:center;margin-top:16px;font-size:11px;">+ 299€ licence & mises à jour (offerte si déjà payée)</p>
-  </div>
-</div>
-
 </body></html>`);
   doc.close();
   setTimeout(() => {
@@ -10270,27 +10259,7 @@ function gererAbonnement() {
 
 function changerFormule() {
   closeMonCompte();
-  var plans = [
-    {name:'Essentiel', price:'30', desc:'1 module au choix', idx:0},
-    {name:'Sport', price:'40', desc:'Podo Sport + Ciné', idx:1},
-    {name:'Duo', price:'50', desc:'Postural + Podopédia', idx:2},
-    {name:'Duo Sport', price:'60', desc:'Podo Sport + 1 module', idx:3},
-    {name:'Intégral', price:'70', desc:'Les 3 modules', idx:4}
-  ];
-  var grid = document.getElementById('modal-tarifs-grid');
-  if(grid && grid.children.length === 0) {
-    plans.forEach(function(p) {
-      var div = document.createElement('div');
-      div.style.cssText = 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center;';
-      div.innerHTML = '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;margin-bottom:6px;">' + p.name + '</div>' +
-        '<div style="font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;">' + p.price + '€<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.4);"> / mois</span></div>' +
-        '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:12px;">' + p.desc + '</div>' +
-        '<button onclick="document.getElementById('modal-tarifs').style.display='none';choisirOffre(' + p.idx + ');" style="width:100%;padding:8px;background:rgba(255,255,255,0.08);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">Choisir</button>';
-      grid.appendChild(div);
-    });
-  }
-  var modal = document.getElementById('modal-tarifs');
-  if(modal) modal.style.display = 'flex';
+  window.open('https://sciopraxi-cmyk.github.io/biomeca-pwa/?mode=tarifs', '_blank');
 }
 
 async function resilierAbonnement() {
