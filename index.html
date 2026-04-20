@@ -2025,7 +2025,7 @@ async function pwaLogout() {
   if(sessionStorage.getItem('scroll_tarifs')) {
     sessionStorage.removeItem('scroll_tarifs');
     setTimeout(function() {
-      var el = document.getElementById('lp-tarifs');
+      var el = document.getElementById('lp-pricing-section');
       if(el) el.scrollIntoView({behavior:'smooth'});
     }, 300);
   }
