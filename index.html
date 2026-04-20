@@ -10259,7 +10259,26 @@ function gererAbonnement() {
 
 function changerFormule() {
   closeMonCompte();
-  window.open('https://sciopraxi-cmyk.github.io/biomeca-pwa/?mode=tarifs', '_blank');
+  // Afficher modal tarifs
+  var modal = document.getElementById('modal-tarifs');
+  if(modal) { modal.style.display = 'flex'; return; }
+  // Créer la modal si elle n'existe pas
+  var m = document.createElement('div');
+  m.id = 'modal-tarifs';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:20000;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;';
+  m.innerHTML = '<div style="background:#0e1f38;border-radius:16px;padding:28px;width:100%;max-width:900px;position:relative;">' +
+    '<button onclick="document.getElementById('modal-tarifs').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;">×</button>' +
+    '<h2 style="color:#fff;text-align:center;margin-bottom:20px;">Changer de formule</h2>' +
+    '<div id="lp-tarifs-modal"></div>' +
+    '</div>';
+  document.body.appendChild(m);
+  // Cloner la section tarifs
+  var tarifs = document.getElementById('lp-tarifs');
+  if(tarifs) {
+    var clone = tarifs.cloneNode(true);
+    clone.style.cssText = 'display:grid;grid-template-columns:repeat(5,1fr);gap:10px;';
+    document.getElementById('lp-tarifs-modal').appendChild(clone);
+  }
 }
 
 async function resilierAbonnement() {
