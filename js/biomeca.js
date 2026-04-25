@@ -519,31 +519,24 @@ initPWA();
 
 
 
-// ─── Service Worker pour PWA hors-ligne ───
-if('serviceWorker' in navigator) {
-  // Créer le SW inline via blob
-  const swCode = `
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open('biomeca-v1').then(cache => {
-      return cache.addAll([location.href]);
-    })
-  );
-  self.skipWaiting();
-});
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
-      const clone = resp.clone();
-      caches.open('biomeca-v1').then(c => c.put(e.request, clone));
-      return resp;
-    }).catch(() => caches.match(e.request)))
-  );
-});
-`;
-  const blob = new Blob([swCode], {type:'text/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl).catch(()=>{});
+// ─── Service Worker ───
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('service-worker.js', { scope: './' })
+      .then(reg => {
+        if (reg.waiting) console.info('[SW] new version waiting');
+        reg.addEventListener('updatefound', () => {
+          const sw = reg.installing;
+          sw && sw.addEventListener('statechange', () => {
+            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+              console.info('[SW] update available — refresh to apply');
+            }
+          });
+        });
+      })
+      .catch(err => console.warn('[SW] registration failed:', err));
+  });
 }
 
 
