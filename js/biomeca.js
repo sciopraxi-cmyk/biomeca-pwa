@@ -2574,24 +2574,6 @@ function updateResults() {
           </div>
         </div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 4 photos</div>`;
-    } else if(t.normAm!==undefined) {
-      const sD=photoSlots.filter(s=>s.side==='D');
-      const sG=photoSlots.filter(s=>s.side==='G');
-      const talD=sD[0]?.angle,planD=sD[1]?.angle,digD=sD[2]?.angle;
-      const talG=sG[0]?.angle,planG=sG[1]?.angle,digG=sG[2]?.angle;
-      const hasAny=talD!=null||planD!=null||digD!=null||talG!=null||planG!=null||digG!=null;
-      if(hasAny){
-        const amD=talD!=null&&planD!=null?Math.abs(talD-planD)/t.normAm:null;
-        const prD=digD!=null&&planD!=null?Math.abs(digD-planD)/t.normAm:null;
-        const amG=talG!=null&&planG!=null?Math.abs(talG-planG)/t.normAm:null;
-        const prG=digG!=null&&planG!=null?Math.abs(digG-planG)/t.normAm:null;
-        html=`<div class="res-side">
-          ${amProCard('D',amD,prD,t.normAm,talD,planD,digD)}
-          ${amProCard('G',amG,prG,t.normAm,talG,planG,digG)}
-        </div>`;
-      } else {
-        html=`<div style="font-size:10px;color:var(--orange);text-align:center;padding:8px;">Capturez les 6 photos : Tal·Plan·Dig × D+G</div>`;
-      }
     } else if(t.mobiliteAP) {
       const p0=photoSlots[0],p1=photoSlots[1];
       const invD=p0?.angleD,evD=p1?.angleD,invG=p0?.angleG,evG=p1?.angleG;
@@ -2609,88 +2591,85 @@ function updateResults() {
     el.innerHTML=html||el.innerHTML;
     return;
   }
-  if(false) {
-  } else {
-    // Mode photo
-    if(t.normDiv!==undefined) {
-      // MLA - angle brut (pas 180-valeur), calcul = écrasement - propulsion
-      const slotsD=photoSlots.filter(s=>s.side==='D');
-      const slotsG=photoSlots.filter(s=>s.side==='G');
-      const propD=slotsD[0]?.angle,ecrD=slotsD[1]?.angle;
-      const propG=slotsG[0]?.angle,ecrG=slotsG[1]?.angle;
-      // deltaD = écrasement - propulsion (doit être positif = arche s'aplatit)
-      const deltaD=(propD!=null&&ecrD!=null)?(ecrD-propD):null;
-      const deltaG=(propG!=null&&ecrG!=null)?(ecrG-propG):null;
-      const pctD=deltaD!==null?deltaD/t.normDiv:null;
-      const pctG=deltaG!==null?deltaG/t.normDiv:null;
-      html=`<div class="res-side">
-        ${mlaCard('D',propD,ecrD,deltaD,pctD,t.normDiv)}
-        ${mlaCard('G',propG,ecrG,deltaG,pctG,t.normDiv)}
-      </div>`;
-    } else if(t.normVerrou!==undefined) {
-      // Verrouillage: 4 photos (statD, statG, pointeD, pointeG)
-      const slotsD = photoSlots.filter(s=>s.side==='D');
-      const slotsG = photoSlots.filter(s=>s.side==='G');
-      const statD=slotsD[0]?.angle, pointeD=slotsD[1]?.angle;
-      const statG=slotsG[0]?.angle, pointeG=slotsG[1]?.angle;
-      // Calcul par pied: RF = pointe/10 ; Mollet = (pointe-stat)/10
-      const rfD=pointeD!=null?pointeD/10:null, molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/10:null;
-      const rfG=pointeG!=null?pointeG/10:null, molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/10:null;
-      const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-      const rfDdeg=pointeD!=null?Math.abs(pointeD).toFixed(1)+'°':'—';
-      const rfGdeg=pointeG!=null?Math.abs(pointeG).toFixed(1)+'°':'—';
-      const molDdeg2=(pointeD!=null&&statD!=null)?Math.abs(pointeD-statD).toFixed(1)+'°':'—';
-      const molGdeg2=(pointeG!=null&&statG!=null)?Math.abs(pointeG-statG).toFixed(1)+'°':'—';
+  // Mode photo
+  if(t.normDiv!==undefined) {
+    // MLA - angle brut (pas 180-valeur), calcul = écrasement - propulsion
+    const slotsD=photoSlots.filter(s=>s.side==='D');
+    const slotsG=photoSlots.filter(s=>s.side==='G');
+    const propD=slotsD[0]?.angle,ecrD=slotsD[1]?.angle;
+    const propG=slotsG[0]?.angle,ecrG=slotsG[1]?.angle;
+    // deltaD = écrasement - propulsion (doit être positif = arche s'aplatit)
+    const deltaD=(propD!=null&&ecrD!=null)?(ecrD-propD):null;
+    const deltaG=(propG!=null&&ecrG!=null)?(ecrG-propG):null;
+    const pctD=deltaD!==null?deltaD/t.normDiv:null;
+    const pctG=deltaG!==null?deltaG/t.normDiv:null;
+    html=`<div class="res-side">
+      ${mlaCard('D',propD,ecrD,deltaD,pctD,t.normDiv)}
+      ${mlaCard('G',propG,ecrG,deltaG,pctG,t.normDiv)}
+    </div>`;
+  } else if(t.normVerrou!==undefined) {
+    // Verrouillage: 4 photos (statD, statG, pointeD, pointeG)
+    const slotsD = photoSlots.filter(s=>s.side==='D');
+    const slotsG = photoSlots.filter(s=>s.side==='G');
+    const statD=slotsD[0]?.angle, pointeD=slotsD[1]?.angle;
+    const statG=slotsG[0]?.angle, pointeG=slotsG[1]?.angle;
+    // Calcul par pied: RF = pointe/10 ; Mollet = (pointe-stat)/10
+    const rfD=pointeD!=null?pointeD/10:null, molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/10:null;
+    const rfG=pointeG!=null?pointeG/10:null, molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/10:null;
+    const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const rfDdeg=pointeD!=null?Math.abs(pointeD).toFixed(1)+'°':'—';
+    const rfGdeg=pointeG!=null?Math.abs(pointeG).toFixed(1)+'°':'—';
+    const molDdeg2=(pointeD!=null&&statD!=null)?Math.abs(pointeD-statD).toFixed(1)+'°':'—';
+    const molGdeg2=(pointeG!=null&&statG!=null)?Math.abs(pointeG-statG).toFixed(1)+'°':'—';
+    html=`<div class="res-side">
+      <div class="res-side-card">
+        <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
+        <div style="font-size:9px;color:var(--mut);">Statique: <b>${apVv(statD)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+        <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apVv(pointeD)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
+        <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfDdeg}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+        <div class="rs-pct" style="color:${rfD!=null?clrGen(Math.abs(rfD)):'var(--mut)'};">  ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'}</div>
+        <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molDdeg2}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+        <div class="rs-pct" style="color:${molD!=null?clrGen(Math.abs(molD)):'var(--mut)'};">  ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'}</div>
+      </div>
+      <div class="res-side-card">
+        <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
+        <div style="font-size:9px;color:var(--mut);">Statique: <b>${apVv(statG)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+        <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apVv(pointeG)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
+        <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfGdeg}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+        <div class="rs-pct" style="color:${rfG!=null?clrGen(Math.abs(rfG)):'var(--mut)'};">  ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'}</div>
+        <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molGdeg2}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+        <div class="rs-pct" style="color:${molG!=null?clrGen(Math.abs(molG)):'var(--mut)'};">  ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'}</div>
+      </div>
+    </div>`;
+  } else if(t.normMob!==undefined) {
+    // Mobilité AP : résultats D et G séparés
+    const p0=photoSlots[0], p1=photoSlots[1];
+    const invD=p0?.angleD, evD=p1?.angleD;
+    const invG=p0?.angleG, evG=p1?.angleG;
+    const hasD=invD!=null&&evD!=null, hasG=invG!=null&&evG!=null;
+    if(hasD||hasG){
+      const mobD=hasD?(invD-evD)/t.normMob:null;
+      const mobG=hasG?(invG-evG)/t.normMob:null;
+      const mobDdeg=hasD?(invD-evD).toFixed(1)+'°':'—';
+      const mobGdeg=hasG?(invG-evG).toFixed(1)+'°':'—';
+      const apV2=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
       html=`<div class="res-side">
         <div class="res-side-card">
           <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-          <div style="font-size:9px;color:var(--mut);">Statique: <b>${apVv(statD)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-          <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apVv(pointeD)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
-          <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfDdeg}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-          <div class="rs-pct" style="color:${rfD!=null?clrGen(Math.abs(rfD)):'var(--mut)'};">  ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'}</div>
-          <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molDdeg2}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-          <div class="rs-pct" style="color:${molD!=null?clrGen(Math.abs(molD)):'var(--mut)'};">  ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'}</div>
+          <div style="font-size:9px;color:var(--mut);margin-top:4px;">Inversion: <b>${apV2(invD)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div>
+          <div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV2(evD)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div>
+          <div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobDdeg}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div>
+          <div class="rs-pct" style="color:${mobD!=null?clrGen(Math.abs(mobD)):'var(--mut)'};">${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'—'}</div>
         </div>
         <div class="res-side-card">
           <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-          <div style="font-size:9px;color:var(--mut);">Statique: <b>${apVv(statG)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-          <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apVv(pointeG)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
-          <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfGdeg}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-          <div class="rs-pct" style="color:${rfG!=null?clrGen(Math.abs(rfG)):'var(--mut)'};">  ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'}</div>
-          <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molGdeg2}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-          <div class="rs-pct" style="color:${molG!=null?clrGen(Math.abs(molG)):'var(--mut)'};">  ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'}</div>
+          <div style="font-size:9px;color:var(--mut);margin-top:4px;">Inversion: <b>${apV2(invG)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div>
+          <div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV2(evG)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div>
+          <div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobGdeg}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div>
+          <div class="rs-pct" style="color:${mobG!=null?clrGen(Math.abs(mobG)):'var(--mut)'};">${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'—'}</div>
         </div>
       </div>`;
-    } else if(t.normMob!==undefined) {
-      // Mobilité AP : résultats D et G séparés
-      const p0=photoSlots[0], p1=photoSlots[1];
-      const invD=p0?.angleD, evD=p1?.angleD;
-      const invG=p0?.angleG, evG=p1?.angleG;
-      const hasD=invD!=null&&evD!=null, hasG=invG!=null&&evG!=null;
-      if(hasD||hasG){
-        const mobD=hasD?(invD-evD)/t.normMob:null;
-        const mobG=hasG?(invG-evG)/t.normMob:null;
-        const mobDdeg=hasD?(invD-evD).toFixed(1)+'°':'—';
-        const mobGdeg=hasG?(invG-evG).toFixed(1)+'°':'—';
-        const apV2=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-        html=`<div class="res-side">
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Inversion: <b>${apV2(invD)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV2(evD)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobDdeg}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div>
-            <div class="rs-pct" style="color:${mobD!=null?clrGen(Math.abs(mobD)):'var(--mut)'};">${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'—'}</div>
-          </div>
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Inversion: <b>${apV2(invG)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV2(evG)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobGdeg}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div>
-            <div class="rs-pct" style="color:${mobG!=null?clrGen(Math.abs(mobG)):'var(--mut)'};">${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'—'}</div>
-          </div>
-        </div>`;
-      } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos (inversion + éversion)</div>`;
-    }
+    } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos (inversion + éversion)</div>`;
   }
   el.innerHTML = html || `<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Placez les marqueurs</div>`;
 }
@@ -3768,13 +3747,6 @@ function buildSidePreview(side,t,data) {
       </div>
       <div style="font-size:9px;margin-top:4px;">Amorti: <b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b> · Propulsion: <b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b> (N:${t.normAm}°=100%)</div>
     </div>`;
-    const cAm=am!==null?clrGen(am):'var(--mut)', cPr=pr!==null?clrGen(pr):'var(--mut)';
-    return `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
-      <div style="font-size:11px;font-weight:700;color:${sideC};margin-bottom:6px;">${label}</div>
-      <div style="font-size:10px;color:var(--mut);">Amorti: <span style="font-weight:700;color:${cAm};">${am!==null?Math.round(am*100)+'%':'—'}</span></div>
-      <div style="font-size:10px;color:var(--mut);">Propulsion: <span style="font-weight:700;color:${cPr};">${pr!==null?Math.round(pr*100)+'%':'—'}</span></div>
-      ${buildPhotoMini(data,side,t)}
-    </div>`;
   } else if(t.normVerrou!==undefined||t.normMob!==undefined){
     const val=t.normVerrou!==undefined?data.rfPct:data.mobPct;
     pct=val;
@@ -4451,15 +4423,6 @@ function buildPrintSide(side, t, data) {
         ${_ph}
       </div>
       <div style="font-size:9px;margin-top:4px;">Amorti: <b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b> · Propulsion: <b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b> (N:${t.normAm}°=100%)</div>
-    </div>`;
-    const cAm=rp_cssColor(am,false),cPr=rp_cssColor(pr,false);
-    const ph=buildPrintPhotos(data,side,t);
-    const phases=data.phases?.[side];
-    return `<div class="rp-side-block rp-side-${side}">
-      <div class="rp-side-title">${sideLabel}</div>
-      <div style="font-size:10px;">Taligrade: ${phases?.tal?.toFixed(1)||'—'}° · Plantigrade: ${phases?.plan?.toFixed(1)||'—'}° · Digitigrade: ${phases?.dig?.toFixed(1)||'—'}°</div>
-      <div style="margin-top:4px;font-size:11px;">Amorti: <strong style="color:${cAm};">${am!==null?Math.round(am*100)+'%':'—'}</strong> · Propulsion: <strong style="color:${cPr};">${pr!==null?Math.round(pr*100)+'%':'—'}</strong></div>
-      ${ph}
     </div>`;
   }
 
@@ -5272,7 +5235,7 @@ window.addEventListener('beforeinstallprompt', e => {
 
 async function installPWA() {
   if(!deferredPrompt) {
-    alert("Sur iPhone/iPad : 1. Bouton Partager en bas 2. Sur l\'ecran d\'accueil 3. Ajouter");
+    alert("Sur iPhone/iPad : 1. Bouton Partager en bas 2. Sur l'ecran d'accueil 3. Ajouter");
     return;
   }
   deferredPrompt.prompt();
@@ -6837,7 +6800,7 @@ function getBilanPosturoHTML() {
           ['Chaine extension (PM)','po-chaine-ext'],
           ['Chaine de flexion (AM)','po-chaine-flex'],
           ['Chaine de fermeture (PL)','po-chaine-ferm'],
-          ["Chaine d\'ouverture (AL)",'po-chaine-ouv'],
+          ["Chaine d'ouverture (AL)",'po-chaine-ouv'],
           ['Chaine statique optimisée (PA)','po-chaine-stat-opt'],
           ['Chaine statique dégradée (AP)','po-chaine-stat-deg']
         ].map(([label,id]) => `
@@ -8781,7 +8744,7 @@ function importDoctolibCSV(input) {
       let ddn = colMap.ddn >= 0 ? cols[colMap.ddn] : '';
       if(ddn) {
         // Convertir DD/MM/YYYY en YYYY-MM-DD
-        const parts = ddn.split(/[\/\-\.]/);
+        const parts = ddn.split(/[/\-.]/);
         if(parts.length === 3) {
           if(parts[2].length === 4) ddn = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
           else if(parts[0].length === 4) ddn = parts[0]+'-'+parts[1].padStart(2,'0')+'-'+parts[2].padStart(2,'0');
