@@ -1,0 +1,15 @@
+# Code legacy — à reformater plus tard avec filet de tests
+index.html
+js/biomeca.js
+js/landing.js
+service-worker.js
+css/biomeca.css
+
+# Generated / vendored
+manifest.json
+package-lock.json
+
+# Standard
+node_modules/
+assets/
+.git/

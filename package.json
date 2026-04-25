@@ -1,0 +1,19 @@
+{
+  "name": "biomeca-pwa",
+  "version": "0.1.0",
+  "description": "BioMéca — bilans cliniques pour podologues, ostéopathes et kinésithérapeutes",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.0.0"
+  }
+}
