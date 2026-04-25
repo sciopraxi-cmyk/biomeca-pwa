@@ -8,6 +8,47 @@
 <meta name="apple-mobile-web-app-title" content="BioMéca"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#0b1e3d"/>
+<!-- Sentry — observabilité production (Sprint 0 Phase 3) -->
+<script
+  src="https://js-de.sentry-cdn.com/0a625e33b08586126dc8aac6ca1b8a9e.min.js"
+  crossorigin="anonymous"
+></script>
+<script>
+  // Configuration Sentry — RGPD-aware pour données de santé
+  if (window.Sentry) {
+    Sentry.onLoad(function () {
+      Sentry.init({
+        dsn: 'https://0a625e33b08586126dc8aac6ca1b8a9e@o4511282988449792.ingest.de.sentry.io/4511283041009744',
+        environment:
+          location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+            ? 'development'
+            : location.hostname.includes('github.io')
+              ? 'production'
+              : 'preview',
+        release: 'biomeca-pwa@0.1.0',
+        sendDefaultPii: false,
+        tracesSampleRate: 0.1,
+        replaysSessionSampleRate: 0,
+        replaysOnErrorSampleRate: 0,
+        beforeSend: function (event) {
+          var stack = '';
+          try {
+            var frames = (event.exception && event.exception.values && event.exception.values[0] && event.exception.values[0].stacktrace && event.exception.values[0].stacktrace.frames) || [];
+            stack = frames.map(function (f) { return f.filename || ''; }).join(' ');
+          } catch (e) {}
+          if (
+            stack.indexOf('extension://') !== -1 ||
+            stack.indexOf('chrome-extension://') !== -1 ||
+            stack.indexOf('moz-extension://') !== -1
+          ) {
+            return null;
+          }
+          return event;
+        },
+      });
+    });
+  }
+</script>
 <link rel="stylesheet" href="css/biomeca.css"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png"/>
