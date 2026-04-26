@@ -232,8 +232,9 @@ export function clrKfppa(pct) {
 
 /**
  * Couleur hex pour le rapport imprimable selon score (deux barèmes).
- * Si genou=true : seuils 80–120 (vert), 50–150 (jaune), sinon rouge.
- * Sinon         : seuils ≥ 66 (vert), ≥ 33 (jaune), sinon rouge.
+ * Branche genou alignée sur interpretKfppa/clrKfppa (Sprint 0 — fix 2026-04-26) :
+ *   genou=true  : 60–140 vert · 20–180 orange (hors norme) · sinon rouge
+ *   genou=false : ≥ 66 vert  · ≥ 33 orange · sinon rouge
  *
  * @param {number|null|undefined} p  Score normalisé (1.0 = 100 %) ; null/undefined → '#aaa'.
  * @param {boolean} genou  true = barème genou (KFPPA), false = barème générique.
@@ -242,12 +243,13 @@ export function clrKfppa(pct) {
 export function rp_cssColor(p, genou) {
   if (p === null || p === undefined) return '#aaa';
   const v = p * 100;
-  if (genou) return v >= 80 && v <= 120 ? '#1a7a3e' : v >= 50 && v <= 150 ? '#856404' : '#b30021';
+  if (genou) return v >= 60 && v <= 140 ? '#1a7a3e' : v >= 20 && v <= 180 ? '#856404' : '#b30021';
   return v >= 66 ? '#1a7a3e' : v >= 33 ? '#856404' : '#b30021';
 }
 
 /**
  * Classe CSS de badge ('rp-badge-g/o/r') selon score, mêmes seuils que rp_cssColor.
+ * Branche genou alignée sur les normes KFPPA (60–140 / 20–180).
  *
  * @param {number|null|undefined} p  Score normalisé.
  * @param {boolean} genou  true = barème genou, false = générique.
@@ -257,12 +259,13 @@ export function rp_badgeCls(p, genou) {
   if (p === null || p === undefined) return 'rp-badge-r';
   const v = p * 100;
   if (genou)
-    return v >= 80 && v <= 120 ? 'rp-badge-g' : v >= 50 && v <= 150 ? 'rp-badge-o' : 'rp-badge-r';
+    return v >= 60 && v <= 140 ? 'rp-badge-g' : v >= 20 && v <= 180 ? 'rp-badge-o' : 'rp-badge-r';
   return v >= 66 ? 'rp-badge-g' : v >= 33 ? 'rp-badge-o' : 'rp-badge-r';
 }
 
 /**
  * Texte de badge ('Normal' / 'Limite' / 'Hors norme') selon score, mêmes seuils.
+ * Branche genou alignée sur les normes KFPPA (60–140 / 20–180).
  *
  * @param {number|null|undefined} p  Score normalisé.
  * @param {boolean} genou  true = barème genou, false = générique.
@@ -271,6 +274,6 @@ export function rp_badgeCls(p, genou) {
 export function rp_badgeTxt(p, genou) {
   if (p === null || p === undefined) return '—';
   const v = p * 100;
-  if (genou) return v >= 80 && v <= 120 ? 'Normal' : v >= 50 && v <= 150 ? 'Limite' : 'Hors norme';
+  if (genou) return v >= 60 && v <= 140 ? 'Normal' : v >= 20 && v <= 180 ? 'Limite' : 'Hors norme';
   return v >= 66 ? 'Normal' : v >= 33 ? 'Limite' : 'Hors norme';
 }

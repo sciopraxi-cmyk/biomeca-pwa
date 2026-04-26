@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { interpretKfppa, clrKfppa, calcAngle3 } from '../js/calc.mjs';
+import {
+  interpretKfppa,
+  clrKfppa,
+  calcAngle3,
+  rp_cssColor,
+  rp_badgeCls,
+  rp_badgeTxt,
+} from '../js/calc.mjs';
 
 // ============================================================================
 // interpretKfppa(p) — interprétation littérale d'un score KFPPA
@@ -114,33 +121,126 @@ describe('calcAngle3', () => {
 });
 
 // ============================================================================
-// Cohérence inter-fonctions : interpretKfppa et clrKfppa doivent toujours
-// donner un verdict aligné (norme/limite/hors norme) pour le même score.
+// rp_cssColor(p, genou=true) — couleur hex rapport, branche genou alignée KFPPA
+// Seuils branche genou (depuis js/calc.mjs, fix 2026-04-26) :
+//   60 ≤ v ≤ 140      → '#1a7a3e' (vert)
+//   20 ≤ v ≤ 180      → '#856404' (orange)
+//   v < 20 ou v > 180 → '#b30021' (rouge)
 // ============================================================================
-describe('cohérence clrKfppa ↔ interpretKfppa', () => {
+describe('rp_cssColor (genou=true)', () => {
+  it('retourne #1a7a3e (vert) pour un score à 100% (centre norme)', () => {
+    expect(rp_cssColor(1.0, true)).toBe('#1a7a3e');
+  });
+
+  it('retourne #1a7a3e (vert) pour un score à 130% — dans la norme 60-140 ; avant le fix retournait à tort orange (Limite)', () => {
+    expect(rp_cssColor(1.3, true)).toBe('#1a7a3e');
+  });
+
+  it('retourne #856404 (orange) pour un score à 150% (limite haute, hors norme mais ≤ 180)', () => {
+    expect(rp_cssColor(1.5, true)).toBe('#856404');
+  });
+
+  it('retourne #856404 (orange) pour un score à 170% (limite haute extrême, encore ≤ 180)', () => {
+    expect(rp_cssColor(1.7, true)).toBe('#856404');
+  });
+
+  it('retourne #b30021 (rouge) pour un score à 200% (hors norme haut, v > 180)', () => {
+    expect(rp_cssColor(2.0, true)).toBe('#b30021');
+  });
+
+  it('retourne #856404 (orange) pour un score à 50% (zone limite basse)', () => {
+    expect(rp_cssColor(0.5, true)).toBe('#856404');
+  });
+
+  it('retourne #b30021 (rouge) pour un score à 10% (hors norme bas, v < 20)', () => {
+    expect(rp_cssColor(0.1, true)).toBe('#b30021');
+  });
+});
+
+// ============================================================================
+// rp_badgeCls(p, genou=true) — classe CSS de badge, branche genou alignée KFPPA
+// ============================================================================
+describe('rp_badgeCls (genou=true)', () => {
+  it('retourne rp-badge-g pour un score à 100% (norme)', () => {
+    expect(rp_badgeCls(1.0, true)).toBe('rp-badge-g');
+  });
+
+  it('retourne rp-badge-g pour un score à 130% — dans la norme 60-140 ; avant le fix retournait à tort rp-badge-o (Limite)', () => {
+    expect(rp_badgeCls(1.3, true)).toBe('rp-badge-g');
+  });
+
+  it('retourne rp-badge-o pour un score à 30% (limite basse, dans 20-180 mais hors norme 60-140)', () => {
+    expect(rp_badgeCls(0.3, true)).toBe('rp-badge-o');
+  });
+
+  it('retourne rp-badge-r pour un score à 190% (hors norme haut, v>180)', () => {
+    expect(rp_badgeCls(1.9, true)).toBe('rp-badge-r');
+  });
+});
+
+// ============================================================================
+// rp_badgeTxt(p, genou=true) — texte de badge, branche genou alignée KFPPA
+// ============================================================================
+describe('rp_badgeTxt (genou=true)', () => {
+  it('retourne "Normal" pour un score à 100%', () => {
+    expect(rp_badgeTxt(1.0, true)).toBe('Normal');
+  });
+
+  it('retourne "Normal" pour un score à 130% — dans la norme 60-140 ; avant le fix retournait à tort "Limite"', () => {
+    expect(rp_badgeTxt(1.3, true)).toBe('Normal');
+  });
+
+  it('retourne "Limite" pour un score à 150% (limite haute, hors norme mais ≤ 180)', () => {
+    expect(rp_badgeTxt(1.5, true)).toBe('Limite');
+  });
+
+  it('retourne "Hors norme" pour un score à 190% (v>180)', () => {
+    expect(rp_badgeTxt(1.9, true)).toBe('Hors norme');
+  });
+});
+
+// ============================================================================
+// Cohérence inter-fonctions : les 5 fonctions KFPPA doivent classifier
+// identiquement un score donné en zone norme / limite / hors norme.
+// Couvre : interpretKfppa, clrKfppa, rp_cssColor(_, true), rp_badgeCls(_, true),
+//          rp_badgeTxt(_, true).
+// ============================================================================
+describe('cohérence inter-fonctions KFPPA (5 fonctions)', () => {
   describe('zone norme (60–140%)', () => {
     [60, 100, 140].forEach((pct) => {
-      it(`${pct}% : interpretKfppa "dans la norme" + clrKfppa var(--green)`, () => {
-        expect(interpretKfppa(pct / 100)).toBe('dans la norme');
-        expect(clrKfppa(pct / 100)).toBe('var(--green)');
+      it(`${pct}% : verdict aligné "norme" sur les 5 fonctions`, () => {
+        const r = pct / 100;
+        expect(interpretKfppa(r)).toBe('dans la norme');
+        expect(clrKfppa(r)).toBe('var(--green)');
+        expect(rp_cssColor(r, true)).toBe('#1a7a3e');
+        expect(rp_badgeCls(r, true)).toBe('rp-badge-g');
+        expect(rp_badgeTxt(r, true)).toBe('Normal');
       });
     });
   });
 
   describe('zone limite (20–60% ou 140–180%)', () => {
     [30, 50, 150, 170].forEach((pct) => {
-      it(`${pct}% : interpretKfppa "valeur limite" + clrKfppa var(--orange)`, () => {
-        expect(interpretKfppa(pct / 100)).toBe('valeur limite');
-        expect(clrKfppa(pct / 100)).toBe('var(--orange)');
+      it(`${pct}% : verdict aligné "limite" sur les 5 fonctions`, () => {
+        const r = pct / 100;
+        expect(interpretKfppa(r)).toBe('valeur limite');
+        expect(clrKfppa(r)).toBe('var(--orange)');
+        expect(rp_cssColor(r, true)).toBe('#856404');
+        expect(rp_badgeCls(r, true)).toBe('rp-badge-o');
+        expect(rp_badgeTxt(r, true)).toBe('Limite');
       });
     });
   });
 
   describe('zone hors norme (<20% ou >180%)', () => {
     [10, 190].forEach((pct) => {
-      it(`${pct}% : interpretKfppa "hors norme" + clrKfppa var(--red)`, () => {
-        expect(interpretKfppa(pct / 100)).toMatch(/hors norme/);
-        expect(clrKfppa(pct / 100)).toBe('var(--red)');
+      it(`${pct}% : verdict aligné "hors norme" sur les 5 fonctions`, () => {
+        const r = pct / 100;
+        expect(interpretKfppa(r)).toMatch(/hors norme/);
+        expect(clrKfppa(r)).toBe('var(--red)');
+        expect(rp_cssColor(r, true)).toBe('#b30021');
+        expect(rp_badgeCls(r, true)).toBe('rp-badge-r');
+        expect(rp_badgeTxt(r, true)).toBe('Hors norme');
       });
     });
   });

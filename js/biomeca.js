@@ -4606,19 +4606,19 @@ function buildPrintPhotos(data,side,t,angleOverride) {
 function rp_cssColor(p,genou){
   if(p===null||p===undefined)return'#aaa';
   const v=p*100;
-  if(genou) return v>=80&&v<=120?'#1a7a3e':v>=50&&v<=150?'#856404':'#b30021';
+  if(genou) return v>=60&&v<=140?'#1a7a3e':v>=20&&v<=180?'#856404':'#b30021';
   return v>=66?'#1a7a3e':v>=33?'#856404':'#b30021';
 }
 function rp_badgeCls(p,genou){
   if(p===null||p===undefined)return'rp-badge-r';
   const v=p*100;
-  if(genou) return v>=80&&v<=120?'rp-badge-g':v>=50&&v<=150?'rp-badge-o':'rp-badge-r';
+  if(genou) return v>=60&&v<=140?'rp-badge-g':v>=20&&v<=180?'rp-badge-o':'rp-badge-r';
   return v>=66?'rp-badge-g':v>=33?'rp-badge-o':'rp-badge-r';
 }
 function rp_badgeTxt(p,genou){
   if(p===null||p===undefined)return'—';
   const v=p*100;
-  if(genou) return v>=80&&v<=120?'Normal':v>=50&&v<=150?'Limite':'Hors norme';
+  if(genou) return v>=60&&v<=140?'Normal':v>=20&&v<=180?'Limite':'Hors norme';
   return v>=66?'Normal':v>=33?'Limite':'Hors norme';
 }
 function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=60&&v<=140)return'dans la norme';if(v>=20&&v<=180)return'valeur limite';return'hors norme — valgus excessif';}
