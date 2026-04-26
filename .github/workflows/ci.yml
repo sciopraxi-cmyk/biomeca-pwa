@@ -33,6 +33,9 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      - name: TypeScript check (calc.mjs)
+        run: npm run typecheck
+
       - name: Syntax check (eslint.config.js)
         run: node --check eslint.config.js
 
