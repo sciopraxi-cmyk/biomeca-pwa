@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  interpretKfppa,
-  clrKfppa,
-  calcAngle3,
-} from '../js/calc.mjs';
+import { interpretKfppa, clrKfppa, calcAngle3 } from '../js/calc.mjs';
 
 // ============================================================================
 // interpretKfppa(p) — interprétation littérale d'un score KFPPA
@@ -90,17 +86,29 @@ describe('clrKfppa', () => {
 // ============================================================================
 describe('calcAngle3', () => {
   it('retourne 90° pour un angle droit en B (A→B→C orthogonaux)', () => {
-    const pts = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }];
+    const pts = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+    ];
     expect(calcAngle3(pts)).toBeCloseTo(90, 5);
   });
 
   it('retourne 180° pour 3 points alignés (angle plat en B)', () => {
-    const pts = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }];
+    const pts = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+    ];
     expect(calcAngle3(pts)).toBeCloseTo(180, 5);
   });
 
-  it('retourne null si un des trois points n\'est pas placé (x null)', () => {
-    const pts = [{ x: null, y: null }, { x: 1, y: 0 }, { x: 2, y: 0 }];
+  it("retourne null si un des trois points n'est pas placé (x null)", () => {
+    const pts = [
+      { x: null, y: null },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+    ];
     expect(calcAngle3(pts)).toBeNull();
   });
 });

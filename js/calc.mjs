@@ -36,10 +36,11 @@
  *   findMarkerAt(120, 200, [{x:118,y:198},{x:50,y:50}], 800) // → 0
  */
 export function findMarkerAt(x, y, markers, cw) {
-  const r=Math.max(14,cw/40);
-  for(let i=markers.length-1;i>=0;i--){
-    const m=markers[i]; if(m.x===null)continue;
-    if(Math.hypot(m.x-x,m.y-y)<r) return i;
+  const r = Math.max(14, cw / 40);
+  for (let i = markers.length - 1; i >= 0; i--) {
+    const m = markers[i];
+    if (m.x === null) continue;
+    if (Math.hypot(m.x - x, m.y - y) < r) return i;
   }
   return -1;
 }
@@ -55,13 +56,14 @@ export function findMarkerAt(x, y, markers, cw) {
  *   calcAngle3([{x:0,y:0},{x:1,y:0},{x:1,y:1}]) // → 90
  */
 export function calcAngle3(pts) {
-  const placed=pts.filter(p=>p.x!==null);
-  if(placed.length<3) return null;
-  const [A,B,C] = placed.length>=4 ? [placed[1],placed[2],placed[3]] : placed;
-  const v1={x:A.x-B.x,y:A.y-B.y},v2={x:C.x-B.x,y:C.y-B.y};
-  const dot=v1.x*v2.x+v1.y*v2.y;
-  const mag=Math.sqrt((v1.x**2+v1.y**2)*(v2.x**2+v2.y**2));
-  return mag===0?null:Math.acos(Math.max(-1,Math.min(1,dot/mag)))*180/Math.PI;
+  const placed = pts.filter((p) => p.x !== null);
+  if (placed.length < 3) return null;
+  const [A, B, C] = placed.length >= 4 ? [placed[1], placed[2], placed[3]] : placed;
+  const v1 = { x: A.x - B.x, y: A.y - B.y },
+    v2 = { x: C.x - B.x, y: C.y - B.y };
+  const dot = v1.x * v2.x + v1.y * v2.y;
+  const mag = Math.sqrt((v1.x ** 2 + v1.y ** 2) * (v2.x ** 2 + v2.y ** 2));
+  return mag === 0 ? null : (Math.acos(Math.max(-1, Math.min(1, dot / mag))) * 180) / Math.PI;
 }
 
 /**
@@ -80,23 +82,23 @@ export function calcAngle3(pts) {
  * @returns {1|-1}  Signe de l'angle.
  */
 export function calcAngleSign(pts) {
-  const placed=pts.filter(p=>p.x!==null);
-  if(placed.length<2) return 1;
-  if(placed.length>=3) {
+  const placed = pts.filter((p) => p.x !== null);
+  if (placed.length < 2) return 1;
+  if (placed.length >= 3) {
     // Point central (Rotule pour KFPPA, CalcaSup pour AP)
     // Détecter si le point central est à droite ou gauche de la ligne top→bot
-    const top=placed[0];   // EIAS ou Milieu mollet
-    const mid=placed[1];   // Rotule ou Jonction musculo-tend.
-    const bot=placed[placed.length-1]; // Tarse ou CalcaInf
+    const top = placed[0]; // EIAS ou Milieu mollet
+    const mid = placed[1]; // Rotule ou Jonction musculo-tend.
+    const bot = placed[placed.length - 1]; // Tarse ou CalcaInf
     // Position de mid par rapport à la ligne top→bot
     // Produit vectoriel : (bot-top) × (mid-top)
     // En coordonnées écran (y vers le bas), cross>0 = mid à droite
-    const cross=(bot.x-top.x)*(mid.y-top.y)-(bot.y-top.y)*(mid.x-top.x);
-    return cross<0?1:-1; // cross<0 en écran = point à droite
+    const cross = (bot.x - top.x) * (mid.y - top.y) - (bot.y - top.y) * (mid.x - top.x);
+    return cross < 0 ? 1 : -1; // cross<0 en écran = point à droite
   }
-  const top=placed[0];
-  const bot=placed[placed.length-1];
-  return bot.x>top.x?1:-1;
+  const top = placed[0];
+  const bot = placed[placed.length - 1];
+  return bot.x > top.x ? 1 : -1;
 }
 
 /**
@@ -117,30 +119,30 @@ export function calcAngleSign(pts) {
  * @returns {number|null}  Angle corrigé en degrés (signé), ou null si rawAng null.
  */
 export function computeCorrectedAngle(rawAng, side, view, testType, pts) {
-  if(rawAng===null) return null;
-  if(testType==='mla') return rawAng;
+  if (rawAng === null) return null;
+  if (testType === 'mla') return rawAng;
   const incl = 180 - rawAng;
   // KFPPA : utiliser incl (180-rawAng) sans correction de signe latéral
-  if(testType==='kfppa') return incl;
+  if (testType === 'kfppa') return incl;
   // Vue dos : utiliser le cross product pour détecter le sens réel
   // cross > 0 = calca penche à droite
   // Pied D : droite = inversion(+), gauche = éversion(-)
   // Pied G : droite = éversion(-), gauche = inversion(+)
-  if(view==='dos' && pts) {
+  if (view === 'dos' && pts) {
     const sign = calcAngleSign(pts);
     // calcAngleSign: +1 = calca penche à gauche, -1 = calca penche à droite
     // Pied D : penche droite(-1) = inversion(+), penche gauche(+1) = éversion(-)
     // Pied G : penche gauche(+1) = inversion(+), penche droite(-1) = éversion(-)
-    if(side==='D') return -sign * incl; // D: droite(-1)=Inv(+) → inverser signe
-    if(side==='G') return sign * incl;  // G: gauche(+1)=Inv(+) → même signe
+    if (side === 'D') return -sign * incl; // D: droite(-1)=Inv(+) → inverser signe
+    if (side === 'G') return sign * incl; // G: gauche(+1)=Inv(+) → même signe
     return incl;
   }
-  if(view==='dos' && side==='G') return -incl;
+  if (view === 'dos' && side === 'G') return -incl;
   // Vue face (KFPPA) : genou D pointe droite=valgus(+), genou G pointe droite=varus(-)
-  if(view==='face' && pts) {
-    const sign=calcAngleSign(pts);
-    if(side==='D') return sign*incl;
-    if(side==='G') return -sign*incl;
+  if (view === 'face' && pts) {
+    const sign = calcAngleSign(pts);
+    if (side === 'D') return sign * incl;
+    if (side === 'G') return -sign * incl;
   }
   return incl;
 }
@@ -149,8 +151,14 @@ export function computeCorrectedAngle(rawAng, side, view, testType, pts) {
  * Convertit un angle KFPPA signé en label lisible « Valgus +X.X° » / « Varus −X.X° ».
  * Convention : valeur positive = valgus pour les deux côtés (déjà corrigé en amont).
  *
- * @param {number|null} ang  Angle en degrés (signé) ; null retourne '—'.
- * @param {'D'|'G'|''} side  Côté du genou (présent pour cohérence d'API, non utilisé dans le calcul actuel).
+ * Le paramètre `_side` est conservé pour cohérence avec les appelants existants
+ * (les 6 sites d'appel dans biomeca.js passent toujours 'D' ou 'G'). Le préfixe
+ * underscore signale qu'il est volontairement non utilisé dans le calcul actuel,
+ * mais la signature est figée pour permettre une éventuelle différenciation
+ * latérale future sans casser les call sites.
+ *
+ * @param {number|null} ang   Angle en degrés (signé) ; null retourne '—'.
+ * @param {'D'|'G'|''} _side  Côté du genou (réservé pour usage futur — voir note ci-dessus).
  * @returns {string}  Label formaté.
  *
  * @example
@@ -158,11 +166,11 @@ export function computeCorrectedAngle(rawAng, side, view, testType, pts) {
  *   kfppaLabel(-4, 'G')   // → 'Varus −4.0°'
  *   kfppaLabel(null, 'D') // → '—'
  */
-export function kfppaLabel(ang, side) {
-  if(ang==null) return '—';
-  const deg = Math.abs(ang).toFixed(1)+'°';
+export function kfppaLabel(ang, _side) {
+  if (ang == null) return '—';
+  const deg = Math.abs(ang).toFixed(1) + '°';
   // Convention incl : valeur positive = valgus pour les 2 côtés
-  return ang>=0 ? 'Valgus +'+deg : 'Varus −'+deg;
+  return ang >= 0 ? 'Valgus +' + deg : 'Varus −' + deg;
 }
 
 /**
@@ -176,7 +184,13 @@ export function kfppaLabel(ang, side) {
  * @param {number|null} p  Score normalisé (1.0 = 100 %) ; null retourne '—'.
  * @returns {string}  Verdict littéral.
  */
-export function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=60&&v<=140)return'dans la norme';if(v>=20&&v<=180)return'valeur limite';return'hors norme — valgus excessif';}
+export function interpretKfppa(p) {
+  if (p === null) return '—';
+  const v = p * 100;
+  if (v >= 60 && v <= 140) return 'dans la norme';
+  if (v >= 20 && v <= 180) return 'valeur limite';
+  return 'hors norme — valgus excessif';
+}
 
 /**
  * Interprète un score générique (non-KFPPA) en littéral clinique.
@@ -185,7 +199,13 @@ export function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=60
  * @param {number|null} p  Score normalisé (1.0 = 100 %) ; null retourne '—'.
  * @returns {string}  Verdict littéral.
  */
-export function interpretGen(p){if(p===null)return'—';const v=p*100;if(v>=66)return'dans la norme';if(v>=33)return'valeur limite';return'insuffisance significative';}
+export function interpretGen(p) {
+  if (p === null) return '—';
+  const v = p * 100;
+  if (v >= 66) return 'dans la norme';
+  if (v >= 33) return 'valeur limite';
+  return 'insuffisance significative';
+}
 
 // ============================================================================
 // CATÉGORIE B — Helpers seuils / formatage (UI clinique)
@@ -203,10 +223,10 @@ export function interpretGen(p){if(p===null)return'—';const v=p*100;if(v>=66)r
  * @returns {string}  Nom de variable CSS : 'var(--red)' | 'var(--orange)' | 'var(--green)' | 'var(--mut)'.
  */
 export function clrKfppa(pct) {
-  if(pct==null||isNaN(pct)) return 'var(--mut)';
-  const p=Math.abs(pct)*100;
-  if(p<20||p>180) return 'var(--red)';
-  if(p<60||p>140) return 'var(--orange)';
+  if (pct == null || isNaN(pct)) return 'var(--mut)';
+  const p = Math.abs(pct) * 100;
+  if (p < 20 || p > 180) return 'var(--red)';
+  if (p < 60 || p > 140) return 'var(--orange)';
   return 'var(--green)';
 }
 
@@ -219,11 +239,11 @@ export function clrKfppa(pct) {
  * @param {boolean} genou  true = barème genou (KFPPA), false = barème générique.
  * @returns {string}  Couleur hex : '#1a7a3e' | '#856404' | '#b30021' | '#aaa'.
  */
-export function rp_cssColor(p,genou){
-  if(p===null||p===undefined)return'#aaa';
-  const v=p*100;
-  if(genou) return v>=80&&v<=120?'#1a7a3e':v>=50&&v<=150?'#856404':'#b30021';
-  return v>=66?'#1a7a3e':v>=33?'#856404':'#b30021';
+export function rp_cssColor(p, genou) {
+  if (p === null || p === undefined) return '#aaa';
+  const v = p * 100;
+  if (genou) return v >= 80 && v <= 120 ? '#1a7a3e' : v >= 50 && v <= 150 ? '#856404' : '#b30021';
+  return v >= 66 ? '#1a7a3e' : v >= 33 ? '#856404' : '#b30021';
 }
 
 /**
@@ -233,11 +253,12 @@ export function rp_cssColor(p,genou){
  * @param {boolean} genou  true = barème genou, false = générique.
  * @returns {'rp-badge-g'|'rp-badge-o'|'rp-badge-r'}  Classe CSS.
  */
-export function rp_badgeCls(p,genou){
-  if(p===null||p===undefined)return'rp-badge-r';
-  const v=p*100;
-  if(genou) return v>=80&&v<=120?'rp-badge-g':v>=50&&v<=150?'rp-badge-o':'rp-badge-r';
-  return v>=66?'rp-badge-g':v>=33?'rp-badge-o':'rp-badge-r';
+export function rp_badgeCls(p, genou) {
+  if (p === null || p === undefined) return 'rp-badge-r';
+  const v = p * 100;
+  if (genou)
+    return v >= 80 && v <= 120 ? 'rp-badge-g' : v >= 50 && v <= 150 ? 'rp-badge-o' : 'rp-badge-r';
+  return v >= 66 ? 'rp-badge-g' : v >= 33 ? 'rp-badge-o' : 'rp-badge-r';
 }
 
 /**
@@ -247,9 +268,9 @@ export function rp_badgeCls(p,genou){
  * @param {boolean} genou  true = barème genou, false = générique.
  * @returns {string}  'Normal' | 'Limite' | 'Hors norme' | '—' (si p null/undefined).
  */
-export function rp_badgeTxt(p,genou){
-  if(p===null||p===undefined)return'—';
-  const v=p*100;
-  if(genou) return v>=80&&v<=120?'Normal':v>=50&&v<=150?'Limite':'Hors norme';
-  return v>=66?'Normal':v>=33?'Limite':'Hors norme';
+export function rp_badgeTxt(p, genou) {
+  if (p === null || p === undefined) return '—';
+  const v = p * 100;
+  if (genou) return v >= 80 && v <= 120 ? 'Normal' : v >= 50 && v <= 150 ? 'Limite' : 'Hors norme';
+  return v >= 66 ? 'Normal' : v >= 33 ? 'Limite' : 'Hors norme';
 }
