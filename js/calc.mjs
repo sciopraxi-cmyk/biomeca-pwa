@@ -167,12 +167,16 @@ export function kfppaLabel(ang, side) {
 
 /**
  * Interprète un score KFPPA (ratio) en littéral clinique.
- * Seuils : 80–120 % = norme · 50–150 % = limite · sinon hors norme (valgus excessif).
+ * Seuils cliniques alignés sur clrKfppa (Sprint 0 — 2026-04-26) :
+ *   v = p × 100
+ *   60 ≤ v ≤ 140       → 'dans la norme'
+ *   20 ≤ v ≤ 180       → 'valeur limite'
+ *   v < 20 ou v > 180  → 'hors norme — valgus excessif'
  *
  * @param {number|null} p  Score normalisé (1.0 = 100 %) ; null retourne '—'.
  * @returns {string}  Verdict littéral.
  */
-export function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=80&&v<=120)return'dans la norme';if(v>=50&&v<=150)return'valeur limite';return'hors norme — valgus excessif';}
+export function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=60&&v<=140)return'dans la norme';if(v>=20&&v<=180)return'valeur limite';return'hors norme — valgus excessif';}
 
 /**
  * Interprète un score générique (non-KFPPA) en littéral clinique.
@@ -189,10 +193,11 @@ export function interpretGen(p){if(p===null)return'—';const v=p*100;if(v>=66)r
 
 /**
  * Couleur CSS (variable) selon score KFPPA.
- * Seuils sur |pct| × 100 :
- *   < 20 % ou > 180 % → rouge
- *   < 60 % ou > 140 % → orange
- *   sinon             → vert
+ * Seuils cliniques validés (Sprint 0 — 2026-04-26) :
+ *   p = |pct| × 100
+ *   60 ≤ p ≤ 140       → vert  (norme)
+ *   20 ≤ p < 60 ou 140 < p ≤ 180 → orange (valeur limite)
+ *   p < 20 ou p > 180  → rouge (hors norme)
  *
  * @param {number|null|undefined} pct  Score signé normalisé (1.0 = 100 %) ; null/undefined/NaN → 'var(--mut)'.
  * @returns {string}  Nom de variable CSS : 'var(--red)' | 'var(--orange)' | 'var(--green)' | 'var(--mut)'.

@@ -4621,7 +4621,7 @@ function rp_badgeTxt(p,genou){
   if(genou) return v>=80&&v<=120?'Normal':v>=50&&v<=150?'Limite':'Hors norme';
   return v>=66?'Normal':v>=33?'Limite':'Hors norme';
 }
-function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=80&&v<=120)return'dans la norme';if(v>=50&&v<=150)return'valeur limite';return'hors norme — valgus excessif';}
+function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=60&&v<=140)return'dans la norme';if(v>=20&&v<=180)return'valeur limite';return'hors norme — valgus excessif';}
 function interpretGen(p){if(p===null)return'—';const v=p*100;if(v>=66)return'dans la norme';if(v>=33)return'valeur limite';return'insuffisance significative';}
 
 // ══════════════════════════════════════════════════════
