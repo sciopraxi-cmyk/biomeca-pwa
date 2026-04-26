@@ -18,6 +18,33 @@
  */
 
 // ============================================================================
+// TYPES PARTAGÉS
+// ============================================================================
+
+/**
+ * @typedef {Object} Marker
+ * @property {number|null} x  Coordonnée x du marqueur (null si non placé).
+ * @property {number|null} y  Coordonnée y du marqueur (null si non placé).
+ */
+
+/**
+ * @typedef {Object} PlacedMarker
+ * @property {number} x  Coordonnée x (non-null car marqueur placé).
+ * @property {number} y  Coordonnée y (non-null car marqueur placé).
+ */
+
+/**
+ * Type guard : vérifie qu'un marqueur a été placé sur le canvas
+ * (coordonnées x et y toutes deux non-null).
+ *
+ * @param {Marker} p
+ * @returns {p is PlacedMarker}
+ */
+function isPlaced(p) {
+  return p.x !== null && p.y !== null;
+}
+
+// ============================================================================
 // CATÉGORIE A — Calculs cliniques
 // ============================================================================
 
@@ -28,7 +55,7 @@
  *
  * @param {number} x  Abscisse du clic en coordonnées canvas.
  * @param {number} y  Ordonnée du clic en coordonnées canvas.
- * @param {Array<{x:number|null,y:number|null}>} markers  Liste de marqueurs ; ceux dont x===null sont ignorés.
+ * @param {Marker[]} markers  Liste de marqueurs ; ceux non placés (x ou y null) sont ignorés.
  * @param {number} cw  Largeur du canvas en pixels (sert au calcul du rayon).
  * @returns {number}  Index du marqueur trouvé, ou −1 si aucun.
  *
@@ -39,7 +66,7 @@ export function findMarkerAt(x, y, markers, cw) {
   const r = Math.max(14, cw / 40);
   for (let i = markers.length - 1; i >= 0; i--) {
     const m = markers[i];
-    if (m.x === null) continue;
+    if (!isPlaced(m)) continue;
     if (Math.hypot(m.x - x, m.y - y) < r) return i;
   }
   return -1;
@@ -49,14 +76,14 @@ export function findMarkerAt(x, y, markers, cw) {
  * Calcule l'angle ABC en degrés à partir de 3 points placés (loi du cosinus).
  * Si la liste contient 4 points placés, utilise les 3 derniers (skip du premier).
  *
- * @param {Array<{x:number|null,y:number|null}>} pts  Liste de points, dont les non-placés ont x===null.
+ * @param {Marker[]} pts  Liste de points, dont les non-placés ont x ou y à null.
  * @returns {number|null}  Angle en degrés (0–180), ou null si moins de 3 points placés ou points colinéaires confondus.
  *
  * @example
  *   calcAngle3([{x:0,y:0},{x:1,y:0},{x:1,y:1}]) // → 90
  */
 export function calcAngle3(pts) {
-  const placed = pts.filter((p) => p.x !== null);
+  const placed = pts.filter(isPlaced);
   if (placed.length < 3) return null;
   const [A, B, C] = placed.length >= 4 ? [placed[1], placed[2], placed[3]] : placed;
   const v1 = { x: A.x - B.x, y: A.y - B.y },
@@ -78,11 +105,11 @@ export function calcAngle3(pts) {
  * Avec exactement 2 points placés : retourne +1 si bot.x > top.x, −1 sinon (fallback).
  * Avec moins de 2 points : retourne +1 par défaut.
  *
- * @param {Array<{x:number|null,y:number|null}>} pts  Liste de points, dont les non-placés ont x===null.
+ * @param {Marker[]} pts  Liste de points, dont les non-placés ont x ou y à null.
  * @returns {1|-1}  Signe de l'angle.
  */
 export function calcAngleSign(pts) {
-  const placed = pts.filter((p) => p.x !== null);
+  const placed = pts.filter(isPlaced);
   if (placed.length < 2) return 1;
   if (placed.length >= 3) {
     // Point central (Rotule pour KFPPA, CalcaSup pour AP)
