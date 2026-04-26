@@ -5,7 +5,15 @@ import prettier from 'eslint-config-prettier';
 export default [
   // Ignores globaux
   {
-    ignores: ['node_modules/**', 'assets/**', 'css/**', '**/*.json', '**/*.md', '.git/**'],
+    ignores: [
+      'node_modules/**',
+      'assets/**',
+      'css/**',
+      'tests/**',
+      '**/*.json',
+      '**/*.md',
+      '.git/**',
+    ],
   },
 
   // Base : règles recommandées
