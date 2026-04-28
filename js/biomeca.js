@@ -523,7 +523,10 @@ if ('serviceWorker' in navigator) {
 let patients = JSON.parse(localStorage.getItem('bm4-patients')||'[]');
 let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
 let currentPatient = null;
-let currentBilanReadOnly = false;
+// Index du bilan dans currentPatient.bilansSport actuellement ouvert pour édition.
+// null = pas de bilan historique ouvert (mode "bilan courant" ou nouveau bilan).
+// Set par ouvrirBilanSport, reset par creerBilanSport et selectPatient.
+let currentOpenedBilanIdx = null;
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -1140,6 +1143,7 @@ function createPatient() {
 }
 
 function selectPatient(p) {
+  currentOpenedBilanIdx = null;
   currentPatient = p;
   const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
   if(document.getElementById('tb-av')) document.getElementById('tb-av').textContent = init;
@@ -1396,6 +1400,7 @@ function creerBilanSport(patIdx, type) {
   p.currentBilanType = 'sport';
   p.currentBilanSousType = type;
   savePatients();
+  currentOpenedBilanIdx = null;
   selectPatient(p);
   nav('pg-sport');
 }
@@ -1406,6 +1411,7 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   const bilan = p.bilansSport?.[bilanIdx];
   if(!bilan) {
     // Bilan courant
+    currentOpenedBilanIdx = null;
     selectPatient(p);
     nav('pg-sport');
     return;
@@ -1413,7 +1419,7 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   selectPatient(p);
   currentPatient.mesures = JSON.parse(JSON.stringify(bilan.mesures||{}));
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilan.bilanData||{}));
-  currentBilanReadOnly = true;
+  currentOpenedBilanIdx = bilanIdx;
   nav('pg-sport');
 }
 
@@ -1435,6 +1441,7 @@ function creerBilanPosturo(patIdx, type) {
   p.currentBilanType = 'posturo';
   p.currentBilanSousType = type;
   savePatients();
+  currentOpenedBilanIdx = null;
   selectPatient(p);
   nav('pg-bilan-posturo');
 }
@@ -1472,7 +1479,7 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
   }
   selectPatient(p);
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
-  currentBilanReadOnly = false;
+  currentOpenedBilanIdx = null;
   // Réinitialiser le canvas pour forcer recalcul taille
   const oldCanvas = document.getElementById('posturo-body-canvas');
   if(oldCanvas) { oldCanvas.width = 0; oldCanvas.height = 0; oldCanvas._baseSnapshot = null; oldCanvas._history = []; }
@@ -2878,6 +2885,7 @@ function validateAndSave() {
 
   if(!currentPatient.mesures) currentPatient.mesures={};
   currentPatient.mesures[currentTestId]=result;
+  syncOpenedBilanToHistory();
   savePatients();
   alert(`✓ Sauvegardé : "${t.name}" pour ${currentPatient.prenom} ${currentPatient.nom}`);
   nav('pg-home');
@@ -4997,6 +5005,18 @@ function setBilanField(field, value) {
   }
 }
 
+// Synchronise les modifications du bilan en cours d'édition vers son entrée
+// dans bilansSport[]. À appeler après chaque savePatients() qui touche
+// currentPatient.mesures ou currentPatient.bilanData.
+function syncOpenedBilanToHistory() {
+  if (currentOpenedBilanIdx == null) return;
+  if (!currentPatient || !currentPatient.bilansSport) return;
+  const target = currentPatient.bilansSport[currentOpenedBilanIdx];
+  if (!target) return;
+  target.mesures = JSON.parse(JSON.stringify(currentPatient.mesures || {}));
+  target.bilanData = JSON.parse(JSON.stringify(currentPatient.bilanData || {}));
+}
+
 function saveBilan() {
   if(!currentPatient) { alert('Aucun patient sélectionné.'); return; }
   if(!bilanData) bilanData = {};
@@ -5081,22 +5101,7 @@ function saveBilan() {
   }
 
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
-  // Mettre à jour le snapshot dans bilansSport si un bilan existant est ouvert
-  if(currentPatient.bilansSport) {
-    // Trouver le bilan qui correspond aux mesures courantes (par date ou index)
-    const idx = currentPatient.bilansSport.findIndex(b => 
-      JSON.stringify(b.mesures) === JSON.stringify(currentPatient.mesures)
-    );
-    if(idx >= 0) {
-      currentPatient.bilansSport[idx].bilanData = JSON.parse(JSON.stringify(bilanData));
-    } else {
-      // Bilan courant (pas encore dans bilansSport) - mettre à jour le dernier initial
-      const initIdx = currentPatient.bilansSport.findIndex(b => b.type === 'initial');
-      if(initIdx >= 0) {
-        currentPatient.bilansSport[initIdx].bilanData = JSON.parse(JSON.stringify(bilanData));
-      }
-    }
-  }
+  syncOpenedBilanToHistory();
   savePatients();
   alert('✓ Bilan clinique sauvegardé');
 }
@@ -5209,6 +5214,7 @@ function saveBilanSilent() {
   const pc = document.getElementById('pieds-canvas');
   if(pc) bilanData._pieds = pc.toDataURL('image/jpeg', 0.85);
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
+  syncOpenedBilanToHistory();
   savePatients();
 }
 
