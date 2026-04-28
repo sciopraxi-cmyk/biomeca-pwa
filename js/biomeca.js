@@ -4338,7 +4338,7 @@ function buildPrintSection(t, data, conclusions) {
       </div></div>`;
       if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP (arrière-pied) droite : ${Math.round(Math.abs(mobD)*100)} % (norme : ≥ 66 %)`);
       if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP (arrière-pied) gauche : ${Math.round(Math.abs(mobG)*100)} % (norme : ≥ 66 %)`);
-      sectionHTML+=`<div class="rp-written"><strong>Pied droit:</strong> Mobilite: ${_mobDpct!=null?_mobDpct+'%':'-'} - ${mobD==null?'':Math.abs(mobD)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(mobD)*100>=33?'Limite':'Hors norme - mobilite tres limitee'}<br><strong>Pied gauche:</strong> Mobilite: ${_mobGpct!=null?_mobGpct+'%':'-'} - ${mobG==null?'':Math.abs(mobG)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(mobG)*100>=33?'Limite':'Hors norme - mobilite tres limitee'}</div>`;
+      sectionHTML+=`<div class="rp-written"><strong>Pied droit :</strong> Mobilité : ${_mobDpct!=null?_mobDpct+'%':'—'} — ${mobD==null?'':Math.abs(mobD)*100>=66?'dans la norme':Math.abs(mobD)*100>=33?'valeur limite':'hors norme'}<br><strong>Pied gauche :</strong> Mobilité : ${_mobGpct!=null?_mobGpct+'%':'—'} — ${mobG==null?'':Math.abs(mobG)*100>=66?'dans la norme':Math.abs(mobG)*100>=33?'valeur limite':'hors norme'}</div>`;
     }
     else {
       sectionHTML+=buildPrintSingleSide(t,data);
