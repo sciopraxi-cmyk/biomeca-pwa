@@ -1060,9 +1060,87 @@ function launchTest(testId) {
 // ══════════════════════════════════════════════════════
 // PATIENTS
 // ══════════════════════════════════════════════════════
+
+// Calcule en bytes la taille totale stockée par BioMéca dans localStorage.
+// Utilise la propriété character.length × 2 (UTF-16 en JS) comme approximation.
+function getBioMecaStorageBytes() {
+  let total = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('bm4-')) {
+        const val = localStorage.getItem(key) || '';
+        total += (key.length + val.length) * 2;
+      }
+    }
+  } catch(e) {}
+  return total;
+}
+
+// Limite typique 5 Mo. On alerte à partir de 80 % (4 Mo) et bloque à 95 % (4.75 Mo).
+const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024;
+const STORAGE_WARNING_THRESHOLD = 0.80;
+const STORAGE_CRITICAL_THRESHOLD = 0.95;
+
+// État pour ne pas spammer l'utilisateur avec des alertes répétées
+let _quotaWarningShown = false;
+
 function savePatients() {
-  localStorage.setItem('bm4-patients', JSON.stringify(patients));
+  const beforeBytes = getBioMecaStorageBytes();
+  const ratio = beforeBytes / STORAGE_QUOTA_BYTES;
+
+  // Seuil critique : on refuse la sauvegarde et on prévient gravement
+  if (ratio >= STORAGE_CRITICAL_THRESHOLD) {
+    const used = (beforeBytes / 1024 / 1024).toFixed(1);
+    alert(
+      '⚠️ ESPACE DE STOCKAGE CRITIQUE\n\n' +
+      'Vous utilisez ' + used + ' Mo sur 5 Mo disponibles dans le stockage local du navigateur.\n\n' +
+      'Pour éviter toute perte de données :\n' +
+      '• Supprimez d\'anciens bilans archivés (fiche patient → ✕ à côté du bilan)\n' +
+      '• Ou supprimez d\'anciens patients de test (page Patients → ✕)\n\n' +
+      'La sauvegarde de cette modification est ANNULÉE pour protéger vos données existantes. ' +
+      'Une fois de l\'espace libéré, vos modifications en cours seront sauvegardées au prochain enregistrement.'
+    );
+    return false;
+  }
+
+  try {
+    localStorage.setItem('bm4-patients', JSON.stringify(patients));
+  } catch(e) {
+    if (e && (e.name === 'QuotaExceededError' || e.code === 22 || (e.message && e.message.toLowerCase().includes('quota')))) {
+      alert(
+        '⚠️ ESPACE DE STOCKAGE PLEIN\n\n' +
+        'La sauvegarde a échoué : la limite de 5 Mo du navigateur est atteinte.\n\n' +
+        'Vos modifications en cours sont en mémoire mais NON sauvegardées sur cet appareil. ' +
+        'NE FERMEZ PAS l\'onglet avant d\'avoir libéré de l\'espace :\n' +
+        '• Supprimez d\'anciens bilans archivés\n' +
+        '• Ou d\'anciens patients de test\n\n' +
+        'Réessayez ensuite la sauvegarde.'
+      );
+      return false;
+    }
+    // Autre erreur inattendue — la propager pour qu'elle soit visible
+    throw e;
+  }
+
+  // Seuil de warning : on alerte une seule fois mais on laisse la sauvegarde se faire
+  const afterBytes = getBioMecaStorageBytes();
+  const afterRatio = afterBytes / STORAGE_QUOTA_BYTES;
+  if (afterRatio >= STORAGE_WARNING_THRESHOLD && !_quotaWarningShown) {
+    _quotaWarningShown = true;
+    const used = (afterBytes / 1024 / 1024).toFixed(1);
+    const pct = Math.round(afterRatio * 100);
+    console.warn('BioMéca storage usage:', used + ' Mo (' + pct + '%)');
+    alert(
+      '⚠️ Espace de stockage à ' + pct + ' %\n\n' +
+      'Vous utilisez ' + used + ' Mo sur 5 Mo disponibles. La sauvegarde s\'est bien effectuée, ' +
+      'mais pensez à archiver ou supprimer d\'anciens bilans pour éviter une saturation prochaine.\n\n' +
+      '(Cette alerte ne s\'affichera qu\'une fois par session.)'
+    );
+  }
+
   saveToSupabase();
+  return true;
 }
 
 function editPatient(idx) {
