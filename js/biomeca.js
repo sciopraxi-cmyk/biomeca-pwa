@@ -9,6 +9,9 @@ const SUPA_KEY = 'sb_publishable_aE4_BZYwz6bGGvby4XXAgw_k8ULnrYh';
 let pwaUser = null;
 
 // ─── Client Supabase léger (sans SDK) ───
+// Les méthodes signIn / signUp / signOut / refreshAccessToken n'utilisent PAS authFetch
+// (publiques ou avec auth gérée explicitement). Toutes les autres passent par authFetch
+// pour bénéficier du refresh transparent du JWT.
 const supa = {
   async signIn(email, password) {
     const res = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
@@ -35,28 +38,33 @@ const supa = {
     });
   },
 
-  async getUser(token) {
-    const res = await fetch(SUPA_URL + '/auth/v1/user', {
-      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token }
+  async refreshAccessToken(refreshToken) {
+    if (!refreshToken) return null;
+    const res = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
+      body: JSON.stringify({ refresh_token: refreshToken })
     });
+    if (!res.ok) return null;
+    return res.json(); // { access_token, refresh_token, ... } ou null si refresh expiré
+  },
+
+  async getUser() {
+    const res = await authFetch(SUPA_URL + '/auth/v1/user');
     return res.json();
   },
 
-  async getUserRecord(token, email) {
-    const res = await fetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email) + '&select=*', {
-      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token }
-    });
+  async getUserRecord(email) {
+    const res = await authFetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email) + '&select=*');
     if(!res.ok) return null;
     const rows = await res.json();
     return rows && rows.length > 0 ? rows[0] : null;
   },
 
-  async updateLicence(token, email) {
-    const res = await fetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email), {
+  async updateLicence(email) {
+    const res = await authFetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email), {
       method: 'PATCH',
       headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
         'Prefer': 'return=minimal'
       },
@@ -65,26 +73,23 @@ const supa = {
     return res.ok;
   },
 
-  async loadData(token, table) {
-    const res = await fetch(SUPA_URL + '/rest/v1/' + table + '?select=*', {
-      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+  async loadData(table) {
+    const res = await authFetch(SUPA_URL + '/rest/v1/' + table + '?select=*', {
+      headers: { 'Content-Type': 'application/json' }
     });
     if(!res.ok) return [];
     return res.json();
   },
 
-  async saveData(token, table, data) {
-    const headers = {
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer ' + token,
+  async saveData(table, data) {
+    const baseHeaders = {
       'Content-Type': 'application/json',
       'Prefer': 'return=minimal'
     };
     // Essayer PATCH d'abord (mise à jour de la ligne existante)
-    const patchHeaders = Object.assign({}, headers, {'Prefer': 'return=representation,count=exact'});
-    const patch = await fetch(SUPA_URL + '/rest/v1/' + table + '?user_id=eq.' + data.user_id, {
+    const patch = await authFetch(SUPA_URL + '/rest/v1/' + table + '?user_id=eq.' + data.user_id, {
       method: 'PATCH',
-      headers: patchHeaders,
+      headers: Object.assign({}, baseHeaders, {'Prefer': 'return=representation,count=exact'}),
       body: JSON.stringify({ data: data.data, updated_at: data.updated_at })
     });
     if(patch.ok) {
@@ -92,9 +97,9 @@ const supa = {
       if(patched && patched.length > 0) return true; // ligne mise à jour
     }
     // Si la ligne n'existe pas encore, faire un POST (insertion)
-    const post = await fetch(SUPA_URL + '/rest/v1/' + table, {
+    const post = await authFetch(SUPA_URL + '/rest/v1/' + table, {
       method: 'POST',
-      headers,
+      headers: baseHeaders,
       body: JSON.stringify(data)
     });
     if(!post.ok) {
@@ -105,10 +110,58 @@ const supa = {
   }
 };
 
+// Wrapper fetch avec auto-refresh sur 401 PGRST303.
+// Refresh une seule fois par chaîne de requête pour éviter les boucles infinies.
+async function authFetch(url, options = {}, _retry = 0) {
+  const session = loadPwaSession();
+  if (!session.token) throw new Error('Pas de session');
+  const headers = Object.assign({}, options.headers || {}, {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + session.token
+  });
+  let res = await fetch(url, Object.assign({}, options, { headers }));
+  if ((res.status === 401 || res.status === 403) && _retry === 0) {
+    // Détection élargie : Supabase renvoie 401 PGRST303 sur /rest/v1/* mais
+    // 403 bad_jwt sur /auth/v1/*. On scanne code/error_code et message/msg
+    // pour couvrir toutes les variations observées.
+    const cloned = res.clone();
+    let isJwtIssue = false;
+    try {
+      const body = await cloned.json();
+      const code = (body.code || body.error_code || '').toString().toLowerCase();
+      const msg = (body.message || body.msg || '').toString().toLowerCase();
+      isJwtIssue = code.includes('jwt') || code === 'pgrst303' || code === 'bad_jwt' ||
+                   msg.includes('jwt') || msg.includes('expired') || msg.includes('token');
+    } catch(e) {}
+    if (isJwtIssue) {
+      const refreshed = await supa.refreshAccessToken(session.refreshToken);
+      if (refreshed && refreshed.access_token) {
+        // Mettre à jour la session avec le nouveau token
+        savePwaSession(refreshed.access_token, refreshed.refresh_token || session.refreshToken, session.user);
+        if (typeof pwaUser !== 'undefined' && pwaUser) {
+          pwaUser.token = refreshed.access_token;
+        }
+        // Retenter la requête originale UNE FOIS avec le nouveau token
+        return authFetch(url, options, 1);
+      } else {
+        // Refresh échoué — refresh_token aussi expiré ou révoqué. Forcer logout propre.
+        console.warn('Refresh token invalide. Déconnexion forcée.');
+        clearPwaSession();
+        alert('Votre session a expiré. Veuillez vous reconnecter.');
+        if (typeof pwaLogout === 'function') pwaLogout();
+        else location.reload();
+        throw new Error('Session expirée');
+      }
+    }
+  }
+  return res;
+}
+
 // ─── Session persistante ───
-function savePwaSession(token, user) {
+function savePwaSession(token, refreshToken, user) {
   try {
     sessionStorage.setItem('bm_token', token);
+    sessionStorage.setItem('bm_refresh', refreshToken || '');
     sessionStorage.setItem('bm_user', JSON.stringify(user));
   } catch(e) {}
 }
@@ -116,14 +169,16 @@ function savePwaSession(token, user) {
 function loadPwaSession() {
   try {
     const token = sessionStorage.getItem('bm_token');
+    const refreshToken = sessionStorage.getItem('bm_refresh') || null;
     const user = JSON.parse(sessionStorage.getItem('bm_user') || 'null');
-    return { token, user };
-  } catch(e) { return { token: null, user: null }; }
+    return { token, refreshToken, user };
+  } catch(e) { return { token: null, refreshToken: null, user: null }; }
 }
 
 function clearPwaSession() {
   try {
     sessionStorage.removeItem('bm_token');
+    sessionStorage.removeItem('bm_refresh');
     sessionStorage.removeItem('bm_user');
   } catch(e) {}
 }
@@ -148,7 +203,7 @@ async function pwaLogin() {
     if(data.access_token) {
       const isAdmin = email.toLowerCase() === 'admin@sciopraxi.fr';
       pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin, user_metadata: data.user?.user_metadata || {} };
-      savePwaSession(data.access_token, pwaUser);
+      savePwaSession(data.access_token, data.refresh_token, pwaUser);
       await onPwaLoginSuccess();
     } else {
       errEl.textContent = data.error_description || data.msg || 'Email ou mot de passe incorrect.';
@@ -180,7 +235,7 @@ async function onPwaLoginSuccess() {
 
   // Recharger user_metadata frais depuis Supabase
   try {
-    const freshUser = await supa.getUser(pwaUser.token);
+    const freshUser = await supa.getUser();
     if(freshUser?.user_metadata) {
       pwaUser.user_metadata = freshUser.user_metadata;
     }
@@ -195,7 +250,7 @@ async function loadSupabaseData() {
 
   try {
     // Charger patients depuis Supabase (table user_data)
-    const rows = await supa.loadData(pwaUser.token, 'user_data');
+    const rows = await supa.loadData('user_data');
     const myRow = rows.find(r => r.user_id === pwaUser.id);
     if(myRow && myRow.data) {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
@@ -203,7 +258,7 @@ async function loadSupabaseData() {
       praticiens = d.praticiens || [];
       // Appliquer les droits depuis user_metadata Supabase (fraîches)
       try {
-        const freshUser = await supa.getUser(pwaUser.token);
+        const freshUser = await supa.getUser();
         const freshMeta = freshUser?.user_metadata || {};
         pwaUser.user_metadata = freshMeta;
         window._userDroits = freshMeta.droits || 'all';
@@ -262,7 +317,7 @@ async function saveToSupabase() {
   if(!pwaUser?.token) return;
   const data = { patients, praticiens };
   try {
-    const ok = await supa.saveData(pwaUser.token, 'user_data', {
+    const ok = await supa.saveData('user_data', {
       user_id: pwaUser.id,
       data: data,
       updated_at: new Date().toISOString()
@@ -474,7 +529,7 @@ async function initPWA() {
   const session = loadPwaSession();
   if(session.token && session.user) {
     try {
-      const userData = await supa.getUser(session.token);
+      const userData = await supa.getUser();
       if(userData.id) {
         const isAdmin = session.user.email?.toLowerCase() === 'admin@sciopraxi.fr';
         pwaUser = { ...session.user, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {} };
@@ -8556,7 +8611,7 @@ async function lancerPaiement(planIdx, modules) {
   var licenceDejaPaye = false;
   if(pwaUser && pwaUser.token && pwaUser.email) {
     try {
-      var userRecord = await supa.getUserRecord(pwaUser.token, pwaUser.email);
+      var userRecord = await supa.getUserRecord(pwaUser.email);
       if(userRecord && userRecord.licence_payee === true) {
         licenceDejaPaye = true;
       }
@@ -8580,7 +8635,7 @@ window.addEventListener('DOMContentLoaded', async function() {
     // Marquer la licence comme payée si l'utilisateur est connecté
     if(pwaUser && pwaUser.token && pwaUser.email) {
       try {
-        await supa.updateLicence(pwaUser.token, pwaUser.email);
+        await supa.updateLicence(pwaUser.email);
         console.log('Licence marquée comme payée');
       } catch(e) {
         console.log('Erreur mise à jour licence:', e);
@@ -8603,7 +8658,7 @@ var _stripePortalUrl = 'https://billing.stripe.com/p/login/cNibJ24ma8Z6a7xgFBfAc
 async function loadAbonnementInfo() {
   if(!pwaUser || !pwaUser.token || !pwaUser.email) return;
   try {
-    var userRecord = await supa.getUserRecord(pwaUser.token, pwaUser.email);
+    var userRecord = await supa.getUserRecord(pwaUser.email);
     if(!userRecord) return;
 
     // Licence
@@ -8689,7 +8744,7 @@ function changerFormule() {
 async function resilierAbonnement() {
   if(!pwaUser || !pwaUser.token || !pwaUser.email) return;
   try {
-    var userRecord = await supa.getUserRecord(pwaUser.token, pwaUser.email);
+    var userRecord = await supa.getUserRecord(pwaUser.email);
     if(!userRecord) return;
 
     // Vérifier engagement 12 mois
