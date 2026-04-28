@@ -24,6 +24,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Block legacy service_role and JWT keys in client code
+        run: |
+          PATTERNS="service_role|sb_secret_|eyJ[A-Za-z0-9_-]{20,}"
+          if grep -rEn "$PATTERNS" js/ index.html service-worker.js 2>&1 | grep -v "^Binary file"; then
+            echo "❌ Sensitive credential pattern detected in client code — blocking build"
+            exit 1
+          fi
+          echo "✓ No sensitive credentials detected in client code"
+
       - name: Lint
         run: npm run lint
 

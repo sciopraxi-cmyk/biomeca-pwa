@@ -4,7 +4,7 @@
 // SUPABASE AUTH — BioMéca PWA
 // ══════════════════════════════════════════════════════
 const SUPA_URL = 'https://tzivizoacdyopwfzerrb.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6aXZpem9hY2R5b3B3ZnplcnJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MjQ0NDcsImV4cCI6MjA5MTQwMDQ0N30.P0Uw6FjUdwzrmgUFii1_AjrqNJgtEbFAPBnplAyg3gY';
+const SUPA_KEY = 'sb_publishable_aE4_BZYwz6bGGvby4XXAgw_k8ULnrYh';
 
 let pwaUser = null;
 
@@ -396,30 +396,6 @@ function closeMonCompte() {
   if(modal) modal.style.display = 'none';
 }
 
-async function adminUpdateAcces(userId, newAcces) {
-  try {
-    const trialStart = newAcces === 'essai' ? new Date().toISOString() : undefined;
-    const meta = trialStart ? { acces: newAcces, trial_start: trialStart } : { acces: newAcces };
-    const r = await fetch(SUPA_URL + '/auth/v1/admin/users/' + userId, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPA_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY
-      },
-      body: JSON.stringify({ user_metadata: meta })
-    });
-    const d = await r.json();
-    if(d.id) {
-      console.log('Accès mis à jour:', newAcces, 'pour', d.email);
-    } else {
-      console.error('Erreur:', JSON.stringify(d));
-    }
-  } catch(e) {
-    console.error('Erreur mise à jour accès:', e);
-  }
-}
-
 function checkTrialStatus() {
   const meta = pwaUser?.user_metadata || {};
   const acces = meta.acces || '';
@@ -548,9 +524,6 @@ let patients = JSON.parse(localStorage.getItem('bm4-patients')||'[]');
 let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
 let currentPatient = null;
 let currentBilanReadOnly = false;
-const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6aXZpem9hY2R5b3B3ZnplcnJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTgyNDQ0NywiZXhwIjoyMDkxNDAwNDQ3fQ.y07k2_nj-hJnG-XlhR1ULr9BlRLpGY2QXgRnM2UQ558";
-const SUPABASE_URL = "https://tzivizoacdyopwfzerrb.supabase.co";
-const ADMIN_EMAIL = "admin@sciopraxi.fr";
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -911,100 +884,18 @@ function nav(id) {
   }
 }
 
-async function fetchSupabaseUsers() {
-  try {
-    const r = await fetch(SUPABASE_URL + '/auth/v1/admin/users?per_page=100', {
-      headers: {
-        'apikey': SUPABASE_SERVICE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY
-      }
-    });
-    const d = await r.json();
-    return d.users || [];
-  } catch(e) {
-    console.error('fetchSupabaseUsers error:', e);
-    return [];
-  }
-}
-
-async function renderParamsPratList() {
+// Affiche un encart redirectionnel — la gestion utilisateurs est désormais
+// effectuée exclusivement depuis le dashboard Supabase (sécurité : la clé
+// admin legacy n'est plus exposée côté client). Voir incident 2026-04-28.
+function renderParamsPratList() {
   const el = document.getElementById('params-prat-list');
   if(!el) return;
-  el.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Chargement...</div>';
-  const supaUsers = await fetchSupabaseUsers();
-  if(!supaUsers.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--mut);">Aucun utilisateur trouvé.</div>';
-    return;
-  }
-  let html = '';
-  supaUsers.forEach(u => {
-    const email = u.email || '—';
-    const isAdmin = email === ADMIN_EMAIL;
-    const meta = u.user_metadata || {};
-    const pratLocal = praticiens.find(pr => pr.email === email);
-    const droits = pratLocal ? (pratLocal.droits || 'all') : 'all';
-    const acces = meta.acces || '—';
-    const nom = meta.nom || (pratLocal ? pratLocal.nom : '') || email.split('@')[0];
-    const prenom = meta.prenom || (pratLocal ? pratLocal.prenom : '') || '';
-    const userId = u.id;
-    const init = ((prenom||nom||'?')[0]).toUpperCase();
-    const lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('fr-FR') : 'Jamais';
-    const adminBadge = isAdmin ? '<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:4px;">Admin</span>' : '';
-    const editBtn = '<button data-uid="'+userId+'" data-nom="'+nom+'" data-prenom="'+prenom+'" onclick="editPraticienMeta(this.dataset.uid, this.dataset.nom, this.dataset.prenom)" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;" title="Modifier nom/prénom">✏️</button>';
-    let droitsSelect = '';
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord);"><div class="av" style="width:36px;height:36px;font-size:13px;">' + init + '</div><div style="flex:1;"><div style="display:flex;align-items:center;gap:6px;"><div style="font-size:13px;font-weight:500;">' + prenom + ' ' + nom + '</div>' + adminBadge + editBtn + '</div><div style="font-size:11px;color:var(--mut);">' + email + '</div><div style="font-size:10px;color:var(--mut);">Dernière connexion : ' + lastLogin + '</div><div style="font-size:10px;color:var(--mut);display:flex;align-items:center;gap:6px;">Accès : <select data-uid="' + userId + '" onchange="adminUpdateAcces(this.dataset.uid, this.value)" style="font-size:11px;padding:2px 6px;border:1px solid var(--bord);border-radius:6px;background:var(--card);color:var(--fg);"><option value="gratuit"' + (acces==="gratuit"?" selected":"") + '>Gratuit (illimité)</option><option value="essai"' + (acces==="essai"?" selected":"") + '>Essai 14 jours</option><option value="postural"' + (acces==="postural"?" selected":"") + '>Bilan postural</option><option value="sport"' + (acces==="sport"?" selected":"") + '>Podologie du sport</option><option value="duo"' + (acces==="duo"?" selected":"") + '>Duo (2 modules)</option><option value="integral"' + (acces==="integral"?" selected":"") + '>Intégral (3 modules)</option></select></div></div>' + droitsSelect + '</div>';
-  });
-  el.innerHTML = html;
-}
-
-async function updateSupabaseUserMeta(userId, nom, prenom) {
-  try {
-    const r = await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + userId, {
-      method: 'PUT',
-      headers: {
-        'apikey': SUPABASE_SERVICE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_metadata: { nom, prenom } })
-    });
-    const d = await r.json();
-    if(r.ok) { renderParamsPratList(); }
-    else alert('Erreur: ' + (d.message||'inconnue'));
-  } catch(e) { alert('Erreur réseau: ' + e.message); }
-}
-
-function editPraticienMeta(userId, currentNom, currentPrenom) {
-  const nom = prompt('Nom :', currentNom || '');
-  if(nom === null) return;
-  const prenom = prompt('Prénom :', currentPrenom || '');
-  if(prenom === null) return;
-  updateSupabaseUserMeta(userId, nom.toUpperCase(), prenom);
-}
-
-async function setPraticienDroitsByEmail(email, droits) {
-  // Mettre à jour dans praticiens locaux
-  const pr = praticiens.find(p => p.email === email);
-  if(pr) { pr.droits = droits; } else { praticiens.push({ id: Date.now(), email, droits }); }
-  savePatients();
-  renderPatientList();
-  // Mettre à jour dans Supabase user_metadata
-  try {
-    const users = await fetchSupabaseUsers();
-    const u = users.find(u => u.email === email);
-    if(u) {
-      const meta = u.user_metadata || {};
-      await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + u.id, {
-        method: 'PUT',
-        headers: {
-          'apikey': SUPABASE_SERVICE_KEY,
-          'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ user_metadata: Object.assign({}, meta, { droits }) })
-      });
-    }
-  } catch(e) { console.error('setPraticienDroits Supabase error:', e); }
+  el.innerHTML = `
+    <div style="font-size:13px;color:var(--mut);line-height:1.6;padding:12px 14px;background:var(--card);border:1px solid var(--bord);border-radius:8px;">
+      La gestion des utilisateurs (création, modification, droits, accès) s'effectue
+      désormais directement sur le dashboard Supabase pour des raisons de sécurité.
+      Cliquez sur le bouton <strong>« 🔗 Ouvrir Supabase Users »</strong> ci-dessus pour y accéder.
+    </div>`;
 }
 
 function setPraticienDroits(pratIdx, droits) {
