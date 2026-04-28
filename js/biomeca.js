@@ -465,7 +465,7 @@ async function pwaLogout() {
   if(tb) tb.style.display = 'none';
   const ov = document.getElementById('trial-expired-overlay');
   if(ov) ov.style.display = 'none';
-  nav('pg-home');
+  nav('pg-sport');
 }
 
 // ─── Init PWA ───
@@ -815,7 +815,7 @@ function nav(id) {
   const pg = document.getElementById(id);
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
-    'pg-home':'tn-home','pg-patients':'tn-patients',
+    'pg-patients':'tn-patients',
     'pg-praticiens':'tn-praticiens','pg-params':'tn-params',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients'
   };
@@ -1342,7 +1342,7 @@ function createBilanInitial(patIdx) {
   p.bilanInitialDate = new Date().toLocaleDateString('fr-FR');
   savePatients();
   renderPatientList();
-  nav('pg-home');
+  nav('pg-sport');
 }
 
 function createBilanControle(patIdx) {
@@ -1364,7 +1364,7 @@ function createBilanControle(patIdx) {
   savePatients();
   selectPatient(p);
   renderPatientList();
-  nav('pg-home');
+  nav('pg-sport');
 }
 
 function loadBilanFromHistory(patIdx, bilanIdx) {
@@ -2888,7 +2888,7 @@ function validateAndSave() {
   syncOpenedBilanToHistory();
   savePatients();
   alert(`✓ Sauvegardé : "${t.name}" pour ${currentPatient.prenom} ${currentPatient.nom}`);
-  nav('pg-home');
+  nav('pg-sport');
 }
 
 // ══════════════════════════════════════════════════════
