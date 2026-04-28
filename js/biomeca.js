@@ -725,8 +725,14 @@ const MEASURE_COMPUTERS = {
     const _delta = (_bd != null && _ud != null) ? (_ud - _bd) : _toI(side === 'D' ? data.deltaD : data.deltaG);
     return (_delta != null) ? _delta / t.div : null;
   },
-  // MLA : ratio déjà persisté
-  mla: (t, data, side) => (side === 'D' ? data.pctD : data.pctG) ?? null,
+  // MLA : ratio persisté OU fallback recompute depuis photos (mirror du render L4470-4476)
+  mla: (t, data, side) => {
+    const persisted = side === 'D' ? data.pctD : data.pctG;
+    if (persisted != null && !isNaN(persisted)) return persisted;
+    const ph = (data.photos || []).filter(p => p.side === side);
+    const prop = ph[0]?.angle, ecr = ph[1]?.angle;
+    return (prop != null && ecr != null) ? (ecr - prop) / (t.normDiv || 20) : null;
+  },
   // Verrouillage RF : pointe / normVerrou
   rf: (t, data, side) => {
     const ph = (data.photos || []).filter(p => p.side === side);
@@ -739,16 +745,29 @@ const MEASURE_COMPUTERS = {
     const stat = ph[0]?.angle, pointe = ph[1]?.angle;
     return (stat != null && pointe != null) ? (pointe - stat) / t.normVerrou : null;
   },
-  // Mobilité : (inv - év) / normMob
+  // Mobilité : (inv - év) / normMob (photos bilatérales side='', mirror du render L4415-4416)
   mob: (t, data, side) => {
     const ph = data.photos || [];
     const inv = side === 'D' ? ph[0]?.angleD : ph[0]?.angleG;
     const ev  = side === 'D' ? ph[1]?.angleD : ph[1]?.angleG;
     return (inv != null && ev != null) ? (inv - ev) / t.normMob : null;
   },
-  // Amorti / Propulsion : ratios déjà persistés
-  am: (t, data, side) => (side === 'D' ? data.amD : data.amG) ?? null,
-  pr: (t, data, side) => (side === 'D' ? data.prD : data.prG) ?? null,
+  // Amorti : persisté OU fallback recompute depuis photos (mirror du render L4480-4485)
+  am: (t, data, side) => {
+    const persisted = side === 'D' ? data.amD : data.amG;
+    if (persisted != null && !isNaN(persisted)) return persisted;
+    const ph2 = (data.photos || []).filter(p => p.side === side);
+    const talV = ph2[0]?.angle, planV = ph2[1]?.angle;
+    return (talV != null && planV != null) ? Math.abs(talV - planV) / t.normAm : null;
+  },
+  // Propulsion : persisté OU fallback recompute depuis photos (mirror du render L4480-4486)
+  pr: (t, data, side) => {
+    const persisted = side === 'D' ? data.prD : data.prG;
+    if (persisted != null && !isNaN(persisted)) return persisted;
+    const ph2 = (data.photos || []).filter(p => p.side === side);
+    const planV = ph2[1]?.angle, digV = ph2[2]?.angle;
+    return (planV != null && digV != null) ? Math.abs(digV - planV) / t.normAm : null;
+  },
 };
 
 // ══════════════════════════════════════════════════════
