@@ -598,7 +598,11 @@ const TESTS = {
     markers:'genou-bi', div:5, normeMin:3, normeMax:7,
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
-    frameLabels:['Repos bipodal','Phase plantigrade (dynamique)']
+    frameLabels:['Repos bipodal','Phase plantigrade (dynamique)'],
+    target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
+    measures:[
+      { key:'kfppa', label:'KFPPA Marche (valgus dynamique du genou)', norm:'60-140 %', interpretFn:'kfppa' },
+    ],
   },
   'kfppa-course': {
     name:'KFPPA Course', mode:'video', view:'face',
@@ -606,7 +610,11 @@ const TESTS = {
     markers:'genou-bi', div:8.5, normeMin:5, normeMax:12,
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
-    frameLabels:['Repos bipodal','Phase appui (dynamique)']
+    frameLabels:['Repos bipodal','Phase appui (dynamique)'],
+    target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
+    measures:[
+      { key:'kfppa', label:'KFPPA Course (valgus dynamique du genou)', norm:'60-140 %', interpretFn:'kfppa' },
+    ],
   },
   'kfppa-sldj': {
     name:'KFPPA SLDJ', mode:'video', view:'face',
@@ -614,7 +622,11 @@ const TESTS = {
     markers:'genou-bi', div:7.5, normeMin:5, normeMax:10,
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
-    frameLabels:['Repos bipodal','Réception saut']
+    frameLabels:['Repos bipodal','Réception saut'],
+    target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
+    measures:[
+      { key:'kfppa', label:'KFPPA SLDJ (valgus dynamique sur drop jump)', norm:'60-140 %', interpretFn:'kfppa' },
+    ],
   },
   // MLA : 3 marqueurs par pied, 2 photos par pied = 4 photos
   'mla-marche': {
@@ -622,14 +634,22 @@ const TESTS = {
     note:'Vue profil · 2 photos par pied (attaque/propulsion + écrasement)',
     markers:'mla', normDiv:20, propNorm:125, ecrNorm:145,
     photoLabels:['Attaque/Propulsion pied D','Écrasement pied D','Attaque/Propulsion pied G','Écrasement pied G'],
-    photoSides:['D','D','G','G'], showPhotoSlots:true, mlaTest:true
+    photoSides:['D','D','G','G'], showPhotoSlots:true, mlaTest:true,
+    target:'Pied', clinicalLabel:'MLA (ressort médio-pied)',
+    measures:[
+      { key:'mla', label:'MLA Marche (ressort médio-pied)', norm:'≥ 66 %', interpretFn:'gen' },
+    ],
   },
   'mla-course': {
     name:'MLA Course', mode:'video', view:'profil',
     note:'Vue profil · 2 photos par pied (attaque/propulsion + écrasement)',
     markers:'mla', normDiv:30, propNorm:120, ecrNorm:150,
     photoLabels:['Attaque/Propulsion pied D','Écrasement pied D','Attaque/Propulsion pied G','Écrasement pied G'],
-    photoSides:['D','D','G','G'], showPhotoSlots:true, mlaTest:true
+    photoSides:['D','D','G','G'], showPhotoSlots:true, mlaTest:true,
+    target:'Pied', clinicalLabel:'MLA (ressort médio-pied)',
+    measures:[
+      { key:'mla', label:'MLA Course (ressort médio-pied)', norm:'≥ 66 %', interpretFn:'gen' },
+    ],
   },
   // Verrouillage : 4 marqueurs jambier+calca, vue dos, 2 photos (neutre + pointe)
   'verrou': {
@@ -638,7 +658,12 @@ const TESTS = {
     markers:'ap-bi', normVerrou:10,
     photoLabels:['Statique bipodal D','Statique bipodal G','Pointe pieds D','Pointe pieds G'],
     photoSides:['D','G','D','G'], showPhotoSlots:true,
-    frameLabels:['Statique bipodal','Pointe pieds']
+    frameLabels:['Statique bipodal','Pointe pieds'],
+    target:'Pied', clinicalLabel:'Verrouillage AP (arrière-pied)',
+    measures:[
+      { key:'rf',     label:'Capacité de verrouillage de l\'arrière-pied', norm:'≥ 66 %', interpretFn:'gen' },
+      { key:'mollet', label:'Force du mollet',                              norm:'≥ 66 %', interpretFn:'gen' },
+    ],
   },
   // Mobilité : 2 photos (inversion + éversion)
   'mobilite': {
@@ -647,7 +672,11 @@ const TESTS = {
     markers:'ap-bi', normMob:30,
     photoLabels:['Inversion forcée bipodal','Éversion forcée bipodal'],
     photoSides:['',''], mobiliteAP:true, showPhotoSlots:true,
-    frameLabels:['Inversion forcée','Éversion forcée']
+    frameLabels:['Inversion forcée','Éversion forcée'],
+    target:'Pied', clinicalLabel:'Mobilité AP (arrière-pied)',
+    measures:[
+      { key:'mob', label:'Mobilité AP (mobilité arrière-pied)', norm:'≥ 66 %', interpretFn:'gen' },
+    ],
   },
   // Amorti/Propulsion : 6 photos (3 phases × 2 pieds)
   'amorti-marche': {
@@ -657,7 +686,12 @@ const TESTS = {
     photoLabels:['Attaque taligrade G','Attaque taligrade D','Phase plantigrade G','Phase plantigrade D','Phase digitigrade G','Phase digitigrade D'],
     photoSides:['G','D','G','D','G','D'],
     frameLabels:['Attaque taligrade','Phase plantigrade','Phase digitigrade'],
-    showPhotoSlots:true
+    showPhotoSlots:true,
+    target:'Pied', clinicalLabel:'Amorti/Propulsion (cinétique arrière-pied)',
+    measures:[
+      { key:'am', label:'Amorti à la marche (cinétique arrière-pied)',     norm:'≥ 66 %', interpretFn:'gen' },
+      { key:'pr', label:'Propulsion à la marche (cinétique arrière-pied)', norm:'≥ 66 %', interpretFn:'gen' },
+    ],
   },
   'amorti-course': {
     name:'Amorti/Propulsion Course', mode:'video', view:'dos',
@@ -666,8 +700,55 @@ const TESTS = {
     photoLabels:['Attaque taligrade G','Attaque taligrade D','Phase plantigrade G','Phase plantigrade D','Phase digitigrade G','Phase digitigrade D'],
     photoSides:['G','D','G','D','G','D'],
     frameLabels:['Attaque taligrade','Phase plantigrade','Phase digitigrade'],
-    showPhotoSlots:true
+    showPhotoSlots:true,
+    target:'Pied', clinicalLabel:'Amorti/Propulsion (cinétique arrière-pied)',
+    measures:[
+      { key:'am', label:'Amorti à la course (cinétique arrière-pied)',     norm:'≥ 66 %', interpretFn:'gen' },
+      { key:'pr', label:'Propulsion à la course (cinétique arrière-pied)', norm:'≥ 66 %', interpretFn:'gen' },
+    ],
   },
+};
+
+// ══════════════════════════════════════════════════════
+// MEASURE COMPUTERS — calcul du ratio par mesure (1.0 = 100%)
+// Sépare la logique de calcul de la config TESTS pour permettre
+// une boucle générique de génération des conclusions.
+// ══════════════════════════════════════════════════════
+const MEASURE_COMPUTERS = {
+  // KFPPA : recompute live depuis photos (cohérent avec rendu actuel)
+  kfppa: (t, data, side) => {
+    const _bip = data.photos?.find(p => p.side === '');
+    const _uni = data.photos?.find(p => p.side === side);
+    const _toI = (v) => v == null ? null : (v > 90 ? 180 - v : v);
+    const _bd = _toI(side === 'D' ? _bip?.angleD : _bip?.angleG);
+    const _ud = _toI(_uni?.angle);
+    const _delta = (_bd != null && _ud != null) ? (_ud - _bd) : _toI(side === 'D' ? data.deltaD : data.deltaG);
+    return (_delta != null) ? _delta / t.div : null;
+  },
+  // MLA : ratio déjà persisté
+  mla: (t, data, side) => (side === 'D' ? data.pctD : data.pctG) ?? null,
+  // Verrouillage RF : pointe / normVerrou
+  rf: (t, data, side) => {
+    const ph = (data.photos || []).filter(p => p.side === side);
+    const pointe = ph[1]?.angle;
+    return (pointe != null) ? pointe / t.normVerrou : null;
+  },
+  // Verrouillage Mollet : (pointe - stat) / normVerrou
+  mollet: (t, data, side) => {
+    const ph = (data.photos || []).filter(p => p.side === side);
+    const stat = ph[0]?.angle, pointe = ph[1]?.angle;
+    return (stat != null && pointe != null) ? (pointe - stat) / t.normVerrou : null;
+  },
+  // Mobilité : (inv - év) / normMob
+  mob: (t, data, side) => {
+    const ph = data.photos || [];
+    const inv = side === 'D' ? ph[0]?.angleD : ph[0]?.angleG;
+    const ev  = side === 'D' ? ph[1]?.angleD : ph[1]?.angleG;
+    return (inv != null && ev != null) ? (inv - ev) / t.normMob : null;
+  },
+  // Amorti / Propulsion : ratios déjà persistés
+  am: (t, data, side) => (side === 'D' ? data.amD : data.amG) ?? null,
+  pr: (t, data, side) => (side === 'D' ? data.prD : data.prG) ?? null,
 };
 
 // ══════════════════════════════════════════════════════
@@ -3888,7 +3969,7 @@ function printReport() {
   // Conclusion générale
   let concluHTML='';
   if(conclusions.length){
-    concluHTML=`<div class="rp-conclu"><strong style="display:block;margin-bottom:4px;">Mesures hors normes physiologiques</strong>${conclusions.join('<br>')}</div>`;
+    concluHTML=`<div class="rp-conclu"><strong style="display:block;margin-bottom:4px;">Mesures à signaler</strong>${conclusions.join('<br>')}</div>`;
   }
 
   const bilanSection = (typeof buildBilanPrintSection === 'function' && currentPatient && currentPatient.bilanData)
@@ -4196,13 +4277,43 @@ function buildBilanPrintSection(bd) {
   return h;
 }
 
+// Construit le titre de section enrichi avec la nomenclature pédagogique.
+// Ex.: t.name='KFPPA Marche' + clinicalLabel='KFPPA (valgus dynamique du genou)'
+//   → 'KFPPA Marche — valgus dynamique du genou'
+function sectionTitle(t) {
+  const m = t.clinicalLabel ? t.clinicalLabel.match(/\(([^)]+)\)/) : null;
+  return m && m[1] ? `${t.name} — ${m[1]}` : t.name;
+}
+
 function buildPrintSection(t, data, conclusions) {
+  // ─── Conclusions auto : boucle générique sur t.measures ───
+  // Pour chaque test, pour chaque mesure, pour chaque côté D/G :
+  // calcule le ratio, applique interpret*(), pousse une ligne factuelle
+  // si la classification n'est pas 'dans la norme'.
+  // Le rendu HTML ci-dessous reste inchangé — on alimente juste la liste conclusions.
+  (t.measures || []).forEach(m => {
+    const compute = MEASURE_COMPUTERS[m.key];
+    const interpret = m.interpretFn === 'kfppa' ? interpretKfppa : interpretGen;
+    const isAbs = m.interpretFn !== 'kfppa'; // KFPPA conserve le signe (valgus/varus)
+    if (!compute) return;
+    ['D', 'G'].forEach(side => {
+      const ratio = compute(t, data, side);
+      if (ratio == null) return;
+      const ratioForInterpret = isAbs ? Math.abs(ratio) : ratio;
+      const classification = interpret(ratioForInterpret);
+      if (classification === 'dans la norme' || classification === '—') return;
+      const pct = Math.round((isAbs ? Math.abs(ratio) : ratio) * 100);
+      const sideLabel = side === 'D' ? 'droit' : 'gauche';
+      conclusions.push(`${t.target} ${sideLabel} · ${m.label} : ${pct} % (norme : ${m.norm}) — ${classification}`);
+    });
+  });
+
   const hasSides=t.div!==undefined||t.normDiv!==undefined||t.normAm!==undefined||t.mlaTest||t.normVerrou!==undefined||t.normMob!==undefined;
   let written='', sectionHTML='';
 
   if(hasSides) {
     sectionHTML+=`<div class="rp-section">
-      <div class="rp-section-title">${t.name}</div>
+      <div class="rp-section-title">${sectionTitle(t)}</div>
       <div class="rp-side-grid">
         ${buildPrintSide('D',t,data)}
         ${buildPrintSide('G',t,data)}
@@ -4228,8 +4339,6 @@ function buildPrintSection(t, data, conclusions) {
       if(vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${data.deltaD?.toFixed(1)||'—'}° (${vD}%) — ${interpretKfppa(pD)}`);
       if(vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${data.deltaG?.toFixed(1)||'—'}° (${vG}%) — ${interpretKfppa(pG)}`);
       lines.push(`Norme physiologique : ${normStr}`);
-      if(vD!==null&&vD>150) conclusions.push(`Genou droit KFPPA (valgus dynamique) : ${vD} % (norme : 60-140 %)`);
-      if(vG!==null&&vG>150) conclusions.push(`Genou gauche KFPPA (valgus dynamique) : ${vG} % (norme : 60-140 %)`);
     } else if(t.normDiv!==undefined||t.mlaTest){
       const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
       const vG=(data.pctG!=null&&!isNaN(data.pctG))?Math.round(data.pctG*100):null;
@@ -4237,8 +4346,6 @@ function buildPrintSection(t, data, conclusions) {
       if(normStr) lines.push(`<em style="color:#888;">${normStr}</em>`);
       if(vD!==null) lines.push(`<strong>Pied droit :</strong> Fonction amortisseur MLA = ${vD}% — ${interpretGen(data.pctD)}`);
       if(vG!==null) lines.push(`<strong>Pied gauche :</strong> Fonction amortisseur MLA = ${vG}% — ${interpretGen(data.pctG)}`);
-      if(vD!==null&&vD<33) conclusions.push(`Arche interne droite MLA (ressort médio-pied) : ${vD} % (norme : ≥ 66 %)`);
-      if(vG!==null&&vG<33) conclusions.push(`Arche interne gauche MLA (ressort médio-pied) : ${vG} % (norme : ≥ 66 %)`);
     } else if(t.normAm!==undefined){
       const amD=data.amD!==null?Math.round(data.amD*100):null;
       const amG=data.amG!==null?Math.round(data.amG*100):null;
@@ -4267,7 +4374,7 @@ function buildPrintSection(t, data, conclusions) {
       const rfG=pointeG!=null?pointeG/t.normVerrou:null;
       const molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/t.normVerrou:null;
       const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-      sectionHTML+=`<div class="rp-section"><div class="rp-section-title">${t.name}</div>
+      sectionHTML+=`<div class="rp-section"><div class="rp-section-title">${sectionTitle(t)}</div>
         <div class="rp-side-grid">
           <div><strong style="color:#185FA5;">Pied Droit</strong><br>
             Statique: ${apV(statD)} (N: 0°)<br>
@@ -4290,8 +4397,6 @@ function buildPrintSection(t, data, conclusions) {
         Pied gauche: Stat: ${statG!=null?Math.abs(statG).toFixed(1)+'deg':'-'} - RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'-'} - Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'-'}
       </div>
       </div>`;
-      if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Verrouillage AP (arrière-pied) droit : ${Math.round(Math.abs(rfD)*100)} % (norme : ≥ 66 %)`);
-      if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Verrouillage AP (arrière-pied) gauche : ${Math.round(Math.abs(rfG)*100)} % (norme : ≥ 66 %)`);
       // Recalculer depuis photos si rfD/rfG null
       const _phD2=(data.photos||[]).filter(p=>p.side==='D');
       const _phG2=(data.photos||[]).filter(p=>p.side==='G');
@@ -4311,7 +4416,7 @@ function buildPrintSection(t, data, conclusions) {
       const mobD=(invD!=null&&evD!=null)?(invD-evD)/t.normMob:null;
       const mobG=(invG!=null&&evG!=null)?(invG-evG)/t.normMob:null;
       const apV2=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-      sectionHTML+=`<div class="rp-section"><div class="rp-section-title">${t.name}</div>
+      sectionHTML+=`<div class="rp-section"><div class="rp-section-title">${sectionTitle(t)}</div>
         <div class="rp-side-grid">
           <div><strong style="color:#185FA5;">Pied Droit</strong><br>
             Inversion: ${apV2(invD)} (N: +20°)<br>
@@ -4330,14 +4435,11 @@ function buildPrintSection(t, data, conclusions) {
       </div>`;
       const _mobDpct=mobD!=null?Math.round(Math.abs(mobD)*100):null;
       const _mobGpct=mobG!=null?Math.round(Math.abs(mobG)*100):null;
-      const interpretMob=(p)=>{if(p==null)return'—';const v=Math.abs(p)*100;if(v>=66)return'dans la norme';if(v>=33)return'valeur limite';return'hors norme';};
       sectionHTML+=`<div class="rp-written">
         <em style="color:#888;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</em><br>
-        <strong>Pied droit :</strong> Inv: ${apV2(invD)} · Év: ${apV2(evD)} · Mobilité: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'°':'—'} (${_mobDpct!=null?_mobDpct+'%':'—'}) — ${interpretMob(mobD)}<br>
-        <strong>Pied gauche :</strong> Inv: ${apV2(invG)} - Ev: ${apV2(evG)} - Mobilite: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'deg':'-'} (${_mobGpct!=null?_mobGpct+'%':'-'}) - ${interpretMob(mobG)}
+        <strong>Pied droit :</strong> Inv: ${apV2(invD)} · Év: ${apV2(evD)} · Mobilité: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'°':'—'} (${_mobDpct!=null?_mobDpct+'%':'—'}) — ${mobD!=null?interpretGen(Math.abs(mobD)):'—'}<br>
+        <strong>Pied gauche :</strong> Inv: ${apV2(invG)} - Ev: ${apV2(evG)} - Mobilite: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'deg':'-'} (${_mobGpct!=null?_mobGpct+'%':'-'}) - ${mobG!=null?interpretGen(Math.abs(mobG)):'—'}
       </div></div>`;
-      if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP (arrière-pied) droite : ${Math.round(Math.abs(mobD)*100)} % (norme : ≥ 66 %)`);
-      if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP (arrière-pied) gauche : ${Math.round(Math.abs(mobG)*100)} % (norme : ≥ 66 %)`);
       sectionHTML+=`<div class="rp-written"><strong>Pied droit :</strong> Mobilité : ${_mobDpct!=null?_mobDpct+'%':'—'} — ${mobD==null?'':Math.abs(mobD)*100>=66?'dans la norme':Math.abs(mobD)*100>=33?'valeur limite':'hors norme'}<br><strong>Pied gauche :</strong> Mobilité : ${_mobGpct!=null?_mobGpct+'%':'—'} — ${mobG==null?'':Math.abs(mobG)*100>=66?'dans la norme':Math.abs(mobG)*100>=33?'valeur limite':'hors norme'}</div>`;
     }
     else {
@@ -4529,7 +4631,7 @@ function buildPrintSingleSide(t,data) {
       ${ph.angle!=null?`<div class="rp-photo-ang" style="color:${cssC};">${ph.angle.toFixed(1)}°</div>`:''}
     </div>`).join('');
   return `<div class="rp-section">
-    <div class="rp-section-title">${t.name}</div>
+    <div class="rp-section-title">${sectionTitle(t)}</div>
     <div class="rp-test-block">
       <div class="rp-gauge-photos">
         <div class="rp-gauge">
