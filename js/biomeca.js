@@ -1334,6 +1334,21 @@ function renderPatientList() {
     const bilansSport = p.bilansSport || [];
     const bilansPosturo = p.bilansPosturo || [];
 
+    // Carte "Bilan en cours" — affichée quand p.mesures contient des tests non encore archivés
+    const hasBilanEnCours = p.mesures && Object.keys(p.mesures).length > 0;
+    const nbTestsEnCours = hasBilanEnCours ? Object.keys(p.mesures).length : 0;
+    const typeEnCoursLabel = p.currentBilanSousType === 'controle' ? 'de Contrôle' : 'Initial';
+    const bilanEnCoursHtml = hasBilanEnCours ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:rgba(247,165,40,0.85);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⏳ Bilan sport en cours</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(247,165,40,0.08);border:1px solid rgba(247,165,40,0.30);border-radius:8px;margin-bottom:5px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#f7a528;flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">Bilan ${typeEnCoursLabel} · ${nbTestsEnCours} test(s) saisi(s)</span>
+          <button onclick="ouvrirBilanSport(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
+          <button onclick="finalizeBilanSport(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
+        </div>
+      </div>` : '';
+
     const bilansSportHtml = bilansSport.length ? `
       <div style="margin-top:10px;">
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans sportifs</div>
@@ -1416,7 +1431,7 @@ function renderPatientList() {
 
     return `
     <div style="margin-bottom:10px;">
-      <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:${bilansSport.length||bilansPosturo.length?'12px 12px 0 0':'12px'};">
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:${hasBilanEnCours||bilansSport.length||bilansPosturo.length?'12px 12px 0 0':'12px'};">
         <div class="av" style="width:44px;height:44px;flex-shrink:0;">${init}</div>
         <div style="flex:1;">
           <div style="font-size:14px;font-weight:700;color:#fff;">${p.prenom} ${p.nom}</div>
@@ -1426,10 +1441,10 @@ function renderPatientList() {
         <button onclick="deletePatient(${i})" style="background:rgba(240,64,96,0.08);border:1px solid rgba(240,64,96,0.2);color:#f04060;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✕</button>
       </div>
       <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-top:none;border-radius:0 0 12px 12px;padding:14px;">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:${bilansSport.length||bilansPosturo.length?'4px':'0'};">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:${hasBilanEnCours||bilansSport.length||bilansPosturo.length?'4px':'0'};">
           ${modPosturo}${modSport}${modPodo}
         </div>
-        ${bilansPosturoHtml}${bilansSportHtml}
+        ${bilanEnCoursHtml}${bilansPosturoHtml}${bilansSportHtml}
       </div>
     </div>`;
   }).join('');
@@ -1512,11 +1527,50 @@ function loadBilanFromHistory(patIdx, bilanIdx) {
 
 // ---- NOUVEAU SYSTÈME BILANS ----
 
+// Archive le bilan sport en cours (currentPatient.mesures) dans bilansSport[]
+// sans démarrer un nouveau bilan. Reste sur la fiche patient.
+function finalizeBilanSport(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  if (!p.mesures || Object.keys(p.mesures).length === 0) {
+    alert('Aucun test n\'a encore été saisi dans le bilan en cours.');
+    return;
+  }
+  if (!p.bilansSport) p.bilansSport = [];
+  const num = p.bilansSport.length + 1;
+  const type = p.currentBilanSousType || 'initial';
+  const label = type === 'initial' ? 'Sportif Initial' : 'Sportif Contrôle ' + num;
+  p.bilansSport.push({
+    label: label,
+    type: type,
+    date: new Date().toLocaleDateString('fr-FR'),
+    mesures: JSON.parse(JSON.stringify(p.mesures)),
+    bilanData: JSON.parse(JSON.stringify(p.bilanData || {}))
+  });
+  // Reset du bilan en cours
+  p.mesures = {};
+  p.bilanData = {};
+  delete p.currentBilanType;
+  delete p.currentBilanSousType;
+  currentOpenedBilanIdx = null;
+  savePatients();
+  renderPatientList();
+  alert('✓ Bilan "' + label + '" archivé avec succès.');
+}
+
 function creerBilanSport(patIdx, type) {
   const p = patients[patIdx];
   if(!p) return;
   // Sauvegarder bilan courant si données existantes
   if(p.mesures && Object.keys(p.mesures).length > 0) {
+    const nbTests = Object.keys(p.mesures).length;
+    const confirmMsg = 'Vous avez un bilan en cours avec ' + nbTests + ' test(s) saisi(s).\n\n' +
+      'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
+      '• OK : finalise et archive le bilan en cours, puis démarre un nouveau bilan ' + (type === 'initial' ? 'initial' : 'de contrôle') + '.\n' +
+      '• Annuler : retour à la fiche patient pour utiliser le bouton "Finaliser et archiver" du bilan en cours.';
+    if (!confirm(confirmMsg)) {
+      return;
+    }
     if(!p.bilansSport) p.bilansSport = [];
     const num = p.bilansSport.length + 1;
     p.bilansSport.push({
