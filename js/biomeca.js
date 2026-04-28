@@ -3888,7 +3888,7 @@ function printReport() {
   // Conclusion générale
   let concluHTML='';
   if(conclusions.length){
-    concluHTML=`<div class="rp-conclu"><strong style="display:block;margin-bottom:4px;">Synthèse clinique</strong>${conclusions.join('<br>')}</div>`;
+    concluHTML=`<div class="rp-conclu"><strong style="display:block;margin-bottom:4px;">Mesures hors normes physiologiques</strong>${conclusions.join('<br>')}</div>`;
   }
 
   const bilanSection = (typeof buildBilanPrintSection === 'function' && currentPatient && currentPatient.bilanData)
@@ -4228,8 +4228,8 @@ function buildPrintSection(t, data, conclusions) {
       if(vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${data.deltaD?.toFixed(1)||'—'}° (${vD}%) — ${interpretKfppa(pD)}`);
       if(vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${data.deltaG?.toFixed(1)||'—'}° (${vG}%) — ${interpretKfppa(pG)}`);
       lines.push(`Norme physiologique : ${normStr}`);
-      if(vD!==null&&vD>150) conclusions.push(`Valgus dynamique excessif genou droit (${vD}%) — ${t.name}`);
-      if(vG!==null&&vG>150) conclusions.push(`Valgus dynamique excessif genou gauche (${vG}%) — ${t.name}`);
+      if(vD!==null&&vD>150) conclusions.push(`Genou droit KFPPA (valgus dynamique) : ${vD} % (norme : 60-140 %)`);
+      if(vG!==null&&vG>150) conclusions.push(`Genou gauche KFPPA (valgus dynamique) : ${vG} % (norme : 60-140 %)`);
     } else if(t.normDiv!==undefined||t.mlaTest){
       const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
       const vG=(data.pctG!=null&&!isNaN(data.pctG))?Math.round(data.pctG*100):null;
@@ -4237,8 +4237,8 @@ function buildPrintSection(t, data, conclusions) {
       if(normStr) lines.push(`<em style="color:#888;">${normStr}</em>`);
       if(vD!==null) lines.push(`<strong>Pied droit :</strong> Fonction amortisseur MLA = ${vD}% — ${interpretGen(data.pctD)}`);
       if(vG!==null) lines.push(`<strong>Pied gauche :</strong> Fonction amortisseur MLA = ${vG}% — ${interpretGen(data.pctG)}`);
-      if(vD!==null&&vD<33) conclusions.push(`Déficience de l'arche interne droite (${vD}%) — ${t.name}`);
-      if(vG!==null&&vG<33) conclusions.push(`Déficience de l'arche interne gauche (${vG}%) — ${t.name}`);
+      if(vD!==null&&vD<33) conclusions.push(`Arche interne droite MLA (ressort médio-pied) : ${vD} % (norme : ≥ 66 %)`);
+      if(vG!==null&&vG<33) conclusions.push(`Arche interne gauche MLA (ressort médio-pied) : ${vG} % (norme : ≥ 66 %)`);
     } else if(t.normAm!==undefined){
       const amD=data.amD!==null?Math.round(data.amD*100):null;
       const amG=data.amG!==null?Math.round(data.amG*100):null;
@@ -4290,8 +4290,8 @@ function buildPrintSection(t, data, conclusions) {
         Pied gauche: Stat: ${statG!=null?Math.abs(statG).toFixed(1)+'deg':'-'} - RF: ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'-'} - Mollet: ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'-'}
       </div>
       </div>`;
-      if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Insuffisance verrouillage AP droit (${Math.round(Math.abs(rfD)*100)}%) — ${t.name}`);
-      if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Insuffisance verrouillage AP gauche (${Math.round(Math.abs(rfG)*100)}%) — ${t.name}`);
+      if(rfD!=null&&Math.abs(rfD)<0.33) conclusions.push(`Verrouillage AP (arrière-pied) droit : ${Math.round(Math.abs(rfD)*100)} % (norme : ≥ 66 %)`);
+      if(rfG!=null&&Math.abs(rfG)<0.33) conclusions.push(`Verrouillage AP (arrière-pied) gauche : ${Math.round(Math.abs(rfG)*100)} % (norme : ≥ 66 %)`);
       // Recalculer depuis photos si rfD/rfG null
       const _phD2=(data.photos||[]).filter(p=>p.side==='D');
       const _phG2=(data.photos||[]).filter(p=>p.side==='G');
@@ -4330,14 +4330,14 @@ function buildPrintSection(t, data, conclusions) {
       </div>`;
       const _mobDpct=mobD!=null?Math.round(Math.abs(mobD)*100):null;
       const _mobGpct=mobG!=null?Math.round(Math.abs(mobG)*100):null;
-      const interpretMob=(p)=>{if(p==null)return'—';const v=Math.abs(p)*100;if(v>=66)return'dans la norme — mobilité arrière-pied suffisante';if(v>=33)return'limite — mobilité arrière-pied réduite';return'hors norme — mobilité arrière-pied très limitée ou absente';};
+      const interpretMob=(p)=>{if(p==null)return'—';const v=Math.abs(p)*100;if(v>=66)return'dans la norme';if(v>=33)return'valeur limite';return'hors norme';};
       sectionHTML+=`<div class="rp-written">
         <em style="color:#888;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</em><br>
         <strong>Pied droit :</strong> Inv: ${apV2(invD)} · Év: ${apV2(evD)} · Mobilité: ${invD!=null&&evD!=null?(invD-evD).toFixed(1)+'°':'—'} (${_mobDpct!=null?_mobDpct+'%':'—'}) — ${interpretMob(mobD)}<br>
         <strong>Pied gauche :</strong> Inv: ${apV2(invG)} - Ev: ${apV2(evG)} - Mobilite: ${invG!=null&&evG!=null?(invG-evG).toFixed(1)+'deg':'-'} (${_mobGpct!=null?_mobGpct+'%':'-'}) - ${interpretMob(mobG)}
       </div></div>`;
-      if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP droite réduite (${Math.round(Math.abs(mobD)*100)}%) — ${t.name}`);
-      if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP gauche réduite (${Math.round(Math.abs(mobG)*100)}%) — ${t.name}`);
+      if(mobD!=null&&Math.abs(mobD)<0.33) conclusions.push(`Mobilité AP (arrière-pied) droite : ${Math.round(Math.abs(mobD)*100)} % (norme : ≥ 66 %)`);
+      if(mobG!=null&&Math.abs(mobG)<0.33) conclusions.push(`Mobilité AP (arrière-pied) gauche : ${Math.round(Math.abs(mobG)*100)} % (norme : ≥ 66 %)`);
       sectionHTML+=`<div class="rp-written"><strong>Pied droit:</strong> Mobilite: ${_mobDpct!=null?_mobDpct+'%':'-'} - ${mobD==null?'':Math.abs(mobD)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(mobD)*100>=33?'Limite':'Hors norme - mobilite tres limitee'}<br><strong>Pied gauche:</strong> Mobilite: ${_mobGpct!=null?_mobGpct+'%':'-'} - ${mobG==null?'':Math.abs(mobG)*100>=66?'Dans la norme - mobilite suffisante':Math.abs(mobG)*100>=33?'Limite':'Hors norme - mobilite tres limitee'}</div>`;
     }
     else {
@@ -4621,8 +4621,8 @@ function rp_badgeTxt(p,genou){
   if(genou) return v>=60&&v<=140?'Normal':v>=20&&v<=180?'Limite':'Hors norme';
   return v>=66?'Normal':v>=33?'Limite':'Hors norme';
 }
-function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=60&&v<=140)return'dans la norme';if(v>=20&&v<=180)return'valeur limite';return'hors norme — valgus excessif';}
-function interpretGen(p){if(p===null)return'—';const v=p*100;if(v>=66)return'dans la norme';if(v>=33)return'valeur limite';return'insuffisance significative';}
+function interpretKfppa(p){if(p===null)return'—';const v=p*100;if(v>=60&&v<=140)return'dans la norme';if(v>=20&&v<=180)return'valeur limite';return'hors norme';}
+function interpretGen(p){if(p===null)return'—';const v=p*100;if(v>=66)return'dans la norme';if(v>=33)return'valeur limite';return'hors norme';}
 
 // ══════════════════════════════════════════════════════
 // BILAN CLINIQUE
@@ -6640,9 +6640,9 @@ function getBilanPosturoHTML() {
         </label>
       </div>
 
-      <!-- Anomalie réfraction -->
+      <!-- Réfraction -->
       <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:10px;margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:600;color:#b7740a;margin-bottom:6px;">- Anomalie de réfraction :</div>
+        <div style="font-size:11px;font-weight:600;color:#b7740a;margin-bottom:6px;">- Réfraction :</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${[['Myopie','po-myopie'],['Hypermétropie','po-hypermetropie'],['Presbyte','po-presbyte'],['Astigmate','po-astigmate']].map(([label,id]) => `
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff9e6;border:2px solid #f0a500;border-radius:20px;padding:4px 12px;color:#222;font-size:12px;">

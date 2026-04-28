@@ -201,37 +201,39 @@ export function kfppaLabel(ang, _side) {
 }
 
 /**
- * Interprète un score KFPPA (ratio) en littéral clinique.
- * Seuils cliniques alignés sur clrKfppa (Sprint 0 — 2026-04-26) :
+ * Classifie un score KFPPA (ratio) par rapport aux seuils physiologiques.
+ * Retourne uniquement la zone factuelle ; ne formule aucun jugement clinique.
+ * Seuils alignés sur clrKfppa :
  *   v = p × 100
  *   60 ≤ v ≤ 140       → 'dans la norme'
  *   20 ≤ v ≤ 180       → 'valeur limite'
- *   v < 20 ou v > 180  → 'hors norme — valgus excessif'
+ *   v < 20 ou v > 180  → 'hors norme'
  *
  * @param {number|null} p  Score normalisé (1.0 = 100 %) ; null retourne '—'.
- * @returns {string}  Verdict littéral.
+ * @returns {string}  Classification factuelle.
  */
 export function interpretKfppa(p) {
   if (p === null) return '—';
   const v = p * 100;
   if (v >= 60 && v <= 140) return 'dans la norme';
   if (v >= 20 && v <= 180) return 'valeur limite';
-  return 'hors norme — valgus excessif';
+  return 'hors norme';
 }
 
 /**
- * Interprète un score générique (non-KFPPA) en littéral clinique.
- * Seuils : ≥ 66 % = norme · ≥ 33 % = limite · sinon insuffisance significative.
+ * Classifie un score générique (non-KFPPA) par rapport aux seuils.
+ * Retourne uniquement la zone factuelle ; ne formule aucun jugement clinique.
+ * Seuils : ≥ 66 % = norme · ≥ 33 % = limite · sinon hors norme.
  *
  * @param {number|null} p  Score normalisé (1.0 = 100 %) ; null retourne '—'.
- * @returns {string}  Verdict littéral.
+ * @returns {string}  Classification factuelle.
  */
 export function interpretGen(p) {
   if (p === null) return '—';
   const v = p * 100;
   if (v >= 66) return 'dans la norme';
   if (v >= 33) return 'valeur limite';
-  return 'insuffisance significative';
+  return 'hors norme';
 }
 
 // ============================================================================

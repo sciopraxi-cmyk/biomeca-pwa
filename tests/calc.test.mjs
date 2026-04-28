@@ -9,12 +9,12 @@ import {
 } from '../js/calc.mjs';
 
 // ============================================================================
-// interpretKfppa(p) — interprétation littérale d'un score KFPPA
+// interpretKfppa(p) — classification factuelle d'un score KFPPA
 // Seuils cliniques (depuis js/calc.mjs, alignés sur clrKfppa) :
 //   v = p * 100
 //   60 ≤ v ≤ 140      → 'dans la norme'
 //   20 ≤ v ≤ 180      → 'valeur limite'
-//   v < 20 ou v > 180 → 'hors norme — valgus excessif'
+//   v < 20 ou v > 180 → 'hors norme'
 //   p === null        → '—'
 // ============================================================================
 describe('interpretKfppa', () => {
@@ -42,12 +42,12 @@ describe('interpretKfppa', () => {
     expect(interpretKfppa(1.5)).toBe('valeur limite');
   });
 
-  it('retourne "hors norme — valgus excessif" pour un score à 10% (très en deçà)', () => {
-    expect(interpretKfppa(0.1)).toBe('hors norme — valgus excessif');
+  it('retourne "hors norme" pour un score à 10% (très en deçà)', () => {
+    expect(interpretKfppa(0.1)).toBe('hors norme');
   });
 
-  it('retourne "hors norme — valgus excessif" pour un score à 200% (très au-delà)', () => {
-    expect(interpretKfppa(2.0)).toBe('hors norme — valgus excessif');
+  it('retourne "hors norme" pour un score à 200% (très au-delà)', () => {
+    expect(interpretKfppa(2.0)).toBe('hors norme');
   });
 });
 
