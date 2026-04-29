@@ -3825,10 +3825,10 @@ function _buildRapportBody(p, d, prat, logo, sections) {
         ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
         return tmp.toDataURL('image/png');
       }
-      bonhommesSection.profilDImg = makeSliceComposite(3);
+      bonhommesSection.profilDImg = makeSliceComposite(0);
       bonhommesSection.face2Img   = makeSliceComposite(1);
       bonhommesSection.faceImg    = makeSliceComposite(2);
-      bonhommesSection.profilGImg = makeSliceComposite(0);
+      bonhommesSection.profilGImg = makeSliceComposite(3);
       bonhommesSection.bodyCanvasData = null;
       _doBuildRapport(p, d, prat, logo, sections);
     };
