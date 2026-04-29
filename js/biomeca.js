@@ -298,11 +298,18 @@ async function loadSupabaseData() {
         }
       }
     });
-    if(migrated) { console.log('Migration bilans OK'); savePatients(); }
+    // Migration #39 (29 avril 2026) : currentBilanType + currentBilanSousType
+    // → currentBilanSportSousType / currentBilanPosturoSousType (indépendants).
+    const flagsMigrated = migrateBilanFlags(patients);
+    if(migrated || flagsMigrated) { console.log('Migration bilans OK'); savePatients(); }
   } catch(e) {
     // Fallback localStorage si Supabase indisponible
     patients = JSON.parse(localStorage.getItem('bm4-patients-pwa') || '[]');
     praticiens = JSON.parse(localStorage.getItem('bm4-praticiens-pwa') || '[]');
+    // Migration #39 sur le fallback aussi
+    if (migrateBilanFlags(patients)) {
+      try { localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients)); } catch(_) {}
+    }
   }
 
   currentPatient = null; bilanData = {};
@@ -1347,6 +1354,27 @@ function hasBilanDataContent(d) {
   });
 }
 
+// Migration #39 (29 avril 2026) : currentBilanType + currentBilanSousType
+// → currentBilanSportSousType / currentBilanPosturoSousType (indépendants).
+// Retourne true si au moins un patient a été migré.
+function migrateBilanFlags(patientsList) {
+  let migrated = false;
+  patientsList.forEach(p => {
+    if (p.currentBilanType && p.currentBilanSousType &&
+        !p.currentBilanSportSousType && !p.currentBilanPosturoSousType) {
+      if (p.currentBilanType === 'sport') {
+        p.currentBilanSportSousType = p.currentBilanSousType;
+      } else if (p.currentBilanType === 'posturo') {
+        p.currentBilanPosturoSousType = p.currentBilanSousType;
+      }
+      delete p.currentBilanType;
+      delete p.currentBilanSousType;
+      migrated = true;
+    }
+  });
+  return migrated;
+}
+
 function renderPatientList() {
   const el = document.getElementById('pt-list-el');
   const search = (document.getElementById('pt-search')?.value||'').toLowerCase().trim();
@@ -1371,14 +1399,14 @@ function renderPatientList() {
     const bilansSport = p.bilansSport || [];
     const bilansPosturo = p.bilansPosturo || [];
 
-    // Carte "Bilan en cours" — affichée dès qu'un bilan est démarré (currentBilanType === 'sport'),
-    // même si aucune donnée n'a encore été saisie. Permet au praticien de visualiser
-    // qu'un bilan est en cours et d'y retourner ou de l'abandonner.
+    // Carte "Bilan en cours" — affichée dès qu'un bilan est démarré
+    // (currentBilanSportSousType non null), même si aucune donnée n'a encore été saisie.
+    // Permet au praticien de visualiser qu'un bilan est en cours et d'y retourner ou de l'abandonner.
     const nbTestsEnCours = p.mesures ? Object.keys(p.mesures).length : 0;
     const hasMesures = nbTestsEnCours > 0;
     const hasBilanData = hasBilanDataContent(p.bilanData);
-    const hasBilanEnCours = p.currentBilanType === 'sport';
-    const typeEnCoursLabel = p.currentBilanSousType === 'controle' ? 'de Contrôle' : 'Initial';
+    const hasBilanEnCours = p.currentBilanSportSousType != null;
+    const typeEnCoursLabel = p.currentBilanSportSousType === 'controle' ? 'de Contrôle' : 'Initial';
     // Construction du sous-libellé selon le contenu présent
     let sousLibelle;
     if (hasMesures && hasBilanData) {
@@ -1404,8 +1432,8 @@ function renderPatientList() {
 
     // Carte "Bilan postural en cours" — mirror du bandeau sport pour le flow posturo.
     const hasBilanPosturoData = hasBilanDataContent(p.bilanDataPosturo);
-    const hasBilanPosturoEnCours = p.currentBilanType === 'posturo';
-    const typePosturoLabel = p.currentBilanSousType === 'controle' ? 'de Contrôle' : 'Initial';
+    const hasBilanPosturoEnCours = p.currentBilanPosturoSousType != null;
+    const typePosturoLabel = p.currentBilanPosturoSousType === 'controle' ? 'de Contrôle' : 'Initial';
     const sousLibellePosturo = hasBilanPosturoData ? 'saisie clinique en cours' : 'aucune donnée encore saisie';
     const bilanPosturoEnCoursHtml = hasBilanPosturoEnCours ? `
       <div style="margin-top:10px;">
@@ -1620,8 +1648,7 @@ function abandonnerBilanSport(patIdx) {
   }
   p.mesures = {};
   p.bilanData = {};
-  delete p.currentBilanType;
-  delete p.currentBilanSousType;
+  delete p.currentBilanSportSousType;
   currentOpenedBilanIdx = null;
   savePatients();
   renderPatientList();
@@ -1640,7 +1667,7 @@ function finalizeBilanSport(patIdx) {
   }
   if (!p.bilansSport) p.bilansSport = [];
   const num = p.bilansSport.length + 1;
-  const type = p.currentBilanSousType || 'initial';
+  const type = p.currentBilanSportSousType || 'initial';
   const label = type === 'initial' ? 'Sportif Initial' : 'Sportif Contrôle ' + num;
   p.bilansSport.push({
     label: label,
@@ -1652,8 +1679,7 @@ function finalizeBilanSport(patIdx) {
   // Reset du bilan en cours
   p.mesures = {};
   p.bilanData = {};
-  delete p.currentBilanType;
-  delete p.currentBilanSousType;
+  delete p.currentBilanSportSousType;
   currentOpenedBilanIdx = null;
   savePatients();
   renderPatientList();
@@ -1673,8 +1699,7 @@ function abandonnerBilanPosturo(patIdx) {
   }
   if (!confirm(confirmMsg)) return;
   p.bilanDataPosturo = {};
-  delete p.currentBilanType;
-  delete p.currentBilanSousType;
+  delete p.currentBilanPosturoSousType;
   savePatients();
   renderPatientList();
 }
@@ -1690,7 +1715,7 @@ function finalizeBilanPosturo(patIdx) {
   }
   if (!p.bilansPosturo) p.bilansPosturo = [];
   const num = p.bilansPosturo.length + 1;
-  const type = p.currentBilanSousType || 'initial';
+  const type = p.currentBilanPosturoSousType || 'initial';
   const label = type === 'initial' ? 'Posturo Initial' : 'Posturo Contrôle ' + num;
   p.bilansPosturo.push({
     label: label,
@@ -1699,8 +1724,7 @@ function finalizeBilanPosturo(patIdx) {
     bilanDataPosturo: JSON.parse(JSON.stringify(p.bilanDataPosturo))
   });
   p.bilanDataPosturo = {};
-  delete p.currentBilanType;
-  delete p.currentBilanSousType;
+  delete p.currentBilanPosturoSousType;
   savePatients();
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
@@ -1732,8 +1756,8 @@ function creerBilanSport(patIdx, type) {
   // Nouveau bilan vide
   p.mesures = {};
   p.bilanData = {};
-  p.currentBilanType = 'sport';
-  p.currentBilanSousType = type;
+  p.currentBilanSportSousType = type;
+  // NE PAS toucher currentBilanPosturoSousType — laisse l'autre bilan en cours intact.
   savePatients();
   currentOpenedBilanIdx = null;
   selectPatient(p);
@@ -1773,8 +1797,8 @@ function creerBilanPosturo(patIdx, type) {
     });
   }
   p.bilanDataPosturo = {};
-  p.currentBilanType = 'posturo';
-  p.currentBilanSousType = type;
+  p.currentBilanPosturoSousType = type;
+  // NE PAS toucher currentBilanSportSousType — laisse l'autre bilan en cours intact.
   savePatients();
   currentOpenedBilanIdx = null;
   selectPatient(p);
