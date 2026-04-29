@@ -1077,8 +1077,11 @@ function getBioMecaStorageBytes() {
   return total;
 }
 
-// Limite typique 5 Mo. On alerte à partir de 80 % (4 Mo) et bloque à 95 % (4.75 Mo).
-const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024;
+// Quota typique Chrome/Edge ~10 Mo (limite réelle), Safari/Firefox 5 Mo. On aligne
+// le threshold sur Chrome pour ne pas bloquer prématurément les utilisateurs principaux.
+// Le catch QuotaExceededError reste le filet de sécurité ultime, qui prendra le relais
+// sur Safari/Firefox quand le mur 5 Mo strict est atteint.
+const STORAGE_QUOTA_BYTES = 10 * 1024 * 1024;
 const STORAGE_WARNING_THRESHOLD = 0.80;
 const STORAGE_CRITICAL_THRESHOLD = 0.95;
 
@@ -1087,14 +1090,34 @@ let _quotaWarningShown = false;
 
 function savePatients() {
   const beforeBytes = getBioMecaStorageBytes();
-  const ratio = beforeBytes / STORAGE_QUOTA_BYTES;
 
-  // Seuil critique : on refuse la sauvegarde et on prévient gravement
-  if (ratio >= STORAGE_CRITICAL_THRESHOLD) {
+  // Calcul de la taille future après sérialisation : seul bm4-patients change.
+  // (savePatients() n'écrit que bm4-patients ; bm4-praticiens est géré par savePraticiens.)
+  const futurePatientsBytes = JSON.stringify(patients).length * 2;
+  const futureKeyBytes = 'bm4-patients'.length * 2;
+  // Reconstituer la taille post-save totale du stockage BioMéca
+  let otherKeysBytes = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('bm4-') && key !== 'bm4-patients') {
+        const val = localStorage.getItem(key) || '';
+        otherKeysBytes += (key.length + val.length) * 2;
+      }
+    }
+  } catch(e) {}
+  const futureBytes = futurePatientsBytes + futureKeyBytes + otherKeysBytes;
+
+  const ratio = beforeBytes / STORAGE_QUOTA_BYTES;
+  const isReduction = futureBytes <= beforeBytes;
+
+  // Seuil critique : on refuse SEULEMENT si on est au-dessus ET qu'on n'est pas en train de réduire.
+  // Si l'opération réduit le stockage (suppression), on autorise toujours pour permettre le déblocage.
+  if (ratio >= STORAGE_CRITICAL_THRESHOLD && !isReduction) {
     const used = (beforeBytes / 1024 / 1024).toFixed(1);
     alert(
       '⚠️ ESPACE DE STOCKAGE CRITIQUE\n\n' +
-      'Vous utilisez ' + used + ' Mo sur 5 Mo disponibles dans le stockage local du navigateur.\n\n' +
+      'Vous utilisez ' + used + ' Mo sur 10 Mo disponibles dans le stockage local du navigateur.\n\n' +
       'Pour éviter toute perte de données :\n' +
       '• Supprimez d\'anciens bilans archivés (fiche patient → ✕ à côté du bilan)\n' +
       '• Ou supprimez d\'anciens patients de test (page Patients → ✕)\n\n' +
@@ -1110,7 +1133,7 @@ function savePatients() {
     if (e && (e.name === 'QuotaExceededError' || e.code === 22 || (e.message && e.message.toLowerCase().includes('quota')))) {
       alert(
         '⚠️ ESPACE DE STOCKAGE PLEIN\n\n' +
-        'La sauvegarde a échoué : la limite de 5 Mo du navigateur est atteinte.\n\n' +
+        'La sauvegarde a échoué : la limite de 5 à 10 Mo selon le navigateur est atteinte.\n\n' +
         'Vos modifications en cours sont en mémoire mais NON sauvegardées sur cet appareil. ' +
         'NE FERMEZ PAS l\'onglet avant d\'avoir libéré de l\'espace :\n' +
         '• Supprimez d\'anciens bilans archivés\n' +
@@ -1123,17 +1146,19 @@ function savePatients() {
     throw e;
   }
 
-  // Seuil de warning : on alerte une seule fois mais on laisse la sauvegarde se faire
+  // Seuil de warning : on alerte une seule fois mais on laisse la sauvegarde se faire.
+  // Si on vient de réduire (isReduction), on n'affiche pas le warning même si encore au-dessus du seuil
+  // — le but est de ne pas spammer l'utilisateur qui est en train de nettoyer son stockage.
   const afterBytes = getBioMecaStorageBytes();
   const afterRatio = afterBytes / STORAGE_QUOTA_BYTES;
-  if (afterRatio >= STORAGE_WARNING_THRESHOLD && !_quotaWarningShown) {
+  if (afterRatio >= STORAGE_WARNING_THRESHOLD && !_quotaWarningShown && !isReduction) {
     _quotaWarningShown = true;
     const used = (afterBytes / 1024 / 1024).toFixed(1);
     const pct = Math.round(afterRatio * 100);
     console.warn('BioMéca storage usage:', used + ' Mo (' + pct + '%)');
     alert(
       '⚠️ Espace de stockage à ' + pct + ' %\n\n' +
-      'Vous utilisez ' + used + ' Mo sur 5 Mo disponibles. La sauvegarde s\'est bien effectuée, ' +
+      'Vous utilisez ' + used + ' Mo sur 10 Mo disponibles. La sauvegarde s\'est bien effectuée, ' +
       'mais pensez à archiver ou supprimer d\'anciens bilans pour éviter une saturation prochaine.\n\n' +
       '(Cette alerte ne s\'affichera qu\'une fois par session.)'
     );
