@@ -1826,11 +1826,22 @@ function creerBilanPosturo(patIdx, type) {
   if(!p) return;
   // Sauvegarder bilan posturo courant si données existantes
   if(p.bilanDataPosturo && Object.keys(p.bilanDataPosturo).length > 0) {
+    const confirmMsg = 'Vous avez un bilan postural en cours.\n\n' +
+      'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
+      '• OK : finalise et archive le bilan en cours, puis démarre un nouveau bilan ' + (type === 'initial' ? 'initial' : 'de contrôle') + '.\n' +
+      '• Annuler : retour à la fiche patient pour utiliser le bouton "Finaliser et archiver" du bilan en cours.';
+    if (!confirm(confirmMsg)) {
+      return;
+    }
     if(!p.bilansPosturo) p.bilansPosturo = [];
+    // Utiliser le type EXISTANT (currentBilanPosturoSousType) pour le label d'archive,
+    // pas le NEW type param. Si pas défini (cas legacy / data orpheline), default à 'initial'.
+    const existingType = p.currentBilanPosturoSousType || 'initial';
     const num = p.bilansPosturo.length + 1;
+    const archiveLabel = existingType === 'initial' ? 'Posturo Initial' + (num > 1 ? ' ' + num : '') : 'Posturo Contrôle ' + num;
     p.bilansPosturo.push({
-      label: type === 'initial' ? 'Posturo Initial' : 'Posturo Contrôle ' + num,
-      type: type,
+      label: archiveLabel,
+      type: existingType,
       date: new Date().toLocaleDateString('fr-FR'),
       bilanDataPosturo: JSON.parse(JSON.stringify(p.bilanDataPosturo||{}))
     });
