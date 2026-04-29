@@ -183,6 +183,35 @@ function clearPwaSession() {
   } catch(e) {}
 }
 
+// ─── Mot de passe oublié ───
+// Affiche un prompt pour saisir l'email et envoie un lien de réinitialisation Supabase.
+async function showForgotPassword() {
+  const email = prompt('Entrez votre adresse email pour recevoir un lien de réinitialisation :');
+  if (!email || !email.trim()) return;
+  const trimmedEmail = email.trim();
+  if (!trimmedEmail.includes('@')) {
+    alert('Adresse email invalide.');
+    return;
+  }
+  try {
+    const res = await fetch(SUPA_URL + '/auth/v1/recover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
+      body: JSON.stringify({ email: trimmedEmail })
+    });
+    if (res.ok) {
+      alert('✓ Si un compte est associé à ' + trimmedEmail + ', vous recevrez sous peu un email avec un lien pour réinitialiser votre mot de passe.\n\nVérifiez aussi vos spams.');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      console.error('Reset password error:', err);
+      alert('Erreur lors de l\'envoi du lien. Veuillez réessayer ou contacter le support.');
+    }
+  } catch(e) {
+    console.error('Reset password network error:', e);
+    alert('Erreur réseau. Vérifiez votre connexion et réessayez.');
+  }
+}
+
 // ─── Login ───
 async function pwaLogin() {
   const email = document.getElementById('pwa-email').value.trim();
