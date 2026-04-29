@@ -230,7 +230,7 @@ async function pwaLogin() {
   try {
     const data = await supa.signIn(email, pwd);
     if(data.access_token) {
-      const isAdmin = email.toLowerCase() === 'admin@sciopraxi.fr';
+      const isAdmin = email.toLowerCase() === 'sciopraxi@gmail.com';
       pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin, user_metadata: data.user?.user_metadata || {} };
       savePwaSession(data.access_token, data.refresh_token, pwaUser);
       await onPwaLoginSuccess();
@@ -488,6 +488,16 @@ function closeMonCompte() {
 }
 
 function checkTrialStatus() {
+  // Les comptes admin bypass tous les checks de trial — ils ont accès illimité
+  // peu importe leur user_metadata.acces (utile en cas de reliquat metadata d'une
+  // ancienne inscription en essai avant promotion en admin).
+  if (pwaUser?.isAdmin) {
+    const b = document.getElementById('trial-banner');
+    if(b) b.style.display = 'none';
+    const ov = document.getElementById('trial-expired-overlay');
+    if(ov) ov.style.display = 'none';
+    return;
+  }
   const meta = pwaUser?.user_metadata || {};
   const acces = meta.acces || '';
   if(acces !== 'essai') {
@@ -567,7 +577,7 @@ async function initPWA() {
     try {
       const userData = await supa.getUser();
       if(userData.id) {
-        const isAdmin = session.user.email?.toLowerCase() === 'admin@sciopraxi.fr';
+        const isAdmin = session.user.email?.toLowerCase() === 'sciopraxi@gmail.com';
         pwaUser = { ...session.user, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {} };
         await onPwaLoginSuccess();
         return;
