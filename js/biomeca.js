@@ -3789,10 +3789,13 @@ const sections = [];
   }
   // Synthèse section 8
   // Plan de semelles (pieds) à la fin dans section 9
-  if(d._feetCanvas) {
-    // _feetCanvas contient déjà le composite fond+dessins
-    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img',
-      img: d._feetCanvas});
+  // Plan de semelles section 9 — priorité :
+  //   1. _feetComposite (nouveau format #43 v4) : composite pré-aligné depuis save → alignement parfait
+  //   2. _feetCanvas legacy : composite ancien (JPEG) ou PNG transparent (formats v2/v3) utilisé tel quel
+  if(d._feetComposite) {
+    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img', img: d._feetComposite});
+  } else if(d._feetCanvas) {
+    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img', img: d._feetCanvas});
   }
 
   _buildRapportBody(p, d, prat, logo, sections);
@@ -8228,20 +8231,24 @@ function initPosturoFeetCanvas() {
   canvas._baseSnapshot = null;
   canvas._tempSnap = null;
   setupDrawCanvas(canvas, 'posturo-feet-canvas');
-  // Restaurer le dessin PUIS prendre le baseSnapshot
-  const savedData = currentPatient?.bilanDataPosturo?._feetCanvas;
-  if(savedData) {
+  // baseSnapshot = canvas vide/transparent. La gomme restaure cet état → révèle
+  // le template DOM (img#posturo-feet-img) derrière, sans pollution.
+  canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
+  // Restauration des dessins — priorité :
+  //   1. _feetDrawings (nouveau format dédié édition, depuis #43 v4 — PNG transparent)
+  //   2. _feetCanvas legacy au format PNG (transition douce depuis v2/v3)
+  //   3. _feetCanvas legacy JPEG composite : ne PAS restaurer sur le canvas
+  //      (double exposition avec template DOM) ; le rapport utilise le composite legacy directement.
+  const drawingsData = currentPatient?.bilanDataPosturo?._feetDrawings
+    || (currentPatient?.bilanDataPosturo?._feetCanvas?.startsWith('data:image/png')
+        ? currentPatient.bilanDataPosturo._feetCanvas
+        : null);
+  if(drawingsData) {
     const saved = new Image();
     saved.onload = () => {
       ctx.drawImage(saved, 0, 0, r.width, r.height);
-      // BaseSnapshot = état avec dessin restauré (pour que undo ne supprime pas le dessin précédent)
-      canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
     };
-    saved.src = savedData;
-  } else {
-    setTimeout(() => {
-      canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
-    }, 100);
+    saved.src = drawingsData;
   }
 }
 
@@ -8446,29 +8453,41 @@ function savePosturoBilan() {
   }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc) {
-    const _buildFeetComposite = (canvas, callback) => {
-      const piedsImgEl = document.getElementById('imgjs-pieds');
-      const iw = piedsImgEl?.naturalWidth || 698;
-      const ih = piedsImgEl?.naturalHeight || 558;
-      // Canvas aux dimensions de l'image pour ne pas rogner
-      const compC = document.createElement('canvas');
-      compC.width = iw; compC.height = ih;
-      const compCtx = compC.getContext('2d');
-      // Fond: image pleine taille
-      if(piedsImgEl) compCtx.drawImage(piedsImgEl, 0, 0, compC.width, compC.height);
-      // Dessins: redimensionner le canvas dessins au même espace
-      if(canvas && canvas.width > 0) {
-        compCtx.drawImage(canvas, 0, 0, compC.width, compC.height);
+    const writeNew = (fc._history && fc._history.length > 0) || !d._feetDrawings;
+    if(writeNew) {
+      // 1. Sauvegarder les dessins seuls (PNG transparent) pour restauration sur canvas
+      //    à la prochaine ouverture du bilan (édition + gomme propre).
+      d._feetDrawings = fc.toDataURL('image/png');
+
+      // 2. Composer template + dessins avec positionnement correct (mesuré DOM-live).
+      //    Ce composite est utilisé tel quel dans le rapport — alignement parfait garanti
+      //    car on mesure ici la position visuelle réelle de l'image dans le canvas.
+      const piedsImg = document.getElementById('posturo-feet-img');
+      if(piedsImg && piedsImg.naturalWidth > 0) {
+        const parent = fc.parentElement;
+        if(parent) {
+          const parentRect = parent.getBoundingClientRect();
+          const imgRect = piedsImg.getBoundingClientRect();
+          const dpr = window.devicePixelRatio || 1;
+          const imgInCanvasX = (imgRect.left - parentRect.left) * dpr;
+          const imgInCanvasY = (imgRect.top - parentRect.top) * dpr;
+          const imgInCanvasW = imgRect.width * dpr;
+          const imgInCanvasH = imgRect.height * dpr;
+
+          const compC = document.createElement('canvas');
+          compC.width = piedsImg.naturalWidth;
+          compC.height = piedsImg.naturalHeight;
+          const compCtx = compC.getContext('2d');
+          compCtx.drawImage(piedsImg, 0, 0, compC.width, compC.height);
+          compCtx.drawImage(
+            fc,
+            imgInCanvasX, imgInCanvasY, imgInCanvasW, imgInCanvasH,
+            0, 0, compC.width, compC.height
+          );
+          d._feetComposite = compC.toDataURL('image/jpeg', 0.85);
+        }
       }
-      callback(compC.toDataURL('image/jpeg', 0.5));
-    };
-    // Si nouveaux dessins -> régénérer, sinon garder l'existant
-    if(fc._history && fc._history.length > 0) {
-      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
-    } else if(!d._feetCanvas) {
-      _buildFeetComposite(fc, url => { d._feetCanvas = url; });
     }
-    // else: garder d._feetCanvas existant intact
   }
   // Mettre à jour le snapshot dans bilansPosturo
   if(currentPatient.bilansPosturo && currentPatient.bilansPosturo.length > 0) {
