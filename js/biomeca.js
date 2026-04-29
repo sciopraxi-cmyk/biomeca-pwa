@@ -1753,12 +1753,14 @@ function finalizeBilanPosturo(patIdx) {
     return;
   }
   if (!p.bilansPosturo) p.bilansPosturo = [];
-  const num = p.bilansPosturo.length + 1;
-  const type = p.currentBilanPosturoSousType || 'initial';
-  const label = type === 'initial' ? 'Posturo Initial' : 'Posturo Contrôle ' + num;
+  // Label position-based : 0 archives → "Posturo Initial" (sans numéro),
+  // ≥1 archives → "Posturo Contrôle N" (N = nombre d'archives existantes).
+  const existingCount = p.bilansPosturo.length;
+  const label = existingCount === 0 ? 'Posturo Initial' : 'Posturo Contrôle ' + existingCount;
+  const archivedType = existingCount === 0 ? 'initial' : 'controle';
   p.bilansPosturo.push({
     label: label,
-    type: type,
+    type: archivedType,
     date: new Date().toLocaleDateString('fr-FR'),
     bilanDataPosturo: JSON.parse(JSON.stringify(p.bilanDataPosturo))
   });
@@ -1824,28 +1826,31 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
 function creerBilanPosturo(patIdx, type) {
   const p = patients[patIdx];
   if(!p) return;
-  // Sauvegarder bilan posturo courant si données existantes
-  if(p.bilanDataPosturo && Object.keys(p.bilanDataPosturo).length > 0) {
+  // Archiver UNIQUEMENT si in-progress (sousType set), pas si viewing-only.
+  // Viewing-only = data chargée par ouvrirBilanPosturo SANS sousType set
+  // → cliquer Initial/Contrôle ne doit PAS créer une archive fantôme.
+  const isInProgress = p.currentBilanPosturoSousType != null;
+  const hasData = p.bilanDataPosturo && Object.keys(p.bilanDataPosturo).length > 0;
+  if(isInProgress && hasData) {
     const confirmMsg = 'Vous avez un bilan postural en cours.\n\n' +
       'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
-      '• OK : finalise et archive le bilan en cours, puis démarre un nouveau bilan ' + (type === 'initial' ? 'initial' : 'de contrôle') + '.\n' +
+      '• OK : finalise et archive le bilan en cours, puis démarre un nouveau bilan.\n' +
       '• Annuler : retour à la fiche patient pour utiliser le bouton "Finaliser et archiver" du bilan en cours.';
-    if (!confirm(confirmMsg)) {
-      return;
-    }
+    if (!confirm(confirmMsg)) return;
     if(!p.bilansPosturo) p.bilansPosturo = [];
-    // Utiliser le type EXISTANT (currentBilanPosturoSousType) pour le label d'archive,
-    // pas le NEW type param. Si pas défini (cas legacy / data orpheline), default à 'initial'.
-    const existingType = p.currentBilanPosturoSousType || 'initial';
-    const num = p.bilansPosturo.length + 1;
-    const archiveLabel = existingType === 'initial' ? 'Posturo Initial' + (num > 1 ? ' ' + num : '') : 'Posturo Contrôle ' + num;
+    // Label position-based : 0 archives → "Posturo Initial" (sans numéro),
+    // ≥1 archives → "Posturo Contrôle N" (N = nombre d'archives existantes).
+    const existingCount = p.bilansPosturo.length;
+    const archiveLabel = existingCount === 0 ? 'Posturo Initial' : 'Posturo Contrôle ' + existingCount;
+    const archiveType = existingCount === 0 ? 'initial' : 'controle';
     p.bilansPosturo.push({
       label: archiveLabel,
-      type: existingType,
+      type: archiveType,
       date: new Date().toLocaleDateString('fr-FR'),
-      bilanDataPosturo: JSON.parse(JSON.stringify(p.bilanDataPosturo||{}))
+      bilanDataPosturo: JSON.parse(JSON.stringify(p.bilanDataPosturo))
     });
   }
+  // Reset état pour démarrer un nouveau bilan vide
   p.bilanDataPosturo = {};
   p.currentBilanPosturoSousType = type;
   // NE PAS toucher currentBilanSportSousType — laisse l'autre bilan en cours intact.
