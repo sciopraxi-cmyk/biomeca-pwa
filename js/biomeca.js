@@ -1959,7 +1959,9 @@ function editPraticien(i) {
     btn.onclick = () => saveEditPraticien(i);
   }
   // Scroller vers le formulaire
-  document.getElementById('np-prat-nom').scrollIntoView({behavior:'smooth'});
+  // Garde-fou : scrollIntoView seulement si l'élément existe (évite TypeError si DOM modifié).
+  const firstField = document.getElementById('pr-nom');
+  if(firstField) firstField.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function saveEditPraticien(i) {
