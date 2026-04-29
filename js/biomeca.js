@@ -628,6 +628,10 @@ let currentPatient = null;
 // null = pas de bilan historique ouvert (mode "bilan courant" ou nouveau bilan).
 // Set par ouvrirBilanSport, reset par creerBilanSport et selectPatient.
 let currentOpenedBilanIdx = null;
+// Idem pour les bilans posturo (currentPatient.bilansPosturo).
+// Set par ouvrirBilanPosturo, reset par creerBilanPosturo, finalizeBilanPosturo,
+// abandonnerBilanPosturo et selectPatient.
+let currentOpenedBilanPosturoIdx = null;
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -1348,6 +1352,7 @@ function createPatient() {
 
 function selectPatient(p) {
   currentOpenedBilanIdx = null;
+  currentOpenedBilanPosturoIdx = null;
   currentPatient = p;
   const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
   if(document.getElementById('tb-av')) document.getElementById('tb-av').textContent = init;
@@ -1739,6 +1744,7 @@ function abandonnerBilanPosturo(patIdx) {
   if (!confirm(confirmMsg)) return;
   p.bilanDataPosturo = {};
   delete p.currentBilanPosturoSousType;
+  currentOpenedBilanPosturoIdx = null;
   savePatients();
   renderPatientList();
 }
@@ -1766,6 +1772,7 @@ function finalizeBilanPosturo(patIdx) {
   });
   p.bilanDataPosturo = {};
   delete p.currentBilanPosturoSousType;
+  currentOpenedBilanPosturoIdx = null;
   savePatients();
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
@@ -1855,7 +1862,7 @@ function creerBilanPosturo(patIdx, type) {
   p.currentBilanPosturoSousType = type;
   // NE PAS toucher currentBilanSportSousType — laisse l'autre bilan en cours intact.
   savePatients();
-  currentOpenedBilanIdx = null;
+  currentOpenedBilanPosturoIdx = null;
   selectPatient(p);
   nav('pg-bilan-posturo');
 }
@@ -1887,6 +1894,8 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
   if(!p) return;
   const bilan = p.bilansPosturo?.[bilanIdx];
   if(!bilan) {
+    // Bilan courant
+    currentOpenedBilanPosturoIdx = null;
     selectPatient(p);
     nav('pg-bilan-posturo');
     return;
@@ -1894,6 +1903,7 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
   selectPatient(p);
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
   currentOpenedBilanIdx = null;
+  currentOpenedBilanPosturoIdx = bilanIdx;
   // Réinitialiser le canvas pour forcer recalcul taille
   const oldCanvas = document.getElementById('posturo-body-canvas');
   if(oldCanvas) { oldCanvas.width = 0; oldCanvas.height = 0; oldCanvas._baseSnapshot = null; oldCanvas._history = []; }
@@ -5382,6 +5392,17 @@ function syncOpenedBilanToHistory() {
   target.bilanData = JSON.parse(JSON.stringify(currentPatient.bilanData || {}));
 }
 
+// Mirror posturo : synchronise les modifications du bilan posturo en cours
+// d'édition vers son entrée dans bilansPosturo[]. À appeler après chaque
+// savePatients() qui touche currentPatient.bilanDataPosturo.
+function syncOpenedBilanPosturoToHistory() {
+  if (currentOpenedBilanPosturoIdx == null) return;
+  if (!currentPatient || !currentPatient.bilansPosturo) return;
+  const target = currentPatient.bilansPosturo[currentOpenedBilanPosturoIdx];
+  if (!target) return;
+  target.bilanDataPosturo = JSON.parse(JSON.stringify(currentPatient.bilanDataPosturo || {}));
+}
+
 function saveBilan() {
   if(!currentPatient) { alert('Aucun patient sélectionné.'); return; }
   if(!bilanData) bilanData = {};
@@ -8505,11 +8526,11 @@ function savePosturoBilan() {
       }
     }
   }
-  // Mettre à jour le snapshot dans bilansPosturo
-  if(currentPatient.bilansPosturo && currentPatient.bilansPosturo.length > 0) {
-    const lastIdx = currentPatient.bilansPosturo.length - 1;
-    currentPatient.bilansPosturo[lastIdx].bilanDataPosturo = JSON.parse(JSON.stringify(d));
-  }
+  // Si on édite un bilan archivé (ouvert via ouvrirBilanPosturo), synchroniser
+  // ses modifications vers son entrée dans bilansPosturo[]. Mirror sport.
+  // Sinon (bilan en cours, pas encore archivé), ne rien écrire dans bilansPosturo[]
+  // — la sauvegarde se fait dans currentPatient.bilanDataPosturo (déjà à jour via `d`).
+  syncOpenedBilanPosturoToHistory();
   savePatients();
   alert('✓ Bilan posturologique sauvegardé');
 }
