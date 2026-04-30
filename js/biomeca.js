@@ -61,18 +61,6 @@ const supa = {
     return rows && rows.length > 0 ? rows[0] : null;
   },
 
-  async updateLicence(email) {
-    const res = await authFetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ licence_payee: true })
-    });
-    return res.ok;
-  },
-
   async loadData(table) {
     const res = await authFetch(SUPA_URL + '/rest/v1/' + table + '?select=*', {
       headers: { 'Content-Type': 'application/json' }
@@ -9356,22 +9344,16 @@ async function lancerPaiement(planIdx, modules) {
   window.location.href = url;
 }
 
-window.addEventListener('DOMContentLoaded', async function() {
+window.addEventListener('DOMContentLoaded', function() {
   var params = new URLSearchParams(window.location.search);
   if(params.get('payment') === 'success') {
-    // Marquer la licence comme payée si l'utilisateur est connecté
-    if(pwaUser && pwaUser.token && pwaUser.email) {
-      try {
-        await supa.updateLicence(pwaUser.email);
-        console.log('Licence marquée comme payée');
-      } catch(e) {
-        console.log('Erreur mise à jour licence:', e);
-      }
-    }
-    // Nettoyer l'URL
+    // Activation de licence_payee : assurée côté serveur par l'Edge Function
+    // stripe-webhook (task #30). Le client n'a plus le droit d'écrire ce champ
+    // depuis l'audit RLS — un trigger SQL bloque toute modification des
+    // colonnes administratives de user_data par le rôle authenticated.
     window.history.replaceState({}, '', window.location.pathname);
     setTimeout(function() {
-      alert('✅ Paiement réussi ! Bienvenue sur Sciopraxi.\nVous allez recevoir un email de confirmation.');
+      alert('✅ Paiement reçu, votre licence sera activée sous quelques minutes.');
     }, 500);
   } else if(params.get('payment') === 'cancel') {
     window.history.replaceState({}, '', window.location.pathname);
