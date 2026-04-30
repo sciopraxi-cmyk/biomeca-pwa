@@ -6936,7 +6936,7 @@ function getBilanPosturoHTML() {
       <div style="font-weight:700;color:#6c3483;font-size:13px;margin-bottom:10px;">🦷 Examen de la mandibule</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${[
-          ['Ouverture maximale 3 doigts','po-ouv-max'],
+          ['Ouverture maximale inférieure à 3 doigts','po-ouv-max'],
           ['Déviation à l\'ouverture de bouche','po-deviation'],
           ['Contractures des muscles masticateurs','po-contractures'],
           ['Douleur capsulo-ligamentaire (palpation)','po-douleur-caps']
@@ -6981,6 +6981,9 @@ function getBilanPosturoHTML() {
         </label>
         <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
           <input type="checkbox" id="po-reor-buc-kine"/> 🏃 Kinésithérapeute
+        </label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+          <input type="checkbox" id="po-reor-buc-osteo"/> 🤲 Ostéopathe
         </label>
       </div>
     </div>
@@ -7771,10 +7774,29 @@ function genererSynthese() {
   console.log('neuro4:', JSON.stringify(d.neuro4));
   const sections = [];
 
-  // Anamnèse
-  const motif = document.getElementById('po-motif')?.value;
-  const eva = document.getElementById('po-eva-val')?.textContent;
-  if(motif) sections.push({titre:'🩺 Anamnèse', items:['Motif: '+motif, 'EVA: '+eva+'/10']});
+  // Anamnèse (psec-0) — format condensé sur une ligne, séparateur ·
+  // Exclus volontairement : po-medecin, po-date-consult, po-travail (en-tête rapport uniquement)
+  const anamParts = [];
+  const anamMotif = document.getElementById('po-motif')?.value?.trim();
+  if(anamMotif) anamParts.push('Motif: '+anamMotif);
+  const anamDouleur = document.querySelector('input[name="po-douleur"]:checked')?.value;
+  if(anamDouleur === 'oui') anamParts.push('Douleur présente');
+  const anamEvaTxt = document.getElementById('po-eva-val')?.textContent;
+  const anamEvaNum = parseInt(anamEvaTxt, 10);
+  if(!isNaN(anamEvaNum) && anamEvaNum > 0) anamParts.push('EVA: '+anamEvaNum+'/10');
+  const anamAtcd = document.getElementById('po-atcd')?.value?.trim();
+  if(anamAtcd) anamParts.push('Antécédents: '+anamAtcd);
+  const anamAppareillage = document.getElementById('po-appareillage')?.value?.trim();
+  if(anamAppareillage) anamParts.push('Appareillage: '+anamAppareillage);
+  const anamExamens = document.getElementById('po-examens')?.value?.trim();
+  if(anamExamens) anamParts.push('Examens: '+anamExamens);
+  const anam1ere = document.querySelector('input[name="po-1ere-intention"]:checked')?.value;
+  if(anam1ere === 'oui') anamParts.push('Consultation 1ère intention');
+  const anamActivite = document.getElementById('po-activite')?.value?.trim();
+  if(anamActivite) anamParts.push('Activité physique: '+anamActivite);
+  const anamActiviteQuot = document.getElementById('po-activite-quot')?.value?.trim();
+  if(anamActiviteQuot) anamParts.push('Activité quotidienne: '+anamActiviteQuot);
+  if(anamParts.length) sections.push({titre:'🩺 Anamnèse', items:[anamParts.join(' · ')]});
 
   // Morphostatique
   const morphoItems = [];
@@ -7802,132 +7824,473 @@ function genererSynthese() {
   if(rombergOcul) romParts.push('Oculaire');
   if(rombergRot) romParts.push('Rotation'+(rombergRotDir?' '+rombergRotDir:''));
   if(romParts.length) morphoItems.push('Romberg: '+romParts.join(', '));
-  if(morphoItems.length) sections.push({titre:'🧍 Morphostatique', items:morphoItems});
+  if(morphoItems.length) sections.push({titre:'🧍 Morphostatique', items:[morphoItems.join(' · ')]});
 
-  // Bilan dynamique
+  // Bilan dynamique (psec-2)
   const dynItems = [];
+  // Observations libres
+  const bilanDynObs = document.getElementById('po-bilan-dyn')?.value?.trim();
+  if(bilanDynObs) dynItems.push('Observations: '+bilanDynObs);
+  const courseObs = document.getElementById('po-course')?.value?.trim();
+  if(courseObs) dynItems.push('Course: '+courseObs);
+  // Force extenseurs poignet (tous niveaux)
+  const poignetD = document.querySelector('input[name="po-poignet-d"]:checked')?.value;
+  if(poignetD) dynItems.push('Force ext. poignet D: '+poignetD.replace(/-/g,' '));
+  const poignetG = document.querySelector('input[name="po-poignet-g"]:checked')?.value;
+  if(poignetG) dynItems.push('Force ext. poignet G: '+poignetG.replace(/-/g,' '));
+  // Stabilité arrière
+  const stab = document.querySelector('input[name="po-test-stab"]:checked')?.value;
+  if(stab) dynItems.push('Stabilité arrière: '+stab.replace(/-/g,' '));
+  // Distance doigt-sol
+  const flexAnt = document.getElementById('po-test-flex-ant')?.value;
+  if(flexAnt !== '' && flexAnt != null) dynItems.push('Distance doigt-sol: '+flexAnt+' cm');
+  // Flexion debout/assis
   const flexDebout = document.querySelector('input[name="po-flex-debout"]:checked')?.value;
   if(flexDebout) dynItems.push('Flexion debout: '+flexDebout);
   const flexAssis = document.querySelector('input[name="po-flex-assis"]:checked')?.value;
   if(flexAssis) dynItems.push('Flexion assis: '+flexAssis);
-  const stab = document.querySelector('input[name="po-test-stab"]:checked')?.value;
-  if(stab) dynItems.push('Stabilité arrière: '+stab);
+  // Mobilités (dysfonctions)
   ['hanche','genou','pied','bassin'].forEach(function(art) {
     const v = document.querySelector('input[name="po-mob-'+art+'"]:checked')?.value;
     if(v === 'oui') dynItems.push('Dysfonction '+art);
   });
-  if(dynItems.length) sections.push({titre:'🏃 Bilan dynamique', items:dynItems});
+  // Tibia/fémur (ILMI anatomique) — détail par côté/os
+  const tfParts = [];
+  ['d','g'].forEach(function(side) {
+    const sideLabel = side === 'd' ? 'D' : 'G';
+    if(document.getElementById('po-tf-'+side)?.checked) {
+      ['femur','tibia'].forEach(function(os) {
+        if(document.getElementById('po-tf-'+side+'-'+os)?.checked) {
+          const dir = document.querySelector('input[name="po-tf-'+side+'-'+os+'-dir"]:checked')?.value;
+          if(dir) {
+            const osLabel = os.charAt(0).toUpperCase()+os.slice(1);
+            const dirLabel = dir === 'court' ? 'plus court' : 'plus long';
+            tfParts.push(osLabel+' '+sideLabel+' '+dirLabel);
+          }
+        }
+      });
+    }
+  });
+  if(tfParts.length) dynItems.push('Tibia/fémur: '+tfParts.join(', '));
+  // Branches pubiennes
+  const pubSide = document.querySelector('input[name="po-pub"]:checked')?.value;
+  const pubDir = document.querySelector('input[name="po-pub-dir"]:checked')?.value;
+  if(pubSide && pubDir) {
+    const sideLabel = pubSide === 'd' ? 'droite' : 'gauche';
+    const dirLabel = pubDir === 'haut' ? 'plus haute' : 'plus basse';
+    dynItems.push('Branche pubienne '+sideLabel+' '+dirLabel);
+  }
+  // Downing test
+  ['d','g'].forEach(function(side) {
+    if(document.getElementById('po-downing-'+side)?.checked) {
+      const res = document.querySelector('input[name="po-downing-'+side+'-res"]:checked')?.value;
+      if(res) {
+        const sideLabel = side === 'd' ? 'D' : 'G';
+        const resLabel = res === 'post' ? 'iliaque POST' : 'iliaque ANT';
+        dynItems.push('Downing '+sideLabel+': '+resLabel);
+      }
+    }
+  });
+  // Conclusion examen en décharge
+  const inegLong = document.querySelector('input[name="po-ineg-long"]:checked')?.value;
+  if(inegLong === 'oui') {
+    const inegDir = document.querySelector('input[name="po-ineg-dir"]:checked')?.value;
+    let txt = 'Inégalité longueur';
+    if(inegDir === 'court-d') txt += ' (plus court à droite)';
+    else if(inegDir === 'court-g') txt += ' (plus court à gauche)';
+    dynItems.push(txt);
+  } else if(inegLong === 'non') {
+    dynItems.push('Pas d\'inégalité longueur');
+  }
+  if(document.getElementById('po-ineg-struct')?.checked) dynItems.push('Inégalité structurelle');
+  if(document.getElementById('po-ineg-comp')?.checked) dynItems.push('Inégalité compensatrice');
+  const equilibre = document.querySelector('input[name="po-equilibre"]:checked')?.value;
+  if(equilibre) dynItems.push('Équilibré: '+equilibre);
+  const scoliose = document.querySelector('input[name="po-scoliose"]:checked')?.value;
+  if(scoliose) dynItems.push('Scoliose: '+scoliose);
+  if(dynItems.length) sections.push({titre:'🏃 Bilan dynamique', items:[dynItems.join(' · ')]});
 
-  // Neuro-fonctionnel (depuis d.neuro4 sauvegardé)
+  // Neuro-fonctionnel (psec-3, depuis d.neuro4 sauvegardé)
   const neuroItems = [];
   if(currentPatient?.bilanDataPosturo?.neuro4) {
     const n = currentPatient.bilanDataPosturo.neuro4;
-    // Posture statique (anciennes clés)
+    // Helper : fusion bilatérale → "label bilat" si G+D, sinon "label G" ou "label D"
+    const bilat = function(label, base) {
+      const g = !!n[base+'-g'];
+      const d = !!n[base+'-d'];
+      if(g && d) return label+' bilat';
+      if(g) return label+' G';
+      if(d) return label+' D';
+      return null;
+    };
+    const pushBilat = function(arr, label, base) {
+      const t = bilat(label, base);
+      if(t) arr.push(t);
+    };
+    // 1. Posture statique
     const aps = [];
-    if(n['aps-epaule-g']) aps.push('Épaule G'); if(n['aps-epaule-d']) aps.push('Épaule D');
-    if(n['aps-rot-g']) aps.push('Rot.épaule G'); if(n['aps-rot-d']) aps.push('Rot.épaule D');
-    if(n['aps-coude-g']) aps.push('Flex.coude G'); if(n['aps-coude-d']) aps.push('Flex.coude D');
-    if(n['aps-pron-g']) aps.push('Pron.poignet G'); if(n['aps-pron-d']) aps.push('Pron.poignet D');
+    pushBilat(aps, 'Épaule', 'aps-epaule');
+    pushBilat(aps, 'Rot. épaule', 'aps-rot');
+    pushBilat(aps, 'Flex. coude', 'aps-coude');
+    pushBilat(aps, 'Pron. poignet', 'aps-pron');
     if(aps.length) neuroItems.push('Posture statique: '+aps.join(', '));
-    // Critères de force
+    // 2. Critères de force
     const force = [];
-    if(n['cf-ext-g']) force.push('Ext.poignet G'); if(n['cf-ext-d']) force.push('Ext.poignet D');
-    if(n['cf-flex-g']) force.push('Flex.hanche G'); if(n['cf-flex-d']) force.push('Flex.hanche D');
+    pushBilat(force, 'Ext. poignet', 'cf-ext');
+    pushBilat(force, 'Flex. hanche', 'cf-flex');
     if(force.length) neuroItems.push('Critères force: '+force.join(', '));
-    // Posture dynamique
+    // 3. Posture dynamique (apd-* uniquement)
     const apd = [];
-    if(n['apd-tronc-g']) apd.push('Tronc cérébral G'); if(n['apd-tronc-d']) apd.push('Tronc cérébral D');
-    if(n['apd-cervelet-g']) apd.push('Cervelet G'); if(n['apd-cervelet-d']) apd.push('Cervelet D');
-    if(n['apd-tete-g']) apd.push('Stab.tête G'); if(n['apd-tete-d']) apd.push('Stab.tête D');
-    if(n['apd-membre-g']) apd.push('Membre sup G'); if(n['apd-membre-d']) apd.push('Membre sup D');
-    if(n['acd-flex-g']) apd.push('Flex.poignet G'); if(n['acd-flex-d']) apd.push('Flex.poignet D');
-    if(n['acd-hyper-g']) apd.push('Hyperext.genou G'); if(n['acd-hyper-d']) apd.push('Hyperext.genou D');
+    pushBilat(apd, 'Tronc cérébral', 'apd-tronc');
+    pushBilat(apd, 'Cervelet', 'apd-cervelet');
+    pushBilat(apd, 'Stab. tête', 'apd-tete');
+    pushBilat(apd, 'Membre sup', 'apd-membre');
     if(apd.length) neuroItems.push('Posture dynamique: '+apd.join(', '));
-    // Hypothèses
+    // 4. Autres critères en dynamique (acd-*)
+    const acd = [];
+    pushBilat(acd, 'Flex. poignet/doigts', 'acd-flex');
+    pushBilat(acd, 'Hyperext. genou', 'acd-hyper');
+    if(acd.length) neuroItems.push('Autres critères dyn.: '+acd.join(', '));
+    // 5. Hypothèses
     const hypo = [];
     if(n['po-hypo-tronc']) hypo.push('Tronc cérébral');
     if(n['po-hypo-cervelet']) hypo.push('Cervelet');
     if(hypo.length) neuroItems.push('Hypothèse: '+hypo.join(', '));
-    // Vestibulaire
+    // 6. Nerfs crâniens (recapillarisation + NC1 à NC12)
+    const ncList = [];
+    pushBilat(ncList, 'Recap', 'nc-recap');
+    for(let i=1; i<=12; i++) {
+      pushBilat(ncList, 'NC'+i, 'nc-nc'+i);
+    }
+    if(ncList.length) neuroItems.push('Nerfs crâniens: '+ncList.join(', '));
+    // 7. Vestibulaire
     const vest = [];
-    if(n['vest-ant-g']) vest.push('CSC ant G'); if(n['vest-ant-d']) vest.push('CSC ant D');
-    if(n['vest-lat-g']) vest.push('CSC lat G'); if(n['vest-lat-d']) vest.push('CSC lat D');
-    if(n['vest-post-g']) vest.push('CSC post G'); if(n['vest-post-d']) vest.push('CSC post D');
+    pushBilat(vest, 'CSC ant', 'vest-ant');
+    pushBilat(vest, 'CSC lat', 'vest-lat');
+    pushBilat(vest, 'CSC post', 'vest-post');
     if(vest.length) neuroItems.push('Vestibulaire: '+vest.join(', '));
-    // Proprioception
+    // 8. Proprioception
     const prop = [];
-    if(n['prop-lent-g']) prop.push('FN lent G'); if(n['prop-lent-d']) prop.push('FN lent D');
-    if(n['prop-rapide-g']) prop.push('FN rapide G'); if(n['prop-rapide-d']) prop.push('FN rapide D');
-    if(n['prop-golgi-g']) prop.push('Golgi G'); if(n['prop-golgi-d']) prop.push('Golgi D');
-    if(n['prop-golgi-a-g']) prop.push('Golgi A G'); if(n['prop-golgi-a-d']) prop.push('Golgi A D');
-    if(n['prop-paccini-g']) prop.push('Paccini G'); if(n['prop-paccini-d']) prop.push('Paccini D');
-    if(n['prop-ruffini-d-g']) prop.push('Ruffini déc G'); if(n['prop-ruffini-d-d']) prop.push('Ruffini déc D');
-    if(n['prop-ruffini-c-g']) prop.push('Ruffini com G'); if(n['prop-ruffini-c-d']) prop.push('Ruffini com D');
+    pushBilat(prop, 'FN lent', 'prop-lent');
+    pushBilat(prop, 'FN rapide', 'prop-rapide');
+    pushBilat(prop, 'Golgi', 'prop-golgi');
+    pushBilat(prop, 'Golgi A', 'prop-golgi-a');
+    pushBilat(prop, 'Paccini', 'prop-paccini');
+    pushBilat(prop, 'Ruffini déc', 'prop-ruffini-d');
+    pushBilat(prop, 'Ruffini com', 'prop-ruffini-c');
     if(prop.length) neuroItems.push('Proprioception: '+prop.join(', '));
-    // Cervelet
+    // 9. Cervelet (vermis + axe + inter + lat)
     const cerv = [];
-    if(n['vermis-sharp-d']||n['vermis-sharp-g']) cerv.push('Sharp Romberg');
-    if(n['vermis-romberg-d']||n['vermis-romberg-g']) cerv.push('Romberg 1 pied');
+    pushBilat(cerv, 'Sharp Romberg', 'vermis-sharp');
+    pushBilat(cerv, 'Romberg 1 pied', 'vermis-romberg');
     const axe = [];
     if(n['proprio-axe-tete']) axe.push('Tête');
     if(n['proprio-axe-corps']) axe.push('Corps');
     if(n['proprio-axe-bassin']) axe.push('Bassin');
     if(axe.length) cerv.push('Proprio axe: '+axe.join('+'));
-    if(n['inter-prec-g']) cerv.push('Préc.doigt G'); if(n['inter-prec-d']) cerv.push('Préc.doigt D');
-    if(n['inter-coord-g']) cerv.push('Coordination G'); if(n['inter-coord-d']) cerv.push('Coordination D');
-    if(n['lat-prec-g']) cerv.push('Piano G'); if(n['lat-prec-d']) cerv.push('Piano D');
-    if(n['lat-coord-g']) cerv.push('Go-No Go G'); if(n['lat-coord-d']) cerv.push('Go-No Go D');
+    pushBilat(cerv, 'Préc. doigt', 'inter-prec');
+    pushBilat(cerv, 'Coordination', 'inter-coord');
+    pushBilat(cerv, 'Piano', 'lat-prec');
+    pushBilat(cerv, 'Go-No Go', 'lat-coord');
     if(cerv.length) neuroItems.push('Cervelet: '+cerv.join(', '));
-    // Réflexes archaïques
+    // 10. Réflexes archaïques (prioritaires "O" + secondaires bilatéraux)
     const refl = [];
-    if(n['ref-rpp-o']) refl.push('RPP +'); if(n['ref-rtp-o']) refl.push('RTP +');
+    if(n['ref-rpp-o']) refl.push('RPP +');
+    if(n['ref-rtp-o']) refl.push('RTP +');
     if(n['ref-moro-o']) refl.push('Moro +');
     if(n['ref-perez-o']) refl.push('Pérez +');
     if(n['ref-landau-o']) refl.push('Landau +');
     if(n['ref-reptation-o']) refl.push('Reptation +');
-    if(n['ref-rtac-g']) refl.push('RTac G'); if(n['ref-rtac-d']) refl.push('RTac D');
-    if(n['ref-galant-g']) refl.push('Galant G'); if(n['ref-galant-d']) refl.push('Galant D');
-    if(n['ref-babinski-g']) refl.push('Babinski G'); if(n['ref-babinski-d']) refl.push('Babinski D');
-    if(n['ref-plantaire-g']) refl.push('Plantaire G'); if(n['ref-plantaire-d']) refl.push('Plantaire D');
-    if(n['ref-palmaire-g']) refl.push('Palmaire G'); if(n['ref-palmaire-d']) refl.push('Palmaire D');
-    if(n['ref-babkin-g']) refl.push('Babkin G'); if(n['ref-babkin-d']) refl.push('Babkin D');
+    pushBilat(refl, 'RTac', 'ref-rtac');
+    pushBilat(refl, 'Galant', 'ref-galant');
+    pushBilat(refl, 'Babinski', 'ref-babinski');
+    pushBilat(refl, 'Plantaire', 'ref-plantaire');
+    pushBilat(refl, 'Palmaire', 'ref-palmaire');
+    pushBilat(refl, 'Babkin', 'ref-babkin');
     if(refl.length) neuroItems.push('Réflexes archaïques: '+refl.join(', '));
-    // Récepteurs tactiles
+    // 11. Récepteurs tactiles
     const rect = [];
-    if(n['tact-merkel-g']) rect.push('Merkel G'); if(n['tact-merkel-d']) rect.push('Merkel D');
-    if(n['tact-ruffini-g']) rect.push('Ruffini G'); if(n['tact-ruffini-d']) rect.push('Ruffini D');
-    if(n['tact-pacini-g']) rect.push('Pacini G'); if(n['tact-pacini-d']) rect.push('Pacini D');
-    if(n['tact-tnl-g']) rect.push('TNL G'); if(n['tact-tnl-d']) rect.push('TNL D');
-    if(n['tact-meissner-g']) rect.push('Meissner G'); if(n['tact-meissner-d']) rect.push('Meissner D');
-    if(n['tact-poils-g']) rect.push('Poils G'); if(n['tact-poils-d']) rect.push('Poils D');
+    pushBilat(rect, 'Merkel', 'tact-merkel');
+    pushBilat(rect, 'Ruffini', 'tact-ruffini');
+    pushBilat(rect, 'Pacini', 'tact-pacini');
+    pushBilat(rect, 'TNL', 'tact-tnl');
+    pushBilat(rect, 'Meissner', 'tact-meissner');
+    pushBilat(rect, 'Poils', 'tact-poils');
     if(rect.length) neuroItems.push('Récepteurs tactiles: '+rect.join(', '));
+    // 12. Totaux automatiques (NC, Proprioception, Cervelet)
+    // NB: l'ID DOM 'vest-total-*' calcule en fait le total de la partie PROPRIOCEPTION
+    // (partie basse de l'encadré "Confluence des données"), pas du sous-bloc vestibulaire.
+    const ncTotG = document.getElementById('nc-total-g')?.textContent || '0';
+    const ncTotD = document.getElementById('nc-total-d')?.textContent || '0';
+    const propTotG = document.getElementById('vest-total-g')?.textContent || '0';
+    const propTotD = document.getElementById('vest-total-d')?.textContent || '0';
+    const cervTotG = document.getElementById('cerv-total-g')?.textContent || '0';
+    const cervTotD = document.getElementById('cerv-total-d')?.textContent || '0';
+    const totalsParts = [];
+    if(ncTotG !== '0' || ncTotD !== '0') totalsParts.push('NC '+ncTotG+'G/'+ncTotD+'D');
+    if(propTotG !== '0' || propTotD !== '0') totalsParts.push('Proprio '+propTotG+'G/'+propTotD+'D');
+    if(cervTotG !== '0' || cervTotD !== '0') totalsParts.push('Cerv '+cervTotG+'G/'+cervTotD+'D');
+    if(totalsParts.length) neuroItems.push('Totaux: '+totalsParts.join(', '));
   }
-  if(neuroItems.length) sections.push({titre:'🧠 Neuro-fonctionnel', items:neuroItems});
+  if(neuroItems.length) sections.push({titre:'🧠 Neuro-fonctionnel', items:[neuroItems.join(' · ')]});
 
-  // Système plantaire
+  // Système plantaire (psec-4)
   const plantItems = [];
-  if(document.querySelector('input[name="po-epines"]:checked')?.value === 'oui') plantItems.push('Épines irritatives présentes');
-  const loc = document.getElementById('po-epines-loc')?.value;
-  if(loc) plantItems.push('Localisation: '+loc);
+  // Helper : fusion bilatérale lue depuis le DOM (psec-4 ne passe pas par d.neuro4)
+  const bilatDom = function(label, base) {
+    const g = document.getElementById(base+'-g')?.checked;
+    const d = document.getElementById(base+'-d')?.checked;
+    if(g && d) return label+' bilat';
+    if(g) return label+' G';
+    if(d) return label+' D';
+    return null;
+  };
+  // 1. Épines irritatives (oui ET non, + localisation)
+  const epines = document.querySelector('input[name="po-epines"]:checked')?.value;
+  if(epines === 'oui') {
+    plantItems.push('Épines irritatives présentes');
+    const epLoc = document.getElementById('po-epines-loc')?.value?.trim();
+    if(epLoc) plantItems.push('Localisation: '+epLoc);
+  } else if(epines === 'non') {
+    plantItems.push('Pas d\'épines irritatives');
+  }
+  // 2. Tactique équilibration
   const tact = document.querySelector('input[name="po-tactique"]:checked')?.value;
   if(tact) plantItems.push('Tactique équilibration: '+tact);
+  // 3. Tests toniques effectués (cases cochées = tests réalisés)
+  const testsTon = [];
+  if(document.getElementById('po-test-pouces')?.checked) testsTon.push('pouces montants');
+  if(document.getElementById('po-test-convergence')?.checked) testsTon.push('convergence podale');
+  if(document.getElementById('po-test-scapulaire')?.checked) testsTon.push('scapulaire de Dupas');
+  if(document.getElementById('po-test-nucale')?.checked) testsTon.push('rotation nucale');
+  if(testsTon.length) plantItems.push('Tests toniques effectués: '+testsTon.join(', '));
+  // 4. Parasites
+  const paras = [];
   ['plantaire','yeux','buccale','cicatrice','vestibulaire','viscerale'].forEach(function(p) {
-    if(document.getElementById('po-para-'+p)?.checked) plantItems.push('Parasite: '+p);
+    if(document.getElementById('po-para-'+p)?.checked) paras.push(p);
   });
-  if(plantItems.length) sections.push({titre:'🦶 Système plantaire', items:plantItems});
+  if(paras.length) plantItems.push('Parasites: '+paras.join(', '));
+  // 5. Stabilité monopodal (déficit)
+  const monoParts = [];
+  ['pied','genou','hanche'].forEach(function(art) {
+    const label = art.charAt(0).toUpperCase()+art.slice(1);
+    const t = bilatDom(label, 'po-mono-'+art);
+    if(t) monoParts.push(t);
+  });
+  if(monoParts.length) plantItems.push('Déficit Stab. monopodal: '+monoParts.join(', '));
+  // 6. Épreuve alignement (cumulables)
+  const align = [];
+  if(document.getElementById('po-align-axe')?.checked) align.push('Axe articulaire en place');
+  if(document.getElementById('po-align-inf')?.checked) align.push('Déséquilibre inférieur');
+  if(document.getElementById('po-align-sup')?.checked) align.push('Déséquilibre supérieur');
+  if(align.length) plantItems.push('Alignement: '+align.join(', '));
+  // 7. Usure chaussure (groupé)
+  const usure = [];
+  if(document.getElementById('po-usure-interne')?.checked) usure.push('interne');
+  if(document.getElementById('po-usure-externe')?.checked) usure.push('externe');
+  if(document.getElementById('po-usure-contrefort')?.checked) usure.push('contrefort');
+  if(usure.length) plantItems.push('Usure: '+usure.join(', '));
+  // 8. Type chaussure (texte libre)
+  const chausType = document.getElementById('po-chaussure-type')?.value?.trim();
+  if(chausType) plantItems.push('Chaussure: '+chausType);
+  if(plantItems.length) sections.push({titre:'🦶 Système plantaire', items:[plantItems.join(' · ')]});
 
-  // Vestibulaire
+  // Vestibulaire (psec-5)
   const vestItems = [];
-  if(document.querySelector('input[name="po-vertiges"]:checked')?.value === 'oui') vestItems.push('Présence de vertiges/nystagmus');
-  if(document.querySelector('input[name="po-vppb"]:checked')?.value === 'oui') vestItems.push('VPPB positif');
-  if(vestItems.length) sections.push({titre:'👂 Vestibulaire', items:vestItems});
+  // 1. Latéralisation (uniquement si oui = investigation)
+  const later = document.querySelector('input[name="po-later"]:checked')?.value;
+  if(later === 'oui') {
+    const laterType = document.querySelector('input[name="po-later-type"]:checked')?.value;
+    const laterSides = [];
+    if(document.getElementById('po-later-d')?.checked) laterSides.push('D');
+    if(document.getElementById('po-later-g')?.checked) laterSides.push('G');
+    let laterTxt = 'Latéralisation';
+    if(laterType) laterTxt += ': '+laterType;
+    if(laterSides.length) laterTxt += (laterType ? ' ' : ': ')+laterSides.join('/');
+    vestItems.push(laterTxt);
+  }
+  // 2. Tests prévention vasculaire (format compact, "/" séparateur)
+  // Affiché uniquement si au moins 1 test a un résultat (positif ou négatif)
+  const prevLabels = [];
+  let prevHasResult = false;
+  [['DeKleyn','po-klein'],['Ligaments','po-ligaments'],['Rancurel','po-rancurel']].forEach(function(t) {
+    const v = document.querySelector('input[name="'+t[1]+'"]:checked')?.value;
+    if(v === 'positif') { prevLabels.push(t[0]+' +'); prevHasResult = true; }
+    else if(v === 'negatif') { prevLabels.push(t[0]+' nég'); prevHasResult = true; }
+    else prevLabels.push(t[0]+' non testé');
+  });
+  if(prevHasResult) vestItems.push('Tests prévention: '+prevLabels.join(' / '));
+  // 3. Head Shaking / Head Impulse (uniquement si positifs)
+  if(document.querySelector('input[name="po-headshaking"]:checked')?.value === 'oui') vestItems.push('Head Shaking +');
+  if(document.querySelector('input[name="po-headimpulse"]:checked')?.value === 'oui') vestItems.push('Head Impulse +');
+  // 4. Tests stato-kinétiques (D ou G uniquement, sinon non testé)
+  const babW = document.querySelector('input[name="po-babinski"]:checked')?.value;
+  if(babW) vestItems.push('Babinski-Weil: déviation '+babW);
+  const unter = document.querySelector('input[name="po-unterburger"]:checked')?.value;
+  if(unter) vestItems.push('Unterburger: déviation '+unter);
+  // 5. Vertiges
+  if(document.querySelector('input[name="po-vertiges"]:checked')?.value === 'oui') vestItems.push('Vertiges/nystagmus présents');
+  // 6. VPPB + détail CSC si oui
+  if(document.querySelector('input[name="po-vppb"]:checked')?.value === 'oui') {
+    const cscList = [];
+    if(document.getElementById('po-csc-d')?.checked) cscList.push('D');
+    if(document.getElementById('po-csc-g')?.checked) cscList.push('G');
+    if(document.getElementById('po-csc-antd')?.checked) cscList.push('Ant D');
+    if(document.getElementById('po-csc-antg')?.checked) cscList.push('Ant G');
+    if(document.getElementById('po-csc-postd')?.checked) cscList.push('Post D');
+    if(document.getElementById('po-csc-postg')?.checked) cscList.push('Post G');
+    let vppbTxt = 'VPPB +';
+    if(cscList.length) vppbTxt += ' (CSC: '+cscList.join(', ')+')';
+    vestItems.push(vppbTxt);
+  }
+  // 7. CLVF + détails si oui (PEVS / canal / manœuvre)
+  if(document.querySelector('input[name="po-clvf"]:checked')?.value === 'oui') {
+    const clvfParts = ['CLVF effectué'];
+    const pevs = document.querySelector('input[name="po-pevs"]:checked')?.value;
+    if(pevs) clvfParts.push('PEVS '+pevs);
+    const canaux = [];
+    if(document.getElementById('po-canal-ant')?.checked) canaux.push('Ant');
+    if(document.getElementById('po-canal-post')?.checked) canaux.push('Post');
+    if(document.getElementById('po-canal-lat')?.checked) canaux.push('Lat');
+    if(canaux.length) clvfParts.push('canal '+canaux.join('+'));
+    const manoeuvres = [];
+    if(document.getElementById('po-man-semont')?.checked) manoeuvres.push('Semont');
+    if(document.getElementById('po-man-epley')?.checked) manoeuvres.push('Epley');
+    if(document.getElementById('po-man-epley-inv')?.checked) manoeuvres.push('Epley inv.');
+    if(document.getElementById('po-man-lempert')?.checked) manoeuvres.push('Lempert');
+    if(manoeuvres.length) clvfParts.push('manœuvre '+manoeuvres.join(', '));
+    vestItems.push(clvfParts.join(' — '));
+  }
+  // 8. Réorientation (ORL / kiné)
+  const reor = [];
+  if(document.getElementById('po-reor-orl')?.checked) reor.push('ORL');
+  if(document.getElementById('po-reor-kine')?.checked) reor.push('Kiné rééd. vestibulaire');
+  if(reor.length) vestItems.push('Réorientation: '+reor.join(', '));
+  // 9. Semelle compensation (uniquement si oui)
+  if(document.querySelector('input[name="po-semelle-comp"]:checked')?.value === 'oui') vestItems.push('Semelle de compensation prescrite');
+  if(vestItems.length) sections.push({titre:'👂 Vestibulaire', items:[vestItems.join(' · ')]});
 
-  // Entrée buccale
+  // Entrée buccale (psec-6, partie haute)
   const buccalItems = [];
-  if(document.querySelector('input[name="po-mcp-ouv"]:checked')?.value === 'oui') buccalItems.push('Amélioration ouverture bouche (ATM secondaire)');
+  // Helper bilatéral DOM (réutilisé)
+  const bilatDomBuc = function(label, baseG, baseD) {
+    const g = document.getElementById(baseG)?.checked;
+    const d = document.getElementById(baseD)?.checked;
+    if(g && d) return label+' bilat';
+    if(g) return label+' G';
+    if(d) return label+' D';
+    return null;
+  };
+  // 1. MCP - Amélioration ouverture bouche (uniquement si oui)
+  if(document.querySelector('input[name="po-mcp-ouv"]:checked')?.value === 'oui') {
+    buccalItems.push('Amélioration ouverture bouche (ATM secondaire)');
+  }
+  // 2. MCP - Serrage de dent + sous-options
+  const serrage = document.querySelector('input[name="po-serrage"]:checked')?.value;
+  if(serrage === 'aggravation') {
+    const aggrSub = [];
+    if(document.getElementById('po-aggr-dents')?.checked) aggrSub.push('dents réactogènes');
+    if(document.getElementById('po-aggr-atm')?.checked) aggrSub.push('ATM');
+    let serrageTxt = 'Serrage: aggravation';
+    if(aggrSub.length) serrageTxt += ' ('+aggrSub.join(', ')+')';
+    buccalItems.push(serrageTxt);
+  } else if(serrage === 'amelioration') {
+    const amSub = [];
+    if(document.getElementById('po-amelio-contact')?.checked) amSub.push('défaut contact dentaire');
+    if(document.getElementById('po-amelio-tension')?.checked) amSub.push('tensions intracrâniennes');
+    let serrageTxt = 'Serrage: amélioration';
+    if(amSub.length) serrageTxt += ' ('+amSub.join(', ')+')';
+    buccalItems.push(serrageTxt);
+  }
+  // 3. ATM origine
   const atm = document.querySelector('input[name="po-atm-origine"]:checked')?.value;
   if(atm) buccalItems.push('ATM origine: '+atm);
-  if(buccalItems.length) sections.push({titre:'🦷 Entrée buccale', items:buccalItems});
+  // 4. Examen mandibule (uniquement les oui = pathologiques)
+  const mandib = [];
+  [
+    ['Ouverture max < 3 doigts','po-ouv-max'],
+    ['Déviation à l\'ouverture','po-deviation'],
+    ['Contractures masticateurs','po-contractures'],
+    ['Douleur capsulo-ligamentaire','po-douleur-caps']
+  ].forEach(function(t) {
+    if(document.querySelector('input[name="'+t[1]+'"]:checked')?.value === 'oui') mandib.push(t[0]);
+  });
+  if(mandib.length) buccalItems.push('Examen mandibule: '+mandib.join(', '));
+  // 5. Ressaut méniscal (si oui + côté)
+  if(document.querySelector('input[name="po-ressaut"]:checked')?.value === 'oui') {
+    const ressautTxt = bilatDomBuc('Ressaut méniscal', 'po-ressaut-gauche', 'po-ressaut-dte');
+    buccalItems.push(ressautTxt || 'Ressaut méniscal +');
+  }
+  // 6. Réorientation buccale (cases cochées : dentiste, ortho, stomato, kiné, ostéo)
+  const reorBuc = [];
+  if(document.getElementById('po-reor-buc-dentiste')?.checked) reorBuc.push('Dentiste');
+  if(document.getElementById('po-reor-buc-ortho')?.checked) reorBuc.push('Orthodontiste');
+  if(document.getElementById('po-reor-buc-stomato')?.checked) reorBuc.push('Stomatologue');
+  if(document.getElementById('po-reor-buc-kine')?.checked) reorBuc.push('Kinésithérapeute');
+  if(document.getElementById('po-reor-buc-osteo')?.checked) reorBuc.push('Ostéopathe');
+  if(reorBuc.length) buccalItems.push('Réorientation: '+reorBuc.join(', '));
+  if(buccalItems.length) sections.push({titre:'🦷 Entrée buccale', items:[buccalItems.join(' · ')]});
+
+  // Entrée visuelle (psec-6, partie basse)
+  const visItems = [];
+  // 1. Latéralisation visuelle (si oui)
+  const visLater = document.querySelector('input[name="po-vis-later"]:checked')?.value;
+  if(visLater === 'oui') {
+    const visLaterType = document.querySelector('input[name="po-vis-later-type"]:checked')?.value;
+    visItems.push('Latéralisation' + (visLaterType ? ': '+visLaterType : ''));
+  }
+  // 2. Tests stato-oculaire (format compact "/")
+  const statoOc = [];
+  let statoHasResult = false;
+  [['Allongement brachial','po-test-allongement'],['Rotation nucale','po-test-rot-nucale']].forEach(function(t) {
+    const v = document.querySelector('input[name="'+t[1]+'"]:checked')?.value;
+    if(v === 'positif') { statoOc.push(t[0]+' +'); statoHasResult = true; }
+    else if(v === 'negatif') { statoOc.push(t[0]+' nég'); statoHasResult = true; }
+    else statoOc.push(t[0]+' non testé');
+  });
+  if(statoHasResult) visItems.push('Tests stato-oculaire: '+statoOc.join(' / '));
+  // 3. Entrée visuelle primaire/secondaire
+  const visEntree = document.querySelector('input[name="po-vis-entree"]:checked')?.value;
+  if(visEntree) visItems.push('Entrée: '+visEntree);
+  // 4. Réfraction (cases cochées)
+  const refrac = [];
+  if(document.getElementById('po-myopie')?.checked) refrac.push('Myopie');
+  if(document.getElementById('po-hypermetropie')?.checked) refrac.push('Hypermétropie');
+  if(document.getElementById('po-presbyte')?.checked) refrac.push('Presbytie');
+  if(document.getElementById('po-astigmate')?.checked) refrac.push('Astigmatie');
+  if(refrac.length) visItems.push('Réfraction: '+refrac.join(', '));
+  // 5. Œil directeur / dominant (format compact)
+  const oeilDir = document.querySelector('input[name="po-oeil-direct"]:checked')?.value;
+  const oeilDom = document.querySelector('input[name="po-oeil-domin"]:checked')?.value;
+  if(oeilDir || oeilDom) {
+    const oeilParts = [];
+    if(oeilDir) oeilParts.push('directeur '+oeilDir);
+    if(oeilDom) oeilParts.push('dominant '+oeilDom);
+    visItems.push('Œil: '+oeilParts.join(' / '));
+  }
+  // 6. Tests oculaires : Convergence + Maddox + Cover
+  if(document.getElementById('po-conv-oculaire')?.checked) visItems.push('Défaut convergence oculaire');
+  const maddox = document.querySelector('input[name="po-maddox"]:checked')?.value;
+  if(maddox) visItems.push('Maddox: '+maddox);
+  const cover = document.querySelector('input[name="po-cover"]:checked')?.value;
+  if(cover) visItems.push('Cover test: '+cover);
+  // 7. Hétérophorie (conséquences posturales — texte libre)
+  const heteroHUni = document.getElementById('po-hetero-h-uni')?.value?.trim();
+  if(heteroHUni) visItems.push('Hétérophorie H. unilatérale: '+heteroHUni);
+  const heteroHBi = document.getElementById('po-hetero-h-bi')?.value?.trim();
+  if(heteroHBi) visItems.push('Hétérophorie H. bilatérale: '+heteroHBi);
+  const heteroV = document.getElementById('po-hetero-v')?.value?.trim();
+  if(heteroV) visItems.push('Hétérophorie verticale: '+heteroV);
+  // 8. Traitement (uniquement les oui)
+  if(document.querySelector('input[name="po-trait-ortho"]:checked')?.value === 'oui') visItems.push('Traitement orthopédique mis en place');
+  if(document.querySelector('input[name="po-fiche-ex"]:checked')?.value === 'oui') visItems.push('Fiche exercice donnée');
+  // 9. Réorientation visuelle (cases cochées)
+  const reorVis = [];
+  if(document.getElementById('po-reor-vis-orthoptiste')?.checked) reorVis.push('Orthoptiste');
+  if(document.getElementById('po-reor-vis-ophtalmo')?.checked) reorVis.push('Ophtalmologiste');
+  if(document.getElementById('po-reor-vis-optom')?.checked) reorVis.push('Optométriste');
+  if(reorVis.length) visItems.push('Réorientation: '+reorVis.join(', '));
+  if(visItems.length) sections.push({titre:'👁️ Entrée visuelle', items:[visItems.join(' · ')]});
 
   // Terrain
   const terrainItems = [];
@@ -7943,7 +8306,7 @@ function genererSynthese() {
   });
   const biomec = document.getElementById('po-biomec-articulaire')?.value;
   if(biomec) terrainItems.push('Biomécanique: '+biomec);
-  if(terrainItems.length) sections.push({titre:'🌿 Terrain', items:terrainItems});
+  if(terrainItems.length) sections.push({titre:'🌿 Terrain', items:[terrainItems.join(' · ')]});
 
   // Afficher résultat
   const result = document.getElementById('po-synthese-result');
