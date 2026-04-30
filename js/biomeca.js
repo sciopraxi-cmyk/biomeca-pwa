@@ -8292,19 +8292,34 @@ function genererSynthese() {
   if(reorVis.length) visItems.push('Réorientation: '+reorVis.join(', '));
   if(visItems.length) sections.push({titre:'👁️ Entrée visuelle', items:[visItems.join(' · ')]});
 
-  // Terrain
+  // Terrain (psec-7) — 3 sous-blocs : posture globale → posture en excès (chaînes) → biomec/articulaire
   const terrainItems = [];
-  if(document.getElementById('po-posture-ant')?.checked) terrainItems.push('Antériorisation globale');
-  if(document.getElementById('po-posture-post')?.checked) terrainItems.push('Postériorisation globale');
+  // 1. Posture globale (regroupée sous un seul item, virgules)
+  const postureGlobale = [];
+  if(document.getElementById('po-posture-ant')?.checked) postureGlobale.push('antériorisation');
+  if(document.getElementById('po-posture-post')?.checked) postureGlobale.push('postériorisation');
   if(document.getElementById('po-posture-later')?.checked) {
     const dir = document.querySelector('input[name="po-posture-later-dir"]:checked')?.value;
-    terrainItems.push('Latéralisation globale' + (dir ? ': '+dir : ''));
+    postureGlobale.push('latéralisation' + (dir ? ' '+dir : ''));
   }
-  ['po-chaine-ext','po-chaine-ferm','po-chaine-ouv','po-chaine-stat-opt','po-chaine-stat-deg'].forEach(function(id) {
-    const el = document.getElementById(id);
-    if(el?.checked) terrainItems.push(el.parentElement.textContent.trim());
+  if(postureGlobale.length) terrainItems.push('Posture globale: '+postureGlobale.join(', '));
+  // 2. Posture en excès — chaînes (map explicite [id, label] pour robustesse,
+  //    couvre les 6 chaînes : ext PM, flex AM, ferm PL, ouv AL, stat-opt PA, stat-deg AP)
+  const chaines = [
+    ['po-chaine-ext','Chaine extension (PM)'],
+    ['po-chaine-flex','Chaine de flexion (AM)'],
+    ['po-chaine-ferm','Chaine de fermeture (PL)'],
+    ['po-chaine-ouv',"Chaine d'ouverture (AL)"],
+    ['po-chaine-stat-opt','Chaine statique optimisée (PA)'],
+    ['po-chaine-stat-deg','Chaine statique dégradée (AP)']
+  ];
+  const chainesActives = [];
+  chaines.forEach(function(c) {
+    if(document.getElementById(c[0])?.checked) chainesActives.push(c[1]);
   });
-  const biomec = document.getElementById('po-biomec-articulaire')?.value;
+  if(chainesActives.length) terrainItems.push('Posture en excès: '+chainesActives.join(', '));
+  // 3. Biomécanique / articulaire (texte libre)
+  const biomec = document.getElementById('po-biomec-articulaire')?.value?.trim();
   if(biomec) terrainItems.push('Biomécanique: '+biomec);
   if(terrainItems.length) sections.push({titre:'🌿 Terrain', items:[terrainItems.join(' · ')]});
 
