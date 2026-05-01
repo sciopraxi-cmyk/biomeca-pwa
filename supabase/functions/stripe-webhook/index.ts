@@ -45,11 +45,11 @@ const cryptoProvider = Stripe.createSubtleCryptoProvider();
 const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  { auth: { autoRefreshToken: false, persistSession: false } },
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
 function identifyFormule(
-  priceIds: string[],
+  priceIds: string[]
 ): { formule: string; engagement: 'sans' | '1_an' } | null {
   for (let i = 0; i < PRICE_MAP.mensuel.length; i++) {
     if (priceIds.includes(PRICE_MAP.mensuel[i])) {
@@ -66,9 +66,7 @@ function identifyFormule(
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const email = session.customer_email || session.customer_details?.email;
-  const customerId = typeof session.customer === 'string'
-    ? session.customer
-    : session.customer?.id;
+  const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
 
   if (!email) {
     console.error('checkout.session.completed: no email on session', session.id);
@@ -108,10 +106,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     update.licence_payee = true;
   }
 
-  const { error } = await supabaseAdmin
-    .from('user_data')
-    .update(update)
-    .eq('email', email);
+  const { error } = await supabaseAdmin.from('user_data').update(update).eq('email', email);
 
   if (error) {
     console.error('checkout.session.completed: update failed', { email, error });
@@ -121,9 +116,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const customerId = typeof subscription.customer === 'string'
-    ? subscription.customer
-    : subscription.customer.id;
+  const customerId =
+    typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
 
   // Reset complet de l'état d'abonnement : la DB doit refléter qu'il n'y a
   // plus de formule active. stripe_customer_id est conservé pour traçabilité
@@ -168,13 +162,10 @@ Deno.serve(async (req) => {
       signature,
       webhookSecret,
       undefined,
-      cryptoProvider,
+      cryptoProvider
     );
   } catch (err) {
-    console.error(
-      'Signature verification failed',
-      err instanceof Error ? err.message : err,
-    );
+    console.error('Signature verification failed', err instanceof Error ? err.message : err);
     return new Response('Invalid signature', { status: 400 });
   }
 
