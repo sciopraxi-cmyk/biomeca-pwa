@@ -125,16 +125,26 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     ? subscription.customer
     : subscription.customer.id;
 
+  // Reset complet de l'état d'abonnement : la DB doit refléter qu'il n'y a
+  // plus de formule active. stripe_customer_id est conservé pour traçabilité
+  // (re-souscription future, support, audit).
+  const update = {
+    licence_payee: false,
+    formule: null,
+    engagement: null,
+    date_debut_abonnement: null,
+  };
+
   const { error } = await supabaseAdmin
     .from('user_data')
-    .update({ licence_payee: false })
+    .update(update)
     .eq('stripe_customer_id', customerId);
 
   if (error) {
     console.error('customer.subscription.deleted: update failed', { customerId, error });
     return;
   }
-  console.log('customer.subscription.deleted: licence_payee=false', { customerId });
+  console.log('customer.subscription.deleted: subscription reset', { customerId });
 }
 
 Deno.serve(async (req) => {
