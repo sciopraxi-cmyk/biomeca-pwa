@@ -9,7 +9,7 @@ test.describe('Authentication', () => {
     await expect(page.locator('#tn-patients')).toBeVisible();
   });
 
-  test('1.2 — logout revient à l\'écran de login', async ({ page }) => {
+  test("1.2 — logout revient à l'écran de login", async ({ page }) => {
     requireCredentials();
     await login(page);
     await logout(page);
@@ -17,7 +17,7 @@ test.describe('Authentication', () => {
     await expect(page.locator('#pwa-email')).toBeVisible();
   });
 
-  test('1.3 — mauvais mot de passe affiche un message d\'erreur', async ({ page }) => {
+  test("1.3 — mauvais mot de passe affiche un message d'erreur", async ({ page }) => {
     await login(page, {
       email: TEST_USER_EMAIL || 'podologue@hotmail.com',
       password: 'mauvais-mot-de-passe-' + Date.now(),

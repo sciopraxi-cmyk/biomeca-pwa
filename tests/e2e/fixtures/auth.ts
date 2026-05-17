@@ -6,14 +6,14 @@ export const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD ?? '';
 export function requireCredentials() {
   if (!TEST_USER_EMAIL || !TEST_USER_PASSWORD) {
     throw new Error(
-      'TEST_USER_EMAIL / TEST_USER_PASSWORD manquants. Copier .env.local.example en .env.local et renseigner le mot de passe.',
+      'TEST_USER_EMAIL / TEST_USER_PASSWORD manquants. Copier .env.local.example en .env.local et renseigner le mot de passe.'
     );
   }
 }
 
 export async function login(
   page: Page,
-  opts: { email?: string; password?: string; expectSuccess?: boolean } = {},
+  opts: { email?: string; password?: string; expectSuccess?: boolean } = {}
 ) {
   const email = opts.email ?? TEST_USER_EMAIL;
   const password = opts.password ?? TEST_USER_PASSWORD;
@@ -37,6 +37,9 @@ export async function logout(page: Page) {
   // pwaLogout() declenche un confirm() — accepter la dialog avant le clic.
   page.once('dialog', (d) => d.accept());
   // Plusieurs boutons appellent pwaLogout() — celui de la topbar (⎋ Déconnexion) suffit.
-  await page.getByRole('button', { name: /Déconnexion/i }).first().click();
+  await page
+    .getByRole('button', { name: /Déconnexion/i })
+    .first()
+    .click();
   await expect(page.locator('#pwa-login')).toBeVisible({ timeout: 10_000 });
 }

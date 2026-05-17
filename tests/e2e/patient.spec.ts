@@ -47,17 +47,17 @@ test.describe('Patient — création + persistence', () => {
     }
   });
 
-  test('2.1 — création d\'un patient avec nom unique apparait dans la liste', async ({ page }) => {
+  test("2.1 — création d'un patient avec nom unique apparait dans la liste", async ({ page }) => {
     await createPatient(page, patientLastName);
     await expect(
-      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`),
+      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`)
     ).toBeVisible({ timeout: 10_000 });
   });
 
   test('2.2 — patient persiste après reload (localStorage + Supabase)', async ({ page }) => {
     await createPatient(page, patientLastName);
     await expect(
-      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`),
+      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`)
     ).toBeVisible();
 
     await page.reload();
@@ -65,19 +65,19 @@ test.describe('Patient — création + persistence', () => {
     await expect(page.locator('#pwa-login')).toBeHidden({ timeout: 15_000 });
     await expect(page.locator('#pg-patients')).toBeVisible();
     await expect(
-      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`),
+      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`)
     ).toBeVisible({ timeout: 15_000 });
   });
 
   test('2.3 — suppression du patient le retire de la liste', async ({ page }) => {
     await createPatient(page, patientLastName);
     await expect(
-      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`),
+      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`)
     ).toBeVisible();
     const deleted = await deletePatientByName(page, patientLastName);
     expect(deleted).toBe(true);
     await expect(
-      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`),
+      page.locator('#pt-list-el').getByText(`${PATIENT_FIRST_NAME} ${patientLastName}`)
     ).toHaveCount(0);
   });
 });
