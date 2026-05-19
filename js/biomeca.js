@@ -644,6 +644,7 @@ function checkAccessStatus() {
     window._accessLevel = 'full';
     _hideAccessBanner();
     _hideAccessOverlay();
+    applyReadOnlyUI(window._accessLevel);
     return;
   }
 
@@ -653,6 +654,9 @@ function checkAccessStatus() {
 
   // Auto-trial dispatch : 'blocked' + 4 conditions vides → on tente le démarrage.
   // Pendant l'attente, état 'loading' (DOM neutre, pas de bandeau ni overlay).
+  // applyReadOnlyUI n'est PAS appelée pendant le dispatch : courte fenêtre (~100-300ms),
+  // la défense en profondeur (early-returns + showAccessRestrictedModal dans les fonctions
+  // cibles) protège quand même contre un click légitime trop rapide.
   if (level === 'blocked' && userData && typeof userData === 'object'
       && !userData.licence_payee && !userData.formule
       && !meta.trial_start && !meta.acces) {
@@ -664,8 +668,10 @@ function checkAccessStatus() {
         // Fail-secure : start-trial a échoué (réseau/500/401). On reste blocked.
         window._accessLevel = 'blocked';
         _showAccessOverlay({ cause: 'never_paid' });
+        applyReadOnlyUI('blocked');
       } else {
         // Succès (200) ou race 409 : pwaUser.user_metadata est à jour, on recalcule.
+        // Le recall propagera applyReadOnlyUI proprement, pas besoin de le call ici.
         checkAccessStatus();
       }
     });
@@ -680,6 +686,7 @@ function checkAccessStatus() {
     // mais filet de sécurité). DOM neutre.
     _hideAccessBanner();
     _hideAccessOverlay();
+    applyReadOnlyUI(window._accessLevel);
     return;
   }
 
@@ -695,10 +702,12 @@ function checkAccessStatus() {
           text: remaining === 1 ? "Dernier jour d'essai !" : 'Essai gratuit — ' + remaining + ' jours restants',
           background: remaining <= 3 ? '#e74c3c' : '',
         });
+        applyReadOnlyUI(window._accessLevel);
         return;
       }
     }
     _hideAccessBanner();
+    applyReadOnlyUI(window._accessLevel);
     return;
   }
 
@@ -708,6 +717,7 @@ function checkAccessStatus() {
       text: "Votre abonnement est suspendu. Vos patients et bilans restent consultables. Reprenez votre abonnement pour créer de nouveaux bilans et exporter en PDF.",
       background: '#e67e22',
     });
+    applyReadOnlyUI(window._accessLevel);
     return;
   }
 
@@ -718,7 +728,114 @@ function checkAccessStatus() {
     // pas réunies ex. user créé manuellement par admin sans acces ni licence).
     const cause = meta.trial_start ? 'trial_expired' : 'never_paid';
     _showAccessOverlay({ cause });
+    applyReadOnlyUI(window._accessLevel);
     return;
+  }
+}
+
+// applyReadOnlyUI — applique le gating visuel sur les 6 boutons cibles (task #57).
+// level : 'full' | 'readonly' | 'blocked' | 'loading'.
+//
+// IMPORTANT — DOM dynamique : applyReadOnlyUI doit être appelée à plusieurs
+// endroits car certains boutons sont re-créés dynamiquement par innerHTML :
+//   1. checkAccessStatus() (en fin de chaque branche)
+//   2. renderPatientList() (re-création des boutons "Nouveau bilan Sport/Posturo"
+//      à chaque modif patient)
+// Si d'autres render functions sont ajoutées plus tard qui régénèrent des boutons
+// cibles, hooker applyReadOnlyUI() à leur fin également.
+//
+// Cibles (6) :
+//   - "+ Nouveau patient" (index.html statique, onclick=openNewPatientModal)
+//   - Boutons "Initial/Contrôle" bilan sport (dynamiques, onclick=creerBilanSport)
+//   - Boutons "Initial/Contrôle" bilan posturo (dynamiques, onclick=creerBilanPosturo)
+//   - "Imprimer / PDF" rapport posturo (index.html statique, onclick=printRapportPosturo)
+//   - "Imprimer / PDF" rapport sport (index.html statique, onclick=printReport)
+//   - "Imprimer" bilan clinique (index.html statique, onclick=printBilan)
+//
+// La sélection par attribut onclick fonctionne pour le HTML statique ET le HTML
+// rendu dynamiquement par innerHTML (l'attribut onclick est inline dans les deux cas).
+function applyReadOnlyUI(level) {
+  const blocked = level === 'readonly' || level === 'blocked';
+  const selectors = [
+    '[onclick*="openNewPatientModal"]',
+    '[onclick*="creerBilanSport"]',
+    '[onclick*="creerBilanPosturo"]',
+    '[onclick*="printRapportPosturo"]',
+    '[onclick*="printReport"]',
+    '[onclick*="printBilan"]',
+  ];
+  const buttons = document.querySelectorAll(selectors.join(','));
+  buttons.forEach(btn => {
+    if (blocked) {
+      btn.classList.add('btn-disabled');
+      btn.setAttribute('disabled', 'true');
+      btn.setAttribute('title', "Reprenez votre abonnement pour activer cette fonctionnalité");
+    } else {
+      btn.classList.remove('btn-disabled');
+      btn.removeAttribute('disabled');
+      btn.removeAttribute('title');
+    }
+  });
+}
+
+// showAccessRestrictedModal — modale affichée quand un utilisateur readonly ou
+// blocked tente une action gatée (création patient/bilan, export PDF).
+// reason : 'create_patient' | 'create_bilan' | 'export_pdf'.
+// Pattern de création runtime cohérent avec openNewPatientModal :
+// le modal est créé une fois et réutilisé. Z-index 10001 pour passer au-dessus
+// du modal Mon Compte (10000) et de l'overlay blocked (9998).
+function showAccessRestrictedModal(reason) {
+  const labels = {
+    create_patient: 'Création de patient',
+    create_bilan: 'Création de bilan',
+    export_pdf: 'Export PDF',
+  };
+  const label = labels[reason] || 'Cette fonctionnalité';
+
+  let modal = document.getElementById('modal-access-restricted');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-access-restricted';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10001;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    document.body.appendChild(modal);
+    // Clic sur le backdrop = fermeture (cohérent avec les autres modales du code).
+    // C'est OK ici : la modale est ponctuelle (déclenchée par une action utilisateur),
+    // pas persistante comme le bandeau readonly ou l'overlay blocked.
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  }
+  // Sécurité : reason doit toujours être une string constante littérale du code,
+  // jamais user-controlled — ${label} est rendu via innerHTML.
+  modal.innerHTML = `
+    <div style="background:var(--card);border-radius:14px;padding:28px;max-width:440px;width:100%;text-align:center;">
+      <div style="font-size:38px;margin-bottom:14px;">🔒</div>
+      <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:8px;">
+        Fonctionnalité réservée aux abonnés actifs
+      </div>
+      <div style="font-size:13px;color:var(--mut);margin-bottom:22px;line-height:1.5;">
+        ${label} indisponible. Reprenez votre abonnement pour réactiver cette fonctionnalité.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button onclick="document.getElementById('modal-access-restricted').style.display='none'" style="background:none;border:1px solid var(--bord);color:var(--mut);padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer;">
+          Fermer
+        </button>
+        <button onclick="document.getElementById('modal-access-restricted').style.display='none';openSubscribeFlow()" style="background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+          Reprendre l'abonnement
+        </button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+// openSubscribeFlow — point d'entrée unique pour le CTA "Reprendre l'abonnement"
+// utilisé par le bandeau readonly, l'overlay blocked et la modale showAccessRestrictedModal.
+// Cache l'overlay s'il intercepte les clicks puis ouvre le modal Mon Compte
+// (qui contient les Payment Links). La présélection sansLicence vs avecLicence
+// selon licence_payee est implémentée dans le commit 5.
+function openSubscribeFlow() {
+  const overlay = document.getElementById('trial-expired-overlay');
+  if (overlay) overlay.style.display = 'none';
+  if (typeof showMonCompte === 'function') {
+    showMonCompte();
   }
 }
 
@@ -1718,6 +1835,11 @@ function closeNewPatientModal() {
 }
 
 function createPatient() {
+  // Gating task #57 — bloque la création si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_patient');
+    return;
+  }
   const nom = document.getElementById('np-nom').value.trim();
   const prenom = document.getElementById('np-prenom').value.trim();
   const errEl = document.getElementById('np-err');
@@ -1999,6 +2121,11 @@ function renderPatientList() {
       </div>
     </div>`;
   }).join('');
+  // Re-apply readonly gating après re-render — les boutons "Initial/Contrôle"
+  // bilan sport/posturo sont régénérés à chaque appel (innerHTML). Sans ce hook,
+  // ils ré-apparaissent actifs même si window._accessLevel est readonly/blocked.
+  // Cf. commentaire d'en-tête de applyReadOnlyUI.
+  if (typeof applyReadOnlyUI === 'function') applyReadOnlyUI(window._accessLevel);
 }
 
 // ══════════════════════════════════════════════════════
@@ -2188,6 +2315,11 @@ function finalizeBilanPosturo(patIdx) {
 }
 
 function creerBilanSport(patIdx, type) {
+  // Gating task #57 — bloque la création si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_bilan');
+    return;
+  }
   const p = patients[patIdx];
   if(!p) return;
   // Sauvegarder bilan courant si données existantes
@@ -2240,6 +2372,11 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
 }
 
 function creerBilanPosturo(patIdx, type) {
+  // Gating task #57 — bloque la création si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_bilan');
+    return;
+  }
   const p = patients[patIdx];
   if(!p) return;
   // Archiver UNIQUEMENT si in-progress (sousType set), pas si viewing-only.
@@ -3912,6 +4049,11 @@ async function validateAndSave() {
 // ══════════════════════════════════════════════════════
 
 function printRapportPosturo() {
+  // Gating task #57 — bloque l'impression si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('export_pdf');
+    return;
+  }
   // L'iframe interne contient déjà le rapport stylé (créé par buildRapportPosturo).
   // On l'imprime directement plutôt que de créer un wrapper qui copierait juste
   // le markup outer de l'iframe (sans son document interne) — cause de l'aperçu blanc.
@@ -4812,6 +4954,11 @@ function buildPhotoMini(data,side,t) {
 // RAPPORT PDF IMPRESSION
 // ══════════════════════════════════════════════════════
 function printReport() {
+  // Gating task #57 — bloque l'impression si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('export_pdf');
+    return;
+  }
   if(!currentPatient){alert('Aucun patient sélectionné.');return;}
   // Sauvegarder automatiquement le bilan avant d'imprimer
   saveBilanSilent();
@@ -6159,6 +6306,13 @@ function toggleDictaphone() {
 }
 
 function printBilan() {
+  // Gating task #57 — bloque l'impression si pas full access.
+  // (printReport a aussi un early-return en double sécurité, mais on stop ici
+  // pour éviter saveBilanSilent inutile et le delay de 200ms.)
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('export_pdf');
+    return;
+  }
   // Sauvegarder d'abord tous les champs
   saveBilanSilent();
   // Puis lancer l'impression du rapport complet
