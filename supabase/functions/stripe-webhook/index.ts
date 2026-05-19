@@ -122,8 +122,12 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   // Reset complet de l'état d'abonnement : la DB doit refléter qu'il n'y a
   // plus de formule active. stripe_customer_id est conservé pour traçabilité
   // (re-souscription future, support, audit).
+  // licence_payee reste true : achat unique à vie, ne pas reset à la résiliation
+  // Stripe. Bug fix task #57 — le reset à false coupait l'accès à des users qui
+  // avaient acheté l'outil et seulement résilié leur abonnement. Reprise possible
+  // via un Payment Link "sansLicence" (moins cher). Seul un admin peut désactiver
+  // licence_payee, et uniquement pour un remboursement (action explicite, audit).
   const update = {
-    licence_payee: false,
     formule: null,
     engagement: null,
     date_debut_abonnement: null,

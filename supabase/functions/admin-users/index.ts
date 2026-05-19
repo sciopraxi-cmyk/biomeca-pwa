@@ -4,7 +4,7 @@
 // Auth : JWT extrait du header → verifié → email == ADMIN_EMAIL.
 // Si pas admin → 403. Sinon route vers handle{Action}.
 //
-// Actions : list | setLicencePayee | setFormule | setDroits.
+// Actions : list | setLicencePayee | setFormule | setDroits | setSubscriptionActive.
 // Actions destructives (suspend/delete/resetPassword/invite) prévues en PR D'.
 //
 // Refs : incident #29 (suppression de la voie service_role côté client),
@@ -77,6 +77,8 @@ Deno.serve(async (req) => {
         return await handleSetFormule(body);
       case 'setDroits':
         return await handleSetDroits(body);
+      case 'setSubscriptionActive':
+        return await handleSetSubscriptionActive(body);
       default:
         return json({ error: 'Unknown action: ' + String(action) }, 400);
     }
@@ -148,7 +150,14 @@ async function handleSetLicencePayee(body: Record<string, unknown>): Promise<Res
     .eq('email', email)
     .select('email');
   if (error) return json({ error: 'update: ' + error.message }, 500);
-  return json({ ok: true, updated: data?.length ?? 0 });
+
+  // Désactivation = action exceptionnelle (remboursement litige). Le client
+  // doit alerter visuellement l'admin. Task #57 : la licence est un achat à vie.
+  const response: Record<string, unknown> = { ok: true, updated: data?.length ?? 0 };
+  if (value === false) {
+    response.warning = 'Désactivation de la licence à vie. À réserver aux remboursements.';
+  }
+  return json(response);
 }
 
 async function handleSetFormule(body: Record<string, unknown>): Promise<Response> {
@@ -188,4 +197,37 @@ async function handleSetDroits(body: Record<string, unknown>): Promise<Response>
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
 
   return json({ ok: true });
+}
+
+// Suspension/réactivation manuelle de l'abonnement par l'admin (task #57).
+// - active=false : reset formule/engagement/date_debut_abonnement (miroir du
+//   webhook customer.subscription.deleted), mais PAS licence_payee — l'achat
+//   à vie est préservé. Cas d'usage : nettoyer un état incohérent en DB,
+//   refléter un remboursement hors-Stripe, etc.
+// - active=true : refusé. La réactivation d'un abonnement passe obligatoirement
+//   par Stripe (Payment Link → checkout.session.completed → set formule). L'admin
+//   ne peut pas créer un abonnement gratuit ici ; pour cela, enchaîner
+//   setLicencePayee(true) (qui set engagement='admin_gratuit') puis setFormule.
+//
+// Écrit dans user_data uniquement (source de vérité pour ces champs). Aucun
+// trigger de sync vers auth.users.user_metadata n'existe — le client doit
+// rafraîchir sa session (re-login) pour voir le changement.
+async function handleSetSubscriptionActive(body: Record<string, unknown>): Promise<Response> {
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const active = body.active;
+  if (!email || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
+  if (active !== true && active !== false) {
+    return json({ error: 'Invalid active (must be boolean)' }, 400);
+  }
+  if (active === true) {
+    return json({ ok: false, error: 'reactivation_must_go_through_stripe' }, 400);
+  }
+
+  const { data, error } = await supaAdmin
+    .from('user_data')
+    .update({ formule: null, engagement: null, date_debut_abonnement: null })
+    .eq('email', email)
+    .select('email');
+  if (error) return json({ error: 'update: ' + error.message }, 500);
+  return json({ ok: true, updated: data?.length ?? 0 });
 }

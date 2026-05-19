@@ -60,3 +60,16 @@ async function adminSetFormule(email, formule) {
 async function adminSetDroits(userId, droits) {
   return callAdminAction('setDroits', { userId, droits });
 }
+
+// Suspend (active=false) ou tente de réactiver (active=true) un abonnement.
+// - active=false : reset formule/engagement/date_debut_abonnement côté user_data.
+//   Préserve licence_payee (achat à vie). Miroir admin du webhook
+//   customer.subscription.deleted.
+// - active=true : refusé serveur-side (la réactivation passe par Stripe).
+//   Pour donner un accès gratuit à un user : enchaîner setLicencePayee(true)
+//   puis setFormule(formule_X).
+// Retourne { ok:true, updated } | { ok:false, error: 'reactivation_must_go_through_stripe' }
+// | { ok:false, error }.
+async function adminSetSubscriptionActive(email, active) {
+  return callAdminAction('setSubscriptionActive', { email, active });
+}
