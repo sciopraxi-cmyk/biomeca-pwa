@@ -980,18 +980,167 @@ function nav(id) {
   }
 }
 
-// Affiche un encart redirectionnel — la gestion utilisateurs est désormais
-// effectuée exclusivement depuis le dashboard Supabase (sécurité : la clé
-// admin legacy n'est plus exposée côté client). Voir incident 2026-04-28.
-function renderParamsPratList() {
+// ─── Admin: gestion utilisateurs via Edge Function admin-users (Task #56) ───
+// L'ancienne clé admin a été retirée du client suite à l'incident #29 — elle
+// vit désormais uniquement comme variable d'env côté Edge Function. Celle-ci
+// vérifie côté serveur que l'appelant est l'admin (JWT email == ADMIN_EMAIL)
+// avant d'exécuter list/setLicencePayee/setFormule/setDroits. Le bouton
+// "Ouvrir Supabase Users" en haut de la page reste comme secours pour les
+// actions hors scope (suspend, delete, invite, resetPassword — voir PR D').
+
+// Cache module-level : les boutons "Modifier" passent un index, pas un objet,
+// pour éviter de sérialiser le user dans onclick="..." (apostrophes, escaping).
+let _adminUsersCache = [];
+
+function _escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
+}
+
+async function renderParamsPratList() {
   const el = document.getElementById('params-prat-list');
-  if(!el) return;
-  el.innerHTML = `
-    <div style="font-size:13px;color:var(--mut);line-height:1.6;padding:12px 14px;background:var(--card);border:1px solid var(--bord);border-radius:8px;">
-      La gestion des utilisateurs (création, modification, droits, accès) s'effectue
-      désormais directement sur le dashboard Supabase pour des raisons de sécurité.
-      Cliquez sur le bouton <strong>« 🔗 Ouvrir Supabase Users »</strong> ci-dessus pour y accéder.
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Chargement des utilisateurs…</div>';
+  const res = await adminListUsers();
+  if (!res || res.ok === false) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px 0;">Erreur : ${_escHtml(res?.error || 'inconnue')}</div>`;
+    return;
+  }
+  _adminUsersCache = Array.isArray(res.users) ? res.users : [];
+  if (_adminUsersCache.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun utilisateur.</div>';
+    return;
+  }
+  el.innerHTML = _adminUsersCache.map((u, i) => _adminUserRowHTML(u, i)).join('');
+}
+
+function _adminUserRowHTML(u, idx) {
+  const licenceBadge = u.licence_payee
+    ? '<span style="color:#2a7a4e;font-weight:600;">✅ Licence</span>'
+    : '<span style="color:#e74c3c;font-weight:600;">⚠️ Sans licence</span>';
+  const formuleTxt = u.formule ? _escHtml(u.formule) : '<span style="color:var(--mut);">—</span>';
+  const droitsTxt = _escHtml(u.droits || 'all');
+  const engagement = u.engagement ? ' · ' + _escHtml(u.engagement) : '';
+  return `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--card);border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;">${_escHtml(u.email)}</div>
+        <div style="font-size:11px;color:var(--mut);margin-top:3px;">
+          ${licenceBadge} · Formule : ${formuleTxt} · Droits : ${droitsTxt}${engagement}
+        </div>
+      </div>
+      <button onclick="openEditUserModal(${idx})" class="btn" style="font-size:11px;padding:6px 12px;flex-shrink:0;">Modifier</button>
     </div>`;
+}
+
+function openEditUserModal(idx) {
+  const u = _adminUsersCache[idx];
+  if (!u) return;
+  let modal = document.getElementById('modal-edit-user');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-edit-user';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeEditUserModal(); });
+  }
+  modal.innerHTML = `
+    <div style="background:var(--card);border-radius:14px;padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:16px;font-weight:700;">Modifier l'utilisateur</div>
+        <button onclick="closeEditUserModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">✕</button>
+      </div>
+      <div style="font-size:13px;color:var(--mut);margin-bottom:18px;">${_escHtml(u.email)}</div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="eu-licence" ${u.licence_payee ? 'checked' : ''}/>
+          Licence activée
+        </label>
+        ${u.engagement ? `<div style="font-size:11px;color:var(--mut);margin-top:4px;margin-left:24px;">Engagement actuel : <strong>${_escHtml(u.engagement)}</strong>${u.date_debut_abonnement ? ` depuis ${_escHtml(new Date(u.date_debut_abonnement).toLocaleDateString('fr-FR'))}` : ''}</div>` : ''}
+        <div style="font-size:11px;color:var(--mut);margin-top:4px;margin-left:24px;">Sur activation : engagement passe à <code>admin_gratuit</code> (distinct des paiements Stripe). Sur désactivation : engagement préservé.</div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Formule</div>
+        <select id="eu-formule" class="inp" style="width:100%;">
+          <option value="">— inchangée —</option>
+          <option value="formule_1" ${u.formule === 'formule_1' ? 'selected' : ''}>formule_1</option>
+          <option value="formule_2" ${u.formule === 'formule_2' ? 'selected' : ''}>formule_2</option>
+          <option value="formule_3" ${u.formule === 'formule_3' ? 'selected' : ''}>formule_3</option>
+          <option value="formule_4" ${u.formule === 'formule_4' ? 'selected' : ''}>formule_4</option>
+          <option value="formule_5" ${u.formule === 'formule_5' ? 'selected' : ''}>formule_5</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Droits</div>
+        <select id="eu-droits" class="inp" style="width:100%;">
+          <option value="all" ${(u.droits || 'all') === 'all' ? 'selected' : ''}>all (tous modules)</option>
+          <option value="sport" ${u.droits === 'sport' ? 'selected' : ''}>sport seulement</option>
+          <option value="posturo" ${u.droits === 'posturo' ? 'selected' : ''}>posturo seulement</option>
+        </select>
+      </div>
+
+      <div id="eu-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:12px;padding:8px 10px;background:rgba(231,76,60,0.1);border-radius:6px;"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeEditUserModal()" class="btn" style="font-size:12px;">Annuler</button>
+        <button onclick="saveEditUser(${idx})" id="eu-save-btn" class="btn btn-blue" style="font-size:12px;">Enregistrer</button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+function closeEditUserModal() {
+  const m = document.getElementById('modal-edit-user');
+  if (m) m.style.display = 'none';
+}
+
+async function saveEditUser(idx) {
+  const u = _adminUsersCache[idx];
+  if (!u) return;
+  const errEl = document.getElementById('eu-err');
+  const btn = document.getElementById('eu-save-btn');
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+
+  const newLicence = document.getElementById('eu-licence').checked;
+  const newFormule = document.getElementById('eu-formule').value;  // '' si inchangée
+  const newDroits = document.getElementById('eu-droits').value;
+
+  // On n'appelle que ce qui a réellement changé. Les actions sont indépendantes
+  // (colonnes différentes pour licence/formule, table différente pour droits)
+  // donc Promise.all est safe — pas de course critique.
+  const tasks = [];
+  if (newLicence !== !!u.licence_payee) {
+    tasks.push(adminSetLicencePayee(u.email, newLicence));
+  }
+  if (newFormule && newFormule !== (u.formule || '')) {
+    tasks.push(adminSetFormule(u.email, newFormule));
+  }
+  if (newDroits !== (u.droits || 'all')) {
+    tasks.push(adminSetDroits(u.id, newDroits));
+  }
+
+  if (tasks.length === 0) {
+    closeEditUserModal();
+    btn.disabled = false; btn.textContent = 'Enregistrer';
+    return;
+  }
+
+  const results = await Promise.all(tasks);
+  const failed = results.filter(r => !r || r.ok === false);
+  if (failed.length > 0) {
+    errEl.textContent = 'Échec partiel : ' + failed.map(r => r.error || 'inconnu').join(' · ');
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Enregistrer';
+    return;
+  }
+
+  closeEditUserModal();
+  renderParamsPratList();
 }
 
 function setPraticienDroits(pratIdx, droits) {
