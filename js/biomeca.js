@@ -234,13 +234,41 @@ async function pwaLogin() {
   }
 }
 
+// ─── Fetch user_data au login (task #57) ───────────────────────────
+// L'app a 2 stores découplés : auth.users.user_metadata (acces, trial_start,
+// droits, nom, prenom) ET la table user_data (licence_payee, formule,
+// engagement, date_debut_abonnement, stripe_customer_id). Pas de trigger DB
+// qui synchronise. checkAccessStatus a besoin des 2, donc on fetch user_data
+// une fois au login et on stash dans pwaUser.user_data.
+//
+// Trois états distincts de pwaUser.user_data (cf. Q2 commit 3) :
+//   - undefined : fetch jamais lancé (1re frame, transitoire) → 'loading'
+//   - null      : fetch lancé et échoué → 'blocked' (fail-secure)
+//   - {...}     : fetch OK → matrice normale
+async function fetchUserDataAtLogin() {
+  if (!pwaUser?.email) {
+    pwaUser && (pwaUser.user_data = null);
+    return;
+  }
+  try {
+    const row = await supa.getUserRecord(pwaUser.email);
+    // getUserRecord retourne null si pas de row, ou l'objet user_data.
+    // Pour la matrice : pas de row = utilisateur sans entrée payante = équivalent
+    // à licence_payee=false + formule=null. On stocke un objet vide pour bien
+    // distinguer du fetch échoué (null).
+    pwaUser.user_data = row || {};
+  } catch (e) {
+    console.error('[access] fetchUserDataAtLogin failed:', e);
+    pwaUser.user_data = null;
+  }
+}
+
 // ─── Après login réussi ───
 async function onPwaLoginSuccess() {
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
   showAdminPanelIfNeeded();
   nav('pg-patients');
-  setTimeout(checkTrialStatus, 500);
 
   // Afficher onglet Paramètres si admin
   const paramsBtn = document.getElementById('tn-params');
@@ -257,6 +285,12 @@ async function onPwaLoginSuccess() {
       pwaUser.user_metadata = freshUser.user_metadata;
     }
   } catch(e) {}
+  // Fetch user_data (licence_payee, formule, etc.) pour gating d'accès task #57.
+  // Doit s'exécuter AVANT checkAccessStatus pour qu'il ait les 2 stores en mémoire.
+  await fetchUserDataAtLogin();
+  // Compute access level et mute le DOM (bandeau + overlay). Plus de setTimeout
+  // 500ms : les awaits ci-dessus garantissent que pwaUser est complet.
+  checkAccessStatus();
   // Charger les données depuis Supabase
   await loadSupabaseData();
 }
@@ -475,50 +509,262 @@ function closeMonCompte() {
   if(modal) modal.style.display = 'none';
 }
 
-function checkTrialStatus() {
-  // Les comptes admin bypass tous les checks de trial — ils ont accès illimité
-  // peu importe leur user_metadata.acces (utile en cas de reliquat metadata d'une
-  // ancienne inscription en essai avant promotion en admin).
-  if (pwaUser?.isAdmin) {
-    const b = document.getElementById('trial-banner');
-    if(b) b.style.display = 'none';
-    const ov = document.getElementById('trial-expired-overlay');
-    if(ov) ov.style.display = 'none';
-    return;
-  }
-  const meta = pwaUser?.user_metadata || {};
-  const acces = meta.acces || '';
-  if(acces !== 'essai') {
-    const b = document.getElementById('trial-banner');
-    if(b) b.style.display = 'none';
-    return;
-  }
-  // Si pas de trial_start, on considère que l'essai commence maintenant
-  const trialStart = meta.trial_start ? new Date(meta.trial_start) : new Date();
-  // Si pas de trial_start défini, mettre à jour dans Supabase
-  if(!meta.trial_start && pwaUser?.token) {
-    const ts = new Date().toISOString();
-    meta.trial_start = ts;
-    fetch(SUPA_URL+'/auth/v1/user', {method:'PUT',
-      headers:{'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+pwaUser.token},
-      body:JSON.stringify({data:{...meta, trial_start:ts}})
-    }).catch(()=>{});
-  }
-  const diffDays = Math.floor((new Date() - trialStart) / 86400000);
-  const remaining = 14 - diffDays;
-  const banner = document.getElementById('trial-banner');
-  const bannerText = document.getElementById('trial-banner-text');
-  const overlay = document.getElementById('trial-expired-overlay');
-  if(remaining <= 0) {
-    if(banner) banner.style.display = 'none';
-    if(overlay) { overlay.style.display = 'flex'; }
-  } else {
-    if(overlay) overlay.style.display = 'none';
-    if(banner) {
-      banner.style.display = 'block';
-      if(bannerText) bannerText.textContent = remaining === 1 ? "Dernier jour d'essai !" : "Essai gratuit — " + remaining + " jours restants";
-      if(remaining <= 3) banner.style.background = '#e74c3c';
+// tryStartTrial — déclenche l'Edge Function start-trial (task #57).
+//
+// Gère explicitement les 4 cas de retour (cf. Q3) :
+//   - 200 OK                    : refresh pwaUser.user_metadata local depuis
+//                                 la réponse, retourne { ok:true }. Caller recall
+//                                 checkAccessStatus pour calculer le nouveau niveau.
+//   - 409 trial_already_started : race condition serveur (autre tab a démarré).
+//                                 Re-fetch supa.getUser() pour synchroniser,
+//                                 retourne { ok:true }. Caller recall.
+//   - 409 acces_already_set     : un admin a set acces entretemps. Même
+//                                 traitement que ci-dessus (re-fetch + recall).
+//   - 401 / 500 / erreur réseau : retourne { ok:false }. Caller set
+//                                 _accessLevel='blocked' (fail-secure).
+async function tryStartTrial() {
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/start-trial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (res.status === 200) {
+      const data = await res.json();
+      if (data && data.ok && data.trial_start && pwaUser) {
+        pwaUser.user_metadata = pwaUser.user_metadata || {};
+        pwaUser.user_metadata.trial_start = data.trial_start;
+        pwaUser.user_metadata.acces = 'essai';
+      }
+      return { ok: true };
     }
+    if (res.status === 409) {
+      // Race : trial_already_started ou acces_already_set. Re-fetch pour sync.
+      try {
+        const fresh = await supa.getUser();
+        if (fresh && fresh.user_metadata && pwaUser) {
+          pwaUser.user_metadata = fresh.user_metadata;
+        }
+      } catch (e) {
+        console.warn('[access] re-fetch user post-409 failed:', e);
+      }
+      return { ok: true };
+    }
+    const errText = await res.text().catch(() => '');
+    console.error('[access] start-trial failed:', res.status, errText);
+    return { ok: false };
+  } catch (e) {
+    console.error('[access] start-trial network error:', e);
+    return { ok: false };
+  }
+}
+
+// computeAccessLevel — fonction pure, testable en unitaire (task #57).
+//
+// Matrice 3-niveaux (cf. spec PR E1+E2) :
+//   - 'full'     : isAdmin OU (licence_payee=true AND formule≠null)
+//                  OU essai en cours (trial_start ≤ 14j)
+//   - 'readonly' : licence_payee=true AND formule=null AND essai expiré/inexistant
+//   - 'blocked'  : licence_payee=false AND pas d'essai actif
+//
+// États transitoires :
+//   - userData === undefined → 'loading' (fetch jamais lancé)
+//   - userData === null      → 'blocked' (fetch échoué, fail-secure)
+//
+// État illégitime : licence_payee=false AND formule≠null. Ne peut résulter
+// que d'une incohérence DB (cf. Q1 — décision défensive "blocked" + log).
+//
+// `meta`     : object pwaUser.user_metadata ({ acces, trial_start, ... })
+// `userData` : object | null | undefined (pwaUser.user_data)
+// `isAdmin`  : bool (extrait de pwaUser.isAdmin)
+// `now`      : timestamp ms (Date.now() par défaut, injectable pour tests)
+//
+// Note pureté : la fonction lit `pwaUser.email` global UNIQUEMENT pour le
+// diagnostic console.error (état illégitime). Aucune lecture de pwaUser
+// n'influence la valeur de retour — les tests Vitest peuvent donc l'appeler
+// sans mocker le global, le log apparaîtra juste sans email enrichi.
+function computeAccessLevel({ isAdmin, meta, userData }, now) {
+  if (isAdmin) return 'full';
+  if (userData === undefined) return 'loading';
+  if (userData === null) return 'blocked';
+
+  const licence = userData.licence_payee === true;
+  const formule = userData.formule;
+  const trialStart = meta && meta.trial_start;
+  const nowMs = typeof now === 'number' ? now : Date.now();
+
+  // État illégitime : formule sans licence. Log + blocked défensif (cf. Q1).
+  if (!licence && formule) {
+    console.error('[access] Illegitimate state detected: formule set without licence', {
+      email: pwaUser && pwaUser.email,
+      formule,
+    });
+    return 'blocked';
+  }
+
+  // Essai actif : 14 jours à partir de trial_start.
+  let trialActive = false;
+  if (trialStart) {
+    const elapsedDays = (nowMs - new Date(trialStart).getTime()) / 86400000;
+    trialActive = elapsedDays >= 0 && elapsedDays <= 14;
+  }
+
+  // Niveau 1 : full
+  if (licence && formule) return 'full';
+  if (trialActive) return 'full';
+  // Niveau 2 : readonly (licence à vie sans abonnement actif)
+  if (licence && !formule) return 'readonly';
+  // Niveau 3 : blocked (défaut)
+  return 'blocked';
+}
+
+// checkAccessStatus — gating 3-niveaux avec auto-trial (task #57).
+//
+// Calcule window._accessLevel à partir de pwaUser.user_metadata + pwaUser.user_data,
+// puis mute le DOM (#trial-banner + #trial-expired-overlay) selon le résultat.
+//
+// CAVEAT — refresh nécessaire après actions admin : ne re-fetch PAS automatiquement
+// les sources si elles changent côté serveur. Si un admin modifie licence_payee
+// ou formule via admin-users après le login d'un user, ce user gardera son niveau
+// d'accès calculé au login jusqu'à un page reload manuel. Cohérent avec le
+// comportement existant de loadAbonnementInfo (qui ne fetch que sur ouverture du
+// modal Mon compte). Un refresh proactif (websocket / polling / event-driven)
+// serait une PR séparée.
+//
+// Auto-trial : si l'utilisateur tomberait en 'blocked' uniquement parce qu'il n'a
+// jamais payé ET n'a jamais démarré son essai (4 conditions : !licence && !formule
+// && !trial_start && !acces), on dispatch start-trial en fire-and-forget puis on
+// se rappelle pour calculer le nouveau niveau (pattern Q3).
+//
+// Renommé depuis l'ancien checkTrialStatus — la sémantique est plus large
+// maintenant (gating 3-niveaux, pas juste countdown d'essai).
+function checkAccessStatus() {
+  // Bypass admin total — pas de loading, pas de fetch nécessaire, DOM neutre.
+  if (pwaUser?.isAdmin) {
+    window._accessLevel = 'full';
+    _hideAccessBanner();
+    _hideAccessOverlay();
+    return;
+  }
+
+  const meta = pwaUser?.user_metadata || {};
+  const userData = pwaUser?.user_data;
+  const level = computeAccessLevel({ isAdmin: false, meta, userData }, Date.now());
+
+  // Auto-trial dispatch : 'blocked' + 4 conditions vides → on tente le démarrage.
+  // Pendant l'attente, état 'loading' (DOM neutre, pas de bandeau ni overlay).
+  if (level === 'blocked' && userData && typeof userData === 'object'
+      && !userData.licence_payee && !userData.formule
+      && !meta.trial_start && !meta.acces) {
+    window._accessLevel = 'loading';
+    _hideAccessBanner();
+    _hideAccessOverlay();
+    tryStartTrial().then(r => {
+      if (!r.ok) {
+        // Fail-secure : start-trial a échoué (réseau/500/401). On reste blocked.
+        window._accessLevel = 'blocked';
+        _showAccessOverlay({ cause: 'never_paid' });
+      } else {
+        // Succès (200) ou race 409 : pwaUser.user_metadata est à jour, on recalcule.
+        checkAccessStatus();
+      }
+    });
+    return;
+  }
+
+  // Dispatch normal selon level
+  window._accessLevel = level;
+
+  if (level === 'loading') {
+    // État transitoire (userData encore undefined, ne devrait pas arriver post-login
+    // mais filet de sécurité). DOM neutre.
+    _hideAccessBanner();
+    _hideAccessOverlay();
+    return;
+  }
+
+  if (level === 'full') {
+    _hideAccessOverlay();
+    // Si l'essai est actif (trial_start ≤ 14j), on affiche le countdown — UX
+    // existante préservée (l'utilisateur sait combien il lui reste).
+    if (meta.trial_start) {
+      const elapsedDays = (Date.now() - new Date(meta.trial_start).getTime()) / 86400000;
+      const remaining = 14 - Math.floor(elapsedDays);
+      if (remaining > 0 && remaining <= 14) {
+        _showAccessBanner({
+          text: remaining === 1 ? "Dernier jour d'essai !" : 'Essai gratuit — ' + remaining + ' jours restants',
+          background: remaining <= 3 ? '#e74c3c' : '',
+        });
+        return;
+      }
+    }
+    _hideAccessBanner();
+    return;
+  }
+
+  if (level === 'readonly') {
+    _hideAccessOverlay();
+    _showAccessBanner({
+      text: "Votre abonnement est suspendu. Vos patients et bilans restent consultables. Reprenez votre abonnement pour créer de nouveaux bilans et exporter en PDF.",
+      background: '#e67e22',
+    });
+    return;
+  }
+
+  if (level === 'blocked') {
+    _hideAccessBanner();
+    // Cause : essai expiré (trial_start présent) vs jamais payé (cas fallback rare
+    // — l'auto-trial gère normalement ce cas en amont, sauf si conditions auto-trial
+    // pas réunies ex. user créé manuellement par admin sans acces ni licence).
+    const cause = meta.trial_start ? 'trial_expired' : 'never_paid';
+    _showAccessOverlay({ cause });
+    return;
+  }
+}
+
+// ─── Helpers DOM bandeau + overlay (task #57) ───────────────────────
+// Utilisent les ID existants (#trial-banner, #trial-banner-text, #trial-expired-overlay).
+// Renommage éventuel vers #access-* possible en PR future si la sémantique « trial »
+// devient trop trompeuse — pas dans cette PR pour limiter le scope HTML.
+
+function _hideAccessBanner() {
+  const b = document.getElementById('trial-banner');
+  if (b) b.style.display = 'none';
+}
+
+function _showAccessBanner({ text, background }) {
+  const b = document.getElementById('trial-banner');
+  const t = document.getElementById('trial-banner-text');
+  if (b) {
+    b.style.display = 'block';
+    if (background !== undefined) b.style.background = background;
+  }
+  if (t) t.textContent = text;
+}
+
+function _hideAccessOverlay() {
+  const o = document.getElementById('trial-expired-overlay');
+  if (o) o.style.display = 'none';
+}
+
+// Mute le titre + le message internes de l'overlay selon la cause du blocage.
+// Les 2 divs n'ont pas d'ID dans le HTML actuel — on les adresse par position
+// (children[1]=titre, children[2]=message du wrapper). Fragile si la structure
+// HTML change ; un commit ultérieur peut les passer en data-* attributes.
+function _showAccessOverlay({ cause }) {
+  const o = document.getElementById('trial-expired-overlay');
+  if (!o) return;
+  o.style.display = 'flex';
+  const wrapper = o.firstElementChild;
+  if (!wrapper || wrapper.children.length < 3) return;
+  const titleEl = wrapper.children[1];
+  const msgEl = wrapper.children[2];
+  if (cause === 'trial_expired') {
+    if (titleEl) titleEl.textContent = 'Votre essai est terminé';
+    if (msgEl) msgEl.textContent = 'Votre essai gratuit de 14 jours est terminé. Choisissez une formule pour continuer.';
+  } else if (cause === 'never_paid') {
+    if (titleEl) titleEl.textContent = 'Bienvenue';
+    if (msgEl) msgEl.textContent = 'Démarrez votre essai gratuit de 14 jours ou choisissez une formule.';
   }
 }
 
