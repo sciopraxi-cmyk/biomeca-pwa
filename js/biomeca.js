@@ -1368,9 +1368,25 @@ function clearBilanFields() {
   if(pc) { pc._history=[]; pc._baseSnapshot=null; drawPiedsTemplate(); }
 }
 
-function deletePatient(i) {
+async function deletePatient(i) {
+  const patient = patients[i];
+  if(!patient) return;
+  // Garde anti double-clic : si une suppression est déjà en cours sur ce patient
+  // (Storage cleanup async en vol), on ignore le 2e clic. Le flag n'est jamais
+  // persisté car splice() retire le patient de patients[] avant savePatients().
+  if(patient.isDeleting) return;
   if(!confirm('Supprimer ce patient ?')) return;
-  if(currentPatient && currentPatient.id===patients[i].id) currentPatient=null;
+  patient.isDeleting = true;
+  // Cleanup Storage best-effort (Task #51 PR B1) — purge le dossier
+  // {userId}/{patientId}/ qui contient toutes les photos posturo et sport du patient.
+  // Si l'opération échoue (réseau, RLS, fichier orphelin), on log un warning et
+  // on procède quand même à la suppression DB : la suppression patient est
+  // l'intention principale de l'utilisateur, Storage est secondaire.
+  if(pwaUser?.id) {
+    const r = await deletePatientFolder(pwaUser.id, patient.id);
+    if(!r.ok) console.warn('[deletePatient] Storage cleanup failed:', r.error);
+  }
+  if(currentPatient && currentPatient.id===patient.id) currentPatient=null;
   patients.splice(i,1); savePatients(); renderPatientList();
 }
 
@@ -1877,7 +1893,64 @@ function supprimerBilanPosturo(patIdx, bilanIdx) {
   renderPatientList();
 }
 
-function ouvrirBilanPosturo(patIdx, bilanIdx) {
+// Clés photo du bilan posturo (Task #51 PR B1). Pour chaque clé `_xxx`,
+// on persiste `_xxxPath` en DB ; la dataUrl correspondante (`_xxx`) reste
+// en RAM le temps de l'édition mais n'est jamais sauvegardée.
+// _feetCanvas est legacy (ancien format, plus écrit aujourd'hui) — migré
+// quand même pour les bilans archivés qui le contiennent encore.
+const POSTURO_PHOTO_KEYS = ['_empreinte', '_bodyCanvas', '_feetDrawings', '_feetComposite', '_feetCanvas'];
+
+// Pour chaque clé photo : si seul le path est présent en DB, on récupère
+// la dataUrl depuis Storage et on la réinjecte dans `d[key]` pour que les
+// renderers (img.src, canvas drawImage) trouvent ce qu'ils attendent.
+// Échec silencieux (warning console) — l'UI affichera un placeholder vide
+// pour la photo manquante, ce qui est acceptable.
+async function prefetchPosturoPhotos(d) {
+  if (!d) return;
+  await Promise.all(POSTURO_PHOTO_KEYS.map(async k => {
+    const pathKey = k + 'Path';
+    if (!d[pathKey] || d[k]) return;
+    const r = await prefetchPhotoToDataUrl(d[pathKey]);
+    if (r.ok) d[k] = r.dataUrl;
+    else console.warn('[posturo] prefetch fail', pathKey, '→', r.error);
+  }));
+}
+
+// Migration lazy des photos posturo vers Storage. Pour chaque clé `_xxx`
+// qui contient encore une dataUrl, upload vers patient-media et remplace
+// par `_xxxPath` (côté `d`). Les dataUrls réussies sont SUPPRIMÉES de `d`
+// par migratePhotoEntry ; en cas d'échec, la dataUrl reste pour retry au
+// prochain save (lazy retry). Retourne un stash des dataUrls initiales,
+// pour que le caller puisse les restaurer en RAM après savePatients().
+async function migratePosturoPhotos(d, patientId, bilanId) {
+  const stash = {};
+  for (const k of POSTURO_PHOTO_KEYS) {
+    if (d[k] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
+      stash[k] = d[k];
+    }
+  }
+  if (Object.keys(stash).length === 0) return stash;
+  const pathArgs = { userId: pwaUser?.id, patientId, type: 'posturo', bilanId };
+  const results = await Promise.all(
+    POSTURO_PHOTO_KEYS.map(k => migratePhotoEntry(d, k, pathArgs))
+  );
+  results.forEach((r, i) => {
+    if (!r.ok) console.warn('[posturo] migrate fail', POSTURO_PHOTO_KEYS[i], '→', r.error);
+  });
+  // Cleanup explicite — couvre le cas "double save sans reload" : à la 2e save,
+  // d[k+'Path'] est déjà set (de la save #1) ET d[k] contient encore la dataUrl
+  // restaurée du stash post-save #1. migratePhotoEntry retourne migrated:false
+  // (no-op, path déjà set), mais sans ce delete la dataUrl serait re-persistée.
+  // Le stash capturé en début de fonction garantit la restauration RAM par le caller.
+  for (const k of POSTURO_PHOTO_KEYS) {
+    if (d[k + 'Path'] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
+      delete d[k];
+    }
+  }
+  return stash;
+}
+
+async function ouvrirBilanPosturo(patIdx, bilanIdx) {
   const p = patients[patIdx];
   if(!p) return;
   const bilan = p.bilansPosturo?.[bilanIdx];
@@ -1885,6 +1958,7 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
     // Bilan courant
     currentOpenedBilanPosturoIdx = null;
     selectPatient(p);
+    await prefetchPosturoPhotos(currentPatient?.bilanDataPosturo);
     nav('pg-bilan-posturo');
     return;
   }
@@ -1895,6 +1969,7 @@ function ouvrirBilanPosturo(patIdx, bilanIdx) {
   // Réinitialiser le canvas pour forcer recalcul taille
   const oldCanvas = document.getElementById('posturo-body-canvas');
   if(oldCanvas) { oldCanvas.width = 0; oldCanvas.height = 0; oldCanvas._baseSnapshot = null; oldCanvas._history = []; }
+  await prefetchPosturoPhotos(currentPatient.bilanDataPosturo);
   nav('pg-bilan-posturo');
   setTimeout(() => {
     loadPosturoBilan();
@@ -8669,10 +8744,13 @@ function setPosturoRadio(name, val) {
 function getPoVal(id) { const e=document.getElementById(id); return e?e.value:''; }
 function setPoVal(id, v) { const e=document.getElementById(id); if(e) e.value=v||''; }
 
-function savePosturoBilan() {
+async function savePosturoBilan() {
   if(!currentPatient) { alert('Sélectionnez un patient'); return; }
   if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
   const d = currentPatient.bilanDataPosturo;
+  // bilanId stable pour scoper les paths Storage. Ne ré-écrit pas un id legacy
+  // (timestamp ou autre) déjà présent — garantit la compat avec l'existant.
+  if (!d.id) d.id = crypto.randomUUID();
   d.medecin=getPoVal('po-medecin'); d.dateConsult=getPoVal('po-date-consult');
   d.activite=getPoVal('po-activite'); d.travail=getPoVal('po-travail');
   d.atcd=getPoVal('po-atcd'); d.appareillage=getPoVal('po-appareillage');
@@ -8894,12 +8972,22 @@ function savePosturoBilan() {
       }
     }
   }
+  // Migration Storage (Task #51 PR B1) — upload des dataUrls neuves, strip
+  // du persisté. Le stash récupère les dataUrls initiales pour les restaurer
+  // en RAM post-save (édition continue sans re-fetch). Best-effort : si
+  // une migration échoue, la dataUrl reste dans `d` et sera retentée au
+  // prochain save.
+  const photoStash = await migratePosturoPhotos(d, currentPatient.id, d.id);
   // Si on édite un bilan archivé (ouvert via ouvrirBilanPosturo), synchroniser
   // ses modifications vers son entrée dans bilansPosturo[]. Mirror sport.
   // Sinon (bilan en cours, pas encore archivé), ne rien écrire dans bilansPosturo[]
   // — la sauvegarde se fait dans currentPatient.bilanDataPosturo (déjà à jour via `d`).
   syncOpenedBilanPosturoToHistory();
   savePatients();
+  // Restaurer les dataUrls migrées en RAM pour conserver l'affichage actuel
+  // (img.src / canvas) sans nouveau fetch. Les clés non migrées (ex. échec
+  // upload) ne sont pas écrasées car d[k] est déjà présent.
+  Object.assign(d, photoStash);
   alert('✓ Bilan posturologique sauvegardé');
 }
 
