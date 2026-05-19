@@ -981,12 +981,12 @@ function nav(id) {
 }
 
 // ─── Admin: gestion utilisateurs via Edge Function admin-users (Task #56) ───
-// La fonction service_role auto-activation a été retirée du client suite à
-// l'incident #29. L'Edge Function vérifie côté serveur que l'appelant est
-// l'admin (JWT email == ADMIN_EMAIL) avant d'exécuter list/setLicencePayee/
-// setFormule/setDroits. Le bouton "Ouvrir Supabase Users" en haut de la page
-// reste comme secours pour les actions hors scope de cette PR (suspend, delete,
-// invite, resetPassword — voir PR D').
+// L'ancienne clé admin a été retirée du client suite à l'incident #29 — elle
+// vit désormais uniquement comme variable d'env côté Edge Function. Celle-ci
+// vérifie côté serveur que l'appelant est l'admin (JWT email == ADMIN_EMAIL)
+// avant d'exécuter list/setLicencePayee/setFormule/setDroits. Le bouton
+// "Ouvrir Supabase Users" en haut de la page reste comme secours pour les
+// actions hors scope (suspend, delete, invite, resetPassword — voir PR D').
 
 // Cache module-level : les boutons "Modifier" passent un index, pas un objet,
 // pour éviter de sérialiser le user dans onclick="..." (apostrophes, escaping).
