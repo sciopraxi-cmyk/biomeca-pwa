@@ -1918,9 +1918,7 @@ function supprimerBilanPosturo(patIdx, bilanIdx) {
 // Clés photo du bilan posturo (Task #51 PR B1). Pour chaque clé `_xxx`,
 // on persiste `_xxxPath` en DB ; la dataUrl correspondante (`_xxx`) reste
 // en RAM le temps de l'édition mais n'est jamais sauvegardée.
-// _feetCanvas est legacy (ancien format, plus écrit aujourd'hui) — migré
-// quand même pour les bilans archivés qui le contiennent encore.
-const POSTURO_PHOTO_KEYS = ['_empreinte', '_bodyCanvas', '_feetDrawings', '_feetComposite', '_feetCanvas'];
+const POSTURO_PHOTO_KEYS = ['_empreinte', '_bodyCanvas', '_feetDrawings', '_feetComposite'];
 
 // Pour chaque clé photo : si seul le path est présent en DB, on récupère
 // la dataUrl depuis Storage et on la réinjecte dans `d[key]` pour que les
@@ -4014,13 +4012,9 @@ const sections = [];
   }
   // Synthèse section 8
   // Plan de semelles (pieds) à la fin dans section 9
-  // Plan de semelles section 9 — priorité :
-  //   1. _feetComposite (nouveau format #43 v4) : composite pré-aligné depuis save → alignement parfait
-  //   2. _feetCanvas legacy : composite ancien (JPEG) ou PNG transparent (formats v2/v3) utilisé tel quel
+  // Plan de semelles section 9 : composite pré-aligné depuis save → alignement parfait.
   if(d._feetComposite) {
     sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img', img: d._feetComposite});
-  } else if(d._feetCanvas) {
-    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img', img: d._feetCanvas});
   }
 
   _buildRapportBody(p, d, prat, logo, sections);
@@ -8848,15 +8842,8 @@ function initPosturoFeetCanvas() {
   // baseSnapshot = canvas vide/transparent. La gomme restaure cet état → révèle
   // le template DOM (img#posturo-feet-img) derrière, sans pollution.
   canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
-  // Restauration des dessins — priorité :
-  //   1. _feetDrawings (nouveau format dédié édition, depuis #43 v4 — PNG transparent)
-  //   2. _feetCanvas legacy au format PNG (transition douce depuis v2/v3)
-  //   3. _feetCanvas legacy JPEG composite : ne PAS restaurer sur le canvas
-  //      (double exposition avec template DOM) ; le rapport utilise le composite legacy directement.
-  const drawingsData = currentPatient?.bilanDataPosturo?._feetDrawings
-    || (currentPatient?.bilanDataPosturo?._feetCanvas?.startsWith('data:image/png')
-        ? currentPatient.bilanDataPosturo._feetCanvas
-        : null);
+  // Restauration des dessins — format dédié édition (PNG transparent depuis #43 v4).
+  const drawingsData = currentPatient?.bilanDataPosturo?._feetDrawings || null;
   if(drawingsData) {
     const saved = new Image();
     saved.onload = () => {
