@@ -167,3 +167,72 @@ async function deletePatientFolder(userId, patientId) {
   if (!del.ok) return del;
   return { ok: true, deleted: files.length };
 }
+
+// ───────────────────────────────────────────────────────────────────
+// Helpers de migration lazy (Task #51 PR B1 — flow bilan posturo)
+// ───────────────────────────────────────────────────────────────────
+//
+// Stratégie :
+//  - dataUrl en RAM pendant l'édition (compat pattern <img src="data:...">).
+//  - SEUL le path est persisté en DB.
+//  - Migration au save : si dataUrl présente sans path → upload, set path,
+//    drop la dataUrl du persisté (mais le caller la garde en RAM via stash).
+//  - Prefetch au load : si path présent sans dataUrl → fetch signed URL →
+//    blob → dataUrl → réinjecte en RAM pour affichage.
+// ───────────────────────────────────────────────────────────────────
+
+// Récupère une photo depuis Storage et la retourne sous forme de dataUrl,
+// pour ré-alimenter une UI qui consomme du `data:image/...` (img.src, canvas).
+async function prefetchPhotoToDataUrl(path) {
+  try {
+    const signed = await getPhotoSignedUrl(path);
+    if (!signed.ok) return { ok: false, error: signed.error };
+    const res = await fetch(signed.signedUrl);
+    if (!res.ok) return { ok: false, error: `Fetch ${res.status}` };
+    const blob = await res.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+      reader.readAsDataURL(blob);
+    });
+    return { ok: true, dataUrl };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
+// Migre une entrée photo d'un objet bilan (in-place).
+//  - obj[key] = dataUrl AND !obj[key + 'Path']  → upload, set Path, retourne
+//    { ok:true, migrated:true } et SUPPRIME obj[key] (caller doit stasher avant
+//    s'il veut la garder en RAM).
+//  - obj[key + 'Path'] déjà set ou rien → no-op, retourne { ok:true, migrated:false }.
+//  - upload échoue → retourne { ok:false, error } et laisse obj[key] intact
+//    pour retry au prochain save (lazy retry).
+//
+// pathArgs = { userId, patientId, type, bilanId, filenamePrefix }
+//   filenamePrefix par défaut = key.replace(/^_/, '') (ex: '_empreinte' → 'empreinte')
+async function migratePhotoEntry(obj, key, pathArgs) {
+  const pathKey = key + 'Path';
+  if (obj[pathKey]) return { ok: true, migrated: false };
+  const val = obj[key];
+  if (!val || typeof val !== 'string' || !val.startsWith('data:')) {
+    return { ok: true, migrated: false };
+  }
+  const { userId, patientId, type, bilanId } = pathArgs;
+  if (!userId || !patientId || !type || !bilanId) {
+    return { ok: false, error: 'pathArgs incomplets (userId/patientId/type/bilanId)' };
+  }
+  const prefix = pathArgs.filenamePrefix || key.replace(/^_/, '');
+  // Détecte l'extension depuis le MIME du dataUrl (image/png → png, image/jpeg → jpg).
+  const mimeMatch = val.match(/data:image\/([a-zA-Z0-9+.-]+)/);
+  const subtype = mimeMatch ? mimeMatch[1].toLowerCase() : 'bin';
+  const ext = subtype === 'jpeg' ? 'jpg' : subtype;
+  const filename = `${prefix}_${Date.now()}.${ext}`;
+  const path = buildPhotoPath(userId, patientId, type, bilanId, filename);
+  const up = await uploadPhotoBase64(val, path);
+  if (!up.ok) return { ok: false, error: up.error };
+  obj[pathKey] = up.path;
+  delete obj[key];
+  return { ok: true, migrated: true };
+}
