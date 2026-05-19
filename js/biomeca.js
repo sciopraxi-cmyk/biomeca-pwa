@@ -1008,7 +1008,7 @@ function switchCaptureMode(mode) {
   document.getElementById('sw-video').className = mode==='video'?'btn btn-blue':'btn';
 }
 
-function launchTest(testId) {
+async function launchTest(testId) {
   if (!currentPatient) { alert('Sélectionnez d\'abord un patient.'); nav('pg-patients'); return; }
   const t = TESTS[testId]; if (!t) return;
   currentTestId = testId;
@@ -1029,16 +1029,17 @@ function launchTest(testId) {
       dataUrl: p.dataUrl || null,
       angle: p.angle !== undefined ? p.angle : null,
       angleD: p.angleD !== undefined ? p.angleD : null,
-      angleG: p.angleG !== undefined ? p.angleG : null
+      angleG: p.angleG !== undefined ? p.angleG : null,
+      path: p.path || null
     }));
     // Compléter si slots manquants
     while(photoSlots.length < t.photoLabels.length) {
       const i = photoSlots.length;
-      photoSlots.push({label:t.photoLabels[i]||'Photo '+(i+1), side:t.photoSides?.[i]||'', dataUrl:null, angle:null});
+      photoSlots.push({label:t.photoLabels[i]||'Photo '+(i+1), side:t.photoSides?.[i]||'', dataUrl:null, angle:null, path:null});
     }
   } else {
     photoSlots = t.photoLabels.map((l,i) => ({
-      label:l, side: t.photoSides?.[i]||'', dataUrl:null, angle:null
+      label:l, side: t.photoSides?.[i]||'', dataUrl:null, angle:null, path:null
     }));
   }
 
@@ -1048,12 +1049,21 @@ function launchTest(testId) {
       time: f.time||0, dataUrl: f.dataUrl||null,
       angD: f.angD!==undefined?f.angD:null,
       angG: f.angG!==undefined?f.angG:null,
-      markers: f.markers||[]
+      markers: f.markers||[],
+      path: f.path || null
     }));
   } else {
     capturedFrames = [];
   }
   selectedFrameIdx = -1;
+
+  // Prefetch Storage paths → populate dataUrls en RAM (Task #53 PR B2).
+  // Mutate photoSlots/capturedFrames entries en place AVANT les renders
+  // (renderPhotoGrid/renderFrameStrip lisent .dataUrl pour les thumbnails).
+  // On prefetch directement dans les globaux RAM plutôt que dans
+  // currentPatient.mesures pour éviter de polluer la struct persistée si
+  // l'utilisateur déclenche un archivage sans avoir d'abord re-sauvegardé.
+  await prefetchSportPhotos({ photos: photoSlots, frames: capturedFrames });
 
   // Mise à jour UI
   document.getElementById('cap-name').textContent = t.name;
@@ -1871,12 +1881,24 @@ function creerBilanPosturo(patIdx, type) {
   nav('pg-bilan-posturo');
 }
 
-function supprimerBilanSport(patIdx, bilanIdx) {
+async function supprimerBilanSport(patIdx, bilanIdx) {
   const p = patients[patIdx];
   if(!p) return;
   const bilan = p.bilansSport?.[bilanIdx];
   if(!bilan) return;
   if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
+  // Cleanup Storage best-effort (Task #53 PR B2) — purge le dossier
+  // {userId}/{patientId}/sport/{bilanId}/ qui contient toutes les photos
+  // et frames du bilan, y compris les orphelins issus de remplacements.
+  // Si l'opération échoue, on log un warning et on procède quand même au
+  // splice : la suppression de l'archive est l'intention principale.
+  // Les bilans très anciens (pré-B2) n'ont pas de _bilanId → cleanup
+  // skip (aucun fichier Storage à purger pour eux).
+  const bilanId = bilan.mesures?._bilanId;
+  if(pwaUser?.id && bilanId) {
+    const r = await deleteSportBilanFolder(pwaUser.id, p.id, bilanId);
+    if(!r.ok) console.warn('[supprimerBilanSport] Storage cleanup failed:', r.error);
+  }
   p.bilansSport.splice(bilanIdx, 1);
   savePatients();
   renderPatientList();
@@ -1948,6 +1970,104 @@ async function migratePosturoPhotos(d, patientId, bilanId) {
     }
   }
   return stash;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Helpers Storage — bilan sport (Task #53 PR B2)
+// ───────────────────────────────────────────────────────────────────
+// Les photos sport sont stockées dans des arrays d'objets :
+//   mesures[testId].photos[i] = { label, side, dataUrl, angle, angleD, angleG, path }
+//   mesures[testId].frames[i] = { time, angD, angG, dataUrl, markers, path }
+//
+// Lifecycle de `path` (différent de posturo qui utilise des clés parallèles `_xxxPath`) :
+//   - vide initial          → { dataUrl: null, path: null }
+//   - après upload utilisateur → { dataUrl: 'data:...', path: null } (migration uploadera)
+//   - après save+migration    → { dataUrl: <stash RAM>, path: 'storage_path' }
+//   - après prefetch reopen   → { dataUrl: <fetched>, path: 'storage_path' }
+//   - après remplacement      → { dataUrl: 'new data:...', path: null } ← caller efface .path
+//                                 → migration ré-uploade, nouveau path, ancien fichier orphan
+//
+// Pour chaque entry avec path mais sans dataUrl, prefetch via Storage et
+// repopule dataUrl en RAM (compat avec le pattern <img src="data:..."> existant).
+async function prefetchSportPhotos(mesuresEntry) {
+  if (!mesuresEntry) return;
+  const photoArr = mesuresEntry.photos || [];
+  const frameArr = mesuresEntry.frames || [];
+  await Promise.all([...photoArr, ...frameArr].map(async entry => {
+    if (!entry || !entry.path || entry.dataUrl) return;
+    const r = await prefetchPhotoToDataUrl(entry.path);
+    if (r.ok) entry.dataUrl = r.dataUrl;
+    else console.warn('[sport] prefetch fail', entry.path, '→', r.error);
+  }));
+}
+
+// Migre les photos/frames d'un mesuresEntry vers Storage. Stash les dataUrls
+// upfront (pour restauration RAM via restoreSportPhotosStash après save) ;
+// upload uniquement les entries `dataUrl set + path null` (replacements et
+// premières captures) ; cleanup en fin pour les entries `dataUrl set + path set`
+// (cas "reopen+save sans modif" — dataUrl restée de la save précédente via stash).
+async function migrateSportPhotos(mesuresEntry, patientId, bilanId, testId) {
+  const stash = [];
+  const photoArr = mesuresEntry.photos || [];
+  const frameArr = mesuresEntry.frames || [];
+
+  [...photoArr, ...frameArr].forEach(entry => {
+    if (entry && typeof entry.dataUrl === 'string' && entry.dataUrl.startsWith('data:')) {
+      stash.push({ entry, dataUrl: entry.dataUrl });
+    }
+  });
+  if (stash.length === 0) return stash;
+
+  const userId = pwaUser?.id;
+  if (!userId || !patientId || !bilanId || !testId) {
+    console.warn('[sport] migrate skipped — pathArgs incomplets', { userId, patientId, bilanId, testId });
+    return stash;
+  }
+
+  // Upload des entries sans path. Les entries `path set + dataUrl set`
+  // sont skip ici (migration no-op) et nettoyées par le cleanup en bas.
+  const tasks = [];
+  const enqueueUpload = (entry, idx, kind) => {
+    if (entry.path) return;
+    if (typeof entry.dataUrl !== 'string' || !entry.dataUrl.startsWith('data:')) return;
+    tasks.push((async () => {
+      const mimeMatch = entry.dataUrl.match(/data:image\/([a-zA-Z0-9+.-]+)/);
+      const subtype = mimeMatch ? mimeMatch[1].toLowerCase() : 'bin';
+      const ext = subtype === 'jpeg' ? 'jpg' : subtype;
+      const filename = `${testId}/${kind}_${idx}_${Date.now()}.${ext}`;
+      const path = buildPhotoPath(userId, patientId, 'sport', bilanId, filename);
+      const up = await uploadPhotoBase64(entry.dataUrl, path);
+      if (up.ok) {
+        entry.path = up.path;
+        delete entry.dataUrl;
+      } else {
+        console.warn('[sport] migrate fail', kind, idx, '→', up.error);
+      }
+    })());
+  };
+  photoArr.forEach((e, i) => enqueueUpload(e, i, 'photoSlot'));
+  frameArr.forEach((e, i) => enqueueUpload(e, i, 'frame'));
+  await Promise.all(tasks);
+
+  // Cleanup : path set + dataUrl encore présent (cas "reopen+save sans modif"
+  // — dataUrl est la copie stash restaurée de la save précédente). Le stash
+  // capturé en début garantit la restauration RAM par le caller via
+  // restoreSportPhotosStash() après savePatients().
+  [...photoArr, ...frameArr].forEach(entry => {
+    if (entry?.path && typeof entry.dataUrl === 'string' && entry.dataUrl.startsWith('data:')) {
+      delete entry.dataUrl;
+    }
+  });
+
+  return stash;
+}
+
+// Restaure les dataUrls retirées par migrateSportPhotos. Appelé après
+// savePatients() pour préserver l'affichage <img>/canvas en RAM sans re-fetch.
+function restoreSportPhotosStash(stash) {
+  stash.forEach(({ entry, dataUrl }) => {
+    if (!entry.dataUrl) entry.dataUrl = dataUrl;
+  });
 }
 
 async function ouvrirBilanPosturo(patIdx, bilanIdx) {
@@ -2174,6 +2294,7 @@ function captureVidPhotoSlot(slotIdx) {
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
+  photoSlots[slotIdx].path = null; // remplacement → migration ré-uploadera (B2)
 
   // Mobilité AP : stocker angles D et G séparément
   if(t?.mobiliteAP) {
@@ -2240,13 +2361,13 @@ function photoSlotHTML(slot, idx) {
 }
 
 function deletePhotoSlot(i) {
-  photoSlots[i].dataUrl=null; photoSlots[i].angle=null;
+  photoSlots[i].dataUrl=null; photoSlots[i].angle=null; photoSlots[i].path=null;
   renderPhotoGrid(); updateResults();
 }
 
 function resetPhotoSlots() {
   const t=TESTS[currentTestId]; if(!t) return;
-  photoSlots=t.photoLabels.map((l,i)=>({label:l,side:t.photoSides[i]||'',dataUrl:null,angle:null}));
+  photoSlots=t.photoLabels.map((l,i)=>({label:l,side:t.photoSides[i]||'',dataUrl:null,angle:null,path:null}));
   renderPhotoGrid(); updateResults();
 }
 
@@ -2272,6 +2393,7 @@ function capturePhotoSlot(slotIdx) {
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
+  photoSlots[slotIdx].path = null; // remplacement → migration ré-uploadera (B2)
   if(t && t.mobiliteAP) {
     const mkrD = liveMarkers.filter(m=>m.side==='D');
     const mkrG = liveMarkers.filter(m=>m.side==='G');
@@ -3291,17 +3413,17 @@ function badgeGen(p){if(p===null)return'<span class="badge bd">—</span>';const
 // ══════════════════════════════════════════════════════
 // VALIDER & SAUVEGARDER
 // ══════════════════════════════════════════════════════
-function validateAndSave() {
+async function validateAndSave() {
   if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
   const t=TESTS[currentTestId];
   const view=t.view||'face';
   let result={photos:[],frames:[],date:new Date().toLocaleString('fr-FR')};
 
   if(t.mode==='video'){
-    result.frames=capturedFrames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl}));
+    result.frames=capturedFrames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl,path:f.path}));
     // Pour les tests video avec encadrés photos (Mobilité, Verrouillage, MLA, Amorti)
     if(t.showPhotoSlots && photoSlots.length) {
-      result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG}));
+      result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path}));
     }
     if(t.div!==undefined){
       // KFPPA : calcul depuis photoSlots (unipodalD et unipodalG vs bipodale)
@@ -3345,7 +3467,7 @@ function validateAndSave() {
       }
     }
   } else {
-    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG}));
+    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path}));
     if(t.normDiv!==undefined){
       const sD=result.photos.filter(s=>s.side==='D');
       const sG=result.photos.filter(s=>s.side==='G');
@@ -3373,9 +3495,21 @@ function validateAndSave() {
   }
 
   if(!currentPatient.mesures) currentPatient.mesures={};
+  // bilanId stable pour scoper les paths Storage (Task #53 PR B2). Lazy
+  // creation : ne ré-écrit pas un _bilanId déjà présent (compat reopen).
+  if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
   currentPatient.mesures[currentTestId]=result;
+  // Migration Storage : upload des dataUrls neuves de result.photos[] et
+  // result.frames[] vers patient-media. Le stash récupère les dataUrls
+  // initiales pour les restaurer en RAM post-save (édition continue sans
+  // re-fetch). Best-effort : si une migration échoue, la dataUrl reste
+  // dans l'entry et sera retentée au prochain save.
+  const photoStash = await migrateSportPhotos(result, currentPatient.id, currentPatient.mesures._bilanId, currentTestId);
   syncOpenedBilanToHistory();
   savePatients();
+  // Restaure les dataUrls migrées en RAM (par référence) pour conserver
+  // l'affichage actuel sans nouveau fetch.
+  restoreSportPhotosStash(photoStash);
   alert(`✓ Sauvegardé : "${t.name}" pour ${currentPatient.prenom} ${currentPatient.nom}`);
   nav('pg-sport');
 }

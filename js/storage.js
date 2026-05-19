@@ -143,13 +143,11 @@ async function _listStorageFolder(prefix) {
   return { ok: true, items };
 }
 
-// Supprime toutes les photos d'un patient (récursif).
-// Walk BFS : list → distingue fichiers (id non null) des sous-dossiers
-// (id null) → collecte les chemins → batch delete final.
+// Walk BFS récursif d'un dossier Storage et purge tous les fichiers en batch.
+// Helper interne partagé entre deletePatientFolder et deleteSportBilanFolder.
 // Retourne { ok, deleted } ou { ok:false, error }.
-async function deletePatientFolder(userId, patientId) {
-  const root = `${userId}/${patientId}`;
-  const queue = [root];
+async function _deleteFolderRecursive(rootPrefix) {
+  const queue = [rootPrefix];
   const files = [];
   while (queue.length) {
     const folder = queue.shift();
@@ -166,6 +164,17 @@ async function deletePatientFolder(userId, patientId) {
   const del = await deletePhotos(files);
   if (!del.ok) return del;
   return { ok: true, deleted: files.length };
+}
+
+// Supprime toutes les photos d'un patient (récursif).
+async function deletePatientFolder(userId, patientId) {
+  return _deleteFolderRecursive(`${userId}/${patientId}`);
+}
+
+// Supprime toutes les photos d'un bilan sport archivé (Task #53 PR B2).
+// Inclut les fichiers orphelins issus de remplacements de photos dans ce bilan.
+async function deleteSportBilanFolder(userId, patientId, bilanId) {
+  return _deleteFolderRecursive(`${userId}/${patientId}/sport/${bilanId}`);
 }
 
 // ───────────────────────────────────────────────────────────────────
