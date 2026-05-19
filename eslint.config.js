@@ -27,11 +27,13 @@ export default [
     },
   },
 
-  // js/landing.js et js/biomeca.js : code legacy, on rétrograde no-unused-vars, no-undef
-  // et no-empty pour éviter de faire exploser la CI sur des globals partagés entre fichiers
-  // et des catch silencieux idiomatiques (storage, speech API, network).
+  // js/landing.js, js/biomeca.js et js/storage.js : scripts classiques chargés
+  // via <script src>, partageant des globals entre fichiers (SUPA_URL, authFetch,
+  // pwaUser, etc.). On rétrograde no-unused-vars, no-undef et no-empty pour
+  // éviter de faire exploser la CI sur ces globals inter-fichiers et les catch
+  // silencieux idiomatiques (storage, speech API, network).
   {
-    files: ['js/landing.js', 'js/biomeca.js'],
+    files: ['js/landing.js', 'js/biomeca.js', 'js/storage.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'script',
