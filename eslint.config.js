@@ -48,6 +48,24 @@ export default [
     },
   },
 
+  // js/*.mjs : ES modules clean (calc.mjs pour les calculs cliniques,
+  // access.mjs pour le gating). Peuvent tourner en navigateur (chargement
+  // futur via import) ou Node (tests Vitest) → on autorise les globals
+  // des 2 environnements. Découvert lors du commit 6 task #57 : access.mjs
+  // utilise console.error et le fallback config par défaut n'avait pas
+  // de globals → erreur no-undef en CI.
+  {
+    files: ['js/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+  },
+
   // service-worker.js : code propre, règles strictes avec contexte SW
   {
     files: ['service-worker.js'],

@@ -234,13 +234,41 @@ async function pwaLogin() {
   }
 }
 
+// ─── Fetch user_data au login (task #57) ───────────────────────────
+// L'app a 2 stores découplés : auth.users.user_metadata (acces, trial_start,
+// droits, nom, prenom) ET la table user_data (licence_payee, formule,
+// engagement, date_debut_abonnement, stripe_customer_id). Pas de trigger DB
+// qui synchronise. checkAccessStatus a besoin des 2, donc on fetch user_data
+// une fois au login et on stash dans pwaUser.user_data.
+//
+// Trois états distincts de pwaUser.user_data (cf. Q2 commit 3) :
+//   - undefined : fetch jamais lancé (1re frame, transitoire) → 'loading'
+//   - null      : fetch lancé et échoué → 'blocked' (fail-secure)
+//   - {...}     : fetch OK → matrice normale
+async function fetchUserDataAtLogin() {
+  if (!pwaUser?.email) {
+    pwaUser && (pwaUser.user_data = null);
+    return;
+  }
+  try {
+    const row = await supa.getUserRecord(pwaUser.email);
+    // getUserRecord retourne null si pas de row, ou l'objet user_data.
+    // Pour la matrice : pas de row = utilisateur sans entrée payante = équivalent
+    // à licence_payee=false + formule=null. On stocke un objet vide pour bien
+    // distinguer du fetch échoué (null).
+    pwaUser.user_data = row || {};
+  } catch (e) {
+    console.error('[access] fetchUserDataAtLogin failed:', e);
+    pwaUser.user_data = null;
+  }
+}
+
 // ─── Après login réussi ───
 async function onPwaLoginSuccess() {
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
   showAdminPanelIfNeeded();
   nav('pg-patients');
-  setTimeout(checkTrialStatus, 500);
 
   // Afficher onglet Paramètres si admin
   const paramsBtn = document.getElementById('tn-params');
@@ -257,6 +285,12 @@ async function onPwaLoginSuccess() {
       pwaUser.user_metadata = freshUser.user_metadata;
     }
   } catch(e) {}
+  // Fetch user_data (licence_payee, formule, etc.) pour gating d'accès task #57.
+  // Doit s'exécuter AVANT checkAccessStatus pour qu'il ait les 2 stores en mémoire.
+  await fetchUserDataAtLogin();
+  // Compute access level et mute le DOM (bandeau + overlay). Plus de setTimeout
+  // 500ms : les awaits ci-dessus garantissent que pwaUser est complet.
+  checkAccessStatus();
   // Charger les données depuis Supabase
   await loadSupabaseData();
 }
@@ -475,50 +509,383 @@ function closeMonCompte() {
   if(modal) modal.style.display = 'none';
 }
 
-function checkTrialStatus() {
-  // Les comptes admin bypass tous les checks de trial — ils ont accès illimité
-  // peu importe leur user_metadata.acces (utile en cas de reliquat metadata d'une
-  // ancienne inscription en essai avant promotion en admin).
-  if (pwaUser?.isAdmin) {
-    const b = document.getElementById('trial-banner');
-    if(b) b.style.display = 'none';
-    const ov = document.getElementById('trial-expired-overlay');
-    if(ov) ov.style.display = 'none';
-    return;
-  }
-  const meta = pwaUser?.user_metadata || {};
-  const acces = meta.acces || '';
-  if(acces !== 'essai') {
-    const b = document.getElementById('trial-banner');
-    if(b) b.style.display = 'none';
-    return;
-  }
-  // Si pas de trial_start, on considère que l'essai commence maintenant
-  const trialStart = meta.trial_start ? new Date(meta.trial_start) : new Date();
-  // Si pas de trial_start défini, mettre à jour dans Supabase
-  if(!meta.trial_start && pwaUser?.token) {
-    const ts = new Date().toISOString();
-    meta.trial_start = ts;
-    fetch(SUPA_URL+'/auth/v1/user', {method:'PUT',
-      headers:{'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+pwaUser.token},
-      body:JSON.stringify({data:{...meta, trial_start:ts}})
-    }).catch(()=>{});
-  }
-  const diffDays = Math.floor((new Date() - trialStart) / 86400000);
-  const remaining = 14 - diffDays;
-  const banner = document.getElementById('trial-banner');
-  const bannerText = document.getElementById('trial-banner-text');
-  const overlay = document.getElementById('trial-expired-overlay');
-  if(remaining <= 0) {
-    if(banner) banner.style.display = 'none';
-    if(overlay) { overlay.style.display = 'flex'; }
-  } else {
-    if(overlay) overlay.style.display = 'none';
-    if(banner) {
-      banner.style.display = 'block';
-      if(bannerText) bannerText.textContent = remaining === 1 ? "Dernier jour d'essai !" : "Essai gratuit — " + remaining + " jours restants";
-      if(remaining <= 3) banner.style.background = '#e74c3c';
+// tryStartTrial — déclenche l'Edge Function start-trial (task #57).
+//
+// Gère explicitement les 4 cas de retour (cf. Q3) :
+//   - 200 OK                    : refresh pwaUser.user_metadata local depuis
+//                                 la réponse, retourne { ok:true }. Caller recall
+//                                 checkAccessStatus pour calculer le nouveau niveau.
+//   - 409 trial_already_started : race condition serveur (autre tab a démarré).
+//                                 Re-fetch supa.getUser() pour synchroniser,
+//                                 retourne { ok:true }. Caller recall.
+//   - 409 acces_already_set     : un admin a set acces entretemps. Même
+//                                 traitement que ci-dessus (re-fetch + recall).
+//   - 401 / 500 / erreur réseau : retourne { ok:false }. Caller set
+//                                 _accessLevel='blocked' (fail-secure).
+async function tryStartTrial() {
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/start-trial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (res.status === 200) {
+      const data = await res.json();
+      if (data && data.ok && data.trial_start && pwaUser) {
+        pwaUser.user_metadata = pwaUser.user_metadata || {};
+        pwaUser.user_metadata.trial_start = data.trial_start;
+        pwaUser.user_metadata.acces = 'essai';
+      }
+      return { ok: true };
     }
+    if (res.status === 409) {
+      // Race : trial_already_started ou acces_already_set. Re-fetch pour sync.
+      try {
+        const fresh = await supa.getUser();
+        if (fresh && fresh.user_metadata && pwaUser) {
+          pwaUser.user_metadata = fresh.user_metadata;
+        }
+      } catch (e) {
+        console.warn('[access] re-fetch user post-409 failed:', e);
+      }
+      return { ok: true };
+    }
+    const errText = await res.text().catch(() => '');
+    console.error('[access] start-trial failed:', res.status, errText);
+    return { ok: false };
+  } catch (e) {
+    console.error('[access] start-trial network error:', e);
+    return { ok: false };
+  }
+}
+
+// computeAccessLevel — fonction pure, testable en unitaire (task #57).
+//
+// Matrice 3-niveaux (cf. spec PR E1+E2) :
+//   - 'full'     : isAdmin OU (licence_payee=true AND formule≠null)
+//                  OU essai en cours (trial_start ≤ 14j)
+//   - 'readonly' : licence_payee=true AND formule=null AND essai expiré/inexistant
+//   - 'blocked'  : licence_payee=false AND pas d'essai actif
+//
+// États transitoires :
+//   - userData === undefined → 'loading' (fetch jamais lancé)
+//   - userData === null      → 'blocked' (fetch échoué, fail-secure)
+//
+// État illégitime : licence_payee=false AND formule≠null. Ne peut résulter
+// que d'une incohérence DB (cf. Q1 — décision défensive "blocked" + log).
+//
+// `meta`     : object pwaUser.user_metadata ({ acces, trial_start, ... })
+// `userData` : object | null | undefined (pwaUser.user_data)
+// `isAdmin`  : bool (extrait de pwaUser.isAdmin)
+// `now`      : timestamp ms (Date.now() par défaut, injectable pour tests)
+//
+// Note pureté : la fonction lit `pwaUser.email` global UNIQUEMENT pour le
+// diagnostic console.error (état illégitime). Aucune lecture de pwaUser
+// n'influence la valeur de retour — les tests Vitest peuvent donc l'appeler
+// sans mocker le global, le log apparaîtra juste sans email enrichi.
+//
+// Note duplication : la même fonction est ré-exportée depuis js/access.mjs
+// pour les tests Vitest (pattern identique à js/calc.mjs). Si tu modifies
+// ici, répercute aussi dans access.mjs sinon les tests dérivent du runtime.
+function computeAccessLevel({ isAdmin, meta, userData }, now) {
+  if (isAdmin) return 'full';
+  if (userData === undefined) return 'loading';
+  if (userData === null) return 'blocked';
+
+  const licence = userData.licence_payee === true;
+  const formule = userData.formule;
+  const trialStart = meta && meta.trial_start;
+  const nowMs = typeof now === 'number' ? now : Date.now();
+
+  // État illégitime : formule sans licence. Log + blocked défensif (cf. Q1).
+  if (!licence && formule) {
+    console.error('[access] Illegitimate state detected: formule set without licence', {
+      email: pwaUser && pwaUser.email,
+      formule,
+    });
+    return 'blocked';
+  }
+
+  // Essai actif : 14 jours à partir de trial_start.
+  let trialActive = false;
+  if (trialStart) {
+    const elapsedDays = (nowMs - new Date(trialStart).getTime()) / 86400000;
+    trialActive = elapsedDays >= 0 && elapsedDays <= 14;
+  }
+
+  // Niveau 1 : full
+  if (licence && formule) return 'full';
+  if (trialActive) return 'full';
+  // Niveau 2 : readonly (licence à vie sans abonnement actif)
+  if (licence && !formule) return 'readonly';
+  // Niveau 3 : blocked (défaut)
+  return 'blocked';
+}
+
+// checkAccessStatus — gating 3-niveaux avec auto-trial (task #57).
+//
+// Calcule window._accessLevel à partir de pwaUser.user_metadata + pwaUser.user_data,
+// puis mute le DOM (#trial-banner + #trial-expired-overlay) selon le résultat.
+//
+// CAVEAT — refresh nécessaire après actions admin : ne re-fetch PAS automatiquement
+// les sources si elles changent côté serveur. Si un admin modifie licence_payee
+// ou formule via admin-users après le login d'un user, ce user gardera son niveau
+// d'accès calculé au login jusqu'à un page reload manuel. Cohérent avec le
+// comportement existant de loadAbonnementInfo (qui ne fetch que sur ouverture du
+// modal Mon compte). Un refresh proactif (websocket / polling / event-driven)
+// serait une PR séparée.
+//
+// Auto-trial : si l'utilisateur tomberait en 'blocked' uniquement parce qu'il n'a
+// jamais payé ET n'a jamais démarré son essai (4 conditions : !licence && !formule
+// && !trial_start && !acces), on dispatch start-trial en fire-and-forget puis on
+// se rappelle pour calculer le nouveau niveau (pattern Q3).
+//
+// Renommé depuis l'ancien checkTrialStatus — la sémantique est plus large
+// maintenant (gating 3-niveaux, pas juste countdown d'essai).
+function checkAccessStatus() {
+  // Bypass admin total — pas de loading, pas de fetch nécessaire, DOM neutre.
+  if (pwaUser?.isAdmin) {
+    window._accessLevel = 'full';
+    _hideAccessBanner();
+    _hideAccessOverlay();
+    applyReadOnlyUI(window._accessLevel);
+    return;
+  }
+
+  const meta = pwaUser?.user_metadata || {};
+  const userData = pwaUser?.user_data;
+  const level = computeAccessLevel({ isAdmin: false, meta, userData }, Date.now());
+
+  // Auto-trial dispatch : 'blocked' + 4 conditions vides → on tente le démarrage.
+  // Pendant l'attente, état 'loading' (DOM neutre, pas de bandeau ni overlay).
+  // applyReadOnlyUI n'est PAS appelée pendant le dispatch : courte fenêtre (~100-300ms),
+  // la défense en profondeur (early-returns + showAccessRestrictedModal dans les fonctions
+  // cibles) protège quand même contre un click légitime trop rapide.
+  if (level === 'blocked' && userData && typeof userData === 'object'
+      && !userData.licence_payee && !userData.formule
+      && !meta.trial_start && !meta.acces) {
+    window._accessLevel = 'loading';
+    _hideAccessBanner();
+    _hideAccessOverlay();
+    tryStartTrial().then(r => {
+      if (!r.ok) {
+        // Fail-secure : start-trial a échoué (réseau/500/401). On reste blocked.
+        window._accessLevel = 'blocked';
+        _showAccessOverlay({ cause: 'never_paid' });
+        applyReadOnlyUI('blocked');
+      } else {
+        // Succès (200) ou race 409 : pwaUser.user_metadata est à jour, on recalcule.
+        // Le recall propagera applyReadOnlyUI proprement, pas besoin de le call ici.
+        checkAccessStatus();
+      }
+    });
+    return;
+  }
+
+  // Dispatch normal selon level
+  window._accessLevel = level;
+
+  if (level === 'loading') {
+    // État transitoire (userData encore undefined, ne devrait pas arriver post-login
+    // mais filet de sécurité). DOM neutre.
+    _hideAccessBanner();
+    _hideAccessOverlay();
+    applyReadOnlyUI(window._accessLevel);
+    return;
+  }
+
+  if (level === 'full') {
+    _hideAccessOverlay();
+    // Si l'essai est actif (trial_start ≤ 14j), on affiche le countdown — UX
+    // existante préservée (l'utilisateur sait combien il lui reste).
+    if (meta.trial_start) {
+      const elapsedDays = (Date.now() - new Date(meta.trial_start).getTime()) / 86400000;
+      const remaining = 14 - Math.floor(elapsedDays);
+      if (remaining > 0 && remaining <= 14) {
+        _showAccessBanner({
+          text: remaining === 1 ? "Dernier jour d'essai !" : 'Essai gratuit — ' + remaining + ' jours restants',
+          background: remaining <= 3 ? '#e74c3c' : '',
+        });
+        applyReadOnlyUI(window._accessLevel);
+        return;
+      }
+    }
+    _hideAccessBanner();
+    applyReadOnlyUI(window._accessLevel);
+    return;
+  }
+
+  if (level === 'readonly') {
+    _hideAccessOverlay();
+    _showAccessBanner({
+      text: "Votre abonnement est suspendu. Vos patients et bilans restent consultables. Reprenez votre abonnement pour créer de nouveaux bilans et exporter en PDF.",
+      background: '#e67e22',
+    });
+    applyReadOnlyUI(window._accessLevel);
+    return;
+  }
+
+  if (level === 'blocked') {
+    _hideAccessBanner();
+    // Cause : essai expiré (trial_start présent) vs jamais payé (cas fallback rare
+    // — l'auto-trial gère normalement ce cas en amont, sauf si conditions auto-trial
+    // pas réunies ex. user créé manuellement par admin sans acces ni licence).
+    const cause = meta.trial_start ? 'trial_expired' : 'never_paid';
+    _showAccessOverlay({ cause });
+    applyReadOnlyUI(window._accessLevel);
+    return;
+  }
+}
+
+// applyReadOnlyUI — applique le gating visuel sur les 6 boutons cibles (task #57).
+// level : 'full' | 'readonly' | 'blocked' | 'loading'.
+//
+// IMPORTANT — DOM dynamique : applyReadOnlyUI doit être appelée à plusieurs
+// endroits car certains boutons sont re-créés dynamiquement par innerHTML :
+//   1. checkAccessStatus() (en fin de chaque branche)
+//   2. renderPatientList() (re-création des boutons "Nouveau bilan Sport/Posturo"
+//      à chaque modif patient)
+// Si d'autres render functions sont ajoutées plus tard qui régénèrent des boutons
+// cibles, hooker applyReadOnlyUI() à leur fin également.
+//
+// Cibles (6) :
+//   - "+ Nouveau patient" (index.html statique, onclick=openNewPatientModal)
+//   - Boutons "Initial/Contrôle" bilan sport (dynamiques, onclick=creerBilanSport)
+//   - Boutons "Initial/Contrôle" bilan posturo (dynamiques, onclick=creerBilanPosturo)
+//   - "Imprimer / PDF" rapport posturo (index.html statique, onclick=printRapportPosturo)
+//   - "Imprimer / PDF" rapport sport (index.html statique, onclick=printReport)
+//   - "Imprimer" bilan clinique (index.html statique, onclick=printBilan)
+//
+// La sélection par attribut onclick fonctionne pour le HTML statique ET le HTML
+// rendu dynamiquement par innerHTML (l'attribut onclick est inline dans les deux cas).
+function applyReadOnlyUI(level) {
+  const blocked = level === 'readonly' || level === 'blocked';
+  const selectors = [
+    '[onclick*="openNewPatientModal"]',
+    '[onclick*="creerBilanSport"]',
+    '[onclick*="creerBilanPosturo"]',
+    '[onclick*="printRapportPosturo"]',
+    '[onclick*="printReport"]',
+    '[onclick*="printBilan"]',
+  ];
+  const buttons = document.querySelectorAll(selectors.join(','));
+  buttons.forEach(btn => {
+    if (blocked) {
+      btn.classList.add('btn-disabled');
+      btn.setAttribute('disabled', 'true');
+      btn.setAttribute('title', "Reprenez votre abonnement pour activer cette fonctionnalité");
+    } else {
+      btn.classList.remove('btn-disabled');
+      btn.removeAttribute('disabled');
+      btn.removeAttribute('title');
+    }
+  });
+}
+
+// showAccessRestrictedModal — modale affichée quand un utilisateur readonly ou
+// blocked tente une action gatée (création patient/bilan, export PDF).
+// reason : 'create_patient' | 'create_bilan' | 'export_pdf'.
+// Pattern de création runtime cohérent avec openNewPatientModal :
+// le modal est créé une fois et réutilisé. Z-index 10001 pour passer au-dessus
+// du modal Mon Compte (10000) et de l'overlay blocked (9998).
+function showAccessRestrictedModal(reason) {
+  const labels = {
+    create_patient: 'Création de patient',
+    create_bilan: 'Création de bilan',
+    export_pdf: 'Export PDF',
+  };
+  const label = labels[reason] || 'Cette fonctionnalité';
+
+  let modal = document.getElementById('modal-access-restricted');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-access-restricted';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10001;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    document.body.appendChild(modal);
+    // Clic sur le backdrop = fermeture (cohérent avec les autres modales du code).
+    // C'est OK ici : la modale est ponctuelle (déclenchée par une action utilisateur),
+    // pas persistante comme le bandeau readonly ou l'overlay blocked.
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  }
+  // Sécurité : reason doit toujours être une string constante littérale du code,
+  // jamais user-controlled — ${label} est rendu via innerHTML.
+  modal.innerHTML = `
+    <div style="background:var(--card);border-radius:14px;padding:28px;max-width:440px;width:100%;text-align:center;">
+      <div style="font-size:38px;margin-bottom:14px;">🔒</div>
+      <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:8px;">
+        Fonctionnalité réservée aux abonnés actifs
+      </div>
+      <div style="font-size:13px;color:var(--mut);margin-bottom:22px;line-height:1.5;">
+        ${label} indisponible. Reprenez votre abonnement pour réactiver cette fonctionnalité.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button onclick="document.getElementById('modal-access-restricted').style.display='none'" style="background:none;border:1px solid var(--bord);color:var(--mut);padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer;">
+          Fermer
+        </button>
+        <button onclick="document.getElementById('modal-access-restricted').style.display='none';openSubscribeFlow()" style="background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+          Reprendre l'abonnement
+        </button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+// openSubscribeFlow — point d'entrée unique pour le CTA "Reprendre l'abonnement"
+// utilisé par le bandeau readonly, l'overlay blocked et la modale showAccessRestrictedModal.
+// Cache l'overlay s'il intercepte les clicks puis ouvre le modal Mon Compte
+// (qui contient les Payment Links). La présélection sansLicence vs avecLicence
+// selon licence_payee est implémentée dans le commit 5.
+function openSubscribeFlow() {
+  const overlay = document.getElementById('trial-expired-overlay');
+  if (overlay) overlay.style.display = 'none';
+  if (typeof showMonCompte === 'function') {
+    showMonCompte();
+  }
+}
+
+// ─── Helpers DOM bandeau + overlay (task #57) ───────────────────────
+// Utilisent les ID existants (#trial-banner, #trial-banner-text, #trial-expired-overlay).
+// Renommage éventuel vers #access-* possible en PR future si la sémantique « trial »
+// devient trop trompeuse — pas dans cette PR pour limiter le scope HTML.
+
+function _hideAccessBanner() {
+  const b = document.getElementById('trial-banner');
+  if (b) b.style.display = 'none';
+}
+
+function _showAccessBanner({ text, background }) {
+  const b = document.getElementById('trial-banner');
+  const t = document.getElementById('trial-banner-text');
+  if (b) {
+    b.style.display = 'block';
+    if (background !== undefined) b.style.background = background;
+  }
+  if (t) t.textContent = text;
+}
+
+function _hideAccessOverlay() {
+  const o = document.getElementById('trial-expired-overlay');
+  if (o) o.style.display = 'none';
+}
+
+// Mute le titre + le message internes de l'overlay selon la cause du blocage.
+// Les 2 divs n'ont pas d'ID dans le HTML actuel — on les adresse par position
+// (children[1]=titre, children[2]=message du wrapper). Fragile si la structure
+// HTML change ; un commit ultérieur peut les passer en data-* attributes.
+function _showAccessOverlay({ cause }) {
+  const o = document.getElementById('trial-expired-overlay');
+  if (!o) return;
+  o.style.display = 'flex';
+  const wrapper = o.firstElementChild;
+  if (!wrapper || wrapper.children.length < 3) return;
+  const titleEl = wrapper.children[1];
+  const msgEl = wrapper.children[2];
+  if (cause === 'trial_expired') {
+    if (titleEl) titleEl.textContent = 'Votre essai est terminé';
+    if (msgEl) msgEl.textContent = 'Votre essai gratuit de 14 jours est terminé. Choisissez une formule pour continuer.';
+  } else if (cause === 'never_paid') {
+    if (titleEl) titleEl.textContent = 'Bienvenue';
+    if (msgEl) msgEl.textContent = 'Démarrez votre essai gratuit de 14 jours ou choisissez une formule.';
   }
 }
 
@@ -1472,6 +1839,11 @@ function closeNewPatientModal() {
 }
 
 function createPatient() {
+  // Gating task #57 — bloque la création si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_patient');
+    return;
+  }
   const nom = document.getElementById('np-nom').value.trim();
   const prenom = document.getElementById('np-prenom').value.trim();
   const errEl = document.getElementById('np-err');
@@ -1753,6 +2125,11 @@ function renderPatientList() {
       </div>
     </div>`;
   }).join('');
+  // Re-apply readonly gating après re-render — les boutons "Initial/Contrôle"
+  // bilan sport/posturo sont régénérés à chaque appel (innerHTML). Sans ce hook,
+  // ils ré-apparaissent actifs même si window._accessLevel est readonly/blocked.
+  // Cf. commentaire d'en-tête de applyReadOnlyUI.
+  if (typeof applyReadOnlyUI === 'function') applyReadOnlyUI(window._accessLevel);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1942,6 +2319,11 @@ function finalizeBilanPosturo(patIdx) {
 }
 
 function creerBilanSport(patIdx, type) {
+  // Gating task #57 — bloque la création si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_bilan');
+    return;
+  }
   const p = patients[patIdx];
   if(!p) return;
   // Sauvegarder bilan courant si données existantes
@@ -1994,6 +2376,11 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
 }
 
 function creerBilanPosturo(patIdx, type) {
+  // Gating task #57 — bloque la création si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_bilan');
+    return;
+  }
   const p = patients[patIdx];
   if(!p) return;
   // Archiver UNIQUEMENT si in-progress (sousType set), pas si viewing-only.
@@ -3666,6 +4053,11 @@ async function validateAndSave() {
 // ══════════════════════════════════════════════════════
 
 function printRapportPosturo() {
+  // Gating task #57 — bloque l'impression si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('export_pdf');
+    return;
+  }
   // L'iframe interne contient déjà le rapport stylé (créé par buildRapportPosturo).
   // On l'imprime directement plutôt que de créer un wrapper qui copierait juste
   // le markup outer de l'iframe (sans son document interne) — cause de l'aperçu blanc.
@@ -4566,6 +4958,11 @@ function buildPhotoMini(data,side,t) {
 // RAPPORT PDF IMPRESSION
 // ══════════════════════════════════════════════════════
 function printReport() {
+  // Gating task #57 — bloque l'impression si pas full access.
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('export_pdf');
+    return;
+  }
   if(!currentPatient){alert('Aucun patient sélectionné.');return;}
   // Sauvegarder automatiquement le bilan avant d'imprimer
   saveBilanSilent();
@@ -5913,6 +6310,13 @@ function toggleDictaphone() {
 }
 
 function printBilan() {
+  // Gating task #57 — bloque l'impression si pas full access.
+  // (printReport a aussi un early-return en double sécurité, mais on stop ici
+  // pour éviter saveBilanSilent inutile et le delay de 200ms.)
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('export_pdf');
+    return;
+  }
   // Sauvegarder d'abord tous les champs
   saveBilanSilent();
   // Puis lancer l'impression du rapport complet
