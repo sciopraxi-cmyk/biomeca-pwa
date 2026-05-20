@@ -583,6 +583,10 @@ async function tryStartTrial() {
 // diagnostic console.error (état illégitime). Aucune lecture de pwaUser
 // n'influence la valeur de retour — les tests Vitest peuvent donc l'appeler
 // sans mocker le global, le log apparaîtra juste sans email enrichi.
+//
+// Note duplication : la même fonction est ré-exportée depuis js/access.mjs
+// pour les tests Vitest (pattern identique à js/calc.mjs). Si tu modifies
+// ici, répercute aussi dans access.mjs sinon les tests dérivent du runtime.
 function computeAccessLevel({ isAdmin, meta, userData }, now) {
   if (isAdmin) return 'full';
   if (userData === undefined) return 'loading';
