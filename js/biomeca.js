@@ -858,7 +858,10 @@ function _showAccessBanner({ text, background }) {
   const t = document.getElementById('trial-banner-text');
   if (b) {
     b.style.display = 'block';
-    if (background !== undefined) b.style.background = background;
+    // Note : `if (background)` (vs `!== undefined`) pour que les falsy values (`''`,
+    // `null`) préservent le style HTML inline. Permet aux callers de signifier "ne pas
+    // toucher" en passant '' ou undefined indifféremment. Task #61.
+    if (background) b.style.background = background;
   }
   if (t) t.textContent = text;
 }
