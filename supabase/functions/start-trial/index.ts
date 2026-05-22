@@ -2,7 +2,9 @@
 //
 // Le client (checkAccessStatus) déclenche cet appel quand il détecte un user
 // authentifié qui n'a ni licence, ni formule, ni trial_start. La fonction
-// écrit user_metadata.trial_start et user_metadata.acces='essai' via service_role.
+// écrit user_metadata.trial_start, user_metadata.acces='essai' et
+// user_metadata.modules (array complet ['postural', 'podopedia', 'podo_sport'])
+// via service_role.
 //
 // Le client ne peut PAS écrire ces champs directement : un trigger SQL bloque
 // le rôle authenticated sur user_metadata pour ces colonnes critiques (cohérent
@@ -17,7 +19,10 @@
 // le caller peut ignorer.
 //
 // Refs : incident #29 (clé admin retirée du client), audit RLS task #21,
-// PR D (admin-users), task #57 (architecture commerce).
+// PR D (admin-users), task #57 (architecture commerce), task #58 (refonte
+// droits enum → modules array : trial démarre avec accès complet à tous
+// les modules pendant 14j, cohérent avec l'esprit "découverte plein
+// produit" de l'essai).
 //
 // Déploiement : supabase functions deploy start-trial --no-verify-jwt
 // (on fait notre propre vérif du JWT côté code pour homogénéité avec admin-users).
@@ -75,19 +80,33 @@ Deno.serve(async (req) => {
   }
 
   // ─── Action : merge + write ────────────────────────────────────────
-  // Préservation explicite des autres champs (nom, prenom, droits, etc.) :
+  // Préservation explicite des autres champs (nom, prenom, etc.) :
   // updateUserById merge déjà, mais le GET + spread garantit qu'on contrôle
   // le payload final côté code — pas de surprise si Supabase change le
-  // comportement default. Pattern identique à handleSetDroits dans admin-users.
+  // comportement default. Pattern identique à handleSetModules dans admin-users.
+  //
+  // modules (task #58) : array complet à la création du trial → le user
+  // découvre l'intégralité du produit pendant 14j. Source de vérité ici =
+  // le canon ['postural', 'podopedia', 'podo_sport'] (test-mirror avec
+  // js/subscription.mjs et prepare-module-change/index.ts).
+  // NB : on écrase volontairement `modules` même si présent dans meta —
+  // au stade trial, on n'a aucune raison d'avoir un set restreint, et
+  // start-trial est gardé par anti-reset (trial_start absent + acces absent).
   const newMeta = {
     ...meta,
     trial_start: new Date().toISOString(),
     acces: 'essai',
+    modules: ['postural', 'podopedia', 'podo_sport'],
   };
   const { error: updErr } = await supaAdmin.auth.admin.updateUserById(user.id, {
     user_metadata: newMeta,
   });
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
 
-  return json({ ok: true, trial_start: newMeta.trial_start, acces: 'essai' });
+  return json({
+    ok: true,
+    trial_start: newMeta.trial_start,
+    acces: 'essai',
+    modules: newMeta.modules,
+  });
 });

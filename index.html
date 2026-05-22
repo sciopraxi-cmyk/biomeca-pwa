@@ -244,17 +244,93 @@
   </div>
 </div>
 
+<!-- Modal subscribe — flow in-app de souscription/changement de formule (task #58) -->
+<!-- z-index 10002 (au-dessus de modal-access-restricted=10001) pour pouvoir s'ouvrir
+     depuis n'importe quel overlay. Cards rendues dynamiquement par showSubscribeModal()
+     dans #ms-cards selon licence_payee + formule actuelle + état toggle. -->
+<div id="modal-subscribe" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10002;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
+  <div style="background:var(--card);border-radius:14px;padding:24px;max-width:900px;width:100%;max-height:90vh;overflow-y:auto;">
+
+    <!-- Header : titre + close conditionnel -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h2 id="ms-title" style="font-size:18px;font-weight:700;margin:0;color:#fff;">Choisir une formule</h2>
+      <button id="ms-close" onclick="closeSubscribeModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--mut);display:none;" aria-label="Fermer">✕</button>
+    </div>
+
+    <!-- Vue 1 — Cards de plans (visible par défaut). Le wrapper #ms-view-cards
+         permet de toggler entre vue 1 (cards) et vue 2 (modules) via
+         msShowCardsView() / msShowModulesView() en JS. Toggle Mensuel/Annuel
+         et footer promo restent visibles dans les 2 vues (header + footer
+         partagés, contenu central qui change). -->
+    <div id="ms-view-cards">
+      <!-- Toggle Mensuel/Annuel — annuel par défaut (Q2=b) -->
+      <!-- Classes lp-toggle-* réutilisées du landing pour cohérence visuelle. -->
+      <div class="lp-toggle-wrap" style="justify-content:center;margin:0 auto 18px;">
+        <span class="lp-toggle-label" id="ms-lbl-m">Mensuel</span>
+        <button class="lp-toggle ann" id="ms-tog" onclick="msToggleAnnuel()" aria-label="Basculer Mensuel/Annuel"><div class="lp-toggle-dot"></div></button>
+        <span class="lp-toggle-label on" id="ms-lbl-a">Annuel</span>
+        <span class="lp-save" id="ms-save" style="display:inline-block;">2 mois offerts</span>
+      </div>
+
+      <!-- Container cards — populated par msRenderCards(). Click sur card →
+           msSelectPlan(idx) qui set _msSelectedPlanIdx et transitionne vers
+           vue 2 via msShowModulesView(). -->
+      <div class="lp-pricing" id="ms-cards"></div>
+    </div>
+
+    <!-- Vue 2 — Choix des modules pour le plan sélectionné (task #58). -->
+    <!-- Hidden par défaut, affiché après click sur une card en vue 1.
+         Populated dynamiquement par msRenderModules(planIdx) qui :
+           - Affiche les modules `required` cochés et disabled (verrouillés)
+           - Affiche les modules `choose.from` cochables avec contrainte count
+           - Présélectionne defaultModulesForPlan(planIdx) au premier rendu
+         Le bouton Confirmer est activable selon msUpdateConfirmButton() qui
+         check isValidModulesForPlan + (canChangeModule si plan inchangé).
+         Cf. Q3 task #58 : changement de plan = transaction légitime sans lock,
+         seul un switch intra-plan déclenche le check anti-abus 30j. -->
+    <div id="ms-view-modules" style="display:none;">
+      <div id="ms-modules-subtitle" style="font-size:13px;color:var(--mut);margin-bottom:14px;"></div>
+
+      <!-- Container des checkboxes modules — populated par msRenderModules. -->
+      <div id="ms-modules-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;"></div>
+
+      <!-- Bandeau d'erreur conditionnel : lock 30j (next_change_date formatée
+           en français) ou erreur Edge Function (réseau, validation, etc.).
+           Hidden par défaut, affiché par subscribePaymentLink en cas d'échec. -->
+      <div id="ms-err" style="display:none;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:#e74c3c;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;"></div>
+
+      <!-- Boutons Retour (← vue 1) + Confirmer (→ subscribePaymentLink → Stripe). -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="msShowCardsView()" class="btn" style="font-size:13px;">← Retour</button>
+        <button id="ms-confirm-btn" onclick="subscribePaymentLink()" class="btn btn-blue" style="font-size:13px;" disabled>Confirmer</button>
+      </div>
+    </div>
+
+    <!-- Footer : promo code stub + footnote -->
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bord);">
+      <div style="margin-bottom:12px;">
+        <label for="ms-promo" style="font-size:11px;color:var(--mut);display:block;margin-bottom:4px;">Code promo (optionnel)</label>
+        <input id="ms-promo" type="text" class="inp" placeholder="EXEMPLE2025" style="width:100%;max-width:300px;font-size:13px;"/>
+      </div>
+      <div style="font-size:10px;color:var(--mut);line-height:1.5;">
+        Le tarif licence à vie est un achat unique permettant l'accès au logiciel à vie. Les abonnements mensuels/annuels couvrent les fonctionnalités cliniques.
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <div class="app" id="biomeca-app" style="display:none;">
 <div id="trial-banner" style="display:none;background:#e67e22;color:#fff;text-align:center;padding:7px 16px;font-size:12px;font-weight:600;position:relative;">
   <span id="trial-banner-text"></span>
-  &nbsp;·&nbsp;<span onclick="openSubscribeFlow()" style="cursor:pointer;text-decoration:underline;">Choisir une formule</span>
+  &nbsp;·&nbsp;<span onclick="showSubscribeModal()" style="cursor:pointer;text-decoration:underline;">Choisir une formule</span>
 </div>
 <div id="trial-expired-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9998;align-items:center;justify-content:center;">
   <div style="background:var(--card);border-radius:16px;padding:32px;max-width:400px;text-align:center;margin:auto;">
     <div style="font-size:36px;margin-bottom:14px;">⏰</div>
     <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:8px;">Essai gratuit terminé</div>
     <div style="font-size:13px;color:var(--mut);margin-bottom:20px;">Choisissez une formule pour continuer.</div>
-    <button onclick="openSubscribeFlow()" style="background:var(--blue);color:#fff;border:none;padding:12px 28px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">Voir les formules</button>
+    <button onclick="showSubscribeModal()" style="background:var(--blue);color:#fff;border:none;padding:12px 28px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">Voir les formules</button>
   </div>
 </div>
 <div class="topbar">
