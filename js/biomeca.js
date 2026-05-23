@@ -236,7 +236,7 @@ async function pwaLogin() {
 
 // ─── Fetch user_data au login (task #57) ───────────────────────────
 // L'app a 2 stores découplés : auth.users.user_metadata (acces, trial_start,
-// droits, nom, prenom) ET la table user_data (licence_payee, formule,
+// modules, nom, prenom) ET la table user_data (licence_payee, formule,
 // engagement, date_debut_abonnement, stripe_customer_id). Pas de trigger DB
 // qui synchronise. checkAccessStatus a besoin des 2, donc on fetch user_data
 // une fois au login et on stash dans pwaUser.user_data.
@@ -307,14 +307,18 @@ async function loadSupabaseData() {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
       patients = d.patients || [];
       praticiens = d.praticiens || [];
-      // Appliquer les droits depuis user_metadata Supabase (fraîches)
+      // Appliquer les modules depuis user_metadata Supabase (fraîches, task #58).
+      // Refonte enum droits → array modules : la source de vérité est désormais
+      // user_metadata.modules (array de 'postural'|'podopedia'|'podo_sport').
+      // Fallback [] si absent (cas legacy avant migration A0, ou flow landing
+      // public pré-task #63 où user_metadata n'est pas encore initialisé).
       try {
         const freshUser = await supa.getUser();
         const freshMeta = freshUser?.user_metadata || {};
         pwaUser.user_metadata = freshMeta;
-        window._userDroits = freshMeta.droits || 'all';
+        window._userModules = Array.isArray(freshMeta.modules) ? freshMeta.modules : [];
       } catch(e) {
-        window._userDroits = pwaUser?.user_metadata?.droits || 'all';
+        window._userModules = Array.isArray(pwaUser?.user_metadata?.modules) ? pwaUser.user_metadata.modules : [];
       }
     } else {
       patients = [];
@@ -737,6 +741,45 @@ function checkAccessStatus() {
   }
 }
 
+// ─── canChangeModule — DUPLIQUÉ de js/subscription.mjs ──────────────
+// Test-mirror : la source testée par Vitest est js/subscription.mjs.
+// Toute modif ici DOIT être répercutée là-bas ET dans
+// supabase/functions/prepare-module-change/index.ts (canChangeModuleServer).
+// Référence task #58.
+//
+// Args :
+//   userData : { date_debut_abonnement: string | null, last_module_change: string | null }
+//   now      : Date (injectable pour tests déterministes)
+//
+// Retourne null si OK (autorisé), sinon { reason, next_change_date? }.
+// Logique : grace period 7j post-souscription initiale + lock 30j entre changements.
+// Le caller (subscribePaymentLink, C3) n'appelle canChangeModule QUE si modules
+// changent ET plan inchangé (cf. Q3 task #58).
+// ────────────────────────────────────────────────────────────────────
+function canChangeModule(userData, now) {
+  // Première souscription : pas de date_debut → toujours OK.
+  if (!userData.date_debut_abonnement) return null;
+
+  const debut = new Date(userData.date_debut_abonnement).getTime();
+  const nowMs = now.getTime();
+  const sevenDaysMs = 7 * 86400 * 1000;
+  // Grace period 7j post-souscription initiale : changement libre.
+  if (nowMs - debut <= sevenDaysMs) return null;
+
+  // Hors grace period : jamais changé → OK.
+  if (!userData.last_module_change) return null;
+
+  const lastChange = new Date(userData.last_module_change).getTime();
+  const thirtyDaysMs = 30 * 86400 * 1000;
+  if (nowMs - lastChange >= thirtyDaysMs) return null;
+
+  // Lock actif : calcule la prochaine date possible.
+  return {
+    reason: 'locked',
+    next_change_date: new Date(lastChange + thirtyDaysMs).toISOString(),
+  };
+}
+
 // applyReadOnlyUI — applique le gating visuel sur les 6 boutons cibles (task #57).
 // level : 'full' | 'readonly' | 'blocked' | 'loading'.
 //
@@ -822,7 +865,7 @@ function showAccessRestrictedModal(reason) {
         <button onclick="document.getElementById('modal-access-restricted').style.display='none'" style="background:none;border:1px solid var(--bord);color:var(--mut);padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer;">
           Fermer
         </button>
-        <button onclick="document.getElementById('modal-access-restricted').style.display='none';openSubscribeFlow()" style="background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+        <button onclick="document.getElementById('modal-access-restricted').style.display='none';showSubscribeModal()" style="background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
           Reprendre l'abonnement
         </button>
       </div>
@@ -830,16 +873,416 @@ function showAccessRestrictedModal(reason) {
   modal.style.display = 'flex';
 }
 
-// openSubscribeFlow — point d'entrée unique pour le CTA "Reprendre l'abonnement"
-// utilisé par le bandeau readonly, l'overlay blocked et la modale showAccessRestrictedModal.
-// Cache l'overlay s'il intercepte les clicks puis ouvre le modal Mon Compte
-// (qui contient les Payment Links). La présélection sansLicence vs avecLicence
-// selon licence_payee est implémentée dans le commit 5.
-function openSubscribeFlow() {
-  const overlay = document.getElementById('trial-expired-overlay');
-  if (overlay) overlay.style.display = 'none';
-  if (typeof showMonCompte === 'function') {
-    showMonCompte();
+// ═══════════════════════════════════════════════════════════════════
+// Wizard subscribe modal (task #58)
+// ═══════════════════════════════════════════════════════════════════
+// Flow 2-vues pour la souscription/changement de formule depuis la PWA :
+//   Vue 1 (#ms-view-cards) : cartes des 5 plans + toggle Mensuel/Annuel.
+//   Vue 2 (#ms-view-modules) : 3 checkboxes pour le plan sélectionné +
+//                              bouton Confirmer → subscribePaymentLink.
+//
+// Découplage avec le flow landing public : ici le user est authentifié, les
+// modules sont stockés en pending_* via prepare-module-change Edge Function,
+// puis appliqués par stripe-webhook au retour signé Stripe.
+//
+// Logique anti-abus (Q3 task #58) :
+//   Plan différent  → CHANGE LIBRE (transaction commerciale légitime)
+//   Plan identique + modules différents → check canChangeModule (lock 30j)
+//   Plan identique + modules identiques → bouton désactivé (no-op)
+
+// Mapping prix (test-mirror du landing pricing index.html lignes 113-117).
+// Source de vérité = Stripe Dashboard + landing public. À synchroniser
+// quand un prix change dans le dashboard.
+const MS_PLAN_NAMES = ['Essentiel', 'Sport', 'Duo', 'Duo Sport', 'Intégral'];
+const MS_PRICES_M  = [30, 40, 50, 60, 70];      // €/mois
+const MS_PRICES_A  = [300, 400, 500, 600, 700]; // €/an (mensuel × 10, 2 mois offerts)
+const MS_DESCR     = [
+  '1 module au choix',
+  'Podo sport + analyse cinématique',
+  'Postural + Podopédiatrie',
+  'Podo Sport + Postural ou Podopédiatrie',
+  'Les 3 modules complets',
+];
+
+// Mapping plan → modules (test-mirror de PLAN_MODULES de js/subscription.mjs).
+// Toute modif DOIT être répercutée là-bas (et dans prepare-module-change
+// Edge Function). Référence task #58.
+const MS_PLAN_MODULES = [
+  { required: [],                                      choose: { from: ['postural', 'podopedia'], count: 1 } },
+  { required: ['podo_sport'],                          choose: null },
+  { required: ['postural', 'podopedia'],               choose: null },
+  { required: ['podo_sport'],                          choose: { from: ['postural', 'podopedia'], count: 1 } },
+  { required: ['postural', 'podopedia', 'podo_sport'], choose: null },
+];
+
+// État local wizard — préfixe _ms cohérent avec _userModules, _accessLevel.
+let _msSelectedPlanIdx = null;  // 0-4 ou null si on est en vue 1 (pas encore choisi)
+let _msSelectedModules = [];    // array canonique ['postural', ...]
+let _msIsAnnuel = true;         // Annuel par défaut (Q2=b)
+
+// ─── Helpers wizard — Vue 1 (cards) ────────────────────────────────
+
+function showSubscribeModal() {
+  // Reset état local pour ne pas hériter d'une session précédente.
+  _msSelectedPlanIdx = null;
+  _msSelectedModules = [];
+  // Hide vue 2 + show vue 1.
+  msShowCardsView();
+  // Close button conditionnel : non-dismissible si accessLevel === 'blocked'.
+  // Cf. C6 — backdrop click logic appliquée aussi.
+  const closeBtn = document.getElementById('ms-close');
+  if (closeBtn) {
+    closeBtn.style.display = window._accessLevel === 'blocked' ? 'none' : 'inline-block';
+  }
+  // Reset bandeau d'erreur d'éventuel call précédent.
+  const errEl = document.getElementById('ms-err');
+  if (errEl) errEl.style.display = 'none';
+  // Re-render cards selon état toggle + licence_payee actuel.
+  msRenderCards();
+  // Affiche le modal + (re-)wire le backdrop handler (C6).
+  // Pattern défensif : on stocke le handler sur modal._backdropHandler pour
+  // pouvoir le retirer/réenregistrer au prochain show (le DOM persiste entre
+  // open/close — la modale est statique dans index.html, pas re-créée).
+  // Ferme uniquement si :
+  //   - le click vise le backdrop (e.target === modal, pas un enfant interne)
+  //   - ET l'accessLevel n'est pas 'blocked' (modal non-dismissible si bloqué,
+  //     cohérent avec closeSubscribeModal qui refuse aussi dans ce cas).
+  const modal = document.getElementById('modal-subscribe');
+  if (modal) {
+    if (modal._backdropHandler) modal.removeEventListener('click', modal._backdropHandler);
+    modal._backdropHandler = (e) => {
+      if (e.target === modal && window._accessLevel !== 'blocked') {
+        modal.style.display = 'none';
+      }
+    };
+    modal.addEventListener('click', modal._backdropHandler);
+    modal.style.display = 'flex';
+  }
+}
+
+function closeSubscribeModal() {
+  // Refuse de fermer si user en accès bloqué (cf. C6).
+  if (window._accessLevel === 'blocked') return;
+  const modal = document.getElementById('modal-subscribe');
+  if (modal) modal.style.display = 'none';
+}
+
+function msShowCardsView() {
+  document.getElementById('ms-view-cards').style.display = '';
+  document.getElementById('ms-view-modules').style.display = 'none';
+  document.getElementById('ms-title').textContent = 'Choisir une formule';
+}
+
+function msToggleAnnuel() {
+  _msIsAnnuel = !_msIsAnnuel;
+  const tog = document.getElementById('ms-tog');
+  const lblM = document.getElementById('ms-lbl-m');
+  const lblA = document.getElementById('ms-lbl-a');
+  if (_msIsAnnuel) {
+    tog?.classList.add('ann');
+    lblM?.classList.remove('on');
+    lblA?.classList.add('on');
+  } else {
+    tog?.classList.remove('ann');
+    lblM?.classList.add('on');
+    lblA?.classList.remove('on');
+  }
+  msRenderCards();
+}
+
+function msRenderCards() {
+  const el = document.getElementById('ms-cards');
+  if (!el) return;
+  // Détecter la formule actuelle pour highlight + badge "Votre formule".
+  const currentFormule = pwaUser?.user_data?.formule;
+  const currentPlanIdx = (typeof currentFormule === 'string' && currentFormule.startsWith('formule_'))
+    ? parseInt(currentFormule.replace('formule_', ''), 10) - 1
+    : null;
+  // Badge licence-aware (Q2) : si licence déjà payée, on remplace la mention
+  // "+ 299€ licence" par un badge vert "✓ Vous avez déjà la licence" — évite
+  // de suggérer au user qu'il va re-payer la licence. Cohérent avec la logique
+  // Edge Function paymentLinkFor qui sélectionne sansLicence si hasLicence.
+  const hasLicence = pwaUser?.user_data?.licence_payee === true;
+  const licenceLine = hasLicence
+    ? '<div style="font-size:10px;color:#2dd4bf;font-weight:600;margin-top:4px;">✓ Vous avez déjà la licence</div>'
+    : '<div style="font-size:10px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div>';
+
+  el.innerHTML = MS_PLAN_NAMES.map((name, idx) => {
+    const price = _msIsAnnuel ? MS_PRICES_A[idx] : MS_PRICES_M[idx];
+    const period = _msIsAnnuel ? '/ an' : '/ mois';
+    const isCurrent = idx === currentPlanIdx;
+    const cardBorder = isCurrent ? '2px solid #2dd4bf' : '1px solid var(--bord)';
+    const currentBadge = isCurrent
+      ? '<div style="font-size:10px;color:#2dd4bf;font-weight:700;margin-bottom:6px;">VOTRE FORMULE ACTUELLE</div>'
+      : '';
+    return `
+      <div style="background:var(--card);border-radius:12px;padding:18px;border:${cardBorder};">
+        ${currentBadge}
+        <div style="font-size:15px;font-weight:700;color:#fff;">${_escHtml(name)}</div>
+        <div style="font-size:22px;font-weight:700;color:#fff;margin-top:8px;">${price}€ <span style="font-size:12px;font-weight:400;color:var(--mut);">${period}</span></div>
+        ${licenceLine}
+        <div style="font-size:12px;color:var(--mut);margin-top:10px;">${_escHtml(MS_DESCR[idx])}</div>
+        <button onclick="msSelectPlan(${idx})" class="btn btn-blue" style="width:100%;margin-top:14px;font-size:13px;">Choisir</button>
+      </div>`;
+  }).join('');
+}
+
+// ─── Helpers wizard — Vue 2 (modules) ──────────────────────────────
+
+function msSelectPlan(idx) {
+  if (!Number.isInteger(idx) || idx < 0 || idx > 4) return;
+  _msSelectedPlanIdx = idx;
+  // Présélection : modules par défaut (required + premiers choose.count).
+  const plan = MS_PLAN_MODULES[idx];
+  const fromChoose = plan.choose ? plan.choose.from.slice(0, plan.choose.count) : [];
+  _msSelectedModules = [...plan.required, ...fromChoose];
+  msShowModulesView();
+}
+
+function msShowModulesView() {
+  document.getElementById('ms-view-cards').style.display = 'none';
+  document.getElementById('ms-view-modules').style.display = '';
+  document.getElementById('ms-title').textContent = 'Choisir vos modules';
+  const subtitle = document.getElementById('ms-modules-subtitle');
+  if (subtitle && _msSelectedPlanIdx !== null) {
+    subtitle.textContent = MS_PLAN_NAMES[_msSelectedPlanIdx] + ' — sélectionnez vos modules.';
+  }
+  const errEl = document.getElementById('ms-err');
+  if (errEl) errEl.style.display = 'none';
+  msRenderModules();
+  msUpdateConfirmButton();
+}
+
+function msRenderModules() {
+  const el = document.getElementById('ms-modules-list');
+  if (!el || _msSelectedPlanIdx === null) return;
+  const plan = MS_PLAN_MODULES[_msSelectedPlanIdx];
+  // Afficher les 3 modules canoniques pour cohérence visuelle, avec état :
+  //   - required → coché + disabled (verrouillé par le plan)
+  //   - choose.from → cochable, contrainte count vérifiée à l'update
+  //   - autres → disabled + opacity réduite ("non disponible dans ce plan")
+  const modules = [
+    { id: 'postural',   label: 'Postural' },
+    { id: 'podopedia',  label: 'Podopédiatrie', suffix: ' (en développement)' },
+    { id: 'podo_sport', label: 'Sport' },
+  ];
+  el.innerHTML = modules.map(m => {
+    const isRequired = plan.required.includes(m.id);
+    const isInChoose = plan.choose ? plan.choose.from.includes(m.id) : false;
+    const isApplicable = isRequired || isInChoose;
+    const isChecked = _msSelectedModules.includes(m.id);
+    const disabled = isRequired || !isApplicable;
+    const opacity = isApplicable ? '1' : '0.4';
+    const note = isRequired
+      ? ' <span style="font-size:10px;color:var(--mut);">(inclus dans le plan)</span>'
+      : (isInChoose
+          ? ` <span style="font-size:10px;color:var(--mut);">(au choix : ${plan.choose.count})</span>`
+          : ' <span style="font-size:10px;color:var(--mut);">(non disponible dans ce plan)</span>');
+    const suffix = m.suffix ? `<span style="font-size:10px;color:var(--mut);">${_escHtml(m.suffix)}</span>` : '';
+    return `
+      <label style="font-size:13px;display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--bord);border-radius:8px;cursor:${disabled ? 'not-allowed' : 'pointer'};opacity:${opacity};">
+        <input type="checkbox" id="ms-mod-${m.id}" ${isChecked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="msToggleModule('${m.id}')"/>
+        ${_escHtml(m.label)}${suffix}${note}
+      </label>`;
+  }).join('');
+}
+
+function msToggleModule(name) {
+  if (_msSelectedModules.includes(name)) {
+    _msSelectedModules = _msSelectedModules.filter(m => m !== name);
+  } else {
+    _msSelectedModules = [..._msSelectedModules, name];
+  }
+  msUpdateConfirmButton();
+}
+
+// msUpdateConfirmButton — applique la logique anti-abus Q3 (task #58).
+//
+//   Cas A : plan ≠ plan actuel
+//           → bouton activé si modules valides pour le plan (NO lock check).
+//             Changement de plan = transaction commerciale légitime.
+//   Cas B : plan = plan actuel + modules ≠
+//           → bouton activé si modules valides ET canChangeModule()===null.
+//             Sinon disabled + affichage du lock + next_date dans #ms-err.
+//   Cas C : plan = plan actuel + modules =
+//           → bouton disabled + message info "Aucun changement" dans #ms-err.
+function msUpdateConfirmButton() {
+  const btn = document.getElementById('ms-confirm-btn');
+  const errEl = document.getElementById('ms-err');
+  if (!btn || _msSelectedPlanIdx === null) return;
+
+  // 1. Validation modules vs plan (test-mirror PLAN_MODULES)
+  if (!msIsValidModulesForPlan(_msSelectedPlanIdx, _msSelectedModules)) {
+    btn.disabled = true;
+    if (errEl) {
+      errEl.style.display = 'block';
+      errEl.style.background = 'rgba(231,76,60,0.1)';
+      errEl.style.color = '#e74c3c';
+      errEl.textContent = 'Sélection incomplète ou invalide pour ce plan.';
+    }
+    return;
+  }
+
+  // 2. Détection changement plan vs actuel
+  const currentFormule = pwaUser?.user_data?.formule;
+  const currentPlanIdx = (typeof currentFormule === 'string' && currentFormule.startsWith('formule_'))
+    ? parseInt(currentFormule.replace('formule_', ''), 10) - 1
+    : null;
+  const planChanged = currentPlanIdx === null || currentPlanIdx !== _msSelectedPlanIdx;
+
+  // 3. Détection changement modules vs actuel
+  const currentModules = Array.isArray(window._userModules) ? window._userModules : [];
+  const sortedCur = [...currentModules].sort();
+  const sortedNew = [..._msSelectedModules].sort();
+  const modulesChanged = sortedCur.length !== sortedNew.length
+    || sortedCur.some((m, i) => m !== sortedNew[i]);
+
+  // Cas C : no-op
+  if (!planChanged && !modulesChanged) {
+    btn.disabled = true;
+    if (errEl) {
+      errEl.style.display = 'block';
+      errEl.style.background = 'rgba(127,127,127,0.1)';
+      errEl.style.color = 'var(--mut)';
+      errEl.textContent = 'Aucun changement par rapport à votre formule actuelle.';
+    }
+    return;
+  }
+
+  // Cas A : plan changé → bouton activé sans lock check
+  if (planChanged) {
+    btn.disabled = false;
+    if (errEl) errEl.style.display = 'none';
+    return;
+  }
+
+  // Cas B : plan inchangé + modules changés → check lock anti-abus (Q3 brief)
+  const lockCheck = canChangeModule(
+    {
+      date_debut_abonnement: pwaUser?.user_data?.date_debut_abonnement || null,
+      last_module_change: pwaUser?.user_data?.last_module_change || null,
+    },
+    new Date()
+  );
+  if (lockCheck) {
+    btn.disabled = true;
+    if (errEl) {
+      errEl.style.display = 'block';
+      errEl.style.background = 'rgba(231,76,60,0.1)';
+      errEl.style.color = '#e74c3c';
+      const nextDate = new Date(lockCheck.next_change_date).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      errEl.textContent = `Changement de modules non autorisé avant le ${nextDate} (lock 30j entre changements).`;
+    }
+    return;
+  }
+
+  btn.disabled = false;
+  if (errEl) errEl.style.display = 'none';
+}
+
+// Mirror local de isValidModulesForPlan (js/subscription.mjs). Cf. duplication
+// test-mirror documentée — toute modif DOIT être répercutée.
+function msIsValidModulesForPlan(planIdx, modules) {
+  const plan = MS_PLAN_MODULES[planIdx];
+  if (!plan) return false;
+  if (!plan.required.every(m => modules.includes(m))) return false;
+  if (plan.choose) {
+    const chosen = modules.filter(m => plan.choose.from.includes(m)).length;
+    if (chosen !== plan.choose.count) return false;
+  }
+  return true;
+}
+
+// subscribePaymentLink — appel Edge Function prepare-module-change (task #58).
+//
+// Flow : check préalable → POST prepare-module-change → redirect Stripe.
+//
+// Retour post-Stripe (V1) : aucune logique custom. Au retour signé Stripe
+// (checkout.session.completed), stripe-webhook applique les pending_modules.
+// L'app reload → onPwaLoginSuccess → fetchUserDataAtLogin → checkAccessStatus
+// s'enchaînent automatiquement. Pas de message "paiement reçu" pour V1 ;
+// à ajouter en V2+ si besoin UX.
+//
+// Pas de loading state explicite : le user verra l'animation Stripe au
+// window.location.href. Si retour de l'app pour cause d'échec (back
+// browser), la modale reste ouverte avec le bouton réactivé (display:flex
+// préservé).
+async function subscribePaymentLink() {
+  // 1. Validation préalable (défense en profondeur — le bouton devrait être
+  //    disabled si invalide, mais on protège contre l'appel direct console).
+  if (_msSelectedPlanIdx === null || !Array.isArray(_msSelectedModules)) {
+    console.error('subscribePaymentLink: state local invalide', { _msSelectedPlanIdx, _msSelectedModules });
+    return;
+  }
+  if (!msIsValidModulesForPlan(_msSelectedPlanIdx, _msSelectedModules)) {
+    console.error('subscribePaymentLink: modules invalides pour plan', { _msSelectedPlanIdx, _msSelectedModules });
+    return;
+  }
+
+  // 2. Lecture promo code (optionnel, vide string acceptée).
+  const promoEl = document.getElementById('ms-promo');
+  const promoCode = (promoEl?.value || '').trim();
+
+  const errEl = document.getElementById('ms-err');
+  const showGenericError = () => {
+    if (!errEl) return;
+    errEl.style.display = 'block';
+    errEl.style.background = 'rgba(231,76,60,0.1)';
+    errEl.style.color = '#e74c3c';
+    errEl.textContent = 'Erreur lors de la préparation du paiement. Veuillez réessayer ou contacter le support.';
+  };
+
+  // 3. Appel Edge Function (authFetch ajoute Authorization Bearer JWT auto).
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/prepare-module-change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planIdx: _msSelectedPlanIdx,
+        modules: _msSelectedModules,
+        isAnnuel: _msIsAnnuel,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    // 4a. 200 OK — redirect Stripe avec append promo code si fourni.
+    if (res.status === 200 && data.ok && typeof data.payment_link_url === 'string') {
+      let url = data.payment_link_url;
+      if (promoCode) {
+        const sep = url.includes('?') ? '&' : '?';
+        url = url + sep + 'prefilled_promo_code=' + encodeURIComponent(promoCode);
+      }
+      window.location.href = url;
+      return;
+    }
+
+    // 4b. 409 locked — affichage du next_change_date formaté (Q5).
+    if (res.status === 409 && data.error === 'locked' && data.next_change_date) {
+      const nextDate = new Date(data.next_change_date).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      if (errEl) {
+        errEl.style.display = 'block';
+        errEl.style.background = 'rgba(231,76,60,0.1)';
+        errEl.style.color = '#e74c3c';
+        errEl.textContent = `Changement de modules non autorisé avant le ${nextDate} (lock 30j entre changements).`;
+      }
+      return;
+    }
+
+    // 4c. Autres erreurs (400, 401, 500, …) — message générique + log.
+    console.error('subscribePaymentLink: erreur Edge Function', { status: res.status, data });
+    showGenericError();
+  } catch (e) {
+    // 4d. Erreur réseau (fetch reject, timeout, etc.).
+    console.error('subscribePaymentLink: exception', e);
+    showGenericError();
   }
 }
 
@@ -1390,14 +1833,18 @@ function _adminUserRowHTML(u, idx) {
     ? '<span style="color:#2a7a4e;font-weight:600;">✅ Licence</span>'
     : '<span style="color:#e74c3c;font-weight:600;">⚠️ Sans licence</span>';
   const formuleTxt = u.formule ? _escHtml(u.formule) : '<span style="color:var(--mut);">—</span>';
-  const droitsTxt = _escHtml(u.droits || 'all');
+  // modules (task #58) : array depuis adminListUsers refactoré. Si vide,
+  // fallback "—" plutôt que "all" pour ne pas mentir sur le périmètre réel.
+  const modulesTxt = u.modules && u.modules.length
+    ? u.modules.map(_escHtml).join(', ')
+    : '<span style="color:var(--mut);">—</span>';
   const engagement = u.engagement ? ' · ' + _escHtml(u.engagement) : '';
   return `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--card);border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;">${_escHtml(u.email)}</div>
         <div style="font-size:11px;color:var(--mut);margin-top:3px;">
-          ${licenceBadge} · Formule : ${formuleTxt} · Droits : ${droitsTxt}${engagement}
+          ${licenceBadge} · Formule : ${formuleTxt} · Modules : ${modulesTxt}${engagement}
         </div>
       </div>
       <button onclick="openEditUserModal(${idx})" class="btn" style="font-size:11px;padding:6px 12px;flex-shrink:0;">Modifier</button>
@@ -1445,12 +1892,22 @@ function openEditUserModal(idx) {
       </div>
 
       <div style="margin-bottom:14px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Droits</div>
-        <select id="eu-droits" class="inp" style="width:100%;">
-          <option value="all" ${(u.droits || 'all') === 'all' ? 'selected' : ''}>all (tous modules)</option>
-          <option value="sport" ${u.droits === 'sport' ? 'selected' : ''}>sport seulement</option>
-          <option value="posturo" ${u.droits === 'posturo' ? 'selected' : ''}>posturo seulement</option>
-        </select>
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Modules</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="eu-mod-postural" ${(u.modules||[]).includes('postural') ? 'checked' : ''}/>
+            Postural
+          </label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="eu-mod-podopedia" ${(u.modules||[]).includes('podopedia') ? 'checked' : ''}/>
+            Podopédiatrie <span style="font-size:10px;color:var(--mut);">(en développement)</span>
+          </label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="eu-mod-podo_sport" ${(u.modules||[]).includes('podo_sport') ? 'checked' : ''}/>
+            Sport
+          </label>
+        </div>
+        <div style="font-size:10px;color:var(--mut);margin-top:6px;">Override admin — pas de contrôle de cohérence avec la formule (responsabilité humaine).</div>
       </div>
 
       <div id="eu-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:12px;padding:8px 10px;background:rgba(231,76,60,0.1);border-radius:6px;"></div>
@@ -1478,10 +1935,16 @@ async function saveEditUser(idx) {
 
   const newLicence = document.getElementById('eu-licence').checked;
   const newFormule = document.getElementById('eu-formule').value;  // '' si inchangée
-  const newDroits = document.getElementById('eu-droits').value;
+
+  // Lecture des 3 checkboxes modules (task #58). Ordre canonique
+  // [postural, podopedia, podo_sport] pour comparaison stable.
+  const newModules = [];
+  if (document.getElementById('eu-mod-postural').checked) newModules.push('postural');
+  if (document.getElementById('eu-mod-podopedia').checked) newModules.push('podopedia');
+  if (document.getElementById('eu-mod-podo_sport').checked) newModules.push('podo_sport');
 
   // On n'appelle que ce qui a réellement changé. Les actions sont indépendantes
-  // (colonnes différentes pour licence/formule, table différente pour droits)
+  // (colonnes différentes pour licence/formule, table différente pour modules)
   // donc Promise.all est safe — pas de course critique.
   const tasks = [];
   if (newLicence !== !!u.licence_payee) {
@@ -1490,8 +1953,15 @@ async function saveEditUser(idx) {
   if (newFormule && newFormule !== (u.formule || '')) {
     tasks.push(adminSetFormule(u.email, newFormule));
   }
-  if (newDroits !== (u.droits || 'all')) {
-    tasks.push(adminSetDroits(u.id, newDroits));
+  // Comparaison set-equality : on trie les 2 arrays pour comparaison stable
+  // (l'ordre dans u.modules vient du serveur, peut différer de l'ordre canonique).
+  const currentModules = Array.isArray(u.modules) ? [...u.modules].sort() : [];
+  const sortedNew = [...newModules].sort();
+  const modulesChanged =
+    currentModules.length !== sortedNew.length ||
+    currentModules.some((m, i) => m !== sortedNew[i]);
+  if (modulesChanged) {
+    tasks.push(adminSetModules(u.id, newModules));
   }
 
   if (tasks.length === 0) {
@@ -1511,13 +1981,6 @@ async function saveEditUser(idx) {
 
   closeEditUserModal();
   renderParamsPratList();
-}
-
-function setPraticienDroits(pratIdx, droits) {
-  if(!praticiens[pratIdx]) return;
-  praticiens[pratIdx].droits = droits;
-  savePatients();
-  renderPatientList();
 }
 
 function switchCaptureMode(mode) {
@@ -1967,9 +2430,17 @@ function renderPatientList() {
   });
   if(!filtered.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun résultat.</div>'; return; }
 
-  const droits = window._userDroits || pwaUser?.user_metadata?.droits || 'all';
-  const canSport = droits === 'all' || droits === 'sport';
-  const canPosturo = droits === 'all' || droits === 'posturo';
+  // Gating runtime modules (task #58) — remplace l'ancien enum droits.
+  // window._userModules est initialisé au login (cf. ligne ~310). Fallback
+  // sur user_metadata frais puis [] si absent (cas user pas encore initialisé).
+  //
+  // Note : pas de canPodopedia ici. Le module Podopédiatrie est UI-placeholder
+  // (badge "Prochainement", buttons disabled inconditionnels ligne ~2095-2110).
+  // Quand l'UI podopédiatrie sera implémentée, ajouter :
+  //   const canPodopedia = modules.includes('podopedia');
+  const modules = window._userModules || (Array.isArray(pwaUser?.user_metadata?.modules) ? pwaUser.user_metadata.modules : []);
+  const canSport = modules.includes('podo_sport');
+  const canPosturo = modules.includes('postural');
 
   el.innerHTML = filtered.map(p => {
     const i = patients.indexOf(p);
@@ -9999,114 +10470,6 @@ var _stripeInstance = null;
 function getStripe() {
   if(!_stripeInstance) _stripeInstance = Stripe('pk_live_51ITNlQIW0WGPcWsGk3UiD3cR7yw8QdNFw3JLaZM6bunA30jzipPZdR8nvrtJJ0QK6qGN3LZCcOYhwYyWqRkXhjYW00u5Kdl22X');
   return _stripeInstance;
-}
-
-var _stripePrices = {
-  mensuel: ['price_1TNy2bIW0WGPcWsGcNjbZ1GS','price_1TNy52IW0WGPcWsGRNeaxypm','price_1TNyFDIW0WGPcWsGC9k5YBUM','price_1TNyHiIW0WGPcWsGtHHZg2mL','price_1TNyMLIW0WGPcWsGw82sj05L'],
-  annuel:  ['price_1TO0q6IW0WGPcWsG05kRrDHq','price_1TO0tYIW0WGPcWsGkkPtZUn4','price_1TO0wcIW0WGPcWsGu8KWNyng','price_1TO0zbIW0WGPcWsGLEXi1KRL','price_1TO12oIW0WGPcWsGxY6tSZ92']
-};
-var _licencePriceId = 'price_1TNyQeIW0WGPcWsGQNMYXnb3';
-
-var _modules = [
-  {id:'postural', name:'Postural', icon:'🧍', desc:'Bilan postural complet'},
-  {id:'podopedia', name:'Podopédia', icon:'🦶', desc:'Bilan podologique'},
-  {id:'podo_sport', name:'Podo Sport', icon:'⚡', desc:'Analyse sportive'}
-];
-
-var _plans = [
-  {name:'Essentiel',   idx:0, fixed:[],           choose:1, pool:['postural','podopedia']},
-  {name:'Sport',       idx:1, fixed:['podo_sport'], choose:0, pool:[]},
-  {name:'Duo',         idx:2, fixed:[],            choose:2, pool:['postural','podopedia']},
-  {name:'Duo Sport',   idx:3, fixed:['podo_sport'], choose:1, pool:['postural','podopedia']},
-  {name:'Intégral',    idx:4, fixed:['postural','podopedia','podo_sport'], choose:0, pool:[]}
-];
-
-var _currentPlanIdx = 0;
-var _selectedModules = [];
-
-
-
-function toggleModule(id, maxChoose, div) {
-  var idx = _selectedModules.indexOf(id);
-  var plan = _plans[_currentPlanIdx];
-  var choosable = _selectedModules.filter(function(m){ return plan.fixed.indexOf(m) === -1; });
-
-  if(idx !== -1) {
-    _selectedModules.splice(idx, 1);
-    div.classList.remove('mm-selected');
-  } else {
-    if(choosable.length >= maxChoose) return;
-    _selectedModules.push(id);
-    div.classList.add('mm-selected');
-  }
-  _updateOkBtn(maxChoose);
-}
-
-function _updateOkBtn(maxChoose) {
-  var plan = _plans[_currentPlanIdx];
-  var choosable = _selectedModules.filter(function(m){ return plan.fixed.indexOf(m) === -1; });
-  var btn = document.getElementById('mm-btn-ok');
-  btn.disabled = choosable.length !== maxChoose;
-  btn.style.opacity = btn.disabled ? '0.4' : '1';
-}
-
-function confirmerModules() {
-  document.getElementById('modal-modules').style.display = 'none';
-  lancerPaiement(_currentPlanIdx, _selectedModules);
-}
-
-async function lancerPaiement(planIdx, modules) {
-  // Liens AVEC licence (nouveaux clients)
-  var mensuelAvecLicence = [
-    'https://buy.stripe.com/test_cNibJ24ma8Z6a7xgFBfAc00',
-    'https://buy.stripe.com/eVq14o9GufnubbBfBxfAc03',
-    'https://buy.stripe.com/fZueVe8Cq1wEa7x751fAc05',
-    'https://buy.stripe.com/3cIcN67ym6QYa7x1KHfAc07',
-    'https://buy.stripe.com/4gM6oIbOCcbifrR1KHfAc09'
-  ];
-  var annuelAvecLicence = [
-    'https://buy.stripe.com/4gMcN6dWK3EMgvV1KHfAc0l',
-    'https://buy.stripe.com/8x24gAcSG6QY3J91KHfAc0m',
-    'https://buy.stripe.com/3cIaEYaKycbi3J90GDfAc0n',
-    'https://buy.stripe.com/aFaeVeg4SfnucfFgFBfAc0o',
-    'https://buy.stripe.com/9B68wQdWK2AI2F5extfAc0p'
-  ];
-  // Liens SANS licence (clients existants changeant de formule)
-  var mensuelSansLicence = [
-    'https://buy.stripe.com/eVqdRa3i64IQa7xahdfAc0b',
-    'https://buy.stripe.com/28E28s8Cq2AI4Nd60XfAc0d',
-    'https://buy.stripe.com/aFa5kE6ui1wE3J9cplfAc0f',
-    'https://buy.stripe.com/eVqaEY19Y8Z6bbBblhfAc0h',
-    'https://buy.stripe.com/7sYaEY6ui1wE1B1blhfAc0j'
-  ];
-  var annuelSansLicence = [
-    'https://buy.stripe.com/eVq7sM4ma4IQ0wXahdfAc0q',
-    'https://buy.stripe.com/3cI5kE2e2ejqa7xahdfAc0r',
-    'https://buy.stripe.com/28EbJ2g4S6QY5RhdtpfAc0s',
-    'https://buy.stripe.com/14AfZi3i6a3a4Nd2OLfAc0t',
-    'https://buy.stripe.com/cNi6oI4ma4IQ0wXfBxfAc0u'
-  ];
-
-  // Vérifier si l'utilisateur a déjà payé la licence
-  var licenceDejaPaye = false;
-  if(pwaUser && pwaUser.token && pwaUser.email) {
-    try {
-      var userRecord = await supa.getUserRecord(pwaUser.email);
-      if(userRecord && userRecord.licence_payee === true) {
-        licenceDejaPaye = true;
-      }
-    } catch(e) {
-      console.log('Erreur vérification licence:', e);
-    }
-  }
-
-  var url;
-  if(licenceDejaPaye) {
-    url = lpAnnual ? annuelSansLicence[planIdx] : mensuelSansLicence[planIdx];
-  } else {
-    url = lpAnnual ? annuelAvecLicence[planIdx] : mensuelAvecLicence[planIdx];
-  }
-  window.location.href = url;
 }
 
 window.addEventListener('DOMContentLoaded', function() {

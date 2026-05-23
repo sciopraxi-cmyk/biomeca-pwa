@@ -33,8 +33,10 @@ async function callAdminAction(action, args) {
 }
 
 // Liste les users (auth.users joints à user_data).
-// Retourne { users: [{ id, email, droits, licence_payee, formule, engagement,
+// Retourne { users: [{ id, email, modules, licence_payee, formule, engagement,
 //   date_debut_abonnement, stripe_customer_id, created_at }, ...] } ou { ok:false, error }.
+// NB (task #58) : `modules` est un array (postural|podopedia|podo_sport), pas
+// l'ancien enum `droits`. Fallback [] si user_metadata.modules absent.
 async function adminListUsers() {
   return callAdminAction('list', {});
 }
@@ -53,12 +55,39 @@ async function adminSetFormule(email, formule) {
   return callAdminAction('setFormule', { email, formule });
 }
 
-// Change les droits d'un user par userId (auth.users.id, pas email).
-// Merge avec le user_metadata existant côté serveur — n'écrase pas
-// acces, nom, prenom, trial_start, etc.
+// Change les modules d'un user par userId (task #58, remplace setDroits).
+// modules = array de strings parmi ['postural', 'podopedia', 'podo_sport'].
+// L'Edge Function valide le contenu (chaque entrée doit être canonique),
+// dédoublonne silencieusement, puis merge avec le user_metadata existant
+// — n'écrase pas acces, nom, prenom, trial_start, etc.
+// Pas de contrôle de cohérence modules ↔ formule côté serveur (admin =
+// override volontaire).
 // Retourne { ok:true } ou { ok:false, error }.
+async function adminSetModules(userId, modules) {
+  return callAdminAction('setModules', { userId, modules });
+}
+
+// Alias rétrocompat (task #58) — convertit l'ancien enum droits ('all' |
+// 'sport' | 'posturo') en array modules CÔTÉ SERVEUR (cf. admin-users
+// handleSetDroits qui délègue à handleSetModules après mapping). Conservé
+// pour ne pas casser d'anciens callers ; à supprimer dans une PR future
+// quand on aura validé qu'il n'y a plus aucun caller actif.
+// Préférer adminSetModules pour les nouveaux callers.
+// Retourne { ok:true } ou { ok:false, error: 'Invalid droits ...' | ... }.
 async function adminSetDroits(userId, droits) {
   return callAdminAction('setDroits', { userId, droits });
+}
+
+// Reset admin du lock 30j sur le changement de modules (task #58).
+// L'Edge Function set user_data.last_module_change = NULL ; module_changes_count
+// est PRÉSERVÉ (historique audit). Action sensible : l'Edge Function log
+// adminEmail + targetEmail + timestamp.
+// Cas d'usage : user qui s'est trompé hors grace period 7j, ou litige
+// support. Identifie par email (pas userId) pour aligner avec les autres
+// actions destructives.
+// Retourne { ok:true, updated } ou { ok:false, error }.
+async function adminResetModuleChangeLock(email) {
+  return callAdminAction('setResetModuleChangeLock', { email });
 }
 
 // Suspend (active=false) ou tente de réactiver (active=true) un abonnement.

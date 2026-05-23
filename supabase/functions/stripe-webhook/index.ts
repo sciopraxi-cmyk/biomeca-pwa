@@ -106,6 +106,128 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     update.licence_payee = true;
   }
 
+  // ─── Application des pending_modules (task #58) ────────────────────────────
+  //
+  // À ce stade, le user a payé via prepare-module-change Edge Function qui a
+  // enregistré dans user_data : pending_modules, pending_plan_idx,
+  // pending_created_at (TTL 1h). On lit cet état pour décider quoi faire.
+  //
+  // 4 cas possibles (arbitrages task #58) :
+  //
+  //  A) Pending présent + TTL ≤ 1h + auth admin OK
+  //     → Apply pending_modules à user_metadata.modules via auth.admin.
+  //     → Reset des champs pending dans le UPDATE.
+  //     → Si les modules ont changé vs metadata actuel, on met aussi à jour
+  //       last_module_change (now) et module_changes_count (+1) pour
+  //       l'anti-abus (lock 30j calculé depuis last_module_change).
+  //
+  //  B) Pending présent + TTL > 1h
+  //     → Stale : on log warning, on reset les champs pending, on n'applique
+  //       PAS les modules (le user a peut-être abandonné puis re-souscrit
+  //       avec une autre intention plus tard). Arbitrage Q3.
+  //
+  //  C) Pending absent
+  //     → Flow landing public (paiement avant signup) : il n'y a pas de
+  //       user_metadata.modules à mettre à jour ici car le user n'existe
+  //       pas encore en auth. Skip — la mise en place initiale sera faite
+  //       par le flow signup (cf. task #63). Arbitrage Q4.
+  //
+  //  D) auth.admin.getUserById/updateUserById échoue
+  //     → Cas anormal (user supprimé entre prepare et webhook ?). On log
+  //       l'erreur avec email + user_id pour investigation manuelle, on
+  //       continue le UPDATE base (formule/engagement/date_debut/licence),
+  //       on NE reset PAS les champs pending (un admin pourra rejouer
+  //       l'apply via task de réconciliation). Arbitrage Q2.
+  //
+  // Lecture unique de user_data ici, puis tous les champs additionnels
+  // sont accumulés dans `update` pour un seul UPDATE final (arbitrage Q1).
+
+  const { data: rows, error: selErr } = await supabaseAdmin
+    .from('user_data')
+    .select('user_id, pending_modules, pending_plan_idx, pending_created_at, module_changes_count')
+    .eq('email', email)
+    .limit(1);
+
+  if (selErr) {
+    console.error('checkout.session.completed: user_data select failed', { email, error: selErr });
+    // On continue quand même le UPDATE base (le SELECT échoue rarement et
+    // l'activation licence/formule reste prioritaire).
+  }
+
+  const row = rows?.[0];
+  const pendingModules = row?.pending_modules as string[] | null | undefined;
+  const pendingCreatedAt = row?.pending_created_at as string | null | undefined;
+  const userId = row?.user_id as string | null | undefined;
+
+  if (pendingModules && pendingCreatedAt && userId) {
+    const ageMs = Date.now() - new Date(pendingCreatedAt).getTime();
+    const oneHourMs = 60 * 60 * 1000;
+
+    if (ageMs > oneHourMs) {
+      // Cas B : pending stale → reset sans apply, log warning.
+      console.warn('checkout.session.completed: pending stale (>1h), resetting without apply', {
+        email,
+        userId,
+        ageMs,
+        pendingModules,
+      });
+      update.pending_modules = null;
+      update.pending_plan_idx = null;
+      update.pending_created_at = null;
+    } else {
+      // Cas A (tentative) : on lit le user auth pour appliquer les modules.
+      const { data: userResp, error: getErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (getErr || !userResp?.user) {
+        // Cas D : log error, NE PAS reset pending, continue UPDATE base.
+        console.error('checkout.session.completed: auth.getUserById failed', {
+          email,
+          userId,
+          error: getErr,
+        });
+      } else {
+        const currentMeta = userResp.user.user_metadata ?? {};
+        const currentModules: string[] = Array.isArray(currentMeta.modules)
+          ? currentMeta.modules
+          : [];
+        const sortedCurrent = [...currentModules].sort();
+        const sortedNew = [...pendingModules].sort();
+        const modulesChanged =
+          sortedCurrent.length !== sortedNew.length ||
+          sortedCurrent.some((m, i) => m !== sortedNew[i]);
+
+        const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: { ...currentMeta, modules: pendingModules },
+        });
+
+        if (updErr) {
+          // Cas D bis : updateUserById échoue → même politique que getUserById.
+          console.error('checkout.session.completed: auth.updateUserById failed', {
+            email,
+            userId,
+            error: updErr,
+          });
+        } else {
+          // Cas A : apply OK → reset pending + (si modules changed) MAJ lock.
+          update.pending_modules = null;
+          update.pending_plan_idx = null;
+          update.pending_created_at = null;
+
+          if (modulesChanged) {
+            update.last_module_change = new Date().toISOString();
+            update.module_changes_count = (row?.module_changes_count ?? 0) + 1;
+          }
+          console.log('checkout.session.completed: modules applied', {
+            email,
+            userId,
+            modules: pendingModules,
+            modulesChanged,
+          });
+        }
+      }
+    }
+  }
+  // Cas C (pendingModules absent) : ne rien faire ici. Voir task #63.
+
   const { error } = await supabaseAdmin.from('user_data').update(update).eq('email', email);
 
   if (error) {

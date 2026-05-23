@@ -4,7 +4,8 @@
 // Auth : JWT extrait du header → verifié → email == ADMIN_EMAIL.
 // Si pas admin → 403. Sinon route vers handle{Action}.
 //
-// Actions : list | setLicencePayee | setFormule | setDroits | setSubscriptionActive.
+// Actions : list | setLicencePayee | setFormule | setModules | setDroits (alias rétrocompat) |
+//   setResetModuleChangeLock | setSubscriptionActive.
 // Actions destructives (suspend/delete/resetPassword/invite) prévues en PR D'.
 //
 // Refs : incident #29 (suppression de la voie service_role côté client),
@@ -39,7 +40,17 @@ function json(body: unknown, status = 200): Response {
 }
 
 const FORMULES = new Set(['formule_1', 'formule_2', 'formule_3', 'formule_4', 'formule_5']);
-const DROITS = new Set(['all', 'sport', 'posturo']);
+const MODULES = new Set(['postural', 'podopedia', 'podo_sport']);
+// Mapping rétrocompat de l'ancien enum droits → array modules (task #58).
+// Identique au mapping de la migration A0 : 'all'=tous, 'sport'=podo_sport,
+// 'posturo'=postural. Utilisé par l'alias setDroits pour convertir les
+// appels legacy avant délégation à setModules. La validation des droits
+// passe par la simple présence de la clé dans ce mapping (undefined = invalide).
+const DROITS_TO_MODULES: Record<string, string[]> = {
+  all: ['postural', 'podopedia', 'podo_sport'],
+  sport: ['podo_sport'],
+  posturo: ['postural'],
+};
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 Deno.serve(async (req) => {
@@ -75,8 +86,13 @@ Deno.serve(async (req) => {
         return await handleSetLicencePayee(body);
       case 'setFormule':
         return await handleSetFormule(body);
+      case 'setModules':
+        return await handleSetModules(body);
       case 'setDroits':
+        // Alias rétrocompat (task #58) — convertit enum → array puis délègue.
         return await handleSetDroits(body);
+      case 'setResetModuleChangeLock':
+        return await handleSetResetModuleChangeLock(body);
       case 'setSubscriptionActive':
         return await handleSetSubscriptionActive(body);
       default:
@@ -110,10 +126,15 @@ async function handleList(): Promise<Response> {
   const users = (usersData.users ?? []).map((u) => {
     const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
     const extra = byEmail.get((u.email ?? '').toLowerCase()) ?? {};
+    // modules : array depuis user_metadata.modules (task #58, ex-droits enum).
+    // Fallback [] si absent : users créés avant la migration A0 OU via flow
+    // landing public pré-task #63. La fonction renvoie maintenant un array
+    // exploitable directement par l'UI admin (B1 affichera 3 checkboxes).
+    const modules: string[] = Array.isArray(meta.modules) ? (meta.modules as string[]) : [];
     return {
       id: u.id,
       email: u.email,
-      droits: (meta.droits as string) || 'all',
+      modules,
       created_at: u.created_at,
       licence_payee: extra.licence_payee ?? false,
       formule: extra.formule ?? null,
@@ -177,26 +198,99 @@ async function handleSetFormule(body: Record<string, unknown>): Promise<Response
   return json({ ok: true, updated: data?.length ?? 0 });
 }
 
-async function handleSetDroits(body: Record<string, unknown>): Promise<Response> {
+// Set modules (task #58) — remplace l'ancien setDroits (enum droits) par
+// un array de modules canoniques : 'postural', 'podopedia', 'podo_sport'.
+//
+// Validation stricte :
+//   1. modules doit être un Array (sinon 400 immédiat)
+//   2. Dédoublonnage silencieux via Set — anticipe des bugs callers qui
+//      enverraient ['postural', 'postural']. On stocke la version dédupée.
+//   3. Chaque entrée doit appartenir au set canonique MODULES.
+//
+// Pas de contrôle de cohérence avec la formule ici (admin = override
+// volontaire, philosophie admin = responsabilité humaine). C'est l'objet de
+// prepare-module-change pour les changements user-initiated.
+//
+// Pattern défensif identique à start-trial et à l'ex-setDroits : GET
+// preliminaire pour merger le user_metadata existant (acces, nom, prenom,
+// trial_start...) avant updateUserById qui sinon écraserait tout.
+async function handleSetModules(body: Record<string, unknown>): Promise<Response> {
   const userId = typeof body.userId === 'string' ? body.userId : '';
-  const droits = typeof body.droits === 'string' ? body.droits : '';
+  const modules = body.modules;
   if (!userId) return json({ error: 'Missing userId' }, 400);
-  if (!DROITS.has(droits)) {
-    return json({ error: 'Invalid droits (must be all|sport|posturo)' }, 400);
+  if (!Array.isArray(modules)) {
+    return json({ error: 'Invalid modules (must be array)' }, 400);
+  }
+  const uniqueModules = [...new Set(modules)];
+  if (!uniqueModules.every((m) => typeof m === 'string' && MODULES.has(m))) {
+    return json(
+      { error: 'Invalid modules (each must be one of postural|podopedia|podo_sport)' },
+      400
+    );
   }
 
-  // GET preliminaire pour merger le user_metadata existant — sinon updateUserById
-  // écrase tout le user_metadata (ex. acces, nom, prenom, trial_start...).
   const { data: getData, error: getErr } = await supaAdmin.auth.admin.getUserById(userId);
   if (getErr || !getData?.user) return json({ error: 'User not found' }, 404);
 
-  const newMeta = { ...(getData.user.user_metadata ?? {}), droits };
+  const newMeta = { ...(getData.user.user_metadata ?? {}), modules: uniqueModules };
   const { error: updErr } = await supaAdmin.auth.admin.updateUserById(userId, {
     user_metadata: newMeta,
   });
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
 
   return json({ ok: true });
+}
+
+// Alias rétrocompat (task #58) — convertit l'ancien enum droits ('all' |
+// 'sport' | 'posturo') en array modules via le mapping de la migration A0,
+// puis délègue à setModules. Conservé pour ne pas casser d'éventuels appels
+// externes ou anciens clients qui n'auraient pas migré. À supprimer dans
+// une PR future quand on aura validé qu'il n'y a plus aucun caller actif.
+async function handleSetDroits(body: Record<string, unknown>): Promise<Response> {
+  const droits = typeof body.droits === 'string' ? body.droits : '';
+  const modules = DROITS_TO_MODULES[droits];
+  if (!modules) {
+    return json({ error: 'Invalid droits (must be all|sport|posturo)' }, 400);
+  }
+  return handleSetModules({ ...body, modules });
+}
+
+// Reset admin du lock 30j sur le changement de modules (task #58).
+//
+// Cas d'usage : un user s'est trompé dans son choix de modules juste après
+// le délai de grâce 7j et veut changer avant les 30j ; ou litige où l'admin
+// déverrouille manuellement après échange support.
+//
+// Implémentation : set last_module_change = NULL → canChangeModule
+// (cf. prepare-module-change.canChangeModuleServer) retournera systématiquement
+// OK au prochain check, comme si le user n'avait jamais changé ses modules.
+//
+// NB : module_changes_count est PRÉSERVÉ volontairement (historique d'usage,
+// audit). C'est un indicateur "user qui change souvent" indépendant du lock,
+// utile pour détecter d'éventuels abus systémiques. Cf. arbitrage A3.1.
+//
+// Audit log : action sensible (déverrouillage anti-abus), on trace
+// l'admin + la cible + le timestamp pour pouvoir retrouver l'événement
+// si un user conteste un déverrouillage. adminEmail = ADMIN_EMAIL (constante)
+// car l'auth a déjà été vérifiée en début de handler (sinon 403). Quand on
+// passera multi-admins, extraire l'email du JWT à la place de la constante.
+async function handleSetResetModuleChangeLock(body: Record<string, unknown>): Promise<Response> {
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (!email || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
+
+  console.log('[admin-users] setResetModuleChangeLock', {
+    adminEmail: ADMIN_EMAIL,
+    targetEmail: email,
+    timestamp: new Date().toISOString(),
+  });
+
+  const { data, error } = await supaAdmin
+    .from('user_data')
+    .update({ last_module_change: null })
+    .eq('email', email)
+    .select('email');
+  if (error) return json({ error: 'update: ' + error.message }, 500);
+  return json({ ok: true, updated: data?.length ?? 0 });
 }
 
 // Suspension/réactivation manuelle de l'abonnement par l'admin (task #57).
