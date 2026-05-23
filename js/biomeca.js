@@ -265,6 +265,9 @@ async function fetchUserDataAtLogin() {
 
 // ─── Après login réussi ───
 async function onPwaLoginSuccess() {
+  // Reset guard data race (task #64) — si l'user fait logout puis re-login
+  // rapidement, _dataLoaded pourrait être relicat true de la session précédente.
+  _dataLoaded = false;
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
   showAdminPanelIfNeeded();
@@ -307,6 +310,7 @@ async function loadSupabaseData() {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
       patients = d.patients || [];
       praticiens = d.praticiens || [];
+      _dataLoaded = true;  // Task #64 — patients global est peuplé, saveToSupabase peut écrire
       // Appliquer les modules depuis user_metadata Supabase (fraîches, task #58).
       // Refonte enum droits → array modules : la source de vérité est désormais
       // user_metadata.modules (array de 'postural'|'podopedia'|'podo_sport').
@@ -323,6 +327,7 @@ async function loadSupabaseData() {
     } else {
       patients = [];
       praticiens = [];
+      _dataLoaded = true;  // Task #64 — nouvel user légitimement vide, saves autorisés
     }
     // Migration : anciens bilans (p.bilans[]) → p.bilansSport[]
     let migrated = false;
@@ -365,6 +370,7 @@ async function loadSupabaseData() {
     if (migrateBilanFlags(patients)) {
       try { localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients)); } catch(_) {}
     }
+    _dataLoaded = true;  // Task #64 — fallback considéré comme valide, saves autorisés
   }
 
   currentPatient = null; bilanData = {};
@@ -377,6 +383,19 @@ async function loadSupabaseData() {
 // ─── Sauvegarde vers Supabase ───
 async function saveToSupabase() {
   if(!pwaUser?.token) return;
+  // Guard data race (task #64) : tant que loadSupabaseData n'a pas peuplé les
+  // globales patients/praticiens, on REFUSE le POST en DB pour ne pas écraser
+  // user_data.data avec un état incohérent (patients=[] en RAM avant fetch).
+  // Le localStorage reste mis à jour par savePatients() upstream — donc rien
+  // n'est perdu en RAM, le prochain save (post-load) propagera bien en DB.
+  if(!_dataLoaded) {
+    console.warn('[#64] saveToSupabase() called before loadSupabaseData completed — SKIP to prevent data loss', {
+      email: pwaUser?.email,
+      patientsCount: patients.length,
+      praticiensCount: praticiens.length,
+    });
+    return;
+  }
   const data = { patients, praticiens };
   try {
     const ok = await supa.saveData('user_data', {
@@ -1346,6 +1365,7 @@ async function pwaLogout() {
   clearPwaSession();
   pwaUser = null;
   patients = []; praticiens = []; currentPatient = null; bilanData = {};
+  _dataLoaded = false;  // Task #64 — reset guard pour prochaine session
   renderPatientList();
   document.getElementById('biomeca-app').style.display = 'none';
   document.getElementById('pwa-login').style.display = 'flex';
@@ -1424,6 +1444,12 @@ if ('serviceWorker' in navigator) {
 // ══════════════════════════════════════════════════════
 let patients = JSON.parse(localStorage.getItem('bm4-patients')||'[]');
 let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
+// Guard data race (task #64) : true uniquement après loadSupabaseData terminée
+// (path success, empty user, OU fallback localStorage). Reset à false au logout
+// + au début de onPwaLoginSuccess. saveToSupabase() early-return tant que false
+// pour empêcher d'écraser user_data.data en DB avec patients=[] en RAM avant
+// que le chargement initial ait peuplé les globales depuis Supabase.
+let _dataLoaded = false;
 let currentPatient = null;
 // Index du bilan dans currentPatient.bilansSport actuellement ouvert pour édition.
 // null = pas de bilan historique ouvert (mode "bilan courant" ou nouveau bilan).
