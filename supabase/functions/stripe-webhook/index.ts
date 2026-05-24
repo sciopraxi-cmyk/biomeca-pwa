@@ -33,6 +33,80 @@ const PRICE_MAP = {
   licence: 'price_1TNyQeIW0WGPcWsGQNMYXnb3',
 } as const;
 
+// ─── PLAN_MODULES (test-mirror) ──────────────────────────────────────────────
+// IMPORTANT — test-mirror : 4 endroits à garder sync
+//   - js/subscription.mjs (source de vérité Vitest)
+//   - js/biomeca.js MS_PLAN_MODULES (UI wizard)
+//   - supabase/functions/prepare-module-change/index.ts (validation server in-app)
+//   - supabase/functions/stripe-webhook/index.ts (apply post-paiement) ← ICI
+//
+// Ajout #63 : utilisé par handleCheckoutCompleted pour set un fallback cohérent
+// de user_metadata.modules au paiement landing public (cas C "pending absent" =
+// flow public où le user n'a pas explicité son choix via le wizard in-app).
+const PLAN_MODULES = [
+  { required: [], choose: { from: ['postural', 'podopedia'], count: 1 } },
+  { required: ['podo_sport'], choose: null },
+  { required: ['postural', 'podopedia'], choose: null },
+  { required: ['podo_sport'], choose: { from: ['postural', 'podopedia'], count: 1 } },
+  { required: ['postural', 'podopedia', 'podo_sport'], choose: null },
+] as const;
+
+// Retourne les modules par défaut d'un plan (required + premiers `count` de choose.from).
+// Test-mirror de defaultModulesForPlan dans js/subscription.mjs.
+function defaultModulesForPlan(planIdx: number): string[] {
+  const plan = PLAN_MODULES[planIdx];
+  if (!plan) return [];
+  const fromChoose = plan.choose ? plan.choose.from.slice(0, plan.choose.count) : [];
+  return [...plan.required, ...fromChoose];
+}
+
+// Valide qu'un set de modules est cohérent avec un plan donné.
+// Test-mirror de isValidModulesForPlan dans js/subscription.mjs.
+function isValidModulesForPlan(planIdx: number, modules: string[]): boolean {
+  const plan = PLAN_MODULES[planIdx];
+  if (!plan) return false;
+  if (!plan.required.every((m) => modules.includes(m))) return false;
+  if (plan.choose) {
+    const chosen = modules.filter((m) => plan.choose!.from.includes(m)).length;
+    if (chosen !== plan.choose.count) return false;
+  }
+  return true;
+}
+
+// ─── resolveUserIdByEmail — résolution email → user_id (task #63) ────────────
+//
+// V1 — Resolution email → user_id via listUsers paginée.
+// Limites :
+//   - O(N) au pire (user en page profonde)
+//   - À monitorer si la base dépasse ~5 000 users
+//   - Refactor cible si nécessaire :
+//     a) Supabase ajoute auth.admin.getUserByEmail() → migration triviale
+//     b) Fonction RPC SQL custom resolve_user_id_by_email() → O(1) avec index
+//   - Voir task #63 PR pour contexte du choix V1
+//
+// Normalisation : email.toLowerCase() côté input ET comparaison (Supabase stocke
+// lowercase, Stripe peut envoyer la casse formulaire originale).
+async function resolveUserIdByEmail(email: string): Promise<string | null> {
+  const normalizedEmail = email.toLowerCase();
+  let page = 1;
+  const perPage = 200;
+  const maxPages = 50; // cap absolu = 10 000 users (V1, documentaire)
+  while (page <= maxPages) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      console.error('resolveUserIdByEmail: listUsers failed', { email, page, error });
+      return null;
+    }
+    if (!data?.users || data.users.length === 0) return null;
+    const match = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+    if (match) return match.id;
+    if (data.users.length < perPage) return null; // dernière page atteinte
+    page++;
+  }
+  console.warn('resolveUserIdByEmail: max pages reached without match', { email, maxPages });
+  return null;
+}
+
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
   apiVersion: '2024-06-20',
   httpClient: Stripe.createFetchHttpClient(),
@@ -91,6 +165,27 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
+  // Déduction planIdx depuis identified.formule (format 'formule_N', N = planIdx+1).
+  // Utilisé pour les apply-modules cas C (defaultModulesForPlan) + logs structurés.
+  const planIdx = parseInt(identified.formule.replace('formule_', ''), 10) - 1;
+
+  // ─── Résolution email → user_id (task #63) ─────────────────────────────────
+  // Source de vérité unique pour user_id dans tout handleCheckoutCompleted.
+  // Si null = cas S3 (paiement Stripe sans signup app) : skip propre + log
+  // structuré pour investigation manuelle. Pas d'UPSERT possible sans user_id
+  // (FK user_data.user_id NOT NULL).
+  const userId = await resolveUserIdByEmail(email);
+  if (!userId) {
+    console.warn('[stripe-webhook] Paiement reçu sans auth.users associé', {
+      event: 'checkout_completed_no_user',
+      email,
+      planIdx,
+      session_id: session.id,
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
   const includesLicence = priceIds.includes(PRICE_MAP.licence);
 
   // licence_payee n'est inclus dans l'update QUE si la session contient le
@@ -144,36 +239,88 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const { data: rows, error: selErr } = await supabaseAdmin
     .from('user_data')
-    .select('user_id, pending_modules, pending_plan_idx, pending_created_at, module_changes_count')
-    .eq('email', email)
+    .select('pending_modules, pending_plan_idx, pending_created_at, module_changes_count')
+    .eq('user_id', userId)
     .limit(1);
 
   if (selErr) {
-    console.error('checkout.session.completed: user_data select failed', { email, error: selErr });
-    // On continue quand même le UPDATE base (le SELECT échoue rarement et
+    console.error('checkout.session.completed: user_data select failed', {
+      email,
+      userId,
+      error: selErr,
+    });
+    // On continue quand même le UPSERT base (le SELECT échoue rarement et
     // l'activation licence/formule reste prioritaire).
   }
 
   const row = rows?.[0];
   const pendingModules = row?.pending_modules as string[] | null | undefined;
   const pendingCreatedAt = row?.pending_created_at as string | null | undefined;
-  const userId = row?.user_id as string | null | undefined;
 
   if (pendingModules && pendingCreatedAt && userId) {
     const ageMs = Date.now() - new Date(pendingCreatedAt).getTime();
     const oneHourMs = 60 * 60 * 1000;
 
     if (ageMs > oneHourMs) {
-      // Cas B : pending stale → reset sans apply, log warning.
-      console.warn('checkout.session.completed: pending stale (>1h), resetting without apply', {
-        email,
-        userId,
-        ageMs,
-        pendingModules,
-      });
+      // Cas B : pending stale → reset + apply default (task #63 — sécurité user).
+      // TTL >1h signale que le pending n'est plus une expression fiable de
+      // l'intent user (peut avoir changé d'avis entre prepare et paiement).
+      // Apply default = comportement sûr + élimine le trou modules=[] post-paiement.
+      console.warn(
+        'checkout.session.completed: pending stale (>1h), resetting and applying default',
+        {
+          email,
+          userId,
+          ageMs,
+          pendingModules,
+        }
+      );
       update.pending_modules = null;
       update.pending_plan_idx = null;
       update.pending_created_at = null;
+
+      // (duplication assumée vs cas C ligne ~325 — factoriser si un 3ème call site apparaît)
+      const { data: userResp, error: getErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (getErr || !userResp?.user) {
+        console.error(
+          'checkout.session.completed: auth.getUserById failed (apply default after stale)',
+          {
+            email,
+            userId,
+            error: getErr,
+          }
+        );
+        // continue UPSERT base avec modules non-appliqués (cohérence cas A — state partiel ≫ no state)
+      } else {
+        const currentMeta = userResp.user.user_metadata ?? {};
+        const finalModules = defaultModulesForPlan(planIdx);
+        const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: { ...currentMeta, modules: finalModules },
+        });
+        if (updErr) {
+          console.error(
+            'checkout.session.completed: auth.updateUserById failed (apply default after stale)',
+            {
+              email,
+              userId,
+              error: updErr,
+            }
+          );
+          // continue UPSERT base avec modules non-appliqués
+        } else {
+          update.last_module_change = new Date().toISOString();
+          update.module_changes_count = (row?.module_changes_count ?? 0) + 1;
+          console.log('[stripe-webhook] modules applied (default)', {
+            event: 'default_applied_after_stale',
+            email,
+            userId,
+            planIdx,
+            modules: finalModules,
+            formule: identified.formule,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
     } else {
       // Cas A (tentative) : on lit le user auth pour appliquer les modules.
       const { data: userResp, error: getErr } = await supabaseAdmin.auth.admin.getUserById(userId);
@@ -226,15 +373,72 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       }
     }
   }
-  // Cas C (pendingModules absent) : ne rien faire ici. Voir task #63.
+  // Cas C — pending absent OU corruption partielle (pending sans createdAt) :
+  // apply default modules cohérent avec le plan payé (task #63).
+  // User signup via pwaRegister sans wizard in-app → pas de pending,
+  // on set defaultModulesForPlan(planIdx).
+  // Le || !pendingCreatedAt couvre le cas pathologique de data corruption
+  // (pending stocké sans timestamp), garantissant que TOUT user post-paiement
+  // reçoit des modules — défense en profondeur.
+  // (duplication assumée vs cas B ligne ~268 — factoriser si un 3ème call site apparaît)
+  if (!pendingModules || !pendingCreatedAt) {
+    const { data: userResp, error: getErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (getErr || !userResp?.user) {
+      console.error(
+        'checkout.session.completed: auth.getUserById failed (apply default no pending)',
+        {
+          email,
+          userId,
+          error: getErr,
+        }
+      );
+      // continue UPSERT base avec modules non-appliqués (cohérence cas A — state partiel ≫ no state)
+    } else {
+      const currentMeta = userResp.user.user_metadata ?? {};
+      const finalModules = defaultModulesForPlan(planIdx);
+      const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: { ...currentMeta, modules: finalModules },
+      });
+      if (updErr) {
+        console.error(
+          'checkout.session.completed: auth.updateUserById failed (apply default no pending)',
+          {
+            email,
+            userId,
+            error: updErr,
+          }
+        );
+        // continue UPSERT base avec modules non-appliqués
+      } else {
+        update.last_module_change = new Date().toISOString();
+        update.module_changes_count = (row?.module_changes_count ?? 0) + 1;
+        console.log('[stripe-webhook] modules applied (default)', {
+          event: 'default_applied_no_pending',
+          email,
+          userId,
+          planIdx,
+          modules: finalModules,
+          formule: identified.formule,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+  }
 
-  const { error } = await supabaseAdmin.from('user_data').update(update).eq('email', email);
+  // UPSERT par user_id (task #63) — crée la row user_data si absente. Cas
+  // typique : user signup via landing public (pwaRegister) sans utiliser le
+  // wizard in-app (prepare-module-change pas appelée), donc row user_data
+  // jamais initialisée. onConflict: 'user_id' utilise la contrainte UNIQUE
+  // (FK auth.users.id) pour distinguer INSERT vs UPDATE atomiquement.
+  const { error } = await supabaseAdmin
+    .from('user_data')
+    .upsert({ user_id: userId, email, ...update }, { onConflict: 'user_id' });
 
   if (error) {
-    console.error('checkout.session.completed: update failed', { email, error });
+    console.error('checkout.session.completed: upsert failed', { email, userId, error });
     return;
   }
-  console.log('checkout.session.completed: updated', { email, ...update });
+  console.log('checkout.session.completed: upserted', { email, userId, ...update });
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {

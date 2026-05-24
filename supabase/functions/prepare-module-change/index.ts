@@ -46,8 +46,12 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-// ─── PLAN_MODULES (dupliqué de js/subscription.mjs) ──────────────────────────
-// Toute modif ici doit être répercutée dans js/subscription.mjs et vice versa.
+// ─── PLAN_MODULES (test-mirror) ──────────────────────────────────────────────
+// IMPORTANT — test-mirror : 4 endroits à garder sync
+//   - js/subscription.mjs (source de vérité Vitest)
+//   - js/biomeca.js MS_PLAN_MODULES (UI wizard)
+//   - supabase/functions/prepare-module-change/index.ts (validation server in-app) ← ICI
+//   - supabase/functions/stripe-webhook/index.ts (apply post-paiement)
 const PLAN_MODULES = [
   { required: [], choose: { from: ['postural', 'podopedia'], count: 1 } },
   { required: ['podo_sport'], choose: null },
@@ -55,6 +59,17 @@ const PLAN_MODULES = [
   { required: ['podo_sport'], choose: { from: ['postural', 'podopedia'], count: 1 } },
   { required: ['postural', 'podopedia', 'podo_sport'], choose: null },
 ] as const;
+
+// Retourne les modules par défaut d'un plan (required + premiers `count` de choose.from).
+// Test-mirror de defaultModulesForPlan dans js/subscription.mjs. Ajout #63 :
+// utilisé par les Edge Functions pour set un fallback cohérent au paiement landing
+// (où le user n'a pas explicité son choix de modules optionnels via le wizard).
+function defaultModulesForPlan(planIdx: number): string[] {
+  const plan = PLAN_MODULES[planIdx];
+  if (!plan) return [];
+  const fromChoose = plan.choose ? plan.choose.from.slice(0, plan.choose.count) : [];
+  return [...plan.required, ...fromChoose];
+}
 
 function isValidModulesForPlan(planIdx: number, modules: string[]): boolean {
   const plan = PLAN_MODULES[planIdx];
