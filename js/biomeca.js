@@ -2802,6 +2802,22 @@ function abandonnerBilanSport(patIdx) {
 function finalizeBilanSport(patIdx) {
   const p = patients[patIdx];
   if (!p) return;
+  // Task #54 — Mode édition archive : si bilan archivé sport ouvert
+  // (currentOpenedBilanIdx !== null), sync les modifs en place + reset,
+  // PAS de push (sinon doublon dans bilansSport[]). Le check hasMesures
+  // qui suit serait toujours passé en mode édition (p.mesures chargé par
+  // ouvrirBilanSport), il faut donc intercepter EN AMONT.
+  if (currentOpenedBilanIdx !== null) {
+    syncOpenedBilanToHistory();
+    p.mesures = {};
+    p.bilanData = {};
+    delete p.currentBilanSportSousType;
+    currentOpenedBilanIdx = null;
+    savePatients();
+    renderPatientList();
+    alert('Bilan archivé mis à jour avec vos modifications.');
+    return;
+  }
   const hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
   const hasBilanData = hasBilanDataContent(p.bilanData);
   if (!hasMesures && !hasBilanData) {
@@ -2852,6 +2868,20 @@ function abandonnerBilanPosturo(patIdx) {
 function finalizeBilanPosturo(patIdx) {
   const p = patients[patIdx];
   if (!p) return;
+  // Task #54 — Mode édition archive posturo : mirror de finalizeBilanSport.
+  // Si bilan archivé posturo ouvert (currentOpenedBilanPosturoIdx !== null),
+  // sync les modifs en place + reset, PAS de push (sinon doublon dans
+  // bilansPosturo[]).
+  if (currentOpenedBilanPosturoIdx !== null) {
+    syncOpenedBilanPosturoToHistory();
+    p.bilanDataPosturo = {};
+    delete p.currentBilanPosturoSousType;
+    currentOpenedBilanPosturoIdx = null;
+    savePatients();
+    renderPatientList();
+    alert('Bilan archivé mis à jour avec vos modifications.');
+    return;
+  }
   const hasBilanPosturoData = hasBilanDataContent(p.bilanDataPosturo);
   if (!hasBilanPosturoData) {
     alert('Aucune saisie clinique n\'a été effectuée dans le bilan postural en cours.');
@@ -2885,6 +2915,18 @@ function creerBilanSport(patIdx, type) {
   }
   const p = patients[patIdx];
   if(!p) return;
+  // Task #54 — Mode édition archive : sync les modifs en place SILENT
+  // (l'action principale est démarrer un nouveau bilan, pas archiver
+  // l'existant). Évite le push doublon lors du flow normal qui suit
+  // (le "bilan en cours" est en réalité une copie d'archive lue par
+  // ouvrirBilanSport).
+  if (currentOpenedBilanIdx !== null) {
+    syncOpenedBilanToHistory();
+    p.mesures = {};
+    p.bilanData = {};
+    delete p.currentBilanSportSousType;
+    currentOpenedBilanIdx = null;
+  }
   // Sauvegarder bilan courant si données existantes
   if(p.mesures && Object.keys(p.mesures).length > 0) {
     const nbTests = Object.keys(p.mesures).length;
@@ -2942,6 +2984,15 @@ function creerBilanPosturo(patIdx, type) {
   }
   const p = patients[patIdx];
   if(!p) return;
+  // Task #54 — Mode édition archive posturo : mirror de creerBilanSport.
+  // Sync les modifs en place SILENT (action principale = démarrer un
+  // nouveau bilan). Évite le push doublon lors du flow normal qui suit.
+  if (currentOpenedBilanPosturoIdx !== null) {
+    syncOpenedBilanPosturoToHistory();
+    p.bilanDataPosturo = {};
+    delete p.currentBilanPosturoSousType;
+    currentOpenedBilanPosturoIdx = null;
+  }
   // Archiver UNIQUEMENT si in-progress (sousType set), pas si viewing-only.
   // Viewing-only = data chargée par ouvrirBilanPosturo SANS sousType set
   // → cliquer Initial/Contrôle ne doit PAS créer une archive fantôme.
