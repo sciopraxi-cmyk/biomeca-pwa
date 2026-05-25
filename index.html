@@ -321,6 +321,13 @@
 </div>
 
 <div class="app" id="biomeca-app" style="display:none;">
+<!-- Sync error banner (task #38) — affiché par _showSyncErrorBanner() lorsque
+     saveToSupabase échoue. Sticky en haut, dismissible via ✕. Position au-dessus
+     de #trial-banner (z-index implicite par ordre DOM) pour priorité visuelle. -->
+<div id="sync-error-banner" style="display:none;background:#c0392b;color:#fff;text-align:center;padding:7px 16px;font-size:12px;font-weight:600;position:relative;">
+  <span id="sync-error-banner-text"></span>
+  <button onclick="_hideSyncErrorBanner()" aria-label="Masquer la notification" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:0 6px;line-height:1;">✕</button>
+</div>
 <div id="trial-banner" style="display:none;background:#e67e22;color:#fff;text-align:center;padding:7px 16px;font-size:12px;font-weight:600;position:relative;">
   <span id="trial-banner-text"></span>
   &nbsp;·&nbsp;<span onclick="showSubscribeModal()" style="cursor:pointer;text-decoration:underline;">Choisir une formule</span>
