@@ -397,6 +397,8 @@ async function saveToSupabase() {
     return;
   }
   const data = { patients, praticiens };
+  // Task #38 — message banner uniforme entre les 2 paths fail.
+  const SYNC_FAIL_MSG = '⚠️ Synchronisation cloud échouée. Vos données sont sauvegardées localement et seront resynchronisées au prochain enregistrement.';
   try {
     const ok = await supa.saveData('user_data', {
       user_id: pwaUser.id,
@@ -404,12 +406,48 @@ async function saveToSupabase() {
       updated_at: new Date().toISOString()
     });
     if(!ok) {
+      // Path !ok (response API non OK) — task #38.
       localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients));
       localStorage.setItem('bm4-praticiens-pwa', JSON.stringify(praticiens));
+      console.error('[#38] saveToSupabase failed', {
+        event: 'sync_failed_response_not_ok',
+        email: pwaUser?.email,
+        patientsCount: patients.length,
+        praticiensCount: praticiens.length,
+        timestamp: new Date().toISOString(),
+      });
+      _showSyncErrorBanner(SYNC_FAIL_MSG);
+      _syncErrorShown = true;
+      // Hook Sentry défensif (V2 — actif quand Sentry intégré). Voir task #69.
+      if (typeof Sentry !== 'undefined' && Sentry?.captureMessage) {
+        Sentry.captureMessage('saveToSupabase: response not ok', { level: 'error', tags: { event: 'sync_failed_response_not_ok' } });
+      }
+    } else if (_syncErrorShown) {
+      // Path success post-fail : recovery détectée → hide banner + log structuré.
+      _hideSyncErrorBanner();
+      console.log('[#38] saveToSupabase recovered', {
+        event: 'sync_recovered',
+        email: pwaUser?.email,
+        timestamp: new Date().toISOString(),
+      });
     }
   } catch(e) {
+    // Path exception (réseau, RLS, etc.) — task #38.
     localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients));
     localStorage.setItem('bm4-praticiens-pwa', JSON.stringify(praticiens));
+    console.error('[#38] saveToSupabase exception', {
+      event: 'sync_failed_exception',
+      email: pwaUser?.email,
+      patientsCount: patients.length,
+      praticiensCount: praticiens.length,
+      error: e instanceof Error ? e.message : String(e),
+      timestamp: new Date().toISOString(),
+    });
+    _showSyncErrorBanner(SYNC_FAIL_MSG);
+    _syncErrorShown = true;
+    if (typeof Sentry !== 'undefined' && Sentry?.captureException) {
+      Sentry.captureException(e, { tags: { event: 'sync_failed_exception' } });
+    }
   }
 }
 
@@ -1333,6 +1371,23 @@ function _hideAccessOverlay() {
   if (o) o.style.display = 'none';
 }
 
+// ─── Sync error banner (task #38) ──────────────────────────────────────────
+// Affiché par saveToSupabase() lorsque la sync DB échoue (path !ok ou catch).
+// Caché automatiquement au prochain save success (via flag _syncErrorShown).
+// Dismissible manuellement par bouton ✕ (cf. index.html #sync-error-banner).
+function _showSyncErrorBanner(message) {
+  const b = document.getElementById('sync-error-banner');
+  const t = document.getElementById('sync-error-banner-text');
+  if (b) b.style.display = 'block';
+  if (t) t.textContent = message;
+}
+
+function _hideSyncErrorBanner() {
+  const b = document.getElementById('sync-error-banner');
+  if (b) b.style.display = 'none';
+  _syncErrorShown = false;
+}
+
 // Mute le titre + le message internes de l'overlay selon la cause du blocage.
 // Les 2 divs n'ont pas d'ID dans le HTML actuel — on les adresse par position
 // (children[1]=titre, children[2]=message du wrapper). Fragile si la structure
@@ -1450,6 +1505,10 @@ let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
 // pour empêcher d'écraser user_data.data en DB avec patients=[] en RAM avant
 // que le chargement initial ait peuplé les globales depuis Supabase.
 let _dataLoaded = false;
+// Flag sync error banner (task #38) — track si bannière sync error active pour
+// log 'sync_recovered' uniquement post-fail (évite spam log au quotidien).
+// Reset par _hideSyncErrorBanner (dismiss user OU recovery automatique).
+let _syncErrorShown = false;
 let currentPatient = null;
 // Index du bilan dans currentPatient.bilansSport actuellement ouvert pour édition.
 // null = pas de bilan historique ouvert (mode "bilan courant" ou nouveau bilan).
