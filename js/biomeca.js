@@ -2927,10 +2927,22 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
     nav('pg-sport');
     return;
   }
+  // Task #69 — Check data-loss AVANT selectPatient (qui aurait des side-effects
+  // DOM via clearBilanFields/loadBilan). On utilise p.* (pas currentPatient.*)
+  // pour ne pas dépendre du timing pre/post-selectPatient. Le warning ne
+  // s'affiche QUE si l'écrasement causerait une perte réelle (data-driven).
+  const hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
+  const hasBilanData = hasBilanDataContent(p.bilanData);
+  if (hasMesures || hasBilanData) {
+    if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
+      return;
+    }
+  }
   selectPatient(p);
   currentPatient.mesures = JSON.parse(JSON.stringify(bilan.mesures||{}));
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilan.bilanData||{}));
   currentOpenedBilanIdx = bilanIdx;
+  currentOpenedBilanPosturoIdx = null;  // Task #69 bonus — symétrie cross-modal avec ouvrirBilanPosturo L3180
   nav('pg-sport');
 }
 
@@ -3174,6 +3186,14 @@ async function ouvrirBilanPosturo(patIdx, bilanIdx) {
     await prefetchPosturoPhotos(currentPatient?.bilanDataPosturo);
     nav('pg-bilan-posturo');
     return;
+  }
+  // Task #69 — Check data-loss AVANT selectPatient (mirror posturo de
+  // ouvrirBilanSport). Posturo a 1 seul champ data (bilanDataPosturo).
+  const hasBilanPosturoData = hasBilanDataContent(p.bilanDataPosturo);
+  if (hasBilanPosturoData) {
+    if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
+      return;
+    }
   }
   selectPatient(p);
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
