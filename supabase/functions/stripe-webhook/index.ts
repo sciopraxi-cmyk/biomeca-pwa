@@ -169,6 +169,21 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Utilisé pour les apply-modules cas C (defaultModulesForPlan) + logs structurés.
   const planIdx = parseInt(identified.formule.replace('formule_', ''), 10) - 1;
 
+  // Task [#66] — garde défensive contre format non-numérique futur
+  // (ex: formule_essai, formule_pro) qui produirait NaN et defaultModulesForPlan([]) silencieux.
+  // Aujourd'hui identifyFormule retourne toujours formule_1..5 mais on protège contre régression future.
+  if (Number.isNaN(planIdx) || planIdx < 0 || planIdx > 4) {
+    console.error('[stripe-webhook] planIdx invalide après extraction', {
+      event: 'checkout_invalid_planIdx',
+      email,
+      formule: identified.formule,
+      planIdx,
+      session_id: session.id,
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
   // ─── Résolution email → user_id (task #63) ─────────────────────────────────
   // Source de vérité unique pour user_id dans tout handleCheckoutCompleted.
   // Si null = cas S3 (paiement Stripe sans signup app) : skip propre + log
