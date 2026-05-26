@@ -2809,7 +2809,10 @@ function finalizeBilanSport(patIdx) {
     return;
   }
   if (!p.bilansSport) p.bilansSport = [];
-  const num = p.bilansSport.length + 1;
+  // Task [#71] — Numérotation Contrôle basée UNIQUEMENT sur les bilans Contrôle
+  // déjà archivés (filter type === 'controle'), pas sur bilansSport.length qui
+  // inclut l'Initial → bug "Sportif Contrôle 2" au lieu de "1" pour le 1er Contrôle.
+  const num = p.bilansSport.filter((b) => b.type === 'controle').length + 1;
   const type = p.currentBilanSportSousType || 'initial';
   const label = type === 'initial' ? 'Sportif Initial' : 'Sportif Contrôle ' + num;
   p.bilansSport.push({
@@ -2899,7 +2902,8 @@ function creerBilanSport(patIdx, type) {
       return;
     }
     if(!p.bilansSport) p.bilansSport = [];
-    const num = p.bilansSport.length + 1;
+    // Task [#71] — voir finalizeBilanSport L2812 pour la justification détaillée.
+    const num = p.bilansSport.filter((b) => b.type === 'controle').length + 1;
     p.bilansSport.push({
       label: type === 'initial' ? 'Sportif Initial' : 'Sportif Contrôle ' + num,
       type: type,
