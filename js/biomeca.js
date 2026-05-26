@@ -2885,8 +2885,11 @@ function creerBilanSport(patIdx, type) {
   }
   const p = patients[patIdx];
   if(!p) return;
-  // Sauvegarder bilan courant si données existantes
-  if(p.mesures && Object.keys(p.mesures).length > 0) {
+  // Sauvegarder bilan courant si données existantes ET bilan effectivement en cours
+  // (sousType set). Task #69.4 — sans ce check sousType, les mesures résiduelles
+  // d'une archive ouverte par ouvrirBilanSport déclencheraient un faux confirm
+  // "bilan en cours" puis push doublon de l'archive. Parité avec creerBilanPosturo.
+  if(p.currentBilanSportSousType && p.mesures && Object.keys(p.mesures).length > 0) {
     const nbTests = Object.keys(p.mesures).length;
     const confirmMsg = 'Vous avez un bilan en cours avec ' + nbTests + ' test(s) saisi(s).\n\n' +
       'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
@@ -2927,10 +2930,28 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
     nav('pg-sport');
     return;
   }
+  // Task #69 — Check data-loss AVANT selectPatient (qui aurait des side-effects
+  // DOM via clearBilanFields/loadBilan). On utilise p.* (pas currentPatient.*)
+  // pour ne pas dépendre du timing pre/post-selectPatient. Le warning ne
+  // s'affiche QUE si l'écrasement causerait une perte réelle (data-driven).
+  const hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
+  const hasBilanData = hasBilanDataContent(p.bilanData);
+  if (hasMesures || hasBilanData) {
+    if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
+      return;
+    }
+  }
   selectPatient(p);
   currentPatient.mesures = JSON.parse(JSON.stringify(bilan.mesures||{}));
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilan.bilanData||{}));
   currentOpenedBilanIdx = bilanIdx;
+  currentOpenedBilanPosturoIdx = null;  // Task #69 bonus — symétrie cross-modal avec ouvrirBilanPosturo L3180
+  // Task #69.3 — Reset flag "bilan en cours" sport pour éviter état hybride
+  // corrompu (bandeau orange affichant un faux bilan en cours avec les mesures
+  // de l'archive). Le user a explicitement consenti à perdre son bilan en cours
+  // via le confirm() ci-dessus. Cohérent avec le pattern delete sousType utilisé
+  // par abandonner/finalize/creer.
+  delete p.currentBilanSportSousType;
   nav('pg-sport');
 }
 
@@ -3175,10 +3196,21 @@ async function ouvrirBilanPosturo(patIdx, bilanIdx) {
     nav('pg-bilan-posturo');
     return;
   }
+  // Task #69 — Check data-loss AVANT selectPatient (mirror posturo de
+  // ouvrirBilanSport). Posturo a 1 seul champ data (bilanDataPosturo).
+  const hasBilanPosturoData = hasBilanDataContent(p.bilanDataPosturo);
+  if (hasBilanPosturoData) {
+    if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
+      return;
+    }
+  }
   selectPatient(p);
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
   currentOpenedBilanIdx = null;
   currentOpenedBilanPosturoIdx = bilanIdx;
+  // Task #69.3 — Reset flag "bilan en cours" posturo (mirror sport). Cohérent
+  // avec le pattern delete sousType utilisé par abandonner/finalize/creer.
+  delete p.currentBilanPosturoSousType;
   // Réinitialiser le canvas pour forcer recalcul taille
   const oldCanvas = document.getElementById('posturo-body-canvas');
   if(oldCanvas) { oldCanvas.width = 0; oldCanvas.height = 0; oldCanvas._baseSnapshot = null; oldCanvas._history = []; }
