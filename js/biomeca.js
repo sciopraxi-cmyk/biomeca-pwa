@@ -2943,6 +2943,12 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilan.bilanData||{}));
   currentOpenedBilanIdx = bilanIdx;
   currentOpenedBilanPosturoIdx = null;  // Task #69 bonus — symétrie cross-modal avec ouvrirBilanPosturo L3180
+  // Task #69.3 — Reset flag "bilan en cours" sport pour éviter état hybride
+  // corrompu (bandeau orange affichant un faux bilan en cours avec les mesures
+  // de l'archive). Le user a explicitement consenti à perdre son bilan en cours
+  // via le confirm() ci-dessus. Cohérent avec le pattern delete sousType utilisé
+  // par abandonner/finalize/creer.
+  delete p.currentBilanSportSousType;
   nav('pg-sport');
 }
 
@@ -3199,6 +3205,9 @@ async function ouvrirBilanPosturo(patIdx, bilanIdx) {
   currentPatient.bilanDataPosturo = JSON.parse(JSON.stringify(bilan.bilanDataPosturo||{}));
   currentOpenedBilanIdx = null;
   currentOpenedBilanPosturoIdx = bilanIdx;
+  // Task #69.3 — Reset flag "bilan en cours" posturo (mirror sport). Cohérent
+  // avec le pattern delete sousType utilisé par abandonner/finalize/creer.
+  delete p.currentBilanPosturoSousType;
   // Réinitialiser le canvas pour forcer recalcul taille
   const oldCanvas = document.getElementById('posturo-body-canvas');
   if(oldCanvas) { oldCanvas.width = 0; oldCanvas.height = 0; oldCanvas._baseSnapshot = null; oldCanvas._history = []; }
