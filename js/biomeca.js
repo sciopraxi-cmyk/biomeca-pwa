@@ -2885,8 +2885,11 @@ function creerBilanSport(patIdx, type) {
   }
   const p = patients[patIdx];
   if(!p) return;
-  // Sauvegarder bilan courant si données existantes
-  if(p.mesures && Object.keys(p.mesures).length > 0) {
+  // Sauvegarder bilan courant si données existantes ET bilan effectivement en cours
+  // (sousType set). Task #69.4 — sans ce check sousType, les mesures résiduelles
+  // d'une archive ouverte par ouvrirBilanSport déclencheraient un faux confirm
+  // "bilan en cours" puis push doublon de l'archive. Parité avec creerBilanPosturo.
+  if(p.currentBilanSportSousType && p.mesures && Object.keys(p.mesures).length > 0) {
     const nbTests = Object.keys(p.mesures).length;
     const confirmMsg = 'Vous avez un bilan en cours avec ' + nbTests + ' test(s) saisi(s).\n\n' +
       'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
