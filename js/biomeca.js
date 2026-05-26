@@ -2936,7 +2936,12 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   // s'affiche QUE si l'écrasement causerait une perte réelle (data-driven).
   const hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
   const hasBilanData = hasBilanDataContent(p.bilanData);
-  if (hasMesures || hasBilanData) {
+  // Task [#70] — check sousType en plus de mesures/bilanData : sinon le résidu
+  // d'une archive précédemment ouverte (mesures écrasées par ouvrirBilanSport,
+  // sousType deleted par #69.3) déclenche un faux confirm "perdre vos données
+  // actuelles" alors qu'il s'agit en réalité des mesures de l'archive précédente.
+  // Parité avec creerBilanSport #69.4 qui a déjà ce check.
+  if (p.currentBilanSportSousType && (hasMesures || hasBilanData)) {
     if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
       return;
     }
@@ -3199,7 +3204,9 @@ async function ouvrirBilanPosturo(patIdx, bilanIdx) {
   // Task #69 — Check data-loss AVANT selectPatient (mirror posturo de
   // ouvrirBilanSport). Posturo a 1 seul champ data (bilanDataPosturo).
   const hasBilanPosturoData = hasBilanDataContent(p.bilanDataPosturo);
-  if (hasBilanPosturoData) {
+  // Task [#70] — check sousType posturo (mirror sport). Parité avec
+  // creerBilanPosturo qui a déjà isInProgress = currentBilanPosturoSousType != null.
+  if (p.currentBilanPosturoSousType && hasBilanPosturoData) {
     if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
       return;
     }
