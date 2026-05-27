@@ -144,6 +144,21 @@
     <div id="forgot-msg" style="display:none;margin-top:8px;background:rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.3);color:#2dd4bf;border-radius:8px;padding:10px;font-size:12px;text-align:center;"></div>
   </div>
 
+  <div id="pwa-reset-password-form" style="display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:32px;max-width:400px;margin:0 auto 40px;">
+    <div style="text-align:center;margin-bottom:22px;">
+      <img src="assets/logo-sciopraxi.png" style="height:40px;margin-bottom:12px;"/>
+      <div style="font-size:16px;font-weight:700;color:#fff;">Réinitialiser le mot de passe</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;">Choisissez un nouveau mot de passe pour votre compte</div>
+    </div>
+    <div style="margin-bottom:14px;"><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:5px;font-weight:500;">Nouveau mot de passe</div>
+    <input id="reset-pwd-new" type="password" class="inp" placeholder="••••••••" autocomplete="new-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')document.getElementById('reset-pwd-confirm').focus()"/></div>
+    <div style="margin-bottom:18px;"><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:5px;font-weight:500;">Confirmer le mot de passe</div>
+    <input id="reset-pwd-confirm" type="password" class="inp" placeholder="••••••••" autocomplete="new-password" style="width:100%;box-sizing:border-box;font-size:15px;padding:11px 12px;" onkeydown="if(event.key==='Enter')submitNewPassword()"/></div>
+    <button onclick="submitNewPassword()" id="reset-pwd-btn" style="width:100%;background:#2dd4bf;color:#04342C;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">Mettre à jour le mot de passe</button>
+    <div id="reset-pwd-err" style="display:none;margin-top:10px;background:rgba(226,75,74,0.15);border:1px solid rgba(226,75,74,0.3);color:#F09595;border-radius:8px;padding:10px;font-size:13px;text-align:center;"></div>
+    <div id="reset-pwd-ok" style="display:none;margin-top:10px;background:rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.3);color:#2dd4bf;border-radius:8px;padding:10px;font-size:13px;text-align:center;"></div>
+  </div>
+
   <div id="pwa-register-form" style="display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:32px;max-width:400px;margin:0 auto 40px;">
     <div style="text-align:center;margin-bottom:22px;">
       <div style="font-size:16px;font-weight:700;color:#fff;">Créer votre compte</div>
