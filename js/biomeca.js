@@ -200,6 +200,84 @@ async function showForgotPassword() {
   }
 }
 
+// ─── Recovery flow (lien email reset password) ───
+// Détecte hash #access_token=...&type=recovery dans l'URL au load, stocke le token
+// global pour submitNewPassword, affiche le modal reset et nettoie l'URL.
+function handleRecoveryToken() {
+  var hash = window.location.hash || '';
+  if (!hash || hash.indexOf('access_token=') === -1) return false;
+  var params = new URLSearchParams(hash.substring(1)); // strip leading '#'
+  var type = params.get('type');
+  if (type !== 'recovery') return false;
+  var token = params.get('access_token');
+  if (!token) return false;
+  _recoveryToken = token;
+  // Cleanup URL (retire le hash pour ne pas re-trigger au refresh)
+  window.history.replaceState({}, '', window.location.pathname);
+  // Affiche modal reset, masque login form
+  var loginForm = document.getElementById('pwa-login-form');
+  var resetForm = document.getElementById('pwa-reset-password-form');
+  if (loginForm) loginForm.style.display = 'none';
+  if (resetForm) resetForm.style.display = 'block';
+  return true;
+}
+
+// Soumet le nouveau mot de passe via PUT /auth/v1/user (Bearer = _recoveryToken).
+// Validations client : non-vide, longueur ≥ 8, pwd === confirm.
+async function submitNewPassword() {
+  const newPwd = document.getElementById('reset-pwd-new').value;
+  const confirmPwd = document.getElementById('reset-pwd-confirm').value;
+  const errEl = document.getElementById('reset-pwd-err');
+  const okEl = document.getElementById('reset-pwd-ok');
+  const btn = document.getElementById('reset-pwd-btn');
+  // Reset feedback zones
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (okEl) { okEl.style.display = 'none'; okEl.textContent = ''; }
+  // Validations client
+  if (!newPwd || !confirmPwd) {
+    if (errEl) { errEl.textContent = 'Veuillez remplir les deux champs.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (newPwd.length < 8) {
+    if (errEl) { errEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (newPwd !== confirmPwd) {
+    if (errEl) { errEl.textContent = 'Les deux mots de passe ne correspondent pas.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!_recoveryToken) {
+    if (errEl) { errEl.textContent = 'Lien de récupération expiré ou invalide. Veuillez redemander un email de réinitialisation.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Mise à jour…'; }
+  try {
+    const res = await fetch(SUPA_URL + '/auth/v1/user', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + _recoveryToken
+      },
+      body: JSON.stringify({ password: newPwd })
+    });
+    if (res.ok) {
+      _recoveryToken = null;
+      if (okEl) { okEl.textContent = '✓ Mot de passe mis à jour. Redirection…'; okEl.style.display = 'block'; }
+      setTimeout(function() { window.location.href = './'; }, 2000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      console.error('Update password error:', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Mettre à jour le mot de passe'; }
+      if (errEl) { errEl.textContent = 'Erreur lors de la mise à jour. Le lien a peut-être expiré.'; errEl.style.display = 'block'; }
+    }
+  } catch(e) {
+    console.error('Update password network error:', e);
+    if (btn) { btn.disabled = false; btn.textContent = 'Mettre à jour le mot de passe'; }
+    if (errEl) { errEl.textContent = 'Erreur réseau. Vérifiez votre connexion et réessayez.'; errEl.style.display = 'block'; }
+  }
+}
+
 // ─── Login ───
 async function pwaLogin() {
   const email = document.getElementById('pwa-email').value.trim();
@@ -1509,6 +1587,7 @@ let _dataLoaded = false;
 // log 'sync_recovered' uniquement post-fail (évite spam log au quotidien).
 // Reset par _hideSyncErrorBanner (dismiss user OU recovery automatique).
 let _syncErrorShown = false;
+let _recoveryToken = null;
 let currentPatient = null;
 // Index du bilan dans currentPatient.bilansSport actuellement ouvert pour édition.
 // null = pas de bilan historique ouvert (mode "bilan courant" ou nouveau bilan).
@@ -10601,6 +10680,8 @@ function getStripe() {
 }
 
 window.addEventListener('DOMContentLoaded', function() {
+  // Priorité au flow recovery (lien email reset password) si présent
+  if (handleRecoveryToken()) return;
   var params = new URLSearchParams(window.location.search);
   if(params.get('payment') === 'success') {
     // Activation de licence_payee : assurée côté serveur par l'Edge Function
