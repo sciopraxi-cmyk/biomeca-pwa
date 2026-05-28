@@ -9977,6 +9977,51 @@ function showPosturoSection(idx) {
   if(idx === 8) setTimeout(initPosturoFeetCanvas, 100);
 }
 
+// ───────────────────────────────────────────
+// SPORT — Navigation onglets bilan clinique (Phase 1 #73)
+// Toggle display des 10 sport-section + état actif des sport-tab.
+// Re-init des canvas dépendants du DOM visible (morpho 4× idx=1 + pieds-canvas idx=9).
+// Gardes synchrones obligatoires : initMorphoCanvas L6472 et drawPiedsTemplate L6722
+// sont DESTRUCTIFS (effacent pixels via canvas.width=... + wipe _history/_baseSnapshot).
+// Sans garde, switch onglet → perte des dessins user. On init UNIQUEMENT la 1ère fois.
+// Motif uniforme : on garde sur _baseSnapshot pour les 5 canvas. clearBilanFields
+// L2523-2527 nullifie synchroniquement _baseSnapshot au switch patient → garantit
+// la ré-init propre du canvas du nouveau patient (style.width n'est pas reset par
+// clearBilanFields donc utiliser !style.width laisserait les dessins de l'ancien
+// patient si onglet morpho caché au moment du switch — bug évité par _baseSnapshot).
+// ───────────────────────────────────────────
+function showSportBilanSection(idx) {
+  // 1. Toggle display block/none sur les 10 sections (scope strict #pg-bilan)
+  document.querySelectorAll('#pg-bilan .sport-section').forEach((s, i) => {
+    s.style.display = i === idx ? 'block' : 'none';
+  });
+  // 2. Toggle .act sur les 10 tabs
+  document.querySelectorAll('.sport-tab').forEach((t, i) => {
+    t.classList.toggle('act', i === idx);
+  });
+  // 3. Re-inject mic buttons (dictaphone) après affichage de la nouvelle section
+  if(typeof _injectMicButtons === 'function') setTimeout(_injectMicButtons, 200);
+  // 4. Section 1 (Morphostatique) — init 4 canvas morpho UNIQUEMENT si pas encore
+  //    initialisés. _baseSnapshot est posé asynchrone par initMorphoCanvas L6488
+  //    → flag idempotent uniforme avec pieds-canvas. Préserve les dessins user au
+  //    switch onglet, et garantit la ré-init au switch patient via clearBilanFields.
+  if(idx === 1) setTimeout(() => {
+    ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
+      const c = document.getElementById(id);
+      if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') initMorphoCanvas(id);
+    });
+  }, 150);
+  // 5. Section 9 (Traitements) — drawPiedsTemplate UNIQUEMENT la 1ère fois.
+  //    _baseSnapshot est posé synchroniquement par drawPiedsTemplate L6744
+  //    → flag idempotent. Préserve le dessin pieds au switch onglet.
+  if(idx === 9) setTimeout(() => {
+    const pc = document.getElementById('pieds-canvas');
+    if(pc && !pc._baseSnapshot && typeof drawPiedsTemplate === 'function') {
+      drawPiedsTemplate(currentPatient?.bilanData?._pieds);
+    }
+  }, 150);
+}
+
 let posturoDrawColor = 'red';
 let posturoIsDrawing = false;
 let posturoLastX = 0, posturoLastY = 0;

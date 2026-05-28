@@ -703,9 +703,23 @@
     </div>
     <div id="mic-status" style="display:none;font-size:11px;color:var(--red);margin-bottom:8px;padding:6px 10px;background:var(--red-d);border-radius:var(--rs);">🔴 En cours — cliquez sur un champ puis parlez</div>
 
+    <div class="sport-tabs" id="sport-tabs">
+      <button class="btn sport-tab act" onclick="showSportBilanSection(0)" id="stab-0" style="font-size:11px;padding:4px 10px;">1. Anamnèse</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(1)" id="stab-1" style="font-size:11px;padding:4px 10px;">2. Morphostatique</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(2)" id="stab-2" style="font-size:11px;padding:4px 10px;">3. Examen en charge</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(3)" id="stab-3" style="font-size:11px;padding:4px 10px;">4. Rotation nucale</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(4)" id="stab-4" style="font-size:11px;padding:4px 10px;">5. Mobilité axe</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(5)" id="stab-5" style="font-size:11px;padding:4px 10px;">6. Mandibule</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(6)" id="stab-6" style="font-size:11px;padding:4px 10px;">7. Stabilométrique</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(7)" id="stab-7" style="font-size:11px;padding:4px 10px;">8. Schémas moteurs</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(8)" id="stab-8" style="font-size:11px;padding:4px 10px;">9. Neuro fonctionnel</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(9)" id="stab-9" style="font-size:11px;padding:4px 10px;">10. Traitements</button>
+    </div>
+
+    <div class="sport-section" id="ssec-0">
     <!-- ANAMNÈSE -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">📋 Anamnèse</div>
+      <div class="sport-block-bleu"><div class="sport-block-title c-bleu">📋 Anamnèse</div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
         <div><div class="field-lbl">Sport(s) pratiqué(s) — type, fréquence, intensité, niveau</div><textarea class="inp bilan-field" rows="2" data-field="sport_detail" placeholder="Ex: Trail 3×/sem, compétition régionale..."></textarea></div>
         <div><div class="field-lbl">Localisation et horaire de la douleur (1er fois / récidive)</div><textarea class="inp bilan-field" rows="2" data-field="douleur" placeholder="Ex: Genou droit à l'effort depuis 3 semaines..."></textarea></div>
@@ -721,10 +735,12 @@
         <input class="inp bilan-field" data-field="ttt_podo_detail" placeholder="Si oui, lequel ?" style="flex:1;min-width:150px;"/>
       </div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-1" style="display:none;">
     <!-- BILAN MORPHOSTATIQUE -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">🧍 Bilan Morphostatique</div>
+      <div class="sport-block-rouge"><div class="sport-block-title c-rouge">🧍 Bilan Morphostatique</div></div>
       <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;align-items:flex-end;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:16px;">
         <div style="flex:1;min-width:100px;text-align:center;">
           <div style="font-size:10px;color:#8892a4;margin-bottom:6px;font-weight:500;">Face ant.</div>
@@ -778,10 +794,12 @@
       </div>
       <div><div class="field-lbl">Hypothèse chaîne musculaire</div><textarea class="inp bilan-field" rows="2" data-field="chaine_musculaire" placeholder="Chaîne croisée, extension, flexion..."></textarea></div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-2" style="display:none;">
     <!-- EXAMEN EN CHARGE -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">⚖️ Examen en Charge</div>
+      <div class="sport-block-orange"><div class="sport-block-title c-orange">⚖️ Examen en Charge</div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
         <div><div class="field-lbl">Hauteur crête iliaque</div><input class="inp bilan-field" data-field="crete_iliaque" placeholder="G / D"/></div>
         <div><div class="field-lbl">EIAS</div><input class="inp bilan-field" data-field="eias_charge" placeholder="Symétrie..."/></div>
@@ -803,10 +821,12 @@
         <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test rotation nucale</span><input class="inp bilan-field" data-field="test_rot_nucale" placeholder="Résultat" style="width:110px;"/></div>
       </div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-3" style="display:none;">
     <!-- ROTATION NUCALE -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">🔄 Test Rotation Nucale</div>
+      <div class="sport-block-violet"><div class="sport-block-title c-violet">🔄 Test Rotation Nucale</div></div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
           <tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);"></th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Gauche</th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Droite</th></tr>
@@ -817,10 +837,12 @@
         </tbody>
       </table></div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-4" style="display:none;">
     <!-- MOBILITÉ AXE CORPOREL -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">📐 Mobilité Axe Corporel</div>
+      <div class="sport-block-vert"><div class="sport-block-title c-vert">📐 Mobilité Axe Corporel</div></div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
           <tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);">Zone</th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Gauche</th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Droite</th></tr>
@@ -834,10 +856,12 @@
         </tbody>
       </table></div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-5" style="display:none;">
     <!-- EXAMEN MANDIBULE -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">🦷 Examen Mandibule</div>
+      <div class="sport-block-bleu"><div class="sport-block-title c-bleu">🦷 Examen Mandibule</div></div>
       <div style="display:flex;gap:0;align-items:stretch;">
         <div style="flex:1;padding-right:14px;">
           <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Ouverture maximale 3 doigts</span><label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_ouverture" value="oui" onchange="setBilanField('mandibule_ouverture','oui')"/> OUI</label>&nbsp;<label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_ouverture" value="non" onchange="setBilanField('mandibule_ouverture','non')"/> NON</label></div>
@@ -853,10 +877,12 @@
       </div>
       <div style="margin-top:8px;"><input class="inp bilan-field" data-field="mandibule_notes" placeholder="Observations (ressaut D/G, etc.)..."/></div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-6" style="display:none;">
     <!-- EXAMEN STABILOMÉTRIQUE -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">📊 Examen Stabilométrique / Baropodométrique</div>
+      <div class="sport-block-rouge"><div class="sport-block-title c-rouge">📊 Examen Stabilométrique / Baropodométrique</div></div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead><tr style="background:var(--surf);">
           <th style="padding:6px 8px;border:1px solid var(--bord);">Paramètre</th>
@@ -874,10 +900,12 @@
       </table></div>
       <div style="margin-top:8px;"><div class="field-lbl">Conclusion examen stabilométrique</div><textarea class="inp bilan-field" rows="2" data-field="stabilo_conclusion" placeholder="Notes et observations du praticien..."></textarea></div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-7" style="display:none;">
     <!-- TESTS SCHÉMAS MOTEURS -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">🏃 Tests Schémas Moteurs</div>
+      <div class="sport-block-orange"><div class="sport-block-title c-orange">🏃 Tests Schémas Moteurs</div></div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead><tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);">Test</th><th style="padding:6px 8px;border:1px solid var(--bord);">Aérien (/2)</th><th style="padding:6px 8px;border:1px solid var(--bord);">Terrien (/2)</th></tr></thead>
         <tbody>
@@ -891,10 +919,12 @@
       </table></div>
       <div style="margin-top:8px;"><div class="field-lbl">Conclusion schéma moteur (Aérien / Terrien)</div><textarea class="inp bilan-field" rows="2" data-field="schema_moteur_conclusion" placeholder="Notes et observations du praticien..."></textarea></div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-8" style="display:none;">
     <!-- NEUROLOGIE FONCTIONNELLE -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">🧠 Neurologie Fonctionnelle</div>
+      <div class="sport-block-violet"><div class="sport-block-title c-violet">🧠 Neurologie Fonctionnelle</div></div>
       <div style="font-size:11px;color:var(--mut);margin-bottom:10px;">Cochez les cases · Utilisez le dictaphone pour annoter les champs texte</div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -1009,10 +1039,12 @@
       </div>
       <div style="margin-top:8px;"><div class="field-lbl">Notes neurologie fonctionnelle</div><textarea class="inp bilan-field" rows="2" data-field="neuro_notes" placeholder="Observations, hypothèses cliniques..."></textarea></div>
     </div>
+    </div>
 
+    <div class="sport-section" id="ssec-9" style="display:none;">
     <!-- PLAN DE TRAITEMENT -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">💊 Plan de Traitement</div>
+      <div class="sport-block-vert"><div class="sport-block-title c-vert">💊 Plan de Traitement</div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div>
           <div class="field-lbl">Circuit Express 1 — Demi Tabata (2 min)</div>
@@ -1050,7 +1082,7 @@
 
     <!-- SCHÉMA PIEDS -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">👣 Plan de Semelles — Schéma Plantaire</div>
+      <div class="sport-block-vert"><div class="sport-block-title c-vert">👣 Plan de Semelles — Schéma Plantaire</div></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <button class="btn" id="tool-pen2" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
         <button class="btn" id="tool-arrow2" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
@@ -1076,7 +1108,7 @@
 
     <!-- TESTS AVANT / APRÈS -->
     <div class="card">
-      <div class="stitle" style="color:var(--blue);">✅ Tests Avant / Après</div>
+      <div class="sport-block-vert"><div class="sport-block-title c-vert">✅ Tests Avant / Après</div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
         <div style="padding:6px 0;border-bottom:1px solid var(--bord);"><div style="font-size:11px;font-weight:500;margin-bottom:3px;">Test de Rotation nucale amélioré</div><div style="display:flex;align-items:center;gap:8px;"><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_rotation" value="oui" onchange="setBilanField('ta_rotation','oui')"/> OUI</label><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_rotation" value="non" onchange="setBilanField('ta_rotation','non')"/> NON</label><input class="inp bilan-field" data-field="ta_rotation_notes" placeholder="Obs." style="flex:1;"/></div></div>
         <div style="padding:6px 0;border-bottom:1px solid var(--bord);"><div style="font-size:11px;font-weight:500;margin-bottom:3px;">Test de Flexion antérieure amélioré</div><div style="display:flex;align-items:center;gap:8px;"><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_flexion" value="oui" onchange="setBilanField('ta_flexion','oui')"/> OUI</label><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_flexion" value="non" onchange="setBilanField('ta_flexion','non')"/> NON</label><input class="inp bilan-field" data-field="ta_flexion_notes" placeholder="Obs." style="flex:1;"/></div></div>
@@ -1089,6 +1121,7 @@
         <div style="padding:6px 0;"><div style="font-size:11px;font-weight:500;margin-bottom:3px;">Appuis sur plateforme améliorés</div><div style="display:flex;align-items:center;gap:8px;"><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_plateforme" value="oui" onchange="setBilanField('ta_plateforme','oui')"/> OUI</label><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_plateforme" value="non" onchange="setBilanField('ta_plateforme','non')"/> NON</label><input class="inp bilan-field" data-field="ta_plateforme_notes" placeholder="Obs." style="flex:1;"/></div></div>
       </div>
     </div>
+    </div><!-- /ssec-9 -->
 
   </div>
 </div><!-- /pg-bilan -->

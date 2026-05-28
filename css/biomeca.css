@@ -360,3 +360,110 @@ body.printing #rpt-print{display:block!important;}
   #pg-rapport-posturo > div:first-child { display: none !important; }
   .rp-page { display: block !important; }
 }
+
+/* ==========================================================================
+   6. Bilan sport — onglets + sections + blocs colorés (Phase 1 #73)
+   ========================================================================== */
+
+/* Barre d'onglets — flex wrap avec gap, séparateur sous-jacent */
+.sport-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 0 4px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--bord);
+}
+
+/* Onglet individuel — fallback CSS (les inline-styles HTML priment :
+   font-size:11px;padding:4px 10px;). Conservé pour robustesse future si
+   les inline sont supprimés. */
+.sport-tab {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: var(--rs);
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+
+/* Onglet actif — identité sport bleue cohérente avec var(--blue) */
+.sport-tab.act {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+/* Section sport (wrapper de chaque groupe de cards) — pas de styling spécifique :
+   le toggle display:none/block est géré inline par showSportBilanSection.
+   Les cards intérieures conservent leur padding via .card. */
+.sport-section {
+  /* no-op : conteneur logique uniquement */
+}
+
+/* ───────── Blocs colorés multi-couleurs (Phase 1 #73 Edit 5) ───────── */
+/* Pattern : gradient bg clair + border-left coloré + radius 8px + padding 12px.
+   Mapping ssec → couleur (cf. Q1 validé Joel) :
+   - ssec-0 Anamnèse        → bleu
+   - ssec-1 Morphostatique  → rouge
+   - ssec-2 Examen charge   → orange
+   - ssec-3 Rotation nucale → violet
+   - ssec-4 Mobilité axe    → vert
+   - ssec-5 Mandibule       → bleu
+   - ssec-6 Stabilométrique → rouge
+   - ssec-7 Schémas moteurs → orange
+   - ssec-8 Neuro fonc.     → violet
+   - ssec-9 Traitements     → vert
+*/
+
+.sport-block-vert {
+  background: linear-gradient(135deg, #f0faf4, #e8f8ee);
+  border-left: 4px solid #2a7a4e;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.sport-block-rouge {
+  background: linear-gradient(135deg, #fff0f0, #ffe8e8);
+  border-left: 4px solid #e74c3c;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.sport-block-orange {
+  background: linear-gradient(135deg, #fff9f0, #fff3e0);
+  border-left: 4px solid #f0a500;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.sport-block-violet {
+  background: linear-gradient(135deg, #f5eeff, #ede0ff);
+  border-left: 4px solid #8e44ad;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+/* Bleu — accent dédié distinct de var(--blue) des onglets pour éviter confusion */
+.sport-block-bleu {
+  background: linear-gradient(135deg, #eaf4ff, #dceeff);
+  border-left: 4px solid #3498db;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+/* Titres des blocs colorés — base commune + variantes couleur texte foncé */
+.sport-block-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.sport-block-title.c-vert   { color: #2a7a4e; }
+.sport-block-title.c-rouge  { color: #c0392b; }
+.sport-block-title.c-orange { color: #b7740a; }
+.sport-block-title.c-violet { color: #6c3483; }
+.sport-block-title.c-bleu   { color: #2471a3; }
