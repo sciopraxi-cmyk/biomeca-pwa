@@ -1931,6 +1931,8 @@ function nav(id) {
         const pc = document.getElementById('pieds-canvas');
         if(pc) { drawPiedsTemplate(currentPatient?.bilanData?._pieds); }
       }, 200);
+      // Injection micros de dictée par champ texte (Q-mic-1 b, #73 A1)
+      if(typeof _injectSportMicButtons === 'function') setTimeout(_injectSportMicButtons, 250);
       // 4. Restaurer les dessins directement (pas via restoreCanvas)
       setTimeout(() => {
         const bd = currentPatient?.bilanData || {};
@@ -10005,7 +10007,7 @@ function showSportBilanSection(idx) {
     t.classList.toggle('act', i === idx);
   });
   // 3. Re-inject mic buttons (dictaphone) après affichage de la nouvelle section
-  if(typeof _injectMicButtons === 'function') setTimeout(_injectMicButtons, 200);
+  if(typeof _injectSportMicButtons === 'function') setTimeout(_injectSportMicButtons, 200);
   // 4. Section 1 (Morphostatique) — init 4 canvas morpho UNIQUEMENT si pas encore
   //    initialisés. _baseSnapshot est posé asynchrone par initMorphoCanvas L6488
   //    → flag idempotent uniforme avec pieds-canvas. Préserve les dessins user au
@@ -10641,6 +10643,33 @@ function _injectMicButtons() {
     btn.onclick = (function(fieldId, b) {
       return function() { startDictation(fieldId, b); };
     })(id, btn);
+    el.parentNode.insertBefore(btn, el.nextSibling);
+  });
+}
+
+// Sport — version générique du mic injection (Q-mic-1 b, Q-mic-2 a, #73 A1).
+// Cible tous les champs texte libres du bilan sport via .bilan-field,
+// exclut date et range (EVA). Génère un id stable spf-<data-field> si absent.
+function _injectSportMicButtons() {
+  var fields = document.querySelectorAll(
+    '#pg-bilan textarea.bilan-field, #pg-bilan input.bilan-field:not([type="date"]):not([type="range"])'
+  );
+  fields.forEach(function(el) {
+    if(el._micInjected) return;
+    if(!el.id) {
+      var df = el.dataset.field;
+      if(!df) return;
+      el.id = 'spf-' + df;
+    }
+    el._micInjected = true;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = 'Dicter dans ce champ';
+    btn.innerHTML = '&#127908;';
+    btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:50%;opacity:0.6;vertical-align:middle;';
+    btn.onclick = (function(fieldId, b) {
+      return function() { startDictation(fieldId, b); };
+    })(el.id, btn);
     el.parentNode.insertBefore(btn, el.nextSibling);
   });
 }
