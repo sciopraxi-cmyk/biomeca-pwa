@@ -6923,6 +6923,11 @@ function loadBilan() {
     if(field && bilanData[field] !== undefined) el.value = bilanData[field];
   });
 
+  // A1 — Rafraîchit l'affichage du span associé aux input range (ex: EVA score)
+  // après restauration de la value : dispatch 'input' déclenche le oninput inline
+  // qui met à jour le span dynamique (sp-an-eva-val).
+  document.querySelectorAll('#pg-bilan input[type=range].bilan-field').forEach(r => r.dispatchEvent(new Event('input')));
+
   // Restaurer les boutons radio
   document.querySelectorAll('#pg-bilan input[type=radio]').forEach(el => {
     if(el.name && bilanData[el.name] !== undefined) {

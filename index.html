@@ -720,20 +720,67 @@
     <!-- ANAMNÈSE -->
     <div class="card sport-card-bleu">
       <div class="sport-block-title c-bleu">📋 Anamnèse</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <div><div class="field-lbl">Sport(s) pratiqué(s) — type, fréquence, intensité, niveau</div><textarea class="inp bilan-field" rows="2" data-field="sport_detail" placeholder="Ex: Trail 3×/sem, compétition régionale..."></textarea></div>
-        <div><div class="field-lbl">Localisation et horaire de la douleur (1er fois / récidive)</div><textarea class="inp bilan-field" rows="2" data-field="douleur" placeholder="Ex: Genou droit à l'effort depuis 3 semaines..."></textarea></div>
-        <div><div class="field-lbl">Antécédents (personnel / familiaux)</div><textarea class="inp bilan-field" rows="2" data-field="antecedents" placeholder="Chirurgies, blessures, maladies..."></textarea></div>
-        <div><div class="field-lbl">Examens déjà réalisés</div><textarea class="inp bilan-field" rows="2" data-field="examens" placeholder="Radio, IRM, scanner, bilan sanguin..."></textarea></div>
-        <div><div class="field-lbl">Hygiène de vie / quotidien (activité physique / profession)</div><textarea class="inp bilan-field" rows="2" data-field="hygiene" placeholder="Profession, activité quotidienne..."></textarea></div>
-        <div><div class="field-lbl">Notes complémentaires</div><textarea class="inp bilan-field" rows="2" data-field="notes_generales" placeholder="..."></textarea></div>
+
+      <!-- Sous-section : Informations patient -->
+      <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;">Informations patient</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div><div class="field-lbl">Médecin</div><input class="inp bilan-field" data-field="medecin" placeholder="Dr..."/></div>
+        <div><div class="field-lbl">Date de consultation</div><input class="inp bilan-field" data-field="date_consult" type="date"/></div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+
+      <!-- Sous-section : Sport & mode de vie -->
+      <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;">Sport & mode de vie</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="grid-column:1/-1;"><div class="field-lbl">Sport(s) pratiqué(s) — type, fréquence, intensité, niveau</div><textarea class="inp bilan-field" rows="2" data-field="sport_detail" placeholder="Ex: Trail 3×/sem, compétition régionale..."></textarea></div>
+        <div><div class="field-lbl">Travail / Profession</div><input class="inp bilan-field" data-field="travail" placeholder="Profession..."/></div>
+        <div><div class="field-lbl">Activité quotidienne</div><input class="inp bilan-field" data-field="activite_quot" placeholder="Sédentaire, actif..."/></div>
+      </div>
+
+      <!-- Sous-section : Antécédents / Appareillage / Examens -->
+      <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;">Antécédents / Appareillage / Examens</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="grid-column:1/-1;"><div class="field-lbl">Antécédents (traumatiques, personnels, familiaux)</div><textarea class="inp bilan-field" rows="2" data-field="antecedents" placeholder="Fractures, entorses, chirurgies, maladies..."></textarea></div>
+        <div><div class="field-lbl">Appareillage</div><input class="inp bilan-field" data-field="appareillage" placeholder="Semelles, lunettes..."/></div>
+        <div><div class="field-lbl">Examens complémentaires</div><textarea class="inp bilan-field" rows="2" data-field="examens" placeholder="Radio, IRM, scanner, bilan sanguin..."></textarea></div>
+        <div style="grid-column:1/-1;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span class="field-lbl" style="white-space:nowrap;">1ère intention :</span>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="1ere_intention" value="oui"/> Oui</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="1ere_intention" value="non"/> Non</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sous-section : Motif & douleur -->
+      <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;">Motif & douleur</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="grid-column:1/-1;"><div class="field-lbl">Motif de consultation</div><textarea class="inp bilan-field" rows="2" data-field="motif" placeholder="Douleurs, inconfort, demande de bilan..."></textarea></div>
+        <div style="grid-column:1/-1;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span class="field-lbl" style="white-space:nowrap;">Douleur :</span>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="douleur_oui_non" value="oui"/> Oui</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="douleur_oui_non" value="non"/> Non</label>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;"><div class="field-lbl">Localisation et horaire de la douleur (1er fois / récidive)</div><textarea class="inp bilan-field" rows="2" data-field="douleur" placeholder="Ex: Genou droit à l'effort depuis 3 semaines..."></textarea></div>
+        <div style="grid-column:1/-1;">
+          <div class="field-lbl">Échelle Visuelle Analogique (0-10)</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <input type="range" min="0" max="10" value="0" id="sp-an-eva" class="bilan-field" data-field="eva" oninput="document.getElementById('sp-an-eva-val').textContent=this.value" style="flex:1;"/>
+            <span style="font-size:13px;font-weight:600;min-width:70px;text-align:right;">Score : <span id="sp-an-eva-val">0</span>/10</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sous-section : Traitement & notes -->
+      <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;">Traitement & notes</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
         <span class="field-lbl" style="white-space:nowrap;">Traitement podologique :</span>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="ttt-podo" value="oui" onchange="setBilanField('ttt_podo','oui')"/> Oui</label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="ttt-podo" value="non" onchange="setBilanField('ttt_podo','non')"/> Non</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="ttt_podo" value="oui"/> Oui</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="ttt_podo" value="non"/> Non</label>
         <input class="inp bilan-field" data-field="ttt_podo_detail" placeholder="Si oui, lequel ?" style="flex:1;min-width:150px;"/>
       </div>
+      <div><div class="field-lbl">Notes complémentaires</div><textarea class="inp bilan-field" rows="2" data-field="notes_generales" placeholder="..."></textarea></div>
     </div>
     </div>
 
