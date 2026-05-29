@@ -10720,7 +10720,7 @@ function _stopMic(btn) {
   });
   if(btn) { btn.style.opacity='0.6'; btn.style.background='none'; }
   var fb = document.getElementById('mic-float');
-  if(fb) { fb.style.background='#0e1f38'; fb.textContent='\u1F3A4'; }
+  if(fb) { fb.style.background='#0e1f38'; fb.innerHTML='&#127908;'; }
   _micTargetId = null;
 }
 
