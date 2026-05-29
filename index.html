@@ -990,119 +990,509 @@
     <!-- NEUROLOGIE FONCTIONNELLE -->
     <div class="card sport-card-violet">
       <div class="sport-block-title c-violet">🧠 Neurologie Fonctionnelle</div>
-      <div style="font-size:11px;color:var(--mut);margin-bottom:10px;">Cochez les cases · Utilisez le dictaphone pour annoter les champs texte</div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div>
-          <div style="font-size:11px;font-weight:700;margin-bottom:6px;">Analyse Posturale Statique</div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Épaule + basse</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_epaule_G" onchange="setBilanField('ps_epaule_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_epaule_D" onchange="setBilanField('ps_epaule_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_epaule_N" onchange="setBilanField('ps_epaule_N',this.checked)"/> N</label></div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Rotation interne épaule</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_rot_epaule_G" onchange="setBilanField('ps_rot_epaule_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_rot_epaule_D" onchange="setBilanField('ps_rot_epaule_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_rot_epaule_N" onchange="setBilanField('ps_rot_epaule_N',this.checked)"/> N</label></div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Flexion du coude</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_flex_coude_G" onchange="setBilanField('ps_flex_coude_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_flex_coude_D" onchange="setBilanField('ps_flex_coude_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_flex_coude_N" onchange="setBilanField('ps_flex_coude_N',this.checked)"/> N</label></div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Pronation du poignet</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_pron_poignet_G" onchange="setBilanField('ps_pron_poignet_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_pron_poignet_D" onchange="setBilanField('ps_pron_poignet_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-ps_pron_poignet_N" onchange="setBilanField('ps_pron_poignet_N',this.checked)"/> N</label></div>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:700;margin-bottom:6px;">Analyse Posturale Dynamique</div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Pattern Tronc cérébral (RIMS/REMI)</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_tc_G" onchange="setBilanField('pd_tc_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_tc_D" onchange="setBilanField('pd_tc_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_tc_N" onchange="setBilanField('pd_tc_N',this.checked)"/> N</label></div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Pattern Cervelet (RIMS/RIMI)</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_cerv_G" onchange="setBilanField('pd_cerv_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_cerv_D" onchange="setBilanField('pd_cerv_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_cerv_N" onchange="setBilanField('pd_cerv_N',this.checked)"/> N</label></div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Défaut stabilisation tête</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_stab_tete_G" onchange="setBilanField('pd_stab_tete_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_stab_tete_D" onchange="setBilanField('pd_stab_tete_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_stab_tete_N" onchange="setBilanField('pd_stab_tete_N',this.checked)"/> N</label></div>
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Membre sup peu mobile</span><label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_memb_sup_G" onchange="setBilanField('pd_memb_sup_G',this.checked)"/> G</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_memb_sup_D" onchange="setBilanField('pd_memb_sup_D',this.checked)"/> D</label>&nbsp;<label style="font-size:10px;cursor:pointer;"><input type="checkbox" id="sbf-pd_memb_sup_N" onchange="setBilanField('pd_memb_sup_N',this.checked)"/> N</label></div>
+      <!-- SOUS-BLOC 1 : ANALYSE POSTURALE STATIQUE + DYNAMIQUE + CF + ACD -->
+      <div style="border-radius:10px;overflow-x:auto;margin-bottom:12px;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <tr>
+            <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;color:#222;">ANALYSE POSTURALE STATIQUE</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">G</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">D</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">N</td>
+            <td colspan="4" style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px 6px;border:1px solid #999;">ANALYSE POSTURALE DYNAMIQUE</td>
+            <td style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">G</td>
+            <td style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">D</td>
+            <td style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">N</td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Épaule + basse</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-epaule-g" onchange="setBilanField('aps_epaule_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-epaule-d" onchange="setBilanField('aps_epaule_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-epaule-n" onchange="setBilanField('aps_epaule_n',this.checked)"/></td>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">PATTERN TRONC CÉRÉBRAL (RIMS/REMI)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-tronc-g" onchange="setBilanField('apd_tronc_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-tronc-d" onchange="setBilanField('apd_tronc_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-tronc-n" onchange="setBilanField('apd_tronc_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Rotation interne épaule</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-rot-g" onchange="setBilanField('aps_rot_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-rot-d" onchange="setBilanField('aps_rot_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-rot-n" onchange="setBilanField('aps_rot_n',this.checked)"/></td>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">PATTERN CERVELET (RIMS/RIMI)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-cervelet-g" onchange="setBilanField('apd_cervelet_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-cervelet-d" onchange="setBilanField('apd_cervelet_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-cervelet-n" onchange="setBilanField('apd_cervelet_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion du coude</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-coude-g" onchange="setBilanField('aps_coude_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-coude-d" onchange="setBilanField('aps_coude_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-coude-n" onchange="setBilanField('aps_coude_n',this.checked)"/></td>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">Défaut stabilisation tête</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-tete-g" onchange="setBilanField('apd_tete_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-tete-d" onchange="setBilanField('apd_tete_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-tete-n" onchange="setBilanField('apd_tete_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Pronation du poignet</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-pron-g" onchange="setBilanField('aps_pron_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-pron-d" onchange="setBilanField('aps_pron_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-aps-pron-n" onchange="setBilanField('aps_pron_n',this.checked)"/></td>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">Membre sup peu mobile</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-membre-g" onchange="setBilanField('apd_membre_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-membre-d" onchange="setBilanField('apd_membre_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-apd-membre-n" onchange="setBilanField('apd_membre_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;color:#222;">CRITÈRES DE FORCE</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">G</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">D</td>
+            <td style="border:1px solid #999;"></td>
+            <td colspan="4" style="background:#ddd;font-weight:700;padding:4px 6px;border:1px solid #999;color:#222;">AUTRES CRITÈRES EN DYNAMIQUE</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">G</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:4px;border:1px solid #999;color:#222;">D</td>
+            <td style="border:1px solid #999;"></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles extenseurs poignet</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-cf-ext-g" onchange="setBilanField('cf_ext_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-cf-ext-d" onchange="setBilanField('cf_ext_d',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion poignet et doigts</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-acd-flex-g" onchange="setBilanField('acd_flex_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-acd-flex-d" onchange="setBilanField('acd_flex_d',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles Fléchisseurs de hanche</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-cf-flex-g" onchange="setBilanField('cf_flex_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-cf-flex-d" onchange="setBilanField('cf_flex_d',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Hyperextension genou</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-acd-hyper-g" onchange="setBilanField('acd_hyper_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-acd-hyper-d" onchange="setBilanField('acd_hyper_d',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- SOUS-BLOC 2 : HYPOTHÈSE -->
+      <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:14px;">
+        <div style="font-weight:700;color:#b7740a;margin-bottom:8px;">🎯 HYPOTHÈSE</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:6px 16px;">
+            <input type="checkbox" id="sn-hypo-tronc" onchange="setBilanField('hypo_tronc',this.checked)" style="width:14px;height:14px;"/>
+            <span style="color:#e74c3c;font-weight:700;">🔴 TRONC CÉRÉBRAL</span>
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:6px 16px;">
+            <input type="checkbox" id="sn-hypo-cervelet" onchange="setBilanField('hypo_cervelet',this.checked)" style="width:14px;height:14px;"/>
+            <span style="color:#3498db;font-weight:700;">🔵 CERVELET</span>
+          </label>
         </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <div class="field-lbl">Hypothèse (Tronc Cérébral / Cervelet)</div>
-        <div style="display:flex;gap:12px;margin-top:4px;">
-          <label style="font-size:12px;cursor:pointer;"><input type="radio" name="neuro_hyp" value="tc" onchange="setBilanField('neuro_hypothese','tc')"/> Tronc Cérébral</label>
-          <label style="font-size:12px;cursor:pointer;"><input type="radio" name="neuro_hyp" value="cerv" onchange="setBilanField('neuro_hypothese','cerv')"/> Cervelet</label>
-          <label style="font-size:12px;cursor:pointer;"><input type="radio" name="neuro_hyp" value="mixte" onchange="setBilanField('neuro_hypothese','mixte')"/> Mixte</label>
+      <!-- SOUS-BLOC 3 : TABLEAU PRINCIPAL TRONC / VESTIBULAIRE / CERVELET -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:12px;">
+
+        <!-- COLONNE TRONC CÉRÉBRAL (rouge) -->
+        <div style="border:2px solid #e74c3c;border-radius:10px;overflow:hidden;">
+          <div style="background:#e74c3c;color:#fff;text-align:center;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">🔴 TRONC CÉRÉBRAL</div>
+          <table style="width:100%;border-collapse:collapse;font-size:10px;">
+            <tr>
+              <td colspan="2" style="background:#f8d7da;color:#222;font-weight:700;padding:3px 4px;border:1px solid #e74c3c;">NERFS CRÂNIENS</td>
+              <td style="background:#f8d7da;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #e74c3c;">G</td>
+              <td style="background:#f8d7da;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #e74c3c;">D</td>
+              <td style="background:#f8d7da;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #e74c3c;">N</td>
+            </tr>
+          <tr>
+            <td colspan="2" style="padding:2px 4px;border:1px solid #f8d7da;">Recapillarisation</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-recap-g" onchange="setBilanField('nc_recap_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-recap-d" onchange="setBilanField('nc_recap_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-recap-n" onchange="setBilanField('nc_recap_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;"></td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC1</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc1-g" onchange="setBilanField('nc_nc1_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc1-d" onchange="setBilanField('nc_nc1_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc1-n" onchange="setBilanField('nc_nc1_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;"></td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC2</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc2-g" onchange="setBilanField('nc_nc2_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc2-d" onchange="setBilanField('nc_nc2_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc2-n" onchange="setBilanField('nc_nc2_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Mésencéphale</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC3</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc3-g" onchange="setBilanField('nc_nc3_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc3-d" onchange="setBilanField('nc_nc3_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc3-n" onchange="setBilanField('nc_nc3_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Mésencéphale</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC4</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc4-g" onchange="setBilanField('nc_nc4_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc4-d" onchange="setBilanField('nc_nc4_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc4-n" onchange="setBilanField('nc_nc4_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Pont de Varole</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC5</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc5-g" onchange="setBilanField('nc_nc5_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc5-d" onchange="setBilanField('nc_nc5_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc5-n" onchange="setBilanField('nc_nc5_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Pont de Varole</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC6</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc6-g" onchange="setBilanField('nc_nc6_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc6-d" onchange="setBilanField('nc_nc6_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc6-n" onchange="setBilanField('nc_nc6_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Pont de Varole</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC7</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc7-g" onchange="setBilanField('nc_nc7_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc7-d" onchange="setBilanField('nc_nc7_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc7-n" onchange="setBilanField('nc_nc7_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Pont de Varole</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC8</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc8-g" onchange="setBilanField('nc_nc8_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc8-d" onchange="setBilanField('nc_nc8_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc8-n" onchange="setBilanField('nc_nc8_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Bulbe rachidien</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC9</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc9-g" onchange="setBilanField('nc_nc9_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc9-d" onchange="setBilanField('nc_nc9_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc9-n" onchange="setBilanField('nc_nc9_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Bulbe rachidien</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC10</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc10-g" onchange="setBilanField('nc_nc10_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc10-d" onchange="setBilanField('nc_nc10_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc10-n" onchange="setBilanField('nc_nc10_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Bulbe rachidien</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC11</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc11-g" onchange="setBilanField('nc_nc11_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc11-d" onchange="setBilanField('nc_nc11_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc11-n" onchange="setBilanField('nc_nc11_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Bulbe rachidien</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">NC12</td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc12-g" onchange="setBilanField('nc_nc12_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc12-d" onchange="setBilanField('nc_nc12_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="sn-nc-nc12-n" onchange="setBilanField('nc_nc12_n',this.checked)"/></td>
+          </tr>
+            <tr style="background:#ddd;font-weight:700;color:#222;">
+              <td colspan="2" style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
+              <td style="text-align:center;border:1px solid #999;" id="sn-nc-total-g">0</td>
+              <td style="text-align:center;border:1px solid #999;" id="sn-nc-total-d">0</td>
+              <td style="border:1px solid #999;"></td>
+            </tr>
+          </table>
         </div>
+
+        <!-- COLONNE CONFLUENCE DES DONNÉES (gris) -->
+        <div style="border:2px solid #555;border-radius:10px;overflow:hidden;">
+          <div style="background:#555;color:#fff;text-align:center;font-style:italic;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">⚡ CONFLUENCE DES DONNÉES</div>
+          <table style="width:100%;border-collapse:collapse;font-size:10px;">
+            <tr>
+              <td style="font-weight:700;padding:3px 4px;border:1px solid #ccc;">VESTIBULAIRE</td>
+              <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
+              <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
+              <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+            </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">ROMBERG + CSC ANT</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-ant-g" onchange="setBilanField('vest_ant_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-ant-d" onchange="setBilanField('vest_ant_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-ant-n" onchange="setBilanField('vest_ant_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">ROMBERG + CSC LAT</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-lat-g" onchange="setBilanField('vest_lat_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-lat-d" onchange="setBilanField('vest_lat_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-lat-n" onchange="setBilanField('vest_lat_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">ROMBERG + CSC POST</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-post-g" onchange="setBilanField('vest_post_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-post-d" onchange="setBilanField('vest_post_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-vest-post-n" onchange="setBilanField('vest_post_n',this.checked)"/></td>
+          </tr>
+            <tr><td colspan="4" style="background:#d4edda;color:#27ae60;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">PROPRIOCEPTION</td></tr>
+            <tr>
+              <td style="background:#d4edda;color:#222;font-weight:700;padding:3px 4px;border:1px solid #ccc;">PRIORITAIRES</td>
+              <td style="background:#d4edda;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
+              <td style="background:#d4edda;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
+              <td style="background:#d4edda;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+            </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#d4edda;color:#222;">FN LENT (M) E. passif</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-lent-g" onchange="setBilanField('prop_lent_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-lent-d" onchange="setBilanField('prop_lent_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-lent-n" onchange="setBilanField('prop_lent_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#d4edda;color:#222;">FN RAPIDE (M) E. actif</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-rapide-g" onchange="setBilanField('prop_rapide_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-rapide-d" onchange="setBilanField('prop_rapide_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-rapide-n" onchange="setBilanField('prop_rapide_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">GOLGI (M) force iso</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-golgi-g" onchange="setBilanField('prop_golgi_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-golgi-d" onchange="setBilanField('prop_golgi_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-golgi-n" onchange="setBilanField('prop_golgi_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">PACCINI (A) mvt précis</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-paccini-g" onchange="setBilanField('prop_paccini_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-paccini-d" onchange="setBilanField('prop_paccini_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-paccini-n" onchange="setBilanField('prop_paccini_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">RUFFINI (A) Décompression</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-ruffini-d-g" onchange="setBilanField('prop_ruffini_d_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-ruffini-d-d" onchange="setBilanField('prop_ruffini_d_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-ruffini-d-n" onchange="setBilanField('prop_ruffini_d_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">RUFFINI (A) Compression</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-ruffini-c-g" onchange="setBilanField('prop_ruffini_c_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-ruffini-c-d" onchange="setBilanField('prop_ruffini_c_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-ruffini-c-n" onchange="setBilanField('prop_ruffini_c_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;">GOLGI (A) mvt forcé</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-golgi-a-g" onchange="setBilanField('prop_golgi_a_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-golgi-a-d" onchange="setBilanField('prop_golgi_a_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-prop-golgi-a-n" onchange="setBilanField('prop_golgi_a_n',this.checked)"/></td>
+          </tr>
+            <tr style="background:#ddd;font-weight:700;color:#222;">
+              <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
+              <td style="text-align:center;border:1px solid #999;" id="sn-vest-total-g">0</td>
+              <td style="text-align:center;border:1px solid #999;" id="sn-vest-total-d">0</td>
+              <td style="border:1px solid #999;"></td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- COLONNE CERVELET (bleu) -->
+        <div style="border:2px solid #3498db;border-radius:10px;overflow:hidden;">
+          <div style="background:#3498db;color:#fff;text-align:center;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">🔵 CERVELET</div>
+          <table style="width:100%;border-collapse:collapse;font-size:10px;">
+            <tr>
+              <td style="background:#d6eaf8;color:#222;font-weight:700;padding:3px 4px;border:1px solid #3498db;">VERMIS</td>
+              <td style="background:#d6eaf8;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">G</td>
+              <td style="background:#d6eaf8;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">D</td>
+              <td style="background:#d6eaf8;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;">N</td>
+            </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;color:#222;">SHARP. ROMBERG</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-vermis-sharp-g" onchange="setBilanField('vermis_sharp_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-vermis-sharp-d" onchange="setBilanField('vermis_sharp_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-vermis-sharp-n" onchange="setBilanField('vermis_sharp_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;color:#222;">ROMBERG 1 PIED</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-vermis-romberg-g" onchange="setBilanField('vermis_romberg_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-vermis-romberg-d" onchange="setBilanField('vermis_romberg_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-vermis-romberg-n" onchange="setBilanField('vermis_romberg_n',this.checked)"/></td>
+          </tr>
+            <tr>
+              <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;color:#222;">PROPRIO AXE <span style="font-size:9px;">X sur les parties du corps affectées</span></td>
+              <td colspan="3" style="text-align:center;border:1px solid #d6eaf8;padding:2px;">
+                <input type="checkbox" id="sn-proprio-axe-tete" onchange="setBilanField('proprio_axe_tete',this.checked)" title="Tête"/> Tête
+                <input type="checkbox" id="sn-proprio-axe-corps" onchange="setBilanField('proprio_axe_corps',this.checked)" title="Corps"/> Corps
+                <input type="checkbox" id="sn-proprio-axe-bassin" onchange="setBilanField('proprio_axe_bassin',this.checked)" title="Bassin"/> Bassin
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;color:#222;">INTER</td>
+              <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">G</td>
+              <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">D</td>
+              <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">N</td>
+            </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;">Précision (doigt-nez)</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-inter-prec-g" onchange="setBilanField('inter_prec_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-inter-prec-d" onchange="setBilanField('inter_prec_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-inter-prec-n" onchange="setBilanField('inter_prec_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;">Coordination (mvt alternatif)</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-inter-coord-g" onchange="setBilanField('inter_coord_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-inter-coord-d" onchange="setBilanField('inter_coord_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-inter-coord-n" onchange="setBilanField('inter_coord_n',this.checked)"/></td>
+          </tr>
+            <tr>
+              <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;color:#222;">LATÉRAL</td>
+              <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">G</td>
+              <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">D</td>
+              <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">N</td>
+            </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;">Précision (piano)</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-lat-prec-g" onchange="setBilanField('lat_prec_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-lat-prec-d" onchange="setBilanField('lat_prec_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-lat-prec-n" onchange="setBilanField('lat_prec_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;">Coordination (Go-No Go)</td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-lat-coord-g" onchange="setBilanField('lat_coord_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-lat-coord-d" onchange="setBilanField('lat_coord_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="sn-lat-coord-n" onchange="setBilanField('lat_coord_n',this.checked)"/></td>
+          </tr>
+            <tr style="background:#ddd;font-weight:700;color:#222;">
+              <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
+              <td style="text-align:center;border:1px solid #999;" id="sn-cerv-total-g">0</td>
+              <td style="text-align:center;border:1px solid #999;" id="sn-cerv-total-d">0</td>
+              <td style="border:1px solid #999;"></td>
+            </tr>
+          </table>
+        </div>
+
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
-        <!-- Nerfs crâniens -->
-        <div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:8px;">
-          <div style="font-size:10px;font-weight:700;color:#e74c3c;margin-bottom:6px;">NERFS CRÂNIENS</div>
-          <div style="font-size:9px;display:grid;grid-template-columns:auto 1fr;gap:2px 6px;align-items:center;">
-            <span style="font-weight:500;">Recapillarisation</span><div><label><input type="checkbox" id="sbf-nc_recap_G" onchange="setBilanField('nc_recap_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc_recap_D" onchange="setBilanField('nc_recap_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc_recap_N" onchange="setBilanField('nc_recap_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC1</span><div><label><input type="checkbox" id="sbf-nc1_G" onchange="setBilanField('nc1_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc1_D" onchange="setBilanField('nc1_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc1_N" onchange="setBilanField('nc1_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC2</span><div><label><input type="checkbox" id="sbf-nc2_G" onchange="setBilanField('nc2_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc2_D" onchange="setBilanField('nc2_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc2_N" onchange="setBilanField('nc2_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC3</span><div><label><input type="checkbox" id="sbf-nc3_G" onchange="setBilanField('nc3_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc3_D" onchange="setBilanField('nc3_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc3_N" onchange="setBilanField('nc3_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC4</span><div><label><input type="checkbox" id="sbf-nc4_G" onchange="setBilanField('nc4_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc4_D" onchange="setBilanField('nc4_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc4_N" onchange="setBilanField('nc4_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC5</span><div><label><input type="checkbox" id="sbf-nc5_G" onchange="setBilanField('nc5_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc5_D" onchange="setBilanField('nc5_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc5_N" onchange="setBilanField('nc5_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC6</span><div><label><input type="checkbox" id="sbf-nc6_G" onchange="setBilanField('nc6_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc6_D" onchange="setBilanField('nc6_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc6_N" onchange="setBilanField('nc6_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC7</span><div><label><input type="checkbox" id="sbf-nc7_G" onchange="setBilanField('nc7_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc7_D" onchange="setBilanField('nc7_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc7_N" onchange="setBilanField('nc7_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC8</span><div><label><input type="checkbox" id="sbf-nc8_G" onchange="setBilanField('nc8_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc8_D" onchange="setBilanField('nc8_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc8_N" onchange="setBilanField('nc8_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC9</span><div><label><input type="checkbox" id="sbf-nc9_G" onchange="setBilanField('nc9_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc9_D" onchange="setBilanField('nc9_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc9_N" onchange="setBilanField('nc9_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC10</span><div><label><input type="checkbox" id="sbf-nc10_G" onchange="setBilanField('nc10_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc10_D" onchange="setBilanField('nc10_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc10_N" onchange="setBilanField('nc10_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC11</span><div><label><input type="checkbox" id="sbf-nc11_G" onchange="setBilanField('nc11_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc11_D" onchange="setBilanField('nc11_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc11_N" onchange="setBilanField('nc11_N',this.checked)"/> N</label></div>
-            <span style="font-weight:500;">NC12</span><div><label><input type="checkbox" id="sbf-nc12_G" onchange="setBilanField('nc12_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-nc12_D" onchange="setBilanField('nc12_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-nc12_N" onchange="setBilanField('nc12_N',this.checked)"/> N</label></div>
-          </div>
-          <div style="margin-top:6px;font-size:10px;">TOTAL: <input class="inp bilan-field" data-field="nc_total" style="width:50px;display:inline;padding:2px 4px;font-size:10px;"/></div>
-        </div>
-        <!-- Vestibulaire / Proprioception -->
-        <div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:8px;">
-          <div style="font-size:10px;font-weight:700;color:#2980b9;margin-bottom:4px;">VESTIBULAIRE</div>
-          <div style="font-size:9px;">
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">ROMBERG+CSC ANT</span><label><input type="checkbox" id="sbf-vest_csc_ant_G" onchange="setBilanField('vest_csc_ant_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-vest_csc_ant_D" onchange="setBilanField('vest_csc_ant_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-vest_csc_ant_N" onchange="setBilanField('vest_csc_ant_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">ROMBERG+CSC LAT</span><label><input type="checkbox" id="sbf-vest_csc_lat_G" onchange="setBilanField('vest_csc_lat_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-vest_csc_lat_D" onchange="setBilanField('vest_csc_lat_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-vest_csc_lat_N" onchange="setBilanField('vest_csc_lat_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">ROMBERG+CSC POST</span><label><input type="checkbox" id="sbf-vest_csc_post_G" onchange="setBilanField('vest_csc_post_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-vest_csc_post_D" onchange="setBilanField('vest_csc_post_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-vest_csc_post_N" onchange="setBilanField('vest_csc_post_N',this.checked)"/> N</label></div>
-          </div>
-          <div style="font-size:10px;font-weight:700;color:#2980b9;margin-top:6px;margin-bottom:4px;">PROPRIOCEPTION</div>
-          <div style="font-size:9px;">
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">FN LENT (M) E. passif</span><label><input type="checkbox" id="sbf-prop_fn_lent_G" onchange="setBilanField('prop_fn_lent_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-prop_fn_lent_D" onchange="setBilanField('prop_fn_lent_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-prop_fn_lent_N" onchange="setBilanField('prop_fn_lent_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">FN RAPIDE (M) E. actif</span><label><input type="checkbox" id="sbf-prop_fn_rapide_G" onchange="setBilanField('prop_fn_rapide_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-prop_fn_rapide_D" onchange="setBilanField('prop_fn_rapide_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-prop_fn_rapide_N" onchange="setBilanField('prop_fn_rapide_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">GOLGI (M) force iso</span><label><input type="checkbox" id="sbf-prop_golgi_G" onchange="setBilanField('prop_golgi_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-prop_golgi_D" onchange="setBilanField('prop_golgi_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-prop_golgi_N" onchange="setBilanField('prop_golgi_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">PACCINI (A) mvt précis</span><label><input type="checkbox" id="sbf-prop_paccini_G" onchange="setBilanField('prop_paccini_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-prop_paccini_D" onchange="setBilanField('prop_paccini_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-prop_paccini_N" onchange="setBilanField('prop_paccini_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">RUFFINI (A) Décompression</span><label><input type="checkbox" id="sbf-prop_ruffini_dec_G" onchange="setBilanField('prop_ruffini_dec_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-prop_ruffini_dec_D" onchange="setBilanField('prop_ruffini_dec_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-prop_ruffini_dec_N" onchange="setBilanField('prop_ruffini_dec_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">RUFFINI (A) Compression</span><label><input type="checkbox" id="sbf-prop_ruffini_com_G" onchange="setBilanField('prop_ruffini_com_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-prop_ruffini_com_D" onchange="setBilanField('prop_ruffini_com_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-prop_ruffini_com_N" onchange="setBilanField('prop_ruffini_com_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">GOLGI (A) mvt forcé</span><label><input type="checkbox" id="sbf-prop_golgi_a_G" onchange="setBilanField('prop_golgi_a_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-prop_golgi_a_D" onchange="setBilanField('prop_golgi_a_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-prop_golgi_a_N" onchange="setBilanField('prop_golgi_a_N',this.checked)"/> N</label></div>
-          </div>
-          <div style="margin-top:6px;font-size:10px;">TOTAL: <input class="inp bilan-field" data-field="vest_total" style="width:50px;display:inline;padding:2px 4px;font-size:10px;"/></div>
-        </div>
-        <!-- Vermis / Cervelet -->
-        <div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:8px;">
-          <div style="font-size:10px;font-weight:700;color:#27ae60;margin-bottom:4px;">VERMIS</div>
-          <div style="font-size:9px;">
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">SHARP. ROMBERG</span><label><input type="checkbox" id="sbf-vermis_sharp" onchange="setBilanField('vermis_sharp',this.checked)"/> ✓</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">ROMBERG 1 PIED</span><label><input type="checkbox" id="sbf-vermis_1pied" onchange="setBilanField('vermis_1pied',this.checked)"/> ✓</label></div>
-          </div>
-          <div style="font-size:10px;font-weight:700;color:#27ae60;margin-top:6px;margin-bottom:4px;">INTER / LATÉRAL</div>
-          <div style="font-size:9px;">
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">Précision (doigt-nez)</span><label><input type="checkbox" id="sbf-cerv_prec_dg_G" onchange="setBilanField('cerv_prec_dg_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-cerv_prec_dg_D" onchange="setBilanField('cerv_prec_dg_D',this.checked)"/> D</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">Coordination (mvt alt.)</span><label><input type="checkbox" id="sbf-cerv_coord_G" onchange="setBilanField('cerv_coord_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-cerv_coord_D" onchange="setBilanField('cerv_coord_D',this.checked)"/> D</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">Précision (piano)</span><label><input type="checkbox" id="sbf-cerv_piano_G" onchange="setBilanField('cerv_piano_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-cerv_piano_D" onchange="setBilanField('cerv_piano_D',this.checked)"/> D</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">Coordination (Go-No Go)</span><label><input type="checkbox" id="sbf-cerv_gono_G" onchange="setBilanField('cerv_gono_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-cerv_gono_D" onchange="setBilanField('cerv_gono_D',this.checked)"/> D</label></div>
-          </div>
-          <div style="margin-top:6px;font-size:10px;">TOTAL: <input class="inp bilan-field" data-field="cerv_total" style="width:50px;display:inline;padding:2px 4px;font-size:10px;"/></div>
-        </div>
-      </div>
+      <!-- SOUS-BLOC 4 + 5 : RÉFLEXES ARCHAÏQUES + RÉCEPTEURS TACTILES (grid 2 colonnes) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
 
-      <!-- Réflexes archaïques + Récepteurs tactiles -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div style="background:var(--surf);border:2px solid #8e44ad;border-radius:var(--rs);padding:8px;">
-          <div style="font-size:10px;font-weight:700;margin-bottom:6px;color:#8e44ad;">🟣 RÉFLEXES ARCHAÏQUES</div>
-          <div style="font-size:9px;">
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="width:40px;font-weight:500;">RPP</span><label><input type="checkbox" id="sbf-refl_rpp_O" onchange="setBilanField('refl_rpp_O',this.checked)"/> O</label> <label><input type="checkbox" id="sbf-refl_rpp_N" onchange="setBilanField('refl_rpp_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">RTAC</span><label><input type="checkbox" id="sbf-refl_rtac_G" onchange="setBilanField('refl_rtac_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-refl_rtac_D" onchange="setBilanField('refl_rtac_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-refl_rtac_N" onchange="setBilanField('refl_rtac_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="width:40px;font-weight:500;">RTP</span><label><input type="checkbox" id="sbf-refl_rtp_O" onchange="setBilanField('refl_rtp_O',this.checked)"/> O</label> <label><input type="checkbox" id="sbf-refl_rtp_N" onchange="setBilanField('refl_rtp_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">GALANT</span><label><input type="checkbox" id="sbf-refl_galant_G" onchange="setBilanField('refl_galant_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-refl_galant_D" onchange="setBilanField('refl_galant_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-refl_galant_N" onchange="setBilanField('refl_galant_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="width:40px;font-weight:500;">MORO</span><label><input type="checkbox" id="sbf-refl_moro_O" onchange="setBilanField('refl_moro_O',this.checked)"/> O</label> <label><input type="checkbox" id="sbf-refl_moro_N" onchange="setBilanField('refl_moro_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">BABINSKI</span><label><input type="checkbox" id="sbf-refl_babinski_G" onchange="setBilanField('refl_babinski_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-refl_babinski_D" onchange="setBilanField('refl_babinski_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-refl_babinski_N" onchange="setBilanField('refl_babinski_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="width:40px;font-weight:500;">PEREZ</span><label><input type="checkbox" id="sbf-refl_perez_O" onchange="setBilanField('refl_perez_O',this.checked)"/> O</label> <label><input type="checkbox" id="sbf-refl_perez_N" onchange="setBilanField('refl_perez_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">PLANTAIRE</span><label><input type="checkbox" id="sbf-refl_plantaire_G" onchange="setBilanField('refl_plantaire_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-refl_plantaire_D" onchange="setBilanField('refl_plantaire_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-refl_plantaire_N" onchange="setBilanField('refl_plantaire_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="width:40px;font-weight:500;">LANDAU</span><label><input type="checkbox" id="sbf-refl_landau_O" onchange="setBilanField('refl_landau_O',this.checked)"/> O</label> <label><input type="checkbox" id="sbf-refl_landau_N" onchange="setBilanField('refl_landau_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">PALMAIRE</span><label><input type="checkbox" id="sbf-refl_palmaire_G" onchange="setBilanField('refl_palmaire_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-refl_palmaire_D" onchange="setBilanField('refl_palmaire_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-refl_palmaire_N" onchange="setBilanField('refl_palmaire_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="width:40px;font-weight:500;">REPT.</span><label><input type="checkbox" id="sbf-refl_reptation_O" onchange="setBilanField('refl_reptation_O',this.checked)"/> O</label> <label><input type="checkbox" id="sbf-refl_reptation_N" onchange="setBilanField('refl_reptation_N',this.checked)"/> N</label><span style="flex:1;"></span><span style="width:44px;font-weight:500;">BABKIN</span><label><input type="checkbox" id="sbf-refl_babkin_G" onchange="setBilanField('refl_babkin_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-refl_babkin_D" onchange="setBilanField('refl_babkin_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-refl_babkin_N" onchange="setBilanField('refl_babkin_N',this.checked)"/> N</label></div>
-          </div>
-        </div>
-        <div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:8px;">
-          <div style="font-size:10px;font-weight:700;margin-bottom:6px;">RÉCEPTEURS TACTILES</div>
-          <div style="font-size:9px;">
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;">Merkel (Toucher/pression)</span><label><input type="checkbox" id="sbf-rect_merkel_G" onchange="setBilanField('rect_merkel_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-rect_merkel_D" onchange="setBilanField('rect_merkel_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-rect_merkel_N" onchange="setBilanField('rect_merkel_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;">Ruffini (Étirement)</span><label><input type="checkbox" id="sbf-rect_ruffini_G" onchange="setBilanField('rect_ruffini_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-rect_ruffini_D" onchange="setBilanField('rect_ruffini_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-rect_ruffini_N" onchange="setBilanField('rect_ruffini_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;">Pacini (vibration)</span><label><input type="checkbox" id="sbf-rect_pacini_G" onchange="setBilanField('rect_pacini_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-rect_pacini_D" onchange="setBilanField('rect_pacini_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-rect_pacini_N" onchange="setBilanField('rect_pacini_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;">TNL (piquer)</span><label><input type="checkbox" id="sbf-rect_tnl_G" onchange="setBilanField('rect_tnl_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-rect_tnl_D" onchange="setBilanField('rect_tnl_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-rect_tnl_N" onchange="setBilanField('rect_tnl_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;">Meissner (caresse coton)</span><label><input type="checkbox" id="sbf-rect_meissner_G" onchange="setBilanField('rect_meissner_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-rect_meissner_D" onchange="setBilanField('rect_meissner_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-rect_meissner_N" onchange="setBilanField('rect_meissner_N',this.checked)"/> N</label></div>
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0;"><span style="flex:1;">Poils (mouvement)</span><label><input type="checkbox" id="sbf-rect_poils_G" onchange="setBilanField('rect_poils_G',this.checked)"/> G</label> <label><input type="checkbox" id="sbf-rect_poils_D" onchange="setBilanField('rect_poils_D',this.checked)"/> D</label> <label><input type="checkbox" id="sbf-rect_poils_N" onchange="setBilanField('rect_poils_N',this.checked)"/> N</label></div>
-          </div>
-        </div>
+        <!-- RÉFLEXES ARCHAÏQUES (violet) -->
+        <table style="border-collapse:collapse;font-size:10px;width:100%;border-radius:10px;overflow:hidden;">
+          <tr><td colspan="8" style="background:#8e44ad;color:#fff;font-weight:700;text-align:center;padding:8px;border:1px solid #8e44ad;font-size:12px;letter-spacing:1px;">🟣 RÉFLEXES ARCHAÏQUES</td></tr>
+          <tr>
+            <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;color:#222;">PRIORITAIRES</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">O</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">N</td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">G</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">D</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">N</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#e8d5f5;color:#222;">RPP</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-rpp-o" onchange="setBilanField('ref_rpp_o',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-rpp-n" onchange="setBilanField('ref_rpp_n',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="padding:2px 4px;border:1px solid #ccc;">RTAC</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-rtac-g" onchange="setBilanField('ref_rtac_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-rtac-d" onchange="setBilanField('ref_rtac_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-rtac-n" onchange="setBilanField('ref_rtac_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#e8d5f5;color:#222;">RTP</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-rtp-o" onchange="setBilanField('ref_rtp_o',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-rtp-n" onchange="setBilanField('ref_rtp_n',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="padding:2px 4px;border:1px solid #ccc;">GALANT</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-galant-g" onchange="setBilanField('ref_galant_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-galant-d" onchange="setBilanField('ref_galant_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-galant-n" onchange="setBilanField('ref_galant_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#e8d5f5;color:#222;">MORO</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-moro-o" onchange="setBilanField('ref_moro_o',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-moro-n" onchange="setBilanField('ref_moro_n',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="padding:2px 4px;border:1px solid #ccc;">BABINSKI</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-babinski-g" onchange="setBilanField('ref_babinski_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-babinski-d" onchange="setBilanField('ref_babinski_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-babinski-n" onchange="setBilanField('ref_babinski_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fff;color:#222;">PEREZ</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-perez-o" onchange="setBilanField('ref_perez_o',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-perez-n" onchange="setBilanField('ref_perez_n',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="padding:2px 4px;border:1px solid #ccc;">PLANTAIRE</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-plantaire-g" onchange="setBilanField('ref_plantaire_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-plantaire-d" onchange="setBilanField('ref_plantaire_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-plantaire-n" onchange="setBilanField('ref_plantaire_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fff;color:#222;">LANDAU</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-landau-o" onchange="setBilanField('ref_landau_o',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-landau-n" onchange="setBilanField('ref_landau_n',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="padding:2px 4px;border:1px solid #ccc;">PALMAIRE</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-palmaire-g" onchange="setBilanField('ref_palmaire_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-palmaire-d" onchange="setBilanField('ref_palmaire_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-palmaire-n" onchange="setBilanField('ref_palmaire_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fff;color:#222;">REPTATION</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-reptation-o" onchange="setBilanField('ref_reptation_o',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-reptation-n" onchange="setBilanField('ref_reptation_n',this.checked)"/></td>
+            <td style="border:1px solid #ccc;"></td>
+            <td style="padding:2px 4px;border:1px solid #ccc;">BABKIN</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-babkin-g" onchange="setBilanField('ref_babkin_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-babkin-d" onchange="setBilanField('ref_babkin_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-ref-babkin-n" onchange="setBilanField('ref_babkin_n',this.checked)"/></td>
+          </tr>
+        </table>
+
+        <!-- RÉCEPTEURS TACTILES (orange) -->
+        <table style="border-collapse:collapse;font-size:10px;width:100%;border-radius:10px;overflow:hidden;">
+          <tr><td colspan="4" style="background:#f0a500;color:#fff;font-weight:700;text-align:center;padding:8px;border:1px solid #f0a500;font-size:12px;letter-spacing:1px;">🟠 RÉCEPTEURS TACTILES</td></tr>
+          <tr>
+            <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;color:#222;">PRIORITAIRES</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">G</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">D</td>
+            <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">N</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fdebd0;color:#222;">Merkel (Toucher/pression)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-merkel-g" onchange="setBilanField('tact_merkel_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-merkel-d" onchange="setBilanField('tact_merkel_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-merkel-n" onchange="setBilanField('tact_merkel_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fdebd0;color:#222;">Ruffini (Étirement)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-ruffini-g" onchange="setBilanField('tact_ruffini_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-ruffini-d" onchange="setBilanField('tact_ruffini_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-ruffini-n" onchange="setBilanField('tact_ruffini_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fdebd0;color:#222;">Pacini (vibration)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-pacini-g" onchange="setBilanField('tact_pacini_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-pacini-d" onchange="setBilanField('tact_pacini_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-pacini-n" onchange="setBilanField('tact_pacini_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fdebd0;color:#222;">TNL (piquer)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-tnl-g" onchange="setBilanField('tact_tnl_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-tnl-d" onchange="setBilanField('tact_tnl_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-tnl-n" onchange="setBilanField('tact_tnl_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fff;color:#222;">Meissner (caresse coton)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-meissner-g" onchange="setBilanField('tact_meissner_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-meissner-d" onchange="setBilanField('tact_meissner_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-meissner-n" onchange="setBilanField('tact_meissner_n',this.checked)"/></td>
+          </tr>
+          <tr>
+            <td style="padding:2px 4px;border:1px solid #ccc;background:#fff;color:#222;">Poils (mouvement)</td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-poils-g" onchange="setBilanField('tact_poils_g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-poils-d" onchange="setBilanField('tact_poils_d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="sn-tact-poils-n" onchange="setBilanField('tact_poils_n',this.checked)"/></td>
+          </tr>
+        </table>
+
       </div>
-      <div style="margin-top:8px;"><div class="field-lbl">Notes neurologie fonctionnelle</div><textarea class="inp bilan-field" rows="2" data-field="neuro_notes" placeholder="Observations, hypothèses cliniques..."></textarea></div>
     </div>
     </div>
 
