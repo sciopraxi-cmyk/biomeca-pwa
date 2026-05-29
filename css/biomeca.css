@@ -467,3 +467,24 @@ body.printing #rpt-print{display:block!important;}
 .sport-block-title.c-orange { color: #b7740a; }
 .sport-block-title.c-violet { color: #6c3483; }
 .sport-block-title.c-bleu   { color: #2471a3; }
+
+/* ───────── Pleine-card colorée façon posturo (Phase 1 #73-Socle) ───────── */
+/* Îlot thème clair scopé : redéfinit les tokens neutres sur les cards
+   colorées sport. Cascade CSS variables flippe automatiquement les ~163
+   usages inline var(--xxx) sombres en clair (--txt, --mut, --surf, --bord),
+   sans !important ni édition inline. Tokens d'accent (--blue/--green/--red)
+   et structure (--card, --bg) NON touchés. */
+
+.card[class*="sport-card-"] {
+  --txt: #1a2b3c;
+  --mut: #5a6b7c;
+  --surf: #ffffff;
+  --bord: rgba(0,0,0,0.12);
+  color: #1a2b3c;
+}
+
+.card.sport-card-vert   { border-left: 4px solid #2a7a4e; background: linear-gradient(135deg, #f0faf4, #e8f8ee); }
+.card.sport-card-rouge  { border-left: 4px solid #e74c3c; background: linear-gradient(135deg, #fff0f0, #ffe8e8); }
+.card.sport-card-orange { border-left: 4px solid #f0a500; background: linear-gradient(135deg, #fff9f0, #fff3e0); }
+.card.sport-card-violet { border-left: 4px solid #8e44ad; background: linear-gradient(135deg, #f5eeff, #ede0ff); }
+.card.sport-card-bleu   { border-left: 4px solid #3498db; background: linear-gradient(135deg, #eaf4ff, #dceeff); }
