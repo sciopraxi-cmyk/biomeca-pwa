@@ -9945,6 +9945,56 @@ function updateNeuroTotals() {
   if(cdt) cdt.textContent = cD;
 }
 
+// ───────────────────────────────────────────
+// SPORT — Totaux neuro fonctionnel (Sprint A2 #73)
+// Calcule 3 totaux affichés dans ssec-8 :
+// - sn-nc-total-g/d : nerfs crâniens (13 items)
+// - sn-vest-total-g/d : PROPRIOCEPTION uniquement (7 items, pas vestibulaire —
+//   comportement reproduit du posturo L9923 où "vest-total" compte seulement les prop)
+// - sn-cerv-total-g/d : cervelet (vermis + inter + lat, 6 items, sans proprio-axe)
+// ───────────────────────────────────────────
+function updateSportNeuroTotals() {
+  // 1. Total nerfs crâniens (13 items)
+  const ncIds = ['sn-nc-recap','sn-nc-nc1','sn-nc-nc2','sn-nc-nc3','sn-nc-nc4',
+                 'sn-nc-nc5','sn-nc-nc6','sn-nc-nc7','sn-nc-nc8','sn-nc-nc9',
+                 'sn-nc-nc10','sn-nc-nc11','sn-nc-nc12'];
+  let ncG=0, ncD=0;
+  ncIds.forEach(id => {
+    if(document.getElementById(id+'-g')?.checked) ncG++;
+    if(document.getElementById(id+'-d')?.checked) ncD++;
+  });
+  const tg = document.getElementById('sn-nc-total-g');
+  const td = document.getElementById('sn-nc-total-d');
+  if(tg) tg.textContent = ncG;
+  if(td) td.textContent = ncD;
+
+  // 2. Total "vest-total" (= PROPRIOCEPTION uniquement, pas vestibulaire — feature posturo)
+  const vestIds = ['sn-prop-lent','sn-prop-rapide','sn-prop-golgi','sn-prop-paccini',
+                   'sn-prop-ruffini-d','sn-prop-ruffini-c','sn-prop-golgi-a'];
+  let vG=0, vD=0;
+  vestIds.forEach(id => {
+    if(document.getElementById(id+'-g')?.checked) vG++;
+    if(document.getElementById(id+'-d')?.checked) vD++;
+  });
+  const vgt = document.getElementById('sn-vest-total-g');
+  const vdt = document.getElementById('sn-vest-total-d');
+  if(vgt) vgt.textContent = vG;
+  if(vdt) vdt.textContent = vD;
+
+  // 3. Total cervelet (vermis + inter + lat, sans proprio-axe)
+  const cervIds = ['sn-vermis-sharp','sn-vermis-romberg','sn-inter-prec','sn-inter-coord',
+                   'sn-lat-prec','sn-lat-coord'];
+  let cG=0, cD=0;
+  cervIds.forEach(id => {
+    if(document.getElementById(id+'-g')?.checked) cG++;
+    if(document.getElementById(id+'-d')?.checked) cD++;
+  });
+  const cgt = document.getElementById('sn-cerv-total-g');
+  const cdt = document.getElementById('sn-cerv-total-d');
+  if(cgt) cgt.textContent = cG;
+  if(cdt) cdt.textContent = cD;
+}
+
 function showPosturoSection(idx) {
   document.querySelectorAll('.posturo-section').forEach((s,i) => {
     s.style.display = i === idx ? 'block' : 'none';
@@ -10017,6 +10067,19 @@ function showSportBilanSection(idx) {
       const c = document.getElementById(id);
       if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') initMorphoCanvas(id);
     });
+  }, 150);
+  // Section 8 (Neuro fonctionnel) — trigger updateSportNeuroTotals + addEventListener
+  // change sur les checkboxes pour recalcul en temps réel. Idempotent via flag _sportNeuroBound.
+  if(idx === 8) setTimeout(() => {
+    const ssec8 = document.getElementById('ssec-8');
+    if(!ssec8) return;
+    if(!ssec8._sportNeuroBound) {
+      ssec8.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', updateSportNeuroTotals);
+      });
+      ssec8._sportNeuroBound = true;
+    }
+    updateSportNeuroTotals();
   }, 150);
   // 5. Section 9 (Traitements) — drawPiedsTemplate UNIQUEMENT la 1ère fois.
   //    _baseSnapshot est posé synchroniquement par drawPiedsTemplate L6744
