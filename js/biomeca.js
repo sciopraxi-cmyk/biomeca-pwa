@@ -9900,20 +9900,15 @@ function toggleSportSerrage(type) {
   const aggOpts = document.getElementById('sm-serrage-aggrav-opts');
   const amelOpts = document.getElementById('sm-serrage-amelio-opts');
   if(!aggOpts || !amelOpts) return;
-  if(type === 'aggravation') {
-    aggOpts.style.display = 'flex';
-    amelOpts.style.display = 'none';
-    const c1 = document.getElementById('sm-amelio-contact');
-    const c2 = document.getElementById('sm-amelio-tension');
-    if(c1) c1.checked = false;
-    if(c2) c2.checked = false;
-  } else {
-    amelOpts.style.display = 'flex';
-    aggOpts.style.display = 'none';
-    const c1 = document.getElementById('sm-aggr-dents');
-    const c2 = document.getElementById('sm-aggr-atm');
-    if(c1) c1.checked = false;
-    if(c2) c2.checked = false;
+  aggOpts.style.display  = (type === 'aggravation')  ? 'flex' : 'none';
+  amelOpts.style.display = (type === 'amelioration') ? 'flex' : 'none';
+  if(type !== 'aggravation') {
+    const c1 = document.getElementById('sm-aggr-dents');   if(c1) c1.checked = false;
+    const c2 = document.getElementById('sm-aggr-atm');     if(c2) c2.checked = false;
+  }
+  if(type !== 'amelioration') {
+    const c3 = document.getElementById('sm-amelio-contact'); if(c3) c3.checked = false;
+    const c4 = document.getElementById('sm-amelio-tension'); if(c4) c4.checked = false;
   }
 }
 
