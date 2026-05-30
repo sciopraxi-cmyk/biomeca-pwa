@@ -927,20 +927,141 @@
     <!-- EXAMEN MANDIBULE -->
     <div class="card sport-card-bleu">
       <div class="sport-block-title c-bleu">🦷 Examen Mandibule</div>
-      <div style="display:flex;gap:0;align-items:stretch;">
-        <div style="flex:1;padding-right:14px;">
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Ouverture maximale 3 doigts</span><label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_ouverture" value="oui" onchange="setBilanField('mandibule_ouverture','oui')"/> OUI</label>&nbsp;<label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_ouverture" value="non" onchange="setBilanField('mandibule_ouverture','non')"/> NON</label></div>
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Déviation à l'ouverture de bouche</span><label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_deviation" value="oui" onchange="setBilanField('mandibule_deviation','oui')"/> OUI</label>&nbsp;<label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_deviation" value="non" onchange="setBilanField('mandibule_deviation','non')"/> NON</label></div>
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;"><span style="flex:1;font-size:11px;">Contractures muscles masticateurs</span><label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_contractures" value="oui" onchange="setBilanField('mandibule_contractures','oui')"/> OUI</label>&nbsp;<label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_contractures" value="non" onchange="setBilanField('mandibule_contractures','non')"/> NON</label></div>
+
+      <!-- BLOC 1 : TEST DE TONICITÉ (ex-Manœuvre de Convergence Podale posturo, encadré vert) -->
+      <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#2a7a4e;font-size:13px;margin-bottom:10px;">🔄 Test de tonicité</div>
+
+        <!-- Sous-test 1 : Amélioration ouverture bouche -->
+        <div style="background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:600;color:#2a7a4e;margin-bottom:6px;">Amélioration ouverture de bouche <span style="color:#888;font-weight:400;">(ATM secondaire)</span></div>
+          <div style="display:flex;gap:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #2a7a4e;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="radio" name="tonicite_ouv" value="oui"/> Oui
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="radio" name="tonicite_ouv" value="non"/> Non
+            </label>
+          </div>
         </div>
-        <div style="width:2px;background:var(--bord);margin:0;flex-shrink:0;"></div>
-        <div style="flex:1;padding-left:14px;">
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Douleur capsulo-ligamentaire</span><label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_douleur" value="oui" onchange="setBilanField('mandibule_douleur','oui')"/> OUI</label>&nbsp;<label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_douleur" value="non" onchange="setBilanField('mandibule_douleur','non')"/> NON</label></div>
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Ressaut méniscal</span><label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_ressaut" value="oui" onchange="setBilanField('mandibule_ressaut','oui')"/> OUI</label>&nbsp;<label style="font-size:11px;cursor:pointer;"><input type="radio" name="mandibule_ressaut" value="non" onchange="setBilanField('mandibule_ressaut','non')"/> NON</label></div>
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;"><span style="flex:1;font-size:11px;">Tests de tonicité</span><input class="inp bilan-field" data-field="mandibule_tonicite" placeholder="Amélioration / aggravation..." style="width:130px;"/></div>
+
+        <!-- Sous-test 2 : Serrage de dent (AVEC TOGGLE) -->
+        <div style="background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;">
+          <div style="font-size:11px;font-weight:600;color:#2a7a4e;margin-bottom:6px;">Serrage de dent</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="radio" name="tonicite_serrage" id="sm-tonicite-serrage-aggrav" value="aggravation" onchange="toggleSportSerrage('aggravation')"/> Aggravation
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="radio" name="tonicite_serrage" id="sm-tonicite-serrage-amelio" value="amelioration" onchange="toggleSportSerrage('amelioration')"/> Amélioration
+            </label>
+          </div>
+          <div id="sm-serrage-aggrav-opts" style="display:none;flex-wrap:wrap;gap:8px;margin-top:4px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="checkbox" id="sm-aggr-dents" onchange="setBilanField('tonicite_aggr_dents',this.checked)"/> 🦷 Dents réactogènes
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="checkbox" id="sm-aggr-atm" onchange="setBilanField('tonicite_aggr_atm',this.checked)"/> 🦴 ATM*
+            </label>
+          </div>
+          <div id="sm-serrage-amelio-opts" style="display:none;flex-wrap:wrap;gap:8px;margin-top:4px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="checkbox" id="sm-amelio-contact" onchange="setBilanField('tonicite_amelio_contact',this.checked)"/> 🦷 Défaut de contact dentaire
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;">
+              <input type="checkbox" id="sm-amelio-tension" onchange="setBilanField('tonicite_amelio_tension',this.checked)"/> 🧠 Tensions intracrâniennes
+            </label>
+          </div>
         </div>
       </div>
-      <div style="margin-top:8px;"><input class="inp bilan-field" data-field="mandibule_notes" placeholder="Observations (ressaut D/G, etc.)..."/></div>
+
+      <!-- BLOC 2 : ATM ORIGINE (encadré orange) -->
+      <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#b7740a;font-size:13px;margin-bottom:8px;">🦴 ATM* — Articulation Temporo-Mandibulaire : origine</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 16px;color:#222;">
+            <input type="radio" name="atm_origine" value="musculaire"/> 💪 Musculaire
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 16px;color:#222;">
+            <input type="radio" name="atm_origine" value="reductible"/> ↩️ Réductible
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 16px;color:#222;">
+            <input type="radio" name="atm_origine" value="irreductible"/> 🔒 Irréductible
+          </label>
+        </div>
+      </div>
+
+      <!-- BLOC 3 : EXAMEN MANDIBULE (encadré violet) -->
+      <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#6c3483;font-size:13px;margin-bottom:10px;">🦷 Examen de la mandibule</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <span style="font-weight:500;color:#222;font-size:12px;">- Ouverture maximale inférieure à 3 doigts</span>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_ouv_max" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_ouv_max" value="non"/> Non</label>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <span style="font-weight:500;color:#222;font-size:12px;">- Déviation à l'ouverture de bouche</span>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_deviation" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_deviation" value="non"/> Non</label>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <span style="font-weight:500;color:#222;font-size:12px;">- Contractures des muscles masticateurs</span>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_contractures" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_contractures" value="non"/> Non</label>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <span style="font-weight:500;color:#222;font-size:12px;">- Douleur capsulo-ligamentaire (palpation)</span>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_douleur_caps" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_douleur_caps" value="non"/> Non</label>
+            </div>
+          </div>
+
+          <!-- Ressaut méniscal (AVEC TOGGLE) -->
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+              <span style="font-weight:500;color:#222;font-size:12px;">- Ressaut méniscal</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_ressaut" value="oui" onchange="toggleSportRessaut(true)"/> Oui</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="mand_ressaut" value="non" onchange="toggleSportRessaut(false)"/> Non</label>
+                <div id="sm-ressaut-opts" style="display:none;gap:8px;">
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f5eeff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="checkbox" id="sm-ressaut-dte" onchange="setBilanField('mand_ressaut_dte',this.checked)"/> Droite</label>
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f5eeff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="checkbox" id="sm-ressaut-gauche" onchange="setBilanField('mand_ressaut_gauche',this.checked)"/> Gauche</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BLOC 4 : RÉORIENTATION (encadré bleu) -->
+      <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#2471a3;font-size:13px;margin-bottom:8px;">🏥 Réorientation</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+            <input type="checkbox" id="sm-reor-dentiste" onchange="setBilanField('reor_dentiste',this.checked)"/> 🦷 Dentiste
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+            <input type="checkbox" id="sm-reor-ortho" onchange="setBilanField('reor_ortho',this.checked)"/> 😁 Orthodontiste
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+            <input type="checkbox" id="sm-reor-stomato" onchange="setBilanField('reor_stomato',this.checked)"/> 🏥 Stomatologue
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+            <input type="checkbox" id="sm-reor-kine" onchange="setBilanField('reor_kine',this.checked)"/> 🏃 Kinésithérapeute
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;">
+            <input type="checkbox" id="sm-reor-osteo" onchange="setBilanField('reor_osteo',this.checked)"/> 🤲 Ostéopathe
+          </label>
+        </div>
+      </div>
     </div>
     </div>
 
