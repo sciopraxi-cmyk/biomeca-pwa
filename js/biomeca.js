@@ -9876,6 +9876,42 @@ function toggleSerrage(type) {
     document.getElementById('po-aggr-atm').checked = false;
   }
 }
+
+// SPORT — Toggle Ressaut méniscal (Sprint A3 #73)
+// Affiche/masque les checkboxes Droite/Gauche du ressaut, décoche si désactivé.
+// Calque toggleRessaut posturo (L9853) avec IDs sport sm-. Posturo intact.
+function toggleSportRessaut(enabled) {
+  const opts = document.getElementById('sm-ressaut-opts');
+  if(!opts) return;
+  opts.style.display = enabled ? 'flex' : 'none';
+  if(!enabled) {
+    const dte = document.getElementById('sm-ressaut-dte');
+    const gauche = document.getElementById('sm-ressaut-gauche');
+    if(dte) dte.checked = false;
+    if(gauche) gauche.checked = false;
+  }
+}
+
+// SPORT — Toggle Serrage de dent (Sprint A3 #73)
+// Exclusion mutuelle Aggravation ↔ Amélioration + nettoyage des cb de l'autre
+// groupe au switch. Calque toggleSerrage posturo (L9863) avec IDs sport sm-.
+// Posturo intact.
+function toggleSportSerrage(type) {
+  const aggOpts = document.getElementById('sm-serrage-aggrav-opts');
+  const amelOpts = document.getElementById('sm-serrage-amelio-opts');
+  if(!aggOpts || !amelOpts) return;
+  aggOpts.style.display  = (type === 'aggravation')  ? 'flex' : 'none';
+  amelOpts.style.display = (type === 'amelioration') ? 'flex' : 'none';
+  if(type !== 'aggravation') {
+    const c1 = document.getElementById('sm-aggr-dents');   if(c1) c1.checked = false;
+    const c2 = document.getElementById('sm-aggr-atm');     if(c2) c2.checked = false;
+  }
+  if(type !== 'amelioration') {
+    const c3 = document.getElementById('sm-amelio-contact'); if(c3) c3.checked = false;
+    const c4 = document.getElementById('sm-amelio-tension'); if(c4) c4.checked = false;
+  }
+}
+
 function toggleCLVF(enabled) {
   const el = document.getElementById('po-clvf-detail');
   if(!el) return;
@@ -10067,6 +10103,16 @@ function showSportBilanSection(idx) {
       const c = document.getElementById(id);
       if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') initMorphoCanvas(id);
     });
+  }, 150);
+  // Section 5 (Mandibule) — au load d'un bilan existant, restaurer l'affichage
+  // conditionnel des toggles depuis l'état des radios. Pas de flag idempotence
+  // nécessaire : les onchange inline gèrent les changements user, et le re-appel
+  // au switch onglet n'a aucun effet de bord (rétablit le même état UI).
+  if(idx === 5) setTimeout(() => {
+    const rrChecked = document.querySelector('input[name="mand_ressaut"]:checked');
+    if(rrChecked) toggleSportRessaut(rrChecked.value === 'oui');
+    const ssChecked = document.querySelector('input[name="tonicite_serrage"]:checked');
+    if(ssChecked) toggleSportSerrage(ssChecked.value);
   }, 150);
   // Section 8 (Neuro fonctionnel) — trigger updateSportNeuroTotals + addEventListener
   // change sur les checkboxes pour recalcul en temps réel. Idempotent via flag _sportNeuroBound.
