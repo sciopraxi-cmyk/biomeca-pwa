@@ -8980,7 +8980,7 @@ function getBilanPosturoHTML() {
       <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin:10px 0 4px;">✏️ Dessin sur les pieds</div>
       <div style="position:relative;margin:8px 0;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:8px;text-align:center;">
         <img id="posturo-feet-img" src="assets/plan-semelles-schema-plantaire.png" style="width:80%;max-width:400px;display:block;margin:0 auto;"/>
-        <canvas id="posturo-feet-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"/>
+        <canvas id="posturo-feet-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"></canvas>
         <span style="position:absolute;left:27%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">G</span>
         <span style="position:absolute;left:73%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">D</span>
       </div>
