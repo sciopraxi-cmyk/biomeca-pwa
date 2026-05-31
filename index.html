@@ -1621,6 +1621,76 @@
     </div>
 
     <div class="sport-section" id="ssec-9" style="display:none;">
+    <!-- PLAN DE SEMELLES (fusionnée — Description + Dessin + Matériaux + Recouvrement, réplique posturo psec-8) -->
+    <div class="card sport-card-vert" id="sp-semelles-card">
+      <div class="sport-block-title c-vert">🦶 Plan de Semelles</div>
+      <div class="field-lbl" style="margin-top:6px;">📝 Description</div>
+      <textarea class="inp" id="sp-semelles-desc" rows="3" placeholder="Description du plan de semelles..." style="background:#fff;color:#222;"></textarea>
+      <div class="field-lbl" style="margin-top:10px;">✏️ Dessin sur les pieds</div>
+      <div style="position:relative;margin:8px 0;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:8px;text-align:center;">
+        <img id="sp-pieds-img" src="assets/plan-semelles-schema-plantaire.png" style="width:80%;max-width:400px;display:block;margin:0 auto;"/>
+        <canvas id="pieds-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"></canvas>
+        <span style="position:absolute;left:27%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">G</span>
+        <span style="position:absolute;left:73%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">D</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;margin-top:8px;">
+        <button class="btn" id="tool-pen2" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
+        <button class="btn" id="tool-arrow2" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
+        <button class="btn" id="tool-arrow-curve2" onclick="setDrawTool('arrow-curve')" title="Flèche courbée (gauche)">↪ Courbée</button>
+        <button class="btn" id="btn-curve-inv-semelles" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
+        <button class="btn" id="tool-circle2" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
+        <button class="btn" id="tool-erase2" onclick="setDrawTool('erase')">🧹 Gomme</button>
+        <select class="inp" style="width:80px;" onchange="drawColor=this.value;">
+          <option value="#e74c3c">Rouge</option>
+          <option value="#2980b9">Bleu</option>
+          <option value="#27ae60">Vert</option>
+          <option value="#111111">Noir</option>
+        </select>
+        <select class="inp" style="width:90px;" onchange="drawSize=+this.value;">
+          <option value="2">Fin</option>
+          <option value="4" selected>Normal</option>
+          <option value="8">Épais</option>
+        </select>
+        <button class="btn btn-red" onclick="undoPieds()">↩ Annuler</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+        <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:10px;">
+          <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🧱 Matériaux</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-materiaux" value="EVA"/> EVA
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-materiaux" value="PE"/> PE
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-materiaux" value="Résine"/> Résine
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-materiaux" value="Mousse"/> Mousse
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-materiaux" value="Autre"/> Autre
+            </label>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:10px;">
+          <div style="font-size:11px;color:#6c3483;font-weight:600;margin-bottom:6px;">🎨 Recouvrement</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-recouvrement" value="EVA"/> EVA
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-recouvrement" value="Microfibre"/> Microfibre
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
+              <input type="checkbox" name="sp-recouvrement" value="Peaucerie naturelle"/> Peaucerie naturelle
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- CIRCUITS EXPRESS -->
     <div class="card sport-card-vert" id="sp-circuits-card">
       <div class="sport-block-title c-vert">🏋️ Circuits Express</div>
@@ -1712,75 +1782,6 @@
         </div>
       </div>
     </div>
-    <!-- PLAN DE SEMELLES — INFOS -->
-    <div class="card sport-card-vert" id="sp-semelles-infos-card">
-      <div class="sport-block-title c-vert">🦶 Plan de Semelles — Infos</div>
-      <div class="field-lbl" style="margin-top:6px;">📝 Description</div>
-      <textarea class="inp" id="sp-semelles-desc" rows="3" placeholder="Type, matériaux, corrections, zones de décharge..." style="background:#fff;color:#222;"></textarea>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
-        <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:10px;">
-          <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🧱 Matériaux</div>
-          <div style="display:flex;flex-direction:column;gap:6px;">
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-materiaux" value="EVA"/> EVA
-          </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-materiaux" value="PE"/> PE
-          </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-materiaux" value="Résine"/> Résine
-          </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-materiaux" value="Mousse"/> Mousse
-          </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-materiaux" value="Autre"/> Autre
-          </label>
-          </div>
-        </div>
-        <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:10px;">
-          <div style="font-size:11px;color:#6c3483;font-weight:600;margin-bottom:6px;">🎨 Recouvrement</div>
-          <div style="display:flex;flex-direction:column;gap:6px;">
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-recouvrement" value="EVA"/> EVA
-          </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-recouvrement" value="Microfibre"/> Microfibre
-          </label>
-          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
-            <input type="checkbox" name="sp-recouvrement" value="Peaucerie naturelle"/> Peaucerie naturelle
-          </label>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SCHÉMA PIEDS -->
-    <div class="card sport-card-vert">
-      <div class="sport-block-title c-vert">👣 Plan de Semelles — Schéma Plantaire</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-        <button class="btn" id="tool-pen2" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
-        <button class="btn" id="tool-arrow2" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
-        <button class="btn" id="tool-arrow-curve2" onclick="setDrawTool('arrow-curve')" title="Flèche courbée (gauche)">↪ Courbée</button>
-        <button class="btn" id="btn-curve-inv-semelles" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
-        <button class="btn" id="tool-circle2" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
-        <button class="btn" id="tool-erase2" onclick="setDrawTool('erase')">🧹 Gomme</button>
-        <select class="inp" style="width:80px;" onchange="drawColor=this.value;">
-          <option value="#e74c3c">Rouge</option>
-          <option value="#2980b9">Bleu</option>
-          <option value="#27ae60">Vert</option>
-          <option value="#111111">Noir</option>
-        </select>
-        <select class="inp" style="width:90px;" onchange="drawSize=+this.value;">
-          <option value="2">Fin</option>
-          <option value="4" selected>Normal</option>
-          <option value="8">Épais</option>
-        </select>
-        <button class="btn btn-red" onclick="undoPieds()">↩ Annuler</button>
-      </div>
-      <canvas id="pieds-canvas" width="600" height="280" style="border:1px solid var(--bord);border-radius:var(--rs);cursor:crosshair;background:#fff;display:block;max-width:100%;"></canvas>
-    </div>
-
     <!-- TESTS AVANT / APRÈS -->
     <div class="card sport-card-vert">
       <div class="sport-block-title c-vert">✅ Tests Avant / Après</div>
@@ -1795,11 +1796,8 @@
         <div style="padding:6px 0;border-bottom:1px solid var(--bord);"><div style="font-size:11px;font-weight:500;margin-bottom:3px;">Test de Romberg amélioré</div><div style="display:flex;align-items:center;gap:8px;"><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_romberg" value="oui" onchange="setBilanField('ta_romberg','oui')"/> OUI</label><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_romberg" value="non" onchange="setBilanField('ta_romberg','non')"/> NON</label><input class="inp bilan-field" data-field="ta_romberg_notes" placeholder="Obs." style="flex:1;"/></div></div>
         <div style="padding:6px 0;"><div style="font-size:11px;font-weight:500;margin-bottom:3px;">Appuis sur plateforme améliorés</div><div style="display:flex;align-items:center;gap:8px;"><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_plateforme" value="oui" onchange="setBilanField('ta_plateforme','oui')"/> OUI</label><label style="font-size:11px;cursor:pointer;"><input type="radio" name="ta_plateforme" value="non" onchange="setBilanField('ta_plateforme','non')"/> NON</label><input class="inp bilan-field" data-field="ta_plateforme_notes" placeholder="Obs." style="flex:1;"/></div></div>
       </div>
-    </div>
-
-    <!-- PROCHAIN RDV -->
-    <div class="card sport-card-vert" id="sp-prochain-rdv-card">
-      <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:10px;">
+      <!-- 📅 Prochain RDV intégré en queue (réplique posturo psec-8 L9130-9133) -->
+      <div style="margin-top:12px;background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:10px;">
         <div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:6px;">📅 Prochain RDV</div>
         <input class="inp" id="sp-prochain-rdv" type="date" style="background:#fff;color:#222;"/>
       </div>
@@ -1839,7 +1837,6 @@
   <img style="display:none;" id="imgjs-morpho-face2" src="assets/morpho-face-posterieure.png">
   <img style="display:none;" id="imgjs-morpho-profilG" src="assets/morpho-profil-gauche.png">
   <img style="display:none;" id="imgjs-morpho-profilD" src="assets/morpho-profil-droit.png">
-  <img style="display:none;" id="imgjs-pieds" src="assets/plan-semelles-schema-plantaire-hd.png">
 </div>
 </body>
 </html>
