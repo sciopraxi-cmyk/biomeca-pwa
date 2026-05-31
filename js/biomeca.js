@@ -2522,6 +2522,9 @@ function clearBilanFields() {
   });
   document.querySelectorAll('#pg-bilan input[type=radio]').forEach(el => el.checked = false);
   document.querySelectorAll('#pg-bilan input[type=checkbox]').forEach(el => el.checked = false);
+  // Fix #89 — vide la pile chronologique d'ordre morpho au switch patient.
+  // Préserve la référence (length=0) — voir clearAllMorpho.
+  _morphoUndoOrder.length = 0;
   const canvasIds = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
   canvasIds.forEach(id => {
     const c = document.getElementById(id);
@@ -6473,6 +6476,15 @@ const MORPHO_SVG_FACE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12
   <line x1="22" y1="110" x2="98" y2="110" stroke="#e74c3c" stroke-width="1.5"/>
 </svg>`;
 
+// Fix #89 — pile chronologique d'ordre des traits morpho. Permet à undoMorpho
+// d'annuler le DERNIER trait peint, peu importe sur quel canvas (vs ancien
+// bug d'ordre alphabétique fixe face → face2 → profilG → profilD). Réutilise
+// le mécanisme _history existant (états APRÈS-trait, push à mouseup) — pas
+// de pile parallèle d'instantanés. Partagée entre les 4 canvas morpho via
+// canvas._undoOrderStack, ce qui en fait un noop strict pour pieds/posturo
+// (non tagués → propriété undefined → push correspondant sauté).
+let _morphoUndoOrder = [];
+
 function initMorphoCanvas(canvasId) {
   const canvas = document.getElementById(canvasId);
   if(!canvas) return;
@@ -6487,6 +6499,10 @@ function initMorphoCanvas(canvasId) {
   const ctx = canvas.getContext('2d');
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
   canvas._history = []; canvas._baseSnapshot = null; canvas._tempSnap = null;
+  // Fix #89 — tag morpho pour la pile chronologique d'ordre. Pieds/posturo
+  // ne sont pas tagués → _undoOrderStack reste undefined → push correspondant
+  // dans setupDrawCanvas mouseup sauté pour eux (noop strict).
+  canvas._undoOrderStack = _morphoUndoOrder;
   // NB: les images sont maintenant dans le DOM via <img>, pas dans le canvas
   // On ne restaure plus l'ancien format (image+dessin fusionnés)
   setTimeout(() => { canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height); }, 100);
@@ -6628,6 +6644,11 @@ function setupDrawCanvas(canvas, canvasId) {
       const snapshot = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
       canvas._history.push(snapshot);
       if(canvas._history.length > 30) canvas._history.shift();
+      // Fix #89 — push additif chronologique morpho uniquement. _undoOrderStack
+      // est tagué dans initMorphoCanvas → truthy pour les 4 canvas morpho ;
+      // undefined sur pieds/posturo → ligne sautée (noop strict, comportement
+      // existant strictement préservé pour eux).
+      if(canvas._undoOrderStack) canvas._undoOrderStack.push(canvas.id);
     }
     drawing = false;
     canvas._tempSnap = null;
@@ -6729,6 +6750,10 @@ function setDrawToolCurveInv() {
 }
 
 function clearAllMorpho() {
+  // Fix #89 — vide la pile chronologique d'ordre AVANT le forEach. Préserve
+  // la référence (length=0 vs réaffectation) car canvas._undoOrderStack pointe
+  // vers ce même tableau via le tag posé en initMorphoCanvas.
+  _morphoUndoOrder.length = 0;
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
     if(c) { c._history = []; c._baseSnapshot = null; c._tempSnap = null; }
@@ -6737,22 +6762,40 @@ function clearAllMorpho() {
 }
 
 function undoMorpho() {
-  const ids = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
-  for(const id of ids) {
-    const c = document.getElementById(id);
-    if(c && c._history && c._history.length > 0) {
-      const prev = c._history.pop();
-      c.getContext('2d').putImageData(prev, 0, 0);
-      return;
-    }
+  // Fix #89 — annule le DERNIER trait peint (peu importe sur quel canvas).
+  // Pattern sémantique repris de undoPosturoBody L10405 : pop discard
+  // (= état APRÈS dernier trait = état courant à l'écran), peek l'état
+  // précédent ou fallback _baseSnapshot si pile vide. Pile chronologique
+  // _morphoUndoOrder alimentée à mouseup côté setupDrawCanvas.
+  if(_morphoUndoOrder.length === 0) return;
+  const canvasId = _morphoUndoOrder.pop();
+  const c = document.getElementById(canvasId);
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  if(c._history && c._history.length > 0) {
+    c._history.pop();
+    const prev = c._history.length > 0 ? c._history[c._history.length-1] : c._baseSnapshot;
+    if(prev) ctx.putImageData(prev, 0, 0);
+  } else if(c._baseSnapshot) {
+    ctx.putImageData(c._baseSnapshot, 0, 0);
   }
 }
 
 function undoPieds() {
+  // Fix #89 (jumeau) — pattern repris de undoPosturoBody L10405 : pop discard
+  // (= état APRÈS dernier trait = état courant), peek l'état précédent ou
+  // fallback _baseSnapshot si pile vide. Pieds-canvas = 1 seul canvas → aucune
+  // pile d'ordre nécessaire, l'historique suffit. Réparation du même Bug A
+  // sémantique (pop+put = no-op) que undoMorpho.
   const c = document.getElementById('pieds-canvas');
-  if(c && c._history && c._history.length > 0) {
-    const prev = c._history.pop();
-    c.getContext('2d').putImageData(prev, 0, 0);
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  if(c._history && c._history.length > 0) {
+    c._history.pop();
+    const prev = c._history.length > 0 ? c._history[c._history.length-1] : c._baseSnapshot;
+    if(prev) ctx.putImageData(prev, 0, 0);
+  } else if(c._baseSnapshot) {
+    ctx.putImageData(c._baseSnapshot, 0, 0);
   }
 }
 
