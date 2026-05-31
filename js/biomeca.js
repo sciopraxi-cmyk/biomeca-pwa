@@ -6800,39 +6800,46 @@ function undoPieds() {
 }
 
 function drawPiedsTemplate(savedData) {
+  // Refactor #91 — pattern posturo (img DOM séparée + canvas transparent overlay).
+  // Mirroir de initPosturoFeetCanvas L10511. Le canvas est désormais un OVERLAY
+  // transparent par-dessus #sp-pieds-img (template visible directement dans le DOM,
+  // pas gravé dans le canvas). Backing store calibré sur le parent rect × dpr,
+  // comme initPosturoFeetCanvas. Labels Pied G/D supprimés du JS — désormais 2
+  // <span> HTML absolus dans le conteneur (sport + posturo identiques).
+  // Pas de retry : alignement strict pattern posturo (initPosturoFeetCanvas L10517
+  // n'a pas de retry non plus, juste early return silent si rect=0). Le garde
+  // idempotent showSportBilanSection idx===9 (`!pc._baseSnapshot`) fournit un
+  // retry implicite au prochain switch onglet 9 si le premier essai échoue.
   const canvas = document.getElementById('pieds-canvas');
   if(!canvas) return;
+  const parent = canvas.parentElement;
+  if(!parent) return;
+  const r = parent.getBoundingClientRect();
+  if(r.width === 0) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(r.width * dpr);
+  canvas.height = Math.round(r.height * dpr);
+  canvas.style.width = r.width + 'px';
+  canvas.style.height = r.height + 'px';
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  canvas._history = []; canvas._baseSnapshot = null;
-
-  const img = new Image();
-  img.onload = () => {
-    // Centrer et adapter l'image dans le canvas
-    const scale = Math.min(canvas.width/img.width, (canvas.height-18)/img.height);
-    const dw = img.width * scale, dh = img.height * scale;
-    const dx = (canvas.width - dw) / 2, dy = 0;
-    ctx.drawImage(img, dx, dy, dw, dh);
-    // Labels
-    ctx.fillStyle = '#555';
-    ctx.font = 'bold 11px DM Sans, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Pied Gauche', canvas.width * 0.27, canvas.height - 2);
-    ctx.fillText('Pied Droit', canvas.width * 0.73, canvas.height - 2);
-    // Sauvegarder le snapshot de base
-    canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
-    setupDrawCanvas(canvas);
-    // Restaurer le dessin sauvegardé par-dessus le template
-    if(savedData) {
-      const saved = new Image();
-      saved.onload = () => {
-        ctx.drawImage(saved, 0, 0, canvas.width, canvas.height);
-      };
-      saved.src = savedData;
-    }
-  };
-  img.src = document.getElementById('imgjs-pieds')?.src || '';
+  ctx.scale(dpr, dpr);
+  canvas._history = []; canvas._baseSnapshot = null; canvas._tempSnap = null;
+  setupDrawCanvas(canvas, 'pieds-canvas');
+  // _baseSnapshot = canvas vide/transparent. undoPieds (post #89) restaure cet
+  // état au dernier clic → canvas redevient transparent → image DOM #sp-pieds-img
+  // reste visible derrière (sans pollution). Sémantique identique à undoPosturoFeet.
+  canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
+  // Restauration des dessins sauvegardés (format PNG transparent, post-soustraction
+  // ou direct depuis canvas vide — tous deux compatibles avec drawImage par-dessus
+  // canvas transparent : pixels opaques visibles, pixels transparents laissent voir
+  // l'img DOM derrière).
+  if(savedData) {
+    const saved = new Image();
+    saved.onload = () => {
+      ctx.drawImage(saved, 0, 0, r.width, r.height);
+    };
+    saved.src = savedData;
+  }
 }
 
 function drawFoot(ctx, ox, oy, mirror) {
@@ -8973,7 +8980,9 @@ function getBilanPosturoHTML() {
       <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin:10px 0 4px;">✏️ Dessin sur les pieds</div>
       <div style="position:relative;margin:8px 0;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:8px;text-align:center;">
         <img id="posturo-feet-img" src="assets/plan-semelles-schema-plantaire.png" style="width:80%;max-width:400px;display:block;margin:0 auto;"/>
-        <canvas id="posturo-feet-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"/>
+        <canvas id="posturo-feet-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"></canvas>
+        <span style="position:absolute;left:27%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">G</span>
+        <span style="position:absolute;left:73%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">D</span>
       </div>
       <div style="background:linear-gradient(135deg,#f8f9fa,#eee);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         <button class="btn" id="ptool-pen-feet" onclick="setDrawTool('line')">╱ Trait</button>
