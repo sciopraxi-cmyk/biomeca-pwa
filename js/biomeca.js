@@ -6681,6 +6681,16 @@ function drawArrow(ctx, x1, y1, x2, y2, color, size) {
   ctx.closePath(); ctx.fill();
 }
 
+// Fix E — helper marquage état actif boutons plantaire sport (scope strict ssec-9).
+// Liste fermée des 6 IDs ; reset tous les boutons puis marque l'actif. Aucun ID
+// morpho (sans suffixe) ni posturo dans la liste → noop ailleurs (additif strict).
+function _markPlantaireTool(activeId) {
+  ['tool-pen2','tool-arrow2','tool-arrow-curve2','tool-circle2','tool-erase2','btn-curve-inv-semelles'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn) btn.className = (id === activeId) ? 'btn btn-blue' : 'btn';
+  });
+}
+
 function setDrawTool(tool) {
   drawTool=tool;
   curveDir=1; // reset direction normale
@@ -6688,11 +6698,17 @@ function setDrawTool(tool) {
     const btn=document.getElementById('tool-'+t);
     if(btn) btn.className=t===tool?'btn btn-blue':'btn';
   });
+  // Fix E — marquage additif plantaire sport (la boucle morpho ci-dessus reste
+  // intacte). Mapping outil interne → ID button plantaire suffixé "2".
+  const _plantaireMap = {'line':'tool-pen2','arrow':'tool-arrow2','arrow-curve':'tool-arrow-curve2','circle':'tool-circle2','erase':'tool-erase2'};
+  _markPlantaireTool(_plantaireMap[tool] || '');
 }
 
 function setDrawToolCurveInv() {
   drawTool='arrow-curve';
   curveDir=-1; // direction inversée
+  // Fix E — marqueur actif sur ↩ Courbée inv plantaire (scope strict ssec-9 sport)
+  _markPlantaireTool('btn-curve-inv-semelles');
 }
 
 function clearAllMorpho() {
@@ -6924,6 +6940,10 @@ function collectSportTtt(d) {
   d.ttt.ch = [1,2,3,4,5,6,7,8].map(i => {
     const exo = _readSportTttExo(document.getElementById('sp-ch-ex' + i + '-libre'));
     exo.detached = !!(prevCh[i - 1] && prevCh[i - 1].detached);
+    // Fix B — ratio Échauffement 30/30 ÷ 45/15 (lu direct du DOM, non auto-reporté,
+    // hors du contenu copié depuis CE → _writeSportTttExo ne le touche jamais)
+    const ratioEl = document.getElementById('sp-ch-ex' + i + '-ratio');
+    exo.ratio = ratioEl ? ratioEl.value : '30/30';
     return exo;
   });
   d.ttt.materiaux = Array.from(
@@ -6960,6 +6980,11 @@ function restoreSportTtt(d) {
   } finally {
     _sportTttCopying = prev;
   }
+  // Fix B — restore ratio Échauffement (indépendant du write exo, hors auto-report)
+  [1,2,3,4,5,6,7,8].forEach(i => {
+    const r = document.getElementById('sp-ch-ex' + i + '-ratio');
+    if(r && t.ch && t.ch[i - 1] && t.ch[i - 1].ratio) r.value = t.ch[i - 1].ratio;
+  });
   if(t.materiaux) {
     document.querySelectorAll('input[name="sp-materiaux"]').forEach(e => {
       e.checked = t.materiaux.includes(e.value);
@@ -7005,8 +7030,21 @@ function setupSportTttAutoReport() {
   const ssec = document.getElementById('ssec-9');
   if(!ssec || ssec._sportTttBound) return;
   ssec._sportTttBound = true;
-  // Réservé pour extensions futures — onchange/oninput inline sur les exos suffisent
-  // actuellement (cf. SE1/SE2 HTML : _onSportTttExpressChange/_onSportTttEchauffementChange).
+  // Fix A — délégation pour les select.exo-sub créés dynamiquement par
+  // updateExerciceSubMenu. Les select.exo-sys ont leur onchange inline ; sans cette
+  // délégation, choisir un exercice dans un sous-menu ne déclencherait l'auto-report
+  // qu'au changement suivant. Scope strict : .exo-sub uniquement.
+  ssec.addEventListener('change', function(e) {
+    if(_sportTttCopying) return;
+    if(!e.target || !e.target.matches || !e.target.matches('select.exo-sub')) return;
+    const stack = e.target.closest('.exo-stack');
+    if(!stack) return;
+    const circuit = stack.dataset.spCircuit;
+    const idx = parseInt(stack.dataset.spIdx, 10);
+    if(!circuit || !idx) return;
+    if(circuit === 'ch') _onSportTttEchauffementChange(idx);
+    else _onSportTttExpressChange(circuit, idx);
+  });
 }
 
 function saveBilan() {
@@ -10955,7 +10993,10 @@ function _injectMicButtons() {
 // exclut date et range (EVA). Génère un id stable spf-<data-field> si absent.
 function _injectSportMicButtons() {
   var fields = document.querySelectorAll(
-    '#pg-bilan textarea.bilan-field, #pg-bilan input.bilan-field:not([type="date"]):not([type="range"])'
+    '#pg-bilan textarea.bilan-field, ' +
+    '#pg-bilan input.bilan-field:not([type="date"]):not([type="range"]), ' +
+    '#pg-bilan textarea#sp-semelles-desc, ' +
+    '#pg-bilan input.exo-libre'
   );
   fields.forEach(function(el) {
     if(el._micInjected) return;
