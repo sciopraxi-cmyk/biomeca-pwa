@@ -6691,15 +6691,30 @@ function _markPlantaireTool(activeId) {
   });
 }
 
+// Fix F — helper marquage état actif boutons morpho sport (scope strict ssec-1).
+// Symétrique à _markPlantaireTool : liste fermée des 6 IDs morpho ; reset tous
+// puis marque l'actif. Aucun ID plantaire (suffixe "2") ni posturo (préfixe
+// "ptool-") dans la liste → noop ailleurs (scope strict comme Fix E).
+function _markMorphoTool(activeId) {
+  ['tool-pen','tool-arrow','tool-arrow-curve','tool-circle','tool-erase','btn-curve-inv-morpho'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn) btn.className = (id === activeId) ? 'btn btn-blue' : 'btn';
+  });
+}
+
 function setDrawTool(tool) {
   drawTool=tool;
   curveDir=1; // reset direction normale
-  ['pen','arrow','erase'].forEach(t=>{
-    const btn=document.getElementById('tool-'+t);
-    if(btn) btn.className=t===tool?'btn btn-blue':'btn';
-  });
-  // Fix E — marquage additif plantaire sport (la boucle morpho ci-dessus reste
-  // intacte). Mapping outil interne → ID button plantaire suffixé "2".
+  // Fix F — remplace l'ancienne boucle ['pen','arrow','erase'] qui butait sur la
+  // dissonance outil interne 'line' vs ID 'tool-pen' (la boucle marquait
+  // l'ID 'tool-line' inexistant — silencieusement noop sur Trait, et les 3 autres
+  // outils Courbée/Cercle/Courbée-inv n'avaient jamais de marqueur). Le mapping
+  // résout 'line' → 'tool-pen' et couvre désormais les 6 outils morpho.
+  const _morphoMap = {'line':'tool-pen','arrow':'tool-arrow','arrow-curve':'tool-arrow-curve','circle':'tool-circle','erase':'tool-erase'};
+  _markMorphoTool(_morphoMap[tool] || '');
+  // Fix E — marquage additif plantaire sport (le helper morpho ci-dessus est
+  // strictement scopé à ssec-1). Mapping outil interne → ID button plantaire
+  // suffixé "2".
   const _plantaireMap = {'line':'tool-pen2','arrow':'tool-arrow2','arrow-curve':'tool-arrow-curve2','circle':'tool-circle2','erase':'tool-erase2'};
   _markPlantaireTool(_plantaireMap[tool] || '');
 }
@@ -6707,6 +6722,8 @@ function setDrawTool(tool) {
 function setDrawToolCurveInv() {
   drawTool='arrow-curve';
   curveDir=-1; // direction inversée
+  // Fix F — marqueur actif sur ↩ Courbée inv morpho (scope strict ssec-1 sport)
+  _markMorphoTool('btn-curve-inv-morpho');
   // Fix E — marqueur actif sur ↩ Courbée inv plantaire (scope strict ssec-9 sport)
   _markPlantaireTool('btn-curve-inv-semelles');
 }
