@@ -2529,6 +2529,8 @@ function clearBilanFields() {
   });
   const pc = document.getElementById('pieds-canvas');
   if(pc) { pc._history=[]; pc._baseSnapshot=null; drawPiedsTemplate(); }
+  // Sprint A4 — vide le bloc traitements sport (selects/libres hors clear auto)
+  clearSportTtt();
 }
 
 async function deletePatient(i) {
@@ -6825,6 +6827,188 @@ function syncOpenedBilanPosturoToHistory() {
   target.bilanDataPosturo = JSON.parse(JSON.stringify(currentPatient.bilanDataPosturo || {}));
 }
 
+// ───────────────────────────────────────────
+// Sport ttt — Traitements (Sprint A4 #73)
+// 8 fonctions + 1 flag réentrant pour smart-detach Échauffement.
+// Stack par exo = 3 sys + 3 sub (créés sync par updateExerciceSubMenu L9829-9851
+// dans chaque .exo-pair) + 1 libre. Wrapper DOM : .exo-stack[data-sp-circuit][data-sp-idx].
+// Detached définitif (Q5) stocké dans bilanData.ttt.ch[i].detached (variable live module).
+// ───────────────────────────────────────────
+let _sportTttCopying = false;
+
+function _readSportTttExo(libreEl) {
+  if(!libreEl) return { sys:[], sub:[], libre:'' };
+  const wrap = libreEl.closest('.exo-stack');
+  if(!wrap) return { sys:[], sub:[], libre: libreEl.value || '' };
+  // Correction 1 : alignement sub↔sys via .exo-pair de chaque sys (pas un querySelectorAll
+  // à plat). Système vide → pas de .exo-pair créé OU pair sans .exo-sub → '' à cet index.
+  const sels = Array.from(wrap.querySelectorAll('select.exo-sys'));
+  return {
+    sys: sels.map(s => s.value),
+    sub: sels.map(s => {
+      const pair = s.closest('.exo-pair');
+      if(!pair) return '';
+      const sub = pair.querySelector('select.exo-sub');
+      return sub ? sub.value : '';
+    }),
+    libre: libreEl.value || ''
+  };
+}
+
+function _writeSportTttExo(libreEl, exo) {
+  if(!libreEl || !exo) return;
+  const wrap = libreEl.closest('.exo-stack');
+  if(!wrap) return;
+  const sels = Array.from(wrap.querySelectorAll('select.exo-sys'));
+  // Correction 3 : updateExerciceSubMenu est synchrone → set sub directement après
+  // dispatchEvent, dans la même tick. Pas de setTimeout. Try/finally synchrone.
+  const prev = _sportTttCopying;
+  _sportTttCopying = true;
+  try {
+    sels.forEach((sel, i) => {
+      sel.value = (exo.sys && exo.sys[i]) || '';
+      sel.dispatchEvent(new Event('change')); // updateExerciceSubMenu crée/supprime .exo-sub sync
+      // Correction 1 : sub via .exo-pair du sys courant (alignement strict)
+      if(exo.sub && exo.sub[i]) {
+        const pair = sel.closest('.exo-pair');
+        const sub = pair ? pair.querySelector('select.exo-sub') : null;
+        if(sub) sub.value = exo.sub[i];
+      }
+    });
+    libreEl.value = exo.libre || '';
+  } finally {
+    _sportTttCopying = prev;
+  }
+}
+
+function _onSportTttExpressChange(circuit, idx) {
+  if(_sportTttCopying) return;
+  // Mapping verrouillé : CE1.ex1-4 → ch1-4 ; CE2.ex1-4 → ch5-8
+  const chIdx = (circuit === 'c1' ? 0 : 4) + idx;
+  // Correction 2 : detached lu depuis bilanData (variable live module), pas currentPatient
+  const chSlot = bilanData && bilanData.ttt && bilanData.ttt.ch && bilanData.ttt.ch[chIdx - 1];
+  if(chSlot && chSlot.detached) return;
+  const srcLibre = document.getElementById('sp-' + circuit + '-ex' + idx + '-libre');
+  const dstLibre = document.getElementById('sp-ch-ex' + chIdx + '-libre');
+  if(!srcLibre || !dstLibre) return;
+  const exo = _readSportTttExo(srcLibre);
+  // Correction 3 : try/finally synchrone (pas de setTimeout, updateExerciceSubMenu est sync)
+  const prev = _sportTttCopying;
+  _sportTttCopying = true;
+  try { _writeSportTttExo(dstLibre, exo); }
+  finally { _sportTttCopying = prev; }
+}
+
+function _onSportTttEchauffementChange(idx) {
+  if(_sportTttCopying) return;
+  // Correction 2 + Q5 : détach DÉFINITIF stocké dans bilanData (variable live module).
+  // Posé une fois, jamais retiré (ni quand user vide, ni à un autre user change).
+  if(!bilanData) return;
+  if(!bilanData.ttt) bilanData.ttt = {};
+  if(!bilanData.ttt.ch) bilanData.ttt.ch = [];
+  if(!bilanData.ttt.ch[idx - 1]) bilanData.ttt.ch[idx - 1] = { sys:[], sub:[], libre:'' };
+  bilanData.ttt.ch[idx - 1].detached = true;
+}
+
+function collectSportTtt(d) {
+  if(!d.ttt) d.ttt = {};
+  // Correction 2 : préserve detached depuis bilanData.ttt.ch (variable live).
+  // Capture la ref AVANT d'écraser d.ttt.ch (d === bilanData en pratique côté saveBilan).
+  const prevCh = (bilanData && bilanData.ttt && bilanData.ttt.ch) ? bilanData.ttt.ch.slice() : [];
+  d.ttt.c1 = [1,2,3,4].map(i =>
+    _readSportTttExo(document.getElementById('sp-c1-ex' + i + '-libre'))
+  );
+  d.ttt.c2 = [1,2,3,4].map(i =>
+    _readSportTttExo(document.getElementById('sp-c2-ex' + i + '-libre'))
+  );
+  d.ttt.ch = [1,2,3,4,5,6,7,8].map(i => {
+    const exo = _readSportTttExo(document.getElementById('sp-ch-ex' + i + '-libre'));
+    exo.detached = !!(prevCh[i - 1] && prevCh[i - 1].detached);
+    return exo;
+  });
+  d.ttt.materiaux = Array.from(
+    document.querySelectorAll('input[name="sp-materiaux"]:checked')
+  ).map(e => e.value);
+  d.ttt.recouvrement = Array.from(
+    document.querySelectorAll('input[name="sp-recouvrement"]:checked')
+  ).map(e => e.value);
+  const descEl = document.getElementById('sp-semelles-desc');
+  d.ttt.semellesDesc = descEl ? descEl.value : '';
+  const rdvEl = document.getElementById('sp-prochain-rdv');
+  d.ttt.prochainRdv = rdvEl ? rdvEl.value : '';
+}
+
+function restoreSportTtt(d) {
+  if(!d || !d.ttt) return;
+  const t = d.ttt;
+  // Correction 3 : try/finally synchrone (updateExerciceSubMenu sync, set sub immédiat)
+  const prev = _sportTttCopying;
+  _sportTttCopying = true;
+  try {
+    [1,2,3,4].forEach(i => {
+      const el = document.getElementById('sp-c1-ex' + i + '-libre');
+      if(el && t.c1 && t.c1[i - 1]) _writeSportTttExo(el, t.c1[i - 1]);
+    });
+    [1,2,3,4].forEach(i => {
+      const el = document.getElementById('sp-c2-ex' + i + '-libre');
+      if(el && t.c2 && t.c2[i - 1]) _writeSportTttExo(el, t.c2[i - 1]);
+    });
+    [1,2,3,4,5,6,7,8].forEach(i => {
+      const el = document.getElementById('sp-ch-ex' + i + '-libre');
+      if(el && t.ch && t.ch[i - 1]) _writeSportTttExo(el, t.ch[i - 1]);
+    });
+  } finally {
+    _sportTttCopying = prev;
+  }
+  if(t.materiaux) {
+    document.querySelectorAll('input[name="sp-materiaux"]').forEach(e => {
+      e.checked = t.materiaux.includes(e.value);
+    });
+  }
+  if(t.recouvrement) {
+    document.querySelectorAll('input[name="sp-recouvrement"]').forEach(e => {
+      e.checked = t.recouvrement.includes(e.value);
+    });
+  }
+  const descEl = document.getElementById('sp-semelles-desc');
+  if(descEl) descEl.value = t.semellesDesc || '';
+  const rdvEl = document.getElementById('sp-prochain-rdv');
+  if(rdvEl) rdvEl.value = t.prochainRdv || '';
+}
+
+function clearSportTtt() {
+  // Correction 3 : try/finally synchrone. _writeSportTttExo avec sys vides déclenche
+  // updateExerciceSubMenu(this) qui supprime les .exo-sub automatiquement (early return L9845).
+  const prev = _sportTttCopying;
+  _sportTttCopying = true;
+  try {
+    ['c1','c2'].forEach(c => [1,2,3,4].forEach(i => {
+      const el = document.getElementById('sp-' + c + '-ex' + i + '-libre');
+      if(el) _writeSportTttExo(el, { sys:['','',''], sub:['','',''], libre:'' });
+    }));
+    [1,2,3,4,5,6,7,8].forEach(i => {
+      const el = document.getElementById('sp-ch-ex' + i + '-libre');
+      if(el) _writeSportTttExo(el, { sys:['','',''], sub:['','',''], libre:'' });
+    });
+  } finally {
+    _sportTttCopying = prev;
+  }
+  document.querySelectorAll('input[name="sp-materiaux"]').forEach(e => e.checked = false);
+  document.querySelectorAll('input[name="sp-recouvrement"]').forEach(e => e.checked = false);
+  const descEl = document.getElementById('sp-semelles-desc');
+  if(descEl) descEl.value = '';
+  const rdvEl = document.getElementById('sp-prochain-rdv');
+  if(rdvEl) rdvEl.value = '';
+}
+
+function setupSportTttAutoReport() {
+  const ssec = document.getElementById('ssec-9');
+  if(!ssec || ssec._sportTttBound) return;
+  ssec._sportTttBound = true;
+  // Réservé pour extensions futures — onchange/oninput inline sur les exos suffisent
+  // actuellement (cf. SE1/SE2 HTML : _onSportTttExpressChange/_onSportTttEchauffementChange).
+}
+
 function saveBilan() {
   if(!currentPatient) { alert('Aucun patient sélectionné.'); return; }
   if(!bilanData) bilanData = {};
@@ -6849,7 +7033,10 @@ function saveBilan() {
     if(match) bilanData[match[1]] = el.checked;
   });
 
-  // 4. Capturer les canvas morpho et pieds (seulement le dessin transparent)
+  // 4. Capturer le bloc traitements sport (Sprint A4) — stack exo hors regex auto
+  collectSportTtt(bilanData);
+
+  // 5. Capturer les canvas morpho et pieds (seulement le dessin transparent)
   // Effacer les anciennes données JPEG (format obsolète)
   ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD','_pieds'].forEach(k => {
     if(bilanData[k] && bilanData[k].startsWith('data:image/jpeg')) delete bilanData[k];
@@ -6949,6 +7136,9 @@ function loadBilan() {
     }
   });
 
+  // Restaurer le bloc traitements sport (Sprint A4) — stack exo hors regex auto
+  restoreSportTtt(bilanData);
+
   // Restaurer les canvas depuis les dataURLs sauvegardées
   const restoreCanvas = (id, key) => {
     const cvs = document.getElementById(id);
@@ -7027,6 +7217,7 @@ function saveBilanSilent() {
     const match = onch.match(/setBilanField\(['"]([^'"]+)['"]/);
     if(match) bilanData[match[1]] = el.checked;
   });
+  collectSportTtt(bilanData);
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
     if(c) bilanData['_'+id.replace('-','_')] = c.toDataURL('image/jpeg', 0.85);
@@ -10135,6 +10326,9 @@ function showSportBilanSection(idx) {
     if(pc && !pc._baseSnapshot && typeof drawPiedsTemplate === 'function') {
       drawPiedsTemplate(currentPatient?.bilanData?._pieds);
     }
+    // Sprint A4 — setup ttt + restore au switch onglet (idempotent via _sportTttBound)
+    setupSportTttAutoReport();
+    if(bilanData && bilanData.ttt) restoreSportTtt(bilanData);
   }, 150);
 }
 
