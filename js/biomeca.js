@@ -7147,6 +7147,48 @@ function setupSportTttAutoReport() {
   });
 }
 
+// Fix #94 — Sérialise un canvas de dessin (overlay drawings user) en PNG transparent.
+// Soustraction pixel-à-pixel par rapport à canvas._baseSnapshot : pixels identiques
+// au baseSnapshot → alpha 0 (transparent), pixels modifiés (dessins user) → préservés.
+// Backing store final downscalé à taille CSS (W/dpr × H/dpr) pour cohérence à la
+// restauration via drawImage.
+//
+// Retourne null si canvas manquant ou _baseSnapshot non encore capturé (cas
+// drawPiedsTemplate/initMorphoCanvas early return rect=0 ou setTimeout pas encore
+// exécuté). L'appelant DOIT skip et NE PAS écraser bilanData pour préserver les
+// éventuelles données existantes — évite la régression #94 où saveBilanSilent
+// écrasait bilanData._pieds avec un JPEG noir (transparency non supportée par JPEG)
+// sur un canvas désormais overlay transparent post-#91.
+//
+// Note : la soustraction porte sur RGB uniquement (alpha non pris en compte
+// volontairement — un pixel noir user RGB=0,0,0 sur baseSnapshot transparent
+// RGB=0,0,0 sera donc effacé ; limitation acceptable car dessiner en noir pur
+// est très rare sur ce type de canvas et c'était déjà la sémantique pré-fix).
+function _serializeDrawCanvas(canvas) {
+  if(!canvas || !canvas._baseSnapshot) return null;
+  const W = canvas.width, H = canvas.height;
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  const tctx = tmp.getContext('2d');
+  tctx.drawImage(canvas, 0, 0);
+  const current = tctx.getImageData(0, 0, W, H);
+  const base = canvas._baseSnapshot;
+  const cd = current.data, bd = base.data;
+  for(let i = 0; i < cd.length; i += 4) {
+    const dr = Math.abs(cd[i] - bd[i]);
+    const dg = Math.abs(cd[i+1] - bd[i+1]);
+    const db = Math.abs(cd[i+2] - bd[i+2]);
+    if(dr < 20 && dg < 20 && db < 20) cd[i+3] = 0;
+  }
+  tctx.putImageData(current, 0, 0);
+  const dpr = window.devicePixelRatio || 1;
+  const out = document.createElement('canvas');
+  out.width = Math.round(W / dpr);
+  out.height = Math.round(H / dpr);
+  out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+
 function saveBilan() {
   if(!currentPatient) { alert('Aucun patient sélectionné.'); return; }
   if(!bilanData) bilanData = {};
@@ -7174,64 +7216,21 @@ function saveBilan() {
   // 4. Capturer le bloc traitements sport (Sprint A4) — stack exo hors regex auto
   collectSportTtt(bilanData);
 
-  // 5. Capturer les canvas morpho et pieds (seulement le dessin transparent)
-  // Effacer les anciennes données JPEG (format obsolète)
+  // 5. Capturer les canvas morpho et pieds (PNG transparent via helper #94).
+  //    Effacer les anciennes données JPEG (format obsolète pré-#91).
   ['_morpho_face','_morpho_face2','_morpho_profilG','_morpho_profilD','_pieds'].forEach(k => {
     if(bilanData[k] && bilanData[k].startsWith('data:image/jpeg')) delete bilanData[k];
   });
-  const saveCanvasDrawing = (id, key) => {
-    const cv = document.getElementById(id);
-    if(!cv) return;
-    const dpr = window.devicePixelRatio || 1;
-    const W = cv.width, H = cv.height;
-    // Canvas temp à la taille réelle du canvas (avec dpr)
-    const tmp = document.createElement('canvas');
-    tmp.width = W; tmp.height = H;
-    const tctx = tmp.getContext('2d');
-    tctx.clearRect(0, 0, W, H);
-    tctx.drawImage(cv, 0, 0);
-    // Rendre transparents les pixels noirs (fond vide du canvas)
-    const imgData = tctx.getImageData(0, 0, W, H);
-    const d = imgData.data;
-    for(let i = 0; i < d.length; i += 4) {
-      const r=d[i], g=d[i+1], b=d[i+2], a=d[i+3];
-      // Rendre transparent: pixels noirs (fond canvas vide) ET pixels blancs/quasi-blancs (fond image)
-      if(a === 0 || (r < 10 && g < 10 && b < 10) || (r > 240 && g > 240 && b > 240)) d[i+3] = 0;
-    }
-    tctx.putImageData(imgData, 0, 0);
-    // Sauvegarder à taille CSS (diviser par dpr) pour cohérence à la restauration
-    const cssW = Math.round(W/dpr), cssH = Math.round(H/dpr);
-    const out = document.createElement('canvas');
-    out.width = cssW; out.height = cssH;
-    out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, cssW, cssH);
-    bilanData[key] = out.toDataURL('image/png');
-  };
+  // Skip silencieux si _baseSnapshot pas encore capturé (canvas pas init) →
+  // préserve la valeur existante de bilanData[key] (cf doc _serializeDrawCanvas).
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
-    saveCanvasDrawing(id, '_'+id.replace(/-/g,'_'));
+    const c = document.getElementById(id);
+    const png = _serializeDrawCanvas(c);
+    if(png !== null) bilanData['_' + id.replace(/-/g,'_')] = png;
   });
-  // Sauvegarder pieds: soustraire le template pour ne garder que le dessin
   const pCanvas = document.getElementById('pieds-canvas');
-  if(pCanvas && pCanvas._baseSnapshot) {
-    const W = pCanvas.width, H = pCanvas.height;
-    const tmp = document.createElement('canvas');
-    tmp.width = W; tmp.height = H;
-    const tctx = tmp.getContext('2d');
-    tctx.drawImage(pCanvas, 0, 0);
-    const current = tctx.getImageData(0, 0, W, H);
-    const base = pCanvas._baseSnapshot;
-    const cd = current.data, bd2 = base.data;
-    // Garder seulement les pixels différents du template
-    for(let i = 0; i < cd.length; i += 4) {
-      const dr = Math.abs(cd[i]-bd2[i]), dg = Math.abs(cd[i+1]-bd2[i+1]), db = Math.abs(cd[i+2]-bd2[i+2]);
-      if(dr < 20 && dg < 20 && db < 20) cd[i+3] = 0; // pixel identique au template → transparent
-    }
-    tctx.putImageData(current, 0, 0);
-    const dpr = window.devicePixelRatio || 1;
-    const out = document.createElement('canvas');
-    out.width = Math.round(W/dpr); out.height = Math.round(H/dpr);
-    out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, out.width, out.height);
-    bilanData._pieds = out.toDataURL('image/png');
-  }
+  const piedsPng = _serializeDrawCanvas(pCanvas);
+  if(piedsPng !== null) bilanData._pieds = piedsPng;
 
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
   syncOpenedBilanToHistory();
@@ -7356,12 +7355,19 @@ function saveBilanSilent() {
     if(match) bilanData[match[1]] = el.checked;
   });
   collectSportTtt(bilanData);
+  // Fix #94 — canvas via helper _serializeDrawCanvas (PNG transparent). Le JPEG
+  // précédent produisait du noir intégral sur canvas désormais overlay transparent
+  // post-#91 (JPEG ne supporte pas la transparence). Skip silencieux si
+  // _baseSnapshot non encore capturé pour préserver la valeur existante de
+  // bilanData[key].
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
-    if(c) bilanData['_'+id.replace('-','_')] = c.toDataURL('image/jpeg', 0.85);
+    const png = _serializeDrawCanvas(c);
+    if(png !== null) bilanData['_' + id.replace(/-/g,'_')] = png;
   });
   const pc = document.getElementById('pieds-canvas');
-  if(pc) bilanData._pieds = pc.toDataURL('image/jpeg', 0.85);
+  const piedsPng = _serializeDrawCanvas(pc);
+  if(piedsPng !== null) bilanData._pieds = piedsPng;
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
   syncOpenedBilanToHistory();
   savePatients();
