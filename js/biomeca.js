@@ -1950,6 +1950,10 @@ function nav(id) {
           img.onload = () => {
             const dpr = window.devicePixelRatio || 1;
             cvs.getContext('2d').drawImage(img, 0, 0, cvs.width/dpr, cvs.height/dpr);
+            // Fix #94 auto-réparation — efface fond noir éventuel des bilans
+            // corrompus pré-fix (saveBilanSilent JPEG sur canvas morpho overlay
+            // transparent). Idempotent sur PNG transparent propre.
+            _stripBackgroundFromRestore(cvs);
           };
           img.src = bd[key];
         });
@@ -6870,6 +6874,10 @@ function drawPiedsTemplate(savedData) {
     const saved = new Image();
     saved.onload = () => {
       ctx.drawImage(saved, 0, 0, r.width, r.height);
+      // Fix #94 auto-réparation — efface fond noir éventuel des bilans corrompus
+      // pré-fix (saveBilanSilent JPEG produisait noir intégral sur canvas overlay
+      // transparent). Idempotent sur PNG transparent propre.
+      _stripBackgroundFromRestore(canvas);
     };
     saved.src = savedData;
   }
@@ -7147,23 +7155,42 @@ function setupSportTttAutoReport() {
   });
 }
 
+// Fix #94 — Boucle commune de soustraction RGB. Pour chaque pixel de imageData :
+// si la diff RGB avec baseSnapshot (alpha non pris en compte) est inférieure au
+// seuil (20 par canal) → met l'alpha à 0 (transparent). Modifie imageData.data
+// in-place.
+//
+// Le seuil 20 est défini UNE SEULE FOIS ici pour éviter toute divergence future
+// entre les call sites save/load — cause racine de la régression #94 où
+// saveBilanSilent utilisait toDataURL('image/jpeg') au lieu de la soustraction
+// baseSnapshot de saveBilan. En centralisant ici, save ET load utilisent la
+// même logique de filtrage pixel.
+//
+// Note : la soustraction porte sur RGB uniquement (alpha non pris en compte
+// volontairement — un pixel noir pur user RGB=0,0,0 sur baseSnapshot transparent
+// RGB=0,0,0 sera donc effacé ; limitation acceptable car dessiner en noir pur
+// est très rare sur ce type de canvas et c'était déjà la sémantique pré-fix).
+function _subtractBaseSnapshot(imageData, baseSnapshot) {
+  const cd = imageData.data, bd = baseSnapshot.data;
+  for(let i = 0; i < cd.length; i += 4) {
+    const dr = Math.abs(cd[i] - bd[i]);
+    const dg = Math.abs(cd[i+1] - bd[i+1]);
+    const db = Math.abs(cd[i+2] - bd[i+2]);
+    if(dr < 20 && dg < 20 && db < 20) cd[i+3] = 0;
+  }
+}
+
 // Fix #94 — Sérialise un canvas de dessin (overlay drawings user) en PNG transparent.
-// Soustraction pixel-à-pixel par rapport à canvas._baseSnapshot : pixels identiques
-// au baseSnapshot → alpha 0 (transparent), pixels modifiés (dessins user) → préservés.
-// Backing store final downscalé à taille CSS (W/dpr × H/dpr) pour cohérence à la
-// restauration via drawImage.
+// Soustrait canvas._baseSnapshot via _subtractBaseSnapshot, downscale à taille CSS
+// (W/dpr × H/dpr) pour cohérence à la restauration via drawImage, retourne
+// toDataURL('image/png').
 //
 // Retourne null si canvas manquant ou _baseSnapshot non encore capturé (cas
 // drawPiedsTemplate/initMorphoCanvas early return rect=0 ou setTimeout pas encore
 // exécuté). L'appelant DOIT skip et NE PAS écraser bilanData pour préserver les
-// éventuelles données existantes — évite la régression #94 où saveBilanSilent
+// éventuelles données existantes — évite la régression où saveBilanSilent
 // écrasait bilanData._pieds avec un JPEG noir (transparency non supportée par JPEG)
 // sur un canvas désormais overlay transparent post-#91.
-//
-// Note : la soustraction porte sur RGB uniquement (alpha non pris en compte
-// volontairement — un pixel noir user RGB=0,0,0 sur baseSnapshot transparent
-// RGB=0,0,0 sera donc effacé ; limitation acceptable car dessiner en noir pur
-// est très rare sur ce type de canvas et c'était déjà la sémantique pré-fix).
 function _serializeDrawCanvas(canvas) {
   if(!canvas || !canvas._baseSnapshot) return null;
   const W = canvas.width, H = canvas.height;
@@ -7172,14 +7199,7 @@ function _serializeDrawCanvas(canvas) {
   const tctx = tmp.getContext('2d');
   tctx.drawImage(canvas, 0, 0);
   const current = tctx.getImageData(0, 0, W, H);
-  const base = canvas._baseSnapshot;
-  const cd = current.data, bd = base.data;
-  for(let i = 0; i < cd.length; i += 4) {
-    const dr = Math.abs(cd[i] - bd[i]);
-    const dg = Math.abs(cd[i+1] - bd[i+1]);
-    const db = Math.abs(cd[i+2] - bd[i+2]);
-    if(dr < 20 && dg < 20 && db < 20) cd[i+3] = 0;
-  }
+  _subtractBaseSnapshot(current, canvas._baseSnapshot);
   tctx.putImageData(current, 0, 0);
   const dpr = window.devicePixelRatio || 1;
   const out = document.createElement('canvas');
@@ -7187,6 +7207,21 @@ function _serializeDrawCanvas(canvas) {
   out.height = Math.round(H / dpr);
   out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, out.width, out.height);
   return out.toDataURL('image/png');
+}
+
+// Fix #94 auto-réparation — soustrait canvas._baseSnapshot in-place après un
+// drawImage de restauration. Les pixels du canvas dont RGB ~ baseSnapshot
+// (transparent post-#91) deviennent alpha 0. Efface le fond noir des bilans
+// corrompus (saveBilanSilent JPEG pré-fix → JPEG noir intégral) tout en préservant
+// les dessins colorés user. Idempotent sur PNG transparent propre (pixels déjà
+// transparents → diff=0 → set alpha 0 = no-op).
+function _stripBackgroundFromRestore(canvas) {
+  if(!canvas || !canvas._baseSnapshot) return;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const current = ctx.getImageData(0, 0, W, H);
+  _subtractBaseSnapshot(current, canvas._baseSnapshot);
+  ctx.putImageData(current, 0, 0);
 }
 
 function saveBilan() {
