@@ -7572,7 +7572,7 @@ function getBilanPosturoHTML() {
         </div>
         <canvas id="posturo-body-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;background:transparent;"/>
       </div>
-      <div style="background:linear-gradient(135deg,#f8f9fa,#eee);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <div class="posturo-draw-toolbar" style="background:linear-gradient(135deg,#f8f9fa,#eee);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         <button class="btn" id="ptool-pen" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
         <button class="btn" id="ptool-arrow" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
         <button class="btn" id="ptool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée (gauche)">↪ Courbée</button>
@@ -9017,7 +9017,7 @@ function getBilanPosturoHTML() {
         <span style="position:absolute;left:27%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">G</span>
         <span style="position:absolute;left:73%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">D</span>
       </div>
-      <div style="background:linear-gradient(135deg,#f8f9fa,#eee);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <div class="posturo-draw-toolbar" style="background:linear-gradient(135deg,#f8f9fa,#eee);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         <button class="btn" id="ptool-pen-feet" onclick="setDrawTool('line')">╱ Trait</button>
         <button class="btn" id="ptool-arrow-feet" onclick="setDrawTool('arrow')">→ Flèche</button>
         <button class="btn" id="ptool-arrow-curve-feet" onclick="setDrawTool('arrow-curve')">↪ Courbée</button>
