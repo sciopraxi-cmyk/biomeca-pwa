@@ -10295,6 +10295,8 @@ function genererSyntheseSport() {
   const chk = id => document.getElementById(id)?.checked;
 
   // 1. Anamnèse (ssec-0, A1) — data-fields auto-saved + radios + EVA range.
+  //    notes_generales ajouté (audit v3). travail/medecin/date_consult exclus
+  //    (réservés à l'en-tête rapport, cf commentaire posturo L9541).
   const an = [];
   if(d.motif) an.push('Motif: ' + d.motif);
   if(rad('douleur_oui_non') === 'oui') an.push('Douleur présente');
@@ -10309,6 +10311,7 @@ function genererSyntheseSport() {
   if(rad('ttt_podo') === 'oui') {
     an.push('TTT podologique' + (d.ttt_podo_detail ? ': ' + d.ttt_podo_detail : ''));
   }
+  if(d.notes_generales) an.push('Notes: ' + d.notes_generales);
   if(an.length) sections.push({ titre: '🩺 Anamnèse', items: [an.join(' · ')] });
 
   // 2. Morphostatique (ssec-1) — Hypothèse chaîne musculaire (textarea).
@@ -10348,7 +10351,9 @@ function genererSyntheseSport() {
   if(d.mob_arc_inf_D_mousse) mob.push('Arc inf. mousse D: ' + d.mob_arc_inf_D_mousse);
   if(mob.length) sections.push({ titre: '🧭 Mobilité axe corporel', items: [mob.join(' · ')] });
 
-  // 6. Mandibule (ssec-5, A3) — radios + cb sous-conditionnelles + 3 ATM cb (post-A3 ajust).
+  // 6. Mandibule (ssec-5, A3) — radios + cb sous-conditionnelles + 3 ATM cb
+  //    (post-A3 ajust). + tonicite_ouv (Amélioration ouverture de bouche /
+  //    ATM secondaire) ajouté (audit v3).
   const man = [];
   if(rad('mand_ouv_max') === 'oui') man.push('Ouverture max');
   if(rad('mand_deviation') === 'oui') man.push('Déviation');
@@ -10360,6 +10365,7 @@ function genererSyntheseSport() {
     if(chk('sm-ressaut-gauche')) cotes.push('G');
     man.push('Ressaut articulaire' + (cotes.length ? ' (' + cotes.join('+') + ')' : ''));
   }
+  if(rad('tonicite_ouv') === 'oui') man.push('Amélioration ouverture de bouche (ATM secondaire)');
   const ton = rad('tonicite_serrage');
   if(ton === 'aggravation') {
     const sub = [];
@@ -10381,58 +10387,163 @@ function genererSyntheseSport() {
   if(atms.length) man.push('ATM: ' + atms.join(', '));
   if(man.length) sections.push({ titre: '🦷 Mandibule', items: [man.join(' · ')] });
 
-  // 7. Stabilométrique (ssec-6) — niveau YFM final + conclusion (choix de scope :
-  //    niveaux YO/YF/YOM intermédiaires existent dans le DOM mais non lus ici ;
-  //    à enrichir en B1 si la couverture clinique demande les niveaux intermédiaires).
+  // 7. Stabilométrique (ssec-6) — couverture complète des 4 niveaux YO/YF/YOM/YFM
+  //    × 4 paramètres (surface, ratio1, romberg, plantaire) + conclusion. Tous
+  //    les 16 data-fields confirmés par grep (audit v3).
   const sta = [];
-  if(d.stabilo_surface_yfm) sta.push('Surface YFM: ' + d.stabilo_surface_yfm);
-  if(d.stabilo_ratio1_yfm) sta.push('Ratio 1 YFM: ' + d.stabilo_ratio1_yfm);
-  if(d.stabilo_romberg_yfm) sta.push('Romberg YFM: ' + d.stabilo_romberg_yfm);
-  if(d.stabilo_plantaire_yfm) sta.push('Plantaire YFM: ' + d.stabilo_plantaire_yfm);
-  if(d.stabilo_conclusion) sta.push('Conclusion: ' + d.stabilo_conclusion);
-  if(sta.length) sections.push({ titre: '📊 Stabilométrique', items: [sta.join(' · ')] });
+  const stabiloRows = [
+    { param: 'surface', label: 'Surface' },
+    { param: 'ratio1', label: 'Ratio 1' },
+    { param: 'romberg', label: 'Romberg' },
+    { param: 'plantaire', label: 'Plantaire' }
+  ];
+  stabiloRows.forEach(row => {
+    const parts = [];
+    ['yo','yf','yom','yfm'].forEach(level => {
+      const v = d['stabilo_' + row.param + '_' + level];
+      if(v) parts.push(level.toUpperCase() + ': ' + v);
+    });
+    if(parts.length) sta.push(row.label + ' — ' + parts.join(', '));
+  });
+  if(d.stabilo_conclusion) sta.push('Conclusion : ' + d.stabilo_conclusion);
+  if(sta.length) sections.push({ titre: '📊 Stabilométrique', items: sta });
 
-  // 8. Schémas Moteurs (ssec-7) — totaux bruts Aérien/Terrien (6 tests × score)
-  //    + conclusion. Le scoring fin profil dominant sera ajouté en B2.
+  // 8. Schémas Moteurs (ssec-7) — totaux Aérien/Terrien + détail compact
+  //    test-par-test + conclusion. Le scoring fin profil dominant viendra en B2.
   const sm = [];
-  const schemaKeys = ['extension','supination_inf','supination_sup','pronation_inf','ancrage_inf','pronation_sup'];
-  const sumAerien = schemaKeys.reduce((s, k) => s + (parseInt(d['schema_' + k + '_aerien'], 10) || 0), 0);
-  const sumTerrien = schemaKeys.reduce((s, k) => s + (parseInt(d['schema_' + k + '_terrien'], 10) || 0), 0);
+  const schemaTests = [
+    { key: 'extension', label: 'Extension' },
+    { key: 'supination_inf', label: 'Supination inf.' },
+    { key: 'supination_sup', label: 'Supination sup.' },
+    { key: 'pronation_inf', label: 'Pronation inf.' },
+    { key: 'ancrage_inf', label: 'Ancrage inf.' },
+    { key: 'pronation_sup', label: 'Pronation sup.' }
+  ];
+  let sumAerien = 0, sumTerrien = 0;
+  const schemaDetails = [];
+  schemaTests.forEach(t => {
+    const a = parseInt(d['schema_' + t.key + '_aerien'], 10) || 0;
+    const tr = parseInt(d['schema_' + t.key + '_terrien'], 10) || 0;
+    sumAerien += a;
+    sumTerrien += tr;
+    if(a > 0 || tr > 0) schemaDetails.push(t.label + ' (A:' + a + '/T:' + tr + ')');
+  });
   if(sumAerien > 0 || sumTerrien > 0) {
-    sm.push('Total Aérien: ' + sumAerien + '/12');
-    sm.push('Total Terrien: ' + sumTerrien + '/12');
+    sm.push('Totaux : Aérien ' + sumAerien + '/12 · Terrien ' + sumTerrien + '/12');
   }
-  if(d.schema_moteur_conclusion) sm.push('Conclusion: ' + d.schema_moteur_conclusion);
-  if(sm.length) sections.push({ titre: '🏃 Schémas Moteurs', items: [sm.join(' · ')] });
+  if(schemaDetails.length) sm.push('Détail : ' + schemaDetails.join(' · '));
+  if(d.schema_moteur_conclusion) sm.push('Conclusion : ' + d.schema_moteur_conclusion);
+  if(sm.length) sections.push({ titre: '🏃 Schémas Moteurs', items: sm });
 
-  // 9. Neuro Fonctionnel (ssec-8, A2) — comptage cb anomalies par bloc.
-  //    Le tableau Neuro contient 4 blocs (vérifié exhaustivement par grep) :
-  //    - APS (Analyse Posturale Statique) : 4 tests × G/D = 8 cb anomalies max
-  //    - APD (Analyse Posturale Dynamique) : 4 tests × G/D = 8 cb anomalies max
-  //    - CF (Critères de Force) : 2 tests × G/D = 4 cb anomalies max
-  //    - ACD (Autres Critères Dynamique) : 2 tests × G/D = 4 cb anomalies max
-  //    → Total 24 cb anomalies max. Les colonnes Normal (sn-aps/apd-*-n, 8 cb)
-  //    sont ignorées (sémantique "test fait sans anomalie", pas une anomalie).
-  //    + Hypothèses tronc/cervelet (seules existant côté code, vérifié grep
-  //    setBilanField('hypo_*) — 2/2 couvertes).
+  // 9. Neuro Fonctionnel (ssec-8, A2) — réécriture v3 data-driven (audit
+  //    exhaustif par grep : 9 sous-blocs, 59 tests + 3 extras = 170 cb +
+  //    2 hypothèses ; 100% des idPrefix vérifiés présents). Listing
+  //    descriptif case-par-case ("Libellé (gauche/droite/normal/observé)")
+  //    plutôt que comptes bruts. 1 ligne par sous-bloc dans le rendu HTML.
+  const NEURO_BLOCKS = [
+    { title: 'Analyse posturale & critères', tests: [
+      { idPrefix: 'sn-aps-epaule', label: 'Épaule + basse', cols: ['g','d','n'] },
+      { idPrefix: 'sn-aps-rot', label: 'Rotation interne épaule', cols: ['g','d','n'] },
+      { idPrefix: 'sn-aps-coude', label: 'Flexion du coude', cols: ['g','d','n'] },
+      { idPrefix: 'sn-aps-pron', label: 'Pronation du poignet', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-tronc', label: 'Pattern tronc cérébral (RIMS/REMI)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-cervelet', label: 'Pattern cervelet (RIMS/RIMI)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-tete', label: 'Défaut stabilisation tête', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-membre', label: 'Membre sup peu mobile', cols: ['g','d','n'] },
+      { idPrefix: 'sn-cf-ext', label: 'Faiblesse extenseurs poignet', cols: ['g','d'] },
+      { idPrefix: 'sn-cf-flex', label: 'Faiblesse fléchisseurs hanche', cols: ['g','d'] },
+      { idPrefix: 'sn-acd-flex', label: 'Flexion poignet et doigts (dyn.)', cols: ['g','d'] },
+      { idPrefix: 'sn-acd-hyper', label: 'Hyperextension genou (dyn.)', cols: ['g','d'] }
+    ]},
+    { title: 'Nerfs crâniens', tests: [
+      { idPrefix: 'sn-nc-recap', label: 'Recapillarisation', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc1', label: 'NC1', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc2', label: 'NC2', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc3', label: 'NC3 (Mésencéphale)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc4', label: 'NC4 (Mésencéphale)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc5', label: 'NC5 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc6', label: 'NC6 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc7', label: 'NC7 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc8', label: 'NC8 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc9', label: 'NC9 (Bulbe rachidien)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc10', label: 'NC10 (Bulbe rachidien)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc11', label: 'NC11 (Bulbe rachidien)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc12', label: 'NC12 (Bulbe rachidien)', cols: ['g','d','n'] }
+    ]},
+    { title: 'Vestibulaire', tests: [
+      { idPrefix: 'sn-vest-ant', label: 'Romberg + CSC antérieur', cols: ['g','d','n'] },
+      { idPrefix: 'sn-vest-lat', label: 'Romberg + CSC latéral', cols: ['g','d','n'] },
+      { idPrefix: 'sn-vest-post', label: 'Romberg + CSC postérieur', cols: ['g','d','n'] }
+    ]},
+    { title: 'Proprioception', tests: [
+      { idPrefix: 'sn-prop-lent', label: 'FN lent (M) E. passif', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-rapide', label: 'FN rapide (M) E. actif', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-golgi', label: 'Golgi (M) force iso', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-paccini', label: 'Paccini (A) mvt précis', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-ruffini-d', label: 'Ruffini (A) Décompression', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-ruffini-c', label: 'Ruffini (A) Compression', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-golgi-a', label: 'Golgi (A) mvt forcé', cols: ['g','d','n'] }
+    ]},
+    { title: 'Cervelet — Vermis', tests: [
+      { idPrefix: 'sn-vermis-sharp', label: 'Sharp Romberg', cols: ['g','d','n'] },
+      { idPrefix: 'sn-vermis-romberg', label: 'Romberg 1 pied', cols: ['g','d','n'] }
+    ], extras: [
+      { id: 'sn-proprio-axe-tete', label: 'Proprio axe — Tête' },
+      { id: 'sn-proprio-axe-corps', label: 'Proprio axe — Corps' },
+      { id: 'sn-proprio-axe-bassin', label: 'Proprio axe — Bassin' }
+    ]},
+    { title: 'Cervelet — Inter', tests: [
+      { idPrefix: 'sn-inter-prec', label: 'Précision (doigt-nez)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-inter-coord', label: 'Coordination (mvt alternatif)', cols: ['g','d','n'] }
+    ]},
+    { title: 'Cervelet — Latéral', tests: [
+      { idPrefix: 'sn-lat-prec', label: 'Précision (piano)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-lat-coord', label: 'Coordination (Go-No Go)', cols: ['g','d','n'] }
+    ]},
+    { title: 'Réflexes archaïques', tests: [
+      { idPrefix: 'sn-ref-rpp', label: 'RPP', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-rtp', label: 'RTP', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-moro', label: 'Moro', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-perez', label: 'Perez', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-landau', label: 'Landau', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-reptation', label: 'Reptation', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-rtac', label: 'RTAC', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-galant', label: 'Galant', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-babinski', label: 'Babinski', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-plantaire', label: 'Plantaire', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-palmaire', label: 'Palmaire', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-babkin', label: 'Babkin', cols: ['g','d','n'] }
+    ]},
+    { title: 'Récepteurs tactiles', tests: [
+      { idPrefix: 'sn-tact-merkel', label: 'Merkel (toucher/pression)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-ruffini', label: 'Ruffini (étirement)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-pacini', label: 'Pacini (vibration)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-tnl', label: 'TNL (piquer)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-meissner', label: 'Meissner (caresse coton)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-poils', label: 'Poils (mouvement)', cols: ['g','d','n'] }
+    ]}
+  ];
+  const NEURO_COL_LABELS = { g: 'gauche', d: 'droite', n: 'normal', o: 'observé' };
   const nf = [];
-  const apsCount = ['epaule','rot','coude','pron'].reduce((s, k) =>
-    s + (chk('sn-aps-' + k + '-g') ? 1 : 0) + (chk('sn-aps-' + k + '-d') ? 1 : 0), 0);
-  const apdCount = ['tronc','cervelet','tete','membre'].reduce((s, k) =>
-    s + (chk('sn-apd-' + k + '-g') ? 1 : 0) + (chk('sn-apd-' + k + '-d') ? 1 : 0), 0);
-  const cfCount = ['ext','flex'].reduce((s, k) =>
-    s + (chk('sn-cf-' + k + '-g') ? 1 : 0) + (chk('sn-cf-' + k + '-d') ? 1 : 0), 0);
-  const acdCount = ['flex','hyper'].reduce((s, k) =>
-    s + (chk('sn-acd-' + k + '-g') ? 1 : 0) + (chk('sn-acd-' + k + '-d') ? 1 : 0), 0);
-  if(apsCount > 0) nf.push('APS: ' + apsCount + '/8 anomalies');
-  if(apdCount > 0) nf.push('APD: ' + apdCount + '/8 anomalies');
-  if(cfCount > 0) nf.push('CF: ' + cfCount + '/4 anomalies');
-  if(acdCount > 0) nf.push('ACD: ' + acdCount + '/4 anomalies');
+  NEURO_BLOCKS.forEach(block => {
+    const items = [];
+    (block.tests || []).forEach(test => {
+      test.cols.forEach(col => {
+        if(chk(test.idPrefix + '-' + col)) {
+          items.push(test.label + ' (' + NEURO_COL_LABELS[col] + ')');
+        }
+      });
+    });
+    (block.extras || []).forEach(extra => {
+      if(chk(extra.id)) items.push(extra.label);
+    });
+    if(items.length) nf.push('— ' + block.title + ' : ' + items.join(', '));
+  });
   const hypoteses = [];
   if(d.hypo_tronc) hypoteses.push('Tronc cérébral');
   if(d.hypo_cervelet) hypoteses.push('Cervelet');
-  if(hypoteses.length) nf.push('Hypothèses: ' + hypoteses.join(', '));
-  if(nf.length) sections.push({ titre: '🧠 Neuro fonctionnel', items: [nf.join(' · ')] });
+  if(hypoteses.length) nf.push('— Hypothèses : ' + hypoteses.join(', '));
+  if(nf.length) sections.push({ titre: '🧠 Neuro fonctionnel', items: nf });
 
   // 10. Traitements (ssec-9, A4) — résumé bilanData.ttt (structure collectSportTtt).
   const ttt = d.ttt || {};
