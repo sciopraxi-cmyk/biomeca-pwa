@@ -6723,6 +6723,27 @@ function _markMorphoTool(activeId) {
   });
 }
 
+// Fix #90 — helper marquage état actif boutons posturo body (scope strict psec-*).
+// Symétrique à _markMorphoTool / _markPlantaireTool : liste fermée des 6 IDs body ;
+// reset tous puis marque l'actif. Aucun ID morpho (sans suffixe), plantaire
+// (suffixe "2") ni posturo feet (suffixe "-feet") dans la liste → noop ailleurs.
+function _markPosturoBodyTool(activeId) {
+  ['ptool-pen','ptool-arrow','ptool-arrow-curve','ptool-circle','ptool-erase','btn-curve-inv-posturo-body'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn) btn.className = (id === activeId) ? 'btn btn-blue' : 'btn';
+  });
+}
+
+// Fix #90 — helper marquage état actif boutons posturo feet (scope strict psec-8).
+// Symétrique à _markPosturoBodyTool : liste fermée des 6 IDs feet (suffixe "-feet").
+// Aucun ID body, morpho, plantaire dans la liste → noop ailleurs (scope strict).
+function _markPosturoFeetTool(activeId) {
+  ['ptool-pen-feet','ptool-arrow-feet','ptool-arrow-curve-feet','ptool-circle-feet','ptool-erase-feet','btn-curve-inv-posturo-feet'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn) btn.className = (id === activeId) ? 'btn btn-blue' : 'btn';
+  });
+}
+
 function setDrawTool(tool) {
   drawTool=tool;
   curveDir=1; // reset direction normale
@@ -6738,6 +6759,14 @@ function setDrawTool(tool) {
   // suffixé "2".
   const _plantaireMap = {'line':'tool-pen2','arrow':'tool-arrow2','arrow-curve':'tool-arrow-curve2','circle':'tool-circle2','erase':'tool-erase2'};
   _markPlantaireTool(_plantaireMap[tool] || '');
+  // Fix #90 — marquage additif posturo body (le helper plantaire ci-dessus est
+  // strictement scopé à ssec-9 sport ; les helpers morpho/plantaire ne touchent
+  // pas les IDs ptool-). Mapping outil interne → ID button posturo body préfixé "ptool-".
+  const _posturoBodyMap = {'line':'ptool-pen','arrow':'ptool-arrow','arrow-curve':'ptool-arrow-curve','circle':'ptool-circle','erase':'ptool-erase'};
+  _markPosturoBodyTool(_posturoBodyMap[tool] || '');
+  // Fix #90 — marquage additif posturo feet. Mêmes IDs que body avec suffixe "-feet".
+  const _posturoFeetMap = {'line':'ptool-pen-feet','arrow':'ptool-arrow-feet','arrow-curve':'ptool-arrow-curve-feet','circle':'ptool-circle-feet','erase':'ptool-erase-feet'};
+  _markPosturoFeetTool(_posturoFeetMap[tool] || '');
 }
 
 function setDrawToolCurveInv() {
@@ -6747,6 +6776,10 @@ function setDrawToolCurveInv() {
   _markMorphoTool('btn-curve-inv-morpho');
   // Fix E — marqueur actif sur ↩ Courbée inv plantaire (scope strict ssec-9 sport)
   _markPlantaireTool('btn-curve-inv-semelles');
+  // Fix #90 — marqueur actif sur ↩ Courbée inv posturo body (scope strict psec-*)
+  _markPosturoBodyTool('btn-curve-inv-posturo-body');
+  // Fix #90 — marqueur actif sur ↩ Courbée inv posturo feet (scope strict psec-8)
+  _markPosturoFeetTool('btn-curve-inv-posturo-feet');
 }
 
 function clearAllMorpho() {
