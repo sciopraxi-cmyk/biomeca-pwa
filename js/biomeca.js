@@ -10284,6 +10284,369 @@ function toggleSportSerrage(type) {
   }
 }
 
+// A5 — toggle conditionnel sub-block latéralisation Postural Global (miroir
+// posturo togglePostureLater). Si décoché, reset des radios sp-posture-later-dir
+// pour cohérence persistance (sweep name= dans saveBilan ne sauvegardera plus
+// de valeur si tous les radios sont décochés).
+function toggleSportPostureLater(checked) {
+  const opts = document.getElementById('sp-posture-later-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  if(!checked) {
+    document.querySelectorAll('input[name="sp-posture-later-dir"]').forEach(r => r.checked = false);
+  }
+}
+
+// A5 — Mutex Terrain (Aérien / Terrien / Mixte). Sur coche d'une case, décoche
+// les 2 autres dans le DOM ET synchronise bilanData pour cohérence persistance.
+// Sur décoche d'une case active, met seulement cette case à false (les 2 autres
+// étaient déjà à false par mutex). onchange="toggleSportTerrain('aerien'|'terrien'|'mixte')"
+// remplace le setBilanField direct des onchange standards — le restore DOM des
+// 3 cb se fait explicitement dans le hook showSportBilanSection idx===10
+// (car le regex setBilanField de loadBilan ne match pas toggleSportTerrain).
+function toggleSportTerrain(which) {
+  const cb = document.getElementById('sp-terrain-' + which);
+  if(!cb) return;
+  if(cb.checked) {
+    // Mutex : décoche les 2 autres + setBilanField cohérent sur les 3
+    ['aerien','terrien','mixte'].forEach(k => {
+      const target = document.getElementById('sp-terrain-' + k);
+      if(target) target.checked = (k === which);
+      setBilanField('terrain_' + k, k === which);
+    });
+  } else {
+    // Décoche la case active → cette case à false (les 2 autres déjà à false)
+    setBilanField('terrain_' + which, false);
+  }
+}
+
+// A5 — Bilan synthèse sport. Miroir du pattern posturo genererSynthese L9533 :
+// agrège les champs cliniques principaux des 11 sections sport (A0-A5 + ssec-10)
+// en sections {titre, items}, filtrées si vides, injectées en HTML structuré dans
+// #sp-synthese-content. Format intra-section : séparateur « · ». Dessins canvas
+// / photos ignorés (texte only). Appel saveBilanSilent() en amont pour garantir
+// que bilanData reflète l'état UI courant. Tous les noms de champs lus ci-dessous
+// ont été vérifiés exhaustivement par grep contre le code (data-field=, name=,
+// id=, setBilanField('...) — aucun nom inventé.
+function genererSyntheseSport() {
+  saveBilanSilent();
+  const d = bilanData || {};
+  const sections = [];
+  const rad = name => document.querySelector('input[name="' + name + '"]:checked')?.value;
+  const chk = id => document.getElementById(id)?.checked;
+
+  // 1. Anamnèse (ssec-0, A1) — data-fields auto-saved + radios + EVA range.
+  //    notes_generales ajouté (audit v3). travail/medecin/date_consult exclus
+  //    (réservés à l'en-tête rapport, cf commentaire posturo L9541).
+  const an = [];
+  if(d.motif) an.push('Motif: ' + d.motif);
+  if(rad('douleur_oui_non') === 'oui') an.push('Douleur présente');
+  const evaNum = parseInt(d.eva, 10);
+  if(!isNaN(evaNum) && evaNum > 0) an.push('EVA: ' + evaNum + '/10');
+  if(d.antecedents) an.push('Antécédents: ' + d.antecedents);
+  if(d.appareillage) an.push('Appareillage: ' + d.appareillage);
+  if(d.examens) an.push('Examens: ' + d.examens);
+  if(rad('1ere_intention') === 'oui') an.push('Consultation 1ère intention');
+  if(d.sport_detail) an.push('Sport: ' + d.sport_detail);
+  if(d.activite_quot) an.push('Activité quotidienne: ' + d.activite_quot);
+  if(rad('ttt_podo') === 'oui') {
+    an.push('TTT podologique' + (d.ttt_podo_detail ? ': ' + d.ttt_podo_detail : ''));
+  }
+  if(d.notes_generales) an.push('Notes: ' + d.notes_generales);
+  if(an.length) sections.push({ titre: '🩺 Anamnèse', items: [an.join(' · ')] });
+
+  // 2. Morphostatique (ssec-1) — Hypothèse chaîne musculaire (textarea).
+  const morpho = [];
+  if(d.chaine_musculaire) morpho.push('Hypothèse chaîne musculaire: ' + d.chaine_musculaire);
+  if(morpho.length) sections.push({ titre: '🧍 Morphostatique', items: [morpho.join(' · ')] });
+
+  // 3. Examen en charge (ssec-2) — 13 data-fields hauteurs + tests cliniques.
+  const ch = [];
+  if(d.crete_iliaque) ch.push('Crête iliaque: ' + d.crete_iliaque);
+  if(d.eias_charge) ch.push('EIAS: ' + d.eias_charge);
+  if(d.eips) ch.push('EIPS: ' + d.eips);
+  if(d.tfd) ch.push('TFD: ' + d.tfd);
+  if(d.tfa) ch.push('TFA: ' + d.tfa);
+  if(d.test_romberg) ch.push('Romberg: ' + d.test_romberg);
+  if(d.test_force_ext_poignet) ch.push('Force ext. poignet: ' + d.test_force_ext_poignet);
+  if(d.test_force_stabilite) ch.push('Force/stab. arr.: ' + d.test_force_stabilite);
+  if(d.test_flexion_ant) ch.push('Flexion ant.: ' + d.test_flexion_ant);
+  if(d.test_fukuda) ch.push('Fukuda: ' + d.test_fukuda);
+  if(d.test_stab_cheville) ch.push('Stab. cheville: ' + d.test_stab_cheville);
+  if(d.test_stab_genou) ch.push('Stab. genou: ' + d.test_stab_genou);
+  if(d.test_chaines_stab) ch.push('Chaînes stab.: ' + d.test_chaines_stab);
+  if(ch.length) sections.push({ titre: '⚖️ Examen en charge', items: [ch.join(' · ')] });
+
+  // 4. Rotation nucale (ssec-3).
+  const rot = [];
+  if(d.test_rot_nucale) rot.push('Test rotation nucale: ' + d.test_rot_nucale);
+  if(d.rot_nucale_D_mousse) rot.push('Avec mousse D: ' + d.rot_nucale_D_mousse);
+  if(d.test_equilibration) rot.push('Test équilibration: ' + d.test_equilibration);
+  if(rot.length) sections.push({ titre: '🌀 Rotation nucale', items: [rot.join(' · ')] });
+
+  // 5. Mobilité axe corporel (ssec-4).
+  const mob = [];
+  if(d.mob_cervical_D_mousse) mob.push('Cervical mousse D: ' + d.mob_cervical_D_mousse);
+  if(d.mob_thoracique_D_mousse) mob.push('Thoracique mousse D: ' + d.mob_thoracique_D_mousse);
+  if(d.mob_lombaire_D_mousse) mob.push('Lombaire mousse D: ' + d.mob_lombaire_D_mousse);
+  if(d.mob_arc_inf_D_mousse) mob.push('Arc inf. mousse D: ' + d.mob_arc_inf_D_mousse);
+  if(mob.length) sections.push({ titre: '🧭 Mobilité axe corporel', items: [mob.join(' · ')] });
+
+  // 6. Mandibule (ssec-5, A3) — radios + cb sous-conditionnelles + 3 ATM cb
+  //    (post-A3 ajust). + tonicite_ouv (Amélioration ouverture de bouche /
+  //    ATM secondaire) ajouté (audit v3).
+  const man = [];
+  if(rad('mand_ouv_max') === 'oui') man.push('Ouverture max');
+  if(rad('mand_deviation') === 'oui') man.push('Déviation');
+  if(rad('mand_contractures') === 'oui') man.push('Contractures');
+  if(rad('mand_douleur_caps') === 'oui') man.push('Douleur capsulaire');
+  if(rad('mand_ressaut') === 'oui') {
+    const cotes = [];
+    if(chk('sm-ressaut-dte')) cotes.push('D');
+    if(chk('sm-ressaut-gauche')) cotes.push('G');
+    man.push('Ressaut articulaire' + (cotes.length ? ' (' + cotes.join('+') + ')' : ''));
+  }
+  if(rad('tonicite_ouv') === 'oui') man.push('Amélioration ouverture de bouche (ATM secondaire)');
+  const ton = rad('tonicite_serrage');
+  if(ton === 'aggravation') {
+    const sub = [];
+    if(chk('sm-aggr-dents')) sub.push('dents');
+    if(chk('sm-aggr-atm')) sub.push('ATM');
+    man.push('Serrage de dent: aggravation' + (sub.length ? ' (' + sub.join('+') + ')' : ''));
+  } else if(ton === 'amelioration') {
+    const sub = [];
+    if(chk('sm-amelio-contact')) sub.push('contact');
+    if(chk('sm-amelio-tension')) sub.push('tension');
+    man.push('Serrage de dent: amélioration' + (sub.length ? ' (' + sub.join('+') + ')' : ''));
+  } else if(ton === 'inchange') {
+    man.push('Serrage de dent: inchangé');
+  }
+  const atms = [];
+  if(d.atm_musculaire) atms.push('musculaire');
+  if(d.atm_reductible) atms.push('articulaire réductible');
+  if(d.atm_irreductible) atms.push('articulaire irréductible');
+  if(atms.length) man.push('ATM: ' + atms.join(', '));
+  if(man.length) sections.push({ titre: '🦷 Mandibule', items: [man.join(' · ')] });
+
+  // 7. Stabilométrique (ssec-6) — couverture complète des 4 niveaux YO/YF/YOM/YFM
+  //    × 4 paramètres (surface, ratio1, romberg, plantaire) + conclusion. Tous
+  //    les 16 data-fields confirmés par grep (audit v3).
+  const sta = [];
+  const stabiloRows = [
+    { param: 'surface', label: 'Surface' },
+    { param: 'ratio1', label: 'Ratio 1' },
+    { param: 'romberg', label: 'Romberg' },
+    { param: 'plantaire', label: 'Plantaire' }
+  ];
+  stabiloRows.forEach(row => {
+    const parts = [];
+    ['yo','yf','yom','yfm'].forEach(level => {
+      const v = d['stabilo_' + row.param + '_' + level];
+      if(v) parts.push(level.toUpperCase() + ': ' + v);
+    });
+    if(parts.length) sta.push(row.label + ' — ' + parts.join(', '));
+  });
+  if(d.stabilo_conclusion) sta.push('Conclusion : ' + d.stabilo_conclusion);
+  if(sta.length) sections.push({ titre: '📊 Stabilométrique', items: sta });
+
+  // 8. Schémas Moteurs (ssec-7) — totaux Aérien/Terrien + détail compact
+  //    test-par-test + conclusion. Le scoring fin profil dominant viendra en B2.
+  const sm = [];
+  const schemaTests = [
+    { key: 'extension', label: 'Extension' },
+    { key: 'supination_inf', label: 'Supination inf.' },
+    { key: 'supination_sup', label: 'Supination sup.' },
+    { key: 'pronation_inf', label: 'Pronation inf.' },
+    { key: 'ancrage_inf', label: 'Ancrage inf.' },
+    { key: 'pronation_sup', label: 'Pronation sup.' }
+  ];
+  let sumAerien = 0, sumTerrien = 0;
+  const schemaDetails = [];
+  schemaTests.forEach(t => {
+    const a = parseInt(d['schema_' + t.key + '_aerien'], 10) || 0;
+    const tr = parseInt(d['schema_' + t.key + '_terrien'], 10) || 0;
+    sumAerien += a;
+    sumTerrien += tr;
+    if(a > 0 || tr > 0) schemaDetails.push(t.label + ' (A:' + a + '/T:' + tr + ')');
+  });
+  if(sumAerien > 0 || sumTerrien > 0) {
+    sm.push('Totaux : Aérien ' + sumAerien + '/12 · Terrien ' + sumTerrien + '/12');
+  }
+  if(schemaDetails.length) sm.push('Détail : ' + schemaDetails.join(' · '));
+  if(d.schema_moteur_conclusion) sm.push('Conclusion : ' + d.schema_moteur_conclusion);
+  if(sm.length) sections.push({ titre: '🏃 Schémas Moteurs', items: sm });
+
+  // 9. Neuro Fonctionnel (ssec-8, A2) — réécriture v3 data-driven (audit
+  //    exhaustif par grep : 9 sous-blocs, 59 tests + 3 extras = 170 cb +
+  //    2 hypothèses ; 100% des idPrefix vérifiés présents). Listing
+  //    descriptif case-par-case ("Libellé (gauche/droite/normal/observé)")
+  //    plutôt que comptes bruts. 1 ligne par sous-bloc dans le rendu HTML.
+  const NEURO_BLOCKS = [
+    { title: 'Analyse posturale & critères', tests: [
+      { idPrefix: 'sn-aps-epaule', label: 'Épaule + basse', cols: ['g','d','n'] },
+      { idPrefix: 'sn-aps-rot', label: 'Rotation interne épaule', cols: ['g','d','n'] },
+      { idPrefix: 'sn-aps-coude', label: 'Flexion du coude', cols: ['g','d','n'] },
+      { idPrefix: 'sn-aps-pron', label: 'Pronation du poignet', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-tronc', label: 'Pattern tronc cérébral (RIMS/REMI)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-cervelet', label: 'Pattern cervelet (RIMS/RIMI)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-tete', label: 'Défaut stabilisation tête', cols: ['g','d','n'] },
+      { idPrefix: 'sn-apd-membre', label: 'Membre sup peu mobile', cols: ['g','d','n'] },
+      { idPrefix: 'sn-cf-ext', label: 'Faiblesse extenseurs poignet', cols: ['g','d'] },
+      { idPrefix: 'sn-cf-flex', label: 'Faiblesse fléchisseurs hanche', cols: ['g','d'] },
+      { idPrefix: 'sn-acd-flex', label: 'Flexion poignet et doigts (dyn.)', cols: ['g','d'] },
+      { idPrefix: 'sn-acd-hyper', label: 'Hyperextension genou (dyn.)', cols: ['g','d'] }
+    ]},
+    { title: 'Nerfs crâniens', tests: [
+      { idPrefix: 'sn-nc-recap', label: 'Recapillarisation', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc1', label: 'NC1', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc2', label: 'NC2', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc3', label: 'NC3 (Mésencéphale)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc4', label: 'NC4 (Mésencéphale)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc5', label: 'NC5 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc6', label: 'NC6 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc7', label: 'NC7 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc8', label: 'NC8 (Pont de Varole)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc9', label: 'NC9 (Bulbe rachidien)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc10', label: 'NC10 (Bulbe rachidien)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc11', label: 'NC11 (Bulbe rachidien)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-nc-nc12', label: 'NC12 (Bulbe rachidien)', cols: ['g','d','n'] }
+    ]},
+    { title: 'Vestibulaire', tests: [
+      { idPrefix: 'sn-vest-ant', label: 'Romberg + CSC antérieur', cols: ['g','d','n'] },
+      { idPrefix: 'sn-vest-lat', label: 'Romberg + CSC latéral', cols: ['g','d','n'] },
+      { idPrefix: 'sn-vest-post', label: 'Romberg + CSC postérieur', cols: ['g','d','n'] }
+    ]},
+    { title: 'Proprioception', tests: [
+      { idPrefix: 'sn-prop-lent', label: 'FN lent (M) E. passif', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-rapide', label: 'FN rapide (M) E. actif', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-golgi', label: 'Golgi (M) force iso', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-paccini', label: 'Paccini (A) mvt précis', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-ruffini-d', label: 'Ruffini (A) Décompression', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-ruffini-c', label: 'Ruffini (A) Compression', cols: ['g','d','n'] },
+      { idPrefix: 'sn-prop-golgi-a', label: 'Golgi (A) mvt forcé', cols: ['g','d','n'] }
+    ]},
+    { title: 'Cervelet — Vermis', tests: [
+      { idPrefix: 'sn-vermis-sharp', label: 'Sharp Romberg', cols: ['g','d','n'] },
+      { idPrefix: 'sn-vermis-romberg', label: 'Romberg 1 pied', cols: ['g','d','n'] }
+    ], extras: [
+      { id: 'sn-proprio-axe-tete', label: 'Proprio axe — Tête' },
+      { id: 'sn-proprio-axe-corps', label: 'Proprio axe — Corps' },
+      { id: 'sn-proprio-axe-bassin', label: 'Proprio axe — Bassin' }
+    ]},
+    { title: 'Cervelet — Inter', tests: [
+      { idPrefix: 'sn-inter-prec', label: 'Précision (doigt-nez)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-inter-coord', label: 'Coordination (mvt alternatif)', cols: ['g','d','n'] }
+    ]},
+    { title: 'Cervelet — Latéral', tests: [
+      { idPrefix: 'sn-lat-prec', label: 'Précision (piano)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-lat-coord', label: 'Coordination (Go-No Go)', cols: ['g','d','n'] }
+    ]},
+    { title: 'Réflexes archaïques', tests: [
+      { idPrefix: 'sn-ref-rpp', label: 'RPP', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-rtp', label: 'RTP', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-moro', label: 'Moro', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-perez', label: 'Perez', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-landau', label: 'Landau', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-reptation', label: 'Reptation', cols: ['o','n'] },
+      { idPrefix: 'sn-ref-rtac', label: 'RTAC', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-galant', label: 'Galant', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-babinski', label: 'Babinski', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-plantaire', label: 'Plantaire', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-palmaire', label: 'Palmaire', cols: ['g','d','n'] },
+      { idPrefix: 'sn-ref-babkin', label: 'Babkin', cols: ['g','d','n'] }
+    ]},
+    { title: 'Récepteurs tactiles', tests: [
+      { idPrefix: 'sn-tact-merkel', label: 'Merkel (toucher/pression)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-ruffini', label: 'Ruffini (étirement)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-pacini', label: 'Pacini (vibration)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-tnl', label: 'TNL (piquer)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-meissner', label: 'Meissner (caresse coton)', cols: ['g','d','n'] },
+      { idPrefix: 'sn-tact-poils', label: 'Poils (mouvement)', cols: ['g','d','n'] }
+    ]}
+  ];
+  const NEURO_COL_LABELS = { g: 'gauche', d: 'droite', n: 'normal', o: 'observé' };
+  const nf = [];
+  NEURO_BLOCKS.forEach(block => {
+    const items = [];
+    (block.tests || []).forEach(test => {
+      test.cols.forEach(col => {
+        if(chk(test.idPrefix + '-' + col)) {
+          items.push(test.label + ' (' + NEURO_COL_LABELS[col] + ')');
+        }
+      });
+    });
+    (block.extras || []).forEach(extra => {
+      if(chk(extra.id)) items.push(extra.label);
+    });
+    if(items.length) nf.push('— ' + block.title + ' : ' + items.join(', '));
+  });
+  const hypoteses = [];
+  if(d.hypo_tronc) hypoteses.push('Tronc cérébral');
+  if(d.hypo_cervelet) hypoteses.push('Cervelet');
+  if(hypoteses.length) nf.push('— Hypothèses : ' + hypoteses.join(', '));
+  if(nf.length) sections.push({ titre: '🧠 Neuro fonctionnel', items: nf });
+
+  // 10. Traitements (ssec-9, A4) — résumé bilanData.ttt (structure collectSportTtt).
+  const ttt = d.ttt || {};
+  const tt = [];
+  const countCircuit = arr => (arr || []).filter(e =>
+    e && (e.libre || (e.sys && e.sys.some(s => s)))).length;
+  const c1n = countCircuit(ttt.c1);
+  const c2n = countCircuit(ttt.c2);
+  const chn = countCircuit(ttt.ch);
+  if(c1n) tt.push('CE1: ' + c1n + '/4 exos remplis');
+  if(c2n) tt.push('CE2: ' + c2n + '/4 exos remplis');
+  if(chn) tt.push('Échauffement EMOM: ' + chn + '/8 exos remplis');
+  if(ttt.materiaux && ttt.materiaux.length) tt.push('Matériaux: ' + ttt.materiaux.join(', '));
+  if(ttt.recouvrement && ttt.recouvrement.length) tt.push('Recouvrement: ' + ttt.recouvrement.join(', '));
+  if(ttt.semellesDesc) tt.push('Semelles: ' + ttt.semellesDesc);
+  if(ttt.prochainRdv) tt.push('Prochain RDV: ' + ttt.prochainRdv);
+  if(tt.length) sections.push({ titre: '💊 Traitements', items: [tt.join(' · ')] });
+
+  // 11. Schémas du patient (ssec-10, A5 — cette section).
+  const sp = [];
+  const terrain = [];
+  if(d.terrain_aerien) terrain.push('Aérien');
+  if(d.terrain_terrien) terrain.push('Terrien');
+  if(d.terrain_mixte) terrain.push('Mixte');
+  if(terrain.length) sp.push('Terrain: ' + terrain.join(', '));
+  const post = [];
+  if(d.posture_ant) post.push('Antériorisation');
+  if(d.posture_post) post.push('Postériorisation');
+  if(d.posture_later) {
+    const dir = rad('sp-posture-later-dir');
+    post.push('Latéralisation' + (dir ? ' ' + dir : ''));
+  }
+  if(post.length) sp.push('Postural: ' + post.join(', '));
+  const chn2 = [];
+  if(d.chaine_ext) chn2.push('extension (PM)');
+  if(d.chaine_flex) chn2.push('flexion (AM)');
+  if(d.chaine_ferm) chn2.push('fermeture (PL)');
+  if(d.chaine_ouv) chn2.push("ouverture (AL)");
+  if(d.chaine_stat_opt) chn2.push('statique opt. (PA)');
+  if(d.chaine_stat_deg) chn2.push('statique dég. (AP)');
+  if(chn2.length) sp.push('NPC: ' + chn2.join(', '));
+  if(d.biomec_articulaire) sp.push('Bioméca/Articulaire/viscéral: ' + d.biomec_articulaire);
+  if(sp.length) sections.push({ titre: '🌿 Schémas du patient', items: [sp.join(' · ')] });
+
+  // Construction HTML + injection
+  let html = '';
+  sections.forEach(sec => {
+    html += '<div style="margin-bottom:12px;"><div style="font-weight:700;color:#2a7a4e;margin-bottom:4px;">' + sec.titre + '</div>';
+    sec.items.forEach(item => {
+      html += '<div style="margin-left:12px;color:#333;">' + item + '</div>';
+    });
+    html += '</div>';
+  });
+  if(!sections.length) {
+    html = '<div style="color:#888;font-style:italic;">Aucun élément renseigné dans le bilan pour le moment.</div>';
+  }
+  const content = document.getElementById('sp-synthese-content');
+  const result = document.getElementById('sp-synthese-result');
+  if(content) content.innerHTML = html;
+  if(result) result.style.display = 'block';
+}
+
 function toggleCLVF(enabled) {
   const el = document.getElementById('po-clvf-detail');
   if(!el) return;
@@ -10510,6 +10873,18 @@ function showSportBilanSection(idx) {
     // Sprint A4 — setup ttt + restore au switch onglet (idempotent via _sportTttBound)
     setupSportTttAutoReport();
     if(bilanData && bilanData.ttt) restoreSportTtt(bilanData);
+  }, 150);
+  // A5 — Section 10 (Schémas/Synthèse) : restore explicit des 3 cb Terrain
+  // (onchange utilise toggleSportTerrain non matché par le regex setBilanField
+  // de loadBilan) + restore affichage sub-block latéralisation Postural depuis
+  // l'état de la cb sp-posture-later restaurée par le mécanisme standard.
+  if(idx === 10) setTimeout(() => {
+    ['aerien','terrien','mixte'].forEach(k => {
+      const cb = document.getElementById('sp-terrain-' + k);
+      if(cb) cb.checked = !!(bilanData && bilanData['terrain_' + k]);
+    });
+    const laterCb = document.getElementById('sp-posture-later');
+    if(laterCb) toggleSportPostureLater(laterCb.checked);
   }, 150);
 }
 

@@ -714,6 +714,7 @@
       <button class="btn sport-tab" onclick="showSportBilanSection(7)" id="stab-7" style="font-size:11px;padding:4px 10px;">8. Schémas moteurs</button>
       <button class="btn sport-tab" onclick="showSportBilanSection(8)" id="stab-8" style="font-size:11px;padding:4px 10px;">9. Neuro fonctionnel</button>
       <button class="btn sport-tab" onclick="showSportBilanSection(9)" id="stab-9" style="font-size:11px;padding:4px 10px;">10. Traitements</button>
+      <button class="btn sport-tab" onclick="showSportBilanSection(10)" id="stab-10" style="font-size:11px;padding:4px 10px;">11. Schémas/Synthèse</button>
     </div>
 
     <div class="sport-section" id="ssec-0">
@@ -1803,6 +1804,101 @@
       </div>
     </div>
     </div><!-- /ssec-9 -->
+
+    <div class="sport-section" id="ssec-10" style="display:none;">
+    <!-- SCHÉMAS DU PATIENT (A5 — réplique posturo psec-7 + nouveau bloc Terrain) -->
+    <div class="card sport-card-violet" id="sp-schemas-card">
+      <div class="sport-block-title c-violet">🌿 Schémas du patient</div>
+
+      <!-- 1. Terrain (turquoise) — mutex via toggleSportTerrain -->
+      <div style="background:linear-gradient(135deg,#e8f8f5,#d5f0e9);border-left:4px solid #1abc9c;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">1 – <span style="color:#1abc9c;">T</span>errain du patient</div>
+        <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Profil :</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #1abc9c;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-terrain-aerien" onchange="toggleSportTerrain('aerien')"/> 🌬️ Aérien
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #1abc9c;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-terrain-terrien" onchange="toggleSportTerrain('terrien')"/> 🌍 Terrien
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #1abc9c;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-terrain-mixte" onchange="toggleSportTerrain('mixte')"/> ⚖️ Mixte
+          </label>
+        </div>
+      </div>
+
+      <!-- 2. Postural Global (bleu, réplique posturo psec-7) -->
+      <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">2 – <span style="color:#3498db;">P</span>ostural (Global)</div>
+        <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture :</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-posture-ant" onchange="setBilanField('posture_ant',this.checked)"/> Antériorisation globale
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-posture-post" onchange="setBilanField('posture_post',this.checked)"/> Postériorisation globale
+          </label>
+          <div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+              <input type="checkbox" id="sp-posture-later" onchange="setBilanField('posture_later',this.checked);toggleSportPostureLater(this.checked)"/> Latéralisation globale
+            </label>
+            <div id="sp-posture-later-opts" style="display:none;flex-wrap:wrap;gap:8px;margin-left:16px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 14px;color:#222;">
+                <input type="radio" name="sp-posture-later-dir" value="gauche"/> 👈 Gauche
+              </label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 14px;color:#222;">
+                <input type="radio" name="sp-posture-later-dir" value="droite"/> 👉 Droite
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. NPC Régional (orange, réplique posturo psec-7) -->
+      <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">3 – <span style="color:#f0a500;">N</span>euro-musculaire / <span style="color:#f0a500;">P</span>roprioceptif / <span style="color:#f0a500;">C</span>hainiste (Régional)</div>
+        <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture en excès :</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-chaine-ext" onchange="setBilanField('chaine_ext',this.checked)"/> Chaine extension (PM)
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-chaine-flex" onchange="setBilanField('chaine_flex',this.checked)"/> Chaine de flexion (AM)
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-chaine-ferm" onchange="setBilanField('chaine_ferm',this.checked)"/> Chaine de fermeture (PL)
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-chaine-ouv" onchange="setBilanField('chaine_ouv',this.checked)"/> Chaine d'ouverture (AL)
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-chaine-stat-opt" onchange="setBilanField('chaine_stat_opt',this.checked)"/> Chaine statique optimisée (PA)
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-chaine-stat-deg" onchange="setBilanField('chaine_stat_deg',this.checked)"/> Chaine statique dégradée (AP)
+          </label>
+        </div>
+      </div>
+
+      <!-- 4. Biomécanique / Articulaire / viscéral Local (vert, réplique posturo psec-7) -->
+      <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">4 – <span style="color:#2a7a4e;">B</span>iomécanique / <span style="color:#f0a500;">A</span>rticulaire / <span style="color:#2a7a4e;">v</span>iscéral (Local)</div>
+        <textarea class="inp bilan-field" id="sp-biomec-articulaire" data-field="biomec_articulaire" rows="4" placeholder="Observations biomécanique, articulaire et viscérale..." style="background:#fff;color:#222;"></textarea>
+      </div>
+    </div>
+
+    <!-- BILAN SYNTHÈSE (A5) -->
+    <div class="card sport-card-vert" id="sp-synthese-card">
+      <div class="sport-block-title c-vert">📋 Bilan synthèse</div>
+      <div style="font-size:11px;color:#555;margin-bottom:10px;">Compilation automatique des éléments positifs du bilan sport</div>
+      <button onclick="genererSyntheseSport()" style="background:linear-gradient(135deg,#2a7a4e,#27ae60);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px;">
+        ✨ Générer la synthèse
+      </button>
+      <div id="sp-synthese-result" style="display:none;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:16px;margin-top:12px;">
+        <div id="sp-synthese-content" style="font-size:12px;color:#222;line-height:1.8;"></div>
+      </div>
+    </div>
+    </div><!-- /ssec-10 -->
 
   </div>
 </div><!-- /pg-bilan -->
