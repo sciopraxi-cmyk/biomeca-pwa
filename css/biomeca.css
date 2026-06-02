@@ -81,6 +81,17 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
    ET l'outil actif marqué par setDrawTool via la classe .btn-blue). */
 .card[class*="sport-card-"] .btn:not(.btn-red):not(.btn-blue):not(.btn-green){background:#fff;color:#1a2b3c;border:1px solid rgba(0,0,0,0.25);}
 .card[class*="sport-card-"] .btn:not(.btn-red):not(.btn-blue):not(.btn-green):hover{background:#f5f5f5;}
+/* Fix #90 (hover) — boutons .btn lisibles dans les toolbars de dessin posturo
+   (body + feet). Les cards posturo utilisent class="card" simple → Fix C
+   (sport-card-) ne s'applique pas. Miroir de Fix C scopé via class
+   "posturo-draw-toolbar" sur les wrappers des 2 toolbars de dessin posturo.
+   Sans cette règle, .btn natif (color:var(--txt)=#fff) sur .btn:hover natif
+   (background:var(--bord)=rgba(255,255,255,0.08)) donne texte blanc sur fond
+   clair blanchi → illisible. Exclusion .btn-red/.btn-blue/.btn-green qui
+   ont leur propre fond coloré et hover propre (ex. Annuler en btn-red,
+   outil actif #90 en btn-blue). */
+.posturo-draw-toolbar .btn:not(.btn-red):not(.btn-blue):not(.btn-green){background:#fff;color:#1a2b3c;border:1px solid rgba(0,0,0,0.25);}
+.posturo-draw-toolbar .btn:not(.btn-red):not(.btn-blue):not(.btn-green):hover{background:#f5f5f5;}
 .badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;}
 .bg{background:var(--green-d);color:var(--green);}
 .bo{background:var(--orange-d);color:var(--orange);}
