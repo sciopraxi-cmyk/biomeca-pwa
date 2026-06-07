@@ -9720,34 +9720,32 @@ function genererSynthese() {
   if(dynItems.length) sections.push({titre:'🏃 Bilan dynamique', items:[dynItems.join(' · ')]});
 
   // Neuro-fonctionnel (psec-3) #92 — standard A5 partagé sport via renderNeuroBlocks.
-  // Reader posturo lit bilanDataPosturo.neuro4 (objet plat, keys SANS préfixe,
-  // peuplé par savePosturoBilan L11085-11088 qui scrape les cb de psec-3).
-  // Hypothèses lues sur 'po-hypo-tronc/-cervelet' (préfixe 'po-' conservé,
-  // cf L11077 — ces IDs gardent 'po-' contrairement aux autres cb neuro4).
-  // Format multi-items : 1 puce par sous-bloc (rendu HTML L10141 <li>). Totaux DOM
-  // (textContent) conservés — alimentés par updateNeuroTotals onchange. NB: l'ID
-  // 'vest-total-*' calcule en fait le total PROPRIOCEPTION (cf updateNeuroTotals L10695).
-  const n4 = currentPatient?.bilanDataPosturo?.neuro4;
-  if(n4) {
-    const posturoNeuroReader = id => !!n4[id];
-    const neuroItems = renderNeuroBlocks(posturoNeuroReader);
-    const hypo = [];
-    if(n4['po-hypo-tronc']) hypo.push('Tronc cérébral');
-    if(n4['po-hypo-cervelet']) hypo.push('Cervelet');
-    if(hypo.length) neuroItems.push('— Hypothèses : ' + hypo.join(', '));
-    const ncTotG   = document.getElementById('nc-total-g')?.textContent   || '0';
-    const ncTotD   = document.getElementById('nc-total-d')?.textContent   || '0';
-    const propTotG = document.getElementById('vest-total-g')?.textContent || '0';
-    const propTotD = document.getElementById('vest-total-d')?.textContent || '0';
-    const cervTotG = document.getElementById('cerv-total-g')?.textContent || '0';
-    const cervTotD = document.getElementById('cerv-total-d')?.textContent || '0';
-    const totParts = [];
-    if(ncTotG   !== '0' || ncTotD   !== '0') totParts.push('NC '      + ncTotG   + 'G/' + ncTotD   + 'D');
-    if(propTotG !== '0' || propTotD !== '0') totParts.push('Proprio ' + propTotG + 'G/' + propTotD + 'D');
-    if(cervTotG !== '0' || cervTotD !== '0') totParts.push('Cerv '    + cervTotG + 'G/' + cervTotD + 'D');
-    if(totParts.length) neuroItems.push('— Totaux : ' + totParts.join(', '));
-    if(neuroItems.length) sections.push({ titre: '🧠 Neuro-fonctionnel', items: neuroItems });
-  }
+  // Reader posturo lit le DOM directement (parité sport + parité totaux). Les cb
+  // psec-3 restent dans le DOM même quand display:none, donc lecture robuste
+  // indépendante de la persistance neuro4 (vide pour bilan contrôle fresh car
+  // savePosturoBilan skippe le scrape si psec-3 caché — garde L11054, fragilité
+  // pré-existante à #92). Hypothèses : IDs DOM 'po-hypo-tronc'/'po-hypo-cervelet'
+  // (préfixe 'po-' contrairement aux autres cb neuro psec-3). Totaux DOM
+  // (textContent) — alimentés par updateNeuroTotals onchange. NB: l'ID 'vest-total-*'
+  // calcule en fait le total PROPRIOCEPTION (cf updateNeuroTotals L10695).
+  const posturoNeuroReader = id => document.getElementById(id)?.checked;
+  const neuroItems = renderNeuroBlocks(posturoNeuroReader);
+  const hypo = [];
+  if(document.getElementById('po-hypo-tronc')?.checked) hypo.push('Tronc cérébral');
+  if(document.getElementById('po-hypo-cervelet')?.checked) hypo.push('Cervelet');
+  if(hypo.length) neuroItems.push('— Hypothèses : ' + hypo.join(', '));
+  const ncTotG   = document.getElementById('nc-total-g')?.textContent   || '0';
+  const ncTotD   = document.getElementById('nc-total-d')?.textContent   || '0';
+  const propTotG = document.getElementById('vest-total-g')?.textContent || '0';
+  const propTotD = document.getElementById('vest-total-d')?.textContent || '0';
+  const cervTotG = document.getElementById('cerv-total-g')?.textContent || '0';
+  const cervTotD = document.getElementById('cerv-total-d')?.textContent || '0';
+  const totParts = [];
+  if(ncTotG   !== '0' || ncTotD   !== '0') totParts.push('NC '      + ncTotG   + 'G/' + ncTotD   + 'D');
+  if(propTotG !== '0' || propTotD !== '0') totParts.push('Proprio ' + propTotG + 'G/' + propTotD + 'D');
+  if(cervTotG !== '0' || cervTotD !== '0') totParts.push('Cerv '    + cervTotG + 'G/' + cervTotD + 'D');
+  if(totParts.length) neuroItems.push('— Totaux : ' + totParts.join(', '));
+  if(neuroItems.length) sections.push({ titre: '🧠 Neuro-fonctionnel', items: neuroItems });
 
   // Système plantaire (psec-4)
   const plantItems = [];
