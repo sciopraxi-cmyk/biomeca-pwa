@@ -5228,10 +5228,16 @@ const sections = [];
   if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
   if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
   const tests = [];
-  const testLabels = ['Rotation nucale','Flexion antérieure','Extenseurs poignet','Stabilité monopodale','Force/stabilité arrière','Mobilité axe','Romberg','Morphostatique'];
-  ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(function(t,i) {
-    if(d['test_'+t]==='oui') tests.push(testLabels[i]+' ✅');
-    else if(d['test_'+t]==='non') tests.push(testLabels[i]+' ❌');
+  // #93 — Libellés rapport posturo lus via TESTS_AVANT_APRES_LABELS (parité R1 :
+  // formulaire = synthèse = rapport). Itère POSTURO_TESTS_AVANT_APRES → ordre
+  // identique au DOM (t1..t4, t9 Fukuda, t5..t8) + inclut le nouveau t9. NB :
+  // libellés rapport passent en format long (ex. « Test de Rotation nucale
+  // amélioré ✅ »), changement rétroactif sur les rapports historiques posturo
+  // (donnée intacte, libellé seul change — validé cadrage #93).
+  Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => {
+    const label = TESTS_AVANT_APRES_LABELS[POSTURO_TESTS_AVANT_APRES[t]];
+    if(d['test_'+t]==='oui') tests.push(label+' ✅');
+    else if(d['test_'+t]==='non') tests.push(label+' ❌');
   });
   if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
   if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
@@ -5984,15 +5990,23 @@ function buildBilanPrintSection(bd) {
   }
 
   // ─── TESTS AVANT / APRÈS ───
-  const taKeys=[['ta_rotation','Rotation nucale'],['ta_flexion','Flexion antérieure'],['ta_force','Force extenseurs poignet'],['ta_stabilite','Stabilité monopodale'],['ta_fukuda','Fukuda'],['ta_force_arr','Force/stabilité arrière'],['ta_mobilite','Mobilité axe corporel'],['ta_romberg','Romberg'],['ta_plateforme','Appuis plateforme']];
-  if(taKeys.some(([k])=>bd[k])) {
+  // #93 — Libellés rapport sport lus via TESTS_AVANT_APRES_LABELS (parité R1 :
+  // formulaire = synthèse = rapport). Itère SPORT_TESTS_AVANT_APRES → 10 entrées
+  // ordonnées (ajout de ta_morphostatique en fin). NB : libellés rapport passent
+  // en format long unifié avec posturo (ex. « Test de Rotation nucale amélioré »
+  // au lieu de « Rotation nucale »). Tableau à 2 colonnes (Test / Résultat) —
+  // colonne Observations retirée (Joel confirme aucun bilan sport historique avec
+  // notes saisies). Les clés ta_*_notes restent dans le modèle (jamais peuplées,
+  // textareas supprimés du DOM Batch 7) — aucune action data migration requise.
+  const taKeys = Object.keys(SPORT_TESTS_AVANT_APRES);
+  if(taKeys.some(k => bd[k])) {
     h += sec('Tests Avant / Après');
     h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">'
-      +'<tr style="background:#f5f0e8;"><th style="padding:2px 5px;border:1px solid #ddd;text-align:left;">Test amélioré</th><th style="padding:2px 5px;border:1px solid #ddd;">Résultat</th><th style="padding:2px 5px;border:1px solid #ddd;">Observations</th></tr>';
-    taKeys.forEach(([k,lbl]) => {
+      +'<tr style="background:#f5f0e8;"><th style="padding:2px 5px;border:1px solid #ddd;text-align:left;">Test amélioré</th><th style="padding:2px 5px;border:1px solid #ddd;">Résultat</th></tr>';
+    taKeys.forEach(k => {
+      const lbl = TESTS_AVANT_APRES_LABELS[SPORT_TESTS_AVANT_APRES[k]];
       if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:600;">'+lbl+'</td>'
-        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+yn(k)+'</td>'
-        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;color:#555;">'+(bd[k+'_notes']||'')+'</td></tr>';
+        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+yn(k)+'</td></tr>';
     });
     h += '</table>';
   }
@@ -9504,13 +9518,14 @@ function getBilanPosturoHTML() {
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test de Rotation nucale amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t1" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t1" value="non"/> ❌ Non</label></div></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test de Flexion antérieur amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t2" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t2" value="non"/> ❌ Non</label></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test de Flexion antérieure amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t2" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t2" value="non"/> ❌ Non</label></div></div>
         <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test extenseurs du poignet amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t3" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t3" value="non"/> ❌ Non</label></div></div>
         <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test stabilité monopodale amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t4" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t4" value="non"/> ❌ Non</label></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test de Fukuda amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t9" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t9" value="non"/> ❌ Non</label></div></div>
         <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test Force/stabilité arrière amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t5" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t5" value="non"/> ❌ Non</label></div></div>
         <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test mobilité axe corporel amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t6" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t6" value="non"/> ❌ Non</label></div></div>
         <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test de Romberg amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t7" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t7" value="non"/> ❌ Non</label></div></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Amélioration morphostatique améliorée</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t8" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t8" value="non"/> ❌ Non</label></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Morphostatique amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t8" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t8" value="non"/> ❌ Non</label></div></div>
       </div>
       <div style="margin-top:12px;background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:10px;">
         <div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:6px;">📅 Prochain RDV</div>
@@ -10063,20 +10078,14 @@ async function genererSynthese() {
   if(semDesc) planItems.push('Description: '+semDesc);
   const rdv = document.getElementById('po-prochain-rdv')?.value?.trim();
   if(rdv) planItems.push('Prochain RDV: '+rdv);
-  const T_LABELS = {
-    t1: 'Test de Rotation nucale amélioré',
-    t2: 'Test de Flexion antérieur amélioré',
-    t3: 'Test extenseurs du poignet amélioré',
-    t4: 'Test stabilité monopodale amélioré',
-    t5: 'Test Force/stabilité arrière amélioré',
-    t6: 'Test mobilité axe corporel amélioré',
-    t7: 'Test de Romberg amélioré',
-    t8: 'Amélioration morphostatique améliorée'
-  };
   const testsT = [];
-  Object.keys(T_LABELS).forEach(t => {
+  // #93 — Libellés lus via TESTS_AVANT_APRES_LABELS (source unique). Itération
+  // sur POSTURO_TESTS_AVANT_APRES → ordre identique au DOM (t1..t4, t9 Fukuda,
+  // t5..t8) + inclusion du nouveau t9. Élimine T_LABELS inline + divergence
+  // pré-#93 (« antérieur » / « Amélioration morphostatique améliorée »).
+  Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => {
     const v = document.querySelector('input[name="po-'+t+'"]:checked')?.value;
-    if(v) testsT.push(T_LABELS[t]+': '+v);
+    if(v) testsT.push(TESTS_AVANT_APRES_LABELS[POSTURO_TESTS_AVANT_APRES[t]]+': '+v);
   });
   if(testsT.length) planItems.push('Tests avant/après: '+testsT.join(' · '));
   const countPoCircuit = cKey => {
@@ -10287,6 +10296,58 @@ function toggleSportTerrain(which) {
     setBilanField('terrain_' + which, false);
   }
 }
+
+// #93 — Config partagée des tests Avant/Après sport ssec-9 + posturo psec-8.
+// Source unique de vérité des libellés HTML : élimine la divergence orthographique
+// pré-#93 entre sport et posturo. Consommée par les 4 readers (synthèse sport +
+// posturo, rapport sport + posturo). Le HTML reste statique côté sport
+// (index.html ssec-9) et template literal côté posturo (getBilanPosturoHTML
+// psec-8) — cohérence HTML ↔ constante maintenue à la main (vérifiée par grep
+// au filet d'intégrité de fin de chantier).
+const TESTS_AVANT_APRES_LABELS = {
+  rotation:       'Test de Rotation nucale amélioré',
+  flexion:        'Test de Flexion antérieure amélioré',
+  extenseurs:     'Test extenseurs du poignet amélioré',
+  stabilite:      'Test stabilité monopodale amélioré',
+  fukuda:         'Test de Fukuda amélioré',
+  force_arr:      'Test Force/stabilité arrière amélioré',
+  mobilite:       'Test mobilité axe corporel amélioré',
+  romberg:        'Test de Romberg amélioré',
+  plateforme:     'Appuis sur plateforme améliorés',
+  morphostatique: 'Morphostatique amélioré'
+};
+
+// Mapping ordinal posturo → clé sémantique. Conserve la numérotation t1-t8
+// (compat bilans posturo archivés) ; ajout t9 = Fukuda. L'ordre des clés ici
+// = ordre d'itération synthèse/rapport (Object.keys garanti insertion-order).
+// t8 libellé renommé en « Morphostatique amélioré » sans changement de clé.
+const POSTURO_TESTS_AVANT_APRES = {
+  t1: 'rotation',
+  t2: 'flexion',
+  t3: 'extenseurs',
+  t4: 'stabilite',
+  t9: 'fukuda',           // #93 ajout — visuellement entre t4 et t5
+  t5: 'force_arr',
+  t6: 'mobilite',
+  t7: 'romberg',
+  t8: 'morphostatique'    // #93 t8 renommé (libellé seul, clé inchangée)
+};
+
+// Mapping clés sport ta_* → clé sémantique. Conserve les clés sémantiques
+// existantes (pas de migration des bilans sport archivés) ; ajout
+// ta_morphostatique. Ordre = ordre d'itération synthèse compacte sport.
+const SPORT_TESTS_AVANT_APRES = {
+  ta_rotation:       'rotation',
+  ta_flexion:        'flexion',
+  ta_force:          'extenseurs',
+  ta_stabilite:      'stabilite',
+  ta_fukuda:         'fukuda',
+  ta_force_arr:      'force_arr',
+  ta_mobilite:       'mobilite',
+  ta_romberg:        'romberg',
+  ta_plateforme:     'plateforme',
+  ta_morphostatique: 'morphostatique'    // #93 ajout
+};
 
 // A5 #92 — Config Neuro fonctionnel partagée sport + posturo. idPrefix sans
 // préfixe DOM ('sn-' sport, lecture neuro4 sans préfixe posturo) : c'est le
@@ -10583,6 +10644,19 @@ function genererSyntheseSport() {
   if(ttt.semellesDesc) tt.push('Semelles: ' + ttt.semellesDesc);
   if(ttt.prochainRdv) tt.push('Prochain RDV: ' + ttt.prochainRdv);
   if(tt.length) sections.push({ titre: '💊 Traitements', items: [tt.join(' · ')] });
+
+  // #93 — Tests avant/après (ssec-9, parité synthèse posturo Batch 4). Lecture
+  // DOM live des radios sport ta_* (cohérent avec le reste de genererSyntheseSport
+  // qui lit le DOM). Itère SPORT_TESTS_AVANT_APRES → ordre canonique + libellés
+  // via TESTS_AVANT_APRES_LABELS. Format identique à la synthèse posturo :
+  // « Label: oui|non » joints par ' · '. Section séparée (miroir du
+  // sec('Tests Avant / Après') du rapport sport buildRapport Batch 6).
+  const taTests = [];
+  Object.keys(SPORT_TESTS_AVANT_APRES).forEach(k => {
+    const v = document.querySelector('input[name="'+k+'"]:checked')?.value;
+    if(v) taTests.push(TESTS_AVANT_APRES_LABELS[SPORT_TESTS_AVANT_APRES[k]]+': '+v);
+  });
+  if(taTests.length) sections.push({ titre: '✅ Tests avant/après', items: [taTests.join(' · ')] });
 
   // 11. Schémas du patient (ssec-10, A5 — cette section).
   const sp = [];
@@ -11156,7 +11230,9 @@ async function savePosturoBilan(silent = false) {
   d.biomecArticulaire=getPoVal('po-biomec-articulaire');
   // Section 9
   d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv');
-  ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(t => { d['test_'+t]=getRad('po-'+t); });
+  // #93 — Itère Object.keys(POSTURO_TESTS_AVANT_APRES) pour inclure t9 (Fukuda).
+  // La constante est la source unique d'ordre/présence des tests posturo.
+  Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { d['test_'+t]=getRad('po-'+t); });
   // Matériaux et recouvrement (checkboxes multiples)
   d.materiaux = Array.from(document.querySelectorAll('input[name="po-materiaux"]:checked')).map(e=>e.value);
   d.recouvrement = Array.from(document.querySelectorAll('input[name="po-recouvrement"]:checked')).map(e=>e.value);
@@ -11428,7 +11504,8 @@ function loadPosturoBilan() {
   setChk('po-chaine-ouv',d.chaineOuv); setChk('po-chaine-stat-opt',d.chaineStatOpt); setChk('po-chaine-stat-deg',d.chaineStatDeg);
   setPoVal('po-biomec-articulaire',d.biomecArticulaire);
   setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv);
-  ['t1','t2','t3','t4','t5','t6','t7','t8'].forEach(t => { setPosturoRadio('po-'+t, d['test_'+t]); });
+  // #93 — Cohérence atomique save↔load : même source ordinale que savePosturoBilan.
+  Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { setPosturoRadio('po-'+t, d['test_'+t]); });
   // Matériaux et recouvrement
   if(d.materiaux) document.querySelectorAll('input[name="po-materiaux"]').forEach(e => { e.checked = d.materiaux.includes(e.value); });
   if(d.recouvrement) document.querySelectorAll('input[name="po-recouvrement"]').forEach(e => { e.checked = d.recouvrement.includes(e.value); });
