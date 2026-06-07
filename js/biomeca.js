@@ -5784,59 +5784,153 @@ function buildBilanPrintSection(bd) {
     if(bd.chaine_musculaire) h += '<p style="font-size:9px;"><strong>Hypothèse chaîne musculaire:</strong> '+bd.chaine_musculaire+'</p>';
   }
 
-  // ─── EXAMEN EN CHARGE ───
-  const hasCharge = bd.crete_iliaque||bd.eias_charge||bd.eips||bd.tfd||bd.tfa;
-  const testFields = [
-    ['Test de Romberg','test_romberg'],['Force extenseurs poignet','test_force_ext_poignet'],
-    ['Force/stabilité arrière','test_force_stabilite'],['Flexion antérieure','test_flexion_ant'],
-    ['Fukuda','test_fukuda'],['Stabilité monopodale cheville','test_stab_cheville'],
-    ['Stabilité monopodale genou','test_stab_genou'],['Chaînes stabilisatrices','test_chaines_stab'],
-    ['Stratégies équilibration','test_equilibration'],['Rotation nucale','test_rot_nucale'],
-  ];
-  const hasTests = testFields.some(([,k])=>bd[k]);
-  if(hasCharge||hasTests) {
-    h += sec('Examen en Charge');
-    if(hasCharge) {
-      h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
-      [['Hauteur crête iliaque','crete_iliaque'],['EIAS','eias_charge'],['EIPS','eips'],['TFD','tfd'],['TFA','tfa']].forEach(([lbl,k]) => {
-        if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:30%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+bd[k]+'</td></tr>';
-      });
-      h += '</table>';
+  // ─── EXAMEN EN CHARGE / DÉCHARGE (B1 #73) ───
+  // Réécriture intégrale. Lecture conditionnelle stricte des sous-valeurs miroir
+  // genererSyntheseSport (B1) : un sub n'est lu que si son parent est dans l'état
+  // requis (neutralise toute valeur résiduelle si toggle n'a pas wiped la RAM).
+  // Libellés cliniques via B1_EXAMEN_LABELS module-level (source partagée).
+  const ecRows = [];
+  const dechRows = [];
+  const pushEC = (lbl, val) => { if(val) ecRows.push([lbl, val]); };
+  const pushDe = (lbl, val) => { if(val) dechRows.push([lbl, val]); };
+
+  // — PARTIE EN CHARGE —
+  [['crete','Crête iliaque'],['eias','EIAS'],['eips','EIPS']].forEach(([k, lbl]) => {
+    const side = bd['sp_'+k+'_side'];
+    if(!side) return;
+    let val = B1_EXAMEN_LABELS.side[side] || side;
+    if((side === 'd' || side === 'g') && bd['sp_'+k+'_dir']) {
+      val += ' (' + (B1_EXAMEN_LABELS.dir[bd['sp_'+k+'_dir']] || bd['sp_'+k+'_dir']) + ')';
     }
-    if(hasTests) {
-      h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;">';
-      testFields.forEach(([lbl,k]) => {
-        if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+bd[k]+'</td></tr>';
-      });
-      h += '</table>';
+    ecRows.push([lbl, val]);
+  });
+  const rombR = [];
+  if(bd.sp_romberg_ant) rombR.push('antériorisé');
+  if(bd.sp_romberg_lat) rombR.push('latéralisé' + (bd.sp_romberg_lat_dir ? ' ' + bd.sp_romberg_lat_dir : ''));
+  if(bd.sp_romberg_post) rombR.push('postériorisé');
+  if(bd.sp_romberg_oculaire) rombR.push('adaptation oculaire');
+  if(bd.sp_romberg_rot) rombR.push('rotation' + (bd.sp_romberg_rot_dir ? ' ' + bd.sp_romberg_rot_dir : ''));
+  if(rombR.length) pushEC('Romberg', rombR.join(', '));
+  if(bd.sp_fukuda) pushEC('Fukuda', B1_EXAMEN_LABELS.fukuda[bd.sp_fukuda] || bd.sp_fukuda);
+  ['pied','genou'].forEach(zone => {
+    if(!bd['sp_stab_'+zone]) return;
+    const sides = [];
+    if(bd['sp_stab_'+zone+'_d']) sides.push('D');
+    if(bd['sp_stab_'+zone+'_g']) sides.push('G');
+    pushEC(B1_EXAMEN_LABELS.stabZone[zone], sides.length ? sides.join(' / ') : '✓');
+  });
+  const chnR = [];
+  if(bd.sp_chaines_eq) chnR.push('équilibré');
+  if(bd.sp_chaines_def_g) chnR.push('déficit G');
+  if(bd.sp_chaines_def_d) chnR.push('déficit D');
+  if(chnR.length) pushEC('Chaînes stabilisatrices', chnR.join(', '));
+  if(bd.sp_tactique) pushEC('Tactique équilibration', bd.sp_tactique);
+  // Bilan dynamique + Tests dynamiques (tests réalisés EN CHARGE, regroupés ici)
+  if(bd.sp_dyn_obs) pushEC('Observations dynamiques', bd.sp_dyn_obs);
+  if(bd.sp_dyn_course) pushEC('Examen de la course', bd.sp_dyn_course);
+  if(bd.sp_dyn_poignet_d) pushEC('Force poignet D', B1_EXAMEN_LABELS.poignet[bd.sp_dyn_poignet_d] || bd.sp_dyn_poignet_d);
+  if(bd.sp_dyn_poignet_g) pushEC('Force poignet G', B1_EXAMEN_LABELS.poignet[bd.sp_dyn_poignet_g] || bd.sp_dyn_poignet_g);
+  if(bd.sp_dyn_test_stab) pushEC('Stabilité arrière', B1_EXAMEN_LABELS.stab[bd.sp_dyn_test_stab] || bd.sp_dyn_test_stab);
+  if(bd.sp_dyn_flex_ant !== '' && bd.sp_dyn_flex_ant != null) pushEC('Distance doigt-sol', bd.sp_dyn_flex_ant + ' cm');
+  if(bd.sp_dyn_flex_debout) pushEC('Flexion debout', bd.sp_dyn_flex_debout);
+  if(bd.sp_dyn_flex_assis) pushEC('Flexion assis', bd.sp_dyn_flex_assis);
+
+  // — PARTIE EN DÉCHARGE —
+  ['hanche','genou','pied','bassin'].forEach(art => {
+    if(bd['sp_dyn_mob_'+art] === 'oui') pushDe('Dysfonction ' + art.charAt(0).toUpperCase() + art.slice(1), '✓');
+  });
+  const tfPartsR = [];
+  ['d','g'].forEach(side => {
+    if(!bd['sp_dyn_tf_'+side]) return;
+    ['femur','tibia'].forEach(os => {
+      if(!bd['sp_dyn_tf_'+side+'_'+os]) return;
+      const dir = bd['sp_dyn_tf_'+side+'_'+os+'_dir'];
+      if(dir) {
+        const osLbl = os.charAt(0).toUpperCase() + os.slice(1);
+        const dirLbl = dir === 'court' ? 'plus court' : 'plus long';
+        tfPartsR.push(osLbl + ' ' + side.toUpperCase() + ' ' + dirLbl);
+      }
+    });
+  });
+  if(tfPartsR.length) pushDe('Tibia/fémur', tfPartsR.join(', '));
+  [['dorsal','Long MI dorsal'],['procubitus','Long MI procubitus']].forEach(([k, lbl]) => {
+    const val = bd['sp_dyn_long_mi_'+k];
+    if(!val) return;
+    let txt = B1_EXAMEN_LABELS.long[val] || val;
+    if((val === 'court' || val === 'long') && bd['sp_dyn_long_mi_'+k+'_side']) {
+      txt += ' à ' + (bd['sp_dyn_long_mi_'+k+'_side'] === 'd' ? 'droite' : 'gauche');
     }
+    pushDe(lbl, txt);
+  });
+  if(bd.sp_dyn_pub) {
+    let txt = bd.sp_dyn_pub === 'd' ? 'droite' : 'gauche';
+    if(bd.sp_dyn_pub_dir) txt += ' ' + (bd.sp_dyn_pub_dir === 'haut' ? 'plus haute' : 'plus basse');
+    pushDe('Branche pubienne', txt);
+  }
+  ['d','g'].forEach(side => {
+    if(!bd['sp_dyn_downing_'+side]) return;
+    const res = bd['sp_dyn_downing_'+side+'_res'];
+    if(res) pushDe('Downing ' + side.toUpperCase(), res === 'post' ? 'iliaque POST' : 'iliaque ANT');
+  });
+  if(bd.sp_dyn_ineg_long === 'oui') {
+    let txt = 'Oui';
+    if(bd.sp_dyn_ineg_dir === 'court-d') txt += ' (plus court à droite)';
+    else if(bd.sp_dyn_ineg_dir === 'court-g') txt += ' (plus court à gauche)';
+    pushDe('Inégalité longueur', txt);
+    if(bd.sp_dyn_ineg_struct) pushDe('Inégalité structurelle', '✓');
+    if(bd.sp_dyn_ineg_comp) pushDe('Inégalité compensatrice', '✓');
+  } else if(bd.sp_dyn_ineg_long === 'non') {
+    pushDe('Inégalité longueur', 'Non');
+  }
+  if(bd.sp_dyn_equilibre) pushDe('Équilibré', bd.sp_dyn_equilibre);
+  if(bd.sp_dyn_scoliose) pushDe('Scoliose', bd.sp_dyn_scoliose);
+
+  if(ecRows.length || dechRows.length) {
+    h += sec('Examen en charge / décharge');
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;">';
+    if(ecRows.length) {
+      h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN CHARGE</td></tr>';
+      ecRows.forEach(([lbl, val]) => {
+        h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
+      });
+    }
+    if(dechRows.length) {
+      h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN DÉCHARGE</td></tr>';
+      dechRows.forEach(([lbl, val]) => {
+        h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
+      });
+    }
+    h += '</table>';
   }
 
-  // ─── ROTATION NUCALE ───
-  const hasNucale = bd.rot_nucale_G_std||bd.rot_nucale_G_mousse||bd.rot_nucale_D_std||bd.rot_nucale_D_mousse;
+  // ─── ROTATION NUCALE (B1 #73) — 4 selects 1/5 → 5/5 ───
+  const hasNucale = bd.sp_rotn_g_std||bd.sp_rotn_g_mousse||bd.sp_rotn_d_std||bd.sp_rotn_d_mousse;
   if(hasNucale) {
     h += sec('Test Rotation Nucale');
-    h += tblHdr4('','Gauche Standard','Gauche Mousse','Droite Standard','Droite Mousse');
-    h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:600;">Rotation nucale</td>'
-      +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('rot_nucale_G_std')+'</td>'
-      +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('rot_nucale_G_mousse')+'</td>'
-      +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('rot_nucale_D_std')+'</td>'
-      +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('rot_nucale_D_mousse')+'</td></tr></table>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
+    h += '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">Sens</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Sur mousse</th></tr>';
+    const fmt5 = v => v ? v + '/5' : '—';
+    h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">Rotation gauche</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_g_std)+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_g_mousse)+'</td></tr>';
+    h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">Rotation droite</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_d_std)+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_d_mousse)+'</td></tr>';
+    h += '</table>';
   }
 
-  // ─── MOBILITÉ AXE CORPOREL ───
-  const mobZones = ['cervical','thoracique','lombaire','arc_inf'];
-  const hasMob = mobZones.some(z => bd['mob_'+z+'_G_std']||bd['mob_'+z+'_D_std']);
+  // ─── MOBILITÉ AXE CORPOREL (B1 #73) — 16 cb limitation ───
+  const MOB_ZONES_R = [['cervical','Cervicale'],['thoracique','Thoracique'],['lombaire','Lombaire'],['arc_inf','Arc inférieur']];
+  const hasMob = MOB_ZONES_R.some(([k]) => bd['sp_mob_'+k+'_g_std']||bd['sp_mob_'+k+'_g_mousse']||bd['sp_mob_'+k+'_d_std']||bd['sp_mob_'+k+'_d_mousse']);
   if(hasMob) {
     h += sec('Mobilité Axe Corporel');
-    h += tblHdr4('Zone','Gauche Standard','Gauche Mousse','Droite Standard','Droite Mousse');
-    [['Cervical','cervical'],['Thoracique','thoracique'],['Lombaire','lombaire'],['Arc Inférieur','arc_inf']].forEach(([lbl,z]) => {
-      if(bd['mob_'+z+'_G_std']||bd['mob_'+z+'_D_std']||bd['mob_'+z+'_G_mousse']||bd['mob_'+z+'_D_mousse'])
-        h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:600;">'+lbl+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('mob_'+z+'_G_std','')+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('mob_'+z+'_G_mousse','')+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('mob_'+z+'_D_std','')+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f('mob_'+z+'_D_mousse','')+'</td></tr>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
+    h += '<tr style="background:#f5f0e8;"><th rowspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:left;vertical-align:middle;">Zone</th><th colspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Gauche</th><th colspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Droite</th></tr>';
+    h += '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Sur mousse</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Sur mousse</th></tr>';
+    const mark = v => v ? '✓' : '';
+    MOB_ZONES_R.forEach(([k, lbl]) => {
+      if(!(bd['sp_mob_'+k+'_g_std']||bd['sp_mob_'+k+'_g_mousse']||bd['sp_mob_'+k+'_d_std']||bd['sp_mob_'+k+'_d_mousse'])) return;
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">'+lbl+'</td>'
+        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_g_std'])+'</td>'
+        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_g_mousse'])+'</td>'
+        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_d_std'])+'</td>'
+        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_d_mousse'])+'</td></tr>';
     });
     h += '</table>';
   }
@@ -7337,6 +7431,58 @@ function loadBilan() {
 
   // Restaurer le bloc traitements sport (Sprint A4) — stack exo hors regex auto
   restoreSportTtt(bilanData);
+
+  // B1 #73 — Restauration UX des wrappers conditionnels sport ssec-2.
+  // Le restore générique des cb/radios L7320-7335 ne dispatch pas l'event 'change'
+  // (programmatique), donc les toggleSport* ne sont jamais déclenchés au reload →
+  // les wrappers *-opts restent cachés visuellement même si la cb/radio parent
+  // est cochée. Pattern miroir loadPosturoBilan (qui fait pareil avec toggleRomberg
+  // et autres). Ordre cascade IMPÉRATIF pour le décubitus dorsal : parent TF avant
+  // TFOs (sinon l'enfant flex reste invisible sous parent caché).
+
+  // Repères en charge — toggleSportRepere si side ∈ {d, g}
+  ['crete','eias','eips'].forEach(field => {
+    const side = bilanData['sp_'+field+'_side'];
+    if(side === 'd' || side === 'g') toggleSportRepere(field, side);
+  });
+
+  // Romberg — toggleSportRomberg si cb parent cochée
+  ['lat','rot'].forEach(type => {
+    if(bilanData['sp_romberg_'+type]) toggleSportRomberg(type, true);
+  });
+
+  // Stab monopodale — toggleSportStabMono si cb parent cochée
+  ['pied','genou'].forEach(zone => {
+    if(bilanData['sp_stab_'+zone]) toggleSportStabMono(zone, true);
+  });
+
+  // Décubitus dorsal — TF cascade : parent (d/g) AVANT enfants (femur/tibia)
+  ['d','g'].forEach(side => {
+    if(!bilanData['sp_dyn_tf_'+side]) return;
+    toggleSportTF(side, true);
+    ['femur','tibia'].forEach(os => {
+      if(bilanData['sp_dyn_tf_'+side+'_'+os]) toggleSportTFOs(side, os, true);
+    });
+  });
+
+  // Long MI dorsal/procubitus — toggleSportLongMI si val ∈ {court, long}
+  ['dorsal','procubitus'].forEach(zone => {
+    const val = bilanData['sp_dyn_long_mi_'+zone];
+    if(val === 'court' || val === 'long') toggleSportLongMI(zone, val);
+  });
+
+  // Branches pubiennes — toggleSportPub si side défini
+  if(bilanData.sp_dyn_pub === 'd' || bilanData.sp_dyn_pub === 'g') {
+    toggleSportPub(bilanData.sp_dyn_pub);
+  }
+
+  // Downing D/G — toggleSportDowning si cb parent cochée
+  ['d','g'].forEach(side => {
+    if(bilanData['sp_dyn_downing_'+side]) toggleSportDowning(side, true);
+  });
+
+  // Inégalité longueur conclusion — toggleSportIneg si 'oui'
+  if(bilanData.sp_dyn_ineg_long === 'oui') toggleSportIneg(true);
 
   // Restaurer les canvas depuis les dataURLs sauvegardées
   const restoreCanvas = (id, key) => {
@@ -10297,6 +10443,135 @@ function toggleSportTerrain(which) {
   }
 }
 
+// B1 #73 — Toggles miroirs psec-2 posturo pour ssec-2 sport (Examen en charge /
+// décharge). 7 miroirs (Romberg, TF, TFOs, LongMI, Pub, Downing, Ineg) +
+// 2 nouveaux (Repere, StabMono). Aucun toggle posturo n'est paramétrable sur
+// le préfixe d'ID, d'où la nécessité de répliquer côté sport — pattern déjà
+// établi par toggleSportRessaut/Serrage/PostureLater/Terrain.
+//
+// Convention :
+//   - ids DOM des wrappers conditionnels : tirets (sp-romberg-lat-opts, sp-dyn-tf-d-opts, …)
+//   - name= des radios = clé bilanData = underscore (sp_romberg_lat_dir, sp_dyn_ineg_dir, …)
+//   - Anti-résidu RAM #95 : quand un toggle décoche des sub-radios, il efface
+//     aussi la clé bilanData correspondante (sinon le restore au refresh re-coche
+//     une valeur fantôme — comportement #95 sur cb identique pour radios).
+
+// Romberg (réplique psec-1 posturo toggleRomberg L9589) — show/hide sub-options
+// direction selon cb. Reset radios + RAM si désactivé.
+function toggleSportRomberg(type, checked) {
+  const opts = document.getElementById('sp-romberg-'+type+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  if(!checked) {
+    document.querySelectorAll('input[name="sp_romberg_'+type+'_dir"]').forEach(r => r.checked = false);
+    setBilanField('sp_romberg_'+type+'_dir', '');
+  }
+}
+
+// Tibia/fémur D/G (sous-bloc Décubitus dorsal). Show/hide sub fémur/tibia.
+function toggleSportTF(side, checked) {
+  const opts = document.getElementById('sp-dyn-tf-'+side+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  opts.style.flexDirection = 'column';
+}
+
+// Tibia/fémur sub-os. Show/hide options « plus court / plus long ».
+function toggleSportTFOs(side, os, checked) {
+  const opts = document.getElementById('sp-dyn-tf-'+side+'-'+os+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+}
+
+// Longueur MI dorsal/procubitus. Affiche side D/G uniquement si court/long.
+// 'egal' décoche les radios side + RAM pour propreté persistance.
+function toggleSportLongMI(zone, val) {
+  const opts = document.getElementById('sp-dyn-long-mi-'+zone+'-opts');
+  if(!opts) return;
+  opts.style.display = (val === 'court' || val === 'long') ? 'flex' : 'none';
+  if(val === 'egal') {
+    document.querySelectorAll('input[name="sp_dyn_long_mi_'+zone+'_side"]').forEach(r => r.checked = false);
+    setBilanField('sp_dyn_long_mi_'+zone+'_side', '');
+  }
+}
+
+// Branches pubiennes — show options « plus haut / plus bas » pour le côté choisi
+// (d ou g), hide pour l'autre. Mutex visuel pur, pas de reset (les radios
+// sp_dyn_pub_dir partagent un seul groupe global pour les 2 côtés).
+function toggleSportPub(side) {
+  ['d','g'].forEach(s => {
+    const opts = document.getElementById('sp-dyn-pub-'+s+'-opts');
+    if(opts) opts.style.display = s === side ? 'flex' : 'none';
+  });
+}
+
+// Downing D/G (sous-bloc Décubitus dorsal). Show/hide options iliaque POST/ANT.
+function toggleSportDowning(side, checked) {
+  const opts = document.getElementById('sp-dyn-downing-'+side+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  opts.style.flexDirection = 'column';
+}
+
+// Inégalité longueur (Conclusion examen en décharge). Show/hide sub-direction
+// court-d/court-g si « oui ». Reset radios + RAM si « non ».
+function toggleSportIneg(show) {
+  const opts = document.getElementById('sp-dyn-ineg-opts');
+  if(!opts) return;
+  opts.style.display = show ? 'flex' : 'none';
+  if(!show) {
+    document.querySelectorAll('input[name="sp_dyn_ineg_dir"]').forEach(r => r.checked = false);
+    setBilanField('sp_dyn_ineg_dir', '');
+  }
+}
+
+// B1 NOUVEAU — Repères en charge (crête iliaque / EIAS / EIPS). Si D ou G,
+// affiche les sub-options « plus haut / plus bas ». 'sym' décoche les radios
+// dir + RAM pour propreté persistance.
+function toggleSportRepere(field, val) {
+  const opts = document.getElementById('sp-'+field+'-dir-opts');
+  if(!opts) return;
+  opts.style.display = (val === 'd' || val === 'g') ? 'flex' : 'none';
+  if(val === 'sym') {
+    document.querySelectorAll('input[name="sp_'+field+'_dir"]').forEach(r => r.checked = false);
+    setBilanField('sp_'+field+'_dir', '');
+  }
+}
+
+// B1 NOUVEAU — Stabilité monopodale (Pied ou Genou). Si la cb est cochée,
+// affiche les sub D/G. Décoche les sub-cb + propage via setBilanField si désactivé,
+// sinon la RAM bilanData garde l'état précédent (faux positif au prochain restore).
+function toggleSportStabMono(zone, checked) {
+  const opts = document.getElementById('sp-stab-'+zone+'-opts');
+  if(!opts) return;
+  opts.style.display = checked ? 'flex' : 'none';
+  if(!checked) {
+    ['d','g'].forEach(s => {
+      const sub = document.getElementById('sp-stab-'+zone+'-'+s);
+      if(sub) {
+        sub.checked = false;
+        setBilanField('sp_stab_'+zone+'_'+s, false);
+      }
+    });
+  }
+}
+
+// B1 #73 — Mappings libellés cliniques partagés synthèse sport + rapport sport
+// pour l'examen en charge/décharge (ssec-2 + ssec-3 + ssec-4). Source unique de
+// vérité des traductions code → français : élimine la duplication entre
+// genererSyntheseSport et buildRapport. Lecture conditionnelle stricte des
+// sous-valeurs reste structurelle dans chaque fonction (pas un risque de
+// divergence de wording).
+const B1_EXAMEN_LABELS = {
+  side:     { d: 'D', g: 'G', sym: 'symétrique' },
+  dir:      { haut: 'plus haut', bas: 'plus bas' },
+  fukuda:   { neutre: 'neutre', dev_d: 'déviation droite', dev_g: 'déviation gauche' },
+  poignet:  { 'pas-de-force': 'pas de force', 'faible': 'force faible', 'moderee': 'force modérée', 'tres-fort': 'très fort' },
+  stab:     { 'forte-instabilite': 'forte instabilité', 'petite-instabilite': 'petite instabilité', 'stable': 'stable', 'tres-stable': 'très stable' },
+  long:     { court: 'plus court', long: 'plus long', egal: 'égal' },
+  stabZone: { pied: 'Instabilité cheville', genou: 'Instabilité genou' }
+};
+
 // #93 — Config partagée des tests Avant/Après sport ssec-9 + posturo psec-8.
 // Source unique de vérité des libellés HTML : élimine la divergence orthographique
 // pré-#93 entre sport et posturo. Consommée par les 4 readers (synthèse sport +
@@ -10502,37 +10777,138 @@ function genererSyntheseSport() {
   if(d.chaine_musculaire) morpho.push('Hypothèse chaîne musculaire: ' + d.chaine_musculaire);
   if(morpho.length) sections.push({ titre: '🧍 Morphostatique', items: [morpho.join(' · ')] });
 
-  // 3. Examen en charge (ssec-2) — 13 data-fields hauteurs + tests cliniques.
-  const ch = [];
-  if(d.crete_iliaque) ch.push('Crête iliaque: ' + d.crete_iliaque);
-  if(d.eias_charge) ch.push('EIAS: ' + d.eias_charge);
-  if(d.eips) ch.push('EIPS: ' + d.eips);
-  if(d.tfd) ch.push('TFD: ' + d.tfd);
-  if(d.tfa) ch.push('TFA: ' + d.tfa);
-  if(d.test_romberg) ch.push('Romberg: ' + d.test_romberg);
-  if(d.test_force_ext_poignet) ch.push('Force ext. poignet: ' + d.test_force_ext_poignet);
-  if(d.test_force_stabilite) ch.push('Force/stab. arr.: ' + d.test_force_stabilite);
-  if(d.test_flexion_ant) ch.push('Flexion ant.: ' + d.test_flexion_ant);
-  if(d.test_fukuda) ch.push('Fukuda: ' + d.test_fukuda);
-  if(d.test_stab_cheville) ch.push('Stab. cheville: ' + d.test_stab_cheville);
-  if(d.test_stab_genou) ch.push('Stab. genou: ' + d.test_stab_genou);
-  if(d.test_chaines_stab) ch.push('Chaînes stab.: ' + d.test_chaines_stab);
-  if(ch.length) sections.push({ titre: '⚖️ Examen en charge', items: [ch.join(' · ')] });
+  // 3. Examen en charge / décharge (ssec-2, B1 #73) — réécriture structurée.
+  //    Lecture CONDITIONNELLE des sous-valeurs : un sub-radio/sub-cb n'est lu
+  //    que si son parent est dans l'état requis (neutralise toute valeur
+  //    imbriquée résiduelle même si un toggle n'a pas nettoyé la RAM en cascade).
+  const ec = [];
+  // — PARTIE EN CHARGE —
+  // Repères crête / EIAS / EIPS — side d/g/sym + sub dir haut/bas (cond. si d/g)
+  [['crete','Crête iliaque'],['eias','EIAS'],['eips','EIPS']].forEach(([k, lbl]) => {
+    const side = d['sp_'+k+'_side'];
+    if(!side) return;
+    let txt = lbl + ': ' + (B1_EXAMEN_LABELS.side[side] || side);
+    if((side === 'd' || side === 'g') && d['sp_'+k+'_dir']) {
+      txt += ' (' + (B1_EXAMEN_LABELS.dir[d['sp_'+k+'_dir']] || d['sp_'+k+'_dir']) + ')';
+    }
+    ec.push(txt);
+  });
+  // Romberg — cb ant/post/oculaire + lat/rot avec sub direction conditionnelle
+  const romb = [];
+  if(d.sp_romberg_ant) romb.push('antériorisé');
+  if(d.sp_romberg_lat) romb.push('latéralisé' + (d.sp_romberg_lat_dir ? ' ' + d.sp_romberg_lat_dir : ''));
+  if(d.sp_romberg_post) romb.push('postériorisé');
+  if(d.sp_romberg_oculaire) romb.push('adaptation oculaire');
+  if(d.sp_romberg_rot) romb.push('rotation' + (d.sp_romberg_rot_dir ? ' ' + d.sp_romberg_rot_dir : ''));
+  if(romb.length) ec.push('Romberg: ' + romb.join(', '));
+  // Fukuda — radio mutex
+  if(d.sp_fukuda) ec.push('Fukuda: ' + (B1_EXAMEN_LABELS.fukuda[d.sp_fukuda] || d.sp_fukuda));
+  // Stab monopodale — cb Pied/Genou + sub D/G (cond. si parent coché)
+  ['pied','genou'].forEach(zone => {
+    if(!d['sp_stab_'+zone]) return;
+    const sides = [];
+    if(d['sp_stab_'+zone+'_d']) sides.push('D');
+    if(d['sp_stab_'+zone+'_g']) sides.push('G');
+    ec.push(B1_EXAMEN_LABELS.stabZone[zone] + (sides.length ? ' (' + sides.join('/') + ')' : ''));
+  });
+  // Chaînes stabilisatrices — cb multi
+  const chnSt = [];
+  if(d.sp_chaines_eq) chnSt.push('équilibré');
+  if(d.sp_chaines_def_g) chnSt.push('déficit G');
+  if(d.sp_chaines_def_d) chnSt.push('déficit D');
+  if(chnSt.length) ec.push('Chaînes: ' + chnSt.join(', '));
+  // Tactique d'équilibration — radio mutex
+  if(d.sp_tactique) ec.push('Tactique équilibration: ' + d.sp_tactique);
+  // Bilan dynamique + Tests dynamiques (tests réalisés EN CHARGE, regroupés ici)
+  if(d.sp_dyn_obs) ec.push('Obs. dyn.: ' + d.sp_dyn_obs);
+  if(d.sp_dyn_course) ec.push('Course: ' + d.sp_dyn_course);
+  if(d.sp_dyn_poignet_d) ec.push('Force poignet D: ' + (B1_EXAMEN_LABELS.poignet[d.sp_dyn_poignet_d] || d.sp_dyn_poignet_d));
+  if(d.sp_dyn_poignet_g) ec.push('Force poignet G: ' + (B1_EXAMEN_LABELS.poignet[d.sp_dyn_poignet_g] || d.sp_dyn_poignet_g));
+  if(d.sp_dyn_test_stab) ec.push('Stab. arrière: ' + (B1_EXAMEN_LABELS.stab[d.sp_dyn_test_stab] || d.sp_dyn_test_stab));
+  if(d.sp_dyn_flex_ant !== '' && d.sp_dyn_flex_ant != null) ec.push('Distance doigt-sol: ' + d.sp_dyn_flex_ant + ' cm');
+  if(d.sp_dyn_flex_debout) ec.push('Flexion debout: ' + d.sp_dyn_flex_debout);
+  if(d.sp_dyn_flex_assis) ec.push('Flexion assis: ' + d.sp_dyn_flex_assis);
 
-  // 4. Rotation nucale (ssec-3).
+  // — PARTIE EN DÉCHARGE —
+  // Mobilité décharge (oui = dysfonction)
+  ['hanche','genou','pied','bassin'].forEach(art => {
+    if(d['sp_dyn_mob_'+art] === 'oui') ec.push('Dysfonction ' + art);
+  });
+  // Décubitus dorsal — tibia/fémur cascade 3 niveaux (cond. en cascade)
+  const tfParts = [];
+  ['d','g'].forEach(side => {
+    if(!d['sp_dyn_tf_'+side]) return;
+    ['femur','tibia'].forEach(os => {
+      if(!d['sp_dyn_tf_'+side+'_'+os]) return;
+      const dir = d['sp_dyn_tf_'+side+'_'+os+'_dir'];
+      if(dir) {
+        const osLbl = os.charAt(0).toUpperCase() + os.slice(1);
+        const dirLbl = dir === 'court' ? 'plus court' : 'plus long';
+        tfParts.push(osLbl + ' ' + side.toUpperCase() + ' ' + dirLbl);
+      }
+    });
+  });
+  if(tfParts.length) ec.push('Tibia/fémur: ' + tfParts.join(', '));
+  // Longueur MI dorsal / procubitus — cond. side si court/long
+  [['dorsal','dorsal'],['procubitus','procubitus']].forEach(([k, lbl]) => {
+    const val = d['sp_dyn_long_mi_'+k];
+    if(!val) return;
+    let txt = 'Long MI ' + lbl + ': ' + (B1_EXAMEN_LABELS.long[val] || val);
+    if((val === 'court' || val === 'long') && d['sp_dyn_long_mi_'+k+'_side']) {
+      txt += ' à ' + (d['sp_dyn_long_mi_'+k+'_side'] === 'd' ? 'droite' : 'gauche');
+    }
+    ec.push(txt);
+  });
+  // Branches pubiennes — side + dir
+  if(d.sp_dyn_pub) {
+    const sLbl = d.sp_dyn_pub === 'd' ? 'droite' : 'gauche';
+    let txt = 'Branche pubienne ' + sLbl;
+    if(d.sp_dyn_pub_dir) txt += ' ' + (d.sp_dyn_pub_dir === 'haut' ? 'plus haute' : 'plus basse');
+    ec.push(txt);
+  }
+  // Downing D/G — cb + res conditionnel
+  ['d','g'].forEach(side => {
+    if(!d['sp_dyn_downing_'+side]) return;
+    const res = d['sp_dyn_downing_'+side+'_res'];
+    if(res) {
+      const resLbl = res === 'post' ? 'iliaque POST' : 'iliaque ANT';
+      ec.push('Downing ' + side.toUpperCase() + ': ' + resLbl);
+    }
+  });
+  // Conclusion — ineg_long=oui → dir/struct/comp conditionnels
+  if(d.sp_dyn_ineg_long === 'oui') {
+    let txt = 'Inégalité longueur';
+    if(d.sp_dyn_ineg_dir === 'court-d') txt += ' (plus court à droite)';
+    else if(d.sp_dyn_ineg_dir === 'court-g') txt += ' (plus court à gauche)';
+    ec.push(txt);
+    if(d.sp_dyn_ineg_struct) ec.push('Inégalité structurelle');
+    if(d.sp_dyn_ineg_comp) ec.push('Inégalité compensatrice');
+  } else if(d.sp_dyn_ineg_long === 'non') {
+    ec.push("Pas d'inégalité longueur");
+  }
+  if(d.sp_dyn_equilibre) ec.push('Équilibré: ' + d.sp_dyn_equilibre);
+  if(d.sp_dyn_scoliose) ec.push('Scoliose: ' + d.sp_dyn_scoliose);
+  if(ec.length) sections.push({ titre: '⚖️ Examen en charge / décharge', items: [ec.join(' · ')] });
+
+  // 4. Rotation nucale (ssec-3, B1 #73) — 4 selects 1/5 → 5/5
   const rot = [];
-  if(d.test_rot_nucale) rot.push('Test rotation nucale: ' + d.test_rot_nucale);
-  if(d.rot_nucale_D_mousse) rot.push('Avec mousse D: ' + d.rot_nucale_D_mousse);
-  if(d.test_equilibration) rot.push('Test équilibration: ' + d.test_equilibration);
-  if(rot.length) sections.push({ titre: '🌀 Rotation nucale', items: [rot.join(' · ')] });
+  if(d.sp_rotn_g_std) rot.push('Rot. G standard: ' + d.sp_rotn_g_std + '/5');
+  if(d.sp_rotn_g_mousse) rot.push('Rot. G mousse: ' + d.sp_rotn_g_mousse + '/5');
+  if(d.sp_rotn_d_std) rot.push('Rot. D standard: ' + d.sp_rotn_d_std + '/5');
+  if(d.sp_rotn_d_mousse) rot.push('Rot. D mousse: ' + d.sp_rotn_d_mousse + '/5');
+  if(rot.length) sections.push({ titre: '🔄 Rotation nucale', items: [rot.join(' · ')] });
 
-  // 5. Mobilité axe corporel (ssec-4).
+  // 5. Mobilité axe corporel (ssec-4, B1 #73) — 16 cb limitation
   const mob = [];
-  if(d.mob_cervical_D_mousse) mob.push('Cervical mousse D: ' + d.mob_cervical_D_mousse);
-  if(d.mob_thoracique_D_mousse) mob.push('Thoracique mousse D: ' + d.mob_thoracique_D_mousse);
-  if(d.mob_lombaire_D_mousse) mob.push('Lombaire mousse D: ' + d.mob_lombaire_D_mousse);
-  if(d.mob_arc_inf_D_mousse) mob.push('Arc inf. mousse D: ' + d.mob_arc_inf_D_mousse);
-  if(mob.length) sections.push({ titre: '🧭 Mobilité axe corporel', items: [mob.join(' · ')] });
+  [['cervical','Cervicale'],['thoracique','Thoracique'],['lombaire','Lombaire'],['arc_inf','Arc inférieur']].forEach(([k, lbl]) => {
+    const cols = [];
+    if(d['sp_mob_'+k+'_g_std']) cols.push('G std');
+    if(d['sp_mob_'+k+'_g_mousse']) cols.push('G mousse');
+    if(d['sp_mob_'+k+'_d_std']) cols.push('D std');
+    if(d['sp_mob_'+k+'_d_mousse']) cols.push('D mousse');
+    if(cols.length) mob.push('Limitation ' + lbl + ' (' + cols.join(', ') + ')');
+  });
+  if(mob.length) sections.push({ titre: '📐 Mobilité axe corporel', items: [mob.join(' · ')] });
 
   // 6. Mandibule (ssec-5, A3) — radios + cb sous-conditionnelles + 3 ATM cb
   //    (post-A3 ajust). + tonicite_ouv (Amélioration ouverture de bouche /

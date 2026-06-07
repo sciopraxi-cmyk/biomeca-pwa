@@ -863,62 +863,566 @@
     </div>
 
     <div class="sport-section" id="ssec-2" style="display:none;">
-    <!-- EXAMEN EN CHARGE -->
+    <!-- EXAMEN EN CHARGE / DÉCHARGE (B1 #73) -->
     <div class="card sport-card-orange">
-      <div class="sport-block-title c-orange">⚖️ Examen en Charge</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
-        <div><div class="field-lbl">Hauteur crête iliaque</div><input class="inp bilan-field" data-field="crete_iliaque" placeholder="G / D"/></div>
-        <div><div class="field-lbl">EIAS</div><input class="inp bilan-field" data-field="eias_charge" placeholder="Symétrie..."/></div>
-        <div><div class="field-lbl">Hauteur EIPS</div><input class="inp bilan-field" data-field="eips" placeholder="G / D"/></div>
-        <div><div class="field-lbl">TFD (test flexion debout)</div><input class="inp bilan-field" data-field="tfd" placeholder="Positif G / D / Négatif"/></div>
-        <div><div class="field-lbl">TFA</div><input class="inp bilan-field" data-field="tfa" placeholder=""/></div>
+      <div class="sport-block-title c-orange">⚖️ Examen en charge / décharge</div>
+
+      <!-- ─── PARTIE EN CHARGE ─── -->
+      <div style="font-weight:700;color:#d35400;font-size:13px;letter-spacing:1px;margin-bottom:12px;border-bottom:1px solid #f0c896;padding-bottom:4px;">PARTIE EN CHARGE</div>
+
+      <!-- Repères en charge (NOUVEAU) — radios D/G/sym + sub haut/bas via toggleSportRepere -->
+      <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#6c3483;font-size:14px;margin-bottom:10px;">📐 Repères en charge</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:11px;color:#6c3483;font-weight:600;margin-bottom:6px;">Hauteur crête iliaque</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_crete_side" value="d" onchange="toggleSportRepere('crete', this.value)"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_crete_side" value="g" onchange="toggleSportRepere('crete', this.value)"/> 👈 Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_crete_side" value="sym" onchange="toggleSportRepere('crete', this.value)"/> ⚖️ Symétrique</label>
+            </div>
+            <div id="sp-crete-dir-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_crete_dir" value="haut"/> Plus haut</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_crete_dir" value="bas"/> Plus bas</label>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:11px;color:#6c3483;font-weight:600;margin-bottom:6px;">Hauteur EIAS</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_eias_side" value="d" onchange="toggleSportRepere('eias', this.value)"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_eias_side" value="g" onchange="toggleSportRepere('eias', this.value)"/> 👈 Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_eias_side" value="sym" onchange="toggleSportRepere('eias', this.value)"/> ⚖️ Symétrique</label>
+            </div>
+            <div id="sp-eias-dir-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_eias_dir" value="haut"/> Plus haut</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_eias_dir" value="bas"/> Plus bas</label>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:11px;color:#6c3483;font-weight:600;margin-bottom:6px;">Hauteur EIPS</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_eips_side" value="d" onchange="toggleSportRepere('eips', this.value)"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_eips_side" value="g" onchange="toggleSportRepere('eips', this.value)"/> 👈 Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_eips_side" value="sym" onchange="toggleSportRepere('eips', this.value)"/> ⚖️ Symétrique</label>
+            </div>
+            <div id="sp-eips-dir-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_eips_dir" value="haut"/> Plus haut</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_eips_dir" value="bas"/> Plus bas</label>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="stitle" style="margin-bottom:6px;">Tests cliniques</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test de Romberg</span><input class="inp bilan-field" data-field="test_romberg" placeholder="Résultat" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test force extenseurs poignet</span><input class="inp bilan-field" data-field="test_force_ext_poignet" placeholder="Résultat" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test force/stabilité arrière</span><input class="inp bilan-field" data-field="test_force_stabilite" placeholder="Résultat" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test flexion antérieure</span><input class="inp bilan-field" data-field="test_flexion_ant" placeholder="Résultat" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test de Fukuda</span><input class="inp bilan-field" data-field="test_fukuda" placeholder="Résultat" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test stabilité monopodale — Cheville G / D</span><input class="inp bilan-field" data-field="test_stab_cheville" placeholder="G: / D:" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test stabilité monopodale — Genou G / D</span><input class="inp bilan-field" data-field="test_stab_genou" placeholder="G: / D:" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test chaînes stabilisatrices</span><input class="inp bilan-field" data-field="test_chaines_stab" placeholder="Résultat" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test stratégies d'équilibration</span><input class="inp bilan-field" data-field="test_equilibration" placeholder="Résultat" style="width:110px;"/></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="flex:1;font-size:11px;">Test rotation nucale</span><input class="inp bilan-field" data-field="test_rot_nucale" placeholder="Résultat" style="width:110px;"/></div>
+
+      <!-- Romberg (réplique psec-1 posturo) -->
+      <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#2471a3;font-size:14px;margin-bottom:10px;">🧪 Romberg</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-romberg-ant" onchange="setBilanField('sp_romberg_ant', this.checked)"/> Antériorisé
+          </label>
+          <div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+              <input type="checkbox" id="sp-romberg-lat" onchange="setBilanField('sp_romberg_lat', this.checked); toggleSportRomberg('lat', this.checked)"/> Latéralisé <span style="font-size:10px;color:#888;">(vestibulaire)</span>
+            </label>
+            <div id="sp-romberg-lat-opts" style="display:none;gap:8px;margin-left:16px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="sp_romberg_lat_dir" value="gauche"/> 👈 Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="sp_romberg_lat_dir" value="droite"/> 👉 Droite</label>
+            </div>
+          </div>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-romberg-post" onchange="setBilanField('sp_romberg_post', this.checked)"/> Postériorisé <span style="font-size:10px;color:#888;">(émotionnel)</span>
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
+            <input type="checkbox" id="sp-romberg-oculaire" onchange="setBilanField('sp_romberg_oculaire', this.checked)"/> Adaptation oculaire
+          </label>
+          <div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+              <input type="checkbox" id="sp-romberg-rot" onchange="setBilanField('sp_romberg_rot', this.checked); toggleSportRomberg('rot', this.checked)"/> Rotation
+            </label>
+            <div id="sp-romberg-rot-opts" style="display:none;gap:8px;margin-left:16px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="sp_romberg_rot_dir" value="droite"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="sp_romberg_rot_dir" value="gauche"/> 👈 Gauche</label>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- Fukuda (radios MUTEX) -->
+      <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#b7740a;font-size:14px;margin-bottom:10px;">🧭 Test de Fukuda</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;"><input type="radio" name="sp_fukuda" value="neutre"/> ⚖️ Neutre</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;"><input type="radio" name="sp_fukuda" value="dev_d"/> 👉 Déviation droite</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 14px;color:#222;"><input type="radio" name="sp_fukuda" value="dev_g"/> 👈 Déviation gauche</label>
+        </div>
+      </div>
+
+      <!-- Stabilité monopodale (cb multi Pied/Genou + sub D/G) -->
+      <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#1e8449;font-size:14px;margin-bottom:10px;">🦶 Stabilité monopodale</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #27ae60;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+              <input type="checkbox" id="sp-stab-pied" onchange="setBilanField('sp_stab_pied', this.checked); toggleSportStabMono('pied', this.checked)"/> 🦶 Instabilité cheville
+            </label>
+            <div id="sp-stab-pied-opts" style="display:none;gap:8px;margin-left:16px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="checkbox" id="sp-stab-pied-d" onchange="setBilanField('sp_stab_pied_d', this.checked)"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="checkbox" id="sp-stab-pied-g" onchange="setBilanField('sp_stab_pied_g', this.checked)"/> 👈 Gauche</label>
+            </div>
+          </div>
+          <div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #27ae60;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
+              <input type="checkbox" id="sp-stab-genou" onchange="setBilanField('sp_stab_genou', this.checked); toggleSportStabMono('genou', this.checked)"/> 🦵 Instabilité genou
+            </label>
+            <div id="sp-stab-genou-opts" style="display:none;gap:8px;margin-left:16px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="checkbox" id="sp-stab-genou-d" onchange="setBilanField('sp_stab_genou_d', this.checked)"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="checkbox" id="sp-stab-genou-g" onchange="setBilanField('sp_stab_genou_g', this.checked)"/> 👈 Gauche</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chaînes stabilisatrices (cb MULTI) -->
+      <div style="background:linear-gradient(135deg,#fff8e1,#ffefc1);border-left:4px solid #e8b400;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#9b7000;font-size:14px;margin-bottom:10px;">⛓️ Chaînes stabilisatrices</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e8b400;border-radius:20px;padding:5px 14px;color:#222;"><input type="checkbox" id="sp-chaines-eq" onchange="setBilanField('sp_chaines_eq', this.checked)"/> ⚖️ Équilibré</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e8b400;border-radius:20px;padding:5px 14px;color:#222;"><input type="checkbox" id="sp-chaines-def-g" onchange="setBilanField('sp_chaines_def_g', this.checked)"/> 👈 Déficit G</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e8b400;border-radius:20px;padding:5px 14px;color:#222;"><input type="checkbox" id="sp-chaines-def-d" onchange="setBilanField('sp_chaines_def_d', this.checked)"/> 👉 Déficit D</label>
+        </div>
+      </div>
+
+      <!-- Tactique d'équilibration (réplique psec-4 posturo, 3 radios mutex) -->
+      <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#2471a3;font-size:14px;margin-bottom:8px;">⚖️ Tactique d'équilibration</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;color:#222;"><input type="radio" name="sp_tactique" value="cheville"/> 🦶 Cheville</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;color:#222;"><input type="radio" name="sp_tactique" value="mixte"/> ↕️ Mixte</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 16px;color:#222;"><input type="radio" name="sp_tactique" value="hanche"/> 🦴 Hanche</label>
+        </div>
+      </div>
+
+      <!-- Bilan dynamique (vert) — observations libres (test réalisé EN CHARGE) -->
+      <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#2a7a4e;font-size:14px;margin-bottom:8px;">🏃 Bilan dynamique</div>
+        <textarea class="inp bilan-field" data-field="sp_dyn_obs" rows="3" placeholder="Observations..." style="background:#fff;color:#222;width:100%;"></textarea>
+      </div>
+
+      <!-- Tests dynamiques (rouge) -->
+      <div style="background:linear-gradient(135deg,#fff0f0,#ffe8e8);border-left:4px solid #e74c3c;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#c0392b;font-size:14px;margin-bottom:10px;">⚡ Tests dynamiques</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+
+          <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">🏃 Examen de la course <em style="font-weight:400;color:#888;">(si douleur à l'effort)</em></div>
+            <input class="inp bilan-field" data-field="sp_dyn_course" placeholder="Observations..." style="background:#f9f9f9;color:#222;"/>
+          </div>
+
+          <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:8px;">💪 Test de force extenseurs du poignet <span style="color:#e74c3c;">(Déficit)</span></div>
+            <div style="margin-bottom:6px;">
+              <div style="font-size:10px;color:#555;font-weight:500;margin-bottom:4px;">Poignet droit</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_d" value="pas-de-force"/> Pas de force</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_d" value="faible"/> Force faible</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #f39c12;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_d" value="moderee"/> Force modérée</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #27ae60;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_d" value="tres-fort"/> Très fort</label>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#555;font-weight:500;margin-bottom:4px;">Poignet gauche</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_g" value="pas-de-force"/> Pas de force</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_g" value="faible"/> Force faible</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #f39c12;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_g" value="moderee"/> Force modérée</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #27ae60;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_poignet_g" value="tres-fort"/> Très fort</label>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:8px;">🛡️ Test de force/stabilité arrière</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_test_stab" value="forte-instabilite"/> Forte instabilité</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #e74c3c;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_test_stab" value="petite-instabilite"/> Petite instabilité</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #27ae60;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_test_stab" value="stable"/> Stable</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #27ae60;border-radius:20px;padding:3px 10px;color:#222;font-size:11px;"><input type="radio" name="sp_dyn_test_stab" value="tres-stable"/> Très stable</label>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">↕️ Test de Flexion Antérieure</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="font-size:12px;color:#222;font-weight:500;">Mesure de la distance doigt-sol :</span>
+              <select class="inp bilan-field" data-field="sp_dyn_flex_ant" style="width:100px;background:#fff;color:#222;">
+                <option value="">-- cm --</option>
+                <option value="0">0 cm</option><option value="1">1 cm</option><option value="2">2 cm</option><option value="3">3 cm</option><option value="4">4 cm</option><option value="5">5 cm</option><option value="6">6 cm</option><option value="7">7 cm</option><option value="8">8 cm</option><option value="9">9 cm</option><option value="10">10 cm</option><option value="11">11 cm</option><option value="12">12 cm</option><option value="13">13 cm</option><option value="14">14 cm</option><option value="15">15 cm</option><option value="16">16 cm</option><option value="17">17 cm</option><option value="18">18 cm</option><option value="19">19 cm</option><option value="20">20 cm</option><option value="21">21 cm</option><option value="22">22 cm</option><option value="23">23 cm</option><option value="24">24 cm</option><option value="25">25 cm</option><option value="26">26 cm</option><option value="27">27 cm</option><option value="28">28 cm</option><option value="29">29 cm</option><option value="30">30 cm</option><option value="31">31 cm</option><option value="32">32 cm</option><option value="33">33 cm</option><option value="34">34 cm</option><option value="35">35 cm</option><option value="36">36 cm</option><option value="37">37 cm</option><option value="38">38 cm</option><option value="39">39 cm</option><option value="40">40 cm</option><option value="41">41 cm</option><option value="42">42 cm</option><option value="43">43 cm</option><option value="44">44 cm</option><option value="45">45 cm</option><option value="46">46 cm</option><option value="47">47 cm</option><option value="48">48 cm</option><option value="49">49 cm</option><option value="50">50 cm</option><option value="51">51 cm</option><option value="52">52 cm</option><option value="53">53 cm</option><option value="54">54 cm</option><option value="55">55 cm</option><option value="56">56 cm</option><option value="57">57 cm</option><option value="58">58 cm</option><option value="59">59 cm</option><option value="60">60 cm</option><option value="61">61 cm</option><option value="62">62 cm</option><option value="63">63 cm</option><option value="64">64 cm</option><option value="65">65 cm</option><option value="66">66 cm</option><option value="67">67 cm</option><option value="68">68 cm</option><option value="69">69 cm</option><option value="70">70 cm</option><option value="71">71 cm</option><option value="72">72 cm</option><option value="73">73 cm</option><option value="74">74 cm</option><option value="75">75 cm</option><option value="76">76 cm</option><option value="77">77 cm</option><option value="78">78 cm</option><option value="79">79 cm</option><option value="80">80 cm</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🧍 Test de flexion Debout <span style="color:#888;font-weight:400;">(Iliaque/pubis)</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;"><input type="radio" name="sp_dyn_flex_debout" value="droite"/> Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;"><input type="radio" name="sp_dyn_flex_debout" value="gauche"/> Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;"><input type="radio" name="sp_dyn_flex_debout" value="neutre"/> Neutre</label>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🪑 Test de flexion Assis <span style="color:#888;font-weight:400;">(Sacrum)</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;"><input type="radio" name="sp_dyn_flex_assis" value="droite"/> Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;"><input type="radio" name="sp_dyn_flex_assis" value="gauche"/> Gauche</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;"><input type="radio" name="sp_dyn_flex_assis" value="neutre"/> Neutre</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PARTIE EN DÉCHARGE ─── -->
+      <div style="font-weight:700;color:#d35400;font-size:13px;letter-spacing:1px;margin:18px 0 12px 0;border-bottom:1px solid #f0c896;padding-bottom:4px;">PARTIE EN DÉCHARGE</div>
+
+      <!-- Mobilité décharge (orange) -->
+      <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#b7740a;font-size:14px;margin-bottom:10px;">🦵 Examen en décharge — Tests mobilité <span style="color:#e74c3c;">(dysfonction)</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🦴 Hanche</div>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_hanche" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_hanche" value="non"/> Non</label>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🦵 Genou</div>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_genou" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_genou" value="non"/> Non</label>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🦶 Pied</div>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_pied" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_pied" value="non"/> Non</label>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🫁 Bassin</div>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_bassin" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_mob_bassin" value="non"/> Non</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Décubitus dorsal (violet) -->
+      <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#6c3483;font-size:14px;margin-bottom:10px;">🛏️ Examen en décubitus dorsal</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+            <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">🦴 Observation tibia/fémur <span style="color:#888;font-weight:400;">(ILMI anatomique)</span></div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <div style="background:#f9f0ff;border:1px solid #d7bde2;border-radius:8px;padding:6px 10px;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+                  <input type="checkbox" id="sp-dyn-tf-d" onchange="setBilanField('sp_dyn_tf_d', this.checked); toggleSportTF('d', this.checked)"/>
+                  <span style="font-weight:600;color:#6c3483;">👉 Droite</span>
+                </label>
+                <div id="sp-dyn-tf-d-opts" style="display:none;flex-direction:column;gap:6px;">
+                  <div>
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+                      <input type="checkbox" id="sp-dyn-tf-d-femur" onchange="setBilanField('sp_dyn_tf_d_femur', this.checked); toggleSportTFOs('d', 'femur', this.checked)"/>
+                      <span style="font-size:11px;font-weight:600;color:#222;">Fémur</span>
+                    </label>
+                    <div id="sp-dyn-tf-d-femur-opts" style="display:none;gap:6px;margin-left:16px;">
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_d_femur_dir" value="court"/> Plus court</label>
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_d_femur_dir" value="long"/> Plus long</label>
+                    </div>
+                  </div>
+                  <div>
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+                      <input type="checkbox" id="sp-dyn-tf-d-tibia" onchange="setBilanField('sp_dyn_tf_d_tibia', this.checked); toggleSportTFOs('d', 'tibia', this.checked)"/>
+                      <span style="font-size:11px;font-weight:600;color:#222;">Tibia</span>
+                    </label>
+                    <div id="sp-dyn-tf-d-tibia-opts" style="display:none;gap:6px;margin-left:16px;">
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_d_tibia_dir" value="court"/> Plus court</label>
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_d_tibia_dir" value="long"/> Plus long</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="background:#f9f0ff;border:1px solid #d7bde2;border-radius:8px;padding:6px 10px;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+                  <input type="checkbox" id="sp-dyn-tf-g" onchange="setBilanField('sp_dyn_tf_g', this.checked); toggleSportTF('g', this.checked)"/>
+                  <span style="font-weight:600;color:#6c3483;">👈 Gauche</span>
+                </label>
+                <div id="sp-dyn-tf-g-opts" style="display:none;flex-direction:column;gap:6px;">
+                  <div>
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+                      <input type="checkbox" id="sp-dyn-tf-g-femur" onchange="setBilanField('sp_dyn_tf_g_femur', this.checked); toggleSportTFOs('g', 'femur', this.checked)"/>
+                      <span style="font-size:11px;font-weight:600;color:#222;">Fémur</span>
+                    </label>
+                    <div id="sp-dyn-tf-g-femur-opts" style="display:none;gap:6px;margin-left:16px;">
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_g_femur_dir" value="court"/> Plus court</label>
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_g_femur_dir" value="long"/> Plus long</label>
+                    </div>
+                  </div>
+                  <div>
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+                      <input type="checkbox" id="sp-dyn-tf-g-tibia" onchange="setBilanField('sp_dyn_tf_g_tibia', this.checked); toggleSportTFOs('g', 'tibia', this.checked)"/>
+                      <span style="font-size:11px;font-weight:600;color:#222;">Tibia</span>
+                    </label>
+                    <div id="sp-dyn-tf-g-tibia-opts" style="display:none;gap:6px;margin-left:16px;">
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_g_tibia_dir" value="court"/> Plus court</label>
+                      <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_tf_g_tibia_dir" value="long"/> Plus long</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+            <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">📏 Longueur membres inférieurs</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_dorsal" value="court" onchange="toggleSportLongMI('dorsal', this.value)"/> Plus court</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_dorsal" value="long" onchange="toggleSportLongMI('dorsal', this.value)"/> Plus long</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_dorsal" value="egal" onchange="toggleSportLongMI('dorsal', this.value)"/> Même longueur</label>
+            </div>
+            <div id="sp-dyn-long-mi-dorsal-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_dorsal_side" value="d"/> 👉 Droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_dorsal_side" value="g"/> 👈 Gauche</label>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">📐 Hauteur branches pubiennes</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;">
+                  <input type="radio" name="sp_dyn_pub" value="d" onchange="toggleSportPub('d')"/> Droite
+                </label>
+                <div id="sp-dyn-pub-d-opts" style="display:none;gap:6px;">
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_pub_dir" value="haut"/> Plus haut</label>
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_pub_dir" value="bas"/> Plus bas</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;">
+                  <input type="radio" name="sp_dyn_pub" value="g" onchange="toggleSportPub('g')"/> Gauche
+                </label>
+                <div id="sp-dyn-pub-g-opts" style="display:none;gap:6px;">
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_pub_dir" value="haut"/> Plus haut</label>
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_pub_dir" value="bas"/> Plus bas</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">🔬 Downing test</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;width:fit-content;margin-bottom:4px;">
+                  <input type="checkbox" id="sp-dyn-downing-d" onchange="setBilanField('sp_dyn_downing_d', this.checked); toggleSportDowning('d', this.checked)"/> Droite
+                </label>
+                <div id="sp-dyn-downing-d-opts" style="display:none;flex-direction:column;gap:4px;margin-left:16px;">
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_downing_d_res" value="post"/> Pas d'allongement (iliaque POST)</label>
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_downing_d_res" value="ant"/> Pas de raccourcissement (iliaque ANT)</label>
+                </div>
+              </div>
+              <div>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f9f0ff;border:2px solid #8e44ad;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;width:fit-content;margin-bottom:4px;">
+                  <input type="checkbox" id="sp-dyn-downing-g" onchange="setBilanField('sp_dyn_downing_g', this.checked); toggleSportDowning('g', this.checked)"/> Gauche
+                </label>
+                <div id="sp-dyn-downing-g-opts" style="display:none;flex-direction:column;gap:4px;margin-left:16px;">
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_downing_g_res" value="post"/> Pas d'allongement (iliaque POST)</label>
+                  <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #8e44ad;border-radius:20px;padding:2px 10px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_downing_g_res" value="ant"/> Pas de raccourcissement (iliaque ANT)</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Procubitus (bleu) -->
+      <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#2471a3;font-size:14px;margin-bottom:10px;">🫃 Examen procubitus</div>
+        <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">📏 Longueur membres inférieurs</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_procubitus" value="court" onchange="toggleSportLongMI('procubitus', this.value)"/> Plus court</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_procubitus" value="long" onchange="toggleSportLongMI('procubitus', this.value)"/> Plus long</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_procubitus" value="egal" onchange="toggleSportLongMI('procubitus', this.value)"/> Même longueur</label>
+          </div>
+          <div id="sp-dyn-long-mi-procubitus-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_procubitus_side" value="d"/> 👉 Droite</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_long_mi_procubitus_side" value="g"/> 👈 Gauche</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conclusion examen en décharge (vert) -->
+      <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#2a7a4e;font-size:14px;margin-bottom:10px;">📊 Conclusion examen en décharge</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+            <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">📐 Inégalité longueur</div>
+            <div style="display:flex;gap:8px;margin-bottom:6px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_ineg_long" value="oui" onchange="toggleSportIneg(true)"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_ineg_long" value="non" onchange="toggleSportIneg(false)"/> Non</label>
+            </div>
+            <div id="sp-dyn-ineg-opts" style="display:none;gap:8px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_ineg_dir" value="court-d"/> Plus court à droite</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:4px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;font-size:11px;color:#222;"><input type="radio" name="sp_dyn_ineg_dir" value="court-g"/> Plus court à gauche</label>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
+            <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">Type d'inégalité</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="checkbox" id="sp-dyn-ineg-struct" onchange="setBilanField('sp_dyn_ineg_struct', this.checked)"/> Inégalité structurelle</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="checkbox" id="sp-dyn-ineg-comp" onchange="setBilanField('sp_dyn_ineg_comp', this.checked)"/> Inégalité compensatrice</label>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">⚖️ Équilibré ?</div>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_equilibre" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_equilibre" value="non"/> Non</label>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:8px 12px;">
+            <div style="font-size:10px;color:#2471a3;font-weight:600;margin-bottom:6px;">🦴 Scoliose ?</div>
+            <div style="display:flex;gap:8px;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_scoliose" value="oui"/> Oui</label>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #ccc;border-radius:20px;padding:3px 12px;color:#222;"><input type="radio" name="sp_dyn_scoliose" value="non"/> Non</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
     </div>
 
     <div class="sport-section" id="ssec-3" style="display:none;">
-    <!-- ROTATION NUCALE -->
+    <!-- ROTATION NUCALE (B1 #73) -->
     <div class="card sport-card-violet">
       <div class="sport-block-title c-violet">🔄 Test Rotation Nucale</div>
-      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <div style="font-size:11px;color:#666;margin-bottom:10px;font-style:italic;">Cotation : 5/5 = norme physiologique · 1/5 = forte restriction</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead>
-          <tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);"></th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Gauche</th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Droite</th></tr>
-          <tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);"></th><th style="padding:6px 8px;border:1px solid var(--bord);">Standard</th><th style="padding:6px 8px;border:1px solid var(--bord);">Sur mousse</th><th style="padding:6px 8px;border:1px solid var(--bord);">Standard</th><th style="padding:6px 8px;border:1px solid var(--bord);">Sur mousse</th></tr>
+          <tr style="background:var(--surf);">
+            <th style="padding:8px 10px;border:1px solid var(--bord);text-align:left;">Sens de rotation</th>
+            <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">Standard</th>
+            <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">Sur mousse</th>
+          </tr>
         </thead>
         <tbody>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);font-weight:500;">Rotation nucale</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="rot_nucale_G_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="rot_nucale_G_mousse" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="rot_nucale_D_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="rot_nucale_D_mousse" style="width:100%;"/></td></tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">👈 Rotation gauche</td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_rotn_g_std" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option>
+                <option value="1">1/5</option>
+                <option value="2">2/5</option>
+                <option value="3">3/5</option>
+                <option value="4">4/5</option>
+                <option value="5">5/5</option>
+              </select>
+            </td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_rotn_g_mousse" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option>
+                <option value="1">1/5</option>
+                <option value="2">2/5</option>
+                <option value="3">3/5</option>
+                <option value="4">4/5</option>
+                <option value="5">5/5</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">👉 Rotation droite</td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_rotn_d_std" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option>
+                <option value="1">1/5</option>
+                <option value="2">2/5</option>
+                <option value="3">3/5</option>
+                <option value="4">4/5</option>
+                <option value="5">5/5</option>
+              </select>
+            </td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_rotn_d_mousse" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option>
+                <option value="1">1/5</option>
+                <option value="2">2/5</option>
+                <option value="3">3/5</option>
+                <option value="4">4/5</option>
+                <option value="5">5/5</option>
+              </select>
+            </td>
+          </tr>
         </tbody>
       </table></div>
     </div>
     </div>
 
     <div class="sport-section" id="ssec-4" style="display:none;">
-    <!-- MOBILITÉ AXE CORPOREL -->
+    <!-- MOBILITÉ AXE CORPOREL (B1 #73) -->
     <div class="card sport-card-vert">
       <div class="sport-block-title c-vert">📐 Mobilité Axe Corporel</div>
-      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <div style="font-size:11px;color:#666;margin-bottom:10px;font-style:italic;">Cocher si limitation observée dans la zone × condition</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead>
-          <tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);">Zone</th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Gauche</th><th colspan="2" style="padding:6px 8px;border:1px solid var(--bord);text-align:center;">Droite</th></tr>
-          <tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);"></th><th style="padding:6px 8px;border:1px solid var(--bord);">Standard</th><th style="padding:6px 8px;border:1px solid var(--bord);">Sur mousse</th><th style="padding:6px 8px;border:1px solid var(--bord);">Standard</th><th style="padding:6px 8px;border:1px solid var(--bord);">Sur mousse</th></tr>
+          <tr style="background:var(--surf);">
+            <th rowspan="2" style="padding:8px 10px;border:1px solid var(--bord);text-align:left;vertical-align:middle;">Zone</th>
+            <th colspan="2" style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">👈 Gauche</th>
+            <th colspan="2" style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">👉 Droite</th>
+          </tr>
+          <tr style="background:var(--surf);">
+            <th style="padding:6px 8px;border:1px solid var(--bord);text-align:center;font-size:11px;">Standard</th>
+            <th style="padding:6px 8px;border:1px solid var(--bord);text-align:center;font-size:11px;">Sur mousse</th>
+            <th style="padding:6px 8px;border:1px solid var(--bord);text-align:center;font-size:11px;">Standard</th>
+            <th style="padding:6px 8px;border:1px solid var(--bord);text-align:center;font-size:11px;">Sur mousse</th>
+          </tr>
         </thead>
         <tbody>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);font-weight:500;">Cervical</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_cervical_G_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_cervical_G_mousse" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_cervical_D_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_cervical_D_mousse" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);font-weight:500;">Thoracique</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_thoracique_G_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_thoracique_G_mousse" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_thoracique_D_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_thoracique_D_mousse" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);font-weight:500;">Lombaire</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_lombaire_G_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_lombaire_G_mousse" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_lombaire_D_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_lombaire_D_mousse" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);font-weight:500;">Arc Inférieur</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_arc_inf_G_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_arc_inf_G_mousse" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_arc_inf_D_std" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="mob_arc_inf_D_mousse" style="width:100%;"/></td></tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Cervicale</td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-cervical-g-std" onchange="setBilanField('sp_mob_cervical_g_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-cervical-g-mousse" onchange="setBilanField('sp_mob_cervical_g_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-cervical-d-std" onchange="setBilanField('sp_mob_cervical_d_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-cervical-d-mousse" onchange="setBilanField('sp_mob_cervical_d_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Thoracique</td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-thoracique-g-std" onchange="setBilanField('sp_mob_thoracique_g_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-thoracique-g-mousse" onchange="setBilanField('sp_mob_thoracique_g_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-thoracique-d-std" onchange="setBilanField('sp_mob_thoracique_d_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-thoracique-d-mousse" onchange="setBilanField('sp_mob_thoracique_d_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Lombaire</td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-lombaire-g-std" onchange="setBilanField('sp_mob_lombaire_g_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-lombaire-g-mousse" onchange="setBilanField('sp_mob_lombaire_g_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-lombaire-d-std" onchange="setBilanField('sp_mob_lombaire_d_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-lombaire-d-mousse" onchange="setBilanField('sp_mob_lombaire_d_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Arc inférieur</td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-arc-inf-g-std" onchange="setBilanField('sp_mob_arc_inf_g_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-arc-inf-g-mousse" onchange="setBilanField('sp_mob_arc_inf_g_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-arc-inf-d-std" onchange="setBilanField('sp_mob_arc_inf_d_std', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+            <td style="padding:6px;border:1px solid var(--bord);text-align:center;"><input type="checkbox" id="sp-mob-arc-inf-d-mousse" onchange="setBilanField('sp_mob_arc_inf_d_mousse', this.checked)" style="width:16px;height:16px;cursor:pointer;"/></td>
+          </tr>
         </tbody>
       </table></div>
     </div>
