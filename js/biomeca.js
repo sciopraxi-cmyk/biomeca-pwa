@@ -6928,6 +6928,19 @@ function setBilanField(field, value) {
   }
 }
 
+// #95 — Persistance per-cb des cases neuro psec-3, parité sport setBilanField.
+// Écriture directe dans currentPatient.bilanDataPosturo.neuro4[id] (autoritative,
+// indépendamment du scrape global gardé par display:none de savePosturoBilan
+// L11054). Sans pollution de bilanData (contrairement à setBilanField qui écrit
+// aussi dedans). Le save sur disque arrive au prochain savePatients (manuel 💾,
+// génération synthèse, etc.) — comme pour sport setBilanField.
+function setPosturoNeuro(id, checked) {
+  if(!currentPatient) return;
+  if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
+  if(!currentPatient.bilanDataPosturo.neuro4) currentPatient.bilanDataPosturo.neuro4 = {};
+  currentPatient.bilanDataPosturo.neuro4[id] = checked;
+}
+
 // Synchronise les modifications du bilan en cours d'édition vers son entrée
 // dans bilansSport[]. À appeler après chaque savePatients() qui touche
 // currentPatient.mesures ou currentPatient.bilanData.
@@ -7972,43 +7985,43 @@ function getBilanPosturoHTML() {
       </tr>
       <tr>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Épaule + basse</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-g" onchange="setPosturoNeuro('aps-epaule-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-d" onchange="setPosturoNeuro('aps-epaule-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-n" onchange="setPosturoNeuro('aps-epaule-n',this.checked)"/></td>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">PATTERN TRONC CÉRÉBRAL (RIMS/REMI)</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-g" onchange="setPosturoNeuro('apd-tronc-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-d" onchange="setPosturoNeuro('apd-tronc-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-n" onchange="setPosturoNeuro('apd-tronc-n',this.checked)"/></td>
       </tr>
       <tr>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Rotation interne épaule</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-g" onchange="setPosturoNeuro('aps-rot-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-d" onchange="setPosturoNeuro('aps-rot-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-n" onchange="setPosturoNeuro('aps-rot-n',this.checked)"/></td>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">PATTERN CERVELET (RIMS/RIMI)</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-g" onchange="setPosturoNeuro('apd-cervelet-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-d" onchange="setPosturoNeuro('apd-cervelet-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-n" onchange="setPosturoNeuro('apd-cervelet-n',this.checked)"/></td>
       </tr>
       <tr>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion du coude</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-g" onchange="setPosturoNeuro('aps-coude-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-d" onchange="setPosturoNeuro('aps-coude-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-n" onchange="setPosturoNeuro('aps-coude-n',this.checked)"/></td>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">Défaut stabilisation tête</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-g" onchange="setPosturoNeuro('apd-tete-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-d" onchange="setPosturoNeuro('apd-tete-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-n" onchange="setPosturoNeuro('apd-tete-n',this.checked)"/></td>
       </tr>
       <tr>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Pronation du poignet</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-g" onchange="setPosturoNeuro('aps-pron-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-d" onchange="setPosturoNeuro('aps-pron-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-n" onchange="setPosturoNeuro('aps-pron-n',this.checked)"/></td>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;background:#ff0;color:#222;">Membre sup peu mobile</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-d"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-n"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-g" onchange="setPosturoNeuro('apd-membre-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-d" onchange="setPosturoNeuro('apd-membre-d',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-membre-n" onchange="setPosturoNeuro('apd-membre-n',this.checked)"/></td>
       </tr>
       <!-- CRITÈRES DE FORCE -->
       <tr>
@@ -8023,22 +8036,22 @@ function getBilanPosturoHTML() {
       </tr>
       <tr>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles extenseurs poignet</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-g" onchange="setPosturoNeuro('cf-ext-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-d" onchange="setPosturoNeuro('cf-ext-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion poignet et doigts</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-g" onchange="setPosturoNeuro('acd-flex-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-d" onchange="setPosturoNeuro('acd-flex-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
       </tr>
       <tr>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles Fléchisseurs de hanche</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-g" onchange="setPosturoNeuro('cf-flex-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-d" onchange="setPosturoNeuro('cf-flex-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
         <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Hyperextension genou</td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-g"/></td>
-        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-d"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-g" onchange="setPosturoNeuro('acd-hyper-g',this.checked)"/></td>
+        <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-d" onchange="setPosturoNeuro('acd-hyper-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
       </tr>
     </table>
@@ -8049,11 +8062,11 @@ function getBilanPosturoHTML() {
       <div style="font-weight:700;color:#b7740a;margin-bottom:8px;">🎯 HYPOTHÈSE</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:6px 16px;">
-          <input type="checkbox" id="po-hypo-tronc" style="width:14px;height:14px;"/>
+          <input type="checkbox" id="po-hypo-tronc" onchange="setPosturoNeuro('po-hypo-tronc',this.checked)" style="width:14px;height:14px;"/>
           <span style="color:#e74c3c;font-weight:700;">🔴 TRONC CÉRÉBRAL</span>
         </label>
         <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:6px 16px;">
-          <input type="checkbox" id="po-hypo-cervelet" style="width:14px;height:14px;"/>
+          <input type="checkbox" id="po-hypo-cervelet" onchange="setPosturoNeuro('po-hypo-cervelet',this.checked)" style="width:14px;height:14px;"/>
           <span style="color:#3498db;font-weight:700;">🔵 CERVELET</span>
         </label>
       </div>
@@ -8074,37 +8087,37 @@ function getBilanPosturoHTML() {
           </tr>
           <tr>
             <td colspan="2" style="padding:2px 4px;border:1px solid #f8d7da;">Recapillarisation</td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-g"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-d"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-n"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-g" onchange="setPosturoNeuro('nc-recap-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-d" onchange="setPosturoNeuro('nc-recap-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-n" onchange="setPosturoNeuro('nc-recap-n',this.checked)"/></td>
           </tr>
           ${['NC1','NC2'].map(nc => `<tr>
             <td style="padding:2px 4px;border:1px solid #f8d7da;"></td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${['NC3','NC4'].map(nc => `<tr>
             <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Mésencéphale</td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${['NC5','NC6','NC7','NC8'].map(nc => `<tr>
             <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Pont de Varole</td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${['NC9','NC10','NC11','NC12'].map(nc => `<tr>
             <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Bulbe rachidien</td>
             <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d"/></td>
-            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
           </tr>`).join('')}
           <tr style="background:#ddd;font-weight:700;color:#222;">
             <td colspan="2" style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
@@ -8127,9 +8140,9 @@ function getBilanPosturoHTML() {
           </tr>
           ${[['ROMBERG + CSC ANT','vest-ant'],['ROMBERG + CSC LAT','vest-lat'],['ROMBERG + CSC POST','vest-post']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #ccc;">${label}</td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
           <tr><td colspan="4" style="background:#d4edda;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#27ae60;">PROPRIOCEPTION</td></tr>
           <tr>
@@ -8140,15 +8153,15 @@ function getBilanPosturoHTML() {
           </tr>
           ${[['FN LENT (M) E. passif','prop-lent'],['FN RAPIDE (M) E. actif','prop-rapide']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #ccc;background:#d4edda;color:#222;">${label}</td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${[['GOLGI (M) force iso','prop-golgi'],['PACCINI (A) mvt précis','prop-paccini'],['RUFFINI (A) Décompression','prop-ruffini-d'],['RUFFINI (A) Compression','prop-ruffini-c'],['GOLGI (A) mvt forcé','prop-golgi-a']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #ccc;">${label}</td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
           <tr style="background:#ddd;font-weight:700;color:#222;">
             <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
@@ -8171,16 +8184,16 @@ function getBilanPosturoHTML() {
           </tr>
           ${[['SHARP. ROMBERG','vermis-sharp'],['ROMBERG 1 PIED','vermis-romberg']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;color:#222;">${label}</td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g"/></td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d"/></td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
           <tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;color:#222;">PROPRIO AXE <span style="font-size:9px;">X sur les parties du corps affectées</span></td>
             <td colspan="3" style="text-align:center;border:1px solid #d6eaf8;padding:2px;">
-              <input type="checkbox" id="proprio-axe-tete" onchange="setBilanField('proprio-axe-tete',this.checked)" title="Tête"/> Tête
-              <input type="checkbox" id="proprio-axe-corps" onchange="setBilanField('proprio-axe-corps',this.checked)" title="Corps"/> Corps
-              <input type="checkbox" id="proprio-axe-bassin" onchange="setBilanField('proprio-axe-bassin',this.checked)" title="Bassin"/> Bassin
+              <input type="checkbox" id="proprio-axe-tete" onchange="setPosturoNeuro('proprio-axe-tete',this.checked)" title="Tête"/> Tête
+              <input type="checkbox" id="proprio-axe-corps" onchange="setPosturoNeuro('proprio-axe-corps',this.checked)" title="Corps"/> Corps
+              <input type="checkbox" id="proprio-axe-bassin" onchange="setPosturoNeuro('proprio-axe-bassin',this.checked)" title="Bassin"/> Bassin
             </td>
           </tr>
           <tr>
@@ -8191,9 +8204,9 @@ function getBilanPosturoHTML() {
           </tr>
           ${[['Précision (doigt-nez)','inter-prec'],['Coordination (mvt alternatif)','inter-coord']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g"/></td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d"/></td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
           <tr>
             <td style="background:#f0a500;font-weight:700;padding:3px 4px;border:1px solid #3498db;color:#222;">LATÉRAL</td>
@@ -8203,9 +8216,9 @@ function getBilanPosturoHTML() {
           </tr>
           ${[['Précision (piano)','lat-prec'],['Coordination (Go-No Go)','lat-coord']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g"/></td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d"/></td>
-            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
           <tr style="background:#ddd;font-weight:700;color:#222;">
             <td style="text-align:center;padding:3px;border:1px solid #999;">TOTAL</td>
@@ -8240,12 +8253,12 @@ function getBilanPosturoHTML() {
           const rid = reflex.toLowerCase();
           return `<tr>
             <td style="padding:2px 4px;border:1px solid #ccc;background:${bg};color:#222;">${label}</td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-o"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-o" onchange="setPosturoNeuro('ref-${id}-o',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-n" onchange="setPosturoNeuro('ref-${id}-n',this.checked)"/></td>
             <td style="padding:2px 4px;border:1px solid #ccc;">${reflex}</td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-g"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-d"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-n"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-g" onchange="setPosturoNeuro('ref-${rid}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-d" onchange="setPosturoNeuro('ref-${rid}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-n" onchange="setPosturoNeuro('ref-${rid}-n',this.checked)"/></td>
           </tr>`;
         }).join('')}
       </table>
@@ -8270,9 +8283,9 @@ function getBilanPosturoHTML() {
           const id = label.split(' ')[0].toLowerCase();
           return `<tr>
             <td style="padding:2px 4px;border:1px solid #ccc;background:${bg==='#f0a500'?'#fdebd0':bg};color:#222;">${label}</td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-g"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-d"/></td>
-            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-n"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-g" onchange="setPosturoNeuro('tact-${id}-g',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-d" onchange="setPosturoNeuro('tact-${id}-d',this.checked)"/></td>
+            <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="tact-${id}-n" onchange="setPosturoNeuro('tact-${id}-n',this.checked)"/></td>
           </tr>`;
         }).join('')}
       </table>
@@ -9571,11 +9584,9 @@ function togglePostureLater(checked) {
   if(!checked) document.querySelectorAll('input[name="po-posture-later-dir"]').forEach(r => r.checked = false);
 }
 
-function genererSynthese() {
-  savePosturoBilan();
+async function genererSynthese() {
+  await savePosturoBilan(true);
   const d = currentPatient?.bilanDataPosturo || {};
-  // DEBUG: afficher neuro4
-  console.log('neuro4:', JSON.stringify(d.neuro4));
   const sections = [];
 
   // Anamnèse (psec-0) — format condensé sur une ligne, séparateur ·
@@ -9600,6 +9611,13 @@ function genererSynthese() {
   if(anamActivite) anamParts.push('Activité physique: '+anamActivite);
   const anamActiviteQuot = document.getElementById('po-activite-quot')?.value?.trim();
   if(anamActiviteQuot) anamParts.push('Activité quotidienne: '+anamActiviteQuot);
+  // #92 fill — terrain-pred/terrain/tension-principal (couverture audit)
+  const anamTerrainPred = document.querySelector('input[name="po-terrain-pred"]:checked')?.value;
+  if(anamTerrainPred) anamParts.push('Terrain prédominant: '+anamTerrainPred);
+  const anamTerrain = document.querySelector('input[name="po-terrain"]:checked')?.value;
+  if(anamTerrain) anamParts.push('Terrain: '+anamTerrain);
+  const anamTension = document.getElementById('po-tension-principal')?.value?.trim();
+  if(anamTension) anamParts.push('Tension principale: '+anamTension);
   if(anamParts.length) sections.push({titre:'🩺 Anamnèse', items:[anamParts.join(' · ')]});
 
   // Morphostatique
@@ -9714,129 +9732,33 @@ function genererSynthese() {
   if(scoliose) dynItems.push('Scoliose: '+scoliose);
   if(dynItems.length) sections.push({titre:'🏃 Bilan dynamique', items:[dynItems.join(' · ')]});
 
-  // Neuro-fonctionnel (psec-3, depuis d.neuro4 sauvegardé)
-  const neuroItems = [];
-  if(currentPatient?.bilanDataPosturo?.neuro4) {
-    const n = currentPatient.bilanDataPosturo.neuro4;
-    // Helper : fusion bilatérale → "label bilat" si G+D, sinon "label G" ou "label D"
-    const bilat = function(label, base) {
-      const g = !!n[base+'-g'];
-      const d = !!n[base+'-d'];
-      if(g && d) return label+' bilat';
-      if(g) return label+' G';
-      if(d) return label+' D';
-      return null;
-    };
-    const pushBilat = function(arr, label, base) {
-      const t = bilat(label, base);
-      if(t) arr.push(t);
-    };
-    // 1. Posture statique
-    const aps = [];
-    pushBilat(aps, 'Épaule', 'aps-epaule');
-    pushBilat(aps, 'Rot. épaule', 'aps-rot');
-    pushBilat(aps, 'Flex. coude', 'aps-coude');
-    pushBilat(aps, 'Pron. poignet', 'aps-pron');
-    if(aps.length) neuroItems.push('Posture statique: '+aps.join(', '));
-    // 2. Critères de force
-    const force = [];
-    pushBilat(force, 'Ext. poignet', 'cf-ext');
-    pushBilat(force, 'Flex. hanche', 'cf-flex');
-    if(force.length) neuroItems.push('Critères force: '+force.join(', '));
-    // 3. Posture dynamique (apd-* uniquement)
-    const apd = [];
-    pushBilat(apd, 'Tronc cérébral', 'apd-tronc');
-    pushBilat(apd, 'Cervelet', 'apd-cervelet');
-    pushBilat(apd, 'Stab. tête', 'apd-tete');
-    pushBilat(apd, 'Membre sup', 'apd-membre');
-    if(apd.length) neuroItems.push('Posture dynamique: '+apd.join(', '));
-    // 4. Autres critères en dynamique (acd-*)
-    const acd = [];
-    pushBilat(acd, 'Flex. poignet/doigts', 'acd-flex');
-    pushBilat(acd, 'Hyperext. genou', 'acd-hyper');
-    if(acd.length) neuroItems.push('Autres critères dyn.: '+acd.join(', '));
-    // 5. Hypothèses
-    const hypo = [];
-    if(n['po-hypo-tronc']) hypo.push('Tronc cérébral');
-    if(n['po-hypo-cervelet']) hypo.push('Cervelet');
-    if(hypo.length) neuroItems.push('Hypothèse: '+hypo.join(', '));
-    // 6. Nerfs crâniens (recapillarisation + NC1 à NC12)
-    const ncList = [];
-    pushBilat(ncList, 'Recap', 'nc-recap');
-    for(let i=1; i<=12; i++) {
-      pushBilat(ncList, 'NC'+i, 'nc-nc'+i);
-    }
-    if(ncList.length) neuroItems.push('Nerfs crâniens: '+ncList.join(', '));
-    // 7. Vestibulaire
-    const vest = [];
-    pushBilat(vest, 'CSC ant', 'vest-ant');
-    pushBilat(vest, 'CSC lat', 'vest-lat');
-    pushBilat(vest, 'CSC post', 'vest-post');
-    if(vest.length) neuroItems.push('Vestibulaire: '+vest.join(', '));
-    // 8. Proprioception
-    const prop = [];
-    pushBilat(prop, 'FN lent', 'prop-lent');
-    pushBilat(prop, 'FN rapide', 'prop-rapide');
-    pushBilat(prop, 'Golgi', 'prop-golgi');
-    pushBilat(prop, 'Golgi A', 'prop-golgi-a');
-    pushBilat(prop, 'Paccini', 'prop-paccini');
-    pushBilat(prop, 'Ruffini déc', 'prop-ruffini-d');
-    pushBilat(prop, 'Ruffini com', 'prop-ruffini-c');
-    if(prop.length) neuroItems.push('Proprioception: '+prop.join(', '));
-    // 9. Cervelet (vermis + axe + inter + lat)
-    const cerv = [];
-    pushBilat(cerv, 'Sharp Romberg', 'vermis-sharp');
-    pushBilat(cerv, 'Romberg 1 pied', 'vermis-romberg');
-    const axe = [];
-    if(n['proprio-axe-tete']) axe.push('Tête');
-    if(n['proprio-axe-corps']) axe.push('Corps');
-    if(n['proprio-axe-bassin']) axe.push('Bassin');
-    if(axe.length) cerv.push('Proprio axe: '+axe.join('+'));
-    pushBilat(cerv, 'Préc. doigt', 'inter-prec');
-    pushBilat(cerv, 'Coordination', 'inter-coord');
-    pushBilat(cerv, 'Piano', 'lat-prec');
-    pushBilat(cerv, 'Go-No Go', 'lat-coord');
-    if(cerv.length) neuroItems.push('Cervelet: '+cerv.join(', '));
-    // 10. Réflexes archaïques (prioritaires "O" + secondaires bilatéraux)
-    const refl = [];
-    if(n['ref-rpp-o']) refl.push('RPP +');
-    if(n['ref-rtp-o']) refl.push('RTP +');
-    if(n['ref-moro-o']) refl.push('Moro +');
-    if(n['ref-perez-o']) refl.push('Pérez +');
-    if(n['ref-landau-o']) refl.push('Landau +');
-    if(n['ref-reptation-o']) refl.push('Reptation +');
-    pushBilat(refl, 'RTac', 'ref-rtac');
-    pushBilat(refl, 'Galant', 'ref-galant');
-    pushBilat(refl, 'Babinski', 'ref-babinski');
-    pushBilat(refl, 'Plantaire', 'ref-plantaire');
-    pushBilat(refl, 'Palmaire', 'ref-palmaire');
-    pushBilat(refl, 'Babkin', 'ref-babkin');
-    if(refl.length) neuroItems.push('Réflexes archaïques: '+refl.join(', '));
-    // 11. Récepteurs tactiles
-    const rect = [];
-    pushBilat(rect, 'Merkel', 'tact-merkel');
-    pushBilat(rect, 'Ruffini', 'tact-ruffini');
-    pushBilat(rect, 'Pacini', 'tact-pacini');
-    pushBilat(rect, 'TNL', 'tact-tnl');
-    pushBilat(rect, 'Meissner', 'tact-meissner');
-    pushBilat(rect, 'Poils', 'tact-poils');
-    if(rect.length) neuroItems.push('Récepteurs tactiles: '+rect.join(', '));
-    // 12. Totaux automatiques (NC, Proprioception, Cervelet)
-    // NB: l'ID DOM 'vest-total-*' calcule en fait le total de la partie PROPRIOCEPTION
-    // (partie basse de l'encadré "Confluence des données"), pas du sous-bloc vestibulaire.
-    const ncTotG = document.getElementById('nc-total-g')?.textContent || '0';
-    const ncTotD = document.getElementById('nc-total-d')?.textContent || '0';
-    const propTotG = document.getElementById('vest-total-g')?.textContent || '0';
-    const propTotD = document.getElementById('vest-total-d')?.textContent || '0';
-    const cervTotG = document.getElementById('cerv-total-g')?.textContent || '0';
-    const cervTotD = document.getElementById('cerv-total-d')?.textContent || '0';
-    const totalsParts = [];
-    if(ncTotG !== '0' || ncTotD !== '0') totalsParts.push('NC '+ncTotG+'G/'+ncTotD+'D');
-    if(propTotG !== '0' || propTotD !== '0') totalsParts.push('Proprio '+propTotG+'G/'+propTotD+'D');
-    if(cervTotG !== '0' || cervTotD !== '0') totalsParts.push('Cerv '+cervTotG+'G/'+cervTotD+'D');
-    if(totalsParts.length) neuroItems.push('Totaux: '+totalsParts.join(', '));
-  }
-  if(neuroItems.length) sections.push({titre:'🧠 Neuro-fonctionnel', items:[neuroItems.join(' · ')]});
+  // Neuro-fonctionnel (psec-3) — standard A5 partagé sport via renderNeuroBlocks.
+  // Reader posturo lit neuro4 (autoritative dès #95 — setPosturoNeuro écrit per-cb
+  // à chaque cochage, indépendamment du display de psec-3). Source plus fiable
+  // que le DOM, qui est recréé par injectBilanPosturoPage à chaque nav posturo
+  // → cb=false tant que loadPosturoBilan/showPosturoSection(3) n'ont pas restauré.
+  // Hypothèses : clés 'po-hypo-tronc'/'po-hypo-cervelet' (préfixe 'po-' conservé).
+  // Totaux DOM (textContent) inchangés — alimentés par updateNeuroTotals onchange.
+  // NB: l'ID 'vest-total-*' calcule en fait le total PROPRIOCEPTION (cf updateNeuroTotals L10695).
+  const n4 = currentPatient?.bilanDataPosturo?.neuro4 || {};
+  const posturoNeuroReader = id => !!n4[id];
+  const neuroItems = renderNeuroBlocks(posturoNeuroReader);
+  const hypo = [];
+  if(n4['po-hypo-tronc']) hypo.push('Tronc cérébral');
+  if(n4['po-hypo-cervelet']) hypo.push('Cervelet');
+  if(hypo.length) neuroItems.push('— Hypothèses : ' + hypo.join(', '));
+  const ncTotG   = document.getElementById('nc-total-g')?.textContent   || '0';
+  const ncTotD   = document.getElementById('nc-total-d')?.textContent   || '0';
+  const propTotG = document.getElementById('vest-total-g')?.textContent || '0';
+  const propTotD = document.getElementById('vest-total-d')?.textContent || '0';
+  const cervTotG = document.getElementById('cerv-total-g')?.textContent || '0';
+  const cervTotD = document.getElementById('cerv-total-d')?.textContent || '0';
+  const totParts = [];
+  if(ncTotG   !== '0' || ncTotD   !== '0') totParts.push('NC '      + ncTotG   + 'G/' + ncTotD   + 'D');
+  if(propTotG !== '0' || propTotD !== '0') totParts.push('Proprio ' + propTotG + 'G/' + propTotD + 'D');
+  if(cervTotG !== '0' || cervTotD !== '0') totParts.push('Cerv '    + cervTotG + 'G/' + cervTotD + 'D');
+  if(totParts.length) neuroItems.push('— Totaux : ' + totParts.join(', '));
+  if(neuroItems.length) sections.push({ titre: '🧠 Neuro-fonctionnel', items: neuroItems });
 
   // Système plantaire (psec-4)
   const plantItems = [];
@@ -10127,6 +10049,52 @@ function genererSynthese() {
   if(biomec) terrainItems.push('Biomécanique: '+biomec);
   if(terrainItems.length) sections.push({titre:'🌿 Terrain', items:[terrainItems.join(' · ')]});
 
+  // Plan semelles (psec-8) #92 — matériaux/recouvrement (cb multi), description,
+  // RDV, tests t1-t8 (radio oui/non, libellés HTML réels vérifiés grep L9493-9500),
+  // circuits CE1/CE2 (countCircuit miroir sport L10592-10593 : libre OU au moins
+  // 1 select.exo-sys sélectionné). Lit d.circ_* populé par savePosturoBilan(true)
+  // appelé en amont L9575.
+  const planItems = [];
+  const matCk = Array.from(document.querySelectorAll('input[name="po-materiaux"]:checked')).map(e=>e.value);
+  if(matCk.length) planItems.push('Matériaux: '+matCk.join(', '));
+  const recCk = Array.from(document.querySelectorAll('input[name="po-recouvrement"]:checked')).map(e=>e.value);
+  if(recCk.length) planItems.push('Recouvrement: '+recCk.join(', '));
+  const semDesc = document.getElementById('po-semelles-desc')?.value?.trim();
+  if(semDesc) planItems.push('Description: '+semDesc);
+  const rdv = document.getElementById('po-prochain-rdv')?.value?.trim();
+  if(rdv) planItems.push('Prochain RDV: '+rdv);
+  const T_LABELS = {
+    t1: 'Test de Rotation nucale amélioré',
+    t2: 'Test de Flexion antérieur amélioré',
+    t3: 'Test extenseurs du poignet amélioré',
+    t4: 'Test stabilité monopodale amélioré',
+    t5: 'Test Force/stabilité arrière amélioré',
+    t6: 'Test mobilité axe corporel amélioré',
+    t7: 'Test de Romberg amélioré',
+    t8: 'Amélioration morphostatique améliorée'
+  };
+  const testsT = [];
+  Object.keys(T_LABELS).forEach(t => {
+    const v = document.querySelector('input[name="po-'+t+'"]:checked')?.value;
+    if(v) testsT.push(T_LABELS[t]+': '+v);
+  });
+  if(testsT.length) planItems.push('Tests avant/après: '+testsT.join(' · '));
+  const countPoCircuit = cKey => {
+    let n = 0;
+    for(let i = 1; i <= 4; i++) {
+      const k = 'circ_'+cKey+'_ex'+i;
+      const libre = d[k];
+      const sys = d[k+'_sys'];
+      if((libre && String(libre).trim()) || (Array.isArray(sys) && sys.some(s => s))) n++;
+    }
+    return n;
+  };
+  const c1n = countPoCircuit('c1');
+  const c2n = countPoCircuit('c2');
+  if(c1n) planItems.push('CE1: '+c1n+'/4 exos remplis');
+  if(c2n) planItems.push('CE2: '+c2n+'/4 exos remplis');
+  if(planItems.length) sections.push({titre:'💊 Plan semelles', items:[planItems.join(' · ')]});
+
   // Afficher résultat
   const result = document.getElementById('po-synthese-result');
   const content = document.getElementById('po-synthese-content');
@@ -10320,6 +10288,119 @@ function toggleSportTerrain(which) {
   }
 }
 
+// A5 #92 — Config Neuro fonctionnel partagée sport + posturo. idPrefix sans
+// préfixe DOM ('sn-' sport, lecture neuro4 sans préfixe posturo) : c'est le
+// reader passé à renderNeuroBlocks qui injecte le préfixe attendu. Liste iso
+// 100% de la version sport d'origine (9 sous-blocs, 59 tests + 3 extras ; les
+// 2 hypothèses sont traitées hors NEURO_BLOCKS car structure asymétrique sport
+// (d.hypo_*) vs posturo (n['po-hypo-*']).
+const NEURO_BLOCKS = [
+  { title: 'Analyse posturale & critères', tests: [
+    { idPrefix: 'aps-epaule',   label: 'Épaule + basse',                cols: ['g','d','n'] },
+    { idPrefix: 'aps-rot',      label: 'Rotation interne épaule',       cols: ['g','d','n'] },
+    { idPrefix: 'aps-coude',    label: 'Flexion du coude',              cols: ['g','d','n'] },
+    { idPrefix: 'aps-pron',     label: 'Pronation du poignet',          cols: ['g','d','n'] },
+    { idPrefix: 'apd-tronc',    label: 'Pattern tronc cérébral (RIMS/REMI)', cols: ['g','d','n'] },
+    { idPrefix: 'apd-cervelet', label: 'Pattern cervelet (RIMS/RIMI)',  cols: ['g','d','n'] },
+    { idPrefix: 'apd-tete',     label: 'Défaut stabilisation tête',     cols: ['g','d','n'] },
+    { idPrefix: 'apd-membre',   label: 'Membre sup peu mobile',         cols: ['g','d','n'] },
+    { idPrefix: 'cf-ext',       label: 'Faiblesse extenseurs poignet',  cols: ['g','d'] },
+    { idPrefix: 'cf-flex',      label: 'Faiblesse fléchisseurs hanche', cols: ['g','d'] },
+    { idPrefix: 'acd-flex',     label: 'Flexion poignet et doigts (dyn.)', cols: ['g','d'] },
+    { idPrefix: 'acd-hyper',    label: 'Hyperextension genou (dyn.)',   cols: ['g','d'] }
+  ]},
+  { title: 'Nerfs crâniens', tests: [
+    { idPrefix: 'nc-recap', label: 'Recapillarisation',            cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc1',   label: 'NC1',                          cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc2',   label: 'NC2',                          cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc3',   label: 'NC3 (Mésencéphale)',           cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc4',   label: 'NC4 (Mésencéphale)',           cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc5',   label: 'NC5 (Pont de Varole)',         cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc6',   label: 'NC6 (Pont de Varole)',         cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc7',   label: 'NC7 (Pont de Varole)',         cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc8',   label: 'NC8 (Pont de Varole)',         cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc9',   label: 'NC9 (Bulbe rachidien)',        cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc10',  label: 'NC10 (Bulbe rachidien)',       cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc11',  label: 'NC11 (Bulbe rachidien)',       cols: ['g','d','n'] },
+    { idPrefix: 'nc-nc12',  label: 'NC12 (Bulbe rachidien)',       cols: ['g','d','n'] }
+  ]},
+  { title: 'Vestibulaire', tests: [
+    { idPrefix: 'vest-ant',  label: 'Romberg + CSC antérieur',  cols: ['g','d','n'] },
+    { idPrefix: 'vest-lat',  label: 'Romberg + CSC latéral',    cols: ['g','d','n'] },
+    { idPrefix: 'vest-post', label: 'Romberg + CSC postérieur', cols: ['g','d','n'] }
+  ]},
+  { title: 'Proprioception', tests: [
+    { idPrefix: 'prop-lent',      label: 'FN lent (M) E. passif',     cols: ['g','d','n'] },
+    { idPrefix: 'prop-rapide',    label: 'FN rapide (M) E. actif',    cols: ['g','d','n'] },
+    { idPrefix: 'prop-golgi',     label: 'Golgi (M) force iso',       cols: ['g','d','n'] },
+    { idPrefix: 'prop-paccini',   label: 'Paccini (A) mvt précis',    cols: ['g','d','n'] },
+    { idPrefix: 'prop-ruffini-d', label: 'Ruffini (A) Décompression', cols: ['g','d','n'] },
+    { idPrefix: 'prop-ruffini-c', label: 'Ruffini (A) Compression',   cols: ['g','d','n'] },
+    { idPrefix: 'prop-golgi-a',   label: 'Golgi (A) mvt forcé',       cols: ['g','d','n'] }
+  ]},
+  { title: 'Cervelet — Vermis', tests: [
+    { idPrefix: 'vermis-sharp',   label: 'Sharp Romberg',  cols: ['g','d','n'] },
+    { idPrefix: 'vermis-romberg', label: 'Romberg 1 pied', cols: ['g','d','n'] }
+  ], extras: [
+    { id: 'proprio-axe-tete',   label: 'Proprio axe — Tête' },
+    { id: 'proprio-axe-corps',  label: 'Proprio axe — Corps' },
+    { id: 'proprio-axe-bassin', label: 'Proprio axe — Bassin' }
+  ]},
+  { title: 'Cervelet — Inter', tests: [
+    { idPrefix: 'inter-prec',  label: 'Précision (doigt-nez)',         cols: ['g','d','n'] },
+    { idPrefix: 'inter-coord', label: 'Coordination (mvt alternatif)', cols: ['g','d','n'] }
+  ]},
+  { title: 'Cervelet — Latéral', tests: [
+    { idPrefix: 'lat-prec',  label: 'Précision (piano)',       cols: ['g','d','n'] },
+    { idPrefix: 'lat-coord', label: 'Coordination (Go-No Go)', cols: ['g','d','n'] }
+  ]},
+  { title: 'Réflexes archaïques', tests: [
+    { idPrefix: 'ref-rpp',       label: 'RPP',       cols: ['o','n'] },
+    { idPrefix: 'ref-rtp',       label: 'RTP',       cols: ['o','n'] },
+    { idPrefix: 'ref-moro',      label: 'Moro',      cols: ['o','n'] },
+    { idPrefix: 'ref-perez',     label: 'Perez',     cols: ['o','n'] },
+    { idPrefix: 'ref-landau',    label: 'Landau',    cols: ['o','n'] },
+    { idPrefix: 'ref-reptation', label: 'Reptation', cols: ['o','n'] },
+    { idPrefix: 'ref-rtac',      label: 'RTAC',      cols: ['g','d','n'] },
+    { idPrefix: 'ref-galant',    label: 'Galant',    cols: ['g','d','n'] },
+    { idPrefix: 'ref-babinski',  label: 'Babinski',  cols: ['g','d','n'] },
+    { idPrefix: 'ref-plantaire', label: 'Plantaire', cols: ['g','d','n'] },
+    { idPrefix: 'ref-palmaire',  label: 'Palmaire',  cols: ['g','d','n'] },
+    { idPrefix: 'ref-babkin',    label: 'Babkin',    cols: ['g','d','n'] }
+  ]},
+  { title: 'Récepteurs tactiles', tests: [
+    { idPrefix: 'tact-merkel',   label: 'Merkel (toucher/pression)', cols: ['g','d','n'] },
+    { idPrefix: 'tact-ruffini',  label: 'Ruffini (étirement)',       cols: ['g','d','n'] },
+    { idPrefix: 'tact-pacini',   label: 'Pacini (vibration)',        cols: ['g','d','n'] },
+    { idPrefix: 'tact-tnl',      label: 'TNL (piquer)',              cols: ['g','d','n'] },
+    { idPrefix: 'tact-meissner', label: 'Meissner (caresse coton)',  cols: ['g','d','n'] },
+    { idPrefix: 'tact-poils',    label: 'Poils (mouvement)',         cols: ['g','d','n'] }
+  ]}
+];
+const NEURO_COL_LABELS = { g: 'gauche', d: 'droite', n: 'normal', o: 'observé' };
+
+// reader(id) reçoit un id sans préfixe ('aps-epaule-g', 'ref-rpp-o', …) et
+// retourne true si la case correspondante est cochée. Sport : reader injecte
+// 'sn-' + id. Posturo : reader lit !!neuro4[id] (objet plat sans préfixe).
+function renderNeuroBlocks(reader) {
+  const out = [];
+  NEURO_BLOCKS.forEach(block => {
+    const items = [];
+    (block.tests || []).forEach(test => {
+      test.cols.forEach(col => {
+        if(reader(test.idPrefix + '-' + col)) {
+          items.push(test.label + ' (' + NEURO_COL_LABELS[col] + ')');
+        }
+      });
+    });
+    (block.extras || []).forEach(extra => {
+      if(reader(extra.id)) items.push(extra.label);
+    });
+    if(items.length) out.push('— ' + block.title + ' : ' + items.join(', '));
+  });
+  return out;
+}
+
 // A5 — Bilan synthèse sport. Miroir du pattern posturo genererSynthese L9533 :
 // agrège les champs cliniques principaux des 11 sections sport (A0-A5 + ssec-10)
 // en sections {titre, items}, filtrées si vides, injectées en HTML structuré dans
@@ -10476,110 +10557,10 @@ function genererSyntheseSport() {
   if(d.schema_moteur_conclusion) sm.push('Conclusion : ' + d.schema_moteur_conclusion);
   if(sm.length) sections.push({ titre: '🏃 Schémas Moteurs', items: sm });
 
-  // 9. Neuro Fonctionnel (ssec-8, A2) — réécriture v3 data-driven (audit
-  //    exhaustif par grep : 9 sous-blocs, 59 tests + 3 extras = 170 cb +
-  //    2 hypothèses ; 100% des idPrefix vérifiés présents). Listing
-  //    descriptif case-par-case ("Libellé (gauche/droite/normal/observé)")
-  //    plutôt que comptes bruts. 1 ligne par sous-bloc dans le rendu HTML.
-  const NEURO_BLOCKS = [
-    { title: 'Analyse posturale & critères', tests: [
-      { idPrefix: 'sn-aps-epaule', label: 'Épaule + basse', cols: ['g','d','n'] },
-      { idPrefix: 'sn-aps-rot', label: 'Rotation interne épaule', cols: ['g','d','n'] },
-      { idPrefix: 'sn-aps-coude', label: 'Flexion du coude', cols: ['g','d','n'] },
-      { idPrefix: 'sn-aps-pron', label: 'Pronation du poignet', cols: ['g','d','n'] },
-      { idPrefix: 'sn-apd-tronc', label: 'Pattern tronc cérébral (RIMS/REMI)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-apd-cervelet', label: 'Pattern cervelet (RIMS/RIMI)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-apd-tete', label: 'Défaut stabilisation tête', cols: ['g','d','n'] },
-      { idPrefix: 'sn-apd-membre', label: 'Membre sup peu mobile', cols: ['g','d','n'] },
-      { idPrefix: 'sn-cf-ext', label: 'Faiblesse extenseurs poignet', cols: ['g','d'] },
-      { idPrefix: 'sn-cf-flex', label: 'Faiblesse fléchisseurs hanche', cols: ['g','d'] },
-      { idPrefix: 'sn-acd-flex', label: 'Flexion poignet et doigts (dyn.)', cols: ['g','d'] },
-      { idPrefix: 'sn-acd-hyper', label: 'Hyperextension genou (dyn.)', cols: ['g','d'] }
-    ]},
-    { title: 'Nerfs crâniens', tests: [
-      { idPrefix: 'sn-nc-recap', label: 'Recapillarisation', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc1', label: 'NC1', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc2', label: 'NC2', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc3', label: 'NC3 (Mésencéphale)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc4', label: 'NC4 (Mésencéphale)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc5', label: 'NC5 (Pont de Varole)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc6', label: 'NC6 (Pont de Varole)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc7', label: 'NC7 (Pont de Varole)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc8', label: 'NC8 (Pont de Varole)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc9', label: 'NC9 (Bulbe rachidien)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc10', label: 'NC10 (Bulbe rachidien)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc11', label: 'NC11 (Bulbe rachidien)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-nc-nc12', label: 'NC12 (Bulbe rachidien)', cols: ['g','d','n'] }
-    ]},
-    { title: 'Vestibulaire', tests: [
-      { idPrefix: 'sn-vest-ant', label: 'Romberg + CSC antérieur', cols: ['g','d','n'] },
-      { idPrefix: 'sn-vest-lat', label: 'Romberg + CSC latéral', cols: ['g','d','n'] },
-      { idPrefix: 'sn-vest-post', label: 'Romberg + CSC postérieur', cols: ['g','d','n'] }
-    ]},
-    { title: 'Proprioception', tests: [
-      { idPrefix: 'sn-prop-lent', label: 'FN lent (M) E. passif', cols: ['g','d','n'] },
-      { idPrefix: 'sn-prop-rapide', label: 'FN rapide (M) E. actif', cols: ['g','d','n'] },
-      { idPrefix: 'sn-prop-golgi', label: 'Golgi (M) force iso', cols: ['g','d','n'] },
-      { idPrefix: 'sn-prop-paccini', label: 'Paccini (A) mvt précis', cols: ['g','d','n'] },
-      { idPrefix: 'sn-prop-ruffini-d', label: 'Ruffini (A) Décompression', cols: ['g','d','n'] },
-      { idPrefix: 'sn-prop-ruffini-c', label: 'Ruffini (A) Compression', cols: ['g','d','n'] },
-      { idPrefix: 'sn-prop-golgi-a', label: 'Golgi (A) mvt forcé', cols: ['g','d','n'] }
-    ]},
-    { title: 'Cervelet — Vermis', tests: [
-      { idPrefix: 'sn-vermis-sharp', label: 'Sharp Romberg', cols: ['g','d','n'] },
-      { idPrefix: 'sn-vermis-romberg', label: 'Romberg 1 pied', cols: ['g','d','n'] }
-    ], extras: [
-      { id: 'sn-proprio-axe-tete', label: 'Proprio axe — Tête' },
-      { id: 'sn-proprio-axe-corps', label: 'Proprio axe — Corps' },
-      { id: 'sn-proprio-axe-bassin', label: 'Proprio axe — Bassin' }
-    ]},
-    { title: 'Cervelet — Inter', tests: [
-      { idPrefix: 'sn-inter-prec', label: 'Précision (doigt-nez)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-inter-coord', label: 'Coordination (mvt alternatif)', cols: ['g','d','n'] }
-    ]},
-    { title: 'Cervelet — Latéral', tests: [
-      { idPrefix: 'sn-lat-prec', label: 'Précision (piano)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-lat-coord', label: 'Coordination (Go-No Go)', cols: ['g','d','n'] }
-    ]},
-    { title: 'Réflexes archaïques', tests: [
-      { idPrefix: 'sn-ref-rpp', label: 'RPP', cols: ['o','n'] },
-      { idPrefix: 'sn-ref-rtp', label: 'RTP', cols: ['o','n'] },
-      { idPrefix: 'sn-ref-moro', label: 'Moro', cols: ['o','n'] },
-      { idPrefix: 'sn-ref-perez', label: 'Perez', cols: ['o','n'] },
-      { idPrefix: 'sn-ref-landau', label: 'Landau', cols: ['o','n'] },
-      { idPrefix: 'sn-ref-reptation', label: 'Reptation', cols: ['o','n'] },
-      { idPrefix: 'sn-ref-rtac', label: 'RTAC', cols: ['g','d','n'] },
-      { idPrefix: 'sn-ref-galant', label: 'Galant', cols: ['g','d','n'] },
-      { idPrefix: 'sn-ref-babinski', label: 'Babinski', cols: ['g','d','n'] },
-      { idPrefix: 'sn-ref-plantaire', label: 'Plantaire', cols: ['g','d','n'] },
-      { idPrefix: 'sn-ref-palmaire', label: 'Palmaire', cols: ['g','d','n'] },
-      { idPrefix: 'sn-ref-babkin', label: 'Babkin', cols: ['g','d','n'] }
-    ]},
-    { title: 'Récepteurs tactiles', tests: [
-      { idPrefix: 'sn-tact-merkel', label: 'Merkel (toucher/pression)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-tact-ruffini', label: 'Ruffini (étirement)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-tact-pacini', label: 'Pacini (vibration)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-tact-tnl', label: 'TNL (piquer)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-tact-meissner', label: 'Meissner (caresse coton)', cols: ['g','d','n'] },
-      { idPrefix: 'sn-tact-poils', label: 'Poils (mouvement)', cols: ['g','d','n'] }
-    ]}
-  ];
-  const NEURO_COL_LABELS = { g: 'gauche', d: 'droite', n: 'normal', o: 'observé' };
-  const nf = [];
-  NEURO_BLOCKS.forEach(block => {
-    const items = [];
-    (block.tests || []).forEach(test => {
-      test.cols.forEach(col => {
-        if(chk(test.idPrefix + '-' + col)) {
-          items.push(test.label + ' (' + NEURO_COL_LABELS[col] + ')');
-        }
-      });
-    });
-    (block.extras || []).forEach(extra => {
-      if(chk(extra.id)) items.push(extra.label);
-    });
-    if(items.length) nf.push('— ' + block.title + ' : ' + items.join(', '));
-  });
+  // 9. Neuro Fonctionnel (ssec-8) — délègue à renderNeuroBlocks (module-level,
+  //    #92 partagé sport + posturo). Reader sport : préfixe DOM 'sn-' injecté.
+  const sportNeuroReader = id => document.getElementById('sn-' + id)?.checked;
+  const nf = renderNeuroBlocks(sportNeuroReader);
   const hypoteses = [];
   if(d.hypo_tronc) hypoteses.push('Tronc cérébral');
   if(d.hypo_cervelet) hypoteses.push('Cervelet');
@@ -11010,7 +10991,7 @@ function setPosturoRadio(name, val) {
 function getPoVal(id) { const e=document.getElementById(id); return e?e.value:''; }
 function setPoVal(id, v) { const e=document.getElementById(id); if(e) e.value=v||''; }
 
-async function savePosturoBilan() {
+async function savePosturoBilan(silent = false) {
   if(!currentPatient) { alert('Sélectionnez un patient'); return; }
   if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
   const d = currentPatient.bilanDataPosturo;
@@ -11254,7 +11235,7 @@ async function savePosturoBilan() {
   // (img.src / canvas) sans nouveau fetch. Les clés non migrées (ex. échec
   // upload) ne sont pas écrasées car d[k] est déjà présent.
   Object.assign(d, photoStash);
-  alert('✓ Bilan posturologique sauvegardé');
+  if(!silent) alert('✓ Bilan posturologique sauvegardé');
 }
 
 function loadPosturoBilan() {
@@ -11478,6 +11459,22 @@ function loadPosturoBilan() {
       }
     });
   });
+  // #95 fix — Restauration neuro4 → DOM dès l'ouverture (parité avec
+  // showPosturoSection(3) qui le fait paresseusement à 400 ms du clic tab).
+  // Garantit que les cb neuro psec-3 reflètent la RAM dès l'arrivée sur la page,
+  // indépendamment de l'onglet visité. Branche "Continuer" de ouvrirBilanPosturo
+  // (bilanIdx=null) ne déclenchait pas showPosturoSection(3) → cb apparaissaient
+  // vides tant que l'utilisateur n'allait pas manuellement sur l'onglet Neuro.
+  // Idempotent avec showPosturoSection(3) (même neuro4, no-op à 400 ms).
+  if(d.neuro4) {
+    Object.entries(d.neuro4).forEach(([key, val]) => {
+      if(typeof val === 'boolean') {
+        const el = document.getElementById(key);
+        if(el) el.checked = val;
+      }
+    });
+    updateNeuroTotals();
+  }
 }
 // ===== DICTAPHONE SYSTEM =====
 var _micRecognition = null;
