@@ -9584,8 +9584,8 @@ function togglePostureLater(checked) {
   if(!checked) document.querySelectorAll('input[name="po-posture-later-dir"]').forEach(r => r.checked = false);
 }
 
-function genererSynthese() {
-  savePosturoBilan(true);
+async function genererSynthese() {
+  await savePosturoBilan(true);
   const d = currentPatient?.bilanDataPosturo || {};
   const sections = [];
 
@@ -9732,20 +9732,20 @@ function genererSynthese() {
   if(scoliose) dynItems.push('Scoliose: '+scoliose);
   if(dynItems.length) sections.push({titre:'🏃 Bilan dynamique', items:[dynItems.join(' · ')]});
 
-  // Neuro-fonctionnel (psec-3) #92 — standard A5 partagé sport via renderNeuroBlocks.
-  // Reader posturo lit le DOM directement (parité sport + parité totaux). Les cb
-  // psec-3 restent dans le DOM même quand display:none, donc lecture robuste
-  // indépendante de la persistance neuro4 (vide pour bilan contrôle fresh car
-  // savePosturoBilan skippe le scrape si psec-3 caché — garde L11054, fragilité
-  // pré-existante à #92). Hypothèses : IDs DOM 'po-hypo-tronc'/'po-hypo-cervelet'
-  // (préfixe 'po-' contrairement aux autres cb neuro psec-3). Totaux DOM
-  // (textContent) — alimentés par updateNeuroTotals onchange. NB: l'ID 'vest-total-*'
-  // calcule en fait le total PROPRIOCEPTION (cf updateNeuroTotals L10695).
-  const posturoNeuroReader = id => document.getElementById(id)?.checked;
+  // Neuro-fonctionnel (psec-3) — standard A5 partagé sport via renderNeuroBlocks.
+  // Reader posturo lit neuro4 (autoritative dès #95 — setPosturoNeuro écrit per-cb
+  // à chaque cochage, indépendamment du display de psec-3). Source plus fiable
+  // que le DOM, qui est recréé par injectBilanPosturoPage à chaque nav posturo
+  // → cb=false tant que loadPosturoBilan/showPosturoSection(3) n'ont pas restauré.
+  // Hypothèses : clés 'po-hypo-tronc'/'po-hypo-cervelet' (préfixe 'po-' conservé).
+  // Totaux DOM (textContent) inchangés — alimentés par updateNeuroTotals onchange.
+  // NB: l'ID 'vest-total-*' calcule en fait le total PROPRIOCEPTION (cf updateNeuroTotals L10695).
+  const n4 = currentPatient?.bilanDataPosturo?.neuro4 || {};
+  const posturoNeuroReader = id => !!n4[id];
   const neuroItems = renderNeuroBlocks(posturoNeuroReader);
   const hypo = [];
-  if(document.getElementById('po-hypo-tronc')?.checked) hypo.push('Tronc cérébral');
-  if(document.getElementById('po-hypo-cervelet')?.checked) hypo.push('Cervelet');
+  if(n4['po-hypo-tronc']) hypo.push('Tronc cérébral');
+  if(n4['po-hypo-cervelet']) hypo.push('Cervelet');
   if(hypo.length) neuroItems.push('— Hypothèses : ' + hypo.join(', '));
   const ncTotG   = document.getElementById('nc-total-g')?.textContent   || '0';
   const ncTotD   = document.getElementById('nc-total-d')?.textContent   || '0';
@@ -11459,6 +11459,22 @@ function loadPosturoBilan() {
       }
     });
   });
+  // #95 fix — Restauration neuro4 → DOM dès l'ouverture (parité avec
+  // showPosturoSection(3) qui le fait paresseusement à 400 ms du clic tab).
+  // Garantit que les cb neuro psec-3 reflètent la RAM dès l'arrivée sur la page,
+  // indépendamment de l'onglet visité. Branche "Continuer" de ouvrirBilanPosturo
+  // (bilanIdx=null) ne déclenchait pas showPosturoSection(3) → cb apparaissaient
+  // vides tant que l'utilisateur n'allait pas manuellement sur l'onglet Neuro.
+  // Idempotent avec showPosturoSection(3) (même neuro4, no-op à 400 ms).
+  if(d.neuro4) {
+    Object.entries(d.neuro4).forEach(([key, val]) => {
+      if(typeof val === 'boolean') {
+        const el = document.getElementById(key);
+        if(el) el.checked = val;
+      }
+    });
+    updateNeuroTotals();
+  }
 }
 // ===== DICTAPHONE SYSTEM =====
 var _micRecognition = null;
