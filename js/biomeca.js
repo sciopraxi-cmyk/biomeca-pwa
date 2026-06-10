@@ -11567,35 +11567,41 @@ function showSportBilanSection(idx) {
   document.querySelectorAll('#pg-bilan .sport-section').forEach((s, i) => {
     s.style.display = i === idx ? 'block' : 'none';
   });
+  // #87 Batch 1 — Résolution id-based de la section affichée pour découpler les
+  // hooks ci-dessous du DOM-order. Permet au Batch 2 (réordo onglets) de bouger
+  // les sections sans casser les comportements section-spécifiques (canvas
+  // morpho, mandibule, neuro, traitements, schémas). Comportement identique
+  // au stade actuel : les ids sont toujours à leurs positions historiques.
+  const shownId = document.querySelectorAll('#pg-bilan .sport-section')[idx]?.id;
   // 2. Toggle .act sur les 10 tabs
   document.querySelectorAll('.sport-tab').forEach((t, i) => {
     t.classList.toggle('act', i === idx);
   });
   // 3. Re-inject mic buttons (dictaphone) après affichage de la nouvelle section
   if(typeof _injectSportMicButtons === 'function') setTimeout(_injectSportMicButtons, 200);
-  // 4. Section 1 (Morphostatique) — init 4 canvas morpho UNIQUEMENT si pas encore
+  // 4. Section Morphostatique (ssec-1) — init 4 canvas morpho UNIQUEMENT si pas encore
   //    initialisés. _baseSnapshot est posé asynchrone par initMorphoCanvas L6488
   //    → flag idempotent uniforme avec pieds-canvas. Préserve les dessins user au
   //    switch onglet, et garantit la ré-init au switch patient via clearBilanFields.
-  if(idx === 1) setTimeout(() => {
+  if(shownId === 'ssec-1') setTimeout(() => {
     ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
       const c = document.getElementById(id);
       if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') initMorphoCanvas(id);
     });
   }, 150);
-  // Section 5 (Mandibule) — au load d'un bilan existant, restaurer l'affichage
+  // Section Mandibule (ssec-5) — au load d'un bilan existant, restaurer l'affichage
   // conditionnel des toggles depuis l'état des radios. Pas de flag idempotence
   // nécessaire : les onchange inline gèrent les changements user, et le re-appel
   // au switch onglet n'a aucun effet de bord (rétablit le même état UI).
-  if(idx === 5) setTimeout(() => {
+  if(shownId === 'ssec-5') setTimeout(() => {
     const rrChecked = document.querySelector('input[name="mand_ressaut"]:checked');
     if(rrChecked) toggleSportRessaut(rrChecked.value === 'oui');
     const ssChecked = document.querySelector('input[name="tonicite_serrage"]:checked');
     if(ssChecked) toggleSportSerrage(ssChecked.value);
   }, 150);
-  // Section 8 (Neuro fonctionnel) — trigger updateSportNeuroTotals + addEventListener
+  // Section Neuro fonctionnel (ssec-8) — trigger updateSportNeuroTotals + addEventListener
   // change sur les checkboxes pour recalcul en temps réel. Idempotent via flag _sportNeuroBound.
-  if(idx === 8) setTimeout(() => {
+  if(shownId === 'ssec-8') setTimeout(() => {
     const ssec8 = document.getElementById('ssec-8');
     if(!ssec8) return;
     if(!ssec8._sportNeuroBound) {
@@ -11606,10 +11612,10 @@ function showSportBilanSection(idx) {
     }
     updateSportNeuroTotals();
   }, 150);
-  // 5. Section 9 (Traitements) — drawPiedsTemplate UNIQUEMENT la 1ère fois.
+  // 5. Section Traitements (ssec-9) — drawPiedsTemplate UNIQUEMENT la 1ère fois.
   //    _baseSnapshot est posé synchroniquement par drawPiedsTemplate L6744
   //    → flag idempotent. Préserve le dessin pieds au switch onglet.
-  if(idx === 9) setTimeout(() => {
+  if(shownId === 'ssec-9') setTimeout(() => {
     const pc = document.getElementById('pieds-canvas');
     if(pc && !pc._baseSnapshot && typeof drawPiedsTemplate === 'function') {
       drawPiedsTemplate(currentPatient?.bilanData?._pieds);
@@ -11618,11 +11624,11 @@ function showSportBilanSection(idx) {
     setupSportTttAutoReport();
     if(bilanData && bilanData.ttt) restoreSportTtt(bilanData);
   }, 150);
-  // A5 — Section 10 (Schémas/Synthèse) : restore explicit des 3 cb Terrain
+  // A5 — Section Schémas/Synthèse (ssec-10) : restore explicit des 3 cb Terrain
   // (onchange utilise toggleSportTerrain non matché par le regex setBilanField
   // de loadBilan) + restore affichage sub-block latéralisation Postural depuis
   // l'état de la cb sp-posture-later restaurée par le mécanisme standard.
-  if(idx === 10) setTimeout(() => {
+  if(shownId === 'ssec-10') setTimeout(() => {
     ['aerien','terrien','mixte'].forEach(k => {
       const cb = document.getElementById('sp-terrain-' + k);
       if(cb) cb.checked = !!(bilanData && bilanData['terrain_' + k]);
