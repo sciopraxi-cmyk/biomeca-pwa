@@ -6033,21 +6033,88 @@ function buildBilanPrintSection(bd) {
     if(bd.neuro_notes) h += '<p style="font-size:9px;margin-top:6px;background:#f9f9f9;padding:5px 8px;border-radius:4px;"><strong>Notes:</strong> '+bd.neuro_notes+'</p>';
   }
 
-  // ─── TESTS SCHÉMAS MOTEURS ───
-  const schemaTests = [["Extension","schema_extension"],["Supination Mbr inf.","schema_supination_inf"],["Supination Mbr sup.","schema_supination_sup"],["Pronation Mbr inf.","schema_pronation_inf"],["Ancrage Mbr inf.","schema_ancrage_inf"],["Pronation Mbr sup.","schema_pronation_sup"]];
-  const hasSchema = schemaTests.some(([,k])=>bd[k+'_aerien']||bd[k+'_terrien']);
-  if(hasSchema) {
+  // ─── TESTS SCHÉMAS MOTEURS (B2 #73) ───
+  // 3 tableaux pilotés par B2_SCHEMAS_MOTEURS (Tests + Chaînes + Plans).
+  // parseFloat (demi-points). Totaux sur 26/26 + profil dominant via
+  // calcTendance (source unique avec curseur DOM + synthèse). Format français
+  // (virgule). Cellules grisées pour les colonnes inactives des Tableaux 1/2.
+  const smFmt = n => String(n).replace('.', ',');
+  const smScore = v => {
+    const f = parseFloat(v) || 0;
+    return f > 0 ? smFmt(f) + '/2' : '';
+  };
+  let smTotalA = 0, smTotalT = 0;
+  B2_SCHEMAS_MOTEURS.tests.forEach(t => {
+    const v = parseFloat(bd[t.keyBase + '_' + t.active]) || 0;
+    if(t.active === 'aerien') smTotalA += v; else smTotalT += v;
+  });
+  B2_SCHEMAS_MOTEURS.chaines.forEach(c => {
+    const v = parseFloat(bd[c.key]) || 0;
+    if(c.active === 'aerien') smTotalA += v; else smTotalT += v;
+  });
+  B2_SCHEMAS_MOTEURS.plans.forEach(g => {
+    g.rows.forEach(r => {
+      smTotalA += parseFloat(bd[r.aerien.key])  || 0;
+      smTotalT += parseFloat(bd[r.terrien.key]) || 0;
+    });
+  });
+  const smHasAnyScore = smTotalA > 0 || smTotalT > 0;
+  if(smHasAnyScore || bd.schema_moteur_conclusion) {
     h += sec('Tests Schémas Moteurs');
+    const thA = '<th style="padding:3px 5px;border:1px solid #ddd;background:#dceeff;color:#2471a3;text-align:center;">Aérien (/2)</th>';
+    const thT = '<th style="padding:3px 5px;border:1px solid #ddd;background:#fff3e0;color:#b7740a;text-align:center;">Terrien (/2)</th>';
+    const tdGray = '<td style="padding:2px 5px;border:1px solid #e0e0e0;background:#e8e8e8;text-align:center;color:#aaa;font-size:9px;">—</td>';
+    // ─ Tableau 1 — Tests des schémas moteurs ─
+    h += '<p style="font-size:9px;font-weight:700;color:#d35400;margin:4px 0 2px 0;">1 — Tests des schémas moteurs</p>';
     h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">'
-      +'<tr style="background:#f5f0e8;"><th style="padding:2px 5px;border:1px solid #ddd;text-align:left;">Test</th><th style="padding:2px 5px;border:1px solid #ddd;">Aérien (/2)</th><th style="padding:2px 5px;border:1px solid #ddd;">Terrien (/2)</th></tr>';
-    schemaTests.forEach(([lbl,k]) => {
-      if(bd[k+'_aerien']||bd[k+'_terrien'])
-        h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+lbl+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f(k+'_aerien','')+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f(k+'_terrien','')+'</td></tr>';
+      + '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">Test</th>' + thA + thT + '</tr>';
+    B2_SCHEMAS_MOTEURS.tests.forEach(t => {
+      const val = smScore(bd[t.keyBase + '_' + t.active]);
+      const cellActive = '<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">' + val + '</td>';
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:600;">' + t.label + '</td>'
+        + (t.active === 'aerien' ? cellActive + tdGray : tdGray + cellActive) + '</tr>';
     });
     h += '</table>';
-    if(bd.schema_moteur_conclusion) h += '<p style="font-size:9px;"><strong>Conclusion:</strong> '+bd.schema_moteur_conclusion+'</p>';
+    // ─ Tableau 2 — Chaînes musculaires ─
+    h += '<p style="font-size:9px;font-weight:700;color:#d35400;margin:4px 0 2px 0;">2 — Chaînes musculaires</p>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">'
+      + '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">Chaîne</th>' + thA + thT + '</tr>';
+    B2_SCHEMAS_MOTEURS.chaines.forEach(c => {
+      const val = smScore(bd[c.key]);
+      const cellActive = '<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">' + val + '</td>';
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:600;">' + c.label + '</td>'
+        + (c.active === 'aerien' ? cellActive + tdGray : tdGray + cellActive) + '</tr>';
+    });
+    h += '</table>';
+    // ─ Tableau 3 — Plans ─
+    h += '<p style="font-size:9px;font-weight:700;color:#d35400;margin:4px 0 2px 0;">3 — Plans</p>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">'
+      + '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">Plan</th>'
+      + '<th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">Critère</th>' + thA + thT + '</tr>';
+    B2_SCHEMAS_MOTEURS.plans.forEach(g => {
+      g.rows.forEach((r, ri) => {
+        h += '<tr>';
+        if(ri === 0) {
+          h += '<td rowspan="' + g.rows.length + '" style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:700;background:#fafafa;text-align:center;vertical-align:middle;">' + g.group + '</td>';
+        }
+        h += '<td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:600;">' + r.row + '</td>';
+        const valA = smScore(bd[r.aerien.key]);
+        const valT = smScore(bd[r.terrien.key]);
+        const cellA = (r.aerien.desc  ? '<em style="color:#2471a3;">' + r.aerien.desc  + ' :</em> ' : '') + valA;
+        const cellT = (r.terrien.desc ? '<em style="color:#b7740a;">' + r.terrien.desc + ' :</em> ' : '') + valT;
+        h += '<td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + cellA + '</td>'
+          +  '<td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + cellT + '</td></tr>';
+      });
+    });
+    h += '</table>';
+    if(smHasAnyScore) {
+      const { libelle } = calcTendance(smTotalA, smTotalT);
+      h += '<p style="font-size:9px;margin:6px 0;"><strong>Totaux :</strong> '
+        + '<span style="color:#2471a3;">Aérien ' + smFmt(smTotalA) + '/26</span> · '
+        + '<span style="color:#b7740a;">Terrien ' + smFmt(smTotalT) + '/26</span> '
+        + '— <strong>Profil :</strong> ' + libelle + '</p>';
+    }
+    if(bd.schema_moteur_conclusion) h += '<p style="font-size:9px;"><strong>Conclusion :</strong> ' + bd.schema_moteur_conclusion + '</p>';
   }
 
   // ─── PLAN DE TRAITEMENT ───
@@ -7394,6 +7461,73 @@ function saveBilan() {
   alert('✓ Bilan clinique sauvegardé');
 }
 
+// B2 #73 — Config Schémas Moteurs sport ssec-7. Source unique de vérité des 3
+// tableaux (Tests / Chaînes musculaires / Plans) + scoreOptions + threshold profil.
+// Pilote 5 consommateurs : updateSchemaMoteursTotals (B2 Batch 2), rendu HTML
+// ssec-7 (B2 Batch 3, statique mais aligné par grep d'intégrité), genererSyntheseSport
+// (B2 Batch 5), buildRapport sport (B2 Batch 6), auto-cochage Terrain ssec-10 via
+// toggleSportTerrain (déclenché dans updateSchemaMoteursTotals).
+//
+// Conventions :
+//   - Tableau 1 : 6 clés legacy 'schema_<keyBase>_<active>' conservées (zéro
+//     migration). L'autre colonne reste vide/grisée (cellule HTML non-éditable).
+//   - Tableau 2 : 6 nouvelles clés 'sp_chaine_<code>' (codes cliniques PM/PA/PL/AM/AP/AL),
+//     distinctes de 'chaine_*' déjà utilisées en ssec-10 NPC Régional.
+//   - Tableau 3 : 14 nouvelles clés 'sp_plan_<group>_<row>_<a|t>'. Premier
+//     descripteur du brief = Aérien, second = Terrien. Horizontal CPP sans
+//     descripteur (juste un select par colonne).
+//   - scoreOptions : 5 valeurs avec demi-points (0, 0.5, 1, 1.5, 2).
+//     parseFloat partout (synthèse + rapport + totaux) — pas parseInt.
+//   - threshold : |Aérien − Terrien| > 1 → profil dominant ; ≤ 1 → Mixte.
+//   - Convention curseur : Aérien à droite (100%), Terrien à gauche (0%), Mixte
+//     au milieu (50%). Garde 0/0 : position 50, profil null (pas d'auto-cochage).
+// Total scorable : 6 + 6 + 14 = 26 cases Aérien et 26 Terrien.
+//
+// ⚠️ Emplacement : déclaré AVANT function loadBilan() (et donc avant le call
+// top-level d'init `selectPatient(patients[patients.length-1])`) pour éviter
+// le ReferenceError TDZ : loadBilan appelle updateSchemaMoteursTotals qui lit
+// B2_SCHEMAS_MOTEURS, et cette chaîne est déclenchée pendant le bootstrap
+// séquentiel du script avant la fin de l'évaluation top-level.
+const B2_SCHEMAS_MOTEURS = {
+  scoreOptions: [0, 0.5, 1, 1.5, 2],
+  threshold: 1,
+  // Tableau 1 — Tests des schémas moteurs (clés legacy, 1 colonne active/ligne)
+  tests: [
+    { keyBase: 'schema_extension',      label: "Test d'Extension",            active: 'aerien' },
+    { keyBase: 'schema_supination_inf', label: 'Test de Supination Mbr inf.', active: 'aerien' },
+    { keyBase: 'schema_supination_sup', label: 'Test de Supination Mbr sup.', active: 'aerien' },
+    { keyBase: 'schema_pronation_inf',  label: 'Test de Pronation Mbr inf.',  active: 'terrien' },
+    { keyBase: 'schema_ancrage_inf',    label: "Test d'Ancrage Mbr inf.",     active: 'terrien' },
+    { keyBase: 'schema_pronation_sup',  label: 'Test de Pronation Mbr sup.',  active: 'terrien' }
+  ],
+  // Tableau 2 — Chaînes musculaires (nouvelles clés sp_, 1 colonne active/ligne)
+  chaines: [
+    { key: 'sp_chaine_pm', label: 'Extension (PM)',  active: 'aerien' },
+    { key: 'sp_chaine_pa', label: 'Statique (PA)',   active: 'aerien' },
+    { key: 'sp_chaine_pl', label: 'Ouverture (PL)',  active: 'aerien' },
+    { key: 'sp_chaine_am', label: 'Flexion (AM)',    active: 'terrien' },
+    { key: 'sp_chaine_ap', label: 'Statique (AP)',   active: 'terrien' },
+    { key: 'sp_chaine_al', label: 'Fermeture (AL)',  active: 'terrien' }
+  ],
+  // Tableau 3 — Plans (14 nouvelles clés, 2 colonnes scorables/ligne, descripteur par cellule)
+  plans: [
+    { group: 'Frontal', rows: [
+      { row: 'Rotation',          aerien: { desc: 'Externe', key: 'sp_plan_frontal_rotation_a' }, terrien: { desc: 'Interne',    key: 'sp_plan_frontal_rotation_t' } },
+      { row: 'Rigide-Souple',     aerien: { desc: 'Rigide',  key: 'sp_plan_frontal_rigid_a'    }, terrien: { desc: 'Souple',     key: 'sp_plan_frontal_rigid_t'    } },
+      { row: 'Flexion-Extension', aerien: { desc: 'Ext.',    key: 'sp_plan_frontal_fe_a'       }, terrien: { desc: 'Flex.',      key: 'sp_plan_frontal_fe_t'       } }
+    ]},
+    { group: 'Sagittal', rows: [
+      { row: 'Appui',                   aerien: { desc: 'En Av.',  key: 'sp_plan_sagittal_appui_a' }, terrien: { desc: 'Axe corps', key: 'sp_plan_sagittal_appui_t' } },
+      { row: 'Mouvements articulaires', aerien: { desc: 'Faibles', key: 'sp_plan_sagittal_mvt_a'   }, terrien: { desc: 'Élevés',    key: 'sp_plan_sagittal_mvt_t'   } },
+      { row: 'Temps de contact au sol', aerien: { desc: 'Court',   key: 'sp_plan_sagittal_tps_a'   }, terrien: { desc: 'Long',      key: 'sp_plan_sagittal_tps_t'   } }
+    ]},
+    { group: 'Horizontal', rows: [
+      // CPP sans descripteur : juste un select par colonne
+      { row: 'CPP', aerien: { desc: '', key: 'sp_plan_horizontal_cpp_a' }, terrien: { desc: '', key: 'sp_plan_horizontal_cpp_t' } }
+    ]}
+  ]
+};
+
 function loadBilan() {
   if(!currentPatient) return;
   bilanData = currentPatient.bilanData ? JSON.parse(JSON.stringify(currentPatient.bilanData)) : {};
@@ -7483,6 +7617,16 @@ function loadBilan() {
 
   // Inégalité longueur conclusion — toggleSportIneg si 'oui'
   if(bilanData.sp_dyn_ineg_long === 'oui') toggleSportIneg(true);
+
+  // B2 #73 — Recalcul Schémas Moteurs ssec-7 au reload : totaux Aérien/Terrien
+  // + position curseur tendance + libellé profil + auto-cochage Terrain ssec-10.
+  // Les selects .bilan-field ont déjà leur .value restaurée L7405. La fonction
+  // lit le DOM live (parseFloat sur chaque cellule active selon B2_SCHEMAS_MOTEURS),
+  // met à jour les spans #sp-sm-total-a/-t + style.left du marker + textContent
+  // du label, et propage l'auto-cochage Terrain via toggleSportTerrain (mutex
+  // idempotent : recoche identique = no-op). Pattern miroir du dispatchEvent
+  // 'input' L7411 sur le curseur EVA (range natif) et des toggles B1 L7435-7485.
+  updateSchemaMoteursTotals();
 
   // Restaurer les canvas depuis les dataURLs sauvegardées
   const restoreCanvas = (id, key) => {
@@ -10967,28 +11111,45 @@ function genererSyntheseSport() {
   if(d.stabilo_conclusion) sta.push('Conclusion : ' + d.stabilo_conclusion);
   if(sta.length) sections.push({ titre: '📊 Stabilométrique', items: sta });
 
-  // 8. Schémas Moteurs (ssec-7) — totaux Aérien/Terrien + détail compact
-  //    test-par-test + conclusion. Le scoring fin profil dominant viendra en B2.
+  // 8. Schémas Moteurs (ssec-7, B2 #73) — 3 tableaux pilotés par
+  //    B2_SCHEMAS_MOTEURS (tests + chaines + plans). parseFloat (demi-points)
+  //    sur les cellules actives par colonne. Totaux combinés sur 26/26
+  //    (6 + 6 + 14 = 26 cases Aérien et 26 Terrien). Profil dominant calculé
+  //    via calcTendance (source unique avec le curseur DOM ssec-7).
+  //    Format affichage : virgule française pour les scores (0.5 → 0,5).
   const sm = [];
-  const schemaTests = [
-    { key: 'extension', label: 'Extension' },
-    { key: 'supination_inf', label: 'Supination inf.' },
-    { key: 'supination_sup', label: 'Supination sup.' },
-    { key: 'pronation_inf', label: 'Pronation inf.' },
-    { key: 'ancrage_inf', label: 'Ancrage inf.' },
-    { key: 'pronation_sup', label: 'Pronation sup.' }
-  ];
-  let sumAerien = 0, sumTerrien = 0;
+  let totalA = 0, totalT = 0;
   const schemaDetails = [];
-  schemaTests.forEach(t => {
-    const a = parseInt(d['schema_' + t.key + '_aerien'], 10) || 0;
-    const tr = parseInt(d['schema_' + t.key + '_terrien'], 10) || 0;
-    sumAerien += a;
-    sumTerrien += tr;
-    if(a > 0 || tr > 0) schemaDetails.push(t.label + ' (A:' + a + '/T:' + tr + ')');
+  // Helpers : fmt format français (point → virgule), pushScore parseFloat + accumule + détail
+  const fmt = n => String(n).replace('.', ',');
+  const pushScore = (label, val, col) => {
+    const v = parseFloat(val) || 0;
+    if(col === 'aerien') totalA += v; else totalT += v;
+    if(v > 0) schemaDetails.push(label + ' : ' + fmt(v) + '/2');
+  };
+  // Tableau 1 — Tests (1 colonne active/ligne, clés legacy schema_<keyBase>_<active>)
+  B2_SCHEMAS_MOTEURS.tests.forEach(t => {
+    pushScore(t.label, d[t.keyBase + '_' + t.active], t.active);
   });
-  if(sumAerien > 0 || sumTerrien > 0) {
-    sm.push('Totaux : Aérien ' + sumAerien + '/12 · Terrien ' + sumTerrien + '/12');
+  // Tableau 2 — Chaînes musculaires (1 colonne active/ligne)
+  B2_SCHEMAS_MOTEURS.chaines.forEach(c => {
+    pushScore(c.label, d[c.key], c.active);
+  });
+  // Tableau 3 — Plans (2 colonnes scorables/ligne, descripteur Aérien/Terrien par cellule)
+  B2_SCHEMAS_MOTEURS.plans.forEach(g => {
+    g.rows.forEach(r => {
+      // Label compact : « <group> <row> [<desc>] » — descripteur seulement si non vide (CPP n'en a pas)
+      const lblA = g.group + ' ' + r.row + (r.aerien.desc ? ' ' + r.aerien.desc : '');
+      const lblT = g.group + ' ' + r.row + (r.terrien.desc ? ' ' + r.terrien.desc : '');
+      pushScore(lblA, d[r.aerien.key], 'aerien');
+      pushScore(lblT, d[r.terrien.key], 'terrien');
+    });
+  });
+  // Totaux + profil dominant (source unique calcTendance — cohérence avec curseur DOM)
+  if(totalA > 0 || totalT > 0) {
+    sm.push('Totaux : Aérien ' + fmt(totalA) + '/26 · Terrien ' + fmt(totalT) + '/26');
+    const { libelle } = calcTendance(totalA, totalT);
+    sm.push('Profil : ' + libelle);
   }
   if(schemaDetails.length) sm.push('Détail : ' + schemaDetails.join(' · '));
   if(d.schema_moteur_conclusion) sm.push('Conclusion : ' + d.schema_moteur_conclusion);
@@ -11195,6 +11356,78 @@ function updateSportNeuroTotals() {
   const cdt = document.getElementById('sn-cerv-total-d');
   if(cgt) cgt.textContent = cG;
   if(cdt) cdt.textContent = cD;
+}
+
+// B2 #73 — Tendance Schémas Moteurs sport (ssec-7).
+// Calcule position curseur + libellé profil dominant à partir des totaux
+// Aérien / Terrien. Convention : Aérien à droite (100 %), Terrien à gauche (0 %),
+// Mixte au milieu (50 %). Garde 0/0 : aucun score saisi → position 50 + profil
+// null (empêche l'auto-cochage Terrain qui préserverait la saisie manuelle).
+function calcTendance(totalA, totalT) {
+  const sum = totalA + totalT;
+  if(sum === 0) return { position: 50, profil: null, libelle: '—' };
+  const position = (totalA / sum) * 100;
+  const delta = totalA - totalT;
+  const thr = B2_SCHEMAS_MOTEURS.threshold;
+  let profil, libelle;
+  if(delta > thr)        { profil = 'aerien';  libelle = 'Schéma aérien';  }
+  else if(delta < -thr)  { profil = 'terrien'; libelle = 'Schéma terrien'; }
+  else                   { profil = 'mixte';   libelle = 'Mixte';          }
+  return { position, profil, libelle };
+}
+
+// B2 #73 — Auto-cochage Terrain ssec-10 (mutex via toggleSportTerrain).
+// Coche la cb sp-terrain-<profil> et délègue le mutex à la fonction existante
+// (qui décoche les 2 autres + propage setBilanField sur les 3 clés).
+// Garde profil null (0/0) : préserve l'état des cb saisies manuellement par le
+// clinicien. Idempotent : recoche identique = no-op (setBilanField écrit la
+// même valeur, aucun side-effect au reload ou recalcul live).
+function applyTendanceToTerrain(profil) {
+  if(!profil) return;
+  const cb = document.getElementById('sp-terrain-' + profil);
+  if(!cb) return;
+  cb.checked = true;
+  toggleSportTerrain(profil);
+}
+
+// B2 #73 — Recalcul live des totaux Schémas Moteurs ssec-7 + position curseur
+// tendance + libellé profil + auto-cochage Terrain ssec-10. Itère
+// B2_SCHEMAS_MOTEURS (tests + chaines + plans) en parseFloat sur les cellules
+// actives par colonne (Aérien / Terrien). Pattern miroir updateNeuroTotals
+// (totaux dérivés, pas persistés — recalculés à l'affichage). Déclenché par
+// onchange inline sur chaque <select> du formulaire + appel direct dans
+// loadBilan après le restore .bilan-field (Batch 4).
+function updateSchemaMoteursTotals() {
+  let totalA = 0, totalT = 0;
+  B2_SCHEMAS_MOTEURS.tests.forEach(t => {
+    const key = t.keyBase + '_' + t.active;
+    const v = parseFloat(document.querySelector('[data-field="'+key+'"]')?.value) || 0;
+    if(t.active === 'aerien') totalA += v; else totalT += v;
+  });
+  B2_SCHEMAS_MOTEURS.chaines.forEach(c => {
+    const v = parseFloat(document.querySelector('[data-field="'+c.key+'"]')?.value) || 0;
+    if(c.active === 'aerien') totalA += v; else totalT += v;
+  });
+  B2_SCHEMAS_MOTEURS.plans.forEach(g => {
+    g.rows.forEach(r => {
+      const vA = parseFloat(document.querySelector('[data-field="'+r.aerien.key+'"]')?.value) || 0;
+      const vT = parseFloat(document.querySelector('[data-field="'+r.terrien.key+'"]')?.value) || 0;
+      totalA += vA;
+      totalT += vT;
+    });
+  });
+  const elA = document.getElementById('sp-sm-total-a');
+  const elT = document.getElementById('sp-sm-total-t');
+  // Format français (point → virgule) pour cohérence avec synthèse + rapport B2.
+  const fmt = n => String(n).replace('.', ',');
+  if(elA) elA.textContent = fmt(totalA);
+  if(elT) elT.textContent = fmt(totalT);
+  const { position, profil, libelle } = calcTendance(totalA, totalT);
+  const marker = document.getElementById('sp-sm-tendance-marker');
+  if(marker) marker.style.left = position + '%';
+  const label = document.getElementById('sp-sm-tendance-label');
+  if(label) label.textContent = libelle;
+  applyTendanceToTerrain(profil);
 }
 
 function showPosturoSection(idx) {
