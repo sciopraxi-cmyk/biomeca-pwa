@@ -4915,24 +4915,81 @@ const sections = [];
   }
 
   // 3. Bilan dynamique
+  // #96 — Clés alignées sur savePosturoBilan / synthèse. Référence pour la logique
+  // conditionnelle : genererSynthese L9956-10038 (DOM-direct, mêmes IDs que save).
   const dyn = [];
   if(d.bilanDyn) dyn.push(['Observations', d.bilanDyn]);
   if(d.course) dyn.push(['Examen de la course', d.course]);
+  // Force extenseurs poignet D/G — valeurs pas-de-force/faible/moderee/tres-fort
+  // → libellés humains via .replace(/-/g,' ') (pattern miroir synthèse L9964-9967).
+  if(d.poignetD) dyn.push(['Force ext. poignet D', d.poignetD.replace(/-/g,' ')]);
+  if(d.poignetG) dyn.push(['Force ext. poignet G', d.poignetG.replace(/-/g,' ')]);
+  if(d.testStab) dyn.push(['Stabilité arrière', d.testStab]);
   if(d.testFlexAnt) dyn.push(['Flexion antérieure', d.testFlexAnt+' cm']);
   if(d.flexDebout) dyn.push(['Flexion debout (Iliaque/pubis)', d.flexDebout]);
   if(d.flexAssis) dyn.push(['Flexion assis (Sacrum)', d.flexAssis]);
-  if(d.testStab) dyn.push(['Stabilité arrière', d.testStab]);
   if(d.mobHanche==='oui') dyn.push(['Dysfonction hanche', '✓']);
   if(d.mobGenou==='oui') dyn.push(['Dysfonction genou', '✓']);
   if(d.mobPied==='oui') dyn.push(['Dysfonction pied', '✓']);
   if(d.mobBassin==='oui') dyn.push(['Dysfonction bassin', '✓']);
-  if(d.tibiaFemur) dyn.push(['Tibia/fémur', d.tibiaFemur]);
-  if(d.longMiDorsal) dyn.push(['Longueur MI dorsal', d.longMiDorsal]);
-  if(d.branchesPub) dyn.push(['Branches pubiennes', d.branchesPub]);
-  if(d.downing) dyn.push(['Downing test', d.downing]);
-  if(d.longMiProc) dyn.push(['Longueur MI procubitus', d.longMiProc]);
-  if(d.inegLong) dyn.push(['Inégalité longueur', d.inegLong]);
-  if(d.inegType) dyn.push(['Type inégalité', d.inegType]);
+  // Tibia/fémur (ILMI anatomique) — itère [d,g] × [femur,tibia], direction court/long
+  const tfParts = [];
+  ['d','g'].forEach(side => {
+    const sideLbl = side.toUpperCase();
+    if(!d['tf'+sideLbl]) return;
+    ['femur','tibia'].forEach(os => {
+      const osLbl = os.charAt(0).toUpperCase()+os.slice(1);
+      if(!d['tf'+sideLbl+osLbl]) return;
+      const dir = d['tf'+sideLbl+osLbl+'Dir'];
+      if(!dir) return;
+      tfParts.push(osLbl+' '+sideLbl+' '+(dir === 'court' ? 'plus court' : 'plus long'));
+    });
+  });
+  if(tfParts.length) dyn.push(['Tibia/fémur', tfParts.join(', ')]);
+  // Longueur MI dorsal (court/long/egal — côté lu seulement si court ou long).
+  // Pattern miroir rapport SPORT B1 L5856-5864.
+  if(d.longMiDorsVal) {
+    let txt = d.longMiDorsVal === 'court' ? 'plus court'
+            : d.longMiDorsVal === 'long'  ? 'plus long'  : 'égal';
+    if((d.longMiDorsVal === 'court' || d.longMiDorsVal === 'long') && d.longMiDorsSide) {
+      txt += ' à '+(d.longMiDorsSide === 'd' ? 'droite' : 'gauche');
+    }
+    dyn.push(['Longueur MI dorsal', txt]);
+  }
+  // Branches pubiennes — côté + direction (haut/bas)
+  if(d.pubSide) {
+    let txt = d.pubSide === 'd' ? 'droite' : 'gauche';
+    if(d.pubDir) txt += ' '+(d.pubDir === 'haut' ? 'plus haute' : 'plus basse');
+    dyn.push(['Branches pubiennes', txt]);
+  }
+  // Downing test — itère [d,g], résultat post/ant → iliaque POST/ANT
+  ['d','g'].forEach(side => {
+    const sideLbl = side.toUpperCase();
+    if(!d['downing'+sideLbl]) return;
+    const res = d['downing'+sideLbl+'Res'];
+    if(!res) return;
+    dyn.push(['Downing '+sideLbl, res === 'post' ? 'iliaque POST' : 'iliaque ANT']);
+  });
+  // Longueur MI procubitus (même pattern que dorsal)
+  if(d.longMiProcVal) {
+    let txt = d.longMiProcVal === 'court' ? 'plus court'
+            : d.longMiProcVal === 'long'  ? 'plus long'  : 'égal';
+    if((d.longMiProcVal === 'court' || d.longMiProcVal === 'long') && d.longMiProcSide) {
+      txt += ' à '+(d.longMiProcSide === 'd' ? 'droite' : 'gauche');
+    }
+    dyn.push(['Longueur MI procubitus', txt]);
+  }
+  // Inégalité longueur — d.inegLong gate, puis direction + struct/comp en lignes additionnelles
+  if(d.inegLong === 'oui') {
+    let txt = 'Oui';
+    if(d.inegDir === 'court-d') txt += ' (plus court à droite)';
+    else if(d.inegDir === 'court-g') txt += ' (plus court à gauche)';
+    dyn.push(['Inégalité longueur', txt]);
+    if(d.inegStruct) dyn.push(['Inégalité structurelle', '✓']);
+    if(d.inegComp) dyn.push(['Inégalité compensatrice', '✓']);
+  } else if(d.inegLong === 'non') {
+    dyn.push(['Inégalité longueur', 'Non']);
+  }
   if(d.equilibre) dyn.push(['Équilibré', d.equilibre]);
   if(d.scoliose) dyn.push(['Scoliose', d.scoliose]);
   if(dyn.length) sections.push({titre:'3. Bilan dynamique', items:dyn, color:'#e74c3c'});
@@ -9999,6 +10056,18 @@ async function genererSynthese() {
     }
   });
   if(tfParts.length) dynItems.push('Tibia/fémur: '+tfParts.join(', '));
+  // #96 — Longueur MI dorsal (court/long/egal — côté lu seulement si court ou long).
+  // Comble le gap synthèse côté psec-2 (save persistait déjà longMiDorsVal/Side).
+  const longMiDorsVal = document.querySelector('input[name="po-long-mi-dors"]:checked')?.value;
+  if(longMiDorsVal) {
+    let txt = longMiDorsVal === 'court' ? 'plus court'
+            : longMiDorsVal === 'long'  ? 'plus long'  : 'égal';
+    if(longMiDorsVal === 'court' || longMiDorsVal === 'long') {
+      const side = document.querySelector('input[name="po-long-mi-dors-side"]:checked')?.value;
+      if(side) txt += ' à '+(side === 'd' ? 'droite' : 'gauche');
+    }
+    dynItems.push('Long MI dorsal: '+txt);
+  }
   // Branches pubiennes
   const pubSide = document.querySelector('input[name="po-pub"]:checked')?.value;
   const pubDir = document.querySelector('input[name="po-pub-dir"]:checked')?.value;
@@ -10018,6 +10087,17 @@ async function genererSynthese() {
       }
     }
   });
+  // #96 — Longueur MI procubitus (même pattern que dorsal).
+  const longMiProcVal = document.querySelector('input[name="po-long-mi-proc"]:checked')?.value;
+  if(longMiProcVal) {
+    let txt = longMiProcVal === 'court' ? 'plus court'
+            : longMiProcVal === 'long'  ? 'plus long'  : 'égal';
+    if(longMiProcVal === 'court' || longMiProcVal === 'long') {
+      const side = document.querySelector('input[name="po-long-mi-proc-side"]:checked')?.value;
+      if(side) txt += ' à '+(side === 'd' ? 'droite' : 'gauche');
+    }
+    dynItems.push('Long MI procubitus: '+txt);
+  }
   // Conclusion examen en décharge
   const inegLong = document.querySelector('input[name="po-ineg-long"]:checked')?.value;
   if(inegLong === 'oui') {
