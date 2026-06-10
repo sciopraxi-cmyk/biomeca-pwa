@@ -1597,20 +1597,278 @@
     </div>
 
     <div class="sport-section" id="ssec-7" style="display:none;">
-    <!-- TESTS SCHÉMAS MOTEURS -->
+    <!-- TESTS SCHÉMAS MOTEURS (B2 #73) -->
     <div class="card sport-card-orange">
       <div class="sport-block-title c-orange">🏃 Tests Schémas Moteurs</div>
-      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead><tr style="background:var(--surf);"><th style="padding:6px 8px;border:1px solid var(--bord);">Test</th><th style="padding:6px 8px;border:1px solid var(--bord);">Aérien (/2)</th><th style="padding:6px 8px;border:1px solid var(--bord);">Terrien (/2)</th></tr></thead>
+      <div style="font-size:11px;color:#666;margin-bottom:10px;font-style:italic;">
+        Cotation : 0 · 0,5 · 1 · 1,5 · 2 (sur 2) — colonne grisée = non-applicable à la ligne.
+      </div>
+
+      <!-- ─── Tableau 1 — Tests des schémas moteurs ─── -->
+      <div style="font-weight:700;font-size:13px;letter-spacing:1px;margin:14px 0 8px 0;color:#d35400;border-bottom:1px solid #f0c896;padding-bottom:4px;">1 — TESTS DES SCHÉMAS MOTEURS</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="background:var(--surf);padding:8px 10px;border:1px solid var(--bord);text-align:left;">Test</th>
+            <th style="background:#3498db;color:#fff;padding:8px 10px;border:1px solid #2471a3;text-align:center;">🌬️ Aérien (/2)</th>
+            <th style="background:#f0a500;color:#fff;padding:8px 10px;border:1px solid #b7740a;text-align:center;">🌍 Terrien (/2)</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);">Test d'Extension</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_extension_aerien" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_extension_terrien" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);">Test de Supination Membre inf.</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_supination_inf_aerien" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_supination_inf_terrien" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);">Test de Supination Membre sup.</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_supination_sup_aerien" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_supination_sup_terrien" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);">Test de Pronation membre inf.</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_pronation_inf_aerien" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_pronation_inf_terrien" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);">Test d'Ancrage Membre inf.</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_ancrage_inf_aerien" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_ancrage_inf_terrien" style="width:100%;"/></td></tr>
-          <tr><td style="padding:6px 8px;border:1px solid var(--bord);">Test de Pronation Membre sup.</td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_pronation_sup_aerien" style="width:100%;"/></td><td style="padding:4px;border:1px solid var(--bord);"><input class="inp bilan-field" data-field="schema_pronation_sup_terrien" style="width:100%;"/></td></tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Test d'Extension</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="schema_extension_aerien" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Test de Supination Mbr inf.</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="schema_supination_inf_aerien" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Test de Supination Mbr sup.</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="schema_supination_sup_aerien" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Test de Pronation Mbr inf.</td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="schema_pronation_inf_terrien" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Test d'Ancrage Mbr inf.</td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="schema_ancrage_inf_terrien" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Test de Pronation Mbr sup.</td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="schema_pronation_sup_terrien" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
         </tbody>
       </table></div>
+
+      <!-- ─── Tableau 2 — Chaînes musculaires ─── -->
+      <div style="font-weight:700;font-size:13px;letter-spacing:1px;margin:18px 0 8px 0;color:#d35400;border-bottom:1px solid #f0c896;padding-bottom:4px;">2 — CHAÎNES MUSCULAIRES</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="background:var(--surf);padding:8px 10px;border:1px solid var(--bord);text-align:left;">Chaîne</th>
+            <th style="background:#3498db;color:#fff;padding:8px 10px;border:1px solid #2471a3;text-align:center;">🌬️ Aérien (/2)</th>
+            <th style="background:#f0a500;color:#fff;padding:8px 10px;border:1px solid #b7740a;text-align:center;">🌍 Terrien (/2)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Extension (PM)</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_chaine_pm" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Statique (PA)</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_chaine_pa" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Ouverture (PL)</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_chaine_pl" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Flexion (AM)</td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_chaine_am" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Statique (AP)</td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_chaine_ap" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Fermeture (AL)</td>
+            <td style="background:#e8e8e8;border:1px solid var(--bord);text-align:center;color:#aaa;font-size:11px;">—</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_chaine_al" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+        </tbody>
+      </table></div>
+
+      <!-- ─── Tableau 3 — Plans ─── -->
+      <div style="font-weight:700;font-size:13px;letter-spacing:1px;margin:18px 0 8px 0;color:#d35400;border-bottom:1px solid #f0c896;padding-bottom:4px;">3 — PLANS</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="background:var(--surf);padding:8px 10px;border:1px solid var(--bord);text-align:left;width:12%;">Plan</th>
+            <th style="background:var(--surf);padding:8px 10px;border:1px solid var(--bord);text-align:left;">Critère</th>
+            <th style="background:#3498db;color:#fff;padding:8px 10px;border:1px solid #2471a3;text-align:center;">🌬️ Aérien (/2)</th>
+            <th style="background:#f0a500;color:#fff;padding:8px 10px;border:1px solid #b7740a;text-align:center;">🌍 Terrien (/2)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td rowspan="3" style="padding:8px 10px;border:1px solid var(--bord);font-weight:700;background:#f5eeff;text-align:center;vertical-align:middle;color:#6c3483;">Frontal</td>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Rotation</td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#2471a3;margin-right:6px;font-weight:600;">Externe :</span>
+              <select class="inp bilan-field" data-field="sp_plan_frontal_rotation_a" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#b7740a;margin-right:6px;font-weight:600;">Interne :</span>
+              <select class="inp bilan-field" data-field="sp_plan_frontal_rotation_t" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Rigide-Souple</td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#2471a3;margin-right:6px;font-weight:600;">Rigide :</span>
+              <select class="inp bilan-field" data-field="sp_plan_frontal_rigid_a" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#b7740a;margin-right:6px;font-weight:600;">Souple :</span>
+              <select class="inp bilan-field" data-field="sp_plan_frontal_rigid_t" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Flexion-Extension</td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#2471a3;margin-right:6px;font-weight:600;">Ext. :</span>
+              <select class="inp bilan-field" data-field="sp_plan_frontal_fe_a" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#b7740a;margin-right:6px;font-weight:600;">Flex. :</span>
+              <select class="inp bilan-field" data-field="sp_plan_frontal_fe_t" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td rowspan="3" style="padding:8px 10px;border:1px solid var(--bord);font-weight:700;background:#eaf4ff;text-align:center;vertical-align:middle;color:#2471a3;">Sagittal</td>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Appui</td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#2471a3;margin-right:6px;font-weight:600;">En Av. :</span>
+              <select class="inp bilan-field" data-field="sp_plan_sagittal_appui_a" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#b7740a;margin-right:6px;font-weight:600;">Axe corps :</span>
+              <select class="inp bilan-field" data-field="sp_plan_sagittal_appui_t" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Mouvements articulaires</td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#2471a3;margin-right:6px;font-weight:600;">Faibles :</span>
+              <select class="inp bilan-field" data-field="sp_plan_sagittal_mvt_a" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#b7740a;margin-right:6px;font-weight:600;">Élevés :</span>
+              <select class="inp bilan-field" data-field="sp_plan_sagittal_mvt_t" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Temps de contact au sol</td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#2471a3;margin-right:6px;font-weight:600;">Court :</span>
+              <select class="inp bilan-field" data-field="sp_plan_sagittal_tps_a" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="padding:4px;border:1px solid var(--bord);"><span style="font-size:11px;color:#b7740a;margin-right:6px;font-weight:600;">Long :</span>
+              <select class="inp bilan-field" data-field="sp_plan_sagittal_tps_t" onchange="updateSchemaMoteursTotals()" style="background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:700;background:#fff9f0;text-align:center;vertical-align:middle;color:#b7740a;">Horizontal</td>
+            <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">CPP</td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_plan_horizontal_cpp_a" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+            <td style="padding:4px;border:1px solid var(--bord);text-align:center;">
+              <select class="inp bilan-field" data-field="sp_plan_horizontal_cpp_t" onchange="updateSchemaMoteursTotals()" style="width:100%;background:#fff;color:#222;">
+                <option value="">--</option><option value="0">0/2</option><option value="0.5">0,5/2</option><option value="1">1/2</option><option value="1.5">1,5/2</option><option value="2">2/2</option>
+              </select>
+            </td>
+          </tr>
+        </tbody>
+      </table></div>
+
+      <!-- ─── Totaux + Curseur tendance ─── -->
+      <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:16px;margin:18px 0;">
+        <div style="display:flex;justify-content:space-around;align-items:center;font-size:14px;font-weight:600;color:#222;">
+          <div>Total <span style="color:#2471a3;">Aérien</span> : <span id="sp-sm-total-a" style="color:#2471a3;font-weight:700;font-size:20px;">0</span> /26</div>
+          <div>Total <span style="color:#b7740a;">Terrien</span> : <span id="sp-sm-total-t" style="color:#b7740a;font-weight:700;font-size:20px;">0</span> /26</div>
+        </div>
+        <div style="margin-top:18px;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin-bottom:6px;">
+            <span style="color:#b7740a;">🌍 Terrien</span>
+            <span style="color:#555;">⚖️ Mixte</span>
+            <span style="color:#2471a3;">🌬️ Aérien</span>
+          </div>
+          <div style="position:relative;height:14px;background:linear-gradient(90deg,#f0a500 0%,#888 50%,#3498db 100%);border-radius:7px;margin:8px 0 16px 0;">
+            <div id="sp-sm-tendance-marker" style="position:absolute;left:50%;top:-5px;transform:translateX(-50%);width:22px;height:22px;background:#fff;border:3px solid #222;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.3);transition:left 0.3s ease;pointer-events:none;"></div>
+          </div>
+          <div style="text-align:center;font-size:15px;font-weight:700;color:#222;margin-top:14px;">Profil : <span id="sp-sm-tendance-label">—</span></div>
+        </div>
+      </div>
+
+      <!-- Conclusion -->
       <div style="margin-top:8px;"><div class="field-lbl">Conclusion schéma moteur (Aérien / Terrien)</div><textarea class="inp bilan-field" rows="2" data-field="schema_moteur_conclusion" placeholder="Notes et observations du praticien..."></textarea></div>
     </div>
     </div>
