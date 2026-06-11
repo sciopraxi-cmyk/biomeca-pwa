@@ -5489,41 +5489,49 @@ function buildRapport() {
     document.getElementById('rpt-body').innerHTML='<div style="color:var(--mut);text-align:center;padding:20px;">Aucun patient sélectionné.</div>';
     return;
   }
+  // #86 Fix E2E — Sauvegarde silencieuse en amont (parité printReport L5723) pour
+  // que l'aperçu reflète l'état UI courant, pas le dernier save sur disque.
+  saveBilanSilent();
   const p = currentPatient;
   document.getElementById('rpt-sub').textContent = p.prenom+' '+p.nom+' · '+(p.sport||'—')+' · '+p.date;
 
-  const mesures = p.mesures || {};
-  let html = '';
+  // #86 Fix E2E — délégation au constructeur partagé (source unique avec printReport).
+  // Corrige (a) le bloc « Mesures à signaler » détaillé manquant (bug conclusions_tmp
+  // jeté par test L5512), (b) le rendu illisible sur thème navy, (c) la divergence
+  // structurelle avec printReport (test-cards navy vs bloc clinique).
+  // Résolution praticien : même smart default 1-cabinet que printReport (alignement
+  // posturo L4779 + fallback praticiens[0] si single-cabinet sans pratId valide).
+  const prat = praticiens.find(pr => pr.id == p.pratId)
+    || (praticiens.length === 1 ? praticiens[0] : {});
+  const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat);
 
-  // Section mesures biomécaniques
-  if(Object.keys(mesures).length > 0) {
-    html += '<div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bord);">📐 Mesures Biomécaniques</div>';
-    // Ordre d'affichage forcé : KFPPA marche→course→sldj en premier, puis le reste
-const ordreAffichage=['kfppa-marche','kfppa-course','kfppa-sldj','verrou','mobilite','mla-marche','mla-course','amorti-marche','amorti-course'];
-const mesuresTriees=Object.entries(mesures).sort(([a],[b])=>{
-  const iA=ordreAffichage.indexOf(a), iB=ordreAffichage.indexOf(b);
-  if(iA===-1&&iB===-1) return 0;
-  if(iA===-1) return 1;
-  if(iB===-1) return -1;
-  return iA-iB;
-});
-mesuresTriees.forEach(([testId,data]) => {
-      const t = TESTS[testId]; if(!t) return;
-      const conclusions_tmp=[];
-      const sectionHTML=buildPrintSection(t,data,conclusions_tmp);
-      if(sectionHTML) html += '<div class="rpt-test-card" style="background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:10px;">'+sectionHTML+'</div>';
-    });
-  }
+  // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
+  // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
+  // L2688) → URL absolue mise en cache par le navigateur, pas de base64 dupliqué.
+  const logoSrc = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
 
-  // Section bilan clinique - même contenu que le PDF
-  const bd = p.bilanData || {};
-  if(Object.keys(bd).length > 0) {
-    const bilanHTML = buildBilanPrintSection(bd);
-    if(bilanHTML) html += '<div style="margin-top:16px;">'+bilanHTML+'</div>';
-  }
-
-  if(!html) html = '<div style="color:var(--mut);text-align:center;padding:20px;font-size:13px;">Aucune donnée enregistrée pour ce patient.</div>';
-  document.getElementById('rpt-body').innerHTML = html;
+  // Wrapper thème clair (force background:#fff, color:#111) — override LOCAL du
+  // thème app navy. Structure HTML clonée de #rpt-print (mêmes classes .rp-hdr/
+  // .rp-pt-info/.rp-prat/.rp-pt-item) → les styles globaux .rp-* (biomeca.css
+  // L198-236) s'appliquent et le contenu inline-styled (background:#f5f0e8 beige,
+  // color:#333, etc. émis par buildPrintSection/buildBilanPrintSection) rend
+  // correctement comme à l'impression. Pas de window.print() : aperçu seulement.
+  const bodyFallback = '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
+  const wrappedHTML = `
+    <div style="background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;border-radius:8px;">
+      <div class="rp-hdr">
+        <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
+          <div style="background:#0e1f38;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
+            <img src="${logoSrc}" alt="Sciopraxi" style="height:42px;display:block;">
+          </div>
+          <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
+        </div>
+        <div class="rp-prat">${pratHTML}</div>
+      </div>
+      <div class="rp-pt-info">${patientHTML}</div>
+      <div>${bodyHTML.trim() ? bodyHTML : bodyFallback}</div>
+    </div>`;
+  document.getElementById('rpt-body').innerHTML = wrappedHTML;
 }
 
 function buildTestPreview(t,data) {
@@ -5712,6 +5720,66 @@ function buildPhotoMini(data,side,t) {
 // ══════════════════════════════════════════════════════
 // RAPPORT PDF IMPRESSION
 // ══════════════════════════════════════════════════════
+// #86 Fix E2E — Constructeur partagé du contenu rapport sport (parité buildRapport
+// vs printReport). Source unique → zéro divergence future entre l'aperçu écran et
+// l'impression PDF. Corrige le bug historique buildRapport L5512 où conclusions_tmp
+// était instancié PAR test et JETÉ (perte du bloc « Mesures à signaler » détaillé).
+// Retourne 3 fragments HTML pour permettre à chaque entrée d'injecter dans son
+// conteneur (rpt-print 3 slots fixes pour printReport, wrapper unique pour
+// buildRapport). bodyHTML = sectionsHTML (tests bioméca ordonnés) + concluHTML
+// (« Mesures à signaler » accumulé sur TOUS les tests) + bilanSection
+// (buildBilanPrintSection — qui contient désormais la synthèse clinique en clôture).
+function _buildSportRapportContentHTML(p, prat) {
+  // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
+  // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
+  // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
+  // + smart default 1-cabinet), donc prat n'est jamais null ici.
+  const pratHTML = `<strong>${prat.nom||''} ${prat.prenom||''}${prat.titre?' — '+prat.titre:''}</strong>${prat.cabinet?'<br>'+prat.cabinet:''}${prat.adresse?'<br>'+prat.adresse:''}${prat.tel?'<br>'+prat.tel:''}${prat.email?'<br>'+prat.email:''}`;
+
+  // 2. Infos patient — identique à printReport L5734-5740
+  const age = p.ddn ? Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans' : '—';
+  const patientHTML = `
+    <div class="rp-pt-item"><strong>Patient</strong>${p.prenom} ${p.nom}</div>
+    <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${p.lat||'—'}</div>
+    <div class="rp-pt-item"><strong>Sport</strong>${p.sport||'—'}</div>
+    <div class="rp-pt-item"><strong>Poids · Taille</strong>${p.poids||'—'} kg · ${p.taille||'—'} cm</div>
+    <div class="rp-pt-item"><strong>Motif</strong>${p.motif||'—'}</div>
+    <div class="rp-pt-item"><strong>Date</strong>${p.date}</div>`;
+
+  // 3. Corps : sectionsHTML (tests bioméca) + concluHTML + bilanSection
+  const mesures = p.mesures || {};
+  let sectionsHTML = '';
+  const conclusions = []; // ⚠️ Accumulateur PARTAGÉ sur tous les tests (corrige bug
+                          // buildRapport L5512 où conclusions_tmp était jeté par test)
+  const ordreRapport = ['kfppa-marche','kfppa-course','kfppa-sldj','verrou','mobilite','mla-marche','mla-course','amorti-marche','amorti-course'];
+  const mesuresRapport = Object.entries(mesures).sort(([a],[b]) => {
+    const iA = ordreRapport.indexOf(a), iB = ordreRapport.indexOf(b);
+    if(iA === -1 && iB === -1) return 0;
+    if(iA === -1) return 1;
+    if(iB === -1) return -1;
+    return iA - iB;
+  });
+  mesuresRapport.forEach(([testId, data]) => {
+    const t = TESTS[testId]; if(!t) return;
+    sectionsHTML += buildPrintSection(t, data, conclusions);
+  });
+
+  // Bloc « Mesures à signaler » détaillé (mode complet : valeurs + normes)
+  // #86 Fix E2E print breaks — break-inside:avoid en inline (couvre les 2 entrées
+  // printReport + buildRapport via le constructeur partagé).
+  let concluHTML = '';
+  if(conclusions.length) {
+    concluHTML = `<div class="rp-conclu" style="break-inside:avoid;page-break-inside:avoid;"><strong style="display:block;margin-bottom:4px;">Mesures à signaler</strong>${conclusions.join('<br>')}</div>`;
+  }
+
+  // Bilan clinique (sections cliniques + synthèse clinique en clôture #86 Point 2)
+  const bilanSection = (typeof buildBilanPrintSection === 'function' && p && p.bilanData)
+    ? buildBilanPrintSection(p.bilanData) : '';
+
+  const bodyHTML = sectionsHTML + concluHTML + bilanSection;
+  return { pratHTML, patientHTML, bodyHTML };
+}
+
 function printReport() {
   // Gating task #57 — bloque l'impression si pas full access.
   if (window._accessLevel && window._accessLevel !== 'full') {
@@ -5722,48 +5790,20 @@ function printReport() {
   // Sauvegarder automatiquement le bilan avant d'imprimer
   saveBilanSilent();
   const p=currentPatient;
-  const prat=praticiens.find(pr=>pr.id==p.pratId);
+  // #86 Fix E2E — alignement résolution praticien sur posturo L4779 (`|| {}`).
+  // Smart default 1-cabinet : si p.pratId ne matche pas ET praticiens.length === 1,
+  // utilise praticiens[0] (couvre le cas legacy patient sans pratId valide en
+  // single-cabinet). Multi-praticiens sans match → {} (header vide, parité posturo).
+  const prat = praticiens.find(pr => pr.id == p.pratId)
+    || (praticiens.length === 1 ? praticiens[0] : {});
 
-  // En-tête praticien
-  document.getElementById('rp-prat-block').innerHTML=prat?
-    `<strong>${prat.nom}</strong>${prat.titre?'<br>'+prat.titre:''}<br>${prat.cabinet||''}${prat.adresse?'<br>'+prat.adresse:''}${prat.tel?'<br>'+prat.tel:''}${prat.email?'<br>'+prat.email:''}`
-    :'<strong>BioMéca Podologie</strong>';
-
-  // Infos patient
-  const age=p.ddn?Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans':'—';
-  document.getElementById('rp-pt-info-block').innerHTML=`
-    <div class="rp-pt-item"><strong>Patient</strong>${p.prenom} ${p.nom}</div>
-    <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${p.lat||'—'}</div>
-    <div class="rp-pt-item"><strong>Sport</strong>${p.sport||'—'}</div>
-    <div class="rp-pt-item"><strong>Poids · Taille</strong>${p.poids||'—'} kg · ${p.taille||'—'} cm</div>
-    <div class="rp-pt-item"><strong>Motif</strong>${p.motif||'—'}</div>
-    <div class="rp-pt-item"><strong>Date</strong>${p.date}</div>`;
-
-  const mesures=p.mesures||{};
-  let sectionsHTML='';
-  const conclusions=[];
-
-  const ordreRapport=['kfppa-marche','kfppa-course','kfppa-sldj','verrou','mobilite','mla-marche','mla-course','amorti-marche','amorti-course'];
-  const mesuresRapport=Object.entries(mesures).sort(([a],[b])=>{
-    const iA=ordreRapport.indexOf(a),iB=ordreRapport.indexOf(b);
-    if(iA===-1&&iB===-1)return 0; if(iA===-1)return 1; if(iB===-1)return -1; return iA-iB;
-  });
-  mesuresRapport.forEach(([testId,data])=>{
-    const t=TESTS[testId]; if(!t) return;
-    sectionsHTML+=buildPrintSection(t,data,conclusions);
-  });
-
-  // Conclusion générale
-  let concluHTML='';
-  if(conclusions.length){
-    concluHTML=`<div class="rp-conclu"><strong style="display:block;margin-bottom:4px;">Mesures à signaler</strong>${conclusions.join('<br>')}</div>`;
-  }
-
-  const bilanSection = (typeof buildBilanPrintSection === 'function' && currentPatient && currentPatient.bilanData)
-    ? buildBilanPrintSection(currentPatient.bilanData) : '';
-  const fullContent = sectionsHTML + concluHTML + bilanSection;
-  document.getElementById('rp-sections').innerHTML = fullContent.trim()
-    ? fullContent
+  // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
+  // (source unique commune avec buildRapport, parité visuelle garantie).
+  const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat);
+  document.getElementById('rp-prat-block').innerHTML = pratHTML;
+  document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
+  document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
+    ? bodyHTML
     : '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
 
   // Lancer l'impression via CSS @media print
@@ -5782,48 +5822,57 @@ function buildBilanPrintSection(bd) {
     : bd[k]==='non'
     ? '<span style="background:#f8d7da;color:#721c24;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;">NON</span>'
     : '<span style="color:#aaa;font-size:9px;">—</span>';
-  const cb = (k) => bd[k]===true
-    ? '<span style="background:#d4edda;color:#155724;padding:1px 5px;border-radius:3px;font-size:9px;">✓</span>'
-    : '<span style="color:#ddd;font-size:9px;">☐</span>';
-  const gdnRow = (lbl, prefix) =>
-    '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+lbl+'</td>'
-    +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+cb(prefix+'_G')+'</td>'
-    +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+cb(prefix+'_D')+'</td>'
-    +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+cb(prefix+'_N')+'</td></tr>';
-  const gdRow = (lbl, prefix) =>
-    '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+lbl+'</td>'
-    +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+cb(prefix+'_G')+'</td>'
-    +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+cb(prefix+'_D')+'</td></tr>';
-  const sec = (title) => '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#333;border-bottom:1px solid #c8a96e;padding-bottom:3px;margin:10px 0 6px;">' + title + '</div>';
+  // #86 Batch 7 — helpers cb/gdnRow/gdRow/tblHdrGDN supprimés (orphelins).
+  // Étaient utilisés uniquement par l'ancien bloc Neuro maison (rendu grid+tables)
+  // remplacé Batch 2 par renderNeuroBlocks. Confirmation 0 call-site avant suppression.
+  // #86 Fix E2E print breaks — close previous + open new section wrapper avec
+  // break-inside:avoid (les 2 syntaxes legacy/modern pour compat large). Source
+  // unique : tout sec() émet le close/open en même temps que son titre. Wrapper
+  // initial ouvert après le titre principal + double-close final à la fin de
+  // buildBilanPrintSection pour fermer (1) dernière sous-section + (2) outer .rp-section.
+  const sec = (title) => '</div><div style="break-inside:avoid;page-break-inside:avoid;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#333;border-bottom:1px solid #c8a96e;padding-bottom:3px;margin:10px 0 6px;">' + title + '</div>';
   const tblHdr4 = (c1,c2,c3,c4,c5) => '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;">'
     +'<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">'+c1+'</th>'
     +'<th style="padding:3px 5px;border:1px solid #ddd;">'+c2+'</th>'
     +'<th style="padding:3px 5px;border:1px solid #ddd;">'+c3+'</th>'
     +'<th style="padding:3px 5px;border:1px solid #ddd;">'+c4+'</th>'
     +(c5?'<th style="padding:3px 5px;border:1px solid #ddd;">'+c5+'</th>':'')+'</tr>';
-  const tblHdrGDN = (title) => '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">'
-    +'<tr style="background:#f5f0e8;"><th style="padding:2px 5px;border:1px solid #ddd;text-align:left;">'+title+'</th>'
-    +'<th style="padding:2px 5px;border:1px solid #ddd;">G</th>'
-    +'<th style="padding:2px 5px;border:1px solid #ddd;">D</th>'
-    +'<th style="padding:2px 5px;border:1px solid #ddd;">N</th></tr>';
 
   let h = '<div class="rp-section" style="page-break-before:always;">';
   h += '<div style="font-size:14px;font-weight:700;text-transform:uppercase;color:#c8a96e;border-bottom:2.5px solid #c8a96e;padding-bottom:6px;margin-bottom:14px;letter-spacing:.05em;">BILAN CLINIQUE PODOLOGIE DU SPORTIF</div>';
+  // #86 Fix E2E print breaks — wrapper initial vide qui sera fermé par le 1er sec().
+  // Permet à la convention « sec() = close + open » de fonctionner uniformément
+  // dès le premier appel, sans cas particulier.
+  h += '<div style="break-inside:avoid;page-break-inside:avoid;">';
 
   // ─── ANAMNÈSE ───
+  // #86 Batch 1 — clés alignées sur save/synthèse genererSyntheseSport L10979-10997.
+  // motif_detail (dead) → motif ; hygiene (dead) supprimé ; ajout travail, appareillage,
+  // activite_quot, EVA, radios 1ere_intention + douleur_oui_non (couverture complète
+  // des champs ssec-0 hors en-tête patient médecin/date_consult/sport/motif déjà
+  // affichés dans rp-pt-info-block L5734-5740).
   h += sec('Anamnèse');
   h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;">';
   [
     ['Sport(s) pratiqué(s) — type, fréquence, intensité, niveau','sport_detail'],
-    ['Motif de consultation','motif_detail'],
-    ['Localisation et horaire de la douleur (1er fois / récidive)','douleur'],
+    ['Motif de consultation','motif'],
+    ['Localisation et horaire de la douleur (texte libre)','douleur'],
     ['Antécédents (personnel / familiaux)','antecedents'],
     ['Examens déjà réalisés','examens'],
-    ['Hygiène de vie / quotidien','hygiene'],
+    ['Travail / Profession','travail'],
+    ['Appareillage','appareillage'],
+    ['Activité quotidienne','activite_quot'],
     ['Notes complémentaires','notes_generales'],
   ].forEach(([lbl,k]) => {
     if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:32%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+bd[k]+'</td></tr>';
   });
+  // Douleur présente (radio oui/non) — affiché seulement si 'oui' (parité synthèse)
+  if(bd.douleur_oui_non === 'oui') h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Douleur</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Présente</td></tr>';
+  // EVA Douleur (range 0-10) — affiché seulement si valeur numérique > 0
+  const evaNum = parseInt(bd.eva, 10);
+  if(!isNaN(evaNum) && evaNum > 0) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">EVA Douleur</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+evaNum+'/10</td></tr>';
+  // Consultation 1ère intention (radio) — affiché seulement si 'oui' (parité synthèse)
+  if(bd['1ere_intention'] === 'oui') h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Consultation 1ère intention</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Oui</td></tr>';
   if(bd.ttt_podo) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Traitement podologique</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+yn('ttt_podo')+(bd.ttt_podo_detail?' — '+bd.ttt_podo_detail:'')+'</td></tr>';
   h += '</table>';
 
@@ -5839,6 +5888,44 @@ function buildBilanPrintSection(bd) {
       h += '</div>';
     }
     if(bd.chaine_musculaire) h += '<p style="font-size:9px;"><strong>Hypothèse chaîne musculaire:</strong> '+bd.chaine_musculaire+'</p>';
+  }
+
+  // ─── NEUROLOGIE FONCTIONNELLE ───
+  // #86 Batch 2 — délégation à renderNeuroBlocks (config NEURO_BLOCKS partagée
+  // L10959-11041) miroir strict synthèse sport L11240-11246. Reader bd-based :
+  // les ids NEURO_BLOCKS sont en dash (ex. 'aps-epaule-g'), les save keys en
+  // underscore (ex. 'aps_epaule_g') — confirmé index.html L883 sn-aps-epaule-g
+  // ↔ setBilanField('aps_epaule_g'). Le replace dash→underscore est universel
+  // (vérifié aussi pour les extras vermis : proprio-axe-tete → proprio_axe_tete).
+  // Suppression de ~140 clés mortes : préfixes ps_/refl_/rect_ (vs aps_/ref_/tact_),
+  // casse _G/_D/_N/_O (vs _g/_d/_n/_o), labels tronqués vest_csc_/prop_fn_/cerv_prec_/
+  // cerv_piano_, modèle obsolète neuro_hypothese radio (vs hypo_tronc + hypo_cervelet).
+  // OMETTRE volontairement (décision Joel) : nc_total/vest_total/cerv_total
+  // (calculés DOM live, non persistés) et neuro_notes (clé inexistante).
+  // Rendu Option A : 1 <p> par sous-bloc avec titre gras (split sûr sur ' : '
+  // car renderNeuroBlocks émet '— <title> : <items>' et items ne contiennent pas ' : ').
+  // Placement post-Morphostatique (#86 Batch 7 — ordre des 9 onglets).
+  const sportBdNeuroReader = id => !!bd[id.replace(/-/g, '_')];
+  const nf = renderNeuroBlocks(sportBdNeuroReader);
+  const hypotheses = [];
+  if(bd.hypo_tronc) hypotheses.push('Tronc cérébral');
+  if(bd.hypo_cervelet) hypotheses.push('Cervelet');
+  if(nf.length || hypotheses.length) {
+    h += sec('Neuro Fonctionnel');
+    nf.forEach(line => {
+      // line = '— <Titre> : <items>'  → strip '— ' prefix + split sur ' : '
+      const colonIdx = line.indexOf(' : ');
+      if(colonIdx > 0) {
+        const title = line.slice(2, colonIdx);
+        const items = line.slice(colonIdx + 3);
+        h += '<p style="font-size:9px;"><strong>' + title + '</strong> : ' + items + '</p>';
+      } else {
+        h += '<p style="font-size:9px;">' + line + '</p>';
+      }
+    });
+    if(hypotheses.length) {
+      h += '<p style="font-size:9px;"><strong>Hypothèses</strong> : ' + hypotheses.join(', ') + '</p>';
+    }
   }
 
   // ─── EXAMEN EN CHARGE / DÉCHARGE (B1 #73) ───
@@ -5942,68 +6029,134 @@ function buildBilanPrintSection(bd) {
   if(bd.sp_dyn_equilibre) pushDe('Équilibré', bd.sp_dyn_equilibre);
   if(bd.sp_dyn_scoliose) pushDe('Scoliose', bd.sp_dyn_scoliose);
 
-  if(ecRows.length || dechRows.length) {
-    h += sec('Examen en charge / décharge');
-    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;">';
-    if(ecRows.length) {
-      h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN CHARGE</td></tr>';
-      ecRows.forEach(([lbl, val]) => {
-        h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
-      });
-    }
-    if(dechRows.length) {
-      h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN DÉCHARGE</td></tr>';
-      dechRows.forEach(([lbl, val]) => {
-        h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
-      });
-    }
-    h += '</table>';
-  }
-
-  // ─── ROTATION NUCALE (B1 #73) — 4 selects 1/5 → 5/5 ───
+  // ─── EXAMEN EN CHARGE / DÉCHARGE — fusion #86 Batch 7 ───
+  // Fusion : 3 sections (Examen c/d, Rotation Nucale, Mobilité Axe) regroupées en
+  // une seule, cohérent avec la fusion HTML #87 où rotation et mobilité sont 2
+  // sous-blocs DANS la PARTIE EN CHARGE de ssec-2. Rendu Option A : table charge/
+  // décharge en haut, puis sous-blocs rotation + mobilité APRÈS (titres <p> gras
+  // — pas de sec() supplémentaire). Garde fusionnée : section émise si au moins 1
+  // des 3 sous-blocs a du contenu. sec('Examen en charge / décharge') unique.
+  // Chaque sous-bloc reste conditionnel à sa propre garde (zéro perte de champ).
+  const hasExamen = ecRows.length || dechRows.length;
   const hasNucale = bd.sp_rotn_g_std||bd.sp_rotn_g_mousse||bd.sp_rotn_d_std||bd.sp_rotn_d_mousse;
-  if(hasNucale) {
-    h += sec('Test Rotation Nucale');
-    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
-    h += '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">Sens</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Sur mousse</th></tr>';
-    const fmt5 = v => v ? v + '/5' : '—';
-    h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">Rotation gauche</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_g_std)+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_g_mousse)+'</td></tr>';
-    h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">Rotation droite</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_d_std)+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_d_mousse)+'</td></tr>';
-    h += '</table>';
-  }
-
-  // ─── MOBILITÉ AXE CORPOREL (B1 #73) — 16 cb limitation ───
   const MOB_ZONES_R = [['cervical','Cervicale'],['thoracique','Thoracique'],['lombaire','Lombaire'],['arc_inf','Arc inférieur']];
   const hasMob = MOB_ZONES_R.some(([k]) => bd['sp_mob_'+k+'_g_std']||bd['sp_mob_'+k+'_g_mousse']||bd['sp_mob_'+k+'_d_std']||bd['sp_mob_'+k+'_d_mousse']);
-  if(hasMob) {
-    h += sec('Mobilité Axe Corporel');
-    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
-    h += '<tr style="background:#f5f0e8;"><th rowspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:left;vertical-align:middle;">Zone</th><th colspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Gauche</th><th colspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Droite</th></tr>';
-    h += '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Sur mousse</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Sur mousse</th></tr>';
-    const mark = v => v ? '✓' : '';
-    MOB_ZONES_R.forEach(([k, lbl]) => {
-      if(!(bd['sp_mob_'+k+'_g_std']||bd['sp_mob_'+k+'_g_mousse']||bd['sp_mob_'+k+'_d_std']||bd['sp_mob_'+k+'_d_mousse'])) return;
-      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">'+lbl+'</td>'
-        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_g_std'])+'</td>'
-        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_g_mousse'])+'</td>'
-        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_d_std'])+'</td>'
-        +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_d_mousse'])+'</td></tr>';
-    });
-    h += '</table>';
+  if(hasExamen || hasNucale || hasMob) {
+    h += sec('Examen en charge / décharge');
+    // — Table charge/décharge (PARTIE EN CHARGE + PARTIE EN DÉCHARGE) —
+    if(hasExamen) {
+      h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;">';
+      if(ecRows.length) {
+        h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN CHARGE</td></tr>';
+        ecRows.forEach(([lbl, val]) => {
+          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
+        });
+      }
+      if(dechRows.length) {
+        h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN DÉCHARGE</td></tr>';
+        dechRows.forEach(([lbl, val]) => {
+          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
+        });
+      }
+      h += '</table>';
+    }
+    // — Sous-bloc Rotation nucale (ex-section autonome, démotée en sous-titre <p> gras) —
+    if(hasNucale) {
+      h += '<p style="font-size:10px;font-weight:700;color:#d35400;margin:8px 0 4px 0;">Rotation nucale</p>';
+      h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
+      h += '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:left;">Sens</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Sur mousse</th></tr>';
+      const fmt5 = v => v ? v + '/5' : '—';
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">Rotation gauche</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_g_std)+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_g_mousse)+'</td></tr>';
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">Rotation droite</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_d_std)+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+fmt5(bd.sp_rotn_d_mousse)+'</td></tr>';
+      h += '</table>';
+    }
+    // — Sous-bloc Mobilité axe corporel (ex-section autonome, démotée en sous-titre <p> gras) —
+    if(hasMob) {
+      h += '<p style="font-size:10px;font-weight:700;color:#d35400;margin:8px 0 4px 0;">Mobilité axe corporel</p>';
+      h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
+      h += '<tr style="background:#f5f0e8;"><th rowspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:left;vertical-align:middle;">Zone</th><th colspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Gauche</th><th colspan="2" style="padding:3px 5px;border:1px solid #ddd;text-align:center;">Droite</th></tr>';
+      h += '<tr style="background:#f5f0e8;"><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Sur mousse</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Standard</th><th style="padding:3px 5px;border:1px solid #ddd;text-align:center;font-size:9px;">Sur mousse</th></tr>';
+      const mark = v => v ? '✓' : '';
+      MOB_ZONES_R.forEach(([k, lbl]) => {
+        if(!(bd['sp_mob_'+k+'_g_std']||bd['sp_mob_'+k+'_g_mousse']||bd['sp_mob_'+k+'_d_std']||bd['sp_mob_'+k+'_d_mousse'])) return;
+        h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;font-size:9px;">'+lbl+'</td>'
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_g_std'])+'</td>'
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_g_mousse'])+'</td>'
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_d_std'])+'</td>'
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+mark(bd['sp_mob_'+k+'_d_mousse'])+'</td></tr>';
+      });
+      h += '</table>';
+    }
   }
 
   // ─── EXAMEN MANDIBULE ───
-  const mandFields = [['Ouverture max 3 doigts','mandibule_ouverture'],['Déviation ouverture','mandibule_deviation'],['Contractures masticateurs','mandibule_contractures'],['Douleur capsulo-ligamentaire','mandibule_douleur'],['Ressaut méniscal','mandibule_ressaut']];
-  const hasMand = mandFields.some(([,k])=>bd[k])||bd.mandibule_tonicite||bd.mandibule_notes;
+  // #86 Batch 3 — clés alignées sur save/synthèse genererSyntheseSport L11137-11171.
+  // 7 clés mandibule_* (DEAD) → vraies clés mand_* + tonicite_* + atm_* + reor_*.
+  // Conditionnels stricts miroir synthèse : sub-options lues seulement si parent
+  // oui/aggravation/amelioration. Lecture exclusive depuis bd (zéro DOM).
+  const mandRadios = [
+    ['Ouverture max < 3 doigts','mand_ouv_max'],
+    ['Déviation à l\'ouverture','mand_deviation'],
+    ['Contractures masticateurs','mand_contractures'],
+    ['Douleur capsulo-ligamentaire','mand_douleur_caps']
+  ];
+  const hasMandRessaut = bd.mand_ressaut === 'oui';
+  const hasMandTonOuv  = bd.tonicite_ouv === 'oui';
+  const hasMandSerrage = bd.tonicite_serrage === 'aggravation' || bd.tonicite_serrage === 'amelioration' || bd.tonicite_serrage === 'inchange';
+  const hasMandAtm     = bd.atm_musculaire || bd.atm_reductible || bd.atm_irreductible;
+  const hasMandReor    = bd.reor_dentiste || bd.reor_ortho || bd.reor_stomato || bd.reor_kine || bd.reor_osteo;
+  const hasMand = mandRadios.some(([,k]) => bd[k]) || hasMandRessaut || hasMandTonOuv || hasMandSerrage || hasMandAtm || hasMandReor;
   if(hasMand) {
     h += sec('Examen Mandibule');
     h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
-    mandFields.forEach(([lbl,k]) => {
+    mandRadios.forEach(([lbl,k]) => {
       if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+yn(k)+'</td></tr>';
     });
-    if(bd.mandibule_tonicite) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Tests tonicité</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+bd.mandibule_tonicite+'</td></tr>';
+    // Ressaut articulaire — radio 'oui' + sous-cb côté D/G (conditionnelles si parent 'oui')
+    if(hasMandRessaut) {
+      const cotes = [];
+      if(bd.mand_ressaut_dte) cotes.push('D');
+      if(bd.mand_ressaut_gauche) cotes.push('G');
+      const cotesTxt = cotes.length ? ' (' + cotes.join(' + ') + ')' : '';
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Ressaut articulaire</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Oui'+cotesTxt+'</td></tr>';
+    }
+    // Amélioration ouverture de bouche (ATM secondaire) — radio oui/non simple
+    if(hasMandTonOuv) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Amélioration ouverture de bouche</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">ATM secondaire</td></tr>';
+    // Serrage de dent — radio aggravation/amelioration/inchange + sous-cb conditionnelles
+    if(bd.tonicite_serrage === 'aggravation') {
+      const sub = [];
+      if(bd.tonicite_aggr_dents) sub.push('dents');
+      if(bd.tonicite_aggr_atm) sub.push('ATM');
+      const subTxt = sub.length ? ' (' + sub.join(' + ') + ')' : '';
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Serrage de dent</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Aggravation'+subTxt+'</td></tr>';
+    } else if(bd.tonicite_serrage === 'amelioration') {
+      const sub = [];
+      if(bd.tonicite_amelio_contact) sub.push('contact');
+      if(bd.tonicite_amelio_tension) sub.push('tension');
+      const subTxt = sub.length ? ' (' + sub.join(' + ') + ')' : '';
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Serrage de dent</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Amélioration'+subTxt+'</td></tr>';
+    } else if(bd.tonicite_serrage === 'inchange') {
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Serrage de dent</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Inchangé</td></tr>';
+    }
+    // ATM (cb multi)
+    if(hasMandAtm) {
+      const atms = [];
+      if(bd.atm_musculaire) atms.push('musculaire');
+      if(bd.atm_reductible) atms.push('articulaire réductible');
+      if(bd.atm_irreductible) atms.push('articulaire irréductible');
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">ATM</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+atms.join(', ')+'</td></tr>';
+    }
+    // Réorientation (cb multi — 5 spécialistes)
+    if(hasMandReor) {
+      const reor = [];
+      if(bd.reor_dentiste) reor.push('Dentiste');
+      if(bd.reor_ortho) reor.push('Orthodontiste');
+      if(bd.reor_stomato) reor.push('Stomatologue');
+      if(bd.reor_kine) reor.push('Kinésithérapeute');
+      if(bd.reor_osteo) reor.push('Ostéopathe');
+      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Réorientation</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+reor.join(', ')+'</td></tr>';
+    }
     h += '</table>';
-    if(bd.mandibule_notes) h += '<p style="font-size:9px;"><strong>Observations:</strong> '+bd.mandibule_notes+'</p>';
   }
 
   // ─── EXAMEN STABILOMÉTRIQUE ───
@@ -6022,72 +6175,6 @@ function buildBilanPrintSection(bd) {
     });
     h += '</table>';
     if(bd.stabilo_conclusion) h += '<p style="font-size:9px;background:#f9f9f9;padding:5px 8px;border-radius:4px;"><strong>Conclusion:</strong> '+bd.stabilo_conclusion+'</p>';
-  }
-
-  // ─── NEUROLOGIE FONCTIONNELLE ───
-  const hasNeuro = bd.neuro_hypothese||bd.neuro_notes||
-    ['ps_epaule','ps_rot_epaule','ps_flex_coude','ps_pron_poignet'].some(k=>bd[k+'_G']||bd[k+'_D']);
-  if(hasNeuro) {
-    h += sec('Neurologie Fonctionnelle');
-    if(bd.neuro_hypothese) h += '<p style="font-size:9px;margin-bottom:6px;"><strong>Hypothèse:</strong> '+(bd.neuro_hypothese==='tc'?'Tronc Cérébral':bd.neuro_hypothese==='cerv'?'Cervelet':'Mixte')+'</p>';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">';
-    // Nerfs crâniens
-    h += '<div><div style="font-size:9px;font-weight:700;color:#c0392b;margin-bottom:3px;">Nerfs Crâniens</div>';
-    h += tblHdrGDN('NC');
-    ['Recapillarisation','NC1','NC2','NC3','NC4','NC5','NC6','NC7','NC8','NC9','NC10','NC11','NC12'].forEach(nc => {
-      const k = 'nc'+(nc==='Recapillarisation'?'_recap':nc.replace('NC','').toLowerCase());
-      if(bd[k+'_G']||bd[k+'_D']||bd[k+'_N']) h += gdnRow(nc, k);
-    });
-    if(bd.nc_total) h += '<tr><td colspan="4" style="padding:2px 5px;font-size:9px;border:1px solid #e0e0e0;"><strong>Total: '+bd.nc_total+'</strong></td></tr>';
-    h += '</table></div>';
-    // Vestibulaire
-    h += '<div><div style="font-size:9px;font-weight:700;color:#2980b9;margin-bottom:3px;">Vestibulaire / Proprioception</div>';
-    h += tblHdrGDN('Test');
-    [['ROMBERG+CSC ANT','vest_csc_ant'],['ROMBERG+CSC LAT','vest_csc_lat'],['ROMBERG+CSC POST','vest_csc_post']].forEach(([lbl,k]) => {
-      if(bd[k+'_G']||bd[k+'_D']||bd[k+'_N']) h += gdnRow(lbl, k);
-    });
-    [['FN LENT passif','prop_fn_lent'],['FN RAPIDE actif','prop_fn_rapide'],['GOLGI force iso','prop_golgi'],['PACCINI mvt précis','prop_paccini'],['RUFFINI Décompression','prop_ruffini_dec'],['RUFFINI Compression','prop_ruffini_com'],['GOLGI mvt forcé','prop_golgi_a']].forEach(([lbl,k]) => {
-      if(bd[k+'_G']||bd[k+'_D']||bd[k+'_N']) h += gdnRow(lbl, k);
-    });
-    if(bd.vest_total) h += '<tr><td colspan="4" style="padding:2px 5px;font-size:9px;border:1px solid #e0e0e0;"><strong>Total: '+bd.vest_total+'</strong></td></tr>';
-    h += '</table></div>';
-    // Vermis / Cervelet
-    h += '<div><div style="font-size:9px;font-weight:700;color:#27ae60;margin-bottom:3px;">Vermis / Cervelet</div>';
-    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;">';
-    [['SHARP.ROMBERG','vermis_sharp'],['ROMBERG 1 PIED','vermis_1pied']].forEach(([lbl,k]) => {
-      if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;">'+cb(k)+'</td></tr>';
-    });
-    [['Précision doigt-nez','cerv_prec_dg'],['Coordination mvt alt.','cerv_coord'],['Précision piano','cerv_piano'],['Go-No Go','cerv_gono']].forEach(([lbl,k]) => {
-      if(bd[k+'_G']||bd[k+'_D']) h += gdRow(lbl, k);
-    });
-    if(bd.cerv_total) h += '<tr><td colspan="3" style="padding:2px 5px;font-size:9px;border:1px solid #e0e0e0;"><strong>Total: '+bd.cerv_total+'</strong></td></tr>';
-    h += '</table></div></div>';
-    // Réflexes archaïques
-    const reflPairs = [['RPP','refl_rpp','RTAC','refl_rtac'],['RTP','refl_rtp','GALANT','refl_galant'],['MORO','refl_moro','BABINSKI','refl_babinski'],['PEREZ','refl_perez','PLANTAIRE','refl_plantaire'],['LANDAU','refl_landau','PALMAIRE','refl_palmaire'],['REPTATION','refl_reptation','BABKIN','refl_babkin']];
-    const hasRefl = reflPairs.some(([,k1,,k2])=>bd[k1+'_O']||bd[k1+'_N']||bd[k2+'_G']||bd[k2+'_D']);
-    if(hasRefl) {
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">';
-      h += '<div><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Réflexes Archaïques</div><table style="width:100%;border-collapse:collapse;font-size:9px;">';
-      h += '<tr style="background:#f5f0e8;"><th style="padding:2px 5px;border:1px solid #ddd;"></th><th style="padding:2px 5px;border:1px solid #ddd;">O</th><th style="padding:2px 5px;border:1px solid #ddd;">N</th><th style="padding:2px 5px;border:1px solid #ddd;"></th><th style="padding:2px 5px;border:1px solid #ddd;">G</th><th style="padding:2px 5px;border:1px solid #ddd;">D</th><th style="padding:2px 5px;border:1px solid #ddd;">N</th></tr>';
-      reflPairs.forEach(([l1,k1,l2,k2]) => {
-        h += '<tr><td style="padding:1px 4px;border:1px solid #e0e0e0;font-size:8px;font-weight:600;">'+l1+'</td>'
-          +'<td style="padding:1px 4px;border:1px solid #e0e0e0;text-align:center;">'+cb(k1+'_O')+'</td>'
-          +'<td style="padding:1px 4px;border:1px solid #e0e0e0;text-align:center;">'+cb(k1+'_N')+'</td>'
-          +'<td style="padding:1px 4px;border:1px solid #e0e0e0;font-size:8px;font-weight:600;">'+l2+'</td>'
-          +'<td style="padding:1px 4px;border:1px solid #e0e0e0;text-align:center;">'+cb(k2+'_G')+'</td>'
-          +'<td style="padding:1px 4px;border:1px solid #e0e0e0;text-align:center;">'+cb(k2+'_D')+'</td>'
-          +'<td style="padding:1px 4px;border:1px solid #e0e0e0;text-align:center;">'+cb(k2+'_N')+'</td></tr>';
-      });
-      h += '</table></div>';
-      // Récepteurs tactiles
-      h += '<div><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Récepteurs Tactiles</div>';
-      h += tblHdrGDN('Récepteur');
-      [['Merkel (toucher/pression)','rect_merkel'],['Ruffini (étirement)','rect_ruffini'],['Pacini (vibration)','rect_pacini'],['TNL (piquer)','rect_tnl'],['Meissner (caresse)','rect_meissner'],['Poils (mouvement)','rect_poils']].forEach(([lbl,k]) => {
-        if(bd[k+'_G']||bd[k+'_D']||bd[k+'_N']) h += gdnRow(lbl, k);
-      });
-      h += '</table></div></div>';
-    }
-    if(bd.neuro_notes) h += '<p style="font-size:9px;margin-top:6px;background:#f9f9f9;padding:5px 8px;border-radius:4px;"><strong>Notes:</strong> '+bd.neuro_notes+'</p>';
   }
 
   // ─── TESTS SCHÉMAS MOTEURS (B2 #73) ───
@@ -6164,47 +6251,148 @@ function buildBilanPrintSection(bd) {
       });
     });
     h += '</table>';
+    // #86 Fix E2E — curseur tendance statique imprimable (parité visuelle avec ssec-7
+    // index.html L2356-2373). Remplace le `<p>` texte par une barre dégradée Terrien
+    // → Mixte → Aérien + marker positionné via calcTendance(...).position. Source
+    // unique (même fonction que synthèse + DOM live). `print-color-adjust:exact` force
+    // le rendu du dégradé en PDF (sinon imprimante peut renvoyer vide).
     if(smHasAnyScore) {
-      const { libelle } = calcTendance(smTotalA, smTotalT);
-      h += '<p style="font-size:9px;margin:6px 0;"><strong>Totaux :</strong> '
-        + '<span style="color:#2471a3;">Aérien ' + smFmt(smTotalA) + '/26</span> · '
-        + '<span style="color:#b7740a;">Terrien ' + smFmt(smTotalT) + '/26</span> '
-        + '— <strong>Profil :</strong> ' + libelle + '</p>';
+      const { position, libelle } = calcTendance(smTotalA, smTotalT);
+      h += '<div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:10px 14px;margin:8px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">'
+        + '<div style="display:flex;justify-content:space-around;align-items:center;font-size:10px;font-weight:600;color:#222;margin-bottom:8px;">'
+        +   '<div>Total <span style="color:#2471a3;">Aérien</span> : <span style="color:#2471a3;font-weight:700;font-size:13px;">' + smFmt(smTotalA) + '</span>/26</div>'
+        +   '<div>Total <span style="color:#b7740a;">Terrien</span> : <span style="color:#b7740a;font-weight:700;font-size:13px;">' + smFmt(smTotalT) + '</span>/26</div>'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;font-size:9px;font-weight:600;margin-bottom:4px;">'
+        +   '<span style="color:#b7740a;">🌍 Terrien</span>'
+        +   '<span style="color:#555;">⚖️ Mixte</span>'
+        +   '<span style="color:#2471a3;">🌬️ Aérien</span>'
+        + '</div>'
+        + '<div style="position:relative;height:10px;background:linear-gradient(90deg,#f0a500 0%,#888 50%,#3498db 100%);border-radius:5px;margin:4px 0 10px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">'
+        +   '<div style="position:absolute;left:' + position + '%;top:-2px;transform:translateX(-50%);width:14px;height:14px;background:#fff;border:2px solid #222;border-radius:50%;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>'
+        + '</div>'
+        + '<div style="text-align:center;font-size:11px;font-weight:700;color:#222;">Profil : ' + libelle + '</div>'
+        + '</div>';
     }
     if(bd.schema_moteur_conclusion) h += '<p style="font-size:9px;"><strong>Conclusion :</strong> ' + bd.schema_moteur_conclusion + '</p>';
   }
 
+  // ─── SCHÉMAS DU PATIENT (ssec-10) ───
+  // #86 Batch 6 — ajout pur. Miroir strict synthèse genererSyntheseSport L11351-11375.
+  // Section précédemment absente du rapport (audit #86 §iv) → 12 champs persistés en
+  // bd jamais affichés au PDF. Lecture conditionnelle ligne par ligne (n'émettre une
+  // ligne que si elle a du contenu), garde de section (n'émettre la section que si
+  // au moins une ligne non vide). Style tableau aligné sur Mandibule (mêmes attributs
+  // CSS). Placement intermédiaire post-Schémas Moteurs ; le réordonnancement final
+  // (Batch 7) déplacera la section selon l'ordre des 9 onglets.
+  // Subtilité 'sp-posture-later-dir' : radio sans data-field, persisté par le sweep
+  // saveBilan L7555-7560 sous le LITERAL name (avec dashes). Lecture rapport :
+  // bd['sp-posture-later-dir'] — PAS de replace dash→underscore. Conditionnel strict :
+  // direction lue seulement si bd.posture_later est cochée (parité synthèse L11361-11364).
+  const terrain = [];
+  if(bd.terrain_aerien)  terrain.push('Aérien');
+  if(bd.terrain_terrien) terrain.push('Terrien');
+  if(bd.terrain_mixte)   terrain.push('Mixte');
+  const postural = [];
+  if(bd.posture_ant)  postural.push('Antériorisation');
+  if(bd.posture_post) postural.push('Postériorisation');
+  if(bd.posture_later) {
+    const dir = bd['sp-posture-later-dir'];
+    postural.push('Latéralisation' + (dir ? ' ' + dir : ''));
+  }
+  const npc = [];
+  if(bd.chaine_ext)      npc.push('extension (PM)');
+  if(bd.chaine_flex)     npc.push('flexion (AM)');
+  if(bd.chaine_ferm)     npc.push('fermeture (PL)');
+  if(bd.chaine_ouv)      npc.push('ouverture (AL)');
+  if(bd.chaine_stat_opt) npc.push('statique opt. (PA)');
+  if(bd.chaine_stat_deg) npc.push('statique dég. (AP)');
+  const bioMec = bd.biomec_articulaire || '';
+  if(terrain.length || postural.length || npc.length || bioMec) {
+    h += sec('Schémas du patient');
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;">';
+    if(terrain.length)  h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Terrain</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + terrain.join(', ') + '</td></tr>';
+    if(postural.length) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Postural</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + postural.join(', ') + '</td></tr>';
+    if(npc.length)      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">NPC</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + npc.join(', ') + '</td></tr>';
+    if(bioMec)          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Bioméca / Articulaire / viscéral</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + bioMec + '</td></tr>';
+    h += '</table>';
+  }
+
   // ─── PLAN DE TRAITEMENT ───
-  const c1 = [1,2,3,4].some(i=>bd['c1_ex'+i]);
-  const c2 = [1,2,3,4].some(i=>bd['c2_ex'+i]);
-  const ch = [1,2,3,4,5,6,7,8].some(i=>bd['ch_ex'+i]);
-  if(c1||c2||ch||bd.semelles_description) {
+  // #86 Batch 4 — clés alignées sur save/synthèse genererSyntheseSport L11248-11263.
+  // Modèle pre-A4 (clés flat c1_ex1..ch_ex8 — DEAD) → structure imbriquée
+  // bd.ttt.c1[0..3] / c2[0..3] / ch[0..7] (collectSportTtt L7287-7311). Chaque exo
+  // = { sys[], sub[], libre, detached?, ratio? }. Format rendu : libellé libre +
+  // systèmes joints (sys filtrés non-vides) + ratio (EMOM uniquement). Omet les
+  // exos vides via filledExo (miroir countCircuit synthèse L11251-11252).
+  // Garde nettoyée : retire bd.semelles_description (déplacé en Plan de Semelles).
+  // Ajout prochainRdv en clôture (parité posturo L5300, format date fr-FR).
+  // const ttt déclaré ICI (1ère utilisation) — partagé avec Plan de Semelles ci-dessous.
+  const ttt = bd.ttt || {};
+  const filledExo = e => e && (e.libre || (e.sys && e.sys.some(s => s)));
+  const countCirc = arr => (arr || []).filter(filledExo).length;
+  const c1n = countCirc(ttt.c1);
+  const c2n = countCirc(ttt.c2);
+  const chn = countCirc(ttt.ch);
+  const renderExo = (exo, idx, durLbl, showRatio) => {
+    // #86 Fix E2E — pour chaque slot exo (3 max par exercice), construit la paire
+    // [Système → Sous-exercice] alignée par index (sys[i] ↔ sub[i] via .exo-pair
+    // wrapper, cf _readSportTttExo L7322-7332). Système rendu via SPORT_SYSTEMES_LABELS
+    // (fallback slug brut si non mappé). Sous-exercice (sub[i]) est déjà une string
+    // lisible (data dict updateExerciceSubMenu L10660 — listes de strings localisées).
+    const pairs = (exo.sys || []).map((s, i) => {
+      if(!s) return '';
+      const sysLbl = SPORT_SYSTEMES_LABELS[s] || s;
+      const subVal = (exo.sub || [])[i] || '';
+      return subVal ? sysLbl + ' → ' + subVal : sysLbl;
+    }).filter(Boolean);
+    let val = exo.libre || '—';
+    if(pairs.length) val += ' <span style="color:#666;">[' + pairs.join('] [') + ']</span>';
+    if(showRatio && exo.ratio) val += ' <span style="color:#666;">· ' + exo.ratio + '</span>';
+    return '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:90px;white-space:nowrap;">'+durLbl+' ex.'+idx+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+val+'</td></tr>';
+  };
+  if(c1n || c2n || chn || ttt.prochainRdv) {
     h += sec('Plan de Traitement');
-    if(c1) {
+    if(c1n) {
       h += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Circuit Express 1 (Demi Tabata 2min)</div>';
       h += '<table style="width:100%;border-collapse:collapse;font-size:9px;">';
-      [1,2,3,4].forEach(i => { if(bd['c1_ex'+i]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:70px;">30s ex.'+i+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+bd['c1_ex'+i]+'</td></tr>'; });
+      // #86 Fix E2E — durLbl inclut le ratio FIXE Demi Tabata « 30s (20/10) » pour
+      // parité avec l'UI bilan ssec-9 L2555+ (texte hardcodé, pas une donnée).
+      (ttt.c1 || []).forEach((exo, i) => { if(filledExo(exo)) h += renderExo(exo, i+1, '30s (20/10)', false); });
       h += '</table></div>';
     }
-    if(c2) {
+    if(c2n) {
       h += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Circuit Express 2 (Demi Tabata 2min)</div>';
       h += '<table style="width:100%;border-collapse:collapse;font-size:9px;">';
-      [1,2,3,4].forEach(i => { if(bd['c2_ex'+i]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:70px;">30s ex.'+i+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+bd['c2_ex'+i]+'</td></tr>'; });
+      (ttt.c2 || []).forEach((exo, i) => { if(filledExo(exo)) h += renderExo(exo, i+1, '30s (20/10)', false); });
       h += '</table></div>';
     }
-    if(ch) {
+    if(chn) {
       h += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Circuit Échauffement EMOM (8min)</div>';
       h += '<table style="width:100%;border-collapse:collapse;font-size:9px;">';
-      [1,2,3,4,5,6,7,8].forEach(i => { if(bd['ch_ex'+i]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:70px;">1min ex.'+i+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+bd['ch_ex'+i]+'</td></tr>'; });
+      (ttt.ch || []).forEach((exo, i) => { if(filledExo(exo)) h += renderExo(exo, i+1, '1min', true); });
       h += '</table></div>';
     }
+    // Prochain RDV — clôture bloc (parité posturo L5300, format date fr-FR via toLocaleDateString)
+    if(ttt.prochainRdv) h += '<p style="font-size:9px;"><strong>Prochain RDV :</strong> ' + new Date(ttt.prochainRdv).toLocaleDateString('fr-FR') + '</p>';
   }
 
   // ─── PLAN DE SEMELLES ───
-  if(bd._pieds||bd.semelles_description) {
+  // #86 Batch 5 — clés alignées sur save/synthèse genererSyntheseSport.
+  // semelles_description (DEAD) → bd.ttt.semellesDesc ; ajout matériaux + recouvrement
+  // (tous dans bd.ttt — structure collectSportTtt L7372-7381).
+  // prochainRdv volontairement omis ici → traité dans le bloc Plan de Traitement
+  // (parité posturo L5300 : « Prochain RDV » est une donnée de planification générale
+  // qui clôt le bloc Traitement, pas le bloc Semelles).
+  // ttt déjà déclaré au début de Plan de Traitement (1ère utilisation #86 Batch 4).
+  const hasMateriaux = ttt.materiaux && ttt.materiaux.length;
+  const hasRecouvr   = ttt.recouvrement && ttt.recouvrement.length;
+  if(bd._pieds || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
     h += sec('Plan de Semelles');
     if(bd._pieds) h += '<img src="'+bd._pieds+'" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
-    if(bd.semelles_description) h += '<p style="font-size:9px;"><strong>Description:</strong> '+bd.semelles_description+'</p>';
+    if(ttt.semellesDesc) h += '<p style="font-size:9px;"><strong>Description :</strong> '+ttt.semellesDesc+'</p>';
+    if(hasMateriaux) h += '<p style="font-size:9px;"><strong>Matériaux :</strong> '+ttt.materiaux.join(', ')+'</p>';
+    if(hasRecouvr) h += '<p style="font-size:9px;"><strong>Recouvrement :</strong> '+ttt.recouvrement.join(', ')+'</p>';
   }
 
   // ─── TESTS AVANT / APRÈS ───
@@ -6229,7 +6417,22 @@ function buildBilanPrintSection(bd) {
     h += '</table>';
   }
 
-  h += '</div>';
+  // #86 Point 2 — Synthèse clinique en clôture du rapport (option C hybride). La
+  // synthèse contient les sections 1→11 (Anamnèse → Schémas du patient) PLUS un
+  // résumé condensé « Mesures à signaler » en tête (cf _buildSportSyntheseHTML-
+  // ForRapport). Doublon INTENTIONNEL avec le bloc autonome détaillé en tête du
+  // rapport (printReport L5757) : détail complet (valeurs + normes) en haut +
+  // résumé condensé (label + classification) en bas. Garde : émet la section
+  // uniquement si la synthèse a du contenu.
+  const syntheseHTML = _buildSportSyntheseHTMLForRapport(bd);
+  if(syntheseHTML && syntheseHTML.trim()) {
+    h += sec('Synthèse clinique');
+    h += syntheseHTML;
+  }
+
+  // #86 Fix E2E print breaks — double close : (1) la dernière section interne
+  // ouverte par sec() ou par le wrapper initial, (2) le wrapper outer class="rp-section".
+  h += '</div></div>';
   return h;
 }
 
@@ -6241,28 +6444,51 @@ function sectionTitle(t) {
   return m && m[1] ? `${t.name} — ${m[1]}` : t.name;
 }
 
-function buildPrintSection(t, data, conclusions) {
-  // ─── Conclusions auto : boucle générique sur t.measures ───
-  // Pour chaque test, pour chaque mesure, pour chaque côté D/G :
-  // calcule le ratio, applique interpret*(), pousse une ligne factuelle
-  // si la classification n'est pas 'dans la norme'.
-  // Le rendu HTML ci-dessous reste inchangé — on alimente juste la liste conclusions.
+// #86 Fix E2E — helper module-level d'extraction des alertes bioméca par test.
+// Boucle générique sur t.measures + MEASURE_COMPUTERS + interpret* (kfppa/gen),
+// retourne les strings d'alerte (classification ≠ 'dans la norme').
+// Modes :
+//   - défaut (opts.condensed=false) : format complet
+//     '<target> <sideLabel> · <m.label> : <pct> % (norme : <m.norm>) — <classification>'
+//     consommé par buildPrintSection (bloc bioméca détaillé en tête du rapport
+//     printReport L5757) + genererSyntheseSport (section en tête synthèse écran).
+//   - opts.condensed=true : format condensé sans valeur ni norme
+//     '<target> <sideLabel> · <m.label> — <classification>'
+//     consommé par _buildSportSyntheseHTMLForRapport (résumé en tête de la synthèse
+//     de clôture du rapport — cadrage option C : détail complet en haut + résumé
+//     condensé en bas, doublon INTENTIONNEL pour rappel synthétique en fin de page).
+function _collectTestAlerts(t, data, opts = {}) {
+  if(!t) return [];
+  const condensed = !!opts.condensed;
+  const alerts = [];
   (t.measures || []).forEach(m => {
     const compute = MEASURE_COMPUTERS[m.key];
     const interpret = m.interpretFn === 'kfppa' ? interpretKfppa : interpretGen;
     const isAbs = m.interpretFn !== 'kfppa'; // KFPPA conserve le signe (valgus/varus)
-    if (!compute) return;
+    if(!compute) return;
     ['D', 'G'].forEach(side => {
       const ratio = compute(t, data, side);
-      if (ratio == null) return;
+      if(ratio == null) return;
       const ratioForInterpret = isAbs ? Math.abs(ratio) : ratio;
       const classification = interpret(ratioForInterpret);
-      if (classification === 'dans la norme' || classification === '—') return;
-      const pct = Math.round((isAbs ? Math.abs(ratio) : ratio) * 100);
+      if(classification === 'dans la norme' || classification === '—') return;
       const sideLabel = side === 'D' ? 'droit' : 'gauche';
-      conclusions.push(`${t.target} ${sideLabel} · ${m.label} : ${pct} % (norme : ${m.norm}) — ${classification}`);
+      if(condensed) {
+        alerts.push(`${t.target} ${sideLabel} · ${m.label} — ${classification}`);
+      } else {
+        const pct = Math.round((isAbs ? Math.abs(ratio) : ratio) * 100);
+        alerts.push(`${t.target} ${sideLabel} · ${m.label} : ${pct} % (norme : ${m.norm}) — ${classification}`);
+      }
     });
   });
+  return alerts;
+}
+
+function buildPrintSection(t, data, conclusions) {
+  // #86 — Conclusions auto déléguées au helper module-level _collectTestAlerts
+  // (extraction pour réemploi synthèse). Équivalence stricte : mêmes calculs, mêmes
+  // seuils, même format string. Le rendu HTML ci-dessous reste inchangé.
+  _collectTestAlerts(t, data).forEach(s => conclusions.push(s));
 
   const hasSides=t.div!==undefined||t.normDiv!==undefined||t.normAm!==undefined||t.mlaTest||t.normVerrou!==undefined||t.normMob!==undefined;
   let written='', sectionHTML='';
@@ -10848,6 +11074,26 @@ const SPORT_TESTS_AVANT_APRES = {
   ta_morphostatique: 'morphostatique'    // #93 ajout
 };
 
+// #86 Fix E2E — Mapping value-slug → libellé humain pour les systèmes ttt circuits
+// express. Source unique pour synthèse + rapport (Plan de Traitement). Aligné
+// strictement sur les <option value="..."> des select.exo-sys d'index.html (L9602-9614)
+// + sur les keys de la data dict de updateExerciceSubMenu L10659 (mappage sys → liste
+// de sous-exercices). 11 systèmes possibles. Si un slug nouveau est ajouté côté HTML
+// sans entrée ici, fallback renderExo retourne le slug brut (pas de crash).
+const SPORT_SYSTEMES_LABELS = {
+  'systeme-visuel':       '👁️ Système visuel',
+  'systeme-vestibulaire': '👂 Système vestibulaire',
+  'systeme-somesthesique':'🤸 Système somesthésique',
+  'reeduc-pied':          '🦶 Rééducation du pied',
+  'systeme-mandibulaire': '🦷 Système mandibulaire',
+  'reeduc-terrain':       '🏃 Rééducation terrain moteur',
+  'reeduc-chaines':       '⛓️ Rééducation chaînes musculaires',
+  'reflexes-archaiques':  '🧠 Réflexes archaïques',
+  'exercices-respi':      '🌬️ Exercices respiratoires',
+  'reeduc-posturale':     '🧍 Rééducation posturale',
+  'reeduc-articulaire':   '🦴 Rééducation articulaire'
+};
+
 // A5 #92 — Config Neuro fonctionnel partagée sport + posturo. idPrefix sans
 // préfixe DOM ('sn-' sport, lecture neuro4 sans préfixe posturo) : c'est le
 // reader passé à renderNeuroBlocks qui injecte le préfixe attendu. Liste iso
@@ -10969,12 +11215,35 @@ function renderNeuroBlocks(reader) {
 // que bilanData reflète l'état UI courant. Tous les noms de champs lus ci-dessous
 // ont été vérifiés exhaustivement par grep contre le code (data-field=, name=,
 // id=, setBilanField('...) — aucun nom inventé.
-function genererSyntheseSport() {
-  saveBilanSilent();
-  const d = bilanData || {};
+// #86 Point 2 — Mapping DOM-id (chk) → clé bd correspondante (issue de l'onchange
+// setBilanField de chaque cb sport). Source unique consommée par _buildSportSynthese-
+// HTMLForRapport (lecteurs bd-based). Couverture : les 6 cb sport référencées par
+// chk('xxx') dans _collectSportSyntheseSections.
+// ⚠️ CRITIQUE — MAINTENANCE SOLIDAIRE : tout NOUVEAU chk('id-xxx') ajouté dans la
+// synthèse DOIT recevoir son entrée ici (sinon : DOM live OK mais rapport silen-
+// cieusement vide). À vérifier par grep avant tout merge :
+//   grep -oE "chk\(['\"][^'\"]+['\"]\)" js/biomeca.js | sort -u
+// doit retourner exactement les 6 clés présentes ici.
+const CHK_ID_TO_BD_KEY = {
+  'sm-ressaut-dte':       'mand_ressaut_dte',
+  'sm-ressaut-gauche':    'mand_ressaut_gauche',
+  'sm-aggr-dents':        'tonicite_aggr_dents',
+  'sm-aggr-atm':          'tonicite_aggr_atm',
+  'sm-amelio-contact':    'tonicite_amelio_contact',
+  'sm-amelio-tension':    'tonicite_amelio_tension'
+};
+
+// #86 Point 2 — Helper d'extraction des sections 1→11 de la synthèse sport.
+// Pure : pas d'effet DOM, pas d'injection. Retourne sections[] {titre, items}.
+// Lecteurs injectés via readers = { rad, chk, neuroReader } — permet 2 lecteurs :
+// (a) DOM live (genererSyntheseSport, écran) ; (b) bd-based (_buildSportSynthese-
+// HTMLForRapport, rapport hors-écran). Aucune lecture DOM directe dans le body.
+// NE PAS y inclure l'unshift « Mesures à signaler » — chaque wrapper (genererSyn-
+// theseSport pour l'écran, _buildSportSyntheseHTMLForRapport pour le rapport) le
+// gère séparément avec son propre mode (complet écran / condensé rapport).
+function _collectSportSyntheseSections(d, readers) {
   const sections = [];
-  const rad = name => document.querySelector('input[name="' + name + '"]:checked')?.value;
-  const chk = id => document.getElementById(id)?.checked;
+  const { rad, chk, neuroReader } = readers;
 
   // 1. Anamnèse (ssec-0, A1) — data-fields auto-saved + radios + EVA range.
   //    notes_generales ajouté (audit v3). travail/medecin/date_consult exclus
@@ -11236,9 +11505,9 @@ function genererSyntheseSport() {
   if(sm.length) sections.push({ titre: '🏃 Schémas Moteurs', items: sm });
 
   // 9. Neuro Fonctionnel (ssec-8) — délègue à renderNeuroBlocks (module-level,
-  //    #92 partagé sport + posturo). Reader sport : préfixe DOM 'sn-' injecté.
-  const sportNeuroReader = id => document.getElementById('sn-' + id)?.checked;
-  const nf = renderNeuroBlocks(sportNeuroReader);
+  //    #92 partagé sport + posturo). Reader injecté via readers.neuroReader
+  //    (#86 Point 2 : DOM live pour synthèse, bd-based pour rapport).
+  const nf = renderNeuroBlocks(neuroReader);
   const hypoteses = [];
   if(d.hypo_tronc) hypoteses.push('Tronc cérébral');
   if(d.hypo_cervelet) hypoteses.push('Cervelet');
@@ -11270,7 +11539,7 @@ function genererSyntheseSport() {
   // sec('Tests Avant / Après') du rapport sport buildRapport Batch 6).
   const taTests = [];
   Object.keys(SPORT_TESTS_AVANT_APRES).forEach(k => {
-    const v = document.querySelector('input[name="'+k+'"]:checked')?.value;
+    const v = rad(k);
     if(v) taTests.push(TESTS_AVANT_APRES_LABELS[SPORT_TESTS_AVANT_APRES[k]]+': '+v);
   });
   if(taTests.length) sections.push({ titre: '✅ Tests avant/après', items: [taTests.join(' · ')] });
@@ -11301,7 +11570,13 @@ function genererSyntheseSport() {
   if(d.biomec_articulaire) sp.push('Bioméca/Articulaire/viscéral: ' + d.biomec_articulaire);
   if(sp.length) sections.push({ titre: '🌿 Schémas du patient', items: [sp.join(' · ')] });
 
-  // Construction HTML + injection
+  return sections;
+}
+
+// #86 Point 2 — Helper de rendu HTML pure. Reproduit la boucle de construction
+// HTML d'origine. Aucune lecture DOM, aucune injection. Consommé par genererSynthese-
+// Sport (écran) + _buildSportSyntheseHTMLForRapport (rapport).
+function _renderSportSyntheseHTML(sections) {
   let html = '';
   sections.forEach(sec => {
     html += '<div style="margin-bottom:12px;"><div style="font-weight:700;color:#2a7a4e;margin-bottom:4px;">' + sec.titre + '</div>';
@@ -11310,6 +11585,38 @@ function genererSyntheseSport() {
     });
     html += '</div>';
   });
+  return html;
+}
+
+// A5 — Bilan synthèse sport (écran). Délègue à _collectSportSyntheseSections
+// + _renderSportSyntheseHTML (extractions module-level #86 Point 2). Readers DOM
+// live. Garde l'unshift « Mesures à signaler » en tête (priorité clinique aux
+// alertes bioméca). Le rapport utilise les mêmes helpers via _buildSportSynthese-
+// HTMLForRapport avec readers bd-based + SANS unshift Mesures (cf bloc autonome
+// printReport L5757, conservé pour le rapport).
+function genererSyntheseSport() {
+  saveBilanSilent();
+  const d = bilanData || {};
+  const readersDOM = {
+    rad: name => document.querySelector('input[name="' + name + '"]:checked')?.value,
+    chk: id => document.getElementById(id)?.checked,
+    neuroReader: id => document.getElementById('sn-' + id)?.checked
+  };
+  const sections = _collectSportSyntheseSections(d, readersDOM);
+  // #86 Fix E2E — section « ⚠️ Mesures à signaler » EN TÊTE (écran uniquement).
+  // unshift ICI (pas dans _collectSportSyntheseSections) — pour éviter doublon
+  // au rapport (qui a déjà un bloc autonome « Mesures à signaler » en tête, L5757).
+  // Source unique _collectTestAlerts → zéro re-dérivation des 9 tests ni des seuils
+  // interpret*. Lit currentPatient.mesures (séparé de bilanData/d).
+  // Itération dans l'ordre canonique (= ordre rapport L5746) pour parité d'affichage.
+  const mesAlerts = [];
+  const _mes = currentPatient?.mesures || {};
+  ['kfppa-marche','kfppa-course','kfppa-sldj','verrou','mobilite','mla-marche','mla-course','amorti-marche','amorti-course'].forEach(testId => {
+    if(_mes[testId]) mesAlerts.push(..._collectTestAlerts(TESTS[testId], _mes[testId]));
+  });
+  if(mesAlerts.length) sections.unshift({ titre: '⚠️ Mesures à signaler', items: mesAlerts });
+
+  let html = _renderSportSyntheseHTML(sections);
   if(!sections.length) {
     html = '<div style="color:#888;font-style:italic;">Aucun élément renseigné dans le bilan pour le moment.</div>';
   }
@@ -11317,6 +11624,34 @@ function genererSyntheseSport() {
   const result = document.getElementById('sp-synthese-result');
   if(content) content.innerHTML = html;
   if(result) result.style.display = 'block';
+}
+
+// #86 Point 2 — Construction de la synthèse sport pour intégration au rapport.
+// Lecteurs bd-based : tous les radios persistent via sweep saveBilan L7596-7601
+// (bd[el.name] = el.value) → reader rad = name => bd[name]. Les cb persistent via
+// setBilanField selon mapping CHK_ID_TO_BD_KEY (maintenance solidaire critique).
+// Le reader neuro miroir Batch 2 #86 buildBilanPrintSection L6097-6132.
+// Unshift section « ⚠️ Mesures à signaler » en mode CONDENSÉ (doublon intentionnel
+// avec le bloc autonome détaillé du rapport, printReport L5757) — cadrage option C :
+// détail complet (valeurs + normes) en tête du rapport + résumé condensé (label +
+// classification) dans la synthèse de clôture. Itération dans l'ordre canonique
+// L5746 pour parité d'affichage avec le bloc détaillé.
+function _buildSportSyntheseHTMLForRapport(bd) {
+  const readersBD = {
+    rad: name => bd[name],
+    chk: id => !!bd[CHK_ID_TO_BD_KEY[id]],
+    neuroReader: id => !!bd[id.replace(/-/g, '_')]
+  };
+  const sections = _collectSportSyntheseSections(bd, readersBD);
+  // Mesures à signaler condensées en tête (résumé — doublon volontaire avec le
+  // bloc détaillé printReport L5757)
+  const mesAlerts = [];
+  const _mes = currentPatient?.mesures || {};
+  ['kfppa-marche','kfppa-course','kfppa-sldj','verrou','mobilite','mla-marche','mla-course','amorti-marche','amorti-course'].forEach(testId => {
+    if(_mes[testId]) mesAlerts.push(..._collectTestAlerts(TESTS[testId], _mes[testId], { condensed: true }));
+  });
+  if(mesAlerts.length) sections.unshift({ titre: '⚠️ Mesures à signaler', items: mesAlerts });
+  return _renderSportSyntheseHTML(sections);
 }
 
 function toggleCLVF(enabled) {
