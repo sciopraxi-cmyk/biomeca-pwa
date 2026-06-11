@@ -5503,35 +5503,41 @@ function buildRapport() {
   // posturo L4779 + fallback praticiens[0] si single-cabinet sans pratId valide).
   const prat = praticiens.find(pr => pr.id == p.pratId)
     || (praticiens.length === 1 ? praticiens[0] : {});
-  const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat);
 
-  // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
-  // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
-  // L2688) → URL absolue mise en cache par le navigateur, pas de base64 dupliqué.
-  const logoSrc = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
+  // #98 Fix canvas — pré-résolution async des composites avant injection HTML.
+  // Sans cela, l'aperçu écran montre les PNG transparents seuls (gabarit invisible).
+  // Pas de window.print() dans buildRapport — l'aperçu reste écran uniquement.
+  _resolveSportRapportImages(p.bilanData || {}, composites => {
+    const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites);
 
-  // Wrapper thème clair (force background:#fff, color:#111) — override LOCAL du
-  // thème app navy. Structure HTML clonée de #rpt-print (mêmes classes .rp-hdr/
-  // .rp-pt-info/.rp-prat/.rp-pt-item) → les styles globaux .rp-* (biomeca.css
-  // L198-236) s'appliquent et le contenu inline-styled (background:#f5f0e8 beige,
-  // color:#333, etc. émis par buildPrintSection/buildBilanPrintSection) rend
-  // correctement comme à l'impression. Pas de window.print() : aperçu seulement.
-  const bodyFallback = '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
-  const wrappedHTML = `
-    <div style="background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;border-radius:8px;">
-      <div class="rp-hdr">
-        <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
-          <div style="background:#0e1f38;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
-            <img src="${logoSrc}" alt="Sciopraxi" style="height:42px;display:block;">
+    // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
+    // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
+    // L2688) → URL absolue mise en cache par le navigateur, pas de base64 dupliqué.
+    const logoSrc = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
+
+    // Wrapper thème clair (force background:#fff, color:#111) — override LOCAL du
+    // thème app navy. Structure HTML clonée de #rpt-print (mêmes classes .rp-hdr/
+    // .rp-pt-info/.rp-prat/.rp-pt-item) → les styles globaux .rp-* (biomeca.css
+    // L198-236) s'appliquent et le contenu inline-styled (background:#f5f0e8 beige,
+    // color:#333, etc. émis par buildPrintSection/buildBilanPrintSection) rend
+    // correctement comme à l'impression. Pas de window.print() : aperçu seulement.
+    const bodyFallback = '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
+    const wrappedHTML = `
+      <div style="background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;border-radius:8px;">
+        <div class="rp-hdr">
+          <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
+            <div style="background:#0e1f38;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
+              <img src="${logoSrc}" alt="Sciopraxi" style="height:42px;display:block;">
+            </div>
+            <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
           </div>
-          <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
+          <div class="rp-prat">${pratHTML}</div>
         </div>
-        <div class="rp-prat">${pratHTML}</div>
-      </div>
-      <div class="rp-pt-info">${patientHTML}</div>
-      <div>${bodyHTML.trim() ? bodyHTML : bodyFallback}</div>
-    </div>`;
-  document.getElementById('rpt-body').innerHTML = wrappedHTML;
+        <div class="rp-pt-info">${patientHTML}</div>
+        <div>${bodyHTML.trim() ? bodyHTML : bodyFallback}</div>
+      </div>`;
+    document.getElementById('rpt-body').innerHTML = wrappedHTML;
+  });
 }
 
 function buildTestPreview(t,data) {
@@ -5720,6 +5726,93 @@ function buildPhotoMini(data,side,t) {
 // ══════════════════════════════════════════════════════
 // RAPPORT PDF IMPRESSION
 // ══════════════════════════════════════════════════════
+// #98 Fix canvas rapport sport — pré-résolution async des composites morpho/pieds.
+// Pattern miroir posturo _buildRapportBody L5319-5356 : drawing.onload garantit le
+// décodage AVANT le compositing, puis callback déclenchée quand TOUTES les images
+// résolues. Sans cela, embed direct des PNG transparents → fond blanc, gabarit
+// invisible (bug préexistant).
+//
+// Pour chaque clé bd présente parmi _morpho_face/_morpho_face2/_morpho_profilG/
+// _morpho_profilD/_pieds : charge le dessin transparent via new Image(), puis dans
+// onload compose un canvas temp [fond blanc → drawImage(baseEl gabarit) →
+// drawImage(dessin décodé)] et renvoie le PNG composite via toDataURL.
+//
+// CRITIQUE — double câblage onload + onerror : les 2 décrémentent `remaining`. Sans
+// onerror, une image cassée bloquerait la callback indéfiniment → window.print()
+// jamais déclenché. Fallback en cas d'échec (gabarit absent, src corrompue,
+// exception drawImage) : retourne bd[key] brut (PNG transparent — comportement
+// actuel, pas pire que l'existant).
+//
+// Cas 0 image (bd vide ou aucune clé canvas) : callback({}) immédiat synchrone,
+// pas de setTimeout (cohérent avec pattern posturo).
+function _resolveSportRapportImages(bd, callback) {
+  const TODO = [
+    { key: '_morpho_face',    baseId: 'imgjs-morpho-face'    },
+    { key: '_morpho_face2',   baseId: 'imgjs-morpho-face2'   },
+    { key: '_morpho_profilG', baseId: 'imgjs-morpho-profilG' },
+    { key: '_morpho_profilD', baseId: 'imgjs-morpho-profilD' },
+    { key: '_pieds',          baseId: 'sp-pieds-img'         }
+  ];
+  const toResolve = TODO.filter(t => bd[t.key]);
+  if(toResolve.length === 0) {
+    callback({});
+    return;
+  }
+  const composites = {};
+  let remaining = toResolve.length;
+  toResolve.forEach(({ key, baseId }) => {
+    const drawing = new Image();
+    const finalize = (compositeOrFallback) => {
+      composites[key] = compositeOrFallback;
+      remaining--;
+      if(remaining === 0) callback(composites);
+    };
+    drawing.onload = () => {
+      const baseEl = document.getElementById(baseId);
+      if(!baseEl || !baseEl.complete || !baseEl.naturalWidth) {
+        finalize(bd[key]);
+        return;
+      }
+      try {
+        // #98 Fix transform — Wd × Hd = dims du dataURL = rect parent en px CSS
+        // au save (downscale par DPR par _serializeDrawCanvas L7763-7767). Composite
+        // dans ce repère pour préserver le dessin 1:1. Gabarit positionné/dimensionné
+        // selon la BOÎTE CSS de l'UI (parité visuelle exacte).
+        const Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
+        const baseW = baseEl.naturalWidth, baseH = baseEl.naturalHeight;
+        const tmp = document.createElement('canvas');
+        tmp.width = Wd; tmp.height = Hd;
+        const ctx = tmp.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, Wd, Hd);
+        let dx, dy, dispW, dispH;
+        if(key === '_pieds') {
+          dispW = Math.min((Wd - 16) * 0.8, 400);
+          dispH = dispW * (baseH / baseW);
+          dx = 8 + ((Wd - 16) - dispW) / 2;
+          dy = 8;
+        } else {
+          const scale = Math.min((Wd - 16) / baseW, 200 / baseH);
+          dispW = baseW * scale;
+          dispH = baseH * scale;
+          dx = (Wd - dispW) / 2;
+          dy = (Hd - dispH) / 2;
+        }
+        ctx.drawImage(baseEl, dx, dy, dispW, dispH);
+        ctx.drawImage(drawing, 0, 0, Wd, Hd);
+        finalize(tmp.toDataURL('image/png'));
+      } catch(e) {
+        finalize(bd[key]);
+      }
+    };
+    drawing.onerror = () => {
+      // CRITIQUE — sans cette branche, dessin cassé = callback jamais appelée.
+      finalize(bd[key]);
+    };
+    drawing.src = bd[key];
+  });
+}
+
 // #86 Fix E2E — Constructeur partagé du contenu rapport sport (parité buildRapport
 // vs printReport). Source unique → zéro divergence future entre l'aperçu écran et
 // l'impression PDF. Corrige le bug historique buildRapport L5512 où conclusions_tmp
@@ -5729,7 +5822,9 @@ function buildPhotoMini(data,side,t) {
 // buildRapport). bodyHTML = sectionsHTML (tests bioméca ordonnés) + concluHTML
 // (« Mesures à signaler » accumulé sur TOUS les tests) + bilanSection
 // (buildBilanPrintSection — qui contient désormais la synthèse clinique en clôture).
-function _buildSportRapportContentHTML(p, prat) {
+// #98 — paramètre composites optionnel propagé à buildBilanPrintSection (pré-
+// résolution canvas par _resolveSportRapportImages avant build).
+function _buildSportRapportContentHTML(p, prat, composites = {}) {
   // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
@@ -5773,8 +5868,9 @@ function _buildSportRapportContentHTML(p, prat) {
   }
 
   // Bilan clinique (sections cliniques + synthèse clinique en clôture #86 Point 2)
+  // #98 — composites propagés à buildBilanPrintSection (PNG composites morpho/pieds).
   const bilanSection = (typeof buildBilanPrintSection === 'function' && p && p.bilanData)
-    ? buildBilanPrintSection(p.bilanData) : '';
+    ? buildBilanPrintSection(p.bilanData, composites) : '';
 
   const bodyHTML = sectionsHTML + concluHTML + bilanSection;
   return { pratHTML, patientHTML, bodyHTML };
@@ -5797,24 +5893,31 @@ function printReport() {
   const prat = praticiens.find(pr => pr.id == p.pratId)
     || (praticiens.length === 1 ? praticiens[0] : {});
 
-  // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
-  // (source unique commune avec buildRapport, parité visuelle garantie).
-  const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat);
-  document.getElementById('rp-prat-block').innerHTML = pratHTML;
-  document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
-  document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
-    ? bodyHTML
-    : '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
+  // #98 Fix canvas — pré-résolution async des composites morpho/pieds AVANT build
+  // + injection + window.print(). Sans cela, embed direct des PNG transparents →
+  // gabarit invisible au PDF (bug préexistant). Tout le reste de printReport
+  // (injection + classe printing + window.print) est déplacé DANS la callback
+  // pour garantir que les composites sont prêts.
+  _resolveSportRapportImages(p.bilanData || {}, composites => {
+    // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
+    // (source unique commune avec buildRapport, parité visuelle garantie).
+    const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites);
+    document.getElementById('rp-prat-block').innerHTML = pratHTML;
+    document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
+    document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
+      ? bodyHTML
+      : '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
 
-  // Lancer l'impression via CSS @media print
-  document.body.classList.add('printing');
-  setTimeout(() => {
-    window.print();
-    setTimeout(() => document.body.classList.remove('printing'), 100);
-  }, 300);
+    // window.print() déclenché DANS la callback, après injection des composites.
+    document.body.classList.add('printing');
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => document.body.classList.remove('printing'), 100);
+    }, 300);
+  });
 }
 
-function buildBilanPrintSection(bd) {
+function buildBilanPrintSection(bd, composites = {}) {
   if(!bd||!Object.keys(bd).length) return '';
   const f = (k,def) => (bd[k]!==undefined && bd[k]!=='' && bd[k]!==null) ? bd[k] : (def||'—');
   const yn = (k) => bd[k]==='oui'
@@ -5880,13 +5983,21 @@ function buildBilanPrintSection(bd) {
   const hasMorpho = bd._morpho_face||bd._morpho_face2||bd._morpho_profilG||bd._morpho_profilD;
   if(hasMorpho||bd.chaine_musculaire) {
     h += sec('Bilan Morphostatique');
-    if(hasMorpho) {
-      h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-end;">';
-      [['_morpho_face','Face ant.'],['_morpho_face2','Face post.'],['_morpho_profilG','Profil G'],['_morpho_profilD','Profil D']].forEach(([k,lbl]) => {
-        if(bd[k]) h += '<div style="text-align:center;flex:1;"><div style="font-size:8px;color:#888;margin-bottom:2px;">'+lbl+'</div><img src="'+bd[k]+'" style="max-width:100%;height:120px;object-fit:contain;border:1px solid #ddd;border-radius:4px;"/></div>';
-      });
-      h += '</div>';
-    }
+    // #98 Option B — toujours rendre les 4 silhouettes quand la section est visible.
+    // Source par vue : composites[k] (composite gabarit + dessin user) si pré-résolu,
+    // sinon fallback src du gabarit nu depuis imgjs-* du img-store (garanti chargé
+    // dès le boot HTML index.html L2688). Garantit le rendu MÊME sans dessin sauvegardé.
+    h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-end;">';
+    [
+      ['_morpho_face',   'Face ant.',  'imgjs-morpho-face'],
+      ['_morpho_face2',  'Face post.', 'imgjs-morpho-face2'],
+      ['_morpho_profilG','Profil G',   'imgjs-morpho-profilG'],
+      ['_morpho_profilD','Profil D',   'imgjs-morpho-profilD']
+    ].forEach(([k,lbl,baseId]) => {
+      const src = composites[k] || (document.getElementById(baseId)?.src || '');
+      if(src) h += '<div style="text-align:center;flex:1;"><div style="font-size:8px;color:#888;margin-bottom:2px;">'+lbl+'</div><img src="'+src+'" style="max-width:100%;height:120px;object-fit:contain;border:1px solid #ddd;border-radius:4px;"/></div>';
+    });
+    h += '</div>';
     if(bd.chaine_musculaire) h += '<p style="font-size:9px;"><strong>Hypothèse chaîne musculaire:</strong> '+bd.chaine_musculaire+'</p>';
   }
 
@@ -6389,7 +6500,9 @@ function buildBilanPrintSection(bd) {
   const hasRecouvr   = ttt.recouvrement && ttt.recouvrement.length;
   if(bd._pieds || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
     h += sec('Plan de Semelles');
-    if(bd._pieds) h += '<img src="'+bd._pieds+'" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
+    // #98 Option B — toujours rendre le gabarit pieds quand la section est visible.
+    const piedsSrc = composites._pieds || (document.getElementById('sp-pieds-img')?.src || '');
+    if(piedsSrc) h += '<img src="'+piedsSrc+'" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
     if(ttt.semellesDesc) h += '<p style="font-size:9px;"><strong>Description :</strong> '+ttt.semellesDesc+'</p>';
     if(hasMateriaux) h += '<p style="font-size:9px;"><strong>Matériaux :</strong> '+ttt.materiaux.join(', ')+'</p>';
     if(hasRecouvr) h += '<p style="font-size:9px;"><strong>Recouvrement :</strong> '+ttt.recouvrement.join(', ')+'</p>';
