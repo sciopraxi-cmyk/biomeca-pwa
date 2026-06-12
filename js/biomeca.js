@@ -5348,15 +5348,25 @@ function _buildRapportBody(p, d, prat, logo, sections) {
       bonhommesSection.faceImg    = makeSliceComposite(2);
       bonhommesSection.profilGImg = makeSliceComposite(3);
       bonhommesSection.bodyCanvasData = null;
-      _doBuildRapport(p, d, prat, logo, sections);
+      // #88-C Annexes PDF — résolution async APRÈS bonhommes, AVANT injection iframe.
+      _resolvePosturoFichesImages(d, function(fichesPages) {
+        _doBuildRapport(p, d, prat, logo, sections, fichesPages);
+      });
     };
     bcImg.src = bonhommesSection.bodyCanvasData;
     return;
   }
-  _doBuildRapport(p, d, prat, logo, sections);
+  // #88-C Annexes PDF — fast-path sans bonhommes, résolution annexes seule.
+  _resolvePosturoFichesImages(d, function(fichesPages) {
+    _doBuildRapport(p, d, prat, logo, sections, fichesPages);
+  });
 }
 
-function _doBuildRapport(p, d, prat, logo, sections) {
+// #88-C 6e param fichesPages = tableau de dataURLs PNG retournés par
+// _resolvePosturoFichesImages (déjà aplaties multi-pages). Defaut [] = aucun
+// changement pour les call-sites legacy (compat). annexesHTML construit avant
+// le </div> final de .rp-page → 1 page A4 par fiche, page-break-before strict.
+function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR');
   const initiales = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
@@ -5466,6 +5476,13 @@ function _doBuildRapport(p, d, prat, logo, sections) {
 
   // FOOTER
   bodyHtml += '<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · '+p.prenom+' '+p.nom+' · '+dateStr+'</div></div>';
+  // #88-C Annexes fiches d'exercices — markup miroir sport (#88-B,
+  // _buildSportRapportContentHTML). page-break-before:always pour démarrer chaque
+  // fiche sur une page A4 vierge. object-fit:contain pour respecter le ratio fiche
+  // source. Si fichesPages = [], la map produit '' → bodyHtml inchangé.
+  bodyHtml += (fichesPages || []).map(function(dataURL) {
+    return '<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="'+dataURL+'" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>';
+  }).join('');
   bodyHtml += '</div>';
 
   // Injecter dans un iframe isolé pour éviter les conflits CSS
@@ -5504,39 +5521,41 @@ function buildRapport() {
   const prat = praticiens.find(pr => pr.id == p.pratId)
     || (praticiens.length === 1 ? praticiens[0] : {});
 
-  // #98 Fix canvas — pré-résolution async des composites avant injection HTML.
-  // Sans cela, l'aperçu écran montre les PNG transparents seuls (gabarit invisible).
-  // Pas de window.print() dans buildRapport — l'aperçu reste écran uniquement.
+  // #88-B Chaînage : composites #98 + fiches annexes 88-B. Pas de window.print()
+  // dans buildRapport (aperçu écran uniquement) — l'utilisateur peut voir les
+  // annexes en faisant défiler l'aperçu.
   _resolveSportRapportImages(p.bilanData || {}, composites => {
-    const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites);
+    _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages);
 
-    // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
-    // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
-    // L2688) → URL absolue mise en cache par le navigateur, pas de base64 dupliqué.
-    const logoSrc = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
+      // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
+      // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
+      // L2688) → URL absolue mise en cache par le navigateur, pas de base64 dupliqué.
+      const logoSrc = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
 
-    // Wrapper thème clair (force background:#fff, color:#111) — override LOCAL du
-    // thème app navy. Structure HTML clonée de #rpt-print (mêmes classes .rp-hdr/
-    // .rp-pt-info/.rp-prat/.rp-pt-item) → les styles globaux .rp-* (biomeca.css
-    // L198-236) s'appliquent et le contenu inline-styled (background:#f5f0e8 beige,
-    // color:#333, etc. émis par buildPrintSection/buildBilanPrintSection) rend
-    // correctement comme à l'impression. Pas de window.print() : aperçu seulement.
-    const bodyFallback = '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
-    const wrappedHTML = `
-      <div style="background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;border-radius:8px;">
-        <div class="rp-hdr">
-          <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
-            <div style="background:#0e1f38;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
-              <img src="${logoSrc}" alt="Sciopraxi" style="height:42px;display:block;">
+      // Wrapper thème clair (force background:#fff, color:#111) — override LOCAL du
+      // thème app navy. Structure HTML clonée de #rpt-print (mêmes classes .rp-hdr/
+      // .rp-pt-info/.rp-prat/.rp-pt-item) → les styles globaux .rp-* (biomeca.css
+      // L198-236) s'appliquent et le contenu inline-styled (background:#f5f0e8 beige,
+      // color:#333, etc. émis par buildPrintSection/buildBilanPrintSection) rend
+      // correctement comme à l'impression. Pas de window.print() : aperçu seulement.
+      const bodyFallback = '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
+      const wrappedHTML = `
+        <div style="background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;border-radius:8px;">
+          <div class="rp-hdr">
+            <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
+              <div style="background:#0e1f38;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
+                <img src="${logoSrc}" alt="Sciopraxi" style="height:42px;display:block;">
+              </div>
+              <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
             </div>
-            <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
+            <div class="rp-prat">${pratHTML}</div>
           </div>
-          <div class="rp-prat">${pratHTML}</div>
-        </div>
-        <div class="rp-pt-info">${patientHTML}</div>
-        <div>${bodyHTML.trim() ? bodyHTML : bodyFallback}</div>
-      </div>`;
-    document.getElementById('rpt-body').innerHTML = wrappedHTML;
+          <div class="rp-pt-info">${patientHTML}</div>
+          <div>${bodyHTML.trim() ? bodyHTML : bodyFallback}</div>
+        </div>`;
+      document.getElementById('rpt-body').innerHTML = wrappedHTML;
+    });
   });
 }
 
@@ -5813,6 +5832,118 @@ function _resolveSportRapportImages(bd, callback) {
   });
 }
 
+// #88-C Moteur partagé sport+posturo — reçoit un Set('slug|sub') déjà collecté
+// (les collecteurs spécifiques par bilan s'occupent du parcours de la structure
+// de données distincte sport=nested vs posturo=flat). Source unique pour la
+// validation FICHES_SYSTEMES, l'encodage URL, le rendu pdf.js scale 2.0, et la
+// gestion d'erreurs par fiche. Tout changement (échelle, cache LRU, switch pdf.js
+// version) se fait UNIQUEMENT ici. callback toujours appelée — jamais bloquante.
+function _resolveFichesImagesFromPairs(pairs, callback) {
+  // Fast-path : 0 fiche OU pdf.js indisponible (CDN bloqué, mode offline strict).
+  // Le rapport reste fonctionnel sans annexes — dégradation gracieuse.
+  if(pairs.size === 0 || typeof pdfjsLib === 'undefined') {
+    callback([]);
+    return;
+  }
+  // Validation manifeste + construction des chemins NFC encodés.
+  // assets/fiches/<slug>/<sub>.pdf — slug = ASCII pur, sub = NFC avec accents/espaces/
+  // apostrophes droites. encodeURI laisse intacts /, (, ), ', . — tous valides RFC 3986
+  // sub-delims/unreserved. Encode espaces → %20 et accents UTF-8 (é → %C3%A9).
+  const urls = [];
+  pairs.forEach(key => {
+    const idx = key.indexOf('|');
+    const slug = key.slice(0, idx);
+    const sub  = key.slice(idx + 1);
+    const cfg = FICHES_SYSTEMES[slug];
+    if(!cfg || !cfg.subs.includes(sub)) {
+      console.warn('[#88] Fiche introuvable dans FICHES_SYSTEMES :', slug, '/', sub);
+      return;
+    }
+    urls.push(encodeURI('assets/fiches/' + slug + '/' + sub + '.pdf'));
+  });
+  if(urls.length === 0) {
+    callback([]);
+    return;
+  }
+  // Rendu page à page : pdf.numPages → render canvas (scale 2.0 = QR nets) → dataURL.
+  // try/catch par fiche → skip + warn ; jamais de rejet global, callback toujours
+  // appelée. Le .flat() à la fin aplatit la liste de listes en une séquence ordonnée
+  // de pages (toutes les pages de la fiche 1, puis fiche 2, …) — l'ordre des fiches
+  // suit l'ordre d'insertion du Set (déterminé par le collecteur).
+  Promise.all(urls.map(async url => {
+    try {
+      const pdf = await pdfjsLib.getDocument(url).promise;
+      const pages = [];
+      for(let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement('canvas');
+        canvas.width  = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        pages.push(canvas.toDataURL('image/png'));
+      }
+      return pages;
+    } catch(e) {
+      console.warn('[#88] Échec rendu fiche :', url, e);
+      return [];
+    }
+  })).then(results => callback(results.flat()))
+    .catch(e => { console.warn('[#88] Erreur globale annexes :', e); callback([]); });
+}
+
+// #88-C Collecteur sport — lit la structure nested bd.ttt.{c1,c2,ch}. Filtre via
+// filledExo (exo avec libre OU au moins un sys non vide). Itère sys[i]/sub[i] alignés
+// par index (.exo-pair côté DOM). Inclut les exos détachés (décision #88-A). Dédup
+// par Set('slug|sub') — ordre d'insertion = ordre de découverte c1→c2→ch.
+function _collectSportFichesPairs(bd) {
+  const ttt = (bd && bd.ttt) || {};
+  const filledExo = e => e && (e.libre || (e.sys && e.sys.some(s => s)));
+  const pairs = new Set();
+  ['c1', 'c2', 'ch'].forEach(circ => {
+    (ttt[circ] || []).forEach(exo => {
+      if(!filledExo(exo)) return;
+      (exo.sys || []).forEach((slug, i) => {
+        const sub = (exo.sub || [])[i];
+        if(slug && sub) pairs.add(slug + '|' + sub);
+      });
+    });
+  });
+  return pairs;
+}
+
+// #88-C Collecteur posturo — lit les clés FLAT d.circ_<id>_sys / d.circ_<id>_sub
+// (savePosturoBilan L12321-12332). 8 exos seulement (c1_ex1..c1_ex4 + c2_ex1..c2_ex4),
+// pas de ch (échauffement absent du modèle posturo). Alignement sys[i]↔sub[i] par
+// index : si désalignement DOM (sub manquant pour un slot intermédiaire), la paire
+// non-conforme est filtrée par _resolveFichesImagesFromPairs via FICHES_SYSTEMES.subs.
+function _collectPosturoFichesPairs(d) {
+  const exos = ['c1_ex1','c1_ex2','c1_ex3','c1_ex4','c2_ex1','c2_ex2','c2_ex3','c2_ex4'];
+  const pairs = new Set();
+  exos.forEach(id => {
+    const sys = d['circ_'+id+'_sys'] || [];
+    const sub = d['circ_'+id+'_sub'] || [];
+    sys.forEach((slug, i) => {
+      const s = sub[i];
+      if(slug && s) pairs.add(slug + '|' + s);
+    });
+  });
+  return pairs;
+}
+
+// #88-C Wrapper sport — signature et comportement strictement inchangés depuis #88-B.
+// Call-sites printReport L5986 + buildRapport L5511 préservés sans modification.
+function _resolveSportFichesImages(bd, callback) {
+  _resolveFichesImagesFromPairs(_collectSportFichesPairs(bd), callback);
+}
+
+// #88-C Wrapper posturo — consommé par _buildRapportBody (chaînage post-bonhommes
+// et fast-path), précède _doBuildRapport qui injecte les pages dataURL en annexe.
+function _resolvePosturoFichesImages(d, callback) {
+  _resolveFichesImagesFromPairs(_collectPosturoFichesPairs(d), callback);
+}
+
 // #86 Fix E2E — Constructeur partagé du contenu rapport sport (parité buildRapport
 // vs printReport). Source unique → zéro divergence future entre l'aperçu écran et
 // l'impression PDF. Corrige le bug historique buildRapport L5512 où conclusions_tmp
@@ -5822,9 +5953,9 @@ function _resolveSportRapportImages(bd, callback) {
 // buildRapport). bodyHTML = sectionsHTML (tests bioméca ordonnés) + concluHTML
 // (« Mesures à signaler » accumulé sur TOUS les tests) + bilanSection
 // (buildBilanPrintSection — qui contient désormais la synthèse clinique en clôture).
-// #98 — paramètre composites optionnel propagé à buildBilanPrintSection (pré-
-// résolution canvas par _resolveSportRapportImages avant build).
-function _buildSportRapportContentHTML(p, prat, composites = {}) {
+// #98 — composites propagé à buildBilanPrintSection (canvas morpho/pieds).
+// #88-B — fichesPages propagé en suffixe bodyHTML (annexes 1 page par dataURL).
+function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = []) {
   // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
@@ -5872,7 +6003,16 @@ function _buildSportRapportContentHTML(p, prat, composites = {}) {
   const bilanSection = (typeof buildBilanPrintSection === 'function' && p && p.bilanData)
     ? buildBilanPrintSection(p.bilanData, composites) : '';
 
-  const bodyHTML = sectionsHTML + concluHTML + bilanSection;
+  // #88-B Annexes PDF fiches d'exercices — 1 page imprimable par dataURL retourné
+  // par _resolveSportFichesImages (déjà aplaties multi-pages). page-break-before
+  // garantit que chaque fiche commence sur une nouvelle page. object-fit:contain
+  // pour respecter le ratio de la fiche A4 source. Si fichesPages = [] (fast-path
+  // 0 fiche ou pdf.js indispo), annexesHTML = '' → bodyHTML inchangé.
+  const annexesHTML = (fichesPages || []).map(dataURL =>
+    `<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="${dataURL}" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>`
+  ).join('');
+
+  const bodyHTML = sectionsHTML + concluHTML + bilanSection + annexesHTML;
   return { pratHTML, patientHTML, bodyHTML };
 }
 
@@ -5893,27 +6033,28 @@ function printReport() {
   const prat = praticiens.find(pr => pr.id == p.pratId)
     || (praticiens.length === 1 ? praticiens[0] : {});
 
-  // #98 Fix canvas — pré-résolution async des composites morpho/pieds AVANT build
-  // + injection + window.print(). Sans cela, embed direct des PNG transparents →
-  // gabarit invisible au PDF (bug préexistant). Tout le reste de printReport
-  // (injection + classe printing + window.print) est déplacé DANS la callback
-  // pour garantir que les composites sont prêts.
+  // #88-B Chaînage : composites canvas (#98) PUIS fiches PDF annexes (88-B) AVANT
+  // build + injection + window.print(). Imbrication intentionnelle (pas Promise.all)
+  // pour garder le pattern callback existant + éviter la complexité async/await à
+  // ce niveau. Le coût pdf.js est entièrement post-composites — pas de race possible.
   _resolveSportRapportImages(p.bilanData || {}, composites => {
-    // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
-    // (source unique commune avec buildRapport, parité visuelle garantie).
-    const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites);
-    document.getElementById('rp-prat-block').innerHTML = pratHTML;
-    document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
-    document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
-      ? bodyHTML
-      : '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
+    _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
+      // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
+      // (source unique commune avec buildRapport, parité visuelle garantie).
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages);
+      document.getElementById('rp-prat-block').innerHTML = pratHTML;
+      document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
+      document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
+        ? bodyHTML
+        : '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
 
-    // window.print() déclenché DANS la callback, après injection des composites.
-    document.body.classList.add('printing');
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => document.body.classList.remove('printing'), 100);
-    }, 300);
+      // window.print() déclenché tout au fond, après injection composites + annexes.
+      document.body.classList.add('printing');
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => document.body.classList.remove('printing'), 100);
+      }, 300);
+    });
   });
 }
 
@@ -9827,180 +9968,36 @@ function getBilanPosturoHTML() {
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#2a7a4e;font-weight:700;">30s (20/10) — Exercice 1</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c1-ex1-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#2a7a4e;font-weight:700;">30s (20/10) — Exercice 2</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c1-ex2-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#2a7a4e;font-weight:700;">30s (20/10) — Exercice 3</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c1-ex3-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#2a7a4e;font-weight:700;">30s (20/10) — Exercice 4</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c1-ex4-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
@@ -10015,180 +10012,36 @@ function getBilanPosturoHTML() {
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 1</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c2-ex1-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 2</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c2-ex2-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 3</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c2-ex3-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
                   <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 4</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
-                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">                      <option value="">-- Système --</option>
-                      <option value="systeme-visuel">👁️ Système visuel</option>
-                      <option value="systeme-vestibulaire">👂 Système vestibulaire</option>
-                      <option value="systeme-somesthesique">🤸 Système somesthésique</option>
-                      <option value="reeduc-pied">🦶 Rééducation du pied</option>
-                      <option value="systeme-mandibulaire">🦷 Système mandibulaire</option>
-                      <option value="reeduc-terrain">🏃 Rééducation terrain moteur</option>
-                      <option value="reeduc-chaines">⛓️ Rééducation chaînes musculaires</option>
-                      <option value="reflexes-archaiques">🧠 Réflexes archaïques</option>
-                      <option value="exercices-respi">🌬️ Exercices respiratoires</option>
-                      <option value="reeduc-posturale">🧍 Rééducation posturale</option>
-                      <option value="reeduc-articulaire">🦴 Rééducation articulaire</option>
-                    </select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
+                    <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <input class="inp" id="po-c2-ex4-libre" placeholder="✏️ Libre..." style="font-size:11px;background:#fff;color:#222;flex:1;min-width:80px;"/>
                   </div>
                 </div>
@@ -10885,7 +10738,6 @@ function toggleIneg(show) {
   if(!show) document.querySelectorAll('input[name="po-ineg-dir"]').forEach(function(r){ r.checked=false; });
 }
 function updateExerciceSubMenu(selEl) {
-  const data = {"systeme-visuel": ["1. Exercices avant et après la rééducation oculaire", "2. Rééducation pour un canal semi circulaire latéral", "3. Rééducation problème de fixation", "4. Rééducation problème de poursuite", "5. Rééducation oculaire de base"], "systeme-vestibulaire": ["1. Rééducation pour un canal semi circulaire latéral", "2. Rééducation pour un Moro ou un canal postérieur", "3. Rééducation pour un canal antérieur", "4. Rééducation pour les saccules", "5. Rééducation pour les utricules", "6. Rééducation du réflexe vestibulo oculaire"], "systeme-somesthesique": ["1. Stimulation du système proprioceptif"], "reeduc-pied": ["1. Rééducation du pied"], "systeme-mandibulaire": ["1. Rééducation de la mâchoire"], "reeduc-terrain": ["1. Rééducation d'un patient en excès de Schéma aérien", "2. Rééducation d'un patient en excès de Schéma terrien"], "reeduc-chaines": ["1. Rééduc d'un excès de chaîne de flexion", "2. Rééduc d'un excès de chaîne d'extension", "3. Rééduc d'un excès de chaîne de fermeture", "4. Rééduc d'un excès de chaîne d'ouverture", "5. Rééduc d'une chaîne statique en expi", "6. Rééduc d'une chaîne statique en inspi"], "reflexes-archaiques": ["1. Réflexe de peur paralysante", "2. Réflexe de MORO", "3. Réflexe tendineux de protection", "6. Réflexe Tonique Asymétrique du Cou RTAC", "8. Réflexe de Galant", "9. Réflexe de Perez", "10. Réflexe de Landau", "11. Réflexe de la reptation", "12. Réflexe de l'agrippement palmaire", "14. Réflexe de Babinski", "15. Réflexe d'Agrippement plantaire", "16. Réflexe de BABKIN"], "exercices-respi": ["1. Exercice autour du diaphragme", "2. Tempos respiratoire", "3. Respiration pour le stress"], "reeduc-posturale": ["10 Exercices chaîne posturale"], "reeduc-articulaire": ["11 Exercices chaîne articulaire"]};
   const system = selEl.value;
   // Trouver ou créer le wrapper pour ce select
   let wrapper = selEl.closest('.exo-pair');
@@ -10899,7 +10751,8 @@ function updateExerciceSubMenu(selEl) {
   // Supprimer l'ancien sous-menu
   const oldSub = wrapper.querySelector('.exo-sub');
   if(oldSub) oldSub.remove();
-  const opts = data[system] || [];
+  // #88 Source unique FICHES_SYSTEMES — anciens dicts inline supprimés.
+  const opts = FICHES_SYSTEMES[system]?.subs || [];
   if(!opts.length) return;
   const sub = document.createElement('select');
   sub.className = 'inp exo-sub';
@@ -11187,25 +11040,166 @@ const SPORT_TESTS_AVANT_APRES = {
   ta_morphostatique: 'morphostatique'    // #93 ajout
 };
 
-// #86 Fix E2E — Mapping value-slug → libellé humain pour les systèmes ttt circuits
-// express. Source unique pour synthèse + rapport (Plan de Traitement). Aligné
-// strictement sur les <option value="..."> des select.exo-sys d'index.html (L9602-9614)
-// + sur les keys de la data dict de updateExerciceSubMenu L10659 (mappage sys → liste
-// de sous-exercices). 11 systèmes possibles. Si un slug nouveau est ajouté côté HTML
-// sans entrée ici, fallback renderExo retourne le slug brut (pas de crash).
-const SPORT_SYSTEMES_LABELS = {
-  'systeme-visuel':       '👁️ Système visuel',
-  'systeme-vestibulaire': '👂 Système vestibulaire',
-  'systeme-somesthesique':'🤸 Système somesthésique',
-  'reeduc-pied':          '🦶 Rééducation du pied',
-  'systeme-mandibulaire': '🦷 Système mandibulaire',
-  'reeduc-terrain':       '🏃 Rééducation terrain moteur',
-  'reeduc-chaines':       '⛓️ Rééducation chaînes musculaires',
-  'reflexes-archaiques':  '🧠 Réflexes archaïques',
-  'exercices-respi':      '🌬️ Exercices respiratoires',
-  'reeduc-posturale':     '🧍 Rééducation posturale',
-  'reeduc-articulaire':   '🦴 Rééducation articulaire'
+// #88 Source unique — pilote (a) dict sous-exercices consommé par updateExerciceSubMenu,
+// (b) options <select.exo-sys> filtrées par bilan via _genSysOptionsHTML, (c) labels
+// système (SPORT_SYSTEMES_LABELS dérivé), (d) chemins PDF assets/fiches/<slug>/<sub>.pdf
+// consommés par le helper async pdf.js du chantier #88-B. Ajouter/retirer un système OU
+// un sub-exo se fait UNIQUEMENT ici — les 3 autres call-sites s'auto-synchronisent.
+const FICHES_SYSTEMES = {
+  'systeme-visuel': {
+    label: '👁️ Système visuel',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Exercices avant et après la rééducation oculaire",
+      "2. Rééducation problème de fixation",
+      "3. Rééducation problème de poursuite",
+      "4. Rééducation oculaire de base"
+    ]
+  },
+  'systeme-vestibulaire': {
+    label: '👂 Système vestibulaire',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Rééducation pour un canal semi circulaire latéral",
+      "2. Rééducation pour un Moro ou un canal postérieur",
+      "3. Rééducation pour un canal antérieur",
+      "4. Rééducation pour les saccules",
+      "5. Rééducation pour les utricules",
+      "6. Rééducation du réflexe vestibulo oculaire"
+    ]
+  },
+  'systeme-somesthesique': {
+    label: '🤸 Système somesthésique',
+    bilans: ['sport', 'posturo'],
+    subs: ["1. Stimulation du système proprioceptif"]
+  },
+  'reeduc-pied': {
+    label: '🦶 Rééducation du pied',
+    bilans: ['sport', 'posturo'],
+    subs: ["1. Rééducation du pied"]
+  },
+  'systeme-mandibulaire': {
+    label: '🦷 Système mandibulaire',
+    bilans: ['sport', 'posturo'],
+    subs: ["1. Rééducation de la mâchoire"]
+  },
+  'reeduc-terrain': {
+    label: '🏃 Rééducation terrain moteur',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Rééducation d'un patient en excès de schéma aérien",
+      "2. Rééducation d'un patient en excès de schéma terrien"
+    ]
+  },
+  'reeduc-chaines': {
+    label: '⛓️ Rééducation chaînes musculaires',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Rééduc d'un excès de chaîne de flexion",
+      "2. Rééduc d'un excès de chaîne d'extension",
+      "3. Rééduc d'un excès de chaîne de fermeture",
+      "4. Rééduc d'un excès de chaîne d'ouverture",
+      "5. Rééduc d'une chaîne statique en expi",
+      "6. Rééduc d'une chaîne statique en inspi"
+    ]
+  },
+  'reflexes-archaiques': {
+    label: '🧠 Réflexes archaïques',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Réflexe de peur paralysante",
+      "2. Réflexe de MORO",
+      "3. Réflexe tendineux de protection",
+      "4. Réflexe de succion",
+      "5. Réflexe Tonique labyrinthique RTL",
+      "6. Réflexe Tonique Asymétrique du Cou RTAC",
+      "7. Réflexe Tonique Symétrique du Cou RTSC",
+      "8. Réflexe de Galant",
+      "9. Réflexe de Perez",
+      "10. Réflexe de Landau",
+      "11. Réflexe de la reptation de BAUER",
+      "12. Réflexe d'agrippement palmaire",
+      "13. Réflexe de Traction des mains",
+      "14. Réflexe de Babinski",
+      "15. Réflexe d'Agrippement plantaire",
+      "16. Réflexe de BABKIN"
+    ]
+  },
+  'respi-sport': {
+    label: '🌬️ Rééducation par la respiration (sport)',
+    bilans: ['sport'],
+    subs: [
+      "1. Exercices autour du diaphragme",
+      "2. Tempos respiratoires",
+      "3. Respiration pour le stress",
+      "4. Les 12 travaux de la respiration",
+      "5. Méthodes EPO",
+      "6. Coordination de la respiration",
+      "7. Rééducation de la cohérence cardiaque"
+    ]
+  },
+  'reeduc-posturale': {
+    label: '🧍 Rééducation posturale',
+    bilans: ['posturo'],
+    subs: ["10. Exercices chaînes posturales"]
+  },
+  'reeduc-articulaire': {
+    label: '🦴 Rééducation articulaire',
+    bilans: ['posturo'],
+    subs: ["11. Exercices chaînes articulaires"]
+  },
+  'pathologies-genou': {
+    label: '🦵 Pathologies du genou',
+    bilans: ['sport'],
+    subs: [
+      "1. Programme de réathlétisation d'un syndrome de la bandelette ilio tibiale",
+      "2. Programme de réathlétisation d'un syndrome fémoro-patellaire"
+    ]
+  },
+  'pathologies-hanche': {
+    label: '🦴 Pathologies de la hanche',
+    bilans: ['sport'],
+    subs: [
+      "1. Programme de réathlétisation d'une pubalgie",
+      "2. Programme de réathlétisation d'un syndrome du piriforme",
+      "3. Programme de réathlétisation d'une tendinopathie du moyen fessier"
+    ]
+  },
+  'pathologies-pied': {
+    label: '🦶 Pathologies du pied',
+    bilans: ['sport'],
+    subs: [
+      "1. Programme de réathlétisation d'une tendinopathie d'Achille",
+      "2. Programme de réathlétisation d'une tendinopathie des fibulaires"
+    ]
+  },
+  'respi-posture': {
+    label: '🌬️ Rééducation par la respiration (posture)',
+    bilans: ['posturo'],
+    subs: [
+      "1. Exercices autour du diaphragme",
+      "2. Tempos respiratoires",
+      "3. Respiration pour le stress"
+    ]
+  }
 };
+
+// #88 Génère le bloc <option> filtré par bilan ('sport' ou 'posturo') pour les
+// select.exo-sys. Utilisé par getBilanPosturoHTML (interpolation template literal)
+// et populateSportSysOptions (injection runtime dans #ssec-9). 1 source = FICHES_SYSTEMES.
+function _genSysOptionsHTML(bilan) {
+  return '<option value="">-- Système --</option>' +
+    Object.entries(FICHES_SYSTEMES)
+      .filter(([, cfg]) => cfg.bilans.includes(bilan))
+      .map(([slug, cfg]) => `<option value="${slug}">${cfg.label}</option>`)
+      .join('');
+}
+
+// #88 Dérivé de FICHES_SYSTEMES — source unique. Fallback brut au call-site
+// (renderExo L6456 : `SPORT_SYSTEMES_LABELS[s] || s`) si slug inconnu.
+const SPORT_SYSTEMES_LABELS = Object.fromEntries(
+  Object.entries(FICHES_SYSTEMES).map(([slug, cfg]) => [slug, cfg.label])
+);
 
 // A5 #92 — Config Neuro fonctionnel partagée sport + posturo. idPrefix sans
 // préfixe DOM ('sn-' sport, lecture neuro4 sans préfixe posturo) : c'est le
@@ -12829,6 +12823,21 @@ document.addEventListener('DOMContentLoaded', function() {
   document.body.appendChild(floatBtn);
   setTimeout(_injectMicButtons, 800);
 });
+
+// #88 Peuple les 48 select.exo-sys statiques de #ssec-9 (index.html) à partir
+// de FICHES_SYSTEMES filtré pour le bilan sport. Les selects sont vides dans
+// index.html (replace_all #88 a retiré les <option> inlines) — c'est ce hook
+// qui les remplit au boot. Posturo n'a pas besoin d'équivalent car getBilanPosturoHTML
+// régénère ses 24 selects à chaque ouverture via interpolation ${_genSysOptionsHTML('posturo')}.
+function populateSportSysOptions() {
+  const optsHTML = _genSysOptionsHTML('sport');
+  document.querySelectorAll('#ssec-9 select.exo-sys').forEach(sel => {
+    const prev = sel.value;
+    sel.innerHTML = optsHTML;
+    if(prev) sel.value = prev;
+  });
+}
+document.addEventListener('DOMContentLoaded', populateSportSysOptions);
 
 // ===== STRIPE + MODULES =====
 var _stripeInstance = null;
