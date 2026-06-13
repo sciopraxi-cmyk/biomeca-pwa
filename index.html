@@ -501,6 +501,27 @@
       <div id="params-prat-list" style="margin-top:8px;"></div>
     </div>
 
+    <!-- #81 Maintenance Storage : backfill one-shot dataURLs → Supabase Storage -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle">🗃️ Maintenance Storage</div>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
+        Migrer les images encore en dataURL (localStorage) vers Supabase Storage. Libère le localStorage et évite la saturation #35.
+      </p>
+      <div id="backfill-count-display" style="font-size:14px;font-weight:600;color:var(--mut);margin-bottom:4px;">Cliquez « Compter à blanc » pour évaluer.</div>
+      <div id="backfill-details" style="margin-bottom:12px;"></div>
+      <button onclick="_runBackfillDryRun()" class="btn" style="background:#666;color:#fff;font-size:12px;padding:6px 14px;margin-right:8px;">📊 Compter à blanc</button>
+      <button onclick="_runBackfillExecution()" class="btn" style="background:#0e1f38;color:#fff;font-size:12px;padding:6px 14px;">🚀 Lancer la migration</button>
+    </div>
+
+    <!-- Modal lock UI pendant la migration (couvre l'écran, empêche tout clic) -->
+    <div id="backfill-lock-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;align-items:center;justify-content:center;flex-direction:column;">
+      <div style="background:#fff;padding:24px;border-radius:8px;max-width:420px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+        <div style="font-size:16px;font-weight:700;color:#0e1f38;margin-bottom:12px;">🔄 Migration Storage en cours</div>
+        <div style="font-size:12px;color:#666;margin-bottom:12px;">Ne fermez pas l'application. Cela peut prendre plusieurs minutes.</div>
+        <div id="backfill-progress" style="font-size:11px;color:#0e1f38;font-family:monospace;background:#f7f8fa;padding:8px;border-radius:4px;">Initialisation…</div>
+      </div>
+    </div>
+
     <!-- Panneau admin: gestion accès utilisateurs -->
     <div class="card" id="admin-panel" style="display:none;">
       <div class="stitle">👑 Gestion des accès utilisateurs</div>

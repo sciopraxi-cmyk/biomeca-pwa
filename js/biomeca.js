@@ -1968,7 +1968,11 @@ function nav(id) {
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
-  if(id === 'pg-params') renderParamsPratList();
+  if(id === 'pg-params') {
+    renderParamsPratList();
+    // #81 — rafraîchit le compteur Maintenance à l'ouverture de Paramètres
+    if (typeof _runBackfillDryRun === 'function') _runBackfillDryRun();
+  }
   if(id === 'pg-sport') {
     // Mettre à jour le sous-titre avec le patient courant
     const sub = document.getElementById('sport-sub');
@@ -3420,6 +3424,236 @@ async function migrateSportBilanDataPhotos(bd, patientId, bilanId) {
 function restoreSportBilanDataPhotosStash(bd, stash) {
   for (const k in stash) {
     if (!bd[k]) bd[k] = stash[k];
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// #81 BACKFILL — migration one-shot des dataURLs historiques vers Storage
+// ══════════════════════════════════════════════════════
+// Couverture exhaustive du state patient :
+//   (a) p.bilanData courant — 9 clés SPORT_BILAN_PHOTO_KEYS
+//   (b) p.bilanDataPosturo courant — 8 clés POSTURO_PHOTO_KEYS
+//   (c) p.mesures[testId].photos[] + frames[] — chaque .dataUrl
+//   (d) p.bilansSport[i].bilanData + .mesures (archives)
+//   (e) p.bilansPosturo[i].bilanDataPosturo (archives)
+// Idempotent (migratePhotoEntry skip si Path déjà set), fail-safe (jamais de
+// delete sans upload OK, cf storage.js L243-245), un seul savePatients final.
+
+function _isDataURL(v) {
+  return typeof v === 'string' && v.startsWith('data:');
+}
+
+// Compte les dataURLs persistées pour un patient sans rien muter.
+// Fonction pure (sauf accès à SPORT_BILAN_PHOTO_KEYS / POSTURO_PHOTO_KEYS).
+function _countDataURLsInPatient(p) {
+  if (!p) return 0;
+  let count = 0;
+  // (a) bilanData courant
+  if (p.bilanData) for (const k of SPORT_BILAN_PHOTO_KEYS) {
+    if (_isDataURL(p.bilanData[k])) count++;
+  }
+  // (b) bilanDataPosturo courant
+  if (p.bilanDataPosturo) for (const k of POSTURO_PHOTO_KEYS) {
+    if (_isDataURL(p.bilanDataPosturo[k])) count++;
+  }
+  // (c) mesures courantes
+  if (p.mesures) for (const tid in p.mesures) {
+    if (tid.startsWith('_')) continue; // skip _bilanId etc.
+    const t = p.mesures[tid];
+    if (Array.isArray(t?.photos)) count += t.photos.filter(e => e && _isDataURL(e.dataUrl)).length;
+    if (Array.isArray(t?.frames)) count += t.frames.filter(e => e && _isDataURL(e.dataUrl)).length;
+  }
+  // (d) bilansSport archives
+  if (Array.isArray(p.bilansSport)) for (const arch of p.bilansSport) {
+    if (arch.bilanData) for (const k of SPORT_BILAN_PHOTO_KEYS) {
+      if (_isDataURL(arch.bilanData[k])) count++;
+    }
+    if (arch.mesures) for (const tid in arch.mesures) {
+      if (tid.startsWith('_')) continue;
+      const t = arch.mesures[tid];
+      if (Array.isArray(t?.photos)) count += t.photos.filter(e => e && _isDataURL(e.dataUrl)).length;
+      if (Array.isArray(t?.frames)) count += t.frames.filter(e => e && _isDataURL(e.dataUrl)).length;
+    }
+  }
+  // (e) bilansPosturo archives
+  if (Array.isArray(p.bilansPosturo)) for (const arch of p.bilansPosturo) {
+    if (arch.bilanDataPosturo) for (const k of POSTURO_PHOTO_KEYS) {
+      if (_isDataURL(arch.bilanDataPosturo[k])) count++;
+    }
+  }
+  return count;
+}
+
+// Compte sans rien muter. Retourne { totals: [{id, name, count}], grand }.
+function _dryRunBackfill() {
+  const totals = (Array.isArray(patients) ? patients : [])
+    .map(p => ({
+      id: p?.id || '?',
+      name: ((p?.prenom || '?') + ' ' + (p?.nom || '?')).trim() || '(sans nom)',
+      count: _countDataURLsInPatient(p)
+    }))
+    .filter(t => t.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const grand = totals.reduce((s, t) => s + t.count, 0);
+  console.log('[#81 dry-run] Total dataURLs à migrer : ' + grand + ' (' + totals.length + ' patients)');
+  if (totals.length > 0) console.table(totals);
+  return { totals, grand };
+}
+
+// Migration effective. ⚠ NE PAS APPELER tant que la validation Joel n'est pas
+// reçue (Palier 3 dry-run only). UN SEUL savePatients final.
+async function _executeBackfill({ onProgress } = {}) {
+  await ensureSession();
+  let migrated = 0, failed = 0, patientsTraités = 0;
+
+  // Helper : itère un objet mesures (courant ou archivé) et migre chaque test.
+  async function _backfillMesuresEntry(mesures, bilanId, patientId) {
+    if (!mesures) return;
+    if (!mesures._bilanId) mesures._bilanId = bilanId;
+    for (const tid in mesures) {
+      if (tid.startsWith('_')) continue;
+      try {
+        await migrateSportPhotos(mesures[tid], patientId, mesures._bilanId, tid);
+        migrated++;
+      } catch (e) {
+        failed++;
+        console.warn('[#81] migrate mesures fail (' + tid + ') :', e);
+      }
+    }
+  }
+
+  for (const p of (Array.isArray(patients) ? patients : [])) {
+    if (!p?.id) continue;
+    // (a) + (c) bilan sport en cours
+    if (!p.mesures) p.mesures = {};
+    if (!p.mesures._bilanId) p.mesures._bilanId = crypto.randomUUID();
+    if (p.bilanData) {
+      try {
+        await migrateSportBilanDataPhotos(p.bilanData, p.id, p.mesures._bilanId);
+        migrated++;
+      } catch (e) {
+        failed++;
+        console.warn('[#81] sport-bd courant fail :', e);
+      }
+    }
+    await _backfillMesuresEntry(p.mesures, p.mesures._bilanId, p.id);
+
+    // (b) bilan posturo en cours
+    if (p.bilanDataPosturo) {
+      if (!p.bilanDataPosturo.id) p.bilanDataPosturo.id = crypto.randomUUID();
+      try {
+        await migratePosturoPhotos(p.bilanDataPosturo, p.id, p.bilanDataPosturo.id);
+        migrated++;
+      } catch (e) {
+        failed++;
+        console.warn('[#81] posturo-bd courant fail :', e);
+      }
+    }
+
+    // (d) archives sport
+    for (const arch of (p.bilansSport || [])) {
+      if (!arch._bilanId) arch._bilanId = crypto.randomUUID();
+      if (arch.bilanData) {
+        try {
+          await migrateSportBilanDataPhotos(arch.bilanData, p.id, arch._bilanId);
+          migrated++;
+        } catch (e) {
+          failed++;
+          console.warn('[#81] archive sport-bd fail :', e);
+        }
+      }
+      await _backfillMesuresEntry(arch.mesures, arch._bilanId, p.id);
+    }
+
+    // (e) archives posturo
+    for (const arch of (p.bilansPosturo || [])) {
+      if (arch.bilanDataPosturo) {
+        if (!arch.bilanDataPosturo.id) arch.bilanDataPosturo.id = crypto.randomUUID();
+        try {
+          await migratePosturoPhotos(arch.bilanDataPosturo, p.id, arch.bilanDataPosturo.id);
+          migrated++;
+        } catch (e) {
+          failed++;
+          console.warn('[#81] archive posturo-bd fail :', e);
+        }
+      }
+    }
+
+    patientsTraités++;
+    if (onProgress) onProgress({
+      patientId: p.id,
+      patientName: ((p.prenom || '?') + ' ' + (p.nom || '?')).trim(),
+      patientsTraités,
+      migrated,
+      failed
+    });
+  }
+
+  // UN SEUL savePatients final → libère le localStorage en un coup.
+  savePatients();
+  return { migrated, failed, patientsTraités };
+}
+
+// ─── UI Maintenance dans Paramètres ───
+
+function _openBackfillLockModal() {
+  const modal = document.getElementById('backfill-lock-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function _closeBackfillLockModal() {
+  const modal = document.getElementById('backfill-lock-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function _runBackfillDryRun() {
+  if (!Array.isArray(patients)) return;
+  const { totals, grand } = _dryRunBackfill();
+  const countEl = document.getElementById('backfill-count-display');
+  if (countEl) {
+    if (grand === 0) {
+      countEl.textContent = '✓ Aucune migration nécessaire (0 dataURL en localStorage).';
+      countEl.style.color = '#2a7a4e';
+    } else {
+      countEl.textContent = grand + ' dataURL' + (grand > 1 ? 's' : '') + ' détectée' +
+        (grand > 1 ? 's' : '') + ' dans ' + totals.length + ' patient' + (totals.length > 1 ? 's' : '');
+      countEl.style.color = '#c0392b';
+    }
+  }
+  const detailsEl = document.getElementById('backfill-details');
+  if (detailsEl) {
+    detailsEl.innerHTML = totals.length === 0
+      ? ''
+      : '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;color:var(--mut);">Détail par patient</summary><ul style="font-size:11px;color:var(--mut);margin-top:6px;">' +
+        totals.map(t => '<li>' + t.name + ' : ' + t.count + ' image' + (t.count > 1 ? 's' : '') + '</li>').join('') +
+        '</ul></details>';
+  }
+}
+
+async function _runBackfillExecution() {
+  if (!confirm("⚠️ Lancer la migration de toutes les dataURLs vers Supabase Storage ?\n\nCette opération peut prendre plusieurs minutes selon le volume. Ne fermez pas l'application pendant l'exécution.")) return;
+  _openBackfillLockModal();
+  try {
+    const progressEl = document.getElementById('backfill-progress');
+    const result = await _executeBackfill({
+      onProgress: ({ patientName, patientsTraités, migrated, failed }) => {
+        if (progressEl) {
+          progressEl.textContent = 'Patient #' + patientsTraités + ' : ' + patientName +
+            ' · ' + migrated + ' migrations · ' + failed + ' échecs';
+        }
+      }
+    });
+    alert('✓ Migration terminée.\n\n' +
+      result.patientsTraités + ' patient(s) traité(s).\n' +
+      result.migrated + ' upload(s) réussi(s).\n' +
+      result.failed + ' échec(s).\n\n' +
+      'Le localStorage est libéré.');
+    _runBackfillDryRun(); // recompte pour montrer le nouveau total
+  } catch (e) {
+    alert('Erreur pendant la migration : ' + (e?.message || e));
+    console.error('[#81] executeBackfill exception :', e);
+  } finally {
+    _closeBackfillLockModal();
   }
 }
 
