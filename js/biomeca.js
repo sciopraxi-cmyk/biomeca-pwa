@@ -2009,29 +2009,10 @@ function nav(id) {
       // Injection micros de dictée par champ texte (Q-mic-1 b, #73 A1)
       if(typeof _injectSportMicButtons === 'function') setTimeout(_injectSportMicButtons, 250);
       // 4. Restaurer les dessins directement (pas via restoreCanvas)
+      // #99 refactor — délégué à _drawMorphoCanvasesFromSource pour fidélité
+      // byte-pour-byte avec le 2e call-site post-prefetch (.then() loadBilan).
       setTimeout(() => {
-        const bd = currentPatient?.bilanData || {};
-        const pairs = [
-          ['morpho-face','_morpho_face'],
-          ['morpho-face2','_morpho_face2'],
-          ['morpho-profilG','_morpho_profilG'],
-          ['morpho-profilD','_morpho_profilD']
-        ];
-        pairs.forEach(([canvasId, key]) => {
-          if(!bd[key]) return;
-          const cvs = document.getElementById(canvasId);
-          if(!cvs || cvs.width === 0) return;
-          const img = new Image();
-          img.onload = () => {
-            const dpr = window.devicePixelRatio || 1;
-            cvs.getContext('2d').drawImage(img, 0, 0, cvs.width/dpr, cvs.height/dpr);
-            // Fix #94 auto-réparation — efface fond noir éventuel des bilans
-            // corrompus pré-fix (saveBilanSilent JPEG sur canvas morpho overlay
-            // transparent). Idempotent sur PNG transparent propre.
-            _stripBackgroundFromRestore(cvs);
-          };
-          img.src = bd[key];
-        });
+        _drawMorphoCanvasesFromSource(currentPatient?.bilanData);
         // pieds restaurés dans drawPiedsTemplate
       }, 500);
     }, 80);
@@ -3367,12 +3348,17 @@ function restoreSportPhotosStash(stash) {
   });
 }
 
-// #85 Phase 1 — clés photo bilanData sport (captures pleine résolution Analyse
-// posturale). NE PAS confondre avec les overlay dessins legacy _morpho_*/_pieds
-// qui restent en dataURL dans bilanData (ticket #99 dédié pour ces 5 clés).
+// #85 Phase 1 + #99 — clés photo bilanData sport migrées vers Storage.
+//   - 4 captures Analyse posturale (JPEG 0.88 1080p) ajoutées en #85.
+//   - 5 overlay dessins legacy (4 morpho + pieds, PNG transparent) ajoutés en #99.
+// Pipeline préserve le MIME : PNG → upload image/png → refetch image/png → dataURL
+// PNG transparente intacte (cf storage.js dataUrlToBlob L29-40 + FileReader L196-212).
 // Pattern miroir POSTURO_PHOTO_KEYS : `_xxx` = dataUrl RAM, `_xxxPath` = path Storage.
 const SPORT_BILAN_PHOTO_KEYS = [
-  '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD'
+  // #85 captures Analyse posturale
+  '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD',
+  // #99 overlay dessins legacy (PNG transparent — calques superposés à la photo)
+  '_morpho_face', '_morpho_face2', '_morpho_profilG', '_morpho_profilD', '_pieds'
 ];
 
 // Miroir prefetchPosturoPhotos L3143 — restaure dataUrl RAM depuis path Storage
@@ -3434,6 +3420,61 @@ async function migrateSportBilanDataPhotos(bd, patientId, bilanId) {
 function restoreSportBilanDataPhotosStash(bd, stash) {
   for (const k in stash) {
     if (!bd[k]) bd[k] = stash[k];
+  }
+}
+
+// #99 Tracé commun des 4 canvas overlay morpho (PNG transparent) depuis un objet
+// source. Extraction du bloc historique nav L2013-2034 pour zéro duplication +
+// fidélité byte-pour-byte garantie entre les 2 call-sites (nav setTimeout 500ms
+// pré-prefetch + .then() post-prefetch de prefetchSportBilanDataPhotos #99).
+//
+// Source paramétrée :
+//   - chaîne nav setTimeout → currentPatient?.bilanData (état persisté, dataURLs
+//     présentes pour bilans non-migrés legacy)
+//   - .then() post-prefetch  → bilanData global (réhydraté par prefetch Storage
+//     pour bilans post-migration où currentPatient.bilanData ne contient que Path)
+//
+// Function declaration → hoistée (insensible à l'ordre). Idempotent : drawImage
+// est non-cumulatif, redraw même image = no-op visible. Donc 2e call-site n'altère
+// pas le rendu du 1er si bilan non-migré.
+function _drawMorphoCanvasesFromSource(source) {
+  if (!source) return;
+  const pairs = [
+    ['morpho-face',    '_morpho_face'],
+    ['morpho-face2',   '_morpho_face2'],
+    ['morpho-profilG', '_morpho_profilG'],
+    ['morpho-profilD', '_morpho_profilD']
+  ];
+  pairs.forEach(([canvasId, key]) => {
+    if (!source[key]) return;
+    const cvs = document.getElementById(canvasId);
+    if (!cvs || cvs.width === 0) return;
+    const img = new Image();
+    img.onload = () => {
+      const dpr = window.devicePixelRatio || 1;
+      cvs.getContext('2d').drawImage(img, 0, 0, cvs.width / dpr, cvs.height / dpr);
+      // Fix #94 auto-réparation — efface fond noir éventuel des bilans
+      // corrompus pré-fix (saveBilanSilent JPEG sur canvas morpho overlay
+      // transparent). Idempotent sur PNG transparent propre.
+      _stripBackgroundFromRestore(cvs);
+    };
+    img.src = source[key];
+  });
+}
+
+// #99 Restauration différée des canvas morpho/pieds depuis bilanData global
+// (post-prefetch Storage). Appelée dans le .then() de prefetchSportBilanDataPhotos
+// pour traiter le cas où les 5 clés _morpho_*/_pieds ont été remplacées par des
+// Path (migration #99) : la chaîne nav setTimeout 500ms lit currentPatient.bilanData
+// au reload et trouve les Path (pas les dataURLs), donc rien ne se dessine. Une
+// fois le prefetch terminé, bilanData global contient les dataURLs réhydratées →
+// redraw réussit. Pour les bilans non-migrés (legacy), le rendu nav setTimeout
+// fonctionne ET ce 2e rendu est idempotent (cf comm _drawMorphoCanvasesFromSource).
+function _restoreSportMorphoPiedsFromBilanData() {
+  if (typeof bilanData === 'undefined' || !bilanData) return;
+  _drawMorphoCanvasesFromSource(bilanData);
+  if (bilanData._pieds && typeof drawPiedsTemplate === 'function') {
+    drawPiedsTemplate(bilanData._pieds);
   }
 }
 
@@ -8532,7 +8573,14 @@ function loadBilan() {
   // #85 Phase 1 — prefetch des captures Analyse posturale depuis Storage
   // (dataUrls absentes de bilanData persisté car migrées par migrateSportBilanDataPhotos).
   // Fire-and-forget — render miniatures dès que les fetch répondent (non bloquant).
-  prefetchSportBilanDataPhotos(bilanData).then(() => _renderAllPostureSlots('sp'));
+  // #99 — ajoute la restauration canvas morpho/pieds APRÈS prefetch : les 5 clés
+  // _morpho_*/_pieds sont désormais migrées aussi → leur dataURL n'est plus dans
+  // bilanData au load (juste Path). Sans ce .then(), les call-sites SYNC nav L2007
+  // + L2013-2034 lisent undefined → calques morpho/pieds disparaissent au reload.
+  prefetchSportBilanDataPhotos(bilanData).then(() => {
+    _renderAllPostureSlots('sp');
+    _restoreSportMorphoPiedsFromBilanData();
+  });
 }
 
 function toggleDictaphone() {
