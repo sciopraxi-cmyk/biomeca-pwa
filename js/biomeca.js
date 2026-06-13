@@ -2348,7 +2348,94 @@ const STORAGE_CRITICAL_THRESHOLD = 0.95;
 // État pour ne pas spammer l'utilisateur avec des alertes répétées
 let _quotaWarningShown = false;
 
+// #81 + Bug RAM-leak posturo — strip in-place les dataURLs déjà migrées (Path set)
+// pour éviter qu'elles re-saturent le localStorage à chaque savePatients. Le pattern
+// posturo prefetchPosturoPhotos écrit la dataURL réhydratée DIRECTEMENT dans
+// currentPatient.bilanDataPosturo (objet persisté) ; savePosturoBilan fait ensuite
+// Object.assign(d, photoStash) pour preserve display RAM. Sans strip à savePatients,
+// tout savePatients() ultérieur (saveBilanSilent sport, navigation, …) écrirait
+// les dataURLs en localStorage → bug 0.10 → 2.46 Mo observé E2E.
+//
+// Garantie : strip UNIQUEMENT si obj[k+'Path'] set ET obj[k] = dataURL. Une édition
+// (cf 10 invalidations Path à mouseup/capture L10926-L10942/L13053/L13064/L13091/
+// L8598-L8602/L8905-L8910) a Path absent → jamais strippée → migration ultérieure
+// uploadera proprement. Couverture exhaustive : bilanData courant + bilanDataPosturo
+// courant + mesures (photos+frames) + archives bilansSport (bilanData + mesures)
+// + archives bilansPosturo.
+function _stripDataURLsForPersist(patientsArr) {
+  const stash = []; // [{ obj, key, dataUrl }]
+  const stripObjFlat = (obj, keysList) => {
+    if (!obj) return;
+    for (const k of keysList) {
+      if (obj[k + 'Path'] && typeof obj[k] === 'string' && obj[k].startsWith('data:')) {
+        stash.push({ obj, key: k, dataUrl: obj[k] });
+        delete obj[k];
+      }
+    }
+  };
+  const stripMesures = (mesures) => {
+    if (!mesures) return;
+    for (const tid in mesures) {
+      if (tid.startsWith('_')) continue;
+      const t = mesures[tid];
+      for (const arr of [t?.photos, t?.frames]) {
+        if (!Array.isArray(arr)) continue;
+        for (const entry of arr) {
+          if (entry && entry.path && typeof entry.dataUrl === 'string' && entry.dataUrl.startsWith('data:')) {
+            stash.push({ obj: entry, key: 'dataUrl', dataUrl: entry.dataUrl });
+            delete entry.dataUrl;
+          }
+        }
+      }
+    }
+  };
+  // #85 Bug RAM-leak neuro4 — purge DÉFINITIVE des clés image qui ont pollué
+  // bilanDataPosturo.neuro4 (et archives) via l'ancien Object.assign(d.neuro4,
+  // bilanData) L13042. Aucun call-site légitime ne lit ces clés depuis neuro4
+  // (les readers L13307/L13464 filtrent boolean). Donc pas de stash/restore :
+  // c'est de la donnée à éliminer définitivement, RAM ET persisté. La pollution
+  // existante se résorbe au prochain savePatients.
+  const purgeImagesFromNeuro4 = (obj) => {
+    if (!obj || !obj.neuro4) return;
+    for (const k of SPORT_BILAN_PHOTO_KEYS) {
+      delete obj.neuro4[k];
+      delete obj.neuro4[k + 'Path'];
+    }
+    for (const k of POSTURO_PHOTO_KEYS) {
+      delete obj.neuro4[k];
+      delete obj.neuro4[k + 'Path'];
+    }
+  };
+  for (const p of patientsArr) {
+    stripObjFlat(p.bilanData, SPORT_BILAN_PHOTO_KEYS);
+    stripObjFlat(p.bilanDataPosturo, POSTURO_PHOTO_KEYS);
+    purgeImagesFromNeuro4(p.bilanDataPosturo);
+    stripMesures(p.mesures);
+    if (Array.isArray(p.bilansSport)) for (const arch of p.bilansSport) {
+      stripObjFlat(arch.bilanData, SPORT_BILAN_PHOTO_KEYS);
+      stripMesures(arch.mesures);
+    }
+    if (Array.isArray(p.bilansPosturo)) for (const arch of p.bilansPosturo) {
+      stripObjFlat(arch.bilanDataPosturo, POSTURO_PHOTO_KEYS);
+      purgeImagesFromNeuro4(arch.bilanDataPosturo);
+    }
+  }
+  return stash;
+}
+
+function _restoreDataURLsAfterPersist(stash) {
+  for (const { obj, key, dataUrl } of stash) {
+    obj[key] = dataUrl;
+  }
+}
+
 function savePatients() {
+  // #81 + Bug RAM-leak — strip in-place AVANT toute sérialisation. try/finally
+  // GARANTIT la restauration RAM sur TOUS les chemins de sortie (return false
+  // critique threshold, return false quota, throw, return normal). RAM continue
+  // d'afficher les dataURLs pour les renderers ; localStorage est propre.
+  const _stripStash = _stripDataURLsForPersist(patients);
+  try {
   const beforeBytes = getBioMecaStorageBytes();
 
   // Calcul de la taille future après sérialisation : seul bm4-patients change.
@@ -2426,6 +2513,13 @@ function savePatients() {
 
   saveToSupabase();
   return true;
+  } finally {
+    // #81 + Bug RAM-leak — restauration RAM garantie sur TOUS les chemins de
+    // sortie (return false critique, return false quota, throw, return normal).
+    // Les renderers (img.src, canvas drawImage) continuent de trouver les
+    // dataURLs en RAM. Persisté = propre, RAM = display continu.
+    _restoreDataURLsAfterPersist(_stripStash);
+  }
 }
 
 function editPatient(idx) {
@@ -2592,10 +2686,25 @@ function clearBilanFields() {
   const canvasIds = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
   canvasIds.forEach(id => {
     const c = document.getElementById(id);
-    if(c) { c._history=[]; c._baseSnapshot=null; initMorphoCanvas(id); }
+    if(c) {
+      c._history=[]; c._baseSnapshot=null;
+      // #99 + Bug édition perdue — reset au switch patient : le nouveau bilan
+      // démarre clean. Aucune édition pending à conserver d'un autre patient.
+      c._userDirty = false;
+      initMorphoCanvas(id);
+    }
   });
   const pc = document.getElementById('pieds-canvas');
-  if(pc) { pc._history=[]; pc._baseSnapshot=null; drawPiedsTemplate(); }
+  if(pc) {
+    pc._history=[]; pc._baseSnapshot=null;
+    pc._userDirty = false;
+    drawPiedsTemplate();
+  }
+  // Reset _userDirty pour les canvas posturo body/feet aussi (symétrie cross-bilan).
+  ['posturo-body-canvas','posturo-feet-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
   // Sprint A4 — vide le bloc traitements sport (selects/libres hors clear auto)
   clearSportTtt();
 }
@@ -2977,6 +3086,12 @@ function finalizeBilanSport(patIdx) {
   p.bilanData = {};
   delete p.currentBilanSportSousType;
   currentOpenedBilanIdx = null;
+  // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas sport :
+  // l'archive est figée, le nouveau bilan en cours est vide → clean.
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
   savePatients();
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
@@ -3671,7 +3786,57 @@ async function _runBackfillExecution() {
 // Function declaration → hoistée (insensible à l'ordre). Idempotent : drawImage
 // est non-cumulatif, redraw même image = no-op visible. Donc 2e call-site n'altère
 // pas le rendu du 1er si bilan non-migré.
-function _drawMorphoCanvasesFromSource(source) {
+// #99 + Bug édition perdue (gating _restoreReady) — overlay visuel posé sur le
+// parent du canvas pendant la fenêtre de restauration async. Affiché seulement
+// si la restauration dépasse ~150 ms (sinon flash gênant pour les bilans légers).
+// pointer-events:none → n'intercepte pas le clic user (sécurité belt-and-suspenders ;
+// le vrai blocage est dans setupDrawCanvas mousedown via guard _restoreReady).
+function _showRestoreOverlay(canvas) {
+  if (!canvas || canvas._restoreReady) return;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  let overlay = parent.querySelector('.restore-loading-overlay');
+  if (!overlay) {
+    // Le parent doit être en position:relative pour que l'overlay s'aligne dessus.
+    const cs = getComputedStyle(parent);
+    if (cs.position === 'static') parent.style.position = 'relative';
+    overlay = document.createElement('div');
+    overlay.className = 'restore-loading-overlay';
+    overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;font-weight:600;pointer-events:none;z-index:10;border-radius:4px;';
+    overlay.textContent = '⏳ Chargement du dessin…';
+    parent.appendChild(overlay);
+  }
+  overlay.style.display = '';
+}
+
+function _hideRestoreOverlay(canvas) {
+  if (!canvas) return;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  const overlay = parent.querySelector('.restore-loading-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+// Affiche l'overlay seulement après 150 ms (évite le flash pour les restorations
+// rapides bilan vierge / dataURL inline déjà en RAM). Re-check _restoreReady au
+// moment d'afficher : si déjà ready, no-op.
+function _showRestoreOverlayDeferred(canvas) {
+  setTimeout(() => {
+    if (canvas && canvas._restoreReady === false) _showRestoreOverlay(canvas);
+  }, 150);
+}
+
+// #99 + Bug édition perdue (gating _restoreReady) — `posesReadyFlag`:
+//   - false (par défaut) : 1ère passe (chaîne nav setTimeout 500ms), source peut
+//     être vide (currentPatient.bilanData pour bilan migré sans dataURL en RAM).
+//     Ne touche pas le flag — la 2e passe via .then() prefetch s'en chargera
+//     après réhydratation. Évite d'ouvrir le gate avant que la restauration
+//     déterministe (Image.onload) ait effectivement peint.
+//   - true : 2e passe via _restoreSportMorphoPiedsFromBilanData dans .then().
+//     Pose `_restoreReady=true` déterministe dans img.onload (après drawImage).
+//     Pour les canvas sans source[key] (rien à dessiner), pose ready immédiat.
+//     img.onerror débloque aussi (sinon canvas figé en cas de dataURL corrompue).
+function _drawMorphoCanvasesFromSource(source, posesReadyFlag) {
   if (!source) return;
   const pairs = [
     ['morpho-face',    '_morpho_face'],
@@ -3680,9 +3845,17 @@ function _drawMorphoCanvasesFromSource(source) {
     ['morpho-profilD', '_morpho_profilD']
   ];
   pairs.forEach(([canvasId, key]) => {
-    if (!source[key]) return;
     const cvs = document.getElementById(canvasId);
     if (!cvs || cvs.width === 0) return;
+    if (!source[key]) {
+      // Rien à restaurer pour ce canvas : ouverture immédiate du gate si on est
+      // dans la passe finale. Sinon, on laisse au caller / 2e passe le soin.
+      if (posesReadyFlag) {
+        cvs._restoreReady = true;
+        _hideRestoreOverlay(cvs);
+      }
+      return;
+    }
     const img = new Image();
     img.onload = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -3691,6 +3864,16 @@ function _drawMorphoCanvasesFromSource(source) {
       // corrompus pré-fix (saveBilanSilent JPEG sur canvas morpho overlay
       // transparent). Idempotent sur PNG transparent propre.
       _stripBackgroundFromRestore(cvs);
+      if (posesReadyFlag) {
+        cvs._restoreReady = true;
+        _hideRestoreOverlay(cvs);
+      }
+    };
+    img.onerror = () => {
+      if (posesReadyFlag) {
+        cvs._restoreReady = true;
+        _hideRestoreOverlay(cvs);
+      }
     };
     img.src = source[key];
   });
@@ -3705,10 +3888,35 @@ function _drawMorphoCanvasesFromSource(source) {
 // redraw réussit. Pour les bilans non-migrés (legacy), le rendu nav setTimeout
 // fonctionne ET ce 2e rendu est idempotent (cf comm _drawMorphoCanvasesFromSource).
 function _restoreSportMorphoPiedsFromBilanData() {
-  if (typeof bilanData === 'undefined' || !bilanData) return;
-  _drawMorphoCanvasesFromSource(bilanData);
-  if (bilanData._pieds && typeof drawPiedsTemplate === 'function') {
-    drawPiedsTemplate(bilanData._pieds);
+  // Fix racine (symétrisation pattern posturo) : lire currentPatient.bilanData,
+  // l'objet où le prefetch a réhydraté les dataURLs. Le bilanData global est une
+  // copie défensive (JSON.parse(stringify(...))) qui ne reçoit plus les dataURLs
+  // une fois le prefetch redirigé vers currentPatient.bilanData. Lire le global
+  // ici ferait lire les Path-only → drawPiedsTemplate(undefined) → canvas vidé.
+  const src = currentPatient?.bilanData;
+  if (!src) return;
+  // #99 + gating _restoreReady : 2e passe (post-prefetch), posesReadyFlag=true.
+  // _drawMorphoCanvasesFromSource pose `_restoreReady=true` déterministiquement
+  // dans img.onload de chaque canvas qui a une dataURL, ou immédiatement pour
+  // les canvas sans dataURL (rien à restaurer).
+  _drawMorphoCanvasesFromSource(src, true);
+  if (src._pieds && typeof drawPiedsTemplate === 'function') {
+    // Callback onReady passé à drawPiedsTemplate → pose `_restoreReady=true`
+    // dans saved.onload après le drawImage déterministe.
+    drawPiedsTemplate(src._pieds, () => {
+      const pc = document.getElementById('pieds-canvas');
+      if (pc) {
+        pc._restoreReady = true;
+        _hideRestoreOverlay(pc);
+      }
+    });
+  } else {
+    // Pas de _pieds à restaurer → ouverture immédiate du gate pour ce canvas.
+    const pc = document.getElementById('pieds-canvas');
+    if (pc) {
+      pc._restoreReady = true;
+      _hideRestoreOverlay(pc);
+    }
   }
 }
 
@@ -7900,6 +8108,11 @@ function setupDrawCanvas(canvas, canvasId) {
   };
 
   canvas.onmousedown = e => {
+    // #99 + Bug édition perdue (gating _restoreReady) — bloque les inputs user
+    // tant que la restauration async n'a pas peint le dessin pré-édition. Sinon
+    // le user dessine pendant la fenêtre de race, drawPiedsTemplate(canvas.width=…)
+    // au .then() efface le DOM et le sweep ne capture pas le trait → édition perdue.
+    if (canvas._restoreReady === false) return;
     e.preventDefault();
     drawing = true;
     const p = getPos(e);
@@ -7974,6 +8187,15 @@ function setupDrawCanvas(canvas, canvasId) {
       // undefined sur pieds/posturo → ligne sautée (noop strict, comportement
       // existant strictement préservé pour eux).
       if(canvas._undoOrderStack) canvas._undoOrderStack.push(canvas.id);
+      // #99 + Bug édition perdue — flag de modification utilisateur insensible
+      // aux ré-init DOM (initMorphoCanvas/drawPiedsTemplate/initPosturoBodyCanvas/
+      // initPosturoFeetCanvas reset _history à chaque appel — déclenchés par nav
+      // page et nav section. Sans ce flag, une édition pendant la fenêtre prefetch
+      // async OU avant re-init section est silencieusement effacée → check
+      // _history.length>0 au save = faux négatif → Path non invalidé → cleanup
+      // post-migrate supprime la nouvelle dataURL = édition perdue au reload).
+      // _userDirty n'est jamais reset par les opérations de restauration DOM.
+      canvas._userDirty = true;
     }
     drawing = false;
     canvas._tempSnap = null;
@@ -8114,7 +8336,15 @@ function clearAllMorpho() {
   _morphoUndoOrder.length = 0;
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
-    if(c) { c._history = []; c._baseSnapshot = null; c._tempSnap = null; }
+    if(c) {
+      c._history = [];
+      c._baseSnapshot = null;
+      c._tempSnap = null;
+      // #99 + Bug édition perdue — clear user-triggered = édition. Force
+      // l'invalidation Path au prochain save (sinon le clear ne serait pas
+      // propagé puisque _history reste à [] après le reset).
+      c._userDirty = true;
+    }
     initMorphoCanvas(id);
   });
 }
@@ -8157,7 +8387,17 @@ function undoPieds() {
   }
 }
 
-function drawPiedsTemplate(savedData) {
+// #99 + Bug édition perdue (gating _restoreReady) — paramètre optionnel `onReady`
+// appelé déterministiquement APRÈS le drawImage du saved.onload (ou immédiatement
+// si pas de savedData, ou dans onerror si dataURL corrompue). Le callback est
+// utilisé par _restoreSportMorphoPiedsFromBilanData pour poser _restoreReady=true
+// au moment où le dessin est effectivement peint sur le canvas.
+//
+// drawPiedsTemplate NE TOUCHE PAS `_restoreReady` lui-même — c'est le caller qui
+// décide via onReady. Cela évite qu'un appel intermédiaire (chaîne nav setTimeout
+// L2011, clearPiedsCanvas, showSportBilanSection idx===9) ouvre prématurément le
+// gate alors qu'une restoration finale est encore en attente (prefetch.then).
+function drawPiedsTemplate(savedData, onReady) {
   // Refactor #91 — pattern posturo (img DOM séparée + canvas transparent overlay).
   // Mirroir de initPosturoFeetCanvas L10511. Le canvas est désormais un OVERLAY
   // transparent par-dessus #sp-pieds-img (template visible directement dans le DOM,
@@ -8199,8 +8439,18 @@ function drawPiedsTemplate(savedData) {
       // pré-fix (saveBilanSilent JPEG produisait noir intégral sur canvas overlay
       // transparent). Idempotent sur PNG transparent propre.
       _stripBackgroundFromRestore(canvas);
+      // #99 + gating _restoreReady — caller décide via onReady, déterministe après
+      // le drawImage effectif (le dessin est peint sur le canvas à cet instant).
+      if (typeof onReady === 'function') onReady();
+    };
+    saved.onerror = () => {
+      // dataURL corrompue → débloque quand même pour ne pas geler l'édition.
+      if (typeof onReady === 'function') onReady();
     };
     saved.src = savedData;
+  } else if (typeof onReady === 'function') {
+    // Pas de savedData → pas d'Image.onload → débloque immédiatement.
+    onReady();
   }
 }
 
@@ -8595,11 +8845,29 @@ async function saveBilan() {
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
     const png = _serializeDrawCanvas(c);
-    if(png !== null) bilanData['_' + id.replace(/-/g,'_')] = png;
+    if(png !== null) {
+      const key = '_' + id.replace(/-/g,'_');
+      bilanData[key] = png;
+      // #99 + Bug édition perdue (option iii) — invalide le Path sur édition
+      // utilisateur réelle. _userDirty est insensible aux ré-init DOM (init/draw
+      // restoration), contrairement à _history.length qui était reset par
+      // drawPiedsTemplate/initMorphoCanvas au reload async post-prefetch et au
+      // re-nav vers pg-bilan, causant la perte silencieuse des éditions.
+      if (c && c._userDirty) delete bilanData[key + 'Path'];
+    }
   });
   const pCanvas = document.getElementById('pieds-canvas');
   const piedsPng = _serializeDrawCanvas(pCanvas);
-  if(piedsPng !== null) bilanData._pieds = piedsPng;
+  if(piedsPng !== null) {
+    bilanData._pieds = piedsPng;
+    if (pCanvas && pCanvas._userDirty) delete bilanData._piedsPath;
+  }
+  // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
+  // Prépare le prochain cycle d'édition (un nouveau mouseup re-marquera dirty).
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
 
   // #85 Phase 1 — migration Storage des captures Analyse posturale AVANT
   // sérialisation (sinon dataUrls JPEG 1080p polluent localStorage, régression #35).
@@ -8690,7 +8958,40 @@ const B2_SCHEMAS_MOTEURS = {
 function loadBilan() {
   if(!currentPatient) return;
   bilanData = currentPatient.bilanData ? JSON.parse(JSON.stringify(currentPatient.bilanData)) : {};
-  if(!Object.keys(bilanData).length) return;
+  // #99 + Bug édition perdue (gating _restoreReady) — fenêtre de restauration
+  // ouverte. _restoreReady=false bloque les inputs user dans setupDrawCanvas
+  // mousedown/touchstart jusqu'à ce que la restauration async (prefetch +
+  // Image.onload) ait peint le dessin pré-édition sur le canvas. Sinon le
+  // user dessine pendant la fenêtre, drawPiedsTemplate(canvas.width = …) au
+  // .then() efface le DOM, et le sweep _serializeDrawCanvas capture l'ancien
+  // dessin sans le trait user → édition perdue au reload.
+  // Overlay deferred 150 ms (évite le flash pour les restorations rapides).
+  // Fallback timeout 3000 ms : si prefetch fail / timeout réseau, débloque
+  // quand même pour ne pas geler l'édition à jamais.
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c) {
+      c._restoreReady = false;
+      _showRestoreOverlayDeferred(c);
+    }
+  });
+  setTimeout(() => {
+    ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+      const c = document.getElementById(id);
+      if (c && c._restoreReady === false) {
+        c._restoreReady = true;
+        _hideRestoreOverlay(c);
+      }
+    });
+  }, 3000);
+  if(!Object.keys(bilanData).length) {
+    // Bilan vide (jamais sauvé) → rien à restaurer, ouvre le gate immédiatement.
+    ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+      const c = document.getElementById(id);
+      if (c) { c._restoreReady = true; _hideRestoreOverlay(c); }
+    });
+    return;
+  }
 
   // Remplir les champs texte/textarea
   document.querySelectorAll('.bilan-field').forEach(el => {
@@ -8811,7 +9112,14 @@ function loadBilan() {
   // _morpho_*/_pieds sont désormais migrées aussi → leur dataURL n'est plus dans
   // bilanData au load (juste Path). Sans ce .then(), les call-sites SYNC nav L2007
   // + L2013-2034 lisent undefined → calques morpho/pieds disparaissent au reload.
-  prefetchSportBilanDataPhotos(bilanData).then(() => {
+  // Fix racine (symétrisation pattern posturo) : prefetch sur currentPatient.bilanData
+  // (objet persisté) au lieu du bilanData global (copie défensive). Pattern miroir
+  // de prefetchPosturoPhotos(currentPatient.bilanDataPosturo). Le strip dans
+  // savePatients (déjà en place sur p.bilanData pour SPORT_BILAN_PHOTO_KEYS)
+  // garantit zéro re-bloat localStorage ; le restore-stash repose les dataURLs
+  // en RAM pour l'affichage. Sites lecteurs (canvas restore, rapport composites)
+  // qui lisent currentPatient.bilanData trouvent désormais les dataURLs.
+  prefetchSportBilanDataPhotos(currentPatient.bilanData).then(() => {
     _renderAllPostureSlots('sp');
     _restoreSportMorphoPiedsFromBilanData();
   });
@@ -8892,11 +9200,24 @@ async function saveBilanSilent() {
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
     const png = _serializeDrawCanvas(c);
-    if(png !== null) bilanData['_' + id.replace(/-/g,'_')] = png;
+    if(png !== null) {
+      const key = '_' + id.replace(/-/g,'_');
+      bilanData[key] = png;
+      // #99 + Bug édition perdue (option iii) — miroir saveBilan : check _userDirty.
+      if (c && c._userDirty) delete bilanData[key + 'Path'];
+    }
   });
   const pc = document.getElementById('pieds-canvas');
   const piedsPng = _serializeDrawCanvas(pc);
-  if(piedsPng !== null) bilanData._pieds = piedsPng;
+  if(piedsPng !== null) {
+    bilanData._pieds = piedsPng;
+    if (pc && pc._userDirty) delete bilanData._piedsPath;
+  }
+  // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
   // #85 Phase 1 — migration Storage AVANT persistance (cf header de la fonction).
   if(!currentPatient.mesures) currentPatient.mesures = {};
   if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
@@ -8913,6 +9234,8 @@ function clearPiedsCanvas() {
   const c = document.getElementById('pieds-canvas');
   if(!c) return;
   c.getContext('2d').clearRect(0,0,c.width,c.height);
+  // #99 + Bug édition perdue — clear user-triggered = édition (cf clearAllMorpho).
+  c._userDirty = true;
   drawPiedsTemplate();
 }
 
@@ -10923,7 +11246,13 @@ function captureEmpreinte() {
   if(img) { img.src = dataUrl; img.style.display = 'block'; }
   const del = document.getElementById('po-empreinte-del');
   if(del) del.style.display = 'inline-block';
-  if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = dataUrl;
+  if(currentPatient?.bilanDataPosturo) {
+    currentPatient.bilanDataPosturo._empreinte = dataUrl;
+    // #99 + Bug RAM-leak — invalide le Path Storage à l'édition (nouvelle capture
+    // = nouveau contenu, le Path obsolète doit être ré-uploadé au prochain save,
+    // sinon migratePhotoEntry skip et l'édition est perdue).
+    delete currentPatient.bilanDataPosturo._empreintePath;
+  }
   stopEmpreinteCamera();
 }
 function deleteEmpreinte() {
@@ -10931,7 +11260,11 @@ function deleteEmpreinte() {
   if(img) { img.src=''; img.style.display='none'; }
   const del = document.getElementById('po-empreinte-del');
   if(del) del.style.display='none';
-  if(currentPatient?.bilanDataPosturo) delete currentPatient.bilanDataPosturo._empreinte;
+  if(currentPatient?.bilanDataPosturo) {
+    delete currentPatient.bilanDataPosturo._empreinte;
+    // #99 + Bug RAM-leak — invalide aussi le Path (suppression = état sans image).
+    delete currentPatient.bilanDataPosturo._empreintePath;
+  }
 }
 function previewEmpreinte(input) {
   if(!input.files || !input.files[0]) return;
@@ -10939,7 +11272,11 @@ function previewEmpreinte(input) {
   reader.onload = e => {
     const img = document.getElementById('po-empreinte-img');
     if(img) { img.src = e.target.result; img.style.display = 'block'; }
-    if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = e.target.result;
+    if(currentPatient?.bilanDataPosturo) {
+      currentPatient.bilanDataPosturo._empreinte = e.target.result;
+      // #99 + Bug RAM-leak — invalide le Path à l'upload d'un nouveau fichier.
+      delete currentPatient.bilanDataPosturo._empreintePath;
+    }
   };
   reader.readAsDataURL(input.files[0]);
 }
@@ -12806,6 +13143,18 @@ function initPosturoBodyCanvas() {
   canvas._history = [];
   canvas._baseSnapshot = null;
   canvas._tempSnap = null;
+  // #99 + Bug édition perdue (gating _restoreReady) — initPosturoBodyCanvas est
+  // ré-appelée à chaque showPosturoSection(1) → fenêtre de restauration ouverte
+  // à chaque visite de psec-1. Bloque les inputs user jusqu'au drawImage effectif
+  // dans saved.onload. Fallback 3000 ms si saved.onload jamais déclenché.
+  canvas._restoreReady = false;
+  _showRestoreOverlayDeferred(canvas);
+  setTimeout(() => {
+    if (canvas._restoreReady === false) {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    }
+  }, 3000);
   // Snapshot de base (fond transparent - les images sont dans les divs en dessous)
   setTimeout(() => {
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
@@ -12813,8 +13162,20 @@ function initPosturoBodyCanvas() {
   // Restaurer dessin sauvegardé si existant
   if(currentPatient?.bilanDataPosturo?._bodyCanvas) {
     const saved = new Image();
-    saved.onload = () => ctx.drawImage(saved, 0, 0, r.width, r.height);
+    saved.onload = () => {
+      ctx.drawImage(saved, 0, 0, r.width, r.height);
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    };
+    saved.onerror = () => {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    };
     saved.src = currentPatient.bilanDataPosturo._bodyCanvas;
+  } else {
+    // Pas de dessin à restaurer → ouverture immédiate du gate.
+    canvas._restoreReady = true;
+    _hideRestoreOverlay(canvas);
   }
   setupDrawCanvas(canvas, 'posturo-body-canvas');
 }
@@ -12836,6 +13197,16 @@ function initPosturoFeetCanvas() {
   canvas._history = [];
   canvas._baseSnapshot = null;
   canvas._tempSnap = null;
+  // #99 + Bug édition perdue (gating _restoreReady) — initPosturoFeetCanvas est
+  // ré-appelée à chaque showPosturoSection(8) → idem body. Fallback 3000 ms.
+  canvas._restoreReady = false;
+  _showRestoreOverlayDeferred(canvas);
+  setTimeout(() => {
+    if (canvas._restoreReady === false) {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    }
+  }, 3000);
   setupDrawCanvas(canvas, 'posturo-feet-canvas');
   // baseSnapshot = canvas vide/transparent. La gomme restaure cet état → révèle
   // le template DOM (img#posturo-feet-img) derrière, sans pollution.
@@ -12846,8 +13217,17 @@ function initPosturoFeetCanvas() {
     const saved = new Image();
     saved.onload = () => {
       ctx.drawImage(saved, 0, 0, r.width, r.height);
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    };
+    saved.onerror = () => {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
     };
     saved.src = drawingsData;
+  } else {
+    canvas._restoreReady = true;
+    _hideRestoreOverlay(canvas);
   }
 }
 
@@ -12928,10 +13308,23 @@ async function savePosturoBilan(silent = false) {
   const getRad = name => document.querySelector('input[name="'+name+'"]:checked')?.value||'';
   // Section 4 - Neuro fonctionnel complet
   d.hypoTronc=getChk('po-hypo-tronc'); d.hypoCervelet=getChk('po-hypo-cervelet');
-  // Sauvegarder les données setBilanField (ps_, pd_, nc_ etc.)
+  // Sauvegarder les données setBilanField (aps_, apd_, acd_, cf_ etc.)
   // Sauvegarder TOUTES les checkboxes de psec-3 par ID
   if(!d.neuro4) d.neuro4 = {};
-  Object.assign(d.neuro4, bilanData);
+  // #85 Bug RAM-leak neuro4 — copie FILTRÉE (anciennement Object.assign(d.neuro4,
+  // bilanData) qui copiait INTÉGRALEMENT bilanData incluant les 9 clés image
+  // (_morpho_*, _pieds, _postureXxx) + Paths + _bilanId + ttt + textareas longues.
+  // Les clés image étaient invisibles à POSTURO_PHOTO_KEYS (niveau racine de d)
+  // → polluaient le persisté en cycle (cause root 2.46 Mo localStorage).
+  // Cas légitime préservé : sync des cb neuro sport modifiées hors contexte
+  // posturo (setBilanField L8323 ne se déclenche que si pgPosturo active).
+  // Filtre : exclut préfixe `_` (clés image/Path/_bilanId) + types non boolean ni
+  // string courte (exclut objets ttt + textareas longs motif/antecedents).
+  for (const [k, v] of Object.entries(bilanData)) {
+    if (k.startsWith('_')) continue;
+    if (typeof v === 'boolean') d.neuro4[k] = v;
+    else if (typeof v === 'string' && v.length <= 200) d.neuro4[k] = v;
+  }
   // Sauvegarder psec-3 seulement si visible (sinon garder neuro4 existant)
   const psec3 = document.getElementById('psec-3');
   if(psec3 && psec3.style.display !== 'none') {
@@ -13048,20 +13441,30 @@ async function savePosturoBilan(silent = false) {
   });
 
   const bc=document.getElementById('posturo-body-canvas');
-  if(bc && bc.width>0 && bc._history && bc._history.length>0) {
+  // #99 + Bug édition perdue (option iii) — check _userDirty au lieu de
+  // _history.length (qui est reset par initPosturoBodyCanvas à chaque
+  // showPosturoSection(1) → édition perdue si user navigue entre sections).
+  if(bc && bc.width>0 && bc._userDirty) {
     // Sauvegarder uniquement le canvas des dessins en PNG transparent
     d._bodyCanvas = bc.toDataURL('image/png');
     // Sauvegarder aussi les dimensions CSS du canvas pour reconstruction
     d._bodyCanvasW = parseFloat(bc.style.width) || bc.width;
     d._bodyCanvasH = parseFloat(bc.style.height) || bc.height;
+    // Invalide le Path : édition utilisateur → upload requis au prochain migrate.
+    delete d._bodyCanvasPath;
   }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc) {
-    const writeNew = (fc._history && fc._history.length > 0) || !d._feetDrawings;
+    // #99 + Bug édition perdue (option iii) — check _userDirty (insensible aux
+    // ré-init initPosturoFeetCanvas par navigation idx === 8). Le cas
+    // `!d._feetDrawings` (1er dessin sans Path préexistant) reste couvert : un
+    // 1er mouseup met _userDirty=true, donc writeNew=true.
+    const writeNew = fc._userDirty || !d._feetDrawings;
     if(writeNew) {
       // 1. Sauvegarder les dessins seuls (PNG transparent) pour restauration sur canvas
       //    à la prochaine ouverture du bilan (édition + gomme propre).
       d._feetDrawings = fc.toDataURL('image/png');
+      delete d._feetDrawingsPath;
 
       // 2. Composer template + dessins avec positionnement correct (mesuré DOM-live).
       //    Ce composite est utilisé tel quel dans le rapport — alignement parfait garanti
@@ -13089,10 +13492,18 @@ async function savePosturoBilan(silent = false) {
             0, 0, compC.width, compC.height
           );
           d._feetComposite = compC.toDataURL('image/jpeg', 0.85);
+          // #99 + Bug RAM-leak — invalide aussi le Path du composite (corrélé au _feetDrawings).
+          delete d._feetCompositePath;
         }
       }
     }
   }
+  // #99 + Bug édition perdue — reset _userDirty pour body/feet posturo APRÈS sweep.
+  // Prépare le prochain cycle d'édition (un nouveau mouseup re-marquera dirty).
+  ['posturo-body-canvas','posturo-feet-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
   // Migration Storage (Task #51 PR B1) — upload des dataUrls neuves, strip
   // du persisté. Le stash récupère les dataUrls initiales pour les restaurer
   // en RAM post-save (édition continue sans re-fetch). Best-effort : si
@@ -13182,7 +13593,15 @@ function loadPosturoBilan() {
   setChk('po-hypo-tronc',d.hypoTronc); setChk('po-hypo-cervelet',d.hypoCervelet);
   // Restaurer les données setBilanField
   if(d.neuro4) {
-    Object.assign(bilanData, d.neuro4);
+    // #85 Bug RAM-leak neuro4 — copie FILTRÉE symétrique au fix L13042.
+    // Empêche la contamination croisée de bilanData sport par les clés image
+    // résiduelles dans neuro4 (cas bilan archivé pré-fix avec dataURLs déjà
+    // dans neuro4). Boolean + string courte uniquement, exclut préfixe `_`.
+    for (const [k, v] of Object.entries(d.neuro4)) {
+      if (k.startsWith('_')) continue;
+      if (typeof v === 'boolean') bilanData[k] = v;
+      else if (typeof v === 'string' && v.length <= 200) bilanData[k] = v;
+    }
     // Restaurer après un délai pour laisser le DOM se construire
     setTimeout(function() {
       Object.entries(d.neuro4).forEach(function([key, val]) {
