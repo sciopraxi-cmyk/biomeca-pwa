@@ -1922,6 +1922,28 @@ const MARKER_TEMPLATES = {
     {name:'Calca supérieur G',        color:'#aab0bc', side:'G'},
     {name:'Calca inférieur G',        color:'#aab0bc', side:'G'},
   ],
+  // #85-2b — Posture profil (G ou D) : 14 points anatomiques, vue latérale.
+  // side:'' (pas de latéralisation D/G dans le template ; le sens est porté par
+  // viewKey 'profilG'|'profilD' au niveau du stockage _postureAnalysis).
+  // Réutilisé par cloneMarkers('posture-profil') dans openPosturePlacementModal.
+  // `hint` = repère anatomique court affiché dans le bandeau de la modale
+  // pour guider le placement. cloneMarkers spread ({...m}) → hint préservé.
+  'posture-profil': [
+    {name:'Tragus',              color:'#f04060', side:'', hint:'petit relief cartilagineux devant le conduit auditif'},
+    {name:'Base crâne',          color:'#f5762a', side:'', hint:'protubérance occipitale externe (inion), à la base de l\'os occipital'},
+    {name:'Apex cervical',       color:'#f5a623', side:'', hint:'sommet de la lordose cervicale (concavité postérieure ~C4-C5)'},
+    {name:'C7',                  color:'#e0c020', side:'', hint:'épineuse la plus proéminente à la base du cou (tête fléchie pour repérer)'},
+    {name:'Acromion',            color:'#4a9eff', side:'', hint:'bord externe et postérieur de l\'épaule (sommet osseux)'},
+    {name:'Apex thoracique',     color:'#3b82f6', side:'', hint:'sommet de la cyphose dorsale, ~pointe des omoplates'},
+    {name:'T12',                 color:'#6366f1', side:'', hint:'repère thoraco-lombaire (au niveau de la dernière côte palpable)'},
+    {name:'Apex lombaire',       color:'#8b5cf6', side:'', hint:'sommet de la lordose lombaire (concavité postérieure ~L3)'},
+    {name:'Base sacrum',         color:'#a78bfa', side:'', hint:'jonction L5-S1, juste au-dessus du sacrum'},
+    {name:'EIAS',                color:'#10b981', side:'', hint:'épine iliaque antéro-supérieure (saillie osseuse antérieure du bassin)'},
+    {name:'EIPS',                color:'#3ecf72', side:'', hint:'épine iliaque postéro-supérieure (fossette latérale du sacrum, sous la ceinture)'},
+    {name:'Grand trochanter',    color:'#6edfaa', side:'', hint:'saillie osseuse latérale de la hanche (relief externe du fémur)'},
+    {name:'Genou (milieu lat.)', color:'#ec4899', side:'', hint:'milieu de l\'interligne articulaire latérale du genou'},
+    {name:'Réf. cheville',       color:'#8892a4', side:'', hint:'juste en avant de la malléole latérale (fibula distale)'},
+  ],
 };
 
 function cloneMarkers(type) {
@@ -4464,6 +4486,22 @@ function loadVidFile(input) {
 // → migration auto Storage côté posturo (POSTURO_PHOTO_KEYS étendu, savePosturoBilan async).
 // Côté sport : Temps 2 brancher saveBilan async + migrateSportBilanDataPhotos.
 // Format : JPEG 0.88, ideal 1920×1080 (fallback gracieux navigateur), facingMode:environment.
+// #85-2d-fix2 — Seuils de neutralité pour les libellés cliniques.
+// Une valeur dont la magnitude (ou l'écart à une référence pour CVA) est ≤ seuil
+// est qualifiée de "neutre" ; au-delà, le signe détermine le libellé clinique
+// (antéversion/rétroversion, flessum/récurvatum, etc.). Centralisé ici pour
+// permettre l'ajustement à l'étape classification (#85-2e à venir).
+const POSTURE_NEUTRAL_THRESHOLDS = {
+  default: 3, // ±3° pour bassin, genou, épaules, hanche (mesures centrées sur 0)
+  cva: 2,     // ±2° autour de 50° (CVA est référencée à 50°, pas à 0°)
+};
+
+// #85-P2a — ratio largeur/hauteur du cadre de capture posturale (portrait).
+// Tunable : 3/4 conservateur (couvre patient debout plein corps avec marge
+// latérale confortable) ; 9/16 plus serré (mobile-like, recadre davantage).
+// Utilisé à la fois pour aspect-ratio du preview vidéo ET pour le crop centré
+// au moment du capture → ce que le praticien voit = ce qui est stocké.
+const POSTURE_CAPTURE_ASPECT = 3/4;
 const POSTURE_VIEWS = [
   { key: 'face',    label: 'Face'     },
   { key: 'dos',     label: 'Dos'      },
@@ -4498,10 +4536,35 @@ function _buildPostureCaptureBlockHTML(prefix) {
         <option value="">— Caméra —</option>
       </select>
       <button class="btn" id="${prefix}-pc-cam-btn" onclick="_togglePostureCam('${prefix}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">▶ Activer caméra</button>
+      <button class="btn" id="${prefix}-pc-grid-btn" onclick="_togglePostureGrid('${prefix}')" title="Afficher/masquer la grille de cadrage" style="font-size:11px;background:#0e7490;color:#fff;padding:5px 10px;">▦ Grille</button>
       <span id="${prefix}-pc-cam-status" class="badge bd" style="font-size:10px;">Inactive</span>
     </div>
-    <div style="position:relative;background:#000;border-radius:6px;overflow:hidden;margin-bottom:8px;min-height:60px;">
-      <video id="${prefix}-pc-video" playsinline autoplay muted style="width:100%;max-height:300px;display:block;"></video>
+    <div style="position:relative;background:#000;border-radius:6px;overflow:hidden;margin:0 auto 8px;max-width:240px;aspect-ratio:${POSTURE_CAPTURE_ASPECT};">
+      <video id="${prefix}-pc-video" playsinline autoplay muted style="width:100%;height:100%;object-fit:cover;display:block;"></video>
+      <!--
+        #85-2c-grid — overlay SVG d'aide au cadrage. Élément DOM séparé du <video>
+        → capturePostureView (drawImage(video, …) L4954) capture le FRAME VIDÉO
+        natif, jamais l'overlay. La grille reste donc UI-only, jamais persistée.
+        viewBox 0 0 100 100 + preserveAspectRatio="none" : la grille s'étire pour
+        coller au conteneur portrait (3/4) → coordonnées en pourcentage.
+        Grille 4 colonnes × 6 lignes (cf brief #85-2c-grid) :
+          - 3 verticales à 25/50/75 % (centrale plus marquée)
+          - 5 horizontales à 16.67/33.33/50/66.67/83.33 % (centrale plus marquée)
+        Les centrales (50 % H/V) servent de repère croisé pour centrer le sujet.
+        Les autres horizontales aident à aligner sol/mur et mur/plafond.
+        Default display:none — affichée automatiquement par _togglePostureCam
+        à l'activation caméra ; le bouton ▦ Grille toggle manuellement.
+      -->
+      <svg id="${prefix}-pc-grid" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none;">
+        <line x1="25" y1="0" x2="25" y2="100" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="75" y1="0" x2="75" y2="100" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="16.67" x2="100" y2="16.67" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="33.33" x2="100" y2="33.33" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="66.67" x2="100" y2="66.67" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="83.33" x2="100" y2="83.33" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="50" y1="0" x2="50" y2="100" stroke="#ffffff" stroke-width="0.4" opacity="0.6"/>
+        <line x1="0" y1="50" x2="100" y2="50" stroke="#ffffff" stroke-width="0.4" opacity="0.6"/>
+      </svg>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">${slotsHTML}</div>
   </div>`;
@@ -4517,18 +4580,46 @@ function _renderPostureSlot(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   const dataUrl = bd?.[key];
+  // #85-2b — bouton 🎯 placement points sur les vues profil (G/D) seulement,
+  // une fois la photo capturée. Badge "✓ N/14 placés" indique l'avancement
+  // de l'analyse pour cette vue. Aucun bouton pour face/dos (pas de template
+  // posture-face/posture-dos pour ce périmètre — placement seul, vue profil).
+  const isProfil = viewKey === 'profilG' || viewKey === 'profilD';
+  const markerCount = isProfil ? _countPostureMarkers(bd, viewKey) : 0;
+  const placementBtn = (dataUrl && isProfil)
+    ? `<button class="btn" onclick="openPosturePlacementModal('${prefix}','${viewKey}')" title="Placer les 14 points anatomiques" style="font-size:9px;padding:2px 6px;background:#7c3aed;color:#fff;">🎯</button>`
+    : '';
+  const placementBadge = (markerCount > 0)
+    ? `<div style="font-size:9px;color:#10b981;font-weight:600;margin-top:2px;">✓ ${markerCount}/14 placés</div>`
+    : '';
+  // #85-2c-import — input file caché + bouton/label cliquable. Pattern label-for-input
+  // pour éviter un onclick programmatique (compat iOS Safari : trigger click sur
+  // input file depuis onclick peut être bloqué hors gesture utilisateur).
+  // L'ID inclut le préfixe + viewKey pour unicité (4 slots × sp/po possible).
+  const importInputId = `${prefix}-pc-import-${viewKey}`;
+  // #85-2c-import — accept inclut explicitement .heic/.heif (iOS) : MIME image/*
+  // matche image/heic|heif mais certains pickers se basent sur l'extension.
+  const importInput = `<input type="file" accept="image/*,.heic,.heif" id="${importInputId}" onchange="importPostureView('${prefix}','${viewKey}',this)" style="display:none;">`;
   if (dataUrl) {
     slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:4px;font-weight:600;">${view.label}</div>
       <img src="${dataUrl}" style="max-width:100%;max-height:90px;border-radius:4px;display:block;margin:0 auto 4px;"/>
-      <div style="display:flex;gap:4px;justify-content:center;">
-        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#0e1f38;color:#fff;">↻</button>
-        <button class="btn" onclick="deletePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#c0392b;color:#fff;">✕</button>
-      </div>`;
+      <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" title="Re-capturer depuis la caméra" style="font-size:9px;padding:2px 6px;background:#0e1f38;color:#fff;">↻</button>
+        <label for="${importInputId}" title="Importer une image" style="font-size:9px;padding:2px 6px;background:#0e7490;color:#fff;border-radius:3px;cursor:pointer;display:inline-block;line-height:1.4;">⬆</label>
+        ${placementBtn}
+        <button class="btn" onclick="deletePostureView('${prefix}','${viewKey}')" title="Supprimer" style="font-size:9px;padding:2px 6px;background:#c0392b;color:#fff;">✕</button>
+      </div>
+      ${importInput}
+      ${placementBadge}`;
     slot.style.borderStyle = 'solid';
     slot.style.background = '#fff';
   } else {
     slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:6px;font-weight:600;">${view.label}</div>
-      <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:11px;background:#0e1f38;color:#fff;padding:6px 12px;">📷 Capturer</button>`;
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:11px;background:#0e1f38;color:#fff;padding:6px 12px;">📷 Capturer</button>
+        <label for="${importInputId}" title="Importer une image (limite ultra grand-angle iOS)" style="font-size:11px;background:#0e7490;color:#fff;padding:6px 12px;border-radius:3px;cursor:pointer;display:inline-block;">⬆ Importer</label>
+      </div>
+      ${importInput}`;
     slot.style.borderStyle = 'dashed';
     slot.style.background = '#f8f9fa';
   }
@@ -4536,6 +4627,806 @@ function _renderPostureSlot(prefix, viewKey) {
 
 function _renderAllPostureSlots(prefix) {
   POSTURE_VIEWS.forEach(v => _renderPostureSlot(prefix, v.key));
+}
+
+// ══════════════════════════════════════════════════════
+// #85-2b — Moteur de placement des 14 points posture (vue profil).
+// ══════════════════════════════════════════════════════
+// Pattern : réutilise canvasXY (L4823) / findMarkerAt (L4828) pour le hit-test
+// et la conversion clic→pixels canvas, exactement comme setupPhotoCanvas
+// (L4334-4358) le fait pour les mesures sport. Différences :
+//   - PAS de flux vidéo : un seul drawImage(img,0,0) au load, puis redraw
+//     image+points à chaque interaction (jamais de requestAnimationFrame).
+//   - PAS de segments ni d'arc d'angle : _drawMarkersOnly se limite aux points
+//     colorés + labels (périmètre #85-2b = placement, pas de calculs).
+//   - Coords stockées NORMALISÉES nx/ny ∈ [0,1] (cf _validatePosturePlacement) :
+//     indépendantes de la résolution photo / taille d'affichage / device DPR.
+// État modal : variables module-level (miroir liveMarkers/selectedMkrIdx/isDragging
+// pour mesures sport L1689). Reset systématique dans _cancelPosturePlacement.
+
+let _postureModalMarkers = [];
+let _postureModalSelIdx = -1;
+let _postureModalDragging = false;
+let _postureModalCanvas = null;
+let _postureModalImg = null;
+let _postureModalCtx = null;
+// #85-2c-angles — calibration optionnelle de l'horizontale du sol.
+// _postureCalibration : { p1:{x,y}, p2:{x,y} } | null (pixels canvas absolus).
+// _postureCalibrationMode : true → les clics canvas placent les 2 points de
+// calibration au lieu des markers. Auto-exit après placement du p2.
+let _postureCalibration = null;
+let _postureCalibrationMode = false;
+
+// Compte les markers placés (nx/ny non nuls) pour la vue donnée.
+// Utilisé par le badge "✓ N/14 placés" dans _renderPostureSlot.
+function _countPostureMarkers(bd, viewKey) {
+  const markers = bd?._postureAnalysis?.[viewKey]?.markers || [];
+  return markers.filter(m => m.nx != null && m.ny != null).length;
+}
+
+// #85-2c-angles — calcul des 4 angles posturaux + global.
+// Renvoie { tragus, acromion, trochanter, genou, global } en degrés signés :
+//   + = antérieur (vers le regard) / − = postérieur. null si point ou cheville manque.
+// `markers` = liste des 14 points (x/y en pixels canvas, ou null).
+// `calibration` = { p1:{x,y}, p2:{x,y} } | null (pixels canvas absolus).
+//
+// Définition du repère :
+//   - plumb_up = vecteur "haut" du fil à plomb. Si calibration : perpendiculaire
+//     à (p2−p1) orientée vers le haut (Y négatif dans repère canvas). Sinon :
+//     (0,−1) = verticale-image.
+//   - anterior_dir = composante horizontale de (Tragus − C7). Le tragus est
+//     antérieur au rachis cervical → le sens s'auto-corrige selon que le sujet
+//     regarde à droite ou à gauche de l'image (robuste profil G ET profil D,
+//     pas de hardcoding par viewKey). Fallback : (Acromion − Base sacrum).
+//     Si rien d'exploitable : +x avec console.warn.
+//
+// Pour chaque landmark L : vec = L − cheville ; angle = atan2(projAnt, projUp)
+// où projAnt = vec · anterior_dir et projUp = vec · plumb_up. atan2 garantit
+// que le signe sort directement antérieur/postérieur sans branche conditionnelle.
+function _computePostureAngles(markers, calibration) {
+  const byName = Object.fromEntries(markers.map(m => [m.name, m]));
+  const cheville = byName['Réf. cheville'];
+  const targets = {
+    tragus:     byName['Tragus'],
+    acromion:   byName['Acromion'],
+    trochanter: byName['Grand trochanter'],
+    genou:      byName['Genou (milieu lat.)'],
+  };
+  const isPlaced = m => m && m.x !== null && m.y !== null;
+  // 1. plumb_up — calculé EN PREMIER : anterior_dir s'en dérive (perpendiculaire).
+  // Sans calibration → verticale-image (0,-1). Avec calibration → perpendiculaire
+  // à (p2−p1) orientée vers le haut (Y<0 dans repère canvas).
+  let plumbUp;
+  if (calibration && calibration.p1 && calibration.p2) {
+    const dx = calibration.p2.x - calibration.p1.x;
+    const dy = calibration.p2.y - calibration.p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      // Deux perpendiculaires possibles : (−dy, dx) et (dy, −dx). Choisir celle
+      // qui pointe vers le haut en repère canvas (Y < 0).
+      let perp = { x: -dy / len, y: dx / len };
+      if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+      plumbUp = perp;
+    } else {
+      plumbUp = { x: 0, y: -1 };
+    }
+  } else {
+    plumbUp = { x: 0, y: -1 };
+  }
+  // 2. anterior_dir — PERPENDICULAIRE à plumb_up, orientée par la géométrie
+  // (signe de (tragus−C7)·perp, fallback acromion−sacrum). Bug corrigé du
+  // hardcoded horizontal {x:±1,y:0} : invalide dès que la calibration sol incline
+  // le plumb_up. En verticale-image (plumb=(0,-1)) → perp=(1,0), même résultat
+  // que l'ancien code (rétro-compat numérique). En calibration tiltée → l'antérieur
+  // s'aligne parallèlement au sol physique, comme attendu cliniquement.
+  const perp = { x: -plumbUp.y, y: plumbUp.x };  // rotation 90° de plumbUp
+  const dot = (a, b) => a.x * b.x + a.y * b.y;
+  let anteriorDir = null;
+  const tragus = byName['Tragus'], c7 = byName['C7'];
+  if (isPlaced(tragus) && isPlaced(c7)) {
+    const diff = { x: tragus.x - c7.x, y: tragus.y - c7.y };
+    const s = Math.sign(dot(diff, perp));
+    if (s !== 0) anteriorDir = { x: perp.x * s, y: perp.y * s };
+  }
+  if (!anteriorDir) {
+    const acr = byName['Acromion'], sac = byName['Base sacrum'];
+    if (isPlaced(acr) && isPlaced(sac)) {
+      const diff = { x: acr.x - sac.x, y: acr.y - sac.y };
+      const s = Math.sign(dot(diff, perp));
+      if (s !== 0) anteriorDir = { x: perp.x * s, y: perp.y * s };
+    }
+  }
+  if (!anteriorDir) {
+    anteriorDir = { x: perp.x, y: perp.y };  // fallback +perp (arbitraire)
+    if (isPlaced(cheville) && Object.values(targets).every(isPlaced)) {
+      console.warn('[#85-2c-angles] anterior_dir non dérivable (Tragus/C7 ou Acromion/Base sacrum manquants ou colinéaires au plumb) — fallback +perp');
+    }
+  }
+  // 3. angles — chaque champ null si point requis manque. Out pré-initialisé à
+  // null pour TOUS les champs (les groupes courbures/CVA/bassin/épaules ne
+  // dépendent PAS de la cheville → toujours calculés si leurs points propres
+  // sont placés). Global antériorisation = moyenne stricte des 4 (null si une
+  // seule manque, pour éviter résultat partiel trompeur cliniquement).
+  const out = {
+    // Antériorisation (vs fil à plomb) — besoin de cheville.
+    tragus: null, acromion: null, trochanter: null, genou: null, global: null,
+    // Courbures rachidiennes — calcAngle3 sur triplets (base, apex, sommet).
+    cervicale: null,  deviationCervicale: null,
+    thoracique: null, deviationThoracique: null,
+    lombaire: null,   deviationLombaire: null,
+    // Tête / Bassin / Tronc (hanche) / Genou / Épaules — voir blocs dédiés.
+    cva: null, bassin: null, genouFlexion: null, epaules: null, flexionHanche: null,
+    // #85-2d-segments — orientations de segments + angle articulaire de hanche.
+    // cuisse = orientation segment (genou→trochHip) vs verticale au genou.
+    // hanche = angle ARTICULAIRE au trochanter (calcAngle3 genou-trochHip-acromion),
+    // distinct de flexionHanche (= orientation du Tronc vs verticale). Garder les deux.
+    cuisse: null, hanche: null,
+  };
+  // 3a. Antériorisation — besoin cheville + ≥1 cible.
+  if (isPlaced(cheville)) {
+    let sum = 0, count = 0;
+    for (const [key, L] of Object.entries(targets)) {
+      if (!isPlaced(L)) continue;
+      const vec = { x: L.x - cheville.x, y: L.y - cheville.y };
+      const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+      const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+      const angleDeg = Math.atan2(projAnt, projUp) * 180 / Math.PI;
+      out[key] = angleDeg;
+      sum += angleDeg; count++;
+    }
+    if (count === 4) out.global = sum / count;
+  }
+  // 3b. Courbures — réutilise calcAngle3 (L5024) qui filtre les non-placés et
+  // calcule l'angle au point milieu (= apex). Renvoie 0-180° (180 = droite).
+  // Déviation = 180 − angle = magnitude de la courbure.
+  const apexC = byName['Apex cervical'], baseCrane = byName['Base crâne'];
+  if (isPlaced(c7) && isPlaced(apexC) && isPlaced(baseCrane)) {
+    out.cervicale = calcAngle3([c7, apexC, baseCrane]);
+    if (out.cervicale !== null) out.deviationCervicale = 180 - out.cervicale;
+  }
+  const apexT = byName['Apex thoracique'], t12 = byName['T12'];
+  if (isPlaced(c7) && isPlaced(apexT) && isPlaced(t12)) {
+    out.thoracique = calcAngle3([c7, apexT, t12]);
+    if (out.thoracique !== null) out.deviationThoracique = 180 - out.thoracique;
+  }
+  const apexL = byName['Apex lombaire'], sacrum = byName['Base sacrum'];
+  if (isPlaced(t12) && isPlaced(apexL) && isPlaced(sacrum)) {
+    out.lombaire = calcAngle3([t12, apexL, sacrum]);
+    if (out.lombaire !== null) out.deviationLombaire = 180 - out.lombaire;
+  }
+  // 3c. CVA (Cranio-Vertebral Angle) — angle de C7→Tragus avec l'horizontale
+  // (= perp). Unsigned 0-90° (mesure clinique standard). Norme ~50° ; valeur
+  // basse = tête en avant. La direction tête haut/bas est gérée par |projUp|
+  // pour que le sujet regardant le haut OU le bas donne le même magnitude.
+  if (isPlaced(c7) && isPlaced(tragus)) {
+    const vec = { x: tragus.x - c7.x, y: tragus.y - c7.y };
+    const projUp   = vec.x * plumbUp.x + vec.y * plumbUp.y;
+    const projHorz = vec.x * perp.x    + vec.y * perp.y;
+    out.cva = Math.atan2(Math.abs(projUp), Math.abs(projHorz)) * 180 / Math.PI;
+  }
+  // 3d. Bassin — ligne EIAS→EIPS vs horizontale, SIGNÉE.
+  // Convention : vec = EIAS − EIPS. + = EIAS sous EIPS (antéversion) ; − = EIAS
+  // au-dessus (rétroversion). atan2(−projUp, projAnt) → + quand projUp < 0
+  // (EIAS plus bas que EIPS dans repère canvas Y-down → projUp < 0 vs plumbUp).
+  const eias = byName['EIAS'], eips = byName['EIPS'];
+  if (isPlaced(eias) && isPlaced(eips)) {
+    const vec = { x: eias.x - eips.x, y: eias.y - eips.y };
+    const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+    const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+    out.bassin = Math.atan2(-projUp, projAnt) * 180 / Math.PI;
+  }
+  // 3e. Genou flexion — calcAngle3 ([trochanter, genou, cheville]) = 0-180°
+  // (180 = droite). Pour distinguer flessum (<180, genou antérieur de la ligne
+  // trochanter-cheville) de récurvatum (>180, genou postérieur), on signe via
+  // projection du genou sur la perpendiculaire à l'axe trochanter-cheville
+  // orientée antérieur : kneeDev > 0 → genou antérieur → on garde raw
+  // (<180 = flessum) ; kneeDev < 0 → genou postérieur → 360 − raw (>180 =
+  // récurvatum). Neutral kneeDev=0 donne raw=180 → 180 quel que soit le signe.
+  const troch = byName['Grand trochanter'], genouPt = byName['Genou (milieu lat.)'];
+  if (isPlaced(troch) && isPlaced(genouPt) && isPlaced(cheville)) {
+    const raw = calcAngle3([troch, genouPt, cheville]);
+    if (raw !== null) {
+      const axis = { x: cheville.x - troch.x, y: cheville.y - troch.y };
+      let perpAxis = { x: -axis.y, y: axis.x };
+      // Orienter vers antérieur via le signe du produit scalaire avec anteriorDir.
+      const dotA = perpAxis.x * anteriorDir.x + perpAxis.y * anteriorDir.y;
+      if (dotA < 0) { perpAxis = { x: -perpAxis.x, y: -perpAxis.y }; }
+      const kneeRel = { x: genouPt.x - troch.x, y: genouPt.y - troch.y };
+      const kneeDev = kneeRel.x * perpAxis.x + kneeRel.y * perpAxis.y;
+      out.genouFlexion = kneeDev >= 0 ? raw : (360 - raw);
+    }
+  }
+  // 3f. Flexion de hanche — angle entre le segment (Grand trochanter → Acromion)
+  // et la VERTICALE au trochanter (= plumb_up). Apex = trochanter. atan2(projAnt,
+  // projUp) donne signe naturel : + = acromion antérieur du trochanter (flexion
+  // de hanche, tronc penché en avant) ; − = extension de hanche. Norme 0° =
+  // tronc parfaitement vertical au-dessus du bassin. Réutilise plumbUp +
+  // anteriorDir dérivés plus haut → cohérent avec calibration sol éventuelle.
+  const acromion = byName['Acromion'];
+  const trochHip = byName['Grand trochanter']; // alias dédié, indépendant de l'accès `troch` du bloc 3e
+  if (isPlaced(trochHip) && isPlaced(acromion)) {
+    const vec = { x: acromion.x - trochHip.x, y: acromion.y - trochHip.y };
+    const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+    const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+    out.flexionHanche = Math.atan2(projAnt, projUp) * 180 / Math.PI;
+  }
+  // 3g. Épaules — décalage horizontal signé de l'Acromion par rapport à l'axe
+  // tronc (C7 → Base sacrum). atan2(décalage_perp, distance_le_long_axe).
+  // + = enroulement antérieur (acromion en avant de l'axe tronc).
+  if (isPlaced(c7) && isPlaced(sacrum) && isPlaced(acromion)) {
+    const axis = { x: sacrum.x - c7.x, y: sacrum.y - c7.y };
+    const axisLen = Math.hypot(axis.x, axis.y);
+    if (axisLen > 0) {
+      const axisU = { x: axis.x / axisLen, y: axis.y / axisLen };
+      let perpU = { x: -axisU.y, y: axisU.x };
+      const dotA = perpU.x * anteriorDir.x + perpU.y * anteriorDir.y;
+      if (dotA < 0) { perpU = { x: -perpU.x, y: -perpU.y }; }
+      const vec = { x: acromion.x - c7.x, y: acromion.y - c7.y };
+      const along = vec.x * axisU.x + vec.y * axisU.y;
+      const perpComp = vec.x * perpU.x + vec.y * perpU.y;
+      out.epaules = Math.atan2(perpComp, along) * 180 / Math.PI;
+    }
+  }
+  // 3h. Cuisse (orientation segment) — apex = genou ; vec genou→trochHip vs
+  // verticale au genou. + = trochanter antérieur du genou (cuisse penchée en
+  // avant) / − = postérieur. Norme 0° = cuisse parfaitement verticale.
+  // genouPt et troch déjà définis (bloc 3e). Réutilise plumbUp + anteriorDir.
+  if (isPlaced(genouPt) && isPlaced(troch)) {
+    const vec = { x: troch.x - genouPt.x, y: troch.y - genouPt.y };
+    const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+    const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+    out.cuisse = Math.atan2(projAnt, projUp) * 180 / Math.PI;
+  }
+  // 3i. Hanche (angle ARTICULAIRE) — apex = grand trochanter ; triplet
+  // (genou, trochHip, acromion). Distinct de flexionHanche (= orientation du
+  // Tronc). raw = calcAngle3 0-180° (180 = aligné) ; mag = 180 − raw (0 = neutre).
+  // Signe : perpendiculaire à l'axe cuisse (trochHip − genou) orientée antérieur
+  // via anteriorDir. Si l'acromion (depuis trochanter) a une composante antérieure
+  // sur cette perpendiculaire → flexion (+) ; sinon extension (−). Même logique
+  // de désambiguïsation que le genou flessum/récurvatum.
+  if (isPlaced(genouPt) && isPlaced(troch) && isPlaced(acromion)) {
+    const raw = calcAngle3([genouPt, troch, acromion]);
+    if (raw !== null) {
+      const mag = 180 - raw;
+      const axisCuisse = { x: troch.x - genouPt.x, y: troch.y - genouPt.y };
+      let perpCuisse = { x: -axisCuisse.y, y: axisCuisse.x };
+      const dotA = perpCuisse.x * anteriorDir.x + perpCuisse.y * anteriorDir.y;
+      if (dotA < 0) { perpCuisse = { x: -perpCuisse.x, y: -perpCuisse.y }; }
+      const vecAcromion = { x: acromion.x - troch.x, y: acromion.y - troch.y };
+      const sideTrunk = vecAcromion.x * perpCuisse.x + vecAcromion.y * perpCuisse.y;
+      out.hanche = sideTrunk >= 0 ? mag : -mag;
+    }
+  }
+  return out;
+}
+
+// Calcule le vecteur plumb_up affichable (réutilisé pour le tracé du fil à plomb).
+// Logique identique à _computePostureAngles (DRY évité car appelée dans la boucle
+// de redraw — duplication contrôlée < 10 lignes pour éviter un getter dédié).
+function _getPostureModalPlumbUp() {
+  const cal = _postureCalibration;
+  if (cal && cal.p1 && cal.p2) {
+    const dx = cal.p2.x - cal.p1.x;
+    const dy = cal.p2.y - cal.p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      let perp = { x: -dy / len, y: dx / len };
+      if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+      return perp;
+    }
+  }
+  return { x: 0, y: -1 };
+}
+
+// Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
+// _redrawPostureModal (live durant drag) ET à chaque _renderPostureMarkerList
+// (changement de sélection/placement). Vert si +, rouge si −, gris si null.
+function _renderPosturePlacementResults() {
+  const panel = document.getElementById('posture-placement-results');
+  if (!panel) return;
+  const a = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  // #85-2d — fmt signé (bleu = +, rouge = −, gris = null) pour antériorisation/
+  // bassin/épaules ; fmt unsigned pour CVA/courbures/genouFlexion (pas de signe
+  // sémantique au niveau de la valeur brute — la classification viendra plus tard).
+  const fmtSigned = v => (v === null || isNaN(v))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:${v > 0 ? '#3b82f6' : '#dc2626'};font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)}°</span>`;
+  const fmtUnsigned = v => (v === null || isNaN(v))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:#0e1f38;font-weight:700;">${v.toFixed(1)}°</span>`;
+  // Courbure : DÉVIATION seule (= 180−angle). 0° = rachis aligné, croissant avec
+  // la courbure. Le libellé tendance (rectitude / norme / hyper) viendra à
+  // l'étape classification.
+  const fmtCurve = dev => dev === null || isNaN(dev)
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:#0e1f38;font-weight:700;">${dev.toFixed(1)}°</span>`;
+  // #85-2d-fix2 — Factory de libellés cliniques centrée sur 0. Renvoie span vide
+  // si valeur null/NaN OU si pos→null (ex. épaules pour valeurs négatives sans
+  // terme clinique défini). Couleurs harmonisées : bleu = direction "positive"
+  // attendue (antéversion, flessum, etc.), rouge = "négative", gris = neutre.
+  const T = POSTURE_NEUTRAL_THRESHOLDS;
+  const _lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
+  const mkLbl = (threshold, posText, negText) => v => {
+    if (v === null || isNaN(v)) return '';
+    if (Math.abs(v) <= threshold) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
+    if (v > 0) return `<span style="${_lblStyle('#3b82f6')}">${posText}</span>`;
+    return negText ? `<span style="${_lblStyle('#dc2626')}">${negText}</span>` : '';
+  };
+  const lblBassin     = mkLbl(T.default, '(antéversion)',             '(rétroversion)');
+  const lblGenouFR    = mkLbl(T.default, '(flessum)',                 '(récurvatum)');
+  const lblEpaules    = mkLbl(T.default, '(enroulement antérieur)',   null); // pas de libellé clinique défini pour < 0
+  const lblHanche     = mkLbl(T.default, '(flexion de hanche)',       '(extension de hanche)');
+  const lblAnterPoint = mkLbl(T.default, '(antérieur)',               '(postérieur)');
+  // #85-2d-segments — CVA en section 1 (Antériorisation) avec vocabulaire segment
+  // unifié (antérieur/postérieur), pas l'ancien (antépulsion/rétropulsion).
+  // Référence 50° (norme clinique), seuil T.cva : low delta = tête forward.
+  const lblCvaAnter = v => {
+    if (v === null || isNaN(v)) return '';
+    const delta = v - 50;
+    if (Math.abs(delta) <= T.cva) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
+    return delta < 0
+      ? `<span style="${_lblStyle('#3b82f6')}">(antérieur)</span>`
+      : `<span style="${_lblStyle('#dc2626')}">(postérieur)</span>`;
+  };
+  const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
+  const lbl = `color:#64748b;`;
+  // Genou centré 0 = neutre, dérivé de genouFlexion (180=neutre, <180=flessum, >180=récurvatum).
+  // Stockage inchangé (sémantique calcAngle3 brut conservée pour le rapport futur).
+  const genouCentered = (a.genouFlexion === null || isNaN(a.genouFlexion)) ? null : 180 - a.genouFlexion;
+  // #85-2d-segments — Conclusion : phrase par segment hors zone neutre, jointe
+  // par « · ». Ordre bas→haut (jambe → cuisse → tronc → tête) cohérent avec la
+  // lecture clinique d'une chaîne posturale. Si tous neutres/null → message
+  // d'alignement. CVA traité à part (référence 50°, pas 0).
+  const conclusionParts = [];
+  const addAnterPart = (val, origin) => {
+    if (val === null || isNaN(val) || Math.abs(val) <= T.default) return;
+    conclusionParts.push((val > 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir ' + origin);
+  };
+  addAnterPart(a.genou,         'des chevilles');  // Jambe
+  addAnterPart(a.cuisse,        'des genoux');     // Cuisse
+  addAnterPart(a.flexionHanche, 'du bassin');      // Tronc
+  if (a.cva !== null && !isNaN(a.cva)) {
+    const delta = a.cva - 50;
+    if (Math.abs(delta) > T.cva) {
+      conclusionParts.push((delta < 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir des cervicales');
+    }
+  }
+  const conclusionText = conclusionParts.length > 0
+    ? conclusionParts.join(' · ')
+    : 'Alignement global — pas de tendance antérieure/postérieure marquée';
+  panel.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
+      <div>
+        <div style="${groupHdr}">Antériorisation / Postériorisation</div>
+        <div><span style="${lbl}">Tête :</span> ${fmtUnsigned(a.cva)} ${lblCvaAnter(a.cva)}</div>
+        <div><span style="${lbl}">Tronc :</span> ${fmtSigned(a.flexionHanche)} ${lblAnterPoint(a.flexionHanche)}</div>
+        <div><span style="${lbl}">Cuisse :</span> ${fmtSigned(a.cuisse)} ${lblAnterPoint(a.cuisse)}</div>
+        <div><span style="${lbl}">Jambe :</span> ${fmtSigned(a.genou)} ${lblAnterPoint(a.genou)}</div>
+        <div style="margin-top:5px;padding-top:5px;border-top:1px solid #cbd5e0;color:#0e1f38;line-height:1.45;">
+          <span style="color:#0e1f38;font-weight:700;">Conclusion :</span>
+          <span style="color:#0e1f38;">${conclusionText}</span>
+        </div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Courbures</div>
+        <div><span style="${lbl}">Cervicale :</span> ${fmtCurve(a.deviationCervicale)}</div>
+        <div><span style="${lbl}">Thoracique :</span> ${fmtCurve(a.deviationThoracique)}</div>
+        <div><span style="${lbl}">Lombaire :</span> ${fmtCurve(a.deviationLombaire)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Bassin / Hanche / Genou</div>
+        <div><span style="${lbl}">Hanche :</span> ${fmtSigned(a.hanche)} ${lblHanche(a.hanche)}</div>
+        <div><span style="${lbl}">Bassin :</span> ${fmtSigned(a.bassin)} ${lblBassin(a.bassin)}</div>
+        <div><span style="${lbl}">Genou :</span> ${fmtSigned(genouCentered)} ${lblGenouFR(genouCentered)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Épaule</div>
+        <div><span style="${lbl}">Épaule :</span> ${fmtSigned(a.epaules)} ${lblEpaules(a.epaules)}</div>
+      </div>
+    </div>
+  `;
+}
+
+// Contrôle calibration sol dans le side-panel. Re-rendu à chaque _renderPostureMarkerList.
+function _renderPostureCalibrationControl() {
+  const el = document.getElementById('posture-calib-control');
+  if (!el) return;
+  const hasP1 = !!_postureCalibration?.p1;
+  const hasP2 = !!_postureCalibration?.p2;
+  const statusMsg = (hasP1 && hasP2)
+    ? `✓ Calibrée (2 points)`
+    : hasP1 ? `Place le 2e point…`
+    : _postureCalibrationMode ? `Place le 1er point sur l'horizontale du sol`
+    : `Optionnel : 2 points sur l'horizontale du sol`;
+  const clearBtn = (hasP1 || hasP2)
+    ? `<button onclick="_clearPostureCalibration()" style="font-size:9px;margin-left:6px;background:#dc2626;color:#fff;border:none;border-radius:3px;padding:2px 6px;cursor:pointer;">Effacer</button>`
+    : '';
+  el.innerHTML = `
+    <div style="margin-bottom:8px;padding:6px 8px;background:${_postureCalibrationMode ? '#fff7ed' : '#fff'};border:1px solid ${_postureCalibrationMode ? '#f97316' : '#cbd5e0'};border-radius:4px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;">
+        <input type="checkbox" ${_postureCalibrationMode ? 'checked' : ''} onclick="_togglePostureCalibrationMode()">
+        <span style="font-weight:600;color:#0e1f38;">📐 Calibrer horizontale sol</span>
+      </label>
+      <div style="font-size:10px;color:#666;margin-top:3px;line-height:1.3;">${statusMsg}${clearBtn}</div>
+    </div>`;
+}
+
+// Toggle du mode calibration. Quand on entre en mode, on ne reset PAS les points
+// existants (l'utilisateur peut vouloir replacer p1 seul après inspection).
+function _togglePostureCalibrationMode() {
+  _postureCalibrationMode = !_postureCalibrationMode;
+  _renderPostureMarkerList();
+  _redrawPostureModal();
+}
+
+function _clearPostureCalibration() {
+  _postureCalibration = null;
+  _renderPostureMarkerList();
+  _redrawPostureModal();
+}
+
+// Variante simplifiée de drawOverlay (L4944) : points + labels uniquement.
+// Pas de drawSegmentRect, pas de calcAngle3, pas d'arc d'angle — périmètre
+// #85-2b strict (placement seul). Texte avec contour noir pour lisibilité
+// sur fonds clairs/sombres (ajout vs drawOverlay qui suppose fond vidéo).
+function _drawMarkersOnly(ctx, canvas, markers, selIdx) {
+  const W = canvas.width;
+  markers.forEach((m, i) => {
+    if (m.x === null || m.y === null) return;
+    const r = Math.max(6, W / 72);
+    const isSel = selIdx === i;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(m.x, m.y, r + 4, 0, 2 * Math.PI);
+    ctx.fillStyle = isSel ? 'rgba(245,166,35,.35)' : 'rgba(255,255,255,.18)';
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
+    ctx.fillStyle = m.color; ctx.fill();
+    ctx.strokeStyle = isSel ? '#f5a623' : '#fff';
+    ctx.lineWidth = isSel ? 2.5 : 1.5; ctx.stroke();
+    ctx.restore();
+    const fontPx = Math.max(10, W / 60);
+    ctx.font = `bold ${fontPx}px DM Sans,sans-serif`;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.strokeText(m.name, m.x + r + 4, m.y + 4);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(m.name, m.x + r + 4, m.y + 4);
+  });
+}
+
+// Repeint l'image puis les overlays. Ordre Z (bas→haut) : image → fil à plomb
+// → ligne de calibration → markers (les markers doivent rester au-dessus pour
+// que le hit-test reste précis et que les labels restent lisibles). Appelé à
+// chaque mouvement/placement (équivalent du startLiveDraw pour mesures, mais
+// déclenché par événement au lieu de rAF — la photo est statique).
+function _redrawPostureModal() {
+  if (!_postureModalCanvas || !_postureModalImg || !_postureModalCtx) return;
+  const ctx = _postureModalCtx;
+  const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
+  ctx.drawImage(_postureModalImg, 0, 0);
+  // #85-2c-angles — fil à plomb passant par la Réf. cheville (si placée).
+  // Trait gris-bleu neutre pour ne pas concurrencer les couleurs des 14 points.
+  // Étendu hors canvas par un t large → garantit que la ligne traverse toute
+  // la photo quelle que soit l'inclinaison (cas calibration sol).
+  const cheville = _postureModalMarkers.find(m => m.name === 'Réf. cheville');
+  if (cheville && cheville.x !== null && cheville.y !== null) {
+    const up = _getPostureModalPlumbUp();
+    const t = Math.max(W, H) * 2;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(100,116,139,0.75)';
+    ctx.lineWidth = Math.max(1.5, W / 400);
+    ctx.beginPath();
+    ctx.moveTo(cheville.x - up.x * t, cheville.y - up.y * t);
+    ctx.lineTo(cheville.x + up.x * t, cheville.y + up.y * t);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // #85-2c-angles — ligne calibration sol (orange tireté) + 2 puces orange.
+  // Distinct des 14 points (couleur réservée). Affichée même partiellement
+  // placée (1 puce seulement) pour feedback intermédiaire.
+  if (_postureCalibration && (_postureCalibration.p1 || _postureCalibration.p2)) {
+    ctx.save();
+    if (_postureCalibration.p1 && _postureCalibration.p2) {
+      ctx.strokeStyle = 'rgba(249,115,22,0.9)';
+      ctx.lineWidth = Math.max(1.5, W / 400);
+      ctx.setLineDash([Math.max(6, W / 100), Math.max(3, W / 200)]);
+      ctx.beginPath();
+      ctx.moveTo(_postureCalibration.p1.x, _postureCalibration.p1.y);
+      ctx.lineTo(_postureCalibration.p2.x, _postureCalibration.p2.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    [_postureCalibration.p1, _postureCalibration.p2].forEach(p => {
+      if (!p) return;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(5, W / 90), 0, 2 * Math.PI);
+      ctx.fillStyle = '#f97316';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+  _drawMarkersOnly(ctx, _postureModalCanvas, _postureModalMarkers, _postureModalSelIdx);
+  // Résultats live : recalculés à chaque redraw → mise à jour fluide pendant drag.
+  _renderPosturePlacementResults();
+}
+
+// Side-panel : liste cliquable des 14 points. État visuel : pastille verte (placé),
+// pastille numérotée grise (non placé), fond ambre clair (sélectionné). Font 12px,
+// nom en #0e1f38 pour contraste lisible (cf demande UX #85-2b).
+function _renderPostureMarkerList() {
+  const list = document.getElementById('posture-mkr-list');
+  if (!list) return;
+  list.innerHTML = _postureModalMarkers.map((m, i) => {
+    const placed = m.x !== null && m.y !== null;
+    const isSel = _postureModalSelIdx === i;
+    return `<div onclick="_selectPostureMarker(${i})" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;background:${isSel ? '#fff7e0' : (placed ? '#f0fdf4' : '#fff')};border-left:3px solid ${m.color};margin-bottom:3px;font-size:12px;">
+      <span style="width:18px;text-align:center;color:${placed ? '#10b981' : '#999'};font-weight:700;">${placed ? '✓' : (i + 1)}</span>
+      <span style="flex:1;color:#0e1f38;font-weight:500;">${m.name}</span>
+    </div>`;
+  }).join('');
+  // Mise à jour bandeau + contrôle calibration + résultats couplés à la liste :
+  // un seul site d'update à maintenir. Tous les changements de sélection
+  // (select / placement / init / toggle calibration) passent par ici.
+  _updatePosturePlacementBanner();
+  _renderPostureCalibrationControl();
+  _renderPosturePlacementResults();
+}
+
+// Bandeau au-dessus du canvas : « 👉 À placer : N/14 — [Nom] » en gros, couleur du point,
+// + hint anatomique en italique dessous. Quand tout est placé (selIdx=-1), affiche
+// l'état complet « ✓ 14/14 placés ». Couplé à _renderPostureMarkerList → s'auto-rafraîchit
+// au moindre changement de sélection sans appels manuels supplémentaires.
+function _updatePosturePlacementBanner() {
+  const banner = document.getElementById('posture-placement-banner');
+  if (!banner) return;
+  // #85-2c-angles — pendant la calibration sol, le bandeau guide explicitement
+  // l'action en cours pour ne pas créer de confusion avec le placement markers.
+  if (_postureCalibrationMode) {
+    const needP1 = !_postureCalibration?.p1;
+    banner.innerHTML = `<div style="font-size:15px;font-weight:700;color:#f97316;">📐 ${needP1 ? 'Place le 1er point' : 'Place le 2e point'} sur l'horizontale du sol</div><div style="font-size:12px;color:#555;margin-top:4px;font-style:italic;line-height:1.35;">2 points alignés sur la même horizontale physique (jonction sol/mur, plinthe, etc.). Le fil à plomb deviendra perpendiculaire à cette horizontale.</div>`;
+    banner.style.background = '#fff7ed';
+    banner.style.borderLeftColor = '#f97316';
+    return;
+  }
+  const total = _postureModalMarkers.length;
+  const placedCount = _postureModalMarkers.filter(m => m.x !== null && m.y !== null).length;
+  if (_postureModalSelIdx < 0 || _postureModalSelIdx >= total) {
+    banner.innerHTML = `<div style="font-size:15px;font-weight:700;color:#10b981;">✓ ${placedCount}/${total} placés — cliquez un point pour ajuster</div>`;
+    banner.style.background = '#f0fdf4';
+    banner.style.borderLeftColor = '#10b981';
+    return;
+  }
+  const m = _postureModalMarkers[_postureModalSelIdx];
+  const isAdjust = (m.x !== null && m.y !== null);
+  const action = isAdjust ? 'À ajuster' : 'À placer';
+  const hint = m.hint ? `<div style="font-size:12px;color:#555;margin-top:4px;font-style:italic;line-height:1.35;">${m.hint}</div>` : '';
+  banner.innerHTML = `<div style="font-size:15px;font-weight:700;color:${m.color};">👉 ${action} : ${_postureModalSelIdx + 1}/${total} — ${m.name}</div>${hint}`;
+  banner.style.background = isAdjust ? '#fffbeb' : '#fff7ed';
+  banner.style.borderLeftColor = m.color;
+}
+
+// Sélectionne un point depuis la liste (= équivalent du clic sur un marker
+// déjà placé dans le canvas, mais accessible aussi pour les non-placés).
+function _selectPostureMarker(i) {
+  _postureModalSelIdx = i;
+  _renderPostureMarkerList();
+  _redrawPostureModal();
+}
+
+// Handlers canvas : pattern miroir setupPhotoCanvas L4334-4358. Clic = hit-test
+// puis place le sélectionné OU le prochain non placé + avance selIdx. Move pendant
+// drag = update du marker sélectionné. Tactile bridge identique.
+function _setupPosturePlacementCanvas(canvas) {
+  const handleDown = e => {
+    e.preventDefault();
+    const ev = (e.touches && e.touches[0]) ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY } : e;
+    const { x, y } = canvasXY(ev, canvas);
+    // #85-2c-angles — mode calibration : les clics placent p1 puis p2 de la
+    // calibration sol au lieu des markers. Auto-exit après p2 (le 3e clic
+    // ré-amorce le cycle : remplace p1 et libère p2 pour repositionnement).
+    if (_postureCalibrationMode) {
+      if (!_postureCalibration) _postureCalibration = { p1: null, p2: null };
+      if (!_postureCalibration.p1) {
+        _postureCalibration.p1 = { x, y };
+      } else if (!_postureCalibration.p2) {
+        _postureCalibration.p2 = { x, y };
+        _postureCalibrationMode = false;
+      } else {
+        _postureCalibration.p1 = { x, y };
+        _postureCalibration.p2 = null;
+      }
+      _renderPostureMarkerList();
+      _redrawPostureModal();
+      return;
+    }
+    const hit = findMarkerAt(x, y, _postureModalMarkers, canvas.width);
+    if (hit >= 0) {
+      _postureModalSelIdx = hit;
+      _postureModalDragging = true;
+      _renderPostureMarkerList();
+      _redrawPostureModal();
+      return;
+    }
+    const idx = _postureModalSelIdx >= 0
+      ? _postureModalSelIdx
+      : _postureModalMarkers.findIndex(m => m.x === null);
+    if (idx >= 0 && idx < _postureModalMarkers.length) {
+      _postureModalMarkers[idx].x = x;
+      _postureModalMarkers[idx].y = y;
+      const next = _postureModalMarkers.findIndex((m, i) => i > idx && m.x === null);
+      _postureModalSelIdx = next >= 0 ? next : -1;
+      _renderPostureMarkerList();
+      _redrawPostureModal();
+    }
+  };
+  const handleMove = e => {
+    if (!_postureModalDragging || _postureModalSelIdx < 0) return;
+    e.preventDefault();
+    const ev = (e.touches && e.touches[0]) ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY } : e;
+    const { x, y } = canvasXY(ev, canvas);
+    _postureModalMarkers[_postureModalSelIdx].x = x;
+    _postureModalMarkers[_postureModalSelIdx].y = y;
+    _redrawPostureModal();
+  };
+  const handleUp = () => { _postureModalDragging = false; };
+  canvas.onmousedown = handleDown;
+  canvas.onmousemove = handleMove;
+  canvas.onmouseup = handleUp;
+  canvas.ontouchstart = handleDown;
+  canvas.ontouchmove = handleMove;
+  canvas.ontouchend = handleUp;
+}
+
+// Ouvre la modale plein écran : photo profil + side-panel + boutons. Le canvas
+// est dimensionné à img.naturalWidth × img.naturalHeight (= taille capture full
+// résolution post #85-P2a, ~810×1080) pour préserver la précision absolue des
+// coords ; CSS max-width/max-height laisse le navigateur scaler en conservant
+// l'aspect-ratio intrinsèque du canvas. Les markers existants (nx/ny ∈ [0,1])
+// sont reconvertis en pixels canvas une fois img.naturalWidth/Height connus.
+function openPosturePlacementModal(prefix, viewKey) {
+  const bd = _getPostureBilanData(prefix);
+  if (!bd) { alert('Aucun bilan ouvert — sélectionne un patient et ouvre un bilan.'); return; }
+  const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  const dataUrl = bd[key];
+  if (!dataUrl) { alert('Capture d\'abord la photo profil avant de placer les points.'); return; }
+  // Init markers : clone template (x:null, y:null), puis injection des coords
+  // sauvegardées par nom (résilient au réordo / renommage futur des points).
+  _postureModalMarkers = cloneMarkers('posture-profil');
+  const saved = bd._postureAnalysis?.[viewKey]?.markers || [];
+  const savedByName = Object.fromEntries(saved.map(m => [m.name, m]));
+  // #85-2c-angles — reset calibration au moment de l'ouverture. Restauration
+  // depuis la sauvegarde (nx/ny → x/y) faite plus bas une fois canvas dimensionné.
+  _postureCalibration = null;
+  _postureCalibrationMode = false;
+  const savedCalib = bd._postureAnalysis?.[viewKey]?.calibration || null;
+  // Build modal DOM (fond sombre semi-transparent, dialog blanc centré).
+  const overlay = document.createElement('div');
+  overlay.id = 'posture-placement-modal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:8px;padding:12px;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des 14 points — Profil ${viewKey === 'profilG' ? 'G' : 'D'}</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn" onclick="_cancelPosturePlacement()" style="font-size:11px;background:#888;color:#fff;padding:5px 12px;">Annuler</button>
+          <button class="btn" onclick="_validatePosturePlacement('${prefix}','${viewKey}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">✓ Valider</button>
+        </div>
+      </div>
+      <div id="posture-placement-banner" style="padding:10px 12px;border-radius:6px;background:#fff7ed;border-left:4px solid #ccc;min-height:42px;flex:none;"></div>
+      <div style="display:flex;gap:10px;flex:1;min-height:0;flex-wrap:wrap;overflow-y:auto;">
+        <div style="flex:1 1 60%;min-width:280px;min-height:280px;max-height:82vh;display:flex;align-items:center;justify-content:center;background:#000;border-radius:6px;overflow:hidden;">
+          <canvas id="posture-placement-canvas" style="max-width:100%;max-height:100%;display:block;cursor:crosshair;touch-action:none;"></canvas>
+        </div>
+        <div style="flex:0 0 280px;min-width:280px;max-height:82vh;overflow-y:auto;padding:6px;background:#f8f9fa;border-radius:6px;display:flex;flex-direction:column;gap:8px;">
+          <div id="posture-placement-results" style="padding:6px 8px;border-radius:5px;background:#fff;border:1px solid #e2e8f0;font-size:12px;flex:none;"></div>
+          <div style="font-size:11px;color:#666;line-height:1.4;padding:0 4px;flex:none;">Clic sur un nom pour sélectionner. Sur la photo : <b>clic</b> = placer ; <b>drag</b> = déplacer.</div>
+          <div id="posture-calib-control" style="flex:none;"></div>
+          <div id="posture-mkr-list" style="flex:none;"></div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  // Charge l'image, puis dimensionne le canvas à la taille naturelle (full res
+  // de la capture portrait). L'aspect-ratio intrinsèque du canvas + max-width/
+  // max-height CSS = scaling navigateur sans distorsion. canvasXY (basé sur
+  // rect.width et canvas.width) reste correct quel que soit le scale.
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.getElementById('posture-placement-canvas');
+    if (!canvas) return;
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    _postureModalCanvas = canvas;
+    _postureModalImg = img;
+    _postureModalCtx = canvas.getContext('2d');
+    // Injection des coords sauvegardées maintenant que les dimensions sont connues.
+    _postureModalMarkers.forEach(m => {
+      const s = savedByName[m.name];
+      if (s && s.nx != null && s.ny != null) {
+        m.x = s.nx * canvas.width;
+        m.y = s.ny * canvas.height;
+      }
+    });
+    // #85-2c-angles — restauration calibration sauvegardée (nx/ny → x/y).
+    if (savedCalib) {
+      _postureCalibration = {
+        p1: savedCalib.p1 && savedCalib.p1.nx != null
+          ? { x: savedCalib.p1.nx * canvas.width, y: savedCalib.p1.ny * canvas.height } : null,
+        p2: savedCalib.p2 && savedCalib.p2.nx != null
+          ? { x: savedCalib.p2.nx * canvas.width, y: savedCalib.p2.ny * canvas.height } : null,
+      };
+      // Si seulement p1 sauvegardé (cas dégradé), on conserve l'objet mais p2 null
+      // → re-render affichera la puce orange et le statusMsg "Place le 2e point…".
+      if (!_postureCalibration.p1 && !_postureCalibration.p2) _postureCalibration = null;
+    }
+    // Sélectionne le premier non placé (séquence guidée) ou -1 si tous placés.
+    _postureModalSelIdx = _postureModalMarkers.findIndex(m => m.x === null);
+    _setupPosturePlacementCanvas(canvas);
+    _renderPostureMarkerList();
+    _redrawPostureModal();
+  };
+  img.onerror = () => { alert('Erreur de chargement de la photo profil.'); _cancelPosturePlacement(); };
+  img.src = dataUrl;
+}
+
+// Ferme la modale + reset complet de l'état module-level (évite les fuites
+// inter-ouvertures si l'utilisateur enchaîne profilG → profilD).
+function _cancelPosturePlacement() {
+  const el = document.getElementById('posture-placement-modal');
+  if (el) el.remove();
+  _postureModalMarkers = [];
+  _postureModalSelIdx = -1;
+  _postureModalDragging = false;
+  _postureModalCanvas = null;
+  _postureModalImg = null;
+  _postureModalCtx = null;
+  _postureCalibration = null;
+  _postureCalibrationMode = false;
+}
+
+// Persiste les coords en NORMALISÉ nx/ny ∈ [0,1] dans bd._postureAnalysis[viewKey].
+// Pourquoi normalisé : indépendant de la résolution photo / taille d'affichage /
+// device DPR — futur-proof pour rapport PDF, ré-ouverture sur autre device, etc.
+// Pas d'upload Storage (struct JSON petite ~1-2 KB pour 14 points × 4 vues).
+// Save silent selon le préfixe : saveBilanSilent (sport) syncronisera ensuite
+// bilanData global → currentPatient.bilanData (cf L9273). savePosturoBilan(true)
+// écrit directement dans currentPatient.bilanDataPosturo (cf L13311).
+async function _validatePosturePlacement(prefix, viewKey) {
+  const bd = _getPostureBilanData(prefix);
+  if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
+  const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
+  // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
+  // moment depuis markers + calibration ; on les stocke quand même pour éviter
+  // de refaire le calcul à chaque affichage rapport / liste / résumé).
+  const angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  if (!bd._postureAnalysis) bd._postureAnalysis = {};
+  bd._postureAnalysis[viewKey] = {
+    markers: _postureModalMarkers.map(m => ({
+      name: m.name,
+      side: m.side,
+      nx: (m.x !== null && W > 0) ? m.x / W : null,
+      ny: (m.y !== null && H > 0) ? m.y / H : null,
+    })),
+    // Calibration en NORMALISÉ comme les markers (cohérent inter-device).
+    calibration: _postureCalibration ? {
+      p1: _postureCalibration.p1 ? { nx: _postureCalibration.p1.x / W, ny: _postureCalibration.p1.y / H } : null,
+      p2: _postureCalibration.p2 ? { nx: _postureCalibration.p2.x / W, ny: _postureCalibration.p2.y / H } : null,
+    } : null,
+    angles,
+  };
+  _cancelPosturePlacement();
+  _renderPostureSlot(prefix, viewKey);
+  // Save silencieux pour persister sans clic "Enregistrer" séparé.
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85-2b] save silent posture analysis a échoué :', e?.message);
+  }
 }
 
 // Active la caméra avec le deviceId sélectionné (ou fallback environment).
@@ -4561,6 +5452,12 @@ async function _togglePostureCam(prefix) {
     const st  = document.getElementById(`${prefix}-pc-cam-status`);
     if (btn) { btn.textContent = '⏹ Arrêter'; btn.style.background = '#c0392b'; }
     if (st)  { st.textContent  = 'Active';   st.className = 'badge bg'; }
+    // #85-2c-grid — affiche la grille par défaut à l'activation caméra (aide
+    // immédiate au cadrage). Masquable ensuite via le bouton ▦ Grille.
+    const grid = document.getElementById(`${prefix}-pc-grid`);
+    if (grid) grid.style.display = 'block';
+    const gridBtn = document.getElementById(`${prefix}-pc-grid-btn`);
+    if (gridBtn) gridBtn.style.background = '#0e7490';
     // Rafraîchir la liste maintenant que la permission est accordée (labels disponibles)
     enumerateCameras(`${prefix}-pc-camera-select`);
   } catch (e) {
@@ -4588,10 +5485,24 @@ function _stopPostureCam(prefix) {
   const st  = document.getElementById(`${prefix}-pc-cam-status`);
   if (btn) { btn.textContent = '▶ Activer caméra'; btn.style.background = '#2a7a4e'; }
   if (st)  { st.textContent  = 'Inactive';         st.className = 'badge bd'; }
+  // #85-2c-grid — masque la grille à l'arrêt (sinon overlay flottant sur fond noir).
+  const grid = document.getElementById(`${prefix}-pc-grid`);
+  if (grid) grid.style.display = 'none';
+}
+
+// #85-2c-grid — toggle manuel de la grille (état indépendant du stream caméra).
+// Couleur du bouton : cyan foncé quand active, gris quand masquée — feedback visuel.
+function _togglePostureGrid(prefix) {
+  const grid = document.getElementById(`${prefix}-pc-grid`);
+  if (!grid) return;
+  const wasVisible = grid.style.display !== 'none';
+  grid.style.display = wasVisible ? 'none' : 'block';
+  const btn = document.getElementById(`${prefix}-pc-grid-btn`);
+  if (btn) btn.style.background = wasVisible ? '#94a3b8' : '#0e7490';
 }
 
 // Capture frame courante du <video> → JPEG 0.88 → bilanData[`_posture<View>`].
-function capturePostureView(prefix, viewKey) {
+async function capturePostureView(prefix, viewKey) {
   const video = document.getElementById(`${prefix}-pc-video`);
   if (!video || !video.videoWidth || !video.videoHeight) {
     alert('Activez la caméra avant de capturer.');
@@ -4602,10 +5513,31 @@ function capturePostureView(prefix, viewKey) {
     alert('Aucun bilan ouvert — sélectionnez un patient et créez/ouvrez un bilan.');
     return;
   }
+  // #85-P2a — crop centré portrait cohérent avec l'affichage object-fit:cover.
+  // Le flux webcam est paysage (16/9 ou 4/3) ; on extrait la bande centrale
+  // d'aspect POSTURE_CAPTURE_ASPECT. Sans ce crop, le preview cover masquait
+  // les bords mais la capture sortait paysage → décalage entre cadrage praticien
+  // et image stockée. Algorithme miroir CSS object-fit:cover (centré, jamais déformé).
+  const vw = video.videoWidth, vh = video.videoHeight;
+  let cropW, cropH, sx, sy;
+  if (vw / vh > POSTURE_CAPTURE_ASPECT) {
+    // Flux plus large que cible → on garde toute la hauteur, on rogne les côtés.
+    cropH = vh;
+    cropW = Math.round(vh * POSTURE_CAPTURE_ASPECT);
+    sx = Math.round((vw - cropW) / 2);
+    sy = 0;
+  } else {
+    // Flux déjà plus étroit (ou déjà portrait) → on garde toute la largeur,
+    // on rogne haut/bas (borné à vh par sécurité).
+    cropW = vw;
+    cropH = Math.min(vh, Math.round(vw / POSTURE_CAPTURE_ASPECT));
+    sx = 0;
+    sy = Math.round((vh - cropH) / 2);
+  }
   const tmp = document.createElement('canvas');
-  tmp.width  = video.videoWidth;
-  tmp.height = video.videoHeight;
-  tmp.getContext('2d').drawImage(video, 0, 0, tmp.width, tmp.height);
+  tmp.width  = cropW;
+  tmp.height = cropH;
+  tmp.getContext('2d').drawImage(video, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   bd[key] = dataUrl;
@@ -4615,15 +5547,135 @@ function capturePostureView(prefix, viewKey) {
   // ticket dédié — pattern miroir photoSlots[].path = null L3523).
   if (bd[key + 'Path']) delete bd[key + 'Path'];
   _renderPostureSlot(prefix, viewKey);
+  // #85 — auto-save silencieux : sans ce save, la capture est perdue au refresh
+  // (bd est en RAM uniquement jusqu'au prochain Enregistrer manuel). Pattern miroir
+  // _validatePosturePlacement L4823-4831. onclick inline ignore la promesse retournée.
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85] auto-save capture posture échoué :', e?.message);
+  }
 }
 
-function deletePostureView(prefix, viewKey) {
+async function deletePostureView(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd) return;
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   delete bd[key];
   if (bd[key + 'Path']) delete bd[key + 'Path'];
   _renderPostureSlot(prefix, viewKey);
+  // #85 — auto-save silencieux : la suppression doit persister immédiatement
+  // (sinon refresh ramène la capture supprimée depuis le bilan persisté).
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85] auto-save delete posture échoué :', e?.message);
+  }
+}
+
+// #85-2c-import — lazy-load heic2any depuis CDN (Chrome/Firefox ne décodent pas
+// HEIC nativement ; iOS Safari le convertit parfois côté OS, parfois pas).
+// Idempotent : si déjà chargé, retourne resolved immédiatement ; si en cours de
+// chargement (script tag avec marker data-heic2any présent), on s'attache à
+// son load/error pour ne pas re-injecter.
+function _loadHeic2anyIfNeeded() {
+  if (window.heic2any) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-heic2any]');
+    if (existing) {
+      existing.addEventListener('load', () => window.heic2any ? resolve() : reject(new Error('heic2any chargé mais window.heic2any absent')));
+      existing.addEventListener('error', () => reject(new Error('Échec chargement heic2any (réseau ?)')));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+    s.dataset.heic2any = '1';
+    s.async = true;
+    s.onload = () => window.heic2any ? resolve() : reject(new Error('heic2any chargé mais window.heic2any absent'));
+    s.onerror = () => reject(new Error('Échec chargement heic2any (réseau ?)'));
+    document.head.appendChild(s);
+  });
+}
+
+// #85-2c-import — import d'une image depuis l'app native (limite iOS : Safari
+// n'expose pas l'ultra grand-angle via getUserMedia). L'image est stockée TELLE
+// QUELLE (pas de crop POSTURE_CAPTURE_ASPECT) car cadrée par le praticien dans
+// l'app caméra native. Le pipeline aval (slot rendering, modale placement
+// _postureAnalysis nx/ny) est résolution-agnostique → marche identiquement.
+// Support HEIC (format par défaut iPhone) : détection MIME OU extension (iOS
+// envoie parfois MIME vide), conversion via heic2any chargée à la demande.
+// Auto-save miroir capturePostureView : dispatch par préfixe (sp/po).
+async function importPostureView(prefix, viewKey, input) {
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  // Détection HEIC avant le check MIME générique : file.type peut être vide
+  // (iOS) ou image/heic|heif (desktop). Le nom de fichier complète la détection.
+  const lcName = (file.name || '').toLowerCase();
+  const isHeic = /^image\/hei[cf]$/i.test(file.type || '') || /\.(heic|heif)$/i.test(lcName);
+  if (!isHeic && (!file.type || !file.type.startsWith('image/'))) {
+    alert('Sélectionnez un fichier image (JPEG, PNG, WebP, HEIC).');
+    input.value = '';
+    return;
+  }
+  const bd = _getPostureBilanData(prefix);
+  if (!bd) {
+    alert('Aucun bilan ouvert — sélectionnez un patient et créez/ouvrez un bilan.');
+    input.value = '';
+    return;
+  }
+  // Conversion HEIC → JPEG si nécessaire. Le FileReader en aval lit indifféremment
+  // un File ou un Blob → assignation à `blob` qui peut être l'un ou l'autre.
+  let blob = file;
+  if (isHeic) {
+    try {
+      await _loadHeic2anyIfNeeded();
+      if (!window.heic2any) throw new Error('Bibliothèque heic2any indisponible');
+      const out = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+      // heic2any retourne soit un Blob (image unique), soit un Array<Blob> (HEIC
+      // multi-frame). On prend la première frame dans le cas array.
+      blob = Array.isArray(out) ? out[0] : out;
+      if (!blob) throw new Error('Conversion HEIC : sortie vide');
+    } catch (e) {
+      alert('Conversion HEIC échouée : ' + (e?.message || e) + '\n\nEnvoyez l\'image au format JPEG ou PNG (ou activez "Plus compatible" dans Réglages iOS → Appareil photo → Formats).');
+      input.value = '';
+      return;
+    }
+  }
+  const dataUrl = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error('FileReader error'));
+    r.readAsDataURL(blob);
+  }).catch(e => {
+    alert('Erreur lecture fichier : ' + (e?.message || e));
+    return null;
+  });
+  // Reset input.value SYSTÉMATIQUEMENT (succès ET échec) pour permettre la
+  // ré-importation du même fichier après modification externe.
+  input.value = '';
+  if (!dataUrl) return;
+  const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  bd[key] = dataUrl;
+  // Path Storage obsolète : la nouvelle image doit ré-uploader au prochain save.
+  if (bd[key + 'Path']) delete bd[key + 'Path'];
+  _renderPostureSlot(prefix, viewKey);
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85] auto-save import posture échoué :', e?.message);
+  }
 }
 
 // Boot sport : peuple le container statique d'index.html avec le markup builder.
@@ -9127,6 +10179,18 @@ function loadBilan() {
   // en RAM pour l'affichage. Sites lecteurs (canvas restore, rapport composites)
   // qui lisent currentPatient.bilanData trouvent désormais les dataURLs.
   prefetchSportBilanDataPhotos(currentPatient.bilanData).then(() => {
+    // #85-P2 — sync global ← currentPatient pour les photos réhydratées. Les slots
+    // posture (_renderPostureSlot 'sp' L4519 via _getPostureBilanData L4480) et
+    // saveBilan lisent le `bilanData` global ; le prefetch (fix racine #99) remplit
+    // currentPatient.bilanData. Sans ce report, les captures sport sont invisibles
+    // au reload (Path présent, dataURL absente du global → slots vides bien que
+    // l'image soit en RAM ailleurs). Restreint à SPORT_BILAN_PHOTO_KEYS pour ne
+    // pas écraser d'autres champs (texte, scores, neuro4) potentiellement édités.
+    if (typeof bilanData !== 'undefined' && bilanData && currentPatient?.bilanData) {
+      SPORT_BILAN_PHOTO_KEYS.forEach(k => {
+        if (currentPatient.bilanData[k]) bilanData[k] = currentPatient.bilanData[k];
+      });
+    }
     _renderAllPostureSlots('sp');
     _restoreSportMorphoPiedsFromBilanData();
   });

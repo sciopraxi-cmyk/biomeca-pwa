@@ -17,10 +17,7 @@
 
 export function isJwtIssueResponse({ status, url, body }) {
   const isStorageEndpoint = typeof url === 'string' && url.includes('/storage/v1/');
-  const statusEligible =
-    status === 401 ||
-    status === 403 ||
-    (status === 400 && isStorageEndpoint);
+  const statusEligible = status === 401 || status === 403 || (status === 400 && isStorageEndpoint);
   if (!statusEligible) return false;
   // Si Storage 400 et qu'on a la garantie one-shot (_retry===0 côté caller),
   // on peut forcer isJwtIssue=true sans scanner le body — il n'y a quasi
@@ -31,10 +28,14 @@ export function isJwtIssueResponse({ status, url, body }) {
     return status === 400 && isStorageEndpoint;
   }
   const code = String(body.code || body.error_code || body.statusCode || '').toLowerCase();
-  const msg  = String(body.message || body.msg || body.error || '').toLowerCase();
+  const msg = String(body.message || body.msg || body.error || '').toLowerCase();
   return (
-    code.includes('jwt') || code === 'pgrst303' || code === 'bad_jwt' ||
-    msg.includes('jwt') || msg.includes('expired') || msg.includes('token') ||
+    code.includes('jwt') ||
+    code === 'pgrst303' ||
+    code === 'bad_jwt' ||
+    msg.includes('jwt') ||
+    msg.includes('expired') ||
+    msg.includes('token') ||
     msg.includes('claim')
   );
 }
