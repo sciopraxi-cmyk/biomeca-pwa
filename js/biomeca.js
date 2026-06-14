@@ -1922,6 +1922,28 @@ const MARKER_TEMPLATES = {
     {name:'Calca supérieur G',        color:'#aab0bc', side:'G'},
     {name:'Calca inférieur G',        color:'#aab0bc', side:'G'},
   ],
+  // #85-2b — Posture profil (G ou D) : 14 points anatomiques, vue latérale.
+  // side:'' (pas de latéralisation D/G dans le template ; le sens est porté par
+  // viewKey 'profilG'|'profilD' au niveau du stockage _postureAnalysis).
+  // Réutilisé par cloneMarkers('posture-profil') dans openPosturePlacementModal.
+  // `hint` = repère anatomique court affiché dans le bandeau de la modale
+  // pour guider le placement. cloneMarkers spread ({...m}) → hint préservé.
+  'posture-profil': [
+    {name:'Tragus',              color:'#f04060', side:'', hint:'petit relief cartilagineux devant le conduit auditif'},
+    {name:'Base crâne',          color:'#f5762a', side:'', hint:'protubérance occipitale externe (inion), à la base de l\'os occipital'},
+    {name:'Apex cervical',       color:'#f5a623', side:'', hint:'sommet de la lordose cervicale (concavité postérieure ~C4-C5)'},
+    {name:'C7',                  color:'#e0c020', side:'', hint:'épineuse la plus proéminente à la base du cou (tête fléchie pour repérer)'},
+    {name:'Acromion',            color:'#4a9eff', side:'', hint:'bord externe et postérieur de l\'épaule (sommet osseux)'},
+    {name:'Apex thoracique',     color:'#3b82f6', side:'', hint:'sommet de la cyphose dorsale, ~pointe des omoplates'},
+    {name:'T12',                 color:'#6366f1', side:'', hint:'repère thoraco-lombaire (au niveau de la dernière côte palpable)'},
+    {name:'Apex lombaire',       color:'#8b5cf6', side:'', hint:'sommet de la lordose lombaire (concavité postérieure ~L3)'},
+    {name:'Base sacrum',         color:'#a78bfa', side:'', hint:'jonction L5-S1, juste au-dessus du sacrum'},
+    {name:'EIAS',                color:'#10b981', side:'', hint:'épine iliaque antéro-supérieure (saillie osseuse antérieure du bassin)'},
+    {name:'EIPS',                color:'#3ecf72', side:'', hint:'épine iliaque postéro-supérieure (fossette latérale du sacrum, sous la ceinture)'},
+    {name:'Grand trochanter',    color:'#6edfaa', side:'', hint:'saillie osseuse latérale de la hanche (relief externe du fémur)'},
+    {name:'Genou (milieu lat.)', color:'#ec4899', side:'', hint:'milieu de l\'interligne articulaire latérale du genou'},
+    {name:'Réf. cheville',       color:'#8892a4', side:'', hint:'juste en avant de la malléole latérale (fibula distale)'},
+  ],
 };
 
 function cloneMarkers(type) {
@@ -4523,13 +4545,27 @@ function _renderPostureSlot(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   const dataUrl = bd?.[key];
+  // #85-2b — bouton 🎯 placement points sur les vues profil (G/D) seulement,
+  // une fois la photo capturée. Badge "✓ N/14 placés" indique l'avancement
+  // de l'analyse pour cette vue. Aucun bouton pour face/dos (pas de template
+  // posture-face/posture-dos pour ce périmètre — placement seul, vue profil).
+  const isProfil = viewKey === 'profilG' || viewKey === 'profilD';
+  const markerCount = isProfil ? _countPostureMarkers(bd, viewKey) : 0;
+  const placementBtn = (dataUrl && isProfil)
+    ? `<button class="btn" onclick="openPosturePlacementModal('${prefix}','${viewKey}')" title="Placer les 14 points anatomiques" style="font-size:9px;padding:2px 6px;background:#7c3aed;color:#fff;">🎯</button>`
+    : '';
+  const placementBadge = (markerCount > 0)
+    ? `<div style="font-size:9px;color:#10b981;font-weight:600;margin-top:2px;">✓ ${markerCount}/14 placés</div>`
+    : '';
   if (dataUrl) {
     slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:4px;font-weight:600;">${view.label}</div>
       <img src="${dataUrl}" style="max-width:100%;max-height:90px;border-radius:4px;display:block;margin:0 auto 4px;"/>
       <div style="display:flex;gap:4px;justify-content:center;">
         <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#0e1f38;color:#fff;">↻</button>
+        ${placementBtn}
         <button class="btn" onclick="deletePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#c0392b;color:#fff;">✕</button>
-      </div>`;
+      </div>
+      ${placementBadge}`;
     slot.style.borderStyle = 'solid';
     slot.style.background = '#fff';
   } else {
@@ -4542,6 +4578,289 @@ function _renderPostureSlot(prefix, viewKey) {
 
 function _renderAllPostureSlots(prefix) {
   POSTURE_VIEWS.forEach(v => _renderPostureSlot(prefix, v.key));
+}
+
+// ══════════════════════════════════════════════════════
+// #85-2b — Moteur de placement des 14 points posture (vue profil).
+// ══════════════════════════════════════════════════════
+// Pattern : réutilise canvasXY (L4823) / findMarkerAt (L4828) pour le hit-test
+// et la conversion clic→pixels canvas, exactement comme setupPhotoCanvas
+// (L4334-4358) le fait pour les mesures sport. Différences :
+//   - PAS de flux vidéo : un seul drawImage(img,0,0) au load, puis redraw
+//     image+points à chaque interaction (jamais de requestAnimationFrame).
+//   - PAS de segments ni d'arc d'angle : _drawMarkersOnly se limite aux points
+//     colorés + labels (périmètre #85-2b = placement, pas de calculs).
+//   - Coords stockées NORMALISÉES nx/ny ∈ [0,1] (cf _validatePosturePlacement) :
+//     indépendantes de la résolution photo / taille d'affichage / device DPR.
+// État modal : variables module-level (miroir liveMarkers/selectedMkrIdx/isDragging
+// pour mesures sport L1689). Reset systématique dans _cancelPosturePlacement.
+
+let _postureModalMarkers = [];
+let _postureModalSelIdx = -1;
+let _postureModalDragging = false;
+let _postureModalCanvas = null;
+let _postureModalImg = null;
+let _postureModalCtx = null;
+
+// Compte les markers placés (nx/ny non nuls) pour la vue donnée.
+// Utilisé par le badge "✓ N/14 placés" dans _renderPostureSlot.
+function _countPostureMarkers(bd, viewKey) {
+  const markers = bd?._postureAnalysis?.[viewKey]?.markers || [];
+  return markers.filter(m => m.nx != null && m.ny != null).length;
+}
+
+// Variante simplifiée de drawOverlay (L4944) : points + labels uniquement.
+// Pas de drawSegmentRect, pas de calcAngle3, pas d'arc d'angle — périmètre
+// #85-2b strict (placement seul). Texte avec contour noir pour lisibilité
+// sur fonds clairs/sombres (ajout vs drawOverlay qui suppose fond vidéo).
+function _drawMarkersOnly(ctx, canvas, markers, selIdx) {
+  const W = canvas.width;
+  markers.forEach((m, i) => {
+    if (m.x === null || m.y === null) return;
+    const r = Math.max(6, W / 72);
+    const isSel = selIdx === i;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(m.x, m.y, r + 4, 0, 2 * Math.PI);
+    ctx.fillStyle = isSel ? 'rgba(245,166,35,.35)' : 'rgba(255,255,255,.18)';
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
+    ctx.fillStyle = m.color; ctx.fill();
+    ctx.strokeStyle = isSel ? '#f5a623' : '#fff';
+    ctx.lineWidth = isSel ? 2.5 : 1.5; ctx.stroke();
+    ctx.restore();
+    const fontPx = Math.max(10, W / 60);
+    ctx.font = `bold ${fontPx}px DM Sans,sans-serif`;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.strokeText(m.name, m.x + r + 4, m.y + 4);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(m.name, m.x + r + 4, m.y + 4);
+  });
+}
+
+// Repeint l'image puis les points. Appelé à chaque mouvement/placement
+// (équivalent du startLiveDraw pour mesures, mais déclenché par événement
+// au lieu de rAF — la photo est statique).
+function _redrawPostureModal() {
+  if (!_postureModalCanvas || !_postureModalImg || !_postureModalCtx) return;
+  const ctx = _postureModalCtx;
+  ctx.drawImage(_postureModalImg, 0, 0);
+  _drawMarkersOnly(ctx, _postureModalCanvas, _postureModalMarkers, _postureModalSelIdx);
+}
+
+// Side-panel : liste cliquable des 14 points. État visuel : pastille verte (placé),
+// pastille numérotée grise (non placé), fond ambre clair (sélectionné). Font 12px,
+// nom en #0e1f38 pour contraste lisible (cf demande UX #85-2b).
+function _renderPostureMarkerList() {
+  const list = document.getElementById('posture-mkr-list');
+  if (!list) return;
+  list.innerHTML = _postureModalMarkers.map((m, i) => {
+    const placed = m.x !== null && m.y !== null;
+    const isSel = _postureModalSelIdx === i;
+    return `<div onclick="_selectPostureMarker(${i})" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;background:${isSel ? '#fff7e0' : (placed ? '#f0fdf4' : '#fff')};border-left:3px solid ${m.color};margin-bottom:3px;font-size:12px;">
+      <span style="width:18px;text-align:center;color:${placed ? '#10b981' : '#999'};font-weight:700;">${placed ? '✓' : (i + 1)}</span>
+      <span style="flex:1;color:#0e1f38;font-weight:500;">${m.name}</span>
+    </div>`;
+  }).join('');
+  // Mise à jour bandeau couplée à la liste : un seul site d'update à maintenir.
+  // Tous les changements de sélection (select / placement / init) passent par ici.
+  _updatePosturePlacementBanner();
+}
+
+// Bandeau au-dessus du canvas : « 👉 À placer : N/14 — [Nom] » en gros, couleur du point,
+// + hint anatomique en italique dessous. Quand tout est placé (selIdx=-1), affiche
+// l'état complet « ✓ 14/14 placés ». Couplé à _renderPostureMarkerList → s'auto-rafraîchit
+// au moindre changement de sélection sans appels manuels supplémentaires.
+function _updatePosturePlacementBanner() {
+  const banner = document.getElementById('posture-placement-banner');
+  if (!banner) return;
+  const total = _postureModalMarkers.length;
+  const placedCount = _postureModalMarkers.filter(m => m.x !== null && m.y !== null).length;
+  if (_postureModalSelIdx < 0 || _postureModalSelIdx >= total) {
+    banner.innerHTML = `<div style="font-size:15px;font-weight:700;color:#10b981;">✓ ${placedCount}/${total} placés — cliquez un point pour ajuster</div>`;
+    banner.style.background = '#f0fdf4';
+    banner.style.borderLeftColor = '#10b981';
+    return;
+  }
+  const m = _postureModalMarkers[_postureModalSelIdx];
+  const isAdjust = (m.x !== null && m.y !== null);
+  const action = isAdjust ? 'À ajuster' : 'À placer';
+  const hint = m.hint ? `<div style="font-size:12px;color:#555;margin-top:4px;font-style:italic;line-height:1.35;">${m.hint}</div>` : '';
+  banner.innerHTML = `<div style="font-size:15px;font-weight:700;color:${m.color};">👉 ${action} : ${_postureModalSelIdx + 1}/${total} — ${m.name}</div>${hint}`;
+  banner.style.background = isAdjust ? '#fffbeb' : '#fff7ed';
+  banner.style.borderLeftColor = m.color;
+}
+
+// Sélectionne un point depuis la liste (= équivalent du clic sur un marker
+// déjà placé dans le canvas, mais accessible aussi pour les non-placés).
+function _selectPostureMarker(i) {
+  _postureModalSelIdx = i;
+  _renderPostureMarkerList();
+  _redrawPostureModal();
+}
+
+// Handlers canvas : pattern miroir setupPhotoCanvas L4334-4358. Clic = hit-test
+// puis place le sélectionné OU le prochain non placé + avance selIdx. Move pendant
+// drag = update du marker sélectionné. Tactile bridge identique.
+function _setupPosturePlacementCanvas(canvas) {
+  const handleDown = e => {
+    e.preventDefault();
+    const ev = (e.touches && e.touches[0]) ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY } : e;
+    const { x, y } = canvasXY(ev, canvas);
+    const hit = findMarkerAt(x, y, _postureModalMarkers, canvas.width);
+    if (hit >= 0) {
+      _postureModalSelIdx = hit;
+      _postureModalDragging = true;
+      _renderPostureMarkerList();
+      _redrawPostureModal();
+      return;
+    }
+    const idx = _postureModalSelIdx >= 0
+      ? _postureModalSelIdx
+      : _postureModalMarkers.findIndex(m => m.x === null);
+    if (idx >= 0 && idx < _postureModalMarkers.length) {
+      _postureModalMarkers[idx].x = x;
+      _postureModalMarkers[idx].y = y;
+      const next = _postureModalMarkers.findIndex((m, i) => i > idx && m.x === null);
+      _postureModalSelIdx = next >= 0 ? next : -1;
+      _renderPostureMarkerList();
+      _redrawPostureModal();
+    }
+  };
+  const handleMove = e => {
+    if (!_postureModalDragging || _postureModalSelIdx < 0) return;
+    e.preventDefault();
+    const ev = (e.touches && e.touches[0]) ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY } : e;
+    const { x, y } = canvasXY(ev, canvas);
+    _postureModalMarkers[_postureModalSelIdx].x = x;
+    _postureModalMarkers[_postureModalSelIdx].y = y;
+    _redrawPostureModal();
+  };
+  const handleUp = () => { _postureModalDragging = false; };
+  canvas.onmousedown = handleDown;
+  canvas.onmousemove = handleMove;
+  canvas.onmouseup = handleUp;
+  canvas.ontouchstart = handleDown;
+  canvas.ontouchmove = handleMove;
+  canvas.ontouchend = handleUp;
+}
+
+// Ouvre la modale plein écran : photo profil + side-panel + boutons. Le canvas
+// est dimensionné à img.naturalWidth × img.naturalHeight (= taille capture full
+// résolution post #85-P2a, ~810×1080) pour préserver la précision absolue des
+// coords ; CSS max-width/max-height laisse le navigateur scaler en conservant
+// l'aspect-ratio intrinsèque du canvas. Les markers existants (nx/ny ∈ [0,1])
+// sont reconvertis en pixels canvas une fois img.naturalWidth/Height connus.
+function openPosturePlacementModal(prefix, viewKey) {
+  const bd = _getPostureBilanData(prefix);
+  if (!bd) { alert('Aucun bilan ouvert — sélectionne un patient et ouvre un bilan.'); return; }
+  const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  const dataUrl = bd[key];
+  if (!dataUrl) { alert('Capture d\'abord la photo profil avant de placer les points.'); return; }
+  // Init markers : clone template (x:null, y:null), puis injection des coords
+  // sauvegardées par nom (résilient au réordo / renommage futur des points).
+  _postureModalMarkers = cloneMarkers('posture-profil');
+  const saved = bd._postureAnalysis?.[viewKey]?.markers || [];
+  const savedByName = Object.fromEntries(saved.map(m => [m.name, m]));
+  // Build modal DOM (fond sombre semi-transparent, dialog blanc centré).
+  const overlay = document.createElement('div');
+  overlay.id = 'posture-placement-modal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:8px;padding:12px;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des 14 points — Profil ${viewKey === 'profilG' ? 'G' : 'D'}</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn" onclick="_cancelPosturePlacement()" style="font-size:11px;background:#888;color:#fff;padding:5px 12px;">Annuler</button>
+          <button class="btn" onclick="_validatePosturePlacement('${prefix}','${viewKey}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">✓ Valider</button>
+        </div>
+      </div>
+      <div id="posture-placement-banner" style="padding:10px 12px;border-radius:6px;background:#fff7ed;border-left:4px solid #ccc;min-height:42px;"></div>
+      <div style="display:flex;gap:10px;flex:1;min-height:0;flex-wrap:wrap;">
+        <div style="flex:1 1 60%;min-width:280px;min-height:0;display:flex;align-items:center;justify-content:center;background:#000;border-radius:6px;overflow:hidden;">
+          <canvas id="posture-placement-canvas" style="max-width:100%;max-height:72vh;display:block;cursor:crosshair;touch-action:none;"></canvas>
+        </div>
+        <div style="flex:0 0 240px;min-width:240px;max-height:72vh;overflow-y:auto;padding:6px;background:#f8f9fa;border-radius:6px;">
+          <div style="font-size:11px;color:#666;margin-bottom:6px;line-height:1.4;">Clic sur un nom pour le sélectionner. Sur la photo : <b>clic</b> = placer le point sélectionné ou le suivant libre ; <b>drag</b> = repositionner un point déjà placé.</div>
+          <div id="posture-mkr-list"></div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  // Charge l'image, puis dimensionne le canvas à la taille naturelle (full res
+  // de la capture portrait). L'aspect-ratio intrinsèque du canvas + max-width/
+  // max-height CSS = scaling navigateur sans distorsion. canvasXY (basé sur
+  // rect.width et canvas.width) reste correct quel que soit le scale.
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.getElementById('posture-placement-canvas');
+    if (!canvas) return;
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    _postureModalCanvas = canvas;
+    _postureModalImg = img;
+    _postureModalCtx = canvas.getContext('2d');
+    // Injection des coords sauvegardées maintenant que les dimensions sont connues.
+    _postureModalMarkers.forEach(m => {
+      const s = savedByName[m.name];
+      if (s && s.nx != null && s.ny != null) {
+        m.x = s.nx * canvas.width;
+        m.y = s.ny * canvas.height;
+      }
+    });
+    // Sélectionne le premier non placé (séquence guidée) ou -1 si tous placés.
+    _postureModalSelIdx = _postureModalMarkers.findIndex(m => m.x === null);
+    _setupPosturePlacementCanvas(canvas);
+    _renderPostureMarkerList();
+    _redrawPostureModal();
+  };
+  img.onerror = () => { alert('Erreur de chargement de la photo profil.'); _cancelPosturePlacement(); };
+  img.src = dataUrl;
+}
+
+// Ferme la modale + reset complet de l'état module-level (évite les fuites
+// inter-ouvertures si l'utilisateur enchaîne profilG → profilD).
+function _cancelPosturePlacement() {
+  const el = document.getElementById('posture-placement-modal');
+  if (el) el.remove();
+  _postureModalMarkers = [];
+  _postureModalSelIdx = -1;
+  _postureModalDragging = false;
+  _postureModalCanvas = null;
+  _postureModalImg = null;
+  _postureModalCtx = null;
+}
+
+// Persiste les coords en NORMALISÉ nx/ny ∈ [0,1] dans bd._postureAnalysis[viewKey].
+// Pourquoi normalisé : indépendant de la résolution photo / taille d'affichage /
+// device DPR — futur-proof pour rapport PDF, ré-ouverture sur autre device, etc.
+// Pas d'upload Storage (struct JSON petite ~1-2 KB pour 14 points × 4 vues).
+// Save silent selon le préfixe : saveBilanSilent (sport) syncronisera ensuite
+// bilanData global → currentPatient.bilanData (cf L9273). savePosturoBilan(true)
+// écrit directement dans currentPatient.bilanDataPosturo (cf L13311).
+async function _validatePosturePlacement(prefix, viewKey) {
+  const bd = _getPostureBilanData(prefix);
+  if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
+  const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
+  if (!bd._postureAnalysis) bd._postureAnalysis = {};
+  bd._postureAnalysis[viewKey] = {
+    markers: _postureModalMarkers.map(m => ({
+      name: m.name,
+      side: m.side,
+      nx: (m.x !== null && W > 0) ? m.x / W : null,
+      ny: (m.y !== null && H > 0) ? m.y / H : null,
+    })),
+  };
+  _cancelPosturePlacement();
+  _renderPostureSlot(prefix, viewKey);
+  // Save silencieux pour persister sans clic "Enregistrer" séparé.
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85-2b] save silent posture analysis a échoué :', e?.message);
+  }
 }
 
 // Active la caméra avec le deviceId sélectionné (ou fallback environment).
@@ -4597,7 +4916,7 @@ function _stopPostureCam(prefix) {
 }
 
 // Capture frame courante du <video> → JPEG 0.88 → bilanData[`_posture<View>`].
-function capturePostureView(prefix, viewKey) {
+async function capturePostureView(prefix, viewKey) {
   const video = document.getElementById(`${prefix}-pc-video`);
   if (!video || !video.videoWidth || !video.videoHeight) {
     alert('Activez la caméra avant de capturer.');
@@ -4642,15 +4961,38 @@ function capturePostureView(prefix, viewKey) {
   // ticket dédié — pattern miroir photoSlots[].path = null L3523).
   if (bd[key + 'Path']) delete bd[key + 'Path'];
   _renderPostureSlot(prefix, viewKey);
+  // #85 — auto-save silencieux : sans ce save, la capture est perdue au refresh
+  // (bd est en RAM uniquement jusqu'au prochain Enregistrer manuel). Pattern miroir
+  // _validatePosturePlacement L4823-4831. onclick inline ignore la promesse retournée.
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85] auto-save capture posture échoué :', e?.message);
+  }
 }
 
-function deletePostureView(prefix, viewKey) {
+async function deletePostureView(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd) return;
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   delete bd[key];
   if (bd[key + 'Path']) delete bd[key + 'Path'];
   _renderPostureSlot(prefix, viewKey);
+  // #85 — auto-save silencieux : la suppression doit persister immédiatement
+  // (sinon refresh ramène la capture supprimée depuis le bilan persisté).
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85] auto-save delete posture échoué :', e?.message);
+  }
 }
 
 // Boot sport : peuple le container statique d'index.html avec le markup builder.
