@@ -8038,7 +8038,15 @@ function initMorphoCanvas(canvasId) {
   canvas._undoOrderStack = _morphoUndoOrder;
   // NB: les images sont maintenant dans le DOM via <img>, pas dans le canvas
   // On ne restaure plus l'ancien format (image+dessin fusionnés)
-  setTimeout(() => { canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height); }, 100);
+  // #83 — capture _baseSnapshot SYNCHRONE (symétrie drawPiedsTemplate L8429). Le
+  // canvas morpho est un overlay transparent (silhouettes dans <img> DOM, pas
+  // gravées dans le canvas) → le base = transparent, capturable immédiatement.
+  // Fiabilise _serializeDrawCanvas (soustraction base vs canvas) au save :
+  // l'ancien setTimeout 100ms posait une fenêtre où le base était null, et
+  // _drawMorphoCanvasesFromSource (restoration overlay) pouvait peindre AVANT
+  // le base, contaminant la soustraction. Le fallback de setupDrawCanvas L8096
+  // (if(!canvas._baseSnapshot)) reste inoffensif : base déjà posé ici.
+  canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
   setupDrawCanvas(canvas, canvasId);
 }
 
@@ -8785,12 +8793,11 @@ function _serializeDrawCanvas(canvas) {
   const current = tctx.getImageData(0, 0, W, H);
   _subtractBaseSnapshot(current, canvas._baseSnapshot);
   tctx.putImageData(current, 0, 0);
-  const dpr = window.devicePixelRatio || 1;
-  const out = document.createElement('canvas');
-  out.width = Math.round(W / dpr);
-  out.height = Math.round(H / dpr);
-  out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, out.width, out.height);
-  return out.toDataURL('image/png');
+  // #83 — pleine résolution : pas de downscale CSS (l'ancien W/dpr perdait
+  // la moitié des pixels à dpr=2, puis la restauration ré-upscalait → flou).
+  // La restauration (drawImage) scale déjà vers le dest rect quel que soit
+  // le source res → source pleine résolution = net. tmp est déjà W×H base soustraite.
+  return tmp.toDataURL('image/png');
 }
 
 // Fix #94 auto-réparation — soustrait canvas._baseSnapshot in-place après un
@@ -13024,10 +13031,26 @@ function showSportBilanSection(idx) {
   //    → flag idempotent uniforme avec pieds-canvas. Préserve les dessins user au
   //    switch onglet, et garantit la ré-init au switch patient via clearBilanFields.
   if(shownId === 'ssec-1') setTimeout(() => {
+    // #83 — symétrie avec ssec-9 pieds : init + restore overlay des dessins
+    // sauvegardés UNIQUEMENT à la (ré)initialisation. Sans restore ici, le
+    // canvas morpho restait vide quand le user arrive sur ssec-1 (la chaîne
+    // loadBilan → _drawMorphoCanvasesFromSource saute les canvas width===0
+    // tant que la section n'a pas été affichée) → édition mal capturée
+    // (soustraction _serializeDrawCanvas sans overlay sous-jacent) → perdue.
+    // posesReadyFlag=false : ne touche pas _restoreReady, le gating est piloté
+    // par loadBilan (fenêtre de restoration globale) ; ici on rejoue juste le
+    // dessin par-dessus le base sync vide. Idempotent grâce au !_baseSnapshot.
+    let needRestore = false;
     ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
       const c = document.getElementById(id);
-      if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') initMorphoCanvas(id);
+      if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') {
+        initMorphoCanvas(id);
+        needRestore = true;
+      }
     });
+    if(needRestore && typeof _drawMorphoCanvasesFromSource === 'function') {
+      _drawMorphoCanvasesFromSource(currentPatient?.bilanData, false);
+    }
   }, 150);
   // Section Mandibule (ssec-5) — au load d'un bilan existant, restaurer l'affichage
   // conditionnel des toggles depuis l'état des radios. Pas de flag idempotence
