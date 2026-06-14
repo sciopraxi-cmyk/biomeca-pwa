@@ -4464,6 +4464,12 @@ function loadVidFile(input) {
 // → migration auto Storage côté posturo (POSTURO_PHOTO_KEYS étendu, savePosturoBilan async).
 // Côté sport : Temps 2 brancher saveBilan async + migrateSportBilanDataPhotos.
 // Format : JPEG 0.88, ideal 1920×1080 (fallback gracieux navigateur), facingMode:environment.
+// #85-P2a — ratio largeur/hauteur du cadre de capture posturale (portrait).
+// Tunable : 3/4 conservateur (couvre patient debout plein corps avec marge
+// latérale confortable) ; 9/16 plus serré (mobile-like, recadre davantage).
+// Utilisé à la fois pour aspect-ratio du preview vidéo ET pour le crop centré
+// au moment du capture → ce que le praticien voit = ce qui est stocké.
+const POSTURE_CAPTURE_ASPECT = 3/4;
 const POSTURE_VIEWS = [
   { key: 'face',    label: 'Face'     },
   { key: 'dos',     label: 'Dos'      },
@@ -4500,8 +4506,8 @@ function _buildPostureCaptureBlockHTML(prefix) {
       <button class="btn" id="${prefix}-pc-cam-btn" onclick="_togglePostureCam('${prefix}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">▶ Activer caméra</button>
       <span id="${prefix}-pc-cam-status" class="badge bd" style="font-size:10px;">Inactive</span>
     </div>
-    <div style="position:relative;background:#000;border-radius:6px;overflow:hidden;margin-bottom:8px;min-height:60px;">
-      <video id="${prefix}-pc-video" playsinline autoplay muted style="width:100%;max-height:300px;display:block;"></video>
+    <div style="position:relative;background:#000;border-radius:6px;overflow:hidden;margin:0 auto 8px;max-width:240px;aspect-ratio:${POSTURE_CAPTURE_ASPECT};">
+      <video id="${prefix}-pc-video" playsinline autoplay muted style="width:100%;height:100%;object-fit:cover;display:block;"></video>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">${slotsHTML}</div>
   </div>`;
@@ -4602,10 +4608,31 @@ function capturePostureView(prefix, viewKey) {
     alert('Aucun bilan ouvert — sélectionnez un patient et créez/ouvrez un bilan.');
     return;
   }
+  // #85-P2a — crop centré portrait cohérent avec l'affichage object-fit:cover.
+  // Le flux webcam est paysage (16/9 ou 4/3) ; on extrait la bande centrale
+  // d'aspect POSTURE_CAPTURE_ASPECT. Sans ce crop, le preview cover masquait
+  // les bords mais la capture sortait paysage → décalage entre cadrage praticien
+  // et image stockée. Algorithme miroir CSS object-fit:cover (centré, jamais déformé).
+  const vw = video.videoWidth, vh = video.videoHeight;
+  let cropW, cropH, sx, sy;
+  if (vw / vh > POSTURE_CAPTURE_ASPECT) {
+    // Flux plus large que cible → on garde toute la hauteur, on rogne les côtés.
+    cropH = vh;
+    cropW = Math.round(vh * POSTURE_CAPTURE_ASPECT);
+    sx = Math.round((vw - cropW) / 2);
+    sy = 0;
+  } else {
+    // Flux déjà plus étroit (ou déjà portrait) → on garde toute la largeur,
+    // on rogne haut/bas (borné à vh par sécurité).
+    cropW = vw;
+    cropH = Math.min(vh, Math.round(vw / POSTURE_CAPTURE_ASPECT));
+    sx = 0;
+    sy = Math.round((vh - cropH) / 2);
+  }
   const tmp = document.createElement('canvas');
-  tmp.width  = video.videoWidth;
-  tmp.height = video.videoHeight;
-  tmp.getContext('2d').drawImage(video, 0, 0, tmp.width, tmp.height);
+  tmp.width  = cropW;
+  tmp.height = cropH;
+  tmp.getContext('2d').drawImage(video, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   bd[key] = dataUrl;
@@ -9127,6 +9154,18 @@ function loadBilan() {
   // en RAM pour l'affichage. Sites lecteurs (canvas restore, rapport composites)
   // qui lisent currentPatient.bilanData trouvent désormais les dataURLs.
   prefetchSportBilanDataPhotos(currentPatient.bilanData).then(() => {
+    // #85-P2 — sync global ← currentPatient pour les photos réhydratées. Les slots
+    // posture (_renderPostureSlot 'sp' L4519 via _getPostureBilanData L4480) et
+    // saveBilan lisent le `bilanData` global ; le prefetch (fix racine #99) remplit
+    // currentPatient.bilanData. Sans ce report, les captures sport sont invisibles
+    // au reload (Path présent, dataURL absente du global → slots vides bien que
+    // l'image soit en RAM ailleurs). Restreint à SPORT_BILAN_PHOTO_KEYS pour ne
+    // pas écraser d'autres champs (texte, scores, neuro4) potentiellement édités.
+    if (typeof bilanData !== 'undefined' && bilanData && currentPatient?.bilanData) {
+      SPORT_BILAN_PHOTO_KEYS.forEach(k => {
+        if (currentPatient.bilanData[k]) bilanData[k] = currentPatient.bilanData[k];
+      });
+    }
     _renderAllPostureSlots('sp');
     _restoreSportMorphoPiedsFromBilanData();
   });
