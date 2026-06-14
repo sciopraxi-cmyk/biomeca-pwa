@@ -4526,10 +4526,35 @@ function _buildPostureCaptureBlockHTML(prefix) {
         <option value="">— Caméra —</option>
       </select>
       <button class="btn" id="${prefix}-pc-cam-btn" onclick="_togglePostureCam('${prefix}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">▶ Activer caméra</button>
+      <button class="btn" id="${prefix}-pc-grid-btn" onclick="_togglePostureGrid('${prefix}')" title="Afficher/masquer la grille de cadrage" style="font-size:11px;background:#0e7490;color:#fff;padding:5px 10px;">▦ Grille</button>
       <span id="${prefix}-pc-cam-status" class="badge bd" style="font-size:10px;">Inactive</span>
     </div>
     <div style="position:relative;background:#000;border-radius:6px;overflow:hidden;margin:0 auto 8px;max-width:240px;aspect-ratio:${POSTURE_CAPTURE_ASPECT};">
       <video id="${prefix}-pc-video" playsinline autoplay muted style="width:100%;height:100%;object-fit:cover;display:block;"></video>
+      <!--
+        #85-2c-grid — overlay SVG d'aide au cadrage. Élément DOM séparé du <video>
+        → capturePostureView (drawImage(video, …) L4954) capture le FRAME VIDÉO
+        natif, jamais l'overlay. La grille reste donc UI-only, jamais persistée.
+        viewBox 0 0 100 100 + preserveAspectRatio="none" : la grille s'étire pour
+        coller au conteneur portrait (3/4) → coordonnées en pourcentage.
+        Grille 4 colonnes × 6 lignes (cf brief #85-2c-grid) :
+          - 3 verticales à 25/50/75 % (centrale plus marquée)
+          - 5 horizontales à 16.67/33.33/50/66.67/83.33 % (centrale plus marquée)
+        Les centrales (50 % H/V) servent de repère croisé pour centrer le sujet.
+        Les autres horizontales aident à aligner sol/mur et mur/plafond.
+        Default display:none — affichée automatiquement par _togglePostureCam
+        à l'activation caméra ; le bouton ▦ Grille toggle manuellement.
+      -->
+      <svg id="${prefix}-pc-grid" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none;">
+        <line x1="25" y1="0" x2="25" y2="100" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="75" y1="0" x2="75" y2="100" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="16.67" x2="100" y2="16.67" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="33.33" x2="100" y2="33.33" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="66.67" x2="100" y2="66.67" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="0" y1="83.33" x2="100" y2="83.33" stroke="#67e8f9" stroke-width="0.25" opacity="0.4"/>
+        <line x1="50" y1="0" x2="50" y2="100" stroke="#ffffff" stroke-width="0.4" opacity="0.6"/>
+        <line x1="0" y1="50" x2="100" y2="50" stroke="#ffffff" stroke-width="0.4" opacity="0.6"/>
+      </svg>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">${slotsHTML}</div>
   </div>`;
@@ -4557,20 +4582,34 @@ function _renderPostureSlot(prefix, viewKey) {
   const placementBadge = (markerCount > 0)
     ? `<div style="font-size:9px;color:#10b981;font-weight:600;margin-top:2px;">✓ ${markerCount}/14 placés</div>`
     : '';
+  // #85-2c-import — input file caché + bouton/label cliquable. Pattern label-for-input
+  // pour éviter un onclick programmatique (compat iOS Safari : trigger click sur
+  // input file depuis onclick peut être bloqué hors gesture utilisateur).
+  // L'ID inclut le préfixe + viewKey pour unicité (4 slots × sp/po possible).
+  const importInputId = `${prefix}-pc-import-${viewKey}`;
+  // #85-2c-import — accept inclut explicitement .heic/.heif (iOS) : MIME image/*
+  // matche image/heic|heif mais certains pickers se basent sur l'extension.
+  const importInput = `<input type="file" accept="image/*,.heic,.heif" id="${importInputId}" onchange="importPostureView('${prefix}','${viewKey}',this)" style="display:none;">`;
   if (dataUrl) {
     slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:4px;font-weight:600;">${view.label}</div>
       <img src="${dataUrl}" style="max-width:100%;max-height:90px;border-radius:4px;display:block;margin:0 auto 4px;"/>
-      <div style="display:flex;gap:4px;justify-content:center;">
-        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#0e1f38;color:#fff;">↻</button>
+      <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" title="Re-capturer depuis la caméra" style="font-size:9px;padding:2px 6px;background:#0e1f38;color:#fff;">↻</button>
+        <label for="${importInputId}" title="Importer une image" style="font-size:9px;padding:2px 6px;background:#0e7490;color:#fff;border-radius:3px;cursor:pointer;display:inline-block;line-height:1.4;">⬆</label>
         ${placementBtn}
-        <button class="btn" onclick="deletePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#c0392b;color:#fff;">✕</button>
+        <button class="btn" onclick="deletePostureView('${prefix}','${viewKey}')" title="Supprimer" style="font-size:9px;padding:2px 6px;background:#c0392b;color:#fff;">✕</button>
       </div>
+      ${importInput}
       ${placementBadge}`;
     slot.style.borderStyle = 'solid';
     slot.style.background = '#fff';
   } else {
     slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:6px;font-weight:600;">${view.label}</div>
-      <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:11px;background:#0e1f38;color:#fff;padding:6px 12px;">📷 Capturer</button>`;
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:11px;background:#0e1f38;color:#fff;padding:6px 12px;">📷 Capturer</button>
+        <label for="${importInputId}" title="Importer une image (limite ultra grand-angle iOS)" style="font-size:11px;background:#0e7490;color:#fff;padding:6px 12px;border-radius:3px;cursor:pointer;display:inline-block;">⬆ Importer</label>
+      </div>
+      ${importInput}`;
     slot.style.borderStyle = 'dashed';
     slot.style.background = '#f8f9fa';
   }
@@ -4601,12 +4640,190 @@ let _postureModalDragging = false;
 let _postureModalCanvas = null;
 let _postureModalImg = null;
 let _postureModalCtx = null;
+// #85-2c-angles — calibration optionnelle de l'horizontale du sol.
+// _postureCalibration : { p1:{x,y}, p2:{x,y} } | null (pixels canvas absolus).
+// _postureCalibrationMode : true → les clics canvas placent les 2 points de
+// calibration au lieu des markers. Auto-exit après placement du p2.
+let _postureCalibration = null;
+let _postureCalibrationMode = false;
 
 // Compte les markers placés (nx/ny non nuls) pour la vue donnée.
 // Utilisé par le badge "✓ N/14 placés" dans _renderPostureSlot.
 function _countPostureMarkers(bd, viewKey) {
   const markers = bd?._postureAnalysis?.[viewKey]?.markers || [];
   return markers.filter(m => m.nx != null && m.ny != null).length;
+}
+
+// #85-2c-angles — calcul des 4 angles posturaux + global.
+// Renvoie { tragus, acromion, trochanter, genou, global } en degrés signés :
+//   + = antérieur (vers le regard) / − = postérieur. null si point ou cheville manque.
+// `markers` = liste des 14 points (x/y en pixels canvas, ou null).
+// `calibration` = { p1:{x,y}, p2:{x,y} } | null (pixels canvas absolus).
+//
+// Définition du repère :
+//   - plumb_up = vecteur "haut" du fil à plomb. Si calibration : perpendiculaire
+//     à (p2−p1) orientée vers le haut (Y négatif dans repère canvas). Sinon :
+//     (0,−1) = verticale-image.
+//   - anterior_dir = composante horizontale de (Tragus − C7). Le tragus est
+//     antérieur au rachis cervical → le sens s'auto-corrige selon que le sujet
+//     regarde à droite ou à gauche de l'image (robuste profil G ET profil D,
+//     pas de hardcoding par viewKey). Fallback : (Acromion − Base sacrum).
+//     Si rien d'exploitable : +x avec console.warn.
+//
+// Pour chaque landmark L : vec = L − cheville ; angle = atan2(projAnt, projUp)
+// où projAnt = vec · anterior_dir et projUp = vec · plumb_up. atan2 garantit
+// que le signe sort directement antérieur/postérieur sans branche conditionnelle.
+function _computePostureAngles(markers, calibration) {
+  const byName = Object.fromEntries(markers.map(m => [m.name, m]));
+  const cheville = byName['Réf. cheville'];
+  const targets = {
+    tragus:     byName['Tragus'],
+    acromion:   byName['Acromion'],
+    trochanter: byName['Grand trochanter'],
+    genou:      byName['Genou (milieu lat.)'],
+  };
+  const isPlaced = m => m && m.x !== null && m.y !== null;
+  // 1. plumb_up — calculé EN PREMIER : anterior_dir s'en dérive (perpendiculaire).
+  // Sans calibration → verticale-image (0,-1). Avec calibration → perpendiculaire
+  // à (p2−p1) orientée vers le haut (Y<0 dans repère canvas).
+  let plumbUp;
+  if (calibration && calibration.p1 && calibration.p2) {
+    const dx = calibration.p2.x - calibration.p1.x;
+    const dy = calibration.p2.y - calibration.p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      // Deux perpendiculaires possibles : (−dy, dx) et (dy, −dx). Choisir celle
+      // qui pointe vers le haut en repère canvas (Y < 0).
+      let perp = { x: -dy / len, y: dx / len };
+      if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+      plumbUp = perp;
+    } else {
+      plumbUp = { x: 0, y: -1 };
+    }
+  } else {
+    plumbUp = { x: 0, y: -1 };
+  }
+  // 2. anterior_dir — PERPENDICULAIRE à plumb_up, orientée par la géométrie
+  // (signe de (tragus−C7)·perp, fallback acromion−sacrum). Bug corrigé du
+  // hardcoded horizontal {x:±1,y:0} : invalide dès que la calibration sol incline
+  // le plumb_up. En verticale-image (plumb=(0,-1)) → perp=(1,0), même résultat
+  // que l'ancien code (rétro-compat numérique). En calibration tiltée → l'antérieur
+  // s'aligne parallèlement au sol physique, comme attendu cliniquement.
+  const perp = { x: -plumbUp.y, y: plumbUp.x };  // rotation 90° de plumbUp
+  const dot = (a, b) => a.x * b.x + a.y * b.y;
+  let anteriorDir = null;
+  const tragus = byName['Tragus'], c7 = byName['C7'];
+  if (isPlaced(tragus) && isPlaced(c7)) {
+    const diff = { x: tragus.x - c7.x, y: tragus.y - c7.y };
+    const s = Math.sign(dot(diff, perp));
+    if (s !== 0) anteriorDir = { x: perp.x * s, y: perp.y * s };
+  }
+  if (!anteriorDir) {
+    const acr = byName['Acromion'], sac = byName['Base sacrum'];
+    if (isPlaced(acr) && isPlaced(sac)) {
+      const diff = { x: acr.x - sac.x, y: acr.y - sac.y };
+      const s = Math.sign(dot(diff, perp));
+      if (s !== 0) anteriorDir = { x: perp.x * s, y: perp.y * s };
+    }
+  }
+  if (!anteriorDir) {
+    anteriorDir = { x: perp.x, y: perp.y };  // fallback +perp (arbitraire)
+    if (isPlaced(cheville) && Object.values(targets).every(isPlaced)) {
+      console.warn('[#85-2c-angles] anterior_dir non dérivable (Tragus/C7 ou Acromion/Base sacrum manquants ou colinéaires au plumb) — fallback +perp');
+    }
+  }
+  // 3. angles — null si cheville absente OU landmark absent. Global = moyenne
+  // des 4 si tous présents, sinon null (interprétation stricte : un global
+  // partiel induirait en erreur clinique).
+  const out = { tragus: null, acromion: null, trochanter: null, genou: null, global: null };
+  if (!isPlaced(cheville)) return out;
+  let sum = 0, count = 0;
+  for (const [key, L] of Object.entries(targets)) {
+    if (!isPlaced(L)) continue;
+    const vec = { x: L.x - cheville.x, y: L.y - cheville.y };
+    const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+    const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+    const angleDeg = Math.atan2(projAnt, projUp) * 180 / Math.PI;
+    out[key] = angleDeg;
+    sum += angleDeg; count++;
+  }
+  if (count === 4) out.global = sum / count;
+  return out;
+}
+
+// Calcule le vecteur plumb_up affichable (réutilisé pour le tracé du fil à plomb).
+// Logique identique à _computePostureAngles (DRY évité car appelée dans la boucle
+// de redraw — duplication contrôlée < 10 lignes pour éviter un getter dédié).
+function _getPostureModalPlumbUp() {
+  const cal = _postureCalibration;
+  if (cal && cal.p1 && cal.p2) {
+    const dx = cal.p2.x - cal.p1.x;
+    const dy = cal.p2.y - cal.p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      let perp = { x: -dy / len, y: dx / len };
+      if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+      return perp;
+    }
+  }
+  return { x: 0, y: -1 };
+}
+
+// Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
+// _redrawPostureModal (live durant drag) ET à chaque _renderPostureMarkerList
+// (changement de sélection/placement). Vert si +, rouge si −, gris si null.
+function _renderPosturePlacementResults() {
+  const panel = document.getElementById('posture-placement-results');
+  if (!panel) return;
+  const angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  const fmt = a => (a === null || isNaN(a))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:${a > 0 ? '#3b82f6' : '#dc2626'};font-weight:700;">${a > 0 ? '+' : ''}${a.toFixed(1)}°</span>`;
+  panel.innerHTML = `
+    <div><span style="color:#64748b;">Tragus :</span> ${fmt(angles.tragus)}</div>
+    <div><span style="color:#64748b;">Acromion :</span> ${fmt(angles.acromion)}</div>
+    <div><span style="color:#64748b;">Gd trochanter :</span> ${fmt(angles.trochanter)}</div>
+    <div><span style="color:#64748b;">Genou :</span> ${fmt(angles.genou)}</div>
+    <div style="border-left:2px solid #cbd5e0;padding-left:12px;"><span style="color:#0e1f38;font-weight:600;">Global :</span> ${fmt(angles.global)}</div>
+  `;
+}
+
+// Contrôle calibration sol dans le side-panel. Re-rendu à chaque _renderPostureMarkerList.
+function _renderPostureCalibrationControl() {
+  const el = document.getElementById('posture-calib-control');
+  if (!el) return;
+  const hasP1 = !!_postureCalibration?.p1;
+  const hasP2 = !!_postureCalibration?.p2;
+  const statusMsg = (hasP1 && hasP2)
+    ? `✓ Calibrée (2 points)`
+    : hasP1 ? `Place le 2e point…`
+    : _postureCalibrationMode ? `Place le 1er point sur l'horizontale du sol`
+    : `Optionnel : 2 points sur l'horizontale du sol`;
+  const clearBtn = (hasP1 || hasP2)
+    ? `<button onclick="_clearPostureCalibration()" style="font-size:9px;margin-left:6px;background:#dc2626;color:#fff;border:none;border-radius:3px;padding:2px 6px;cursor:pointer;">Effacer</button>`
+    : '';
+  el.innerHTML = `
+    <div style="margin-bottom:8px;padding:6px 8px;background:${_postureCalibrationMode ? '#fff7ed' : '#fff'};border:1px solid ${_postureCalibrationMode ? '#f97316' : '#cbd5e0'};border-radius:4px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;">
+        <input type="checkbox" ${_postureCalibrationMode ? 'checked' : ''} onclick="_togglePostureCalibrationMode()">
+        <span style="font-weight:600;color:#0e1f38;">📐 Calibrer horizontale sol</span>
+      </label>
+      <div style="font-size:10px;color:#666;margin-top:3px;line-height:1.3;">${statusMsg}${clearBtn}</div>
+    </div>`;
+}
+
+// Toggle du mode calibration. Quand on entre en mode, on ne reset PAS les points
+// existants (l'utilisateur peut vouloir replacer p1 seul après inspection).
+function _togglePostureCalibrationMode() {
+  _postureCalibrationMode = !_postureCalibrationMode;
+  _renderPostureMarkerList();
+  _redrawPostureModal();
+}
+
+function _clearPostureCalibration() {
+  _postureCalibration = null;
+  _renderPostureMarkerList();
+  _redrawPostureModal();
 }
 
 // Variante simplifiée de drawOverlay (L4944) : points + labels uniquement.
@@ -4637,14 +4854,63 @@ function _drawMarkersOnly(ctx, canvas, markers, selIdx) {
   });
 }
 
-// Repeint l'image puis les points. Appelé à chaque mouvement/placement
-// (équivalent du startLiveDraw pour mesures, mais déclenché par événement
-// au lieu de rAF — la photo est statique).
+// Repeint l'image puis les overlays. Ordre Z (bas→haut) : image → fil à plomb
+// → ligne de calibration → markers (les markers doivent rester au-dessus pour
+// que le hit-test reste précis et que les labels restent lisibles). Appelé à
+// chaque mouvement/placement (équivalent du startLiveDraw pour mesures, mais
+// déclenché par événement au lieu de rAF — la photo est statique).
 function _redrawPostureModal() {
   if (!_postureModalCanvas || !_postureModalImg || !_postureModalCtx) return;
   const ctx = _postureModalCtx;
+  const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
   ctx.drawImage(_postureModalImg, 0, 0);
+  // #85-2c-angles — fil à plomb passant par la Réf. cheville (si placée).
+  // Trait gris-bleu neutre pour ne pas concurrencer les couleurs des 14 points.
+  // Étendu hors canvas par un t large → garantit que la ligne traverse toute
+  // la photo quelle que soit l'inclinaison (cas calibration sol).
+  const cheville = _postureModalMarkers.find(m => m.name === 'Réf. cheville');
+  if (cheville && cheville.x !== null && cheville.y !== null) {
+    const up = _getPostureModalPlumbUp();
+    const t = Math.max(W, H) * 2;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(100,116,139,0.75)';
+    ctx.lineWidth = Math.max(1.5, W / 400);
+    ctx.beginPath();
+    ctx.moveTo(cheville.x - up.x * t, cheville.y - up.y * t);
+    ctx.lineTo(cheville.x + up.x * t, cheville.y + up.y * t);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // #85-2c-angles — ligne calibration sol (orange tireté) + 2 puces orange.
+  // Distinct des 14 points (couleur réservée). Affichée même partiellement
+  // placée (1 puce seulement) pour feedback intermédiaire.
+  if (_postureCalibration && (_postureCalibration.p1 || _postureCalibration.p2)) {
+    ctx.save();
+    if (_postureCalibration.p1 && _postureCalibration.p2) {
+      ctx.strokeStyle = 'rgba(249,115,22,0.9)';
+      ctx.lineWidth = Math.max(1.5, W / 400);
+      ctx.setLineDash([Math.max(6, W / 100), Math.max(3, W / 200)]);
+      ctx.beginPath();
+      ctx.moveTo(_postureCalibration.p1.x, _postureCalibration.p1.y);
+      ctx.lineTo(_postureCalibration.p2.x, _postureCalibration.p2.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    [_postureCalibration.p1, _postureCalibration.p2].forEach(p => {
+      if (!p) return;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(5, W / 90), 0, 2 * Math.PI);
+      ctx.fillStyle = '#f97316';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
   _drawMarkersOnly(ctx, _postureModalCanvas, _postureModalMarkers, _postureModalSelIdx);
+  // Résultats live : recalculés à chaque redraw → mise à jour fluide pendant drag.
+  _renderPosturePlacementResults();
 }
 
 // Side-panel : liste cliquable des 14 points. État visuel : pastille verte (placé),
@@ -4661,9 +4927,12 @@ function _renderPostureMarkerList() {
       <span style="flex:1;color:#0e1f38;font-weight:500;">${m.name}</span>
     </div>`;
   }).join('');
-  // Mise à jour bandeau couplée à la liste : un seul site d'update à maintenir.
-  // Tous les changements de sélection (select / placement / init) passent par ici.
+  // Mise à jour bandeau + contrôle calibration + résultats couplés à la liste :
+  // un seul site d'update à maintenir. Tous les changements de sélection
+  // (select / placement / init / toggle calibration) passent par ici.
   _updatePosturePlacementBanner();
+  _renderPostureCalibrationControl();
+  _renderPosturePlacementResults();
 }
 
 // Bandeau au-dessus du canvas : « 👉 À placer : N/14 — [Nom] » en gros, couleur du point,
@@ -4673,6 +4942,15 @@ function _renderPostureMarkerList() {
 function _updatePosturePlacementBanner() {
   const banner = document.getElementById('posture-placement-banner');
   if (!banner) return;
+  // #85-2c-angles — pendant la calibration sol, le bandeau guide explicitement
+  // l'action en cours pour ne pas créer de confusion avec le placement markers.
+  if (_postureCalibrationMode) {
+    const needP1 = !_postureCalibration?.p1;
+    banner.innerHTML = `<div style="font-size:15px;font-weight:700;color:#f97316;">📐 ${needP1 ? 'Place le 1er point' : 'Place le 2e point'} sur l'horizontale du sol</div><div style="font-size:12px;color:#555;margin-top:4px;font-style:italic;line-height:1.35;">2 points alignés sur la même horizontale physique (jonction sol/mur, plinthe, etc.). Le fil à plomb deviendra perpendiculaire à cette horizontale.</div>`;
+    banner.style.background = '#fff7ed';
+    banner.style.borderLeftColor = '#f97316';
+    return;
+  }
   const total = _postureModalMarkers.length;
   const placedCount = _postureModalMarkers.filter(m => m.x !== null && m.y !== null).length;
   if (_postureModalSelIdx < 0 || _postureModalSelIdx >= total) {
@@ -4706,6 +4984,24 @@ function _setupPosturePlacementCanvas(canvas) {
     e.preventDefault();
     const ev = (e.touches && e.touches[0]) ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY } : e;
     const { x, y } = canvasXY(ev, canvas);
+    // #85-2c-angles — mode calibration : les clics placent p1 puis p2 de la
+    // calibration sol au lieu des markers. Auto-exit après p2 (le 3e clic
+    // ré-amorce le cycle : remplace p1 et libère p2 pour repositionnement).
+    if (_postureCalibrationMode) {
+      if (!_postureCalibration) _postureCalibration = { p1: null, p2: null };
+      if (!_postureCalibration.p1) {
+        _postureCalibration.p1 = { x, y };
+      } else if (!_postureCalibration.p2) {
+        _postureCalibration.p2 = { x, y };
+        _postureCalibrationMode = false;
+      } else {
+        _postureCalibration.p1 = { x, y };
+        _postureCalibration.p2 = null;
+      }
+      _renderPostureMarkerList();
+      _redrawPostureModal();
+      return;
+    }
     const hit = findMarkerAt(x, y, _postureModalMarkers, canvas.width);
     if (hit >= 0) {
       _postureModalSelIdx = hit;
@@ -4761,6 +5057,11 @@ function openPosturePlacementModal(prefix, viewKey) {
   _postureModalMarkers = cloneMarkers('posture-profil');
   const saved = bd._postureAnalysis?.[viewKey]?.markers || [];
   const savedByName = Object.fromEntries(saved.map(m => [m.name, m]));
+  // #85-2c-angles — reset calibration au moment de l'ouverture. Restauration
+  // depuis la sauvegarde (nx/ny → x/y) faite plus bas une fois canvas dimensionné.
+  _postureCalibration = null;
+  _postureCalibrationMode = false;
+  const savedCalib = bd._postureAnalysis?.[viewKey]?.calibration || null;
   // Build modal DOM (fond sombre semi-transparent, dialog blanc centré).
   const overlay = document.createElement('div');
   overlay.id = 'posture-placement-modal';
@@ -4774,12 +5075,14 @@ function openPosturePlacementModal(prefix, viewKey) {
         </div>
       </div>
       <div id="posture-placement-banner" style="padding:10px 12px;border-radius:6px;background:#fff7ed;border-left:4px solid #ccc;min-height:42px;"></div>
+      <div id="posture-placement-results" style="padding:8px 12px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;"></div>
       <div style="display:flex;gap:10px;flex:1;min-height:0;flex-wrap:wrap;">
         <div style="flex:1 1 60%;min-width:280px;min-height:0;display:flex;align-items:center;justify-content:center;background:#000;border-radius:6px;overflow:hidden;">
-          <canvas id="posture-placement-canvas" style="max-width:100%;max-height:72vh;display:block;cursor:crosshair;touch-action:none;"></canvas>
+          <canvas id="posture-placement-canvas" style="max-width:100%;max-height:68vh;display:block;cursor:crosshair;touch-action:none;"></canvas>
         </div>
-        <div style="flex:0 0 240px;min-width:240px;max-height:72vh;overflow-y:auto;padding:6px;background:#f8f9fa;border-radius:6px;">
+        <div style="flex:0 0 240px;min-width:240px;max-height:68vh;overflow-y:auto;padding:6px;background:#f8f9fa;border-radius:6px;">
           <div style="font-size:11px;color:#666;margin-bottom:6px;line-height:1.4;">Clic sur un nom pour le sélectionner. Sur la photo : <b>clic</b> = placer le point sélectionné ou le suivant libre ; <b>drag</b> = repositionner un point déjà placé.</div>
+          <div id="posture-calib-control"></div>
           <div id="posture-mkr-list"></div>
         </div>
       </div>
@@ -4806,6 +5109,18 @@ function openPosturePlacementModal(prefix, viewKey) {
         m.y = s.ny * canvas.height;
       }
     });
+    // #85-2c-angles — restauration calibration sauvegardée (nx/ny → x/y).
+    if (savedCalib) {
+      _postureCalibration = {
+        p1: savedCalib.p1 && savedCalib.p1.nx != null
+          ? { x: savedCalib.p1.nx * canvas.width, y: savedCalib.p1.ny * canvas.height } : null,
+        p2: savedCalib.p2 && savedCalib.p2.nx != null
+          ? { x: savedCalib.p2.nx * canvas.width, y: savedCalib.p2.ny * canvas.height } : null,
+      };
+      // Si seulement p1 sauvegardé (cas dégradé), on conserve l'objet mais p2 null
+      // → re-render affichera la puce orange et le statusMsg "Place le 2e point…".
+      if (!_postureCalibration.p1 && !_postureCalibration.p2) _postureCalibration = null;
+    }
     // Sélectionne le premier non placé (séquence guidée) ou -1 si tous placés.
     _postureModalSelIdx = _postureModalMarkers.findIndex(m => m.x === null);
     _setupPosturePlacementCanvas(canvas);
@@ -4827,6 +5142,8 @@ function _cancelPosturePlacement() {
   _postureModalCanvas = null;
   _postureModalImg = null;
   _postureModalCtx = null;
+  _postureCalibration = null;
+  _postureCalibrationMode = false;
 }
 
 // Persiste les coords en NORMALISÉ nx/ny ∈ [0,1] dans bd._postureAnalysis[viewKey].
@@ -4840,6 +5157,10 @@ async function _validatePosturePlacement(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
+  // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
+  // moment depuis markers + calibration ; on les stocke quand même pour éviter
+  // de refaire le calcul à chaque affichage rapport / liste / résumé).
+  const angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
   if (!bd._postureAnalysis) bd._postureAnalysis = {};
   bd._postureAnalysis[viewKey] = {
     markers: _postureModalMarkers.map(m => ({
@@ -4848,6 +5169,12 @@ async function _validatePosturePlacement(prefix, viewKey) {
       nx: (m.x !== null && W > 0) ? m.x / W : null,
       ny: (m.y !== null && H > 0) ? m.y / H : null,
     })),
+    // Calibration en NORMALISÉ comme les markers (cohérent inter-device).
+    calibration: _postureCalibration ? {
+      p1: _postureCalibration.p1 ? { nx: _postureCalibration.p1.x / W, ny: _postureCalibration.p1.y / H } : null,
+      p2: _postureCalibration.p2 ? { nx: _postureCalibration.p2.x / W, ny: _postureCalibration.p2.y / H } : null,
+    } : null,
+    angles,
   };
   _cancelPosturePlacement();
   _renderPostureSlot(prefix, viewKey);
@@ -4886,6 +5213,12 @@ async function _togglePostureCam(prefix) {
     const st  = document.getElementById(`${prefix}-pc-cam-status`);
     if (btn) { btn.textContent = '⏹ Arrêter'; btn.style.background = '#c0392b'; }
     if (st)  { st.textContent  = 'Active';   st.className = 'badge bg'; }
+    // #85-2c-grid — affiche la grille par défaut à l'activation caméra (aide
+    // immédiate au cadrage). Masquable ensuite via le bouton ▦ Grille.
+    const grid = document.getElementById(`${prefix}-pc-grid`);
+    if (grid) grid.style.display = 'block';
+    const gridBtn = document.getElementById(`${prefix}-pc-grid-btn`);
+    if (gridBtn) gridBtn.style.background = '#0e7490';
     // Rafraîchir la liste maintenant que la permission est accordée (labels disponibles)
     enumerateCameras(`${prefix}-pc-camera-select`);
   } catch (e) {
@@ -4913,6 +5246,20 @@ function _stopPostureCam(prefix) {
   const st  = document.getElementById(`${prefix}-pc-cam-status`);
   if (btn) { btn.textContent = '▶ Activer caméra'; btn.style.background = '#2a7a4e'; }
   if (st)  { st.textContent  = 'Inactive';         st.className = 'badge bd'; }
+  // #85-2c-grid — masque la grille à l'arrêt (sinon overlay flottant sur fond noir).
+  const grid = document.getElementById(`${prefix}-pc-grid`);
+  if (grid) grid.style.display = 'none';
+}
+
+// #85-2c-grid — toggle manuel de la grille (état indépendant du stream caméra).
+// Couleur du bouton : cyan foncé quand active, gris quand masquée — feedback visuel.
+function _togglePostureGrid(prefix) {
+  const grid = document.getElementById(`${prefix}-pc-grid`);
+  if (!grid) return;
+  const wasVisible = grid.style.display !== 'none';
+  grid.style.display = wasVisible ? 'none' : 'block';
+  const btn = document.getElementById(`${prefix}-pc-grid-btn`);
+  if (btn) btn.style.background = wasVisible ? '#94a3b8' : '#0e7490';
 }
 
 // Capture frame courante du <video> → JPEG 0.88 → bilanData[`_posture<View>`].
@@ -4992,6 +5339,103 @@ async function deletePostureView(prefix, viewKey) {
     }
   } catch (e) {
     console.warn('[#85] auto-save delete posture échoué :', e?.message);
+  }
+}
+
+// #85-2c-import — lazy-load heic2any depuis CDN (Chrome/Firefox ne décodent pas
+// HEIC nativement ; iOS Safari le convertit parfois côté OS, parfois pas).
+// Idempotent : si déjà chargé, retourne resolved immédiatement ; si en cours de
+// chargement (script tag avec marker data-heic2any présent), on s'attache à
+// son load/error pour ne pas re-injecter.
+function _loadHeic2anyIfNeeded() {
+  if (window.heic2any) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-heic2any]');
+    if (existing) {
+      existing.addEventListener('load', () => window.heic2any ? resolve() : reject(new Error('heic2any chargé mais window.heic2any absent')));
+      existing.addEventListener('error', () => reject(new Error('Échec chargement heic2any (réseau ?)')));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+    s.dataset.heic2any = '1';
+    s.async = true;
+    s.onload = () => window.heic2any ? resolve() : reject(new Error('heic2any chargé mais window.heic2any absent'));
+    s.onerror = () => reject(new Error('Échec chargement heic2any (réseau ?)'));
+    document.head.appendChild(s);
+  });
+}
+
+// #85-2c-import — import d'une image depuis l'app native (limite iOS : Safari
+// n'expose pas l'ultra grand-angle via getUserMedia). L'image est stockée TELLE
+// QUELLE (pas de crop POSTURE_CAPTURE_ASPECT) car cadrée par le praticien dans
+// l'app caméra native. Le pipeline aval (slot rendering, modale placement
+// _postureAnalysis nx/ny) est résolution-agnostique → marche identiquement.
+// Support HEIC (format par défaut iPhone) : détection MIME OU extension (iOS
+// envoie parfois MIME vide), conversion via heic2any chargée à la demande.
+// Auto-save miroir capturePostureView : dispatch par préfixe (sp/po).
+async function importPostureView(prefix, viewKey, input) {
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  // Détection HEIC avant le check MIME générique : file.type peut être vide
+  // (iOS) ou image/heic|heif (desktop). Le nom de fichier complète la détection.
+  const lcName = (file.name || '').toLowerCase();
+  const isHeic = /^image\/hei[cf]$/i.test(file.type || '') || /\.(heic|heif)$/i.test(lcName);
+  if (!isHeic && (!file.type || !file.type.startsWith('image/'))) {
+    alert('Sélectionnez un fichier image (JPEG, PNG, WebP, HEIC).');
+    input.value = '';
+    return;
+  }
+  const bd = _getPostureBilanData(prefix);
+  if (!bd) {
+    alert('Aucun bilan ouvert — sélectionnez un patient et créez/ouvrez un bilan.');
+    input.value = '';
+    return;
+  }
+  // Conversion HEIC → JPEG si nécessaire. Le FileReader en aval lit indifféremment
+  // un File ou un Blob → assignation à `blob` qui peut être l'un ou l'autre.
+  let blob = file;
+  if (isHeic) {
+    try {
+      await _loadHeic2anyIfNeeded();
+      if (!window.heic2any) throw new Error('Bibliothèque heic2any indisponible');
+      const out = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+      // heic2any retourne soit un Blob (image unique), soit un Array<Blob> (HEIC
+      // multi-frame). On prend la première frame dans le cas array.
+      blob = Array.isArray(out) ? out[0] : out;
+      if (!blob) throw new Error('Conversion HEIC : sortie vide');
+    } catch (e) {
+      alert('Conversion HEIC échouée : ' + (e?.message || e) + '\n\nEnvoyez l\'image au format JPEG ou PNG (ou activez "Plus compatible" dans Réglages iOS → Appareil photo → Formats).');
+      input.value = '';
+      return;
+    }
+  }
+  const dataUrl = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error('FileReader error'));
+    r.readAsDataURL(blob);
+  }).catch(e => {
+    alert('Erreur lecture fichier : ' + (e?.message || e));
+    return null;
+  });
+  // Reset input.value SYSTÉMATIQUEMENT (succès ET échec) pour permettre la
+  // ré-importation du même fichier après modification externe.
+  input.value = '';
+  if (!dataUrl) return;
+  const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  bd[key] = dataUrl;
+  // Path Storage obsolète : la nouvelle image doit ré-uploader au prochain save.
+  if (bd[key + 'Path']) delete bd[key + 'Path'];
+  _renderPostureSlot(prefix, viewKey);
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#85] auto-save import posture échoué :', e?.message);
   }
 }
 
