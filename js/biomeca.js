@@ -108,19 +108,34 @@ async function authFetch(url, options = {}, _retry = 0) {
     'Authorization': 'Bearer ' + session.token
   });
   let res = await fetch(url, Object.assign({}, options, { headers }));
-  if ((res.status === 401 || res.status === 403) && _retry === 0) {
-    // Détection élargie : Supabase renvoie 401 PGRST303 sur /rest/v1/* mais
-    // 403 bad_jwt sur /auth/v1/*. On scanne code/error_code et message/msg
-    // pour couvrir toutes les variations observées.
+  // #85 Fix bug critique — Storage Supabase renvoie 400 « "exp" claim timestamp
+  // check failed » sur token expiré (et NON 401/403), donc le retry initial ne
+  // se déclenchait jamais sur les requêtes /storage/v1/*. Étendu : 400 éligible
+  // UNIQUEMENT pour les endpoints Storage (400 reste un code générique côté REST
+  // PostgREST pour validation, on ne veut pas le retry sur ces cas-là).
+  // ⚠ Logique dupliquée dans js/auth-detect.mjs (testée par tests/auth-detect.test.mjs)
+  // — si tu modifies ici, répercute aussi là-bas sinon les tests dérivent du runtime.
+  const isStorageEndpoint = url.includes('/storage/v1/');
+  const statusEligible =
+    res.status === 401 ||
+    res.status === 403 ||
+    (res.status === 400 && isStorageEndpoint);
+  if (statusEligible && _retry === 0) {
+    // Détection élargie : Supabase renvoie 401 PGRST303 sur /rest/v1/*, 403 bad_jwt
+    // sur /auth/v1/*, 400 « claim » sur /storage/v1/*. Body scan couvre les 3 cas.
     const cloned = res.clone();
     let isJwtIssue = false;
     try {
       const body = await cloned.json();
-      const code = (body.code || body.error_code || '').toString().toLowerCase();
-      const msg = (body.message || body.msg || '').toString().toLowerCase();
+      const code = (body.code || body.error_code || body.statusCode || '').toString().toLowerCase();
+      const msg = (body.message || body.msg || body.error || '').toString().toLowerCase();
       isJwtIssue = code.includes('jwt') || code === 'pgrst303' || code === 'bad_jwt' ||
-                   msg.includes('jwt') || msg.includes('expired') || msg.includes('token');
-    } catch(e) {}
+                   msg.includes('jwt') || msg.includes('expired') || msg.includes('token') ||
+                   msg.includes('claim');
+    } catch(e) {
+      // Storage 400 sans body parsable → on présume JWT-issue (one-shot _retry protège).
+      if (res.status === 400 && isStorageEndpoint) isJwtIssue = true;
+    }
     if (isJwtIssue) {
       const refreshed = await supa.refreshAccessToken(session.refreshToken);
       if (refreshed && refreshed.access_token) {
@@ -143,6 +158,60 @@ async function authFetch(url, options = {}, _retry = 0) {
     }
   }
   return res;
+}
+
+// #85 Phase 1 — refresh préventif de session avant les appels Storage.
+// Évite la race au boot (loadBilan → prefetchSportBilanDataPhotos déclenche
+// authFetch AVANT que initPWA n'ait fini de valider/rafraîchir le token).
+// Pattern : décode JWT côté client → si exp < now+60s → refresh proactif.
+// Hoistée volontairement via function declaration (vs const arrow) pour
+// insensibilité à l'ordre dans le fichier (cf TDZ fix #85 FICHES_SYSTEMES).
+//
+// Anti-tempête : un seul refresh en vol à la fois. Si deux helpers Storage
+// tournent en parallèle (ex. prefetchSport + prefetchPosturo), ils awaitent
+// la MÊME promesse de refresh — sinon ils brûleraient deux refresh_token
+// concurrents et la rotation Supabase invaliderait le 2e.
+let _refreshInFlight = null;
+let _sessionRefreshTimer = null;
+
+async function ensureSession() {
+  const session = loadPwaSession();
+  if (!session.token) return false;
+  // Décode segment middle du JWT pour lire exp. Base64URL → Base64 standard
+  // (- → +, _ → /), puis padding manquant (longueur multiple de 4) avant atob.
+  // Sans padding, atob throw « InvalidCharacterError » sur certains tokens.
+  let expMs;
+  try {
+    const seg = session.token.split('.')[1] || '';
+    const b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    if (!payload || typeof payload.exp !== 'number') return true; // pas d'exp → on présume valide
+    expMs = payload.exp * 1000;
+  } catch (e) {
+    // Décode raté → on retourne true (laisse authFetch retry-on-fail prendre le relais).
+    return true;
+  }
+  if (expMs > Date.now() + 60_000) return true; // valide encore > 60 s
+  // Refresh préventif. Dé-dup via _refreshInFlight (anti-tempête concurrents).
+  if (_refreshInFlight) {
+    return _refreshInFlight;
+  }
+  _refreshInFlight = (async () => {
+    try {
+      const r = await supa.refreshAccessToken(session.refreshToken);
+      if (!r || !r.access_token) return false;
+      savePwaSession(r.access_token, r.refresh_token || session.refreshToken, session.user);
+      if (typeof pwaUser !== 'undefined' && pwaUser) pwaUser.token = r.access_token;
+      return true;
+    } catch (e) {
+      console.warn('[#85] ensureSession refresh fail :', e);
+      return false;
+    } finally {
+      _refreshInFlight = null;
+    }
+  })();
+  return _refreshInFlight;
 }
 
 // ─── Session persistante ───
@@ -169,6 +238,8 @@ function clearPwaSession() {
     sessionStorage.removeItem('bm_refresh');
     sessionStorage.removeItem('bm_user');
   } catch(e) {}
+  // #85 Fix D — stop le refresh préventif (sinon il continue après déconnexion).
+  if (_sessionRefreshTimer) { clearInterval(_sessionRefreshTimer); _sessionRefreshTimer = null; }
 }
 
 // ─── Mot de passe oublié ───
@@ -346,6 +417,10 @@ async function onPwaLoginSuccess() {
   // Reset guard data race (task #64) — si l'user fait logout puis re-login
   // rapidement, _dataLoaded pourrait être relicat true de la session précédente.
   _dataLoaded = false;
+  // #85 Fix D — refresh préventif périodique (50 min, sous la durée standard
+  // d'1h de l'access_token Supabase). clearInterval dans pwaLogout/clearPwaSession.
+  if (_sessionRefreshTimer) clearInterval(_sessionRefreshTimer);
+  _sessionRefreshTimer = setInterval(ensureSession, 50 * 60 * 1000);
   document.getElementById('pwa-login').style.display = 'none';
   document.getElementById('biomeca-app').style.display = '';
   showAdminPanelIfNeeded();
@@ -1893,7 +1968,11 @@ function nav(id) {
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
-  if(id === 'pg-params') renderParamsPratList();
+  if(id === 'pg-params') {
+    renderParamsPratList();
+    // #81 — rafraîchit le compteur Maintenance à l'ouverture de Paramètres
+    if (typeof _runBackfillDryRun === 'function') _runBackfillDryRun();
+  }
   if(id === 'pg-sport') {
     // Mettre à jour le sous-titre avec le patient courant
     const sub = document.getElementById('sport-sub');
@@ -1934,29 +2013,10 @@ function nav(id) {
       // Injection micros de dictée par champ texte (Q-mic-1 b, #73 A1)
       if(typeof _injectSportMicButtons === 'function') setTimeout(_injectSportMicButtons, 250);
       // 4. Restaurer les dessins directement (pas via restoreCanvas)
+      // #99 refactor — délégué à _drawMorphoCanvasesFromSource pour fidélité
+      // byte-pour-byte avec le 2e call-site post-prefetch (.then() loadBilan).
       setTimeout(() => {
-        const bd = currentPatient?.bilanData || {};
-        const pairs = [
-          ['morpho-face','_morpho_face'],
-          ['morpho-face2','_morpho_face2'],
-          ['morpho-profilG','_morpho_profilG'],
-          ['morpho-profilD','_morpho_profilD']
-        ];
-        pairs.forEach(([canvasId, key]) => {
-          if(!bd[key]) return;
-          const cvs = document.getElementById(canvasId);
-          if(!cvs || cvs.width === 0) return;
-          const img = new Image();
-          img.onload = () => {
-            const dpr = window.devicePixelRatio || 1;
-            cvs.getContext('2d').drawImage(img, 0, 0, cvs.width/dpr, cvs.height/dpr);
-            // Fix #94 auto-réparation — efface fond noir éventuel des bilans
-            // corrompus pré-fix (saveBilanSilent JPEG sur canvas morpho overlay
-            // transparent). Idempotent sur PNG transparent propre.
-            _stripBackgroundFromRestore(cvs);
-          };
-          img.src = bd[key];
-        });
+        _drawMorphoCanvasesFromSource(currentPatient?.bilanData);
         // pieds restaurés dans drawPiedsTemplate
       }, 500);
     }, 80);
@@ -2288,7 +2348,94 @@ const STORAGE_CRITICAL_THRESHOLD = 0.95;
 // État pour ne pas spammer l'utilisateur avec des alertes répétées
 let _quotaWarningShown = false;
 
+// #81 + Bug RAM-leak posturo — strip in-place les dataURLs déjà migrées (Path set)
+// pour éviter qu'elles re-saturent le localStorage à chaque savePatients. Le pattern
+// posturo prefetchPosturoPhotos écrit la dataURL réhydratée DIRECTEMENT dans
+// currentPatient.bilanDataPosturo (objet persisté) ; savePosturoBilan fait ensuite
+// Object.assign(d, photoStash) pour preserve display RAM. Sans strip à savePatients,
+// tout savePatients() ultérieur (saveBilanSilent sport, navigation, …) écrirait
+// les dataURLs en localStorage → bug 0.10 → 2.46 Mo observé E2E.
+//
+// Garantie : strip UNIQUEMENT si obj[k+'Path'] set ET obj[k] = dataURL. Une édition
+// (cf 10 invalidations Path à mouseup/capture L10926-L10942/L13053/L13064/L13091/
+// L8598-L8602/L8905-L8910) a Path absent → jamais strippée → migration ultérieure
+// uploadera proprement. Couverture exhaustive : bilanData courant + bilanDataPosturo
+// courant + mesures (photos+frames) + archives bilansSport (bilanData + mesures)
+// + archives bilansPosturo.
+function _stripDataURLsForPersist(patientsArr) {
+  const stash = []; // [{ obj, key, dataUrl }]
+  const stripObjFlat = (obj, keysList) => {
+    if (!obj) return;
+    for (const k of keysList) {
+      if (obj[k + 'Path'] && typeof obj[k] === 'string' && obj[k].startsWith('data:')) {
+        stash.push({ obj, key: k, dataUrl: obj[k] });
+        delete obj[k];
+      }
+    }
+  };
+  const stripMesures = (mesures) => {
+    if (!mesures) return;
+    for (const tid in mesures) {
+      if (tid.startsWith('_')) continue;
+      const t = mesures[tid];
+      for (const arr of [t?.photos, t?.frames]) {
+        if (!Array.isArray(arr)) continue;
+        for (const entry of arr) {
+          if (entry && entry.path && typeof entry.dataUrl === 'string' && entry.dataUrl.startsWith('data:')) {
+            stash.push({ obj: entry, key: 'dataUrl', dataUrl: entry.dataUrl });
+            delete entry.dataUrl;
+          }
+        }
+      }
+    }
+  };
+  // #85 Bug RAM-leak neuro4 — purge DÉFINITIVE des clés image qui ont pollué
+  // bilanDataPosturo.neuro4 (et archives) via l'ancien Object.assign(d.neuro4,
+  // bilanData) L13042. Aucun call-site légitime ne lit ces clés depuis neuro4
+  // (les readers L13307/L13464 filtrent boolean). Donc pas de stash/restore :
+  // c'est de la donnée à éliminer définitivement, RAM ET persisté. La pollution
+  // existante se résorbe au prochain savePatients.
+  const purgeImagesFromNeuro4 = (obj) => {
+    if (!obj || !obj.neuro4) return;
+    for (const k of SPORT_BILAN_PHOTO_KEYS) {
+      delete obj.neuro4[k];
+      delete obj.neuro4[k + 'Path'];
+    }
+    for (const k of POSTURO_PHOTO_KEYS) {
+      delete obj.neuro4[k];
+      delete obj.neuro4[k + 'Path'];
+    }
+  };
+  for (const p of patientsArr) {
+    stripObjFlat(p.bilanData, SPORT_BILAN_PHOTO_KEYS);
+    stripObjFlat(p.bilanDataPosturo, POSTURO_PHOTO_KEYS);
+    purgeImagesFromNeuro4(p.bilanDataPosturo);
+    stripMesures(p.mesures);
+    if (Array.isArray(p.bilansSport)) for (const arch of p.bilansSport) {
+      stripObjFlat(arch.bilanData, SPORT_BILAN_PHOTO_KEYS);
+      stripMesures(arch.mesures);
+    }
+    if (Array.isArray(p.bilansPosturo)) for (const arch of p.bilansPosturo) {
+      stripObjFlat(arch.bilanDataPosturo, POSTURO_PHOTO_KEYS);
+      purgeImagesFromNeuro4(arch.bilanDataPosturo);
+    }
+  }
+  return stash;
+}
+
+function _restoreDataURLsAfterPersist(stash) {
+  for (const { obj, key, dataUrl } of stash) {
+    obj[key] = dataUrl;
+  }
+}
+
 function savePatients() {
+  // #81 + Bug RAM-leak — strip in-place AVANT toute sérialisation. try/finally
+  // GARANTIT la restauration RAM sur TOUS les chemins de sortie (return false
+  // critique threshold, return false quota, throw, return normal). RAM continue
+  // d'afficher les dataURLs pour les renderers ; localStorage est propre.
+  const _stripStash = _stripDataURLsForPersist(patients);
+  try {
   const beforeBytes = getBioMecaStorageBytes();
 
   // Calcul de la taille future après sérialisation : seul bm4-patients change.
@@ -2366,6 +2513,13 @@ function savePatients() {
 
   saveToSupabase();
   return true;
+  } finally {
+    // #81 + Bug RAM-leak — restauration RAM garantie sur TOUS les chemins de
+    // sortie (return false critique, return false quota, throw, return normal).
+    // Les renderers (img.src, canvas drawImage) continuent de trouver les
+    // dataURLs en RAM. Persisté = propre, RAM = display continu.
+    _restoreDataURLsAfterPersist(_stripStash);
+  }
 }
 
 function editPatient(idx) {
@@ -2532,10 +2686,25 @@ function clearBilanFields() {
   const canvasIds = ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'];
   canvasIds.forEach(id => {
     const c = document.getElementById(id);
-    if(c) { c._history=[]; c._baseSnapshot=null; initMorphoCanvas(id); }
+    if(c) {
+      c._history=[]; c._baseSnapshot=null;
+      // #99 + Bug édition perdue — reset au switch patient : le nouveau bilan
+      // démarre clean. Aucune édition pending à conserver d'un autre patient.
+      c._userDirty = false;
+      initMorphoCanvas(id);
+    }
   });
   const pc = document.getElementById('pieds-canvas');
-  if(pc) { pc._history=[]; pc._baseSnapshot=null; drawPiedsTemplate(); }
+  if(pc) {
+    pc._history=[]; pc._baseSnapshot=null;
+    pc._userDirty = false;
+    drawPiedsTemplate();
+  }
+  // Reset _userDirty pour les canvas posturo body/feet aussi (symétrie cross-bilan).
+  ['posturo-body-canvas','posturo-feet-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
   // Sprint A4 — vide le bloc traitements sport (selects/libres hors clear auto)
   clearSportTtt();
 }
@@ -2917,6 +3086,12 @@ function finalizeBilanSport(patIdx) {
   p.bilanData = {};
   delete p.currentBilanSportSousType;
   currentOpenedBilanIdx = null;
+  // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas sport :
+  // l'archive est figée, le nouveau bilan en cours est vide → clean.
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
   savePatients();
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
@@ -3133,7 +3308,12 @@ function supprimerBilanPosturo(patIdx, bilanIdx) {
 // Clés photo du bilan posturo (Task #51 PR B1). Pour chaque clé `_xxx`,
 // on persiste `_xxxPath` en DB ; la dataUrl correspondante (`_xxx`) reste
 // en RAM le temps de l'édition mais n'est jamais sauvegardée.
-const POSTURO_PHOTO_KEYS = ['_empreinte', '_bodyCanvas', '_feetDrawings', '_feetComposite'];
+// #85 Phase 1 — extension : 4 captures Analyse posturale (face/dos/profilG/profilD).
+// savePosturoBilan est déjà async + appelle migratePosturoPhotos → migration auto.
+const POSTURO_PHOTO_KEYS = [
+  '_empreinte', '_bodyCanvas', '_feetDrawings', '_feetComposite',
+  '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD'
+];
 
 // Pour chaque clé photo : si seul le path est présent en DB, on récupère
 // la dataUrl depuis Storage et on la réinjecte dans `d[key]` pour que les
@@ -3142,6 +3322,8 @@ const POSTURO_PHOTO_KEYS = ['_empreinte', '_bodyCanvas', '_feetDrawings', '_feet
 // pour la photo manquante, ce qui est acceptable.
 async function prefetchPosturoPhotos(d) {
   if (!d) return;
+  // #85 Fix race boot — refresh préventif si JWT proche de l'expiration.
+  await ensureSession();
   await Promise.all(POSTURO_PHOTO_KEYS.map(async k => {
     const pathKey = k + 'Path';
     if (!d[pathKey] || d[k]) return;
@@ -3158,6 +3340,8 @@ async function prefetchPosturoPhotos(d) {
 // prochain save (lazy retry). Retourne un stash des dataUrls initiales,
 // pour que le caller puisse les restaurer en RAM après savePatients().
 async function migratePosturoPhotos(d, patientId, bilanId) {
+  // #85 Fix race boot — refresh préventif avant les uploads Storage.
+  await ensureSession();
   const stash = {};
   for (const k of POSTURO_PHOTO_KEYS) {
     if (d[k] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
@@ -3281,6 +3465,459 @@ function restoreSportPhotosStash(stash) {
   stash.forEach(({ entry, dataUrl }) => {
     if (!entry.dataUrl) entry.dataUrl = dataUrl;
   });
+}
+
+// #85 Phase 1 + #99 — clés photo bilanData sport migrées vers Storage.
+//   - 4 captures Analyse posturale (JPEG 0.88 1080p) ajoutées en #85.
+//   - 5 overlay dessins legacy (4 morpho + pieds, PNG transparent) ajoutés en #99.
+// Pipeline préserve le MIME : PNG → upload image/png → refetch image/png → dataURL
+// PNG transparente intacte (cf storage.js dataUrlToBlob L29-40 + FileReader L196-212).
+// Pattern miroir POSTURO_PHOTO_KEYS : `_xxx` = dataUrl RAM, `_xxxPath` = path Storage.
+const SPORT_BILAN_PHOTO_KEYS = [
+  // #85 captures Analyse posturale
+  '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD',
+  // #99 overlay dessins legacy (PNG transparent — calques superposés à la photo)
+  '_morpho_face', '_morpho_face2', '_morpho_profilG', '_morpho_profilD', '_pieds'
+];
+
+// Miroir prefetchPosturoPhotos L3143 — restaure dataUrl RAM depuis path Storage
+// à l'ouverture du bilan sport. Échec silencieux par clé (console.warn) → l'UI
+// affichera une cellule vide pour la photo manquante, acceptable.
+async function prefetchSportBilanDataPhotos(bd) {
+  if (!bd) return;
+  // #85 Fix boot — js/storage.js chargé APRÈS js/biomeca.js dans index.html L2680-2681,
+  // donc prefetchPhotoToDataUrl peut être undefined au 1er loadBilan top-level (boot).
+  // Skip gracieux : les loadBilan ultérieurs (post-boot via navigation utilisateur)
+  // bénéficieront du prefetch puisque storage.js sera chargé.
+  if (typeof prefetchPhotoToDataUrl !== 'function') return;
+  // #85 Fix race boot — refresh préventif si JWT proche de l'expiration.
+  await ensureSession();
+  await Promise.all(SPORT_BILAN_PHOTO_KEYS.map(async k => {
+    const pathKey = k + 'Path';
+    if (!bd[pathKey] || bd[k]) return;
+    const r = await prefetchPhotoToDataUrl(bd[pathKey]);
+    if (r.ok) bd[k] = r.dataUrl;
+    else console.warn('[sport-bd] prefetch fail', pathKey, '→', r.error);
+  }));
+}
+
+// Miroir migratePosturoPhotos L3160 — upload dataUrl → Storage, set path, delete
+// dataUrl. Stash retourné pour restauration RAM post-savePatients (preserve display
+// sans re-fetch). Type Storage = 'sport' (vs 'posturo' côté posturo).
+async function migrateSportBilanDataPhotos(bd, patientId, bilanId) {
+  // #85 Fix boot — garde défensive miroir prefetchSportBilanDataPhotos. Théoriquement
+  // saveBilan/saveBilanSilent ne sont pas dans le boot top-level, mais protection
+  // cohérente. Retour stash vide → restoreSportBilanDataPhotosStash no-op safe.
+  if (typeof migratePhotoEntry !== 'function') return {};
+  // #85 Fix race boot — refresh préventif avant les uploads Storage.
+  await ensureSession();
+  const stash = {};
+  for (const k of SPORT_BILAN_PHOTO_KEYS) {
+    if (bd[k] && typeof bd[k] === 'string' && bd[k].startsWith('data:')) {
+      stash[k] = bd[k];
+    }
+  }
+  if (Object.keys(stash).length === 0) return stash;
+  const pathArgs = { userId: pwaUser?.id, patientId, type: 'sport', bilanId };
+  const results = await Promise.all(
+    SPORT_BILAN_PHOTO_KEYS.map(k => migratePhotoEntry(bd, k, pathArgs))
+  );
+  results.forEach((r, i) => {
+    if (!r.ok) console.warn('[sport-bd] migrate fail', SPORT_BILAN_PHOTO_KEYS[i], '→', r.error);
+  });
+  // Cleanup miroir migratePosturoPhotos L3180-3184 (cas "double save sans reload").
+  for (const k of SPORT_BILAN_PHOTO_KEYS) {
+    if (bd[k + 'Path'] && typeof bd[k] === 'string' && bd[k].startsWith('data:')) {
+      delete bd[k];
+    }
+  }
+  return stash;
+}
+
+// Restaure les dataUrls retirées par migrateSportBilanDataPhotos. Appelé après
+// savePatients() pour preserve display RAM.
+function restoreSportBilanDataPhotosStash(bd, stash) {
+  for (const k in stash) {
+    if (!bd[k]) bd[k] = stash[k];
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// #81 BACKFILL — migration one-shot des dataURLs historiques vers Storage
+// ══════════════════════════════════════════════════════
+// Couverture exhaustive du state patient :
+//   (a) p.bilanData courant — 9 clés SPORT_BILAN_PHOTO_KEYS
+//   (b) p.bilanDataPosturo courant — 8 clés POSTURO_PHOTO_KEYS
+//   (c) p.mesures[testId].photos[] + frames[] — chaque .dataUrl
+//   (d) p.bilansSport[i].bilanData + .mesures (archives)
+//   (e) p.bilansPosturo[i].bilanDataPosturo (archives)
+// Idempotent (migratePhotoEntry skip si Path déjà set), fail-safe (jamais de
+// delete sans upload OK, cf storage.js L243-245), un seul savePatients final.
+
+function _isDataURL(v) {
+  return typeof v === 'string' && v.startsWith('data:');
+}
+
+// Compte les dataURLs persistées pour un patient sans rien muter.
+// Fonction pure (sauf accès à SPORT_BILAN_PHOTO_KEYS / POSTURO_PHOTO_KEYS).
+function _countDataURLsInPatient(p) {
+  if (!p) return 0;
+  let count = 0;
+  // (a) bilanData courant
+  if (p.bilanData) for (const k of SPORT_BILAN_PHOTO_KEYS) {
+    if (_isDataURL(p.bilanData[k])) count++;
+  }
+  // (b) bilanDataPosturo courant
+  if (p.bilanDataPosturo) for (const k of POSTURO_PHOTO_KEYS) {
+    if (_isDataURL(p.bilanDataPosturo[k])) count++;
+  }
+  // (c) mesures courantes
+  if (p.mesures) for (const tid in p.mesures) {
+    if (tid.startsWith('_')) continue; // skip _bilanId etc.
+    const t = p.mesures[tid];
+    if (Array.isArray(t?.photos)) count += t.photos.filter(e => e && _isDataURL(e.dataUrl)).length;
+    if (Array.isArray(t?.frames)) count += t.frames.filter(e => e && _isDataURL(e.dataUrl)).length;
+  }
+  // (d) bilansSport archives
+  if (Array.isArray(p.bilansSport)) for (const arch of p.bilansSport) {
+    if (arch.bilanData) for (const k of SPORT_BILAN_PHOTO_KEYS) {
+      if (_isDataURL(arch.bilanData[k])) count++;
+    }
+    if (arch.mesures) for (const tid in arch.mesures) {
+      if (tid.startsWith('_')) continue;
+      const t = arch.mesures[tid];
+      if (Array.isArray(t?.photos)) count += t.photos.filter(e => e && _isDataURL(e.dataUrl)).length;
+      if (Array.isArray(t?.frames)) count += t.frames.filter(e => e && _isDataURL(e.dataUrl)).length;
+    }
+  }
+  // (e) bilansPosturo archives
+  if (Array.isArray(p.bilansPosturo)) for (const arch of p.bilansPosturo) {
+    if (arch.bilanDataPosturo) for (const k of POSTURO_PHOTO_KEYS) {
+      if (_isDataURL(arch.bilanDataPosturo[k])) count++;
+    }
+  }
+  return count;
+}
+
+// Compte sans rien muter. Retourne { totals: [{id, name, count}], grand }.
+function _dryRunBackfill() {
+  const totals = (Array.isArray(patients) ? patients : [])
+    .map(p => ({
+      id: p?.id || '?',
+      name: ((p?.prenom || '?') + ' ' + (p?.nom || '?')).trim() || '(sans nom)',
+      count: _countDataURLsInPatient(p)
+    }))
+    .filter(t => t.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const grand = totals.reduce((s, t) => s + t.count, 0);
+  console.log('[#81 dry-run] Total dataURLs à migrer : ' + grand + ' (' + totals.length + ' patients)');
+  if (totals.length > 0) console.table(totals);
+  return { totals, grand };
+}
+
+// Migration effective. ⚠ NE PAS APPELER tant que la validation Joel n'est pas
+// reçue (Palier 3 dry-run only). UN SEUL savePatients final.
+async function _executeBackfill({ onProgress } = {}) {
+  await ensureSession();
+  let migrated = 0, failed = 0, patientsTraités = 0;
+
+  // Helper : itère un objet mesures (courant ou archivé) et migre chaque test.
+  async function _backfillMesuresEntry(mesures, bilanId, patientId) {
+    if (!mesures) return;
+    if (!mesures._bilanId) mesures._bilanId = bilanId;
+    for (const tid in mesures) {
+      if (tid.startsWith('_')) continue;
+      try {
+        await migrateSportPhotos(mesures[tid], patientId, mesures._bilanId, tid);
+        migrated++;
+      } catch (e) {
+        failed++;
+        console.warn('[#81] migrate mesures fail (' + tid + ') :', e);
+      }
+    }
+  }
+
+  for (const p of (Array.isArray(patients) ? patients : [])) {
+    if (!p?.id) continue;
+    // (a) + (c) bilan sport en cours
+    if (!p.mesures) p.mesures = {};
+    if (!p.mesures._bilanId) p.mesures._bilanId = crypto.randomUUID();
+    if (p.bilanData) {
+      try {
+        await migrateSportBilanDataPhotos(p.bilanData, p.id, p.mesures._bilanId);
+        migrated++;
+      } catch (e) {
+        failed++;
+        console.warn('[#81] sport-bd courant fail :', e);
+      }
+    }
+    await _backfillMesuresEntry(p.mesures, p.mesures._bilanId, p.id);
+
+    // (b) bilan posturo en cours
+    if (p.bilanDataPosturo) {
+      if (!p.bilanDataPosturo.id) p.bilanDataPosturo.id = crypto.randomUUID();
+      try {
+        await migratePosturoPhotos(p.bilanDataPosturo, p.id, p.bilanDataPosturo.id);
+        migrated++;
+      } catch (e) {
+        failed++;
+        console.warn('[#81] posturo-bd courant fail :', e);
+      }
+    }
+
+    // (d) archives sport
+    for (const arch of (p.bilansSport || [])) {
+      if (!arch._bilanId) arch._bilanId = crypto.randomUUID();
+      if (arch.bilanData) {
+        try {
+          await migrateSportBilanDataPhotos(arch.bilanData, p.id, arch._bilanId);
+          migrated++;
+        } catch (e) {
+          failed++;
+          console.warn('[#81] archive sport-bd fail :', e);
+        }
+      }
+      await _backfillMesuresEntry(arch.mesures, arch._bilanId, p.id);
+    }
+
+    // (e) archives posturo
+    for (const arch of (p.bilansPosturo || [])) {
+      if (arch.bilanDataPosturo) {
+        if (!arch.bilanDataPosturo.id) arch.bilanDataPosturo.id = crypto.randomUUID();
+        try {
+          await migratePosturoPhotos(arch.bilanDataPosturo, p.id, arch.bilanDataPosturo.id);
+          migrated++;
+        } catch (e) {
+          failed++;
+          console.warn('[#81] archive posturo-bd fail :', e);
+        }
+      }
+    }
+
+    patientsTraités++;
+    if (onProgress) onProgress({
+      patientId: p.id,
+      patientName: ((p.prenom || '?') + ' ' + (p.nom || '?')).trim(),
+      patientsTraités,
+      migrated,
+      failed
+    });
+  }
+
+  // UN SEUL savePatients final → libère le localStorage en un coup.
+  savePatients();
+  return { migrated, failed, patientsTraités };
+}
+
+// ─── UI Maintenance dans Paramètres ───
+
+function _openBackfillLockModal() {
+  const modal = document.getElementById('backfill-lock-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function _closeBackfillLockModal() {
+  const modal = document.getElementById('backfill-lock-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function _runBackfillDryRun() {
+  if (!Array.isArray(patients)) return;
+  const { totals, grand } = _dryRunBackfill();
+  const countEl = document.getElementById('backfill-count-display');
+  if (countEl) {
+    if (grand === 0) {
+      countEl.textContent = '✓ Aucune migration nécessaire (0 dataURL en localStorage).';
+      countEl.style.color = '#2a7a4e';
+    } else {
+      countEl.textContent = grand + ' dataURL' + (grand > 1 ? 's' : '') + ' détectée' +
+        (grand > 1 ? 's' : '') + ' dans ' + totals.length + ' patient' + (totals.length > 1 ? 's' : '');
+      countEl.style.color = '#c0392b';
+    }
+  }
+  const detailsEl = document.getElementById('backfill-details');
+  if (detailsEl) {
+    detailsEl.innerHTML = totals.length === 0
+      ? ''
+      : '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;color:var(--mut);">Détail par patient</summary><ul style="font-size:11px;color:var(--mut);margin-top:6px;">' +
+        totals.map(t => '<li>' + t.name + ' : ' + t.count + ' image' + (t.count > 1 ? 's' : '') + '</li>').join('') +
+        '</ul></details>';
+  }
+}
+
+async function _runBackfillExecution() {
+  if (!confirm("⚠️ Lancer la migration de toutes les dataURLs vers Supabase Storage ?\n\nCette opération peut prendre plusieurs minutes selon le volume. Ne fermez pas l'application pendant l'exécution.")) return;
+  _openBackfillLockModal();
+  try {
+    const progressEl = document.getElementById('backfill-progress');
+    const result = await _executeBackfill({
+      onProgress: ({ patientName, patientsTraités, migrated, failed }) => {
+        if (progressEl) {
+          progressEl.textContent = 'Patient #' + patientsTraités + ' : ' + patientName +
+            ' · ' + migrated + ' migrations · ' + failed + ' échecs';
+        }
+      }
+    });
+    alert('✓ Migration terminée.\n\n' +
+      result.patientsTraités + ' patient(s) traité(s).\n' +
+      result.migrated + ' upload(s) réussi(s).\n' +
+      result.failed + ' échec(s).\n\n' +
+      'Le localStorage est libéré.');
+    _runBackfillDryRun(); // recompte pour montrer le nouveau total
+  } catch (e) {
+    alert('Erreur pendant la migration : ' + (e?.message || e));
+    console.error('[#81] executeBackfill exception :', e);
+  } finally {
+    _closeBackfillLockModal();
+  }
+}
+
+// #99 Tracé commun des 4 canvas overlay morpho (PNG transparent) depuis un objet
+// source. Extraction du bloc historique nav L2013-2034 pour zéro duplication +
+// fidélité byte-pour-byte garantie entre les 2 call-sites (nav setTimeout 500ms
+// pré-prefetch + .then() post-prefetch de prefetchSportBilanDataPhotos #99).
+//
+// Source paramétrée :
+//   - chaîne nav setTimeout → currentPatient?.bilanData (état persisté, dataURLs
+//     présentes pour bilans non-migrés legacy)
+//   - .then() post-prefetch  → bilanData global (réhydraté par prefetch Storage
+//     pour bilans post-migration où currentPatient.bilanData ne contient que Path)
+//
+// Function declaration → hoistée (insensible à l'ordre). Idempotent : drawImage
+// est non-cumulatif, redraw même image = no-op visible. Donc 2e call-site n'altère
+// pas le rendu du 1er si bilan non-migré.
+// #99 + Bug édition perdue (gating _restoreReady) — overlay visuel posé sur le
+// parent du canvas pendant la fenêtre de restauration async. Affiché seulement
+// si la restauration dépasse ~150 ms (sinon flash gênant pour les bilans légers).
+// pointer-events:none → n'intercepte pas le clic user (sécurité belt-and-suspenders ;
+// le vrai blocage est dans setupDrawCanvas mousedown via guard _restoreReady).
+function _showRestoreOverlay(canvas) {
+  if (!canvas || canvas._restoreReady) return;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  let overlay = parent.querySelector('.restore-loading-overlay');
+  if (!overlay) {
+    // Le parent doit être en position:relative pour que l'overlay s'aligne dessus.
+    const cs = getComputedStyle(parent);
+    if (cs.position === 'static') parent.style.position = 'relative';
+    overlay = document.createElement('div');
+    overlay.className = 'restore-loading-overlay';
+    overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;font-weight:600;pointer-events:none;z-index:10;border-radius:4px;';
+    overlay.textContent = '⏳ Chargement du dessin…';
+    parent.appendChild(overlay);
+  }
+  overlay.style.display = '';
+}
+
+function _hideRestoreOverlay(canvas) {
+  if (!canvas) return;
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  const overlay = parent.querySelector('.restore-loading-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+// Affiche l'overlay seulement après 150 ms (évite le flash pour les restorations
+// rapides bilan vierge / dataURL inline déjà en RAM). Re-check _restoreReady au
+// moment d'afficher : si déjà ready, no-op.
+function _showRestoreOverlayDeferred(canvas) {
+  setTimeout(() => {
+    if (canvas && canvas._restoreReady === false) _showRestoreOverlay(canvas);
+  }, 150);
+}
+
+// #99 + Bug édition perdue (gating _restoreReady) — `posesReadyFlag`:
+//   - false (par défaut) : 1ère passe (chaîne nav setTimeout 500ms), source peut
+//     être vide (currentPatient.bilanData pour bilan migré sans dataURL en RAM).
+//     Ne touche pas le flag — la 2e passe via .then() prefetch s'en chargera
+//     après réhydratation. Évite d'ouvrir le gate avant que la restauration
+//     déterministe (Image.onload) ait effectivement peint.
+//   - true : 2e passe via _restoreSportMorphoPiedsFromBilanData dans .then().
+//     Pose `_restoreReady=true` déterministe dans img.onload (après drawImage).
+//     Pour les canvas sans source[key] (rien à dessiner), pose ready immédiat.
+//     img.onerror débloque aussi (sinon canvas figé en cas de dataURL corrompue).
+function _drawMorphoCanvasesFromSource(source, posesReadyFlag) {
+  if (!source) return;
+  const pairs = [
+    ['morpho-face',    '_morpho_face'],
+    ['morpho-face2',   '_morpho_face2'],
+    ['morpho-profilG', '_morpho_profilG'],
+    ['morpho-profilD', '_morpho_profilD']
+  ];
+  pairs.forEach(([canvasId, key]) => {
+    const cvs = document.getElementById(canvasId);
+    if (!cvs || cvs.width === 0) return;
+    if (!source[key]) {
+      // Rien à restaurer pour ce canvas : ouverture immédiate du gate si on est
+      // dans la passe finale. Sinon, on laisse au caller / 2e passe le soin.
+      if (posesReadyFlag) {
+        cvs._restoreReady = true;
+        _hideRestoreOverlay(cvs);
+      }
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const dpr = window.devicePixelRatio || 1;
+      cvs.getContext('2d').drawImage(img, 0, 0, cvs.width / dpr, cvs.height / dpr);
+      // Fix #94 auto-réparation — efface fond noir éventuel des bilans
+      // corrompus pré-fix (saveBilanSilent JPEG sur canvas morpho overlay
+      // transparent). Idempotent sur PNG transparent propre.
+      _stripBackgroundFromRestore(cvs);
+      if (posesReadyFlag) {
+        cvs._restoreReady = true;
+        _hideRestoreOverlay(cvs);
+      }
+    };
+    img.onerror = () => {
+      if (posesReadyFlag) {
+        cvs._restoreReady = true;
+        _hideRestoreOverlay(cvs);
+      }
+    };
+    img.src = source[key];
+  });
+}
+
+// #99 Restauration différée des canvas morpho/pieds depuis bilanData global
+// (post-prefetch Storage). Appelée dans le .then() de prefetchSportBilanDataPhotos
+// pour traiter le cas où les 5 clés _morpho_*/_pieds ont été remplacées par des
+// Path (migration #99) : la chaîne nav setTimeout 500ms lit currentPatient.bilanData
+// au reload et trouve les Path (pas les dataURLs), donc rien ne se dessine. Une
+// fois le prefetch terminé, bilanData global contient les dataURLs réhydratées →
+// redraw réussit. Pour les bilans non-migrés (legacy), le rendu nav setTimeout
+// fonctionne ET ce 2e rendu est idempotent (cf comm _drawMorphoCanvasesFromSource).
+function _restoreSportMorphoPiedsFromBilanData() {
+  // Fix racine (symétrisation pattern posturo) : lire currentPatient.bilanData,
+  // l'objet où le prefetch a réhydraté les dataURLs. Le bilanData global est une
+  // copie défensive (JSON.parse(stringify(...))) qui ne reçoit plus les dataURLs
+  // une fois le prefetch redirigé vers currentPatient.bilanData. Lire le global
+  // ici ferait lire les Path-only → drawPiedsTemplate(undefined) → canvas vidé.
+  const src = currentPatient?.bilanData;
+  if (!src) return;
+  // #99 + gating _restoreReady : 2e passe (post-prefetch), posesReadyFlag=true.
+  // _drawMorphoCanvasesFromSource pose `_restoreReady=true` déterministiquement
+  // dans img.onload de chaque canvas qui a une dataURL, ou immédiatement pour
+  // les canvas sans dataURL (rien à restaurer).
+  _drawMorphoCanvasesFromSource(src, true);
+  if (src._pieds && typeof drawPiedsTemplate === 'function') {
+    // Callback onReady passé à drawPiedsTemplate → pose `_restoreReady=true`
+    // dans saved.onload après le drawImage déterministe.
+    drawPiedsTemplate(src._pieds, () => {
+      const pc = document.getElementById('pieds-canvas');
+      if (pc) {
+        pc._restoreReady = true;
+        _hideRestoreOverlay(pc);
+      }
+    });
+  } else {
+    // Pas de _pieds à restaurer → ouverture immédiate du gate pour ce canvas.
+    const pc = document.getElementById('pieds-canvas');
+    if (pc) {
+      pc._restoreReady = true;
+      _hideRestoreOverlay(pc);
+    }
+  }
 }
 
 async function ouvrirBilanPosturo(patIdx, bilanIdx) {
@@ -3816,6 +4453,186 @@ function loadVidFile(input) {
     document.getElementById('vcam-st').textContent='Vidéo'; document.getElementById('vcam-st').className='badge bb';
     setupVidCanvas(player,vcanvas);
   };
+}
+
+// ══════════════════════════════════════════════════════
+// #85 Phase 1 — ANALYSE POSTURALE : CAPTURE 4 VUES (sport + posturo)
+// ══════════════════════════════════════════════════════
+// Bloc partagé sport (ssec-1) + posturo (psec-1), paramétré par préfixe 'sp'/'po'.
+// 1 stream caméra partagé pour les 4 vues, 4 captures distinctes via drawImage+toDataURL.
+// Stockage dataUrl direct dans bilanData/bilanDataPosturo (clés _postureFace/Dos/ProfilG/ProfilD)
+// → migration auto Storage côté posturo (POSTURO_PHOTO_KEYS étendu, savePosturoBilan async).
+// Côté sport : Temps 2 brancher saveBilan async + migrateSportBilanDataPhotos.
+// Format : JPEG 0.88, ideal 1920×1080 (fallback gracieux navigateur), facingMode:environment.
+const POSTURE_VIEWS = [
+  { key: 'face',    label: 'Face'     },
+  { key: 'dos',     label: 'Dos'      },
+  { key: 'profilG', label: 'Profil G' },
+  { key: 'profilD', label: 'Profil D' }
+];
+const _postureStreams = { sp: null, po: null };
+
+// Renvoie l'objet bilanData (sport) ou bilanDataPosturo (posturo) selon prefix.
+// Pendant l'édition : ces objets sont en RAM dans currentPatient (sport) ou
+// la variable d (posturo). Si non disponibles (pas de patient sélectionné),
+// retourne null → la capture est skip silencieuse.
+function _getPostureBilanData(prefix) {
+  if (prefix === 'sp') return (typeof bilanData !== 'undefined' && bilanData) ? bilanData : null;
+  if (prefix === 'po') return currentPatient?.bilanDataPosturo || null;
+  return null;
+}
+
+// Builder HTML partagé — retourne le markup du bloc (à interpoler dans template
+// posturo OU injecter dans #sp-posture-capture-container au boot sport).
+function _buildPostureCaptureBlockHTML(prefix) {
+  const slotsHTML = POSTURE_VIEWS.map(v =>
+    `<div class="pc-slot" id="${prefix}-pc-slot-${v.key}" style="flex:1;min-width:140px;background:#f8f9fa;border:1px dashed #cbd5e0;border-radius:6px;padding:8px;text-align:center;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+       <div style="font-size:10px;color:#666;margin-bottom:6px;font-weight:600;">${v.label}</div>
+       <button class="btn" onclick="capturePostureView('${prefix}','${v.key}')" style="font-size:11px;background:#0e1f38;color:#fff;padding:6px 12px;">📷 Capturer</button>
+     </div>`
+  ).join('');
+  return `<div class="card" style="margin-bottom:12px;border:1px solid #cbd5e0;border-radius:8px;padding:12px;background:#fff;">
+    <div style="font-weight:700;color:#0e1f38;font-size:13px;margin-bottom:8px;">📸 Analyse posturale — captures 4 vues</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+      <select id="${prefix}-pc-camera-select" onchange="_switchPostureCam('${prefix}')" style="font-size:11px;padding:4px 8px;border:1px solid #cbd5e0;border-radius:4px;min-width:160px;">
+        <option value="">— Caméra —</option>
+      </select>
+      <button class="btn" id="${prefix}-pc-cam-btn" onclick="_togglePostureCam('${prefix}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">▶ Activer caméra</button>
+      <span id="${prefix}-pc-cam-status" class="badge bd" style="font-size:10px;">Inactive</span>
+    </div>
+    <div style="position:relative;background:#000;border-radius:6px;overflow:hidden;margin-bottom:8px;min-height:60px;">
+      <video id="${prefix}-pc-video" playsinline autoplay muted style="width:100%;max-height:300px;display:block;"></video>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">${slotsHTML}</div>
+  </div>`;
+}
+
+// Met à jour 1 cellule (vide → miniature → ré-capture). Lit la dataUrl depuis
+// bilanData/bilanDataPosturo (clé `_posture<View>`). Idempotent (re-render OK).
+function _renderPostureSlot(prefix, viewKey) {
+  const slot = document.getElementById(`${prefix}-pc-slot-${viewKey}`);
+  if (!slot) return;
+  const view = POSTURE_VIEWS.find(v => v.key === viewKey);
+  if (!view) return;
+  const bd = _getPostureBilanData(prefix);
+  const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  const dataUrl = bd?.[key];
+  if (dataUrl) {
+    slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:4px;font-weight:600;">${view.label}</div>
+      <img src="${dataUrl}" style="max-width:100%;max-height:90px;border-radius:4px;display:block;margin:0 auto 4px;"/>
+      <div style="display:flex;gap:4px;justify-content:center;">
+        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#0e1f38;color:#fff;">↻</button>
+        <button class="btn" onclick="deletePostureView('${prefix}','${viewKey}')" style="font-size:9px;padding:2px 6px;background:#c0392b;color:#fff;">✕</button>
+      </div>`;
+    slot.style.borderStyle = 'solid';
+    slot.style.background = '#fff';
+  } else {
+    slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:6px;font-weight:600;">${view.label}</div>
+      <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" style="font-size:11px;background:#0e1f38;color:#fff;padding:6px 12px;">📷 Capturer</button>`;
+    slot.style.borderStyle = 'dashed';
+    slot.style.background = '#f8f9fa';
+  }
+}
+
+function _renderAllPostureSlots(prefix) {
+  POSTURE_VIEWS.forEach(v => _renderPostureSlot(prefix, v.key));
+}
+
+// Active la caméra avec le deviceId sélectionné (ou fallback environment).
+// Pattern miroir toggleVCam L3770-3796. Stream stocké dans _postureStreams[prefix].
+async function _togglePostureCam(prefix) {
+  if (_postureStreams[prefix]) { _stopPostureCam(prefix); return; }
+  const sel = document.getElementById(`${prefix}-pc-camera-select`);
+  const selVal = sel?.value;
+  const constraints = {
+    audio: false,
+    video: selVal
+      ? { deviceId: { exact: selVal }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+  };
+  try {
+    _postureStreams[prefix] = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById(`${prefix}-pc-video`);
+    if (video) {
+      video.srcObject = _postureStreams[prefix];
+      video.play().catch(() => {});
+    }
+    const btn = document.getElementById(`${prefix}-pc-cam-btn`);
+    const st  = document.getElementById(`${prefix}-pc-cam-status`);
+    if (btn) { btn.textContent = '⏹ Arrêter'; btn.style.background = '#c0392b'; }
+    if (st)  { st.textContent  = 'Active';   st.className = 'badge bg'; }
+    // Rafraîchir la liste maintenant que la permission est accordée (labels disponibles)
+    enumerateCameras(`${prefix}-pc-camera-select`);
+  } catch (e) {
+    const st = document.getElementById(`${prefix}-pc-cam-status`);
+    if (st) { st.textContent = 'Erreur'; st.className = 'badge br'; }
+    console.warn('[#85] Caméra inaccessible :', e.message);
+  }
+}
+
+// Switch caméra : stop le stream actuel, redémarre avec le nouveau deviceId.
+async function _switchPostureCam(prefix) {
+  if (!_postureStreams[prefix]) return; // pas de stream → l'utilisateur clique « Activer » d'abord
+  _stopPostureCam(prefix);
+  await _togglePostureCam(prefix);
+}
+
+function _stopPostureCam(prefix) {
+  if (_postureStreams[prefix]) {
+    _postureStreams[prefix].getTracks().forEach(t => t.stop());
+    _postureStreams[prefix] = null;
+  }
+  const video = document.getElementById(`${prefix}-pc-video`);
+  if (video) video.srcObject = null;
+  const btn = document.getElementById(`${prefix}-pc-cam-btn`);
+  const st  = document.getElementById(`${prefix}-pc-cam-status`);
+  if (btn) { btn.textContent = '▶ Activer caméra'; btn.style.background = '#2a7a4e'; }
+  if (st)  { st.textContent  = 'Inactive';         st.className = 'badge bd'; }
+}
+
+// Capture frame courante du <video> → JPEG 0.88 → bilanData[`_posture<View>`].
+function capturePostureView(prefix, viewKey) {
+  const video = document.getElementById(`${prefix}-pc-video`);
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    alert('Activez la caméra avant de capturer.');
+    return;
+  }
+  const bd = _getPostureBilanData(prefix);
+  if (!bd) {
+    alert('Aucun bilan ouvert — sélectionnez un patient et créez/ouvrez un bilan.');
+    return;
+  }
+  const tmp = document.createElement('canvas');
+  tmp.width  = video.videoWidth;
+  tmp.height = video.videoHeight;
+  tmp.getContext('2d').drawImage(video, 0, 0, tmp.width, tmp.height);
+  const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
+  const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  bd[key] = dataUrl;
+  // #85 Phase 1 — si un Path Storage existait pour une capture précédente, on
+  // l'invalide (le delete .path force migrateSportBilanDataPhotos / migratePosturoPhotos
+  // à ré-upload au prochain save ; l'ancien fichier devient orphelin, nettoyé par
+  // ticket dédié — pattern miroir photoSlots[].path = null L3523).
+  if (bd[key + 'Path']) delete bd[key + 'Path'];
+  _renderPostureSlot(prefix, viewKey);
+}
+
+function deletePostureView(prefix, viewKey) {
+  const bd = _getPostureBilanData(prefix);
+  if (!bd) return;
+  const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  delete bd[key];
+  if (bd[key + 'Path']) delete bd[key + 'Path'];
+  _renderPostureSlot(prefix, viewKey);
+}
+
+// Boot sport : peuple le container statique d'index.html avec le markup builder.
+// Posturo ne nécessite pas d'équivalent — l'interpolation est dans getBilanPosturoHTML
+// régénéré à chaque ouverture du bilan posturo.
+function populateSportPostureCaptureBlock() {
+  const container = document.getElementById('sp-posture-capture-container');
+  if (!container) return;
+  container.innerHTML = _buildPostureCaptureBlockHTML('sp');
 }
 
 function setupVidCanvas(player, vcanvas) {
@@ -7221,7 +8038,15 @@ function initMorphoCanvas(canvasId) {
   canvas._undoOrderStack = _morphoUndoOrder;
   // NB: les images sont maintenant dans le DOM via <img>, pas dans le canvas
   // On ne restaure plus l'ancien format (image+dessin fusionnés)
-  setTimeout(() => { canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height); }, 100);
+  // #83 — capture _baseSnapshot SYNCHRONE (symétrie drawPiedsTemplate L8429). Le
+  // canvas morpho est un overlay transparent (silhouettes dans <img> DOM, pas
+  // gravées dans le canvas) → le base = transparent, capturable immédiatement.
+  // Fiabilise _serializeDrawCanvas (soustraction base vs canvas) au save :
+  // l'ancien setTimeout 100ms posait une fenêtre où le base était null, et
+  // _drawMorphoCanvasesFromSource (restoration overlay) pouvait peindre AVANT
+  // le base, contaminant la soustraction. Le fallback de setupDrawCanvas L8096
+  // (if(!canvas._baseSnapshot)) reste inoffensif : base déjà posé ici.
+  canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
   setupDrawCanvas(canvas, canvasId);
 }
 
@@ -7291,6 +8116,11 @@ function setupDrawCanvas(canvas, canvasId) {
   };
 
   canvas.onmousedown = e => {
+    // #99 + Bug édition perdue (gating _restoreReady) — bloque les inputs user
+    // tant que la restauration async n'a pas peint le dessin pré-édition. Sinon
+    // le user dessine pendant la fenêtre de race, drawPiedsTemplate(canvas.width=…)
+    // au .then() efface le DOM et le sweep ne capture pas le trait → édition perdue.
+    if (canvas._restoreReady === false) return;
     e.preventDefault();
     drawing = true;
     const p = getPos(e);
@@ -7365,6 +8195,15 @@ function setupDrawCanvas(canvas, canvasId) {
       // undefined sur pieds/posturo → ligne sautée (noop strict, comportement
       // existant strictement préservé pour eux).
       if(canvas._undoOrderStack) canvas._undoOrderStack.push(canvas.id);
+      // #99 + Bug édition perdue — flag de modification utilisateur insensible
+      // aux ré-init DOM (initMorphoCanvas/drawPiedsTemplate/initPosturoBodyCanvas/
+      // initPosturoFeetCanvas reset _history à chaque appel — déclenchés par nav
+      // page et nav section. Sans ce flag, une édition pendant la fenêtre prefetch
+      // async OU avant re-init section est silencieusement effacée → check
+      // _history.length>0 au save = faux négatif → Path non invalidé → cleanup
+      // post-migrate supprime la nouvelle dataURL = édition perdue au reload).
+      // _userDirty n'est jamais reset par les opérations de restauration DOM.
+      canvas._userDirty = true;
     }
     drawing = false;
     canvas._tempSnap = null;
@@ -7505,7 +8344,15 @@ function clearAllMorpho() {
   _morphoUndoOrder.length = 0;
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
-    if(c) { c._history = []; c._baseSnapshot = null; c._tempSnap = null; }
+    if(c) {
+      c._history = [];
+      c._baseSnapshot = null;
+      c._tempSnap = null;
+      // #99 + Bug édition perdue — clear user-triggered = édition. Force
+      // l'invalidation Path au prochain save (sinon le clear ne serait pas
+      // propagé puisque _history reste à [] après le reset).
+      c._userDirty = true;
+    }
     initMorphoCanvas(id);
   });
 }
@@ -7548,7 +8395,17 @@ function undoPieds() {
   }
 }
 
-function drawPiedsTemplate(savedData) {
+// #99 + Bug édition perdue (gating _restoreReady) — paramètre optionnel `onReady`
+// appelé déterministiquement APRÈS le drawImage du saved.onload (ou immédiatement
+// si pas de savedData, ou dans onerror si dataURL corrompue). Le callback est
+// utilisé par _restoreSportMorphoPiedsFromBilanData pour poser _restoreReady=true
+// au moment où le dessin est effectivement peint sur le canvas.
+//
+// drawPiedsTemplate NE TOUCHE PAS `_restoreReady` lui-même — c'est le caller qui
+// décide via onReady. Cela évite qu'un appel intermédiaire (chaîne nav setTimeout
+// L2011, clearPiedsCanvas, showSportBilanSection idx===9) ouvre prématurément le
+// gate alors qu'une restoration finale est encore en attente (prefetch.then).
+function drawPiedsTemplate(savedData, onReady) {
   // Refactor #91 — pattern posturo (img DOM séparée + canvas transparent overlay).
   // Mirroir de initPosturoFeetCanvas L10511. Le canvas est désormais un OVERLAY
   // transparent par-dessus #sp-pieds-img (template visible directement dans le DOM,
@@ -7590,8 +8447,18 @@ function drawPiedsTemplate(savedData) {
       // pré-fix (saveBilanSilent JPEG produisait noir intégral sur canvas overlay
       // transparent). Idempotent sur PNG transparent propre.
       _stripBackgroundFromRestore(canvas);
+      // #99 + gating _restoreReady — caller décide via onReady, déterministe après
+      // le drawImage effectif (le dessin est peint sur le canvas à cet instant).
+      if (typeof onReady === 'function') onReady();
+    };
+    saved.onerror = () => {
+      // dataURL corrompue → débloque quand même pour ne pas geler l'édition.
+      if (typeof onReady === 'function') onReady();
     };
     saved.src = savedData;
+  } else if (typeof onReady === 'function') {
+    // Pas de savedData → pas d'Image.onload → débloque immédiatement.
+    onReady();
   }
 }
 
@@ -7926,12 +8793,11 @@ function _serializeDrawCanvas(canvas) {
   const current = tctx.getImageData(0, 0, W, H);
   _subtractBaseSnapshot(current, canvas._baseSnapshot);
   tctx.putImageData(current, 0, 0);
-  const dpr = window.devicePixelRatio || 1;
-  const out = document.createElement('canvas');
-  out.width = Math.round(W / dpr);
-  out.height = Math.round(H / dpr);
-  out.getContext('2d').drawImage(tmp, 0, 0, W, H, 0, 0, out.width, out.height);
-  return out.toDataURL('image/png');
+  // #83 — pleine résolution : pas de downscale CSS (l'ancien W/dpr perdait
+  // la moitié des pixels à dpr=2, puis la restauration ré-upscalait → flou).
+  // La restauration (drawImage) scale déjà vers le dest rect quel que soit
+  // le source res → source pleine résolution = net. tmp est déjà W×H base soustraite.
+  return tmp.toDataURL('image/png');
 }
 
 // Fix #94 auto-réparation — soustrait canvas._baseSnapshot in-place après un
@@ -7949,7 +8815,7 @@ function _stripBackgroundFromRestore(canvas) {
   ctx.putImageData(current, 0, 0);
 }
 
-function saveBilan() {
+async function saveBilan() {
   if(!currentPatient) { alert('Aucun patient sélectionné.'); return; }
   if(!bilanData) bilanData = {};
 
@@ -7986,15 +8852,46 @@ function saveBilan() {
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
     const png = _serializeDrawCanvas(c);
-    if(png !== null) bilanData['_' + id.replace(/-/g,'_')] = png;
+    if(png !== null) {
+      const key = '_' + id.replace(/-/g,'_');
+      bilanData[key] = png;
+      // #99 + Bug édition perdue (option iii) — invalide le Path sur édition
+      // utilisateur réelle. _userDirty est insensible aux ré-init DOM (init/draw
+      // restoration), contrairement à _history.length qui était reset par
+      // drawPiedsTemplate/initMorphoCanvas au reload async post-prefetch et au
+      // re-nav vers pg-bilan, causant la perte silencieuse des éditions.
+      if (c && c._userDirty) delete bilanData[key + 'Path'];
+    }
   });
   const pCanvas = document.getElementById('pieds-canvas');
   const piedsPng = _serializeDrawCanvas(pCanvas);
-  if(piedsPng !== null) bilanData._pieds = piedsPng;
+  if(piedsPng !== null) {
+    bilanData._pieds = piedsPng;
+    if (pCanvas && pCanvas._userDirty) delete bilanData._piedsPath;
+  }
+  // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
+  // Prépare le prochain cycle d'édition (un nouveau mouseup re-marquera dirty).
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
+
+  // #85 Phase 1 — migration Storage des captures Analyse posturale AVANT
+  // sérialisation (sinon dataUrls JPEG 1080p polluent localStorage, régression #35).
+  // Réutilise l'identifiant stable _bilanId géré par saveMesures L4968 — lazy-create
+  // si saveBilan est appelé avant qu'une mesure ait été sauvegardée.
+  if(!currentPatient.mesures) currentPatient.mesures = {};
+  if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
+  const _postureStash = await migrateSportBilanDataPhotos(
+    bilanData, currentPatient.id, currentPatient.mesures._bilanId
+  );
 
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
   syncOpenedBilanToHistory();
   savePatients();
+  // Restaure les dataUrls RAM pour preserve display sans re-fetch Storage
+  // (miroir restoreSportPhotosStash L3285 pour le flow mesures).
+  restoreSportBilanDataPhotosStash(bilanData, _postureStash);
   alert('✓ Bilan clinique sauvegardé');
 }
 
@@ -8068,7 +8965,40 @@ const B2_SCHEMAS_MOTEURS = {
 function loadBilan() {
   if(!currentPatient) return;
   bilanData = currentPatient.bilanData ? JSON.parse(JSON.stringify(currentPatient.bilanData)) : {};
-  if(!Object.keys(bilanData).length) return;
+  // #99 + Bug édition perdue (gating _restoreReady) — fenêtre de restauration
+  // ouverte. _restoreReady=false bloque les inputs user dans setupDrawCanvas
+  // mousedown/touchstart jusqu'à ce que la restauration async (prefetch +
+  // Image.onload) ait peint le dessin pré-édition sur le canvas. Sinon le
+  // user dessine pendant la fenêtre, drawPiedsTemplate(canvas.width = …) au
+  // .then() efface le DOM, et le sweep _serializeDrawCanvas capture l'ancien
+  // dessin sans le trait user → édition perdue au reload.
+  // Overlay deferred 150 ms (évite le flash pour les restorations rapides).
+  // Fallback timeout 3000 ms : si prefetch fail / timeout réseau, débloque
+  // quand même pour ne pas geler l'édition à jamais.
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c) {
+      c._restoreReady = false;
+      _showRestoreOverlayDeferred(c);
+    }
+  });
+  setTimeout(() => {
+    ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+      const c = document.getElementById(id);
+      if (c && c._restoreReady === false) {
+        c._restoreReady = true;
+        _hideRestoreOverlay(c);
+      }
+    });
+  }, 3000);
+  if(!Object.keys(bilanData).length) {
+    // Bilan vide (jamais sauvé) → rien à restaurer, ouvre le gate immédiatement.
+    ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+      const c = document.getElementById(id);
+      if (c) { c._restoreReady = true; _hideRestoreOverlay(c); }
+    });
+    return;
+  }
 
   // Remplir les champs texte/textarea
   document.querySelectorAll('.bilan-field').forEach(el => {
@@ -8182,6 +9112,24 @@ function loadBilan() {
   // Les nouvelles sauvegardes contiennent juste le dessin transparent
   // Les anciennes sauvegardes (avec fond) sont ignorées car elles contiennent l'image en double
   // La restauration des canvas se fait séparément après initMorphoCanvas
+  // #85 Phase 1 — prefetch des captures Analyse posturale depuis Storage
+  // (dataUrls absentes de bilanData persisté car migrées par migrateSportBilanDataPhotos).
+  // Fire-and-forget — render miniatures dès que les fetch répondent (non bloquant).
+  // #99 — ajoute la restauration canvas morpho/pieds APRÈS prefetch : les 5 clés
+  // _morpho_*/_pieds sont désormais migrées aussi → leur dataURL n'est plus dans
+  // bilanData au load (juste Path). Sans ce .then(), les call-sites SYNC nav L2007
+  // + L2013-2034 lisent undefined → calques morpho/pieds disparaissent au reload.
+  // Fix racine (symétrisation pattern posturo) : prefetch sur currentPatient.bilanData
+  // (objet persisté) au lieu du bilanData global (copie défensive). Pattern miroir
+  // de prefetchPosturoPhotos(currentPatient.bilanDataPosturo). Le strip dans
+  // savePatients (déjà en place sur p.bilanData pour SPORT_BILAN_PHOTO_KEYS)
+  // garantit zéro re-bloat localStorage ; le restore-stash repose les dataURLs
+  // en RAM pour l'affichage. Sites lecteurs (canvas restore, rapport composites)
+  // qui lisent currentPatient.bilanData trouvent désormais les dataURLs.
+  prefetchSportBilanDataPhotos(currentPatient.bilanData).then(() => {
+    _renderAllPostureSlots('sp');
+    _restoreSportMorphoPiedsFromBilanData();
+  });
 }
 
 function toggleDictaphone() {
@@ -8227,8 +9175,15 @@ function printBilan() {
   setTimeout(() => printReport(), 200);
 }
 
-function saveBilanSilent() {
-  // Même que saveBilan mais sans alert
+async function saveBilanSilent() {
+  // Même que saveBilan mais sans alert.
+  // #85 Phase 1 — async pour migrer les captures _postureXxx vers Storage AVANT
+  // savePatients (sinon dataURLs JPEG 1080p écrites en localStorage par les
+  // call-sites buildRapport/printReport/genererSyntheseSport → régression #35).
+  // Le sweep DOM → bilanData reste SYNCHRONE en début de fonction : les call-sites
+  // (qui n'awaitent pas) lisent bilanData RAM cohérent avec l'UI courante. La
+  // migration + savePatients s'exécutent en background (fire-and-forget côté caller),
+  // mais l'ordre interne sweep → migrate → savePatients → restore est strict.
   if(!currentPatient) return;
   if(!bilanData) bilanData = {};
   document.querySelectorAll('.bilan-field').forEach(el => {
@@ -8252,22 +9207,214 @@ function saveBilanSilent() {
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
     const png = _serializeDrawCanvas(c);
-    if(png !== null) bilanData['_' + id.replace(/-/g,'_')] = png;
+    if(png !== null) {
+      const key = '_' + id.replace(/-/g,'_');
+      bilanData[key] = png;
+      // #99 + Bug édition perdue (option iii) — miroir saveBilan : check _userDirty.
+      if (c && c._userDirty) delete bilanData[key + 'Path'];
+    }
   });
   const pc = document.getElementById('pieds-canvas');
   const piedsPng = _serializeDrawCanvas(pc);
-  if(piedsPng !== null) bilanData._pieds = piedsPng;
+  if(piedsPng !== null) {
+    bilanData._pieds = piedsPng;
+    if (pc && pc._userDirty) delete bilanData._piedsPath;
+  }
+  // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
+  ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
+  // #85 Phase 1 — migration Storage AVANT persistance (cf header de la fonction).
+  if(!currentPatient.mesures) currentPatient.mesures = {};
+  if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
+  const _postureStash = await migrateSportBilanDataPhotos(
+    bilanData, currentPatient.id, currentPatient.mesures._bilanId
+  );
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
   syncOpenedBilanToHistory();
   savePatients();
+  restoreSportBilanDataPhotosStash(bilanData, _postureStash);
 }
 
 function clearPiedsCanvas() {
   const c = document.getElementById('pieds-canvas');
   if(!c) return;
   c.getContext('2d').clearRect(0,0,c.width,c.height);
+  // #99 + Bug édition perdue — clear user-triggered = édition (cf clearAllMorpho).
+  c._userDirty = true;
   drawPiedsTemplate();
 }
+
+// ══════════════════════════════════════════════════════
+// #85 Fix TDZ — déplacé avant le boot (cf learning #11 / fix B2 NEURO_BLOCKS).
+// Raison : selectPatient(L8551 → ...) → loadBilan → restoreSportTtt → dispatchEvent
+// change → updateExerciceSubMenu lit FICHES_SYSTEMES dès le 1er tick top-level.
+// Si déclaré après, ReferenceError TDZ. Aucun nouveau TDZ créé par le déplacement :
+// les autres consommateurs (_resolveFichesImagesFromPairs, getBilanPosturoHTML, etc.)
+// sont des fonctions appelées au runtime. SPORT_SYSTEMES_LABELS dérivé reste valide
+// car l'ordre relatif dans le bloc est préservé (FICHES_SYSTEMES déclaré au-dessus).
+// ══════════════════════════════════════════════════════
+// #88 Source unique — pilote (a) dict sous-exercices consommé par updateExerciceSubMenu,
+// (b) options <select.exo-sys> filtrées par bilan via _genSysOptionsHTML, (c) labels
+// système (SPORT_SYSTEMES_LABELS dérivé), (d) chemins PDF assets/fiches/<slug>/<sub>.pdf
+// consommés par le helper async pdf.js du chantier #88-B. Ajouter/retirer un système OU
+// un sub-exo se fait UNIQUEMENT ici — les 3 autres call-sites s'auto-synchronisent.
+const FICHES_SYSTEMES = {
+  'systeme-visuel': {
+    label: '👁️ Système visuel',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Exercices avant et après la rééducation oculaire",
+      "2. Rééducation problème de fixation",
+      "3. Rééducation problème de poursuite",
+      "4. Rééducation oculaire de base"
+    ]
+  },
+  'systeme-vestibulaire': {
+    label: '👂 Système vestibulaire',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Rééducation pour un canal semi circulaire latéral",
+      "2. Rééducation pour un Moro ou un canal postérieur",
+      "3. Rééducation pour un canal antérieur",
+      "4. Rééducation pour les saccules",
+      "5. Rééducation pour les utricules",
+      "6. Rééducation du réflexe vestibulo oculaire"
+    ]
+  },
+  'systeme-somesthesique': {
+    label: '🤸 Système somesthésique',
+    bilans: ['sport', 'posturo'],
+    subs: ["1. Stimulation du système proprioceptif"]
+  },
+  'reeduc-pied': {
+    label: '🦶 Rééducation du pied',
+    bilans: ['sport', 'posturo'],
+    subs: ["1. Rééducation du pied"]
+  },
+  'systeme-mandibulaire': {
+    label: '🦷 Système mandibulaire',
+    bilans: ['sport', 'posturo'],
+    subs: ["1. Rééducation de la mâchoire"]
+  },
+  'reeduc-terrain': {
+    label: '🏃 Rééducation terrain moteur',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Rééducation d'un patient en excès de schéma aérien",
+      "2. Rééducation d'un patient en excès de schéma terrien"
+    ]
+  },
+  'reeduc-chaines': {
+    label: '⛓️ Rééducation chaînes musculaires',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Rééduc d'un excès de chaîne de flexion",
+      "2. Rééduc d'un excès de chaîne d'extension",
+      "3. Rééduc d'un excès de chaîne de fermeture",
+      "4. Rééduc d'un excès de chaîne d'ouverture",
+      "5. Rééduc d'une chaîne statique en expi",
+      "6. Rééduc d'une chaîne statique en inspi"
+    ]
+  },
+  'reflexes-archaiques': {
+    label: '🧠 Réflexes archaïques',
+    bilans: ['sport', 'posturo'],
+    subs: [
+      "1. Réflexe de peur paralysante",
+      "2. Réflexe de MORO",
+      "3. Réflexe tendineux de protection",
+      "4. Réflexe de succion",
+      "5. Réflexe Tonique labyrinthique RTL",
+      "6. Réflexe Tonique Asymétrique du Cou RTAC",
+      "7. Réflexe Tonique Symétrique du Cou RTSC",
+      "8. Réflexe de Galant",
+      "9. Réflexe de Perez",
+      "10. Réflexe de Landau",
+      "11. Réflexe de la reptation de BAUER",
+      "12. Réflexe d'agrippement palmaire",
+      "13. Réflexe de Traction des mains",
+      "14. Réflexe de Babinski",
+      "15. Réflexe d'Agrippement plantaire",
+      "16. Réflexe de BABKIN"
+    ]
+  },
+  'respi-sport': {
+    label: '🌬️ Rééducation par la respiration (sport)',
+    bilans: ['sport'],
+    subs: [
+      "1. Exercices autour du diaphragme",
+      "2. Tempos respiratoires",
+      "3. Respiration pour le stress",
+      "4. Les 12 travaux de la respiration",
+      "5. Méthodes EPO",
+      "6. Coordination de la respiration",
+      "7. Rééducation de la cohérence cardiaque"
+    ]
+  },
+  'reeduc-posturale': {
+    label: '🧍 Rééducation posturale',
+    bilans: ['posturo'],
+    subs: ["10. Exercices chaînes posturales"]
+  },
+  'reeduc-articulaire': {
+    label: '🦴 Rééducation articulaire',
+    bilans: ['posturo'],
+    subs: ["11. Exercices chaînes articulaires"]
+  },
+  'pathologies-genou': {
+    label: '🦵 Pathologies du genou',
+    bilans: ['sport'],
+    subs: [
+      "1. Programme de réathlétisation d'un syndrome de la bandelette ilio tibiale",
+      "2. Programme de réathlétisation d'un syndrome fémoro-patellaire"
+    ]
+  },
+  'pathologies-hanche': {
+    label: '🦴 Pathologies de la hanche',
+    bilans: ['sport'],
+    subs: [
+      "1. Programme de réathlétisation d'une pubalgie",
+      "2. Programme de réathlétisation d'un syndrome du piriforme",
+      "3. Programme de réathlétisation d'une tendinopathie du moyen fessier"
+    ]
+  },
+  'pathologies-pied': {
+    label: '🦶 Pathologies du pied',
+    bilans: ['sport'],
+    subs: [
+      "1. Programme de réathlétisation d'une tendinopathie d'Achille",
+      "2. Programme de réathlétisation d'une tendinopathie des fibulaires"
+    ]
+  },
+  'respi-posture': {
+    label: '🌬️ Rééducation par la respiration (posture)',
+    bilans: ['posturo'],
+    subs: [
+      "1. Exercices autour du diaphragme",
+      "2. Tempos respiratoires",
+      "3. Respiration pour le stress"
+    ]
+  }
+};
+
+// #88 Génère le bloc <option> filtré par bilan ('sport' ou 'posturo') pour les
+// select.exo-sys. Utilisé par getBilanPosturoHTML (interpolation template literal)
+// et populateSportSysOptions (injection runtime dans #ssec-9). 1 source = FICHES_SYSTEMES.
+function _genSysOptionsHTML(bilan) {
+  return '<option value="">-- Système --</option>' +
+    Object.entries(FICHES_SYSTEMES)
+      .filter(([, cfg]) => cfg.bilans.includes(bilan))
+      .map(([slug, cfg]) => `<option value="${slug}">${cfg.label}</option>`)
+      .join('');
+}
+
+// #88 Dérivé de FICHES_SYSTEMES — source unique. Fallback brut au call-site
+// (renderExo L6456 : `SPORT_SYSTEMES_LABELS[s] || s`) si slug inconnu.
+const SPORT_SYSTEMES_LABELS = Object.fromEntries(
+  Object.entries(FICHES_SYSTEMES).map(([slug, cfg]) => [slug, cfg.label])
+);
 
 // ══════════════════════════════════════════════════════
 // INIT
@@ -8433,6 +9580,7 @@ function getBilanPosturoHTML() {
   </div>
 
   <div class="posturo-section"  id="psec-1" style="padding:0 20px;display:none;">
+    ${_buildPostureCaptureBlockHTML('po')}
     <div class="card" style="margin-bottom:16px;">
       <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
         <div style="font-weight:700;color:#2a7a4e;font-size:14px;">🧍 Bilan morphostatique — Silhouettes</div>
@@ -10105,7 +11253,13 @@ function captureEmpreinte() {
   if(img) { img.src = dataUrl; img.style.display = 'block'; }
   const del = document.getElementById('po-empreinte-del');
   if(del) del.style.display = 'inline-block';
-  if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = dataUrl;
+  if(currentPatient?.bilanDataPosturo) {
+    currentPatient.bilanDataPosturo._empreinte = dataUrl;
+    // #99 + Bug RAM-leak — invalide le Path Storage à l'édition (nouvelle capture
+    // = nouveau contenu, le Path obsolète doit être ré-uploadé au prochain save,
+    // sinon migratePhotoEntry skip et l'édition est perdue).
+    delete currentPatient.bilanDataPosturo._empreintePath;
+  }
   stopEmpreinteCamera();
 }
 function deleteEmpreinte() {
@@ -10113,7 +11267,11 @@ function deleteEmpreinte() {
   if(img) { img.src=''; img.style.display='none'; }
   const del = document.getElementById('po-empreinte-del');
   if(del) del.style.display='none';
-  if(currentPatient?.bilanDataPosturo) delete currentPatient.bilanDataPosturo._empreinte;
+  if(currentPatient?.bilanDataPosturo) {
+    delete currentPatient.bilanDataPosturo._empreinte;
+    // #99 + Bug RAM-leak — invalide aussi le Path (suppression = état sans image).
+    delete currentPatient.bilanDataPosturo._empreintePath;
+  }
 }
 function previewEmpreinte(input) {
   if(!input.files || !input.files[0]) return;
@@ -10121,7 +11279,11 @@ function previewEmpreinte(input) {
   reader.onload = e => {
     const img = document.getElementById('po-empreinte-img');
     if(img) { img.src = e.target.result; img.style.display = 'block'; }
-    if(currentPatient?.bilanDataPosturo) currentPatient.bilanDataPosturo._empreinte = e.target.result;
+    if(currentPatient?.bilanDataPosturo) {
+      currentPatient.bilanDataPosturo._empreinte = e.target.result;
+      // #99 + Bug RAM-leak — invalide le Path à l'upload d'un nouveau fichier.
+      delete currentPatient.bilanDataPosturo._empreintePath;
+    }
   };
   reader.readAsDataURL(input.files[0]);
 }
@@ -11040,166 +12202,9 @@ const SPORT_TESTS_AVANT_APRES = {
   ta_morphostatique: 'morphostatique'    // #93 ajout
 };
 
-// #88 Source unique — pilote (a) dict sous-exercices consommé par updateExerciceSubMenu,
-// (b) options <select.exo-sys> filtrées par bilan via _genSysOptionsHTML, (c) labels
-// système (SPORT_SYSTEMES_LABELS dérivé), (d) chemins PDF assets/fiches/<slug>/<sub>.pdf
-// consommés par le helper async pdf.js du chantier #88-B. Ajouter/retirer un système OU
-// un sub-exo se fait UNIQUEMENT ici — les 3 autres call-sites s'auto-synchronisent.
-const FICHES_SYSTEMES = {
-  'systeme-visuel': {
-    label: '👁️ Système visuel',
-    bilans: ['sport', 'posturo'],
-    subs: [
-      "1. Exercices avant et après la rééducation oculaire",
-      "2. Rééducation problème de fixation",
-      "3. Rééducation problème de poursuite",
-      "4. Rééducation oculaire de base"
-    ]
-  },
-  'systeme-vestibulaire': {
-    label: '👂 Système vestibulaire',
-    bilans: ['sport', 'posturo'],
-    subs: [
-      "1. Rééducation pour un canal semi circulaire latéral",
-      "2. Rééducation pour un Moro ou un canal postérieur",
-      "3. Rééducation pour un canal antérieur",
-      "4. Rééducation pour les saccules",
-      "5. Rééducation pour les utricules",
-      "6. Rééducation du réflexe vestibulo oculaire"
-    ]
-  },
-  'systeme-somesthesique': {
-    label: '🤸 Système somesthésique',
-    bilans: ['sport', 'posturo'],
-    subs: ["1. Stimulation du système proprioceptif"]
-  },
-  'reeduc-pied': {
-    label: '🦶 Rééducation du pied',
-    bilans: ['sport', 'posturo'],
-    subs: ["1. Rééducation du pied"]
-  },
-  'systeme-mandibulaire': {
-    label: '🦷 Système mandibulaire',
-    bilans: ['sport', 'posturo'],
-    subs: ["1. Rééducation de la mâchoire"]
-  },
-  'reeduc-terrain': {
-    label: '🏃 Rééducation terrain moteur',
-    bilans: ['sport', 'posturo'],
-    subs: [
-      "1. Rééducation d'un patient en excès de schéma aérien",
-      "2. Rééducation d'un patient en excès de schéma terrien"
-    ]
-  },
-  'reeduc-chaines': {
-    label: '⛓️ Rééducation chaînes musculaires',
-    bilans: ['sport', 'posturo'],
-    subs: [
-      "1. Rééduc d'un excès de chaîne de flexion",
-      "2. Rééduc d'un excès de chaîne d'extension",
-      "3. Rééduc d'un excès de chaîne de fermeture",
-      "4. Rééduc d'un excès de chaîne d'ouverture",
-      "5. Rééduc d'une chaîne statique en expi",
-      "6. Rééduc d'une chaîne statique en inspi"
-    ]
-  },
-  'reflexes-archaiques': {
-    label: '🧠 Réflexes archaïques',
-    bilans: ['sport', 'posturo'],
-    subs: [
-      "1. Réflexe de peur paralysante",
-      "2. Réflexe de MORO",
-      "3. Réflexe tendineux de protection",
-      "4. Réflexe de succion",
-      "5. Réflexe Tonique labyrinthique RTL",
-      "6. Réflexe Tonique Asymétrique du Cou RTAC",
-      "7. Réflexe Tonique Symétrique du Cou RTSC",
-      "8. Réflexe de Galant",
-      "9. Réflexe de Perez",
-      "10. Réflexe de Landau",
-      "11. Réflexe de la reptation de BAUER",
-      "12. Réflexe d'agrippement palmaire",
-      "13. Réflexe de Traction des mains",
-      "14. Réflexe de Babinski",
-      "15. Réflexe d'Agrippement plantaire",
-      "16. Réflexe de BABKIN"
-    ]
-  },
-  'respi-sport': {
-    label: '🌬️ Rééducation par la respiration (sport)',
-    bilans: ['sport'],
-    subs: [
-      "1. Exercices autour du diaphragme",
-      "2. Tempos respiratoires",
-      "3. Respiration pour le stress",
-      "4. Les 12 travaux de la respiration",
-      "5. Méthodes EPO",
-      "6. Coordination de la respiration",
-      "7. Rééducation de la cohérence cardiaque"
-    ]
-  },
-  'reeduc-posturale': {
-    label: '🧍 Rééducation posturale',
-    bilans: ['posturo'],
-    subs: ["10. Exercices chaînes posturales"]
-  },
-  'reeduc-articulaire': {
-    label: '🦴 Rééducation articulaire',
-    bilans: ['posturo'],
-    subs: ["11. Exercices chaînes articulaires"]
-  },
-  'pathologies-genou': {
-    label: '🦵 Pathologies du genou',
-    bilans: ['sport'],
-    subs: [
-      "1. Programme de réathlétisation d'un syndrome de la bandelette ilio tibiale",
-      "2. Programme de réathlétisation d'un syndrome fémoro-patellaire"
-    ]
-  },
-  'pathologies-hanche': {
-    label: '🦴 Pathologies de la hanche',
-    bilans: ['sport'],
-    subs: [
-      "1. Programme de réathlétisation d'une pubalgie",
-      "2. Programme de réathlétisation d'un syndrome du piriforme",
-      "3. Programme de réathlétisation d'une tendinopathie du moyen fessier"
-    ]
-  },
-  'pathologies-pied': {
-    label: '🦶 Pathologies du pied',
-    bilans: ['sport'],
-    subs: [
-      "1. Programme de réathlétisation d'une tendinopathie d'Achille",
-      "2. Programme de réathlétisation d'une tendinopathie des fibulaires"
-    ]
-  },
-  'respi-posture': {
-    label: '🌬️ Rééducation par la respiration (posture)',
-    bilans: ['posturo'],
-    subs: [
-      "1. Exercices autour du diaphragme",
-      "2. Tempos respiratoires",
-      "3. Respiration pour le stress"
-    ]
-  }
-};
-
-// #88 Génère le bloc <option> filtré par bilan ('sport' ou 'posturo') pour les
-// select.exo-sys. Utilisé par getBilanPosturoHTML (interpolation template literal)
-// et populateSportSysOptions (injection runtime dans #ssec-9). 1 source = FICHES_SYSTEMES.
-function _genSysOptionsHTML(bilan) {
-  return '<option value="">-- Système --</option>' +
-    Object.entries(FICHES_SYSTEMES)
-      .filter(([, cfg]) => cfg.bilans.includes(bilan))
-      .map(([slug, cfg]) => `<option value="${slug}">${cfg.label}</option>`)
-      .join('');
-}
-
-// #88 Dérivé de FICHES_SYSTEMES — source unique. Fallback brut au call-site
-// (renderExo L6456 : `SPORT_SYSTEMES_LABELS[s] || s`) si slug inconnu.
-const SPORT_SYSTEMES_LABELS = Object.fromEntries(
-  Object.entries(FICHES_SYSTEMES).map(([slug, cfg]) => [slug, cfg.label])
-);
+// #85 Fix TDZ — bloc FICHES_SYSTEMES / _genSysOptionsHTML / SPORT_SYSTEMES_LABELS
+// déplacé avant le bloc INIT (cf nouveau lieu, raison : selectPatient top-level →
+// loadBilan → restoreSportTtt → updateExerciceSubMenu lit FICHES_SYSTEMES au boot).
 
 // A5 #92 — Config Neuro fonctionnel partagée sport + posturo. idPrefix sans
 // préfixe DOM ('sn-' sport, lecture neuro4 sans préfixe posturo) : c'est le
@@ -12026,10 +13031,26 @@ function showSportBilanSection(idx) {
   //    → flag idempotent uniforme avec pieds-canvas. Préserve les dessins user au
   //    switch onglet, et garantit la ré-init au switch patient via clearBilanFields.
   if(shownId === 'ssec-1') setTimeout(() => {
+    // #83 — symétrie avec ssec-9 pieds : init + restore overlay des dessins
+    // sauvegardés UNIQUEMENT à la (ré)initialisation. Sans restore ici, le
+    // canvas morpho restait vide quand le user arrive sur ssec-1 (la chaîne
+    // loadBilan → _drawMorphoCanvasesFromSource saute les canvas width===0
+    // tant que la section n'a pas été affichée) → édition mal capturée
+    // (soustraction _serializeDrawCanvas sans overlay sous-jacent) → perdue.
+    // posesReadyFlag=false : ne touche pas _restoreReady, le gating est piloté
+    // par loadBilan (fenêtre de restoration globale) ; ici on rejoue juste le
+    // dessin par-dessus le base sync vide. Idempotent grâce au !_baseSnapshot.
+    let needRestore = false;
     ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
       const c = document.getElementById(id);
-      if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') initMorphoCanvas(id);
+      if(c && !c._baseSnapshot && typeof initMorphoCanvas === 'function') {
+        initMorphoCanvas(id);
+        needRestore = true;
+      }
     });
+    if(needRestore && typeof _drawMorphoCanvasesFromSource === 'function') {
+      _drawMorphoCanvasesFromSource(currentPatient?.bilanData, false);
+    }
   }, 150);
   // Section Mandibule (ssec-5) — au load d'un bilan existant, restaurer l'affichage
   // conditionnel des toggles depuis l'état des radios. Pas de flag idempotence
@@ -12145,6 +13166,18 @@ function initPosturoBodyCanvas() {
   canvas._history = [];
   canvas._baseSnapshot = null;
   canvas._tempSnap = null;
+  // #99 + Bug édition perdue (gating _restoreReady) — initPosturoBodyCanvas est
+  // ré-appelée à chaque showPosturoSection(1) → fenêtre de restauration ouverte
+  // à chaque visite de psec-1. Bloque les inputs user jusqu'au drawImage effectif
+  // dans saved.onload. Fallback 3000 ms si saved.onload jamais déclenché.
+  canvas._restoreReady = false;
+  _showRestoreOverlayDeferred(canvas);
+  setTimeout(() => {
+    if (canvas._restoreReady === false) {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    }
+  }, 3000);
   // Snapshot de base (fond transparent - les images sont dans les divs en dessous)
   setTimeout(() => {
     canvas._baseSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
@@ -12152,8 +13185,20 @@ function initPosturoBodyCanvas() {
   // Restaurer dessin sauvegardé si existant
   if(currentPatient?.bilanDataPosturo?._bodyCanvas) {
     const saved = new Image();
-    saved.onload = () => ctx.drawImage(saved, 0, 0, r.width, r.height);
+    saved.onload = () => {
+      ctx.drawImage(saved, 0, 0, r.width, r.height);
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    };
+    saved.onerror = () => {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    };
     saved.src = currentPatient.bilanDataPosturo._bodyCanvas;
+  } else {
+    // Pas de dessin à restaurer → ouverture immédiate du gate.
+    canvas._restoreReady = true;
+    _hideRestoreOverlay(canvas);
   }
   setupDrawCanvas(canvas, 'posturo-body-canvas');
 }
@@ -12175,6 +13220,16 @@ function initPosturoFeetCanvas() {
   canvas._history = [];
   canvas._baseSnapshot = null;
   canvas._tempSnap = null;
+  // #99 + Bug édition perdue (gating _restoreReady) — initPosturoFeetCanvas est
+  // ré-appelée à chaque showPosturoSection(8) → idem body. Fallback 3000 ms.
+  canvas._restoreReady = false;
+  _showRestoreOverlayDeferred(canvas);
+  setTimeout(() => {
+    if (canvas._restoreReady === false) {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    }
+  }, 3000);
   setupDrawCanvas(canvas, 'posturo-feet-canvas');
   // baseSnapshot = canvas vide/transparent. La gomme restaure cet état → révèle
   // le template DOM (img#posturo-feet-img) derrière, sans pollution.
@@ -12185,8 +13240,17 @@ function initPosturoFeetCanvas() {
     const saved = new Image();
     saved.onload = () => {
       ctx.drawImage(saved, 0, 0, r.width, r.height);
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
+    };
+    saved.onerror = () => {
+      canvas._restoreReady = true;
+      _hideRestoreOverlay(canvas);
     };
     saved.src = drawingsData;
+  } else {
+    canvas._restoreReady = true;
+    _hideRestoreOverlay(canvas);
   }
 }
 
@@ -12267,10 +13331,23 @@ async function savePosturoBilan(silent = false) {
   const getRad = name => document.querySelector('input[name="'+name+'"]:checked')?.value||'';
   // Section 4 - Neuro fonctionnel complet
   d.hypoTronc=getChk('po-hypo-tronc'); d.hypoCervelet=getChk('po-hypo-cervelet');
-  // Sauvegarder les données setBilanField (ps_, pd_, nc_ etc.)
+  // Sauvegarder les données setBilanField (aps_, apd_, acd_, cf_ etc.)
   // Sauvegarder TOUTES les checkboxes de psec-3 par ID
   if(!d.neuro4) d.neuro4 = {};
-  Object.assign(d.neuro4, bilanData);
+  // #85 Bug RAM-leak neuro4 — copie FILTRÉE (anciennement Object.assign(d.neuro4,
+  // bilanData) qui copiait INTÉGRALEMENT bilanData incluant les 9 clés image
+  // (_morpho_*, _pieds, _postureXxx) + Paths + _bilanId + ttt + textareas longues.
+  // Les clés image étaient invisibles à POSTURO_PHOTO_KEYS (niveau racine de d)
+  // → polluaient le persisté en cycle (cause root 2.46 Mo localStorage).
+  // Cas légitime préservé : sync des cb neuro sport modifiées hors contexte
+  // posturo (setBilanField L8323 ne se déclenche que si pgPosturo active).
+  // Filtre : exclut préfixe `_` (clés image/Path/_bilanId) + types non boolean ni
+  // string courte (exclut objets ttt + textareas longs motif/antecedents).
+  for (const [k, v] of Object.entries(bilanData)) {
+    if (k.startsWith('_')) continue;
+    if (typeof v === 'boolean') d.neuro4[k] = v;
+    else if (typeof v === 'string' && v.length <= 200) d.neuro4[k] = v;
+  }
   // Sauvegarder psec-3 seulement si visible (sinon garder neuro4 existant)
   const psec3 = document.getElementById('psec-3');
   if(psec3 && psec3.style.display !== 'none') {
@@ -12387,20 +13464,30 @@ async function savePosturoBilan(silent = false) {
   });
 
   const bc=document.getElementById('posturo-body-canvas');
-  if(bc && bc.width>0 && bc._history && bc._history.length>0) {
+  // #99 + Bug édition perdue (option iii) — check _userDirty au lieu de
+  // _history.length (qui est reset par initPosturoBodyCanvas à chaque
+  // showPosturoSection(1) → édition perdue si user navigue entre sections).
+  if(bc && bc.width>0 && bc._userDirty) {
     // Sauvegarder uniquement le canvas des dessins en PNG transparent
     d._bodyCanvas = bc.toDataURL('image/png');
     // Sauvegarder aussi les dimensions CSS du canvas pour reconstruction
     d._bodyCanvasW = parseFloat(bc.style.width) || bc.width;
     d._bodyCanvasH = parseFloat(bc.style.height) || bc.height;
+    // Invalide le Path : édition utilisateur → upload requis au prochain migrate.
+    delete d._bodyCanvasPath;
   }
   const fc=document.getElementById('posturo-feet-canvas');
   if(fc) {
-    const writeNew = (fc._history && fc._history.length > 0) || !d._feetDrawings;
+    // #99 + Bug édition perdue (option iii) — check _userDirty (insensible aux
+    // ré-init initPosturoFeetCanvas par navigation idx === 8). Le cas
+    // `!d._feetDrawings` (1er dessin sans Path préexistant) reste couvert : un
+    // 1er mouseup met _userDirty=true, donc writeNew=true.
+    const writeNew = fc._userDirty || !d._feetDrawings;
     if(writeNew) {
       // 1. Sauvegarder les dessins seuls (PNG transparent) pour restauration sur canvas
       //    à la prochaine ouverture du bilan (édition + gomme propre).
       d._feetDrawings = fc.toDataURL('image/png');
+      delete d._feetDrawingsPath;
 
       // 2. Composer template + dessins avec positionnement correct (mesuré DOM-live).
       //    Ce composite est utilisé tel quel dans le rapport — alignement parfait garanti
@@ -12428,10 +13515,18 @@ async function savePosturoBilan(silent = false) {
             0, 0, compC.width, compC.height
           );
           d._feetComposite = compC.toDataURL('image/jpeg', 0.85);
+          // #99 + Bug RAM-leak — invalide aussi le Path du composite (corrélé au _feetDrawings).
+          delete d._feetCompositePath;
         }
       }
     }
   }
+  // #99 + Bug édition perdue — reset _userDirty pour body/feet posturo APRÈS sweep.
+  // Prépare le prochain cycle d'édition (un nouveau mouseup re-marquera dirty).
+  ['posturo-body-canvas','posturo-feet-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c._userDirty = false;
+  });
   // Migration Storage (Task #51 PR B1) — upload des dataUrls neuves, strip
   // du persisté. Le stash récupère les dataUrls initiales pour les restaurer
   // en RAM post-save (édition continue sans re-fetch). Best-effort : si
@@ -12521,7 +13616,15 @@ function loadPosturoBilan() {
   setChk('po-hypo-tronc',d.hypoTronc); setChk('po-hypo-cervelet',d.hypoCervelet);
   // Restaurer les données setBilanField
   if(d.neuro4) {
-    Object.assign(bilanData, d.neuro4);
+    // #85 Bug RAM-leak neuro4 — copie FILTRÉE symétrique au fix L13042.
+    // Empêche la contamination croisée de bilanData sport par les clés image
+    // résiduelles dans neuro4 (cas bilan archivé pré-fix avec dataURLs déjà
+    // dans neuro4). Boolean + string courte uniquement, exclut préfixe `_`.
+    for (const [k, v] of Object.entries(d.neuro4)) {
+      if (k.startsWith('_')) continue;
+      if (typeof v === 'boolean') bilanData[k] = v;
+      else if (typeof v === 'string' && v.length <= 200) bilanData[k] = v;
+    }
     // Restaurer après un délai pour laisser le DOM se construire
     setTimeout(function() {
       Object.entries(d.neuro4).forEach(function([key, val]) {
@@ -12689,6 +13792,10 @@ function loadPosturoBilan() {
     });
     updateNeuroTotals();
   }
+  // #85 Phase 1 — render miniatures Analyse posturale après prefetch Storage
+  // (déjà effectué par ouvrirBilanPosturo L3356/L3380 via await prefetchPosturoPhotos).
+  // d._postureFace/Dos/ProfilG/ProfilD sont en RAM (depuis Path ou direct).
+  _renderAllPostureSlots('po');
 }
 // ===== DICTAPHONE SYSTEM =====
 var _micRecognition = null;
@@ -12838,6 +13945,11 @@ function populateSportSysOptions() {
   });
 }
 document.addEventListener('DOMContentLoaded', populateSportSysOptions);
+// #85 Phase 1 — peuple le container Analyse posturale en tête de ssec-1
+// (sport HTML statique → injection au boot). Posturo n'a pas d'équivalent : son
+// markup est régénéré à chaque ouverture via getBilanPosturoHTML (interpolation
+// directe `${_buildPostureCaptureBlockHTML('po')}`).
+document.addEventListener('DOMContentLoaded', populateSportPostureCaptureBlock);
 
 // ===== STRIPE + MODULES =====
 var _stripeInstance = null;
