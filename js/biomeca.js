@@ -4486,6 +4486,16 @@ function loadVidFile(input) {
 // → migration auto Storage côté posturo (POSTURO_PHOTO_KEYS étendu, savePosturoBilan async).
 // Côté sport : Temps 2 brancher saveBilan async + migrateSportBilanDataPhotos.
 // Format : JPEG 0.88, ideal 1920×1080 (fallback gracieux navigateur), facingMode:environment.
+// #85-2d-fix2 — Seuils de neutralité pour les libellés cliniques.
+// Une valeur dont la magnitude (ou l'écart à une référence pour CVA) est ≤ seuil
+// est qualifiée de "neutre" ; au-delà, le signe détermine le libellé clinique
+// (antéversion/rétroversion, flessum/récurvatum, etc.). Centralisé ici pour
+// permettre l'ajustement à l'étape classification (#85-2e à venir).
+const POSTURE_NEUTRAL_THRESHOLDS = {
+  default: 3, // ±3° pour bassin, genou, épaules, hanche (mesures centrées sur 0)
+  cva: 2,     // ±2° autour de 50° (CVA est référencée à 50°, pas à 0°)
+};
+
 // #85-P2a — ratio largeur/hauteur du cadre de capture posturale (portrait).
 // Tunable : 3/4 conservateur (couvre patient debout plein corps avec marge
 // latérale confortable) ; 9/16 plus serré (mobile-like, recadre davantage).
@@ -4732,22 +4742,161 @@ function _computePostureAngles(markers, calibration) {
       console.warn('[#85-2c-angles] anterior_dir non dérivable (Tragus/C7 ou Acromion/Base sacrum manquants ou colinéaires au plumb) — fallback +perp');
     }
   }
-  // 3. angles — null si cheville absente OU landmark absent. Global = moyenne
-  // des 4 si tous présents, sinon null (interprétation stricte : un global
-  // partiel induirait en erreur clinique).
-  const out = { tragus: null, acromion: null, trochanter: null, genou: null, global: null };
-  if (!isPlaced(cheville)) return out;
-  let sum = 0, count = 0;
-  for (const [key, L] of Object.entries(targets)) {
-    if (!isPlaced(L)) continue;
-    const vec = { x: L.x - cheville.x, y: L.y - cheville.y };
+  // 3. angles — chaque champ null si point requis manque. Out pré-initialisé à
+  // null pour TOUS les champs (les groupes courbures/CVA/bassin/épaules ne
+  // dépendent PAS de la cheville → toujours calculés si leurs points propres
+  // sont placés). Global antériorisation = moyenne stricte des 4 (null si une
+  // seule manque, pour éviter résultat partiel trompeur cliniquement).
+  const out = {
+    // Antériorisation (vs fil à plomb) — besoin de cheville.
+    tragus: null, acromion: null, trochanter: null, genou: null, global: null,
+    // Courbures rachidiennes — calcAngle3 sur triplets (base, apex, sommet).
+    cervicale: null,  deviationCervicale: null,
+    thoracique: null, deviationThoracique: null,
+    lombaire: null,   deviationLombaire: null,
+    // Tête / Bassin / Tronc (hanche) / Genou / Épaules — voir blocs dédiés.
+    cva: null, bassin: null, genouFlexion: null, epaules: null, flexionHanche: null,
+    // #85-2d-segments — orientations de segments + angle articulaire de hanche.
+    // cuisse = orientation segment (genou→trochHip) vs verticale au genou.
+    // hanche = angle ARTICULAIRE au trochanter (calcAngle3 genou-trochHip-acromion),
+    // distinct de flexionHanche (= orientation du Tronc vs verticale). Garder les deux.
+    cuisse: null, hanche: null,
+  };
+  // 3a. Antériorisation — besoin cheville + ≥1 cible.
+  if (isPlaced(cheville)) {
+    let sum = 0, count = 0;
+    for (const [key, L] of Object.entries(targets)) {
+      if (!isPlaced(L)) continue;
+      const vec = { x: L.x - cheville.x, y: L.y - cheville.y };
+      const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+      const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+      const angleDeg = Math.atan2(projAnt, projUp) * 180 / Math.PI;
+      out[key] = angleDeg;
+      sum += angleDeg; count++;
+    }
+    if (count === 4) out.global = sum / count;
+  }
+  // 3b. Courbures — réutilise calcAngle3 (L5024) qui filtre les non-placés et
+  // calcule l'angle au point milieu (= apex). Renvoie 0-180° (180 = droite).
+  // Déviation = 180 − angle = magnitude de la courbure.
+  const apexC = byName['Apex cervical'], baseCrane = byName['Base crâne'];
+  if (isPlaced(c7) && isPlaced(apexC) && isPlaced(baseCrane)) {
+    out.cervicale = calcAngle3([c7, apexC, baseCrane]);
+    if (out.cervicale !== null) out.deviationCervicale = 180 - out.cervicale;
+  }
+  const apexT = byName['Apex thoracique'], t12 = byName['T12'];
+  if (isPlaced(c7) && isPlaced(apexT) && isPlaced(t12)) {
+    out.thoracique = calcAngle3([c7, apexT, t12]);
+    if (out.thoracique !== null) out.deviationThoracique = 180 - out.thoracique;
+  }
+  const apexL = byName['Apex lombaire'], sacrum = byName['Base sacrum'];
+  if (isPlaced(t12) && isPlaced(apexL) && isPlaced(sacrum)) {
+    out.lombaire = calcAngle3([t12, apexL, sacrum]);
+    if (out.lombaire !== null) out.deviationLombaire = 180 - out.lombaire;
+  }
+  // 3c. CVA (Cranio-Vertebral Angle) — angle de C7→Tragus avec l'horizontale
+  // (= perp). Unsigned 0-90° (mesure clinique standard). Norme ~50° ; valeur
+  // basse = tête en avant. La direction tête haut/bas est gérée par |projUp|
+  // pour que le sujet regardant le haut OU le bas donne le même magnitude.
+  if (isPlaced(c7) && isPlaced(tragus)) {
+    const vec = { x: tragus.x - c7.x, y: tragus.y - c7.y };
+    const projUp   = vec.x * plumbUp.x + vec.y * plumbUp.y;
+    const projHorz = vec.x * perp.x    + vec.y * perp.y;
+    out.cva = Math.atan2(Math.abs(projUp), Math.abs(projHorz)) * 180 / Math.PI;
+  }
+  // 3d. Bassin — ligne EIAS→EIPS vs horizontale, SIGNÉE.
+  // Convention : vec = EIAS − EIPS. + = EIAS sous EIPS (antéversion) ; − = EIAS
+  // au-dessus (rétroversion). atan2(−projUp, projAnt) → + quand projUp < 0
+  // (EIAS plus bas que EIPS dans repère canvas Y-down → projUp < 0 vs plumbUp).
+  const eias = byName['EIAS'], eips = byName['EIPS'];
+  if (isPlaced(eias) && isPlaced(eips)) {
+    const vec = { x: eias.x - eips.x, y: eias.y - eips.y };
+    const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+    const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+    out.bassin = Math.atan2(-projUp, projAnt) * 180 / Math.PI;
+  }
+  // 3e. Genou flexion — calcAngle3 ([trochanter, genou, cheville]) = 0-180°
+  // (180 = droite). Pour distinguer flessum (<180, genou antérieur de la ligne
+  // trochanter-cheville) de récurvatum (>180, genou postérieur), on signe via
+  // projection du genou sur la perpendiculaire à l'axe trochanter-cheville
+  // orientée antérieur : kneeDev > 0 → genou antérieur → on garde raw
+  // (<180 = flessum) ; kneeDev < 0 → genou postérieur → 360 − raw (>180 =
+  // récurvatum). Neutral kneeDev=0 donne raw=180 → 180 quel que soit le signe.
+  const troch = byName['Grand trochanter'], genouPt = byName['Genou (milieu lat.)'];
+  if (isPlaced(troch) && isPlaced(genouPt) && isPlaced(cheville)) {
+    const raw = calcAngle3([troch, genouPt, cheville]);
+    if (raw !== null) {
+      const axis = { x: cheville.x - troch.x, y: cheville.y - troch.y };
+      let perpAxis = { x: -axis.y, y: axis.x };
+      // Orienter vers antérieur via le signe du produit scalaire avec anteriorDir.
+      const dotA = perpAxis.x * anteriorDir.x + perpAxis.y * anteriorDir.y;
+      if (dotA < 0) { perpAxis = { x: -perpAxis.x, y: -perpAxis.y }; }
+      const kneeRel = { x: genouPt.x - troch.x, y: genouPt.y - troch.y };
+      const kneeDev = kneeRel.x * perpAxis.x + kneeRel.y * perpAxis.y;
+      out.genouFlexion = kneeDev >= 0 ? raw : (360 - raw);
+    }
+  }
+  // 3f. Flexion de hanche — angle entre le segment (Grand trochanter → Acromion)
+  // et la VERTICALE au trochanter (= plumb_up). Apex = trochanter. atan2(projAnt,
+  // projUp) donne signe naturel : + = acromion antérieur du trochanter (flexion
+  // de hanche, tronc penché en avant) ; − = extension de hanche. Norme 0° =
+  // tronc parfaitement vertical au-dessus du bassin. Réutilise plumbUp +
+  // anteriorDir dérivés plus haut → cohérent avec calibration sol éventuelle.
+  const acromion = byName['Acromion'];
+  const trochHip = byName['Grand trochanter']; // alias dédié, indépendant de l'accès `troch` du bloc 3e
+  if (isPlaced(trochHip) && isPlaced(acromion)) {
+    const vec = { x: acromion.x - trochHip.x, y: acromion.y - trochHip.y };
     const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
     const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
-    const angleDeg = Math.atan2(projAnt, projUp) * 180 / Math.PI;
-    out[key] = angleDeg;
-    sum += angleDeg; count++;
+    out.flexionHanche = Math.atan2(projAnt, projUp) * 180 / Math.PI;
   }
-  if (count === 4) out.global = sum / count;
+  // 3g. Épaules — décalage horizontal signé de l'Acromion par rapport à l'axe
+  // tronc (C7 → Base sacrum). atan2(décalage_perp, distance_le_long_axe).
+  // + = enroulement antérieur (acromion en avant de l'axe tronc).
+  if (isPlaced(c7) && isPlaced(sacrum) && isPlaced(acromion)) {
+    const axis = { x: sacrum.x - c7.x, y: sacrum.y - c7.y };
+    const axisLen = Math.hypot(axis.x, axis.y);
+    if (axisLen > 0) {
+      const axisU = { x: axis.x / axisLen, y: axis.y / axisLen };
+      let perpU = { x: -axisU.y, y: axisU.x };
+      const dotA = perpU.x * anteriorDir.x + perpU.y * anteriorDir.y;
+      if (dotA < 0) { perpU = { x: -perpU.x, y: -perpU.y }; }
+      const vec = { x: acromion.x - c7.x, y: acromion.y - c7.y };
+      const along = vec.x * axisU.x + vec.y * axisU.y;
+      const perpComp = vec.x * perpU.x + vec.y * perpU.y;
+      out.epaules = Math.atan2(perpComp, along) * 180 / Math.PI;
+    }
+  }
+  // 3h. Cuisse (orientation segment) — apex = genou ; vec genou→trochHip vs
+  // verticale au genou. + = trochanter antérieur du genou (cuisse penchée en
+  // avant) / − = postérieur. Norme 0° = cuisse parfaitement verticale.
+  // genouPt et troch déjà définis (bloc 3e). Réutilise plumbUp + anteriorDir.
+  if (isPlaced(genouPt) && isPlaced(troch)) {
+    const vec = { x: troch.x - genouPt.x, y: troch.y - genouPt.y };
+    const projAnt = vec.x * anteriorDir.x + vec.y * anteriorDir.y;
+    const projUp  = vec.x * plumbUp.x     + vec.y * plumbUp.y;
+    out.cuisse = Math.atan2(projAnt, projUp) * 180 / Math.PI;
+  }
+  // 3i. Hanche (angle ARTICULAIRE) — apex = grand trochanter ; triplet
+  // (genou, trochHip, acromion). Distinct de flexionHanche (= orientation du
+  // Tronc). raw = calcAngle3 0-180° (180 = aligné) ; mag = 180 − raw (0 = neutre).
+  // Signe : perpendiculaire à l'axe cuisse (trochHip − genou) orientée antérieur
+  // via anteriorDir. Si l'acromion (depuis trochanter) a une composante antérieure
+  // sur cette perpendiculaire → flexion (+) ; sinon extension (−). Même logique
+  // de désambiguïsation que le genou flessum/récurvatum.
+  if (isPlaced(genouPt) && isPlaced(troch) && isPlaced(acromion)) {
+    const raw = calcAngle3([genouPt, troch, acromion]);
+    if (raw !== null) {
+      const mag = 180 - raw;
+      const axisCuisse = { x: troch.x - genouPt.x, y: troch.y - genouPt.y };
+      let perpCuisse = { x: -axisCuisse.y, y: axisCuisse.x };
+      const dotA = perpCuisse.x * anteriorDir.x + perpCuisse.y * anteriorDir.y;
+      if (dotA < 0) { perpCuisse = { x: -perpCuisse.x, y: -perpCuisse.y }; }
+      const vecAcromion = { x: acromion.x - troch.x, y: acromion.y - troch.y };
+      const sideTrunk = vecAcromion.x * perpCuisse.x + vecAcromion.y * perpCuisse.y;
+      out.hanche = sideTrunk >= 0 ? mag : -mag;
+    }
+  }
   return out;
 }
 
@@ -4775,16 +4924,106 @@ function _getPostureModalPlumbUp() {
 function _renderPosturePlacementResults() {
   const panel = document.getElementById('posture-placement-results');
   if (!panel) return;
-  const angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
-  const fmt = a => (a === null || isNaN(a))
+  const a = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  // #85-2d — fmt signé (bleu = +, rouge = −, gris = null) pour antériorisation/
+  // bassin/épaules ; fmt unsigned pour CVA/courbures/genouFlexion (pas de signe
+  // sémantique au niveau de la valeur brute — la classification viendra plus tard).
+  const fmtSigned = v => (v === null || isNaN(v))
     ? `<span style="color:#94a3b8;">—</span>`
-    : `<span style="color:${a > 0 ? '#3b82f6' : '#dc2626'};font-weight:700;">${a > 0 ? '+' : ''}${a.toFixed(1)}°</span>`;
+    : `<span style="color:${v > 0 ? '#3b82f6' : '#dc2626'};font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)}°</span>`;
+  const fmtUnsigned = v => (v === null || isNaN(v))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:#0e1f38;font-weight:700;">${v.toFixed(1)}°</span>`;
+  // Courbure : DÉVIATION seule (= 180−angle). 0° = rachis aligné, croissant avec
+  // la courbure. Le libellé tendance (rectitude / norme / hyper) viendra à
+  // l'étape classification.
+  const fmtCurve = dev => dev === null || isNaN(dev)
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:#0e1f38;font-weight:700;">${dev.toFixed(1)}°</span>`;
+  // #85-2d-fix2 — Factory de libellés cliniques centrée sur 0. Renvoie span vide
+  // si valeur null/NaN OU si pos→null (ex. épaules pour valeurs négatives sans
+  // terme clinique défini). Couleurs harmonisées : bleu = direction "positive"
+  // attendue (antéversion, flessum, etc.), rouge = "négative", gris = neutre.
+  const T = POSTURE_NEUTRAL_THRESHOLDS;
+  const _lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
+  const mkLbl = (threshold, posText, negText) => v => {
+    if (v === null || isNaN(v)) return '';
+    if (Math.abs(v) <= threshold) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
+    if (v > 0) return `<span style="${_lblStyle('#3b82f6')}">${posText}</span>`;
+    return negText ? `<span style="${_lblStyle('#dc2626')}">${negText}</span>` : '';
+  };
+  const lblBassin     = mkLbl(T.default, '(antéversion)',             '(rétroversion)');
+  const lblGenouFR    = mkLbl(T.default, '(flessum)',                 '(récurvatum)');
+  const lblEpaules    = mkLbl(T.default, '(enroulement antérieur)',   null); // pas de libellé clinique défini pour < 0
+  const lblHanche     = mkLbl(T.default, '(flexion de hanche)',       '(extension de hanche)');
+  const lblAnterPoint = mkLbl(T.default, '(antérieur)',               '(postérieur)');
+  // #85-2d-segments — CVA en section 1 (Antériorisation) avec vocabulaire segment
+  // unifié (antérieur/postérieur), pas l'ancien (antépulsion/rétropulsion).
+  // Référence 50° (norme clinique), seuil T.cva : low delta = tête forward.
+  const lblCvaAnter = v => {
+    if (v === null || isNaN(v)) return '';
+    const delta = v - 50;
+    if (Math.abs(delta) <= T.cva) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
+    return delta < 0
+      ? `<span style="${_lblStyle('#3b82f6')}">(antérieur)</span>`
+      : `<span style="${_lblStyle('#dc2626')}">(postérieur)</span>`;
+  };
+  const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
+  const lbl = `color:#64748b;`;
+  // Genou centré 0 = neutre, dérivé de genouFlexion (180=neutre, <180=flessum, >180=récurvatum).
+  // Stockage inchangé (sémantique calcAngle3 brut conservée pour le rapport futur).
+  const genouCentered = (a.genouFlexion === null || isNaN(a.genouFlexion)) ? null : 180 - a.genouFlexion;
+  // #85-2d-segments — Conclusion : phrase par segment hors zone neutre, jointe
+  // par « · ». Ordre bas→haut (jambe → cuisse → tronc → tête) cohérent avec la
+  // lecture clinique d'une chaîne posturale. Si tous neutres/null → message
+  // d'alignement. CVA traité à part (référence 50°, pas 0).
+  const conclusionParts = [];
+  const addAnterPart = (val, origin) => {
+    if (val === null || isNaN(val) || Math.abs(val) <= T.default) return;
+    conclusionParts.push((val > 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir ' + origin);
+  };
+  addAnterPart(a.genou,         'des chevilles');  // Jambe
+  addAnterPart(a.cuisse,        'des genoux');     // Cuisse
+  addAnterPart(a.flexionHanche, 'du bassin');      // Tronc
+  if (a.cva !== null && !isNaN(a.cva)) {
+    const delta = a.cva - 50;
+    if (Math.abs(delta) > T.cva) {
+      conclusionParts.push((delta < 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir des cervicales');
+    }
+  }
+  const conclusionText = conclusionParts.length > 0
+    ? conclusionParts.join(' · ')
+    : 'Alignement global — pas de tendance antérieure/postérieure marquée';
   panel.innerHTML = `
-    <div><span style="color:#64748b;">Tragus :</span> ${fmt(angles.tragus)}</div>
-    <div><span style="color:#64748b;">Acromion :</span> ${fmt(angles.acromion)}</div>
-    <div><span style="color:#64748b;">Gd trochanter :</span> ${fmt(angles.trochanter)}</div>
-    <div><span style="color:#64748b;">Genou :</span> ${fmt(angles.genou)}</div>
-    <div style="border-left:2px solid #cbd5e0;padding-left:12px;"><span style="color:#0e1f38;font-weight:600;">Global :</span> ${fmt(angles.global)}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
+      <div>
+        <div style="${groupHdr}">Antériorisation / Postériorisation</div>
+        <div><span style="${lbl}">Tête :</span> ${fmtUnsigned(a.cva)} ${lblCvaAnter(a.cva)}</div>
+        <div><span style="${lbl}">Tronc :</span> ${fmtSigned(a.flexionHanche)} ${lblAnterPoint(a.flexionHanche)}</div>
+        <div><span style="${lbl}">Cuisse :</span> ${fmtSigned(a.cuisse)} ${lblAnterPoint(a.cuisse)}</div>
+        <div><span style="${lbl}">Jambe :</span> ${fmtSigned(a.genou)} ${lblAnterPoint(a.genou)}</div>
+        <div style="margin-top:5px;padding-top:5px;border-top:1px solid #cbd5e0;color:#0e1f38;line-height:1.45;">
+          <span style="color:#0e1f38;font-weight:700;">Conclusion :</span>
+          <span style="color:#0e1f38;">${conclusionText}</span>
+        </div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Courbures</div>
+        <div><span style="${lbl}">Cervicale :</span> ${fmtCurve(a.deviationCervicale)}</div>
+        <div><span style="${lbl}">Thoracique :</span> ${fmtCurve(a.deviationThoracique)}</div>
+        <div><span style="${lbl}">Lombaire :</span> ${fmtCurve(a.deviationLombaire)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Bassin / Hanche / Genou</div>
+        <div><span style="${lbl}">Hanche :</span> ${fmtSigned(a.hanche)} ${lblHanche(a.hanche)}</div>
+        <div><span style="${lbl}">Bassin :</span> ${fmtSigned(a.bassin)} ${lblBassin(a.bassin)}</div>
+        <div><span style="${lbl}">Genou :</span> ${fmtSigned(genouCentered)} ${lblGenouFR(genouCentered)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Épaule</div>
+        <div><span style="${lbl}">Épaule :</span> ${fmtSigned(a.epaules)} ${lblEpaules(a.epaules)}</div>
+      </div>
+    </div>
   `;
 }
 
@@ -5074,16 +5313,16 @@ function openPosturePlacementModal(prefix, viewKey) {
           <button class="btn" onclick="_validatePosturePlacement('${prefix}','${viewKey}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">✓ Valider</button>
         </div>
       </div>
-      <div id="posture-placement-banner" style="padding:10px 12px;border-radius:6px;background:#fff7ed;border-left:4px solid #ccc;min-height:42px;"></div>
-      <div id="posture-placement-results" style="padding:8px 12px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;"></div>
-      <div style="display:flex;gap:10px;flex:1;min-height:0;flex-wrap:wrap;">
-        <div style="flex:1 1 60%;min-width:280px;min-height:0;display:flex;align-items:center;justify-content:center;background:#000;border-radius:6px;overflow:hidden;">
-          <canvas id="posture-placement-canvas" style="max-width:100%;max-height:68vh;display:block;cursor:crosshair;touch-action:none;"></canvas>
+      <div id="posture-placement-banner" style="padding:10px 12px;border-radius:6px;background:#fff7ed;border-left:4px solid #ccc;min-height:42px;flex:none;"></div>
+      <div style="display:flex;gap:10px;flex:1;min-height:0;flex-wrap:wrap;overflow-y:auto;">
+        <div style="flex:1 1 60%;min-width:280px;min-height:280px;max-height:82vh;display:flex;align-items:center;justify-content:center;background:#000;border-radius:6px;overflow:hidden;">
+          <canvas id="posture-placement-canvas" style="max-width:100%;max-height:100%;display:block;cursor:crosshair;touch-action:none;"></canvas>
         </div>
-        <div style="flex:0 0 240px;min-width:240px;max-height:68vh;overflow-y:auto;padding:6px;background:#f8f9fa;border-radius:6px;">
-          <div style="font-size:11px;color:#666;margin-bottom:6px;line-height:1.4;">Clic sur un nom pour le sélectionner. Sur la photo : <b>clic</b> = placer le point sélectionné ou le suivant libre ; <b>drag</b> = repositionner un point déjà placé.</div>
-          <div id="posture-calib-control"></div>
-          <div id="posture-mkr-list"></div>
+        <div style="flex:0 0 280px;min-width:280px;max-height:82vh;overflow-y:auto;padding:6px;background:#f8f9fa;border-radius:6px;display:flex;flex-direction:column;gap:8px;">
+          <div id="posture-placement-results" style="padding:6px 8px;border-radius:5px;background:#fff;border:1px solid #e2e8f0;font-size:12px;flex:none;"></div>
+          <div style="font-size:11px;color:#666;line-height:1.4;padding:0 4px;flex:none;">Clic sur un nom pour sélectionner. Sur la photo : <b>clic</b> = placer ; <b>drag</b> = déplacer.</div>
+          <div id="posture-calib-control" style="flex:none;"></div>
+          <div id="posture-mkr-list" style="flex:none;"></div>
         </div>
       </div>
     </div>`;
