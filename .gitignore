@@ -18,6 +18,10 @@ npm-debug.log*
 .vscode/
 .idea/
 
+# Claude Code / Kilo tooling
+.claude/
+.kilo/
+
 # Build
 dist/
 build/

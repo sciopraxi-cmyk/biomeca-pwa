@@ -1994,6 +1994,8 @@ function nav(id) {
     renderParamsPratList();
     // #81 — rafraîchit le compteur Maintenance à l'ouverture de Paramètres
     if (typeof _runBackfillDryRun === 'function') _runBackfillDryRun();
+    // #106-A — peuple la card seuils analyse posturale (valeurs actuelles ou défauts)
+    if (typeof _renderPostureThresholdsPanel === 'function') _renderPostureThresholdsPanel();
   }
   if(id === 'pg-sport') {
     // Mettre à jour le sous-titre avec le patient courant
@@ -4486,15 +4488,142 @@ function loadVidFile(input) {
 // → migration auto Storage côté posturo (POSTURO_PHOTO_KEYS étendu, savePosturoBilan async).
 // Côté sport : Temps 2 brancher saveBilan async + migrateSportBilanDataPhotos.
 // Format : JPEG 0.88, ideal 1920×1080 (fallback gracieux navigateur), facingMode:environment.
-// #85-2d-fix2 — Seuils de neutralité pour les libellés cliniques.
-// Une valeur dont la magnitude (ou l'écart à une référence pour CVA) est ≤ seuil
-// est qualifiée de "neutre" ; au-delà, le signe détermine le libellé clinique
-// (antéversion/rétroversion, flessum/récurvatum, etc.). Centralisé ici pour
-// permettre l'ajustement à l'étape classification (#85-2e à venir).
-const POSTURE_NEUTRAL_THRESHOLDS = {
-  default: 3, // ±3° pour bassin, genou, épaules, hanche (mesures centrées sur 0)
-  cva: 2,     // ±2° autour de 50° (CVA est référencée à 50°, pas à 0°)
+// #106-A — Seuils analyse posturale profil. Structure complète configurable :
+//   - neutralite : zone de neutralité par mesure (mesures à zéro = neutre).
+//   - courbures  : bornes basse (rectitude) et haute (hyper) par segment rachis,
+//     sur la DÉVIATION (= 180 − calcAngle3).
+// Chargée depuis localStorage clé bm4-posture-thresholds avec fallback défauts.
+// Modifiable depuis Paramètres → « Seuils — analyse posturale (profil) ».
+const POSTURE_THRESHOLDS_KEY = 'bm4-posture-thresholds';
+const POSTURE_THRESHOLDS_DEFAULTS = {
+  neutralite: {
+    anteriorisation: 3, // Tête/Tronc/Cuisse/Jambe (segments d'orientation)
+    cva: 2,             // ±2° autour de 50° (CVA référencée à 50°, pas à 0°)
+    bassin: 3,
+    hanche: 3,          // hanche articulaire ET flexionHanche (Tronc)
+    genou: 3,           // genou centré 0 = neutre (flessum/récurvatum)
+    epaule: 3,
+  },
+  courbures: {
+    cervicale:  { rectitude: 10, hyper: 28 },
+    thoracique: { rectitude: 12, hyper: 32 },
+    lombaire:   { rectitude: 12, hyper: 35 },
+  },
 };
+
+// Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
+// partiel (ex. ajout d'un seuil dans une release future, ou JSON corrompu sur
+// une seule clé). Renvoie toujours une structure valide.
+function _loadPostureThresholds() {
+  try {
+    const raw = localStorage.getItem(POSTURE_THRESHOLDS_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
+    const stored = JSON.parse(raw);
+    return {
+      neutralite: { ...POSTURE_THRESHOLDS_DEFAULTS.neutralite, ...(stored.neutralite || {}) },
+      courbures: {
+        cervicale:  { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.cervicale,  ...(stored.courbures?.cervicale  || {}) },
+        thoracique: { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.thoracique, ...(stored.courbures?.thoracique || {}) },
+        lombaire:   { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.lombaire,   ...(stored.courbures?.lombaire   || {}) },
+      },
+    };
+  } catch (e) {
+    console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
+    return JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
+  }
+}
+let POSTURE_THRESHOLDS = _loadPostureThresholds();
+function _savePostureThresholds() {
+  try {
+    localStorage.setItem(POSTURE_THRESHOLDS_KEY, JSON.stringify(POSTURE_THRESHOLDS));
+  } catch (e) {
+    console.warn('[#106] Échec sauvegarde seuils :', e?.message);
+  }
+}
+function _resetPostureThresholds() {
+  POSTURE_THRESHOLDS = JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
+  try { localStorage.removeItem(POSTURE_THRESHOLDS_KEY); } catch (e) { /* noop */ }
+}
+
+// #106-A — Render du panneau Paramètres pour éditer les seuils. Appelé à
+// l'ouverture de pg-params (nav L1995). Inputs number, save live sur oninput.
+function _renderPostureThresholdsPanel() {
+  const container = document.getElementById('params-posture-thresholds');
+  if (!container) return;
+  const T = POSTURE_THRESHOLDS;
+  // Helper input numérique. `path` est l'argument dot-notation pour
+  // _updatePostureThreshold (ex. 'neutralite.bassin' ou 'courbures.cervicale.hyper').
+  const num = (label, val, path) =>
+    `<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;">
+      <span style="flex:1;color:#444;">${label}</span>
+      <input type="number" value="${val}" min="0" step="0.5"
+        onchange="_updatePostureThreshold('${path}', this.value)"
+        style="width:64px;padding:3px 6px;border:1px solid #cbd5e0;border-radius:3px;font-size:12px;text-align:right;">
+      <span style="color:#888;font-size:11px;">°</span>
+    </label>`;
+  const subHdr = `font-weight:600;color:#0e1f38;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;`;
+  const courbHdr = `font-size:10px;color:#666;margin:6px 0 3px;`;
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
+      <div>
+        <div style="${subHdr}">Zone de neutralité (±°)</div>
+        ${num('Antériorisation (Tête/Tronc/Cuisse/Jambe)', T.neutralite.anteriorisation, 'neutralite.anteriorisation')}
+        ${num('CVA (autour de 50°)',                       T.neutralite.cva,             'neutralite.cva')}
+        ${num('Bassin',                                    T.neutralite.bassin,          'neutralite.bassin')}
+        ${num('Hanche',                                    T.neutralite.hanche,          'neutralite.hanche')}
+        ${num('Genou (flessum/récurvatum)',                T.neutralite.genou,           'neutralite.genou')}
+        ${num('Épaule',                                    T.neutralite.epaule,          'neutralite.epaule')}
+      </div>
+      <div>
+        <div style="${subHdr}">Courbures rachidiennes (déviation, °)</div>
+        <div style="${courbHdr}">Cervicale</div>
+        ${num('Rectitude si déviation &lt;',              T.courbures.cervicale.rectitude,  'courbures.cervicale.rectitude')}
+        ${num('Hyperlordose si déviation &gt;',           T.courbures.cervicale.hyper,      'courbures.cervicale.hyper')}
+        <div style="${courbHdr}">Thoracique</div>
+        ${num('Rectitude si déviation &lt;',              T.courbures.thoracique.rectitude, 'courbures.thoracique.rectitude')}
+        ${num('Hypercyphose si déviation &gt;',           T.courbures.thoracique.hyper,     'courbures.thoracique.hyper')}
+        <div style="${courbHdr}">Lombaire</div>
+        ${num('Rectitude si déviation &lt;',              T.courbures.lombaire.rectitude,   'courbures.lombaire.rectitude')}
+        ${num('Hyperlordose si déviation &gt;',           T.courbures.lombaire.hyper,       'courbures.lombaire.hyper')}
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <button onclick="_resetPostureThresholdsAndRefresh()" class="btn" style="background:#888;color:#fff;font-size:11px;padding:6px 14px;">↺ Réinitialiser les valeurs par défaut</button>
+    </div>`;
+}
+
+// Met à jour un seuil par dot-path (ex. 'neutralite.bassin' ou
+// 'courbures.cervicale.hyper') et persiste immédiatement en localStorage.
+// Garde-fou courbures : rectitude STRICTEMENT < hyper sur chaque segment, sinon
+// la bande « normes » devient incohérente (vide ou ambiguë). Si la saisie casse
+// l'invariant, on refuse + re-render → l'input revient à la valeur valide.
+function _updatePostureThreshold(path, value) {
+  const n = parseFloat(value);
+  if (isNaN(n) || n < 0) return;
+  const parts = path.split('.');
+  if (parts[0] === 'courbures' && parts.length === 3) {
+    const sibling = POSTURE_THRESHOLDS.courbures?.[parts[1]];
+    if (sibling) {
+      const key = parts[2];
+      if (key === 'rectitude' && n >= sibling.hyper) { _renderPostureThresholdsPanel(); return; }
+      if (key === 'hyper'     && n <= sibling.rectitude) { _renderPostureThresholdsPanel(); return; }
+    }
+  }
+  const lastKey = parts.pop();
+  let target = POSTURE_THRESHOLDS;
+  for (const p of parts) {
+    if (!target[p]) return;
+    target = target[p];
+  }
+  target[lastKey] = n;
+  _savePostureThresholds();
+}
+
+// Reset + re-render du panneau pour réafficher les valeurs par défaut dans les inputs.
+function _resetPostureThresholdsAndRefresh() {
+  _resetPostureThresholds();
+  _renderPostureThresholdsPanel();
+}
 
 // #85-P2a — ratio largeur/hauteur du cadre de capture posturale (portrait).
 // Tunable : 3/4 conservateur (couvre patient debout plein corps avec marge
@@ -4918,6 +5047,62 @@ function _getPostureModalPlumbUp() {
   return { x: 0, y: -1 };
 }
 
+// #106-A — Classification posturale : applique les seuils POSTURE_THRESHOLDS
+// aux angles calculés pour produire une « proposition » de tendance par mesure.
+// Retour : { cva, tronc, cuisse, jambe, bassin, hanche, genou, epaule,
+//           cervicale, thoracique, lombaire } où chaque entrée est :
+//   - null si la mesure n'est pas calculable (point requis manquant) ;
+//   - { tendance: 'normes' }       si dans la zone de neutralité ;
+//   - { tendance: 'hors-normes' }  si hors zone (mesures à zéro) ;
+//   - { tendance: 'normes' | 'rectitude' | 'hyper', label: '<texte clinique>' }
+//     pour les courbures (rectitude / normes / hyperlordose / hypercyphose).
+// La signature accepte un thr custom pour permettre des tests unitaires sans
+// dépendance au global mutable POSTURE_THRESHOLDS.
+function _classifyPostureAngles(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  if (!angles) return {};
+  const n = thr.neutralite;
+  const out = {};
+  // Mesure centrée sur 0, zone de neutralité ±seuil.
+  const classifyNeutral = (val, seuil) => {
+    if (val === null || isNaN(val)) return null;
+    return { tendance: Math.abs(val) <= seuil ? 'normes' : 'hors-normes' };
+  };
+  // Courbure : déviation 180−angle. <rectitude → rectitude / [rectitude,hyper]
+  // → normes / >hyper → hyper. Libellé hyper distinct cervicale/lombaire
+  // (hyperlordose) vs thoracique (hypercyphose).
+  const classifyCurvature = (dev, bands, hyperLabel) => {
+    if (dev === null || isNaN(dev)) return null;
+    if (dev < bands.rectitude) return { tendance: 'rectitude', label: 'rectitude / perte de courbure' };
+    if (dev > bands.hyper)     return { tendance: 'hyper',     label: hyperLabel };
+    return { tendance: 'normes', label: 'normes' };
+  };
+  // CVA : référencée à 50° (norme). Zone neutre = |cva−50| ≤ n.cva.
+  if (angles.cva !== null && !isNaN(angles.cva)) {
+    out.cva = { tendance: Math.abs(angles.cva - 50) <= n.cva ? 'normes' : 'hors-normes' };
+  } else {
+    out.cva = null;
+  }
+  // Segments d'orientation (Tronc, Cuisse, Jambe) — tous seuil n.anteriorisation.
+  out.tronc  = classifyNeutral(angles.flexionHanche, n.anteriorisation);
+  out.cuisse = classifyNeutral(angles.cuisse,        n.anteriorisation);
+  // Jambe = angle d'antériorisation du genou depuis le fil à plomb à la cheville.
+  out.jambe  = classifyNeutral(angles.genou,         n.anteriorisation);
+  // Bassin / Hanche articulaire / Épaule.
+  out.bassin = classifyNeutral(angles.bassin, n.bassin);
+  out.hanche = classifyNeutral(angles.hanche, n.hanche);
+  out.epaule = classifyNeutral(angles.epaules, n.epaule);
+  // Genou flex/réc — utilise la valeur centrée (180−genouFlexion), comme l'affichage.
+  const genouCentered = (angles.genouFlexion === null || isNaN(angles.genouFlexion))
+    ? null : 180 - angles.genouFlexion;
+  out.genou = classifyNeutral(genouCentered, n.genou);
+  // Courbures rachidiennes (libellés cliniques par segment).
+  out.cervicale  = classifyCurvature(angles.deviationCervicale,  thr.courbures.cervicale,  'hyperlordose');
+  out.thoracique = classifyCurvature(angles.deviationThoracique, thr.courbures.thoracique, 'hypercyphose');
+  out.lombaire   = classifyCurvature(angles.deviationLombaire,   thr.courbures.lombaire,   'hyperlordose');
+  return out;
+}
+
 // Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
 // _redrawPostureModal (live durant drag) ET à chaque _renderPostureMarkerList
 // (changement de sélection/placement). Vert si +, rouge si −, gris si null.
@@ -4944,7 +5129,8 @@ function _renderPosturePlacementResults() {
   // si valeur null/NaN OU si pos→null (ex. épaules pour valeurs négatives sans
   // terme clinique défini). Couleurs harmonisées : bleu = direction "positive"
   // attendue (antéversion, flessum, etc.), rouge = "négative", gris = neutre.
-  const T = POSTURE_NEUTRAL_THRESHOLDS;
+  // #106-A — seuils lus depuis POSTURE_THRESHOLDS.neutralite (configurable).
+  const N = POSTURE_THRESHOLDS.neutralite;
   const _lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
   const mkLbl = (threshold, posText, negText) => v => {
     if (v === null || isNaN(v)) return '';
@@ -4952,22 +5138,34 @@ function _renderPosturePlacementResults() {
     if (v > 0) return `<span style="${_lblStyle('#3b82f6')}">${posText}</span>`;
     return negText ? `<span style="${_lblStyle('#dc2626')}">${negText}</span>` : '';
   };
-  const lblBassin     = mkLbl(T.default, '(antéversion)',             '(rétroversion)');
-  const lblGenouFR    = mkLbl(T.default, '(flessum)',                 '(récurvatum)');
-  const lblEpaules    = mkLbl(T.default, '(enroulement antérieur)',   null); // pas de libellé clinique défini pour < 0
-  const lblHanche     = mkLbl(T.default, '(flexion de hanche)',       '(extension de hanche)');
-  const lblAnterPoint = mkLbl(T.default, '(antérieur)',               '(postérieur)');
+  const lblBassin     = mkLbl(N.bassin,          '(antéversion)',             '(rétroversion)');
+  const lblGenouFR    = mkLbl(N.genou,           '(flessum)',                 '(récurvatum)');
+  const lblEpaules    = mkLbl(N.epaule,          '(enroulement antérieur)',   null); // pas de libellé clinique défini pour < 0
+  const lblHanche     = mkLbl(N.hanche,          '(flexion de hanche)',       '(extension de hanche)');
+  const lblAnterPoint = mkLbl(N.anteriorisation, '(antérieur)',               '(postérieur)');
   // #85-2d-segments — CVA en section 1 (Antériorisation) avec vocabulaire segment
   // unifié (antérieur/postérieur), pas l'ancien (antépulsion/rétropulsion).
-  // Référence 50° (norme clinique), seuil T.cva : low delta = tête forward.
+  // Référence 50° (norme clinique), seuil N.cva : low delta = tête forward.
   const lblCvaAnter = v => {
     if (v === null || isNaN(v)) return '';
     const delta = v - 50;
-    if (Math.abs(delta) <= T.cva) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
+    if (Math.abs(delta) <= N.cva) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
     return delta < 0
       ? `<span style="${_lblStyle('#3b82f6')}">(antérieur)</span>`
       : `<span style="${_lblStyle('#dc2626')}">(postérieur)</span>`;
   };
+  // #106-A — Libellé de tendance issu de _classifyPostureAngles. Vert = normes,
+  // orange-rouge = hors-normes / rectitude / hyper. Toujours suffixé « (proposition) »
+  // pour signaler à l'utilisateur que c'est une suggestion algorithmique, pas
+  // un diagnostic. Si classification null (mesure non calculable) → rien.
+  const fmtTendance = cls => {
+    if (!cls) return '';
+    const isNormes = cls.tendance === 'normes';
+    const color = isNormes ? '#10b981' : '#ea580c';
+    const text = cls.label || cls.tendance;
+    return `<span style="${_lblStyle(color)}">${text} (proposition)</span>`;
+  };
+  const cls = _classifyPostureAngles(a);
   const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
   const lbl = `color:#64748b;`;
   // Genou centré 0 = neutre, dérivé de genouFlexion (180=neutre, <180=flessum, >180=récurvatum).
@@ -4979,7 +5177,7 @@ function _renderPosturePlacementResults() {
   // d'alignement. CVA traité à part (référence 50°, pas 0).
   const conclusionParts = [];
   const addAnterPart = (val, origin) => {
-    if (val === null || isNaN(val) || Math.abs(val) <= T.default) return;
+    if (val === null || isNaN(val) || Math.abs(val) <= N.anteriorisation) return;
     conclusionParts.push((val > 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir ' + origin);
   };
   addAnterPart(a.genou,         'des chevilles');  // Jambe
@@ -4987,7 +5185,7 @@ function _renderPosturePlacementResults() {
   addAnterPart(a.flexionHanche, 'du bassin');      // Tronc
   if (a.cva !== null && !isNaN(a.cva)) {
     const delta = a.cva - 50;
-    if (Math.abs(delta) > T.cva) {
+    if (Math.abs(delta) > N.cva) {
       conclusionParts.push((delta < 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir des cervicales');
     }
   }
@@ -4998,10 +5196,10 @@ function _renderPosturePlacementResults() {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
       <div>
         <div style="${groupHdr}">Antériorisation / Postériorisation</div>
-        <div><span style="${lbl}">Tête :</span> ${fmtUnsigned(a.cva)} ${lblCvaAnter(a.cva)}</div>
-        <div><span style="${lbl}">Tronc :</span> ${fmtSigned(a.flexionHanche)} ${lblAnterPoint(a.flexionHanche)}</div>
-        <div><span style="${lbl}">Cuisse :</span> ${fmtSigned(a.cuisse)} ${lblAnterPoint(a.cuisse)}</div>
-        <div><span style="${lbl}">Jambe :</span> ${fmtSigned(a.genou)} ${lblAnterPoint(a.genou)}</div>
+        <div><span style="${lbl}">Tête :</span> ${fmtUnsigned(a.cva)} ${lblCvaAnter(a.cva)} ${fmtTendance(cls.cva)}</div>
+        <div><span style="${lbl}">Tronc :</span> ${fmtSigned(a.flexionHanche)} ${lblAnterPoint(a.flexionHanche)} ${fmtTendance(cls.tronc)}</div>
+        <div><span style="${lbl}">Cuisse :</span> ${fmtSigned(a.cuisse)} ${lblAnterPoint(a.cuisse)} ${fmtTendance(cls.cuisse)}</div>
+        <div><span style="${lbl}">Jambe :</span> ${fmtSigned(a.genou)} ${lblAnterPoint(a.genou)} ${fmtTendance(cls.jambe)}</div>
         <div style="margin-top:5px;padding-top:5px;border-top:1px solid #cbd5e0;color:#0e1f38;line-height:1.45;">
           <span style="color:#0e1f38;font-weight:700;">Conclusion :</span>
           <span style="color:#0e1f38;">${conclusionText}</span>
@@ -5009,19 +5207,19 @@ function _renderPosturePlacementResults() {
       </div>
       <div>
         <div style="${groupHdr}">Courbures</div>
-        <div><span style="${lbl}">Cervicale :</span> ${fmtCurve(a.deviationCervicale)}</div>
-        <div><span style="${lbl}">Thoracique :</span> ${fmtCurve(a.deviationThoracique)}</div>
-        <div><span style="${lbl}">Lombaire :</span> ${fmtCurve(a.deviationLombaire)}</div>
+        <div><span style="${lbl}">Cervicale :</span> ${fmtCurve(a.deviationCervicale)} ${fmtTendance(cls.cervicale)}</div>
+        <div><span style="${lbl}">Thoracique :</span> ${fmtCurve(a.deviationThoracique)} ${fmtTendance(cls.thoracique)}</div>
+        <div><span style="${lbl}">Lombaire :</span> ${fmtCurve(a.deviationLombaire)} ${fmtTendance(cls.lombaire)}</div>
       </div>
       <div>
         <div style="${groupHdr}">Bassin / Hanche / Genou</div>
-        <div><span style="${lbl}">Hanche :</span> ${fmtSigned(a.hanche)} ${lblHanche(a.hanche)}</div>
-        <div><span style="${lbl}">Bassin :</span> ${fmtSigned(a.bassin)} ${lblBassin(a.bassin)}</div>
-        <div><span style="${lbl}">Genou :</span> ${fmtSigned(genouCentered)} ${lblGenouFR(genouCentered)}</div>
+        <div><span style="${lbl}">Hanche :</span> ${fmtSigned(a.hanche)} ${lblHanche(a.hanche)} ${fmtTendance(cls.hanche)}</div>
+        <div><span style="${lbl}">Bassin :</span> ${fmtSigned(a.bassin)} ${lblBassin(a.bassin)} ${fmtTendance(cls.bassin)}</div>
+        <div><span style="${lbl}">Genou :</span> ${fmtSigned(genouCentered)} ${lblGenouFR(genouCentered)} ${fmtTendance(cls.genou)}</div>
       </div>
       <div>
         <div style="${groupHdr}">Épaule</div>
-        <div><span style="${lbl}">Épaule :</span> ${fmtSigned(a.epaules)} ${lblEpaules(a.epaules)}</div>
+        <div><span style="${lbl}">Épaule :</span> ${fmtSigned(a.epaules)} ${lblEpaules(a.epaules)} ${fmtTendance(cls.epaule)}</div>
       </div>
     </div>
   `;
