@@ -7941,7 +7941,20 @@ function buildPhotoMini(data,side,t) {
 //
 // Cas 0 image (bd vide ou aucune clé canvas) : callback({}) immédiat synchrone,
 // pas de setTimeout (cohérent avec pattern posturo).
-function _resolveSportRapportImages(bd, callback) {
+// #106 fix rapport sport morpho — Path-aware. Préexistant à #106 (régression
+// #81/#85 migration Storage) : après un save, la dataURL `bd._morpho_face` est
+// strippée de currentPatient.bilanData (seul `_morpho_facePath` reste), donc
+// l'ancien filtre `bd[t.key]` éliminait toutes les entrées migrées → dessins
+// invisibles au rapport (template vierge seul). On résout d'abord chaque clé
+// vers une dataURL : (a) si en RAM, on l'utilise ; (b) sinon si Path Storage,
+// on fetch via prefetchPhotoToDataUrl (helper existant L195 storage.js, jamais
+// throw — { ok, dataUrl } | { ok:false, error }) ; (c) sinon entrée ignorée.
+// Fallback gracieux préservé : si prefetch échoue (offline/Storage), pas de
+// crash — l'entrée est simplement absente de composites, le caller retombe sur
+// le template vierge (cf src = composites[k] || imgjs-*.src L8315).
+// Mutation IN PLACE de bd évitée — on utilise un objet local drawingUrls pour
+// ne pas re-peupler `currentPatient.bilanData` (laissé décidé par saveBilanSilent).
+async function _resolveSportRapportImages(bd, callback) {
   const TODO = [
     { key: '_morpho_face',    baseId: 'imgjs-morpho-face'    },
     { key: '_morpho_face2',   baseId: 'imgjs-morpho-face2'   },
@@ -7949,7 +7962,22 @@ function _resolveSportRapportImages(bd, callback) {
     { key: '_morpho_profilD', baseId: 'imgjs-morpho-profilD' },
     { key: '_pieds',          baseId: 'sp-pieds-img'         }
   ];
-  const toResolve = TODO.filter(t => bd[t.key]);
+  // Résolution dataURL (RAM ou Storage) en parallèle. Une entrée sans dataURL
+  // ni Path est simplement absente de drawingUrls (skip propre).
+  const drawingUrls = {};
+  await Promise.all(TODO.map(async t => {
+    if (bd[t.key]) {
+      drawingUrls[t.key] = bd[t.key];
+      return;
+    }
+    const path = bd[t.key + 'Path'];
+    if (path && typeof prefetchPhotoToDataUrl === 'function') {
+      const r = await prefetchPhotoToDataUrl(path);
+      if (r.ok) drawingUrls[t.key] = r.dataUrl;
+      else console.warn('[rapport-sport] prefetch fail', t.key + 'Path', '→', r.error);
+    }
+  }));
+  const toResolve = TODO.filter(t => drawingUrls[t.key]);
   if(toResolve.length === 0) {
     callback({});
     return;
@@ -7966,14 +7994,20 @@ function _resolveSportRapportImages(bd, callback) {
     drawing.onload = () => {
       const baseEl = document.getElementById(baseId);
       if(!baseEl || !baseEl.complete || !baseEl.naturalWidth) {
-        finalize(bd[key]);
+        finalize(drawingUrls[key]);
         return;
       }
       try {
-        // #98 Fix transform — Wd × Hd = dims du dataURL = rect parent en px CSS
-        // au save (downscale par DPR par _serializeDrawCanvas L7763-7767). Composite
-        // dans ce repère pour préserver le dessin 1:1. Gabarit positionné/dimensionné
-        // selon la BOÎTE CSS de l'UI (parité visuelle exacte).
+        // #106 Fix géométrie — régression #83 (commit 2b3e1e0 « netteté dessins
+        // sérialisation pleine résolution »). Avant #83, _serializeDrawCanvas
+        // downscalait par DPR → Wd × Hd étaient en pixels CSS, et la constante
+        // hardcodée 200 (= max-height:200px CSS du template en éditeur) avait
+        // du sens. Post-#83, Wd × Hd sont en pixels INTERNES (= CSS × DPR), donc
+        // la constante CSS 200 doit être remplacée par Hd (canvas full height).
+        // Idem pour la constante 400 du branch _pieds (= max-width:400px CSS).
+        // Fix : scale dérivé de Hd / baseH (morpho) ou de min(Wd, Hd) × 0.8
+        // (pieds) → DPR-invariant : le template remplit le canvas exactement
+        // comme dans l'éditeur, à n'importe quel DPR.
         const Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
         const baseW = baseEl.naturalWidth, baseH = baseEl.naturalHeight;
         const tmp = document.createElement('canvas');
@@ -7983,12 +8017,22 @@ function _resolveSportRapportImages(bd, callback) {
         ctx.fillRect(0, 0, Wd, Hd);
         let dx, dy, dispW, dispH;
         if(key === '_pieds') {
-          dispW = Math.min((Wd - 16) * 0.8, 400);
-          dispH = dispW * (baseH / baseW);
-          dx = 8 + ((Wd - 16) - dispW) / 2;
-          dy = 8;
+          // Éditeur (index.html L2516) : <img style="width:80%;max-width:400px">.
+          // Le facteur 0.8 reste DPR-invariant (fraction). On le combine au scale
+          // "fit-to-canvas" comme pour morpho, centré → comportement homogène.
+          // Pas de top-alignment (dy=8) ici : avec un rapport rendu à hauteur fixe,
+          // le centrage produit un visuel plus stable cross-DPR.
+          const scale = Math.min((Wd - 16) / baseW, Hd / baseH) * 0.8;
+          dispW = baseW * scale;
+          dispH = baseH * scale;
+          dx = (Wd - dispW) / 2;
+          dy = (Hd - dispH) / 2;
         } else {
-          const scale = Math.min((Wd - 16) / baseW, 200 / baseH);
+          // Morpho : object-fit:contain équivalent. Hd remplace l'ancien 200 codé
+          // en dur (CSS pré-#83). Template occupe canvas-full ou plus petit selon
+          // baseH / baseW. Padding -16 internal (≈ 8-16 CSS px selon DPR) accepté
+          // car cosmétique mineur, pas d'impact géométrique sur l'alignement.
+          const scale = Math.min((Wd - 16) / baseW, Hd / baseH);
           dispW = baseW * scale;
           dispH = baseH * scale;
           dx = (Wd - dispW) / 2;
@@ -7998,14 +8042,14 @@ function _resolveSportRapportImages(bd, callback) {
         ctx.drawImage(drawing, 0, 0, Wd, Hd);
         finalize(tmp.toDataURL('image/png'));
       } catch(e) {
-        finalize(bd[key]);
+        finalize(drawingUrls[key]);
       }
     };
     drawing.onerror = () => {
       // CRITIQUE — sans cette branche, dessin cassé = callback jamais appelée.
-      finalize(bd[key]);
+      finalize(drawingUrls[key]);
     };
-    drawing.src = bd[key];
+    drawing.src = drawingUrls[key];
   });
 }
 
