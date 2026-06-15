@@ -8017,16 +8017,29 @@ async function _resolveSportRapportImages(bd, callback) {
         ctx.fillRect(0, 0, Wd, Hd);
         let dx, dy, dispW, dispH;
         if(key === '_pieds') {
-          // Éditeur (index.html L2516) : <img style="width:80%;max-width:400px">.
-          // Le facteur 0.8 reste DPR-invariant (fraction). On le combine au scale
-          // "fit-to-canvas" comme pour morpho, centré → comportement homogène.
-          // Pas de top-alignment (dy=8) ici : avec un rapport rendu à hauteur fixe,
-          // le centrage produit un visuel plus stable cross-DPR.
-          const scale = Math.min((Wd - 16) / baseW, Hd / baseH) * 0.8;
-          dispW = baseW * scale;
-          dispH = baseH * scale;
+          // #106 Fix2 — Géométrie miroir éditeur (index.html L2515-2517) en
+          // fractions de Wd/Hd, DPR-invariant. Éditeur :
+          //   <img width:80% max-width:400px margin:0 auto> dans parent padding:8px
+          //   → canvas couvre parent entier ; image top-alignée avec petit padding,
+          //     centrée horizontalement.
+          // Fractions appliquées :
+          //   dispW = 0.80 × Wd        → ≈ width:80% éditeur
+          //   dispH = dispW × baseH/baseW  → préserve aspect template (cap si dépasse Hd)
+          //   dx = (Wd - dispW)/2      → ≈ 0.10 × Wd de chaque côté (centré H)
+          //   dy = Hd × 0.03           → top-aligné, fraction exacte éditeur (16/522 = 8/261 ≈ 0.0306)
+          // Note : la formule précédente `min(...,Hd/baseH) × 0.8` faisait Hd/baseH
+          // dominer pour les templates hauts (baseH > baseW), rétrécissant l'image
+          // sous l'attendu éditeur. Ici, dispW dérive directement de Wd sans cap
+          // par Hd (sauf garde-fou si l'aspect dépasse le canvas).
+          dispW = Wd * 0.8;
+          dispH = dispW * (baseH / baseW);
+          if (dispH > Hd * 0.96) {
+            // Garde-fou : aspect template très allongé + canvas peu haut → cap.
+            dispH = Hd * 0.96;
+            dispW = dispH * baseW / baseH;
+          }
           dx = (Wd - dispW) / 2;
-          dy = (Hd - dispH) / 2;
+          dy = Hd * 0.03;
         } else {
           // Morpho : object-fit:contain équivalent. Hd remplace l'ancien 200 codé
           // en dur (CSS pré-#83). Template occupe canvas-full ou plus petit selon
