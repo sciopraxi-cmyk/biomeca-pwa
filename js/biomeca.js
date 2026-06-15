@@ -5103,6 +5103,106 @@ function _classifyPostureAngles(angles, thr) {
   return out;
 }
 
+// #106-B — Construit la phrase de Conclusion (ordre bas→haut : jambe → cuisse
+// → tronc → tête). Renvoie '' si tous les segments sont dans leur zone de
+// neutralité. Source de vérité unique pour la modale ET la synthèse/rapport
+// (évite la divergence si la logique évolue). CVA traité à part : référencée
+// à 50° avec son seuil propre n.cva, pas à 0 comme les autres.
+function _buildPostureConclusion(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  if (!angles) return '';
+  const n = thr.neutralite;
+  const parts = [];
+  const addAnter = (val, origin) => {
+    if (val === null || isNaN(val) || Math.abs(val) <= n.anteriorisation) return;
+    parts.push((val > 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir ' + origin);
+  };
+  addAnter(angles.genou,         'des chevilles'); // Jambe
+  addAnter(angles.cuisse,        'des genoux');    // Cuisse
+  addAnter(angles.flexionHanche, 'du bassin');     // Tronc
+  if (angles.cva !== null && !isNaN(angles.cva)) {
+    const delta = angles.cva - 50;
+    if (Math.abs(delta) > n.cva) {
+      parts.push((delta < 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir des cervicales');
+    }
+  }
+  return parts.join(' · ');
+}
+
+// #106-B — Liste des mesures hors-normes + conclusion, pour intégration dans
+// la synthèse posturo et le rapport PDF. Format :
+//   { horsNormes: [{ mesure: 'Tronc', detail: 'antérieur' }, ...],
+//     conclusion: 'Antériorisation à partir du bassin · …' | '' }
+// Le caller décide du marquage « dans les normes » si horsNormes + conclusion
+// sont tous deux vides (cf brief : « Posture profil dans les normes — aucune
+// tendance marquée »). Libellés cliniques alignés sur ceux affichés en modale.
+function _buildPostureFindings(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  const empty = { horsNormes: [], conclusion: '' };
+  if (!angles) return empty;
+  const cls = _classifyPostureAngles(angles, thr);
+  const horsNormes = [];
+  const push = (mesure, detail) => horsNormes.push({ mesure, detail });
+  // Tête (CVA) — libellé spécifique antépulsion/rétropulsion + dir antérieur/postérieur.
+  if (cls.cva && cls.cva.tendance !== 'normes') {
+    const delta = angles.cva - 50;
+    push('Tête (CVA)', delta < 0
+      ? 'antérieur (antépulsion de tête)'
+      : 'postérieur (rétropulsion de tête)');
+  }
+  // Segments d'orientation (Tronc/Cuisse/Jambe) — antérieur/postérieur par signe.
+  if (cls.tronc  && cls.tronc.tendance  !== 'normes') push('Tronc',  angles.flexionHanche > 0 ? 'antérieur' : 'postérieur');
+  if (cls.cuisse && cls.cuisse.tendance !== 'normes') push('Cuisse', angles.cuisse        > 0 ? 'antérieur' : 'postérieur');
+  if (cls.jambe  && cls.jambe.tendance  !== 'normes') push('Jambe',  angles.genou         > 0 ? 'antérieur' : 'postérieur');
+  // Bassin / Hanche articulaire / Genou flex-réc / Épaule.
+  if (cls.bassin && cls.bassin.tendance !== 'normes') push('Bassin', angles.bassin > 0 ? 'antéversion' : 'rétroversion');
+  if (cls.hanche && cls.hanche.tendance !== 'normes') push('Hanche', angles.hanche > 0 ? 'flexion de hanche' : 'extension de hanche');
+  if (cls.genou  && cls.genou.tendance  !== 'normes') {
+    const genouCentered = 180 - angles.genouFlexion;
+    push('Genou', genouCentered > 0 ? 'flessum' : 'récurvatum');
+  }
+  // Épaule : libellé clinique défini uniquement pour valeur positive (enroulement
+  // antérieur). Valeurs négatives n'ont pas de terme conventionnel → on skip,
+  // ne polluons pas la liste avec « hors-normes » sans libellé.
+  if (cls.epaule && cls.epaule.tendance !== 'normes' && angles.epaules > 0) {
+    push('Épaule', 'enroulement antérieur');
+  }
+  // Courbures : label de la classification. On simplifie 'rectitude / perte de
+  // courbure' → 'rectitude' pour rester concis dans synthèse/rapport.
+  const simplifyCurv = label => label === 'rectitude / perte de courbure' ? 'rectitude' : label;
+  if (cls.cervicale  && cls.cervicale.tendance  !== 'normes') push('Cervicale',  simplifyCurv(cls.cervicale.label));
+  if (cls.thoracique && cls.thoracique.tendance !== 'normes') push('Thoracique', simplifyCurv(cls.thoracique.label));
+  if (cls.lombaire   && cls.lombaire.tendance   !== 'normes') push('Lombaire',   simplifyCurv(cls.lombaire.label));
+  return { horsNormes, conclusion: _buildPostureConclusion(angles, thr) };
+}
+
+// #106-B fix — Helper synthèse partagé (posturo + sport). Renvoie le tableau
+// des sections « 📐 Analyse posturale — profil <gauche|droit> (propositions à
+// valider) » pour chaque vue placée. Une section vide n'est PAS pushée (pas de
+// vue analysée = pas de bruit). Appelé par genererSynthese (posturo, d = currentPatient.
+// bilanDataPosturo) ET genererSyntheseSport (sport, d = bilanData global) — l'identité
+// d'objet est différente mais la lecture _postureAnalysis y est symétrique :
+// _validatePosturePlacement écrit dans bd via _getPostureBilanData(prefix), qui
+// renvoie le MÊME objet (bilanData pour 'sp', currentPatient.bilanDataPosturo pour 'po').
+function _buildPostureProfilSectionsSynthese(d) {
+  const out = [];
+  ['profilG', 'profilD'].forEach(function(viewKey) {
+    const analysis = d && d._postureAnalysis && d._postureAnalysis[viewKey];
+    if (!analysis || !analysis.angles) return;
+    const findings = _buildPostureFindings(analysis.angles);
+    const items = [];
+    findings.horsNormes.forEach(function(f) { items.push(f.mesure + ' : ' + f.detail); });
+    if (findings.conclusion) items.push('Conclusion : ' + findings.conclusion);
+    if (!items.length) items.push('Posture profil dans les normes — aucune tendance marquée');
+    const side = viewKey === 'profilG' ? 'gauche' : 'droit';
+    out.push({
+      titre: '📐 Analyse posturale — profil ' + side + ' (propositions à valider)',
+      items: items,
+    });
+  });
+  return out;
+}
+
 // Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
 // _redrawPostureModal (live durant drag) ET à chaque _renderPostureMarkerList
 // (changement de sélection/placement). Vert si +, rouge si −, gris si null.
@@ -5175,23 +5275,11 @@ function _renderPosturePlacementResults() {
   // par « · ». Ordre bas→haut (jambe → cuisse → tronc → tête) cohérent avec la
   // lecture clinique d'une chaîne posturale. Si tous neutres/null → message
   // d'alignement. CVA traité à part (référence 50°, pas 0).
-  const conclusionParts = [];
-  const addAnterPart = (val, origin) => {
-    if (val === null || isNaN(val) || Math.abs(val) <= N.anteriorisation) return;
-    conclusionParts.push((val > 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir ' + origin);
-  };
-  addAnterPart(a.genou,         'des chevilles');  // Jambe
-  addAnterPart(a.cuisse,        'des genoux');     // Cuisse
-  addAnterPart(a.flexionHanche, 'du bassin');      // Tronc
-  if (a.cva !== null && !isNaN(a.cva)) {
-    const delta = a.cva - 50;
-    if (Math.abs(delta) > N.cva) {
-      conclusionParts.push((delta < 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir des cervicales');
-    }
-  }
-  const conclusionText = conclusionParts.length > 0
-    ? conclusionParts.join(' · ')
-    : 'Alignement global — pas de tendance antérieure/postérieure marquée';
+  // #106-B — Conclusion extraite vers _buildPostureConclusion (source unique
+  // partagée avec la synthèse + rapport). La fonction renvoie '' si tout est
+  // aligné ; on ajoute ici le texte fallback spécifique à l'affichage modale.
+  const conclusionText = _buildPostureConclusion(a)
+    || 'Alignement global — pas de tendance antérieure/postérieure marquée';
   panel.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
       <div>
@@ -6980,6 +7068,28 @@ const sections = [];
       });
     }
   }
+
+  // #106-B — Analyse posturale profil : findings hors-normes + Conclusion par vue.
+  // Sections « 2bis » insérées juste après Morphostatique — Silhouettes pour
+  // continuité visuelle (suite de l'analyse posturale). Pas de section pour une
+  // vue non analysée (analysis.angles absent). Sous-titre du contenu « Propositions
+  // — à valider par le praticien » signalé dans la première ligne d'items pour
+  // homogénéité avec la structure tuple [label, value] du rapport.
+  ['profilG', 'profilD'].forEach(function(viewKey) {
+    const analysis = d._postureAnalysis && d._postureAnalysis[viewKey];
+    if (!analysis || !analysis.angles) return;
+    const findings = _buildPostureFindings(analysis.angles);
+    const items = [];
+    findings.horsNormes.forEach(function(f) { items.push([f.mesure, f.detail]); });
+    if (findings.conclusion) items.push(['Conclusion', findings.conclusion]);
+    if (!items.length) items.push(['Synthèse', 'Posture profil dans les normes — aucune tendance marquée']);
+    const side = viewKey === 'profilG' ? 'gauche' : 'droit';
+    sections.push({
+      titre: '2. Morphostatique — Posture profil ' + side + ' (Propositions — à valider par le praticien)',
+      items: items,
+      color: '#3498db',
+    });
+  });
 
   // 3. Bilan dynamique
   // #96 — Clés alignées sur savePosturoBilan / synthèse. Référence pour la logique
@@ -12626,6 +12736,12 @@ async function genererSynthese() {
   if(romParts.length) morphoItems.push('Romberg: '+romParts.join(', '));
   if(morphoItems.length) sections.push({titre:'🧍 Morphostatique', items:[morphoItems.join(' · ')]});
 
+  // #106-B — Analyse posturale profil : juste après Morphostatique pour
+  // continuité visuelle avec les captures + placement 14 points. Helper
+  // _buildPostureProfilSectionsSynthese partagé avec genererSyntheseSport
+  // (anti-divergence). Posturo lit currentPatient.bilanDataPosturo (= d).
+  Array.prototype.push.apply(sections, _buildPostureProfilSectionsSynthese(d));
+
   // Bilan dynamique (psec-2)
   const dynItems = [];
   // Observations libres
@@ -13644,6 +13760,12 @@ function _collectSportSyntheseSections(d, readers) {
   if(d.chaine_musculaire) morpho.push('Hypothèse chaîne musculaire: ' + d.chaine_musculaire);
   if(morpho.length) sections.push({ titre: '🧍 Morphostatique', items: [morpho.join(' · ')] });
 
+  // #106-B fix2 — Analyse posturale profil DANS la source partagée (synthèse +
+  // rapport sport). _buildSportSyntheseHTMLForRapport reçoit currentPatient.bilanData
+  // qui porte _postureAnalysis après saveBilanSilent (cf L9273 sync global → persisté).
+  // Pour les bilans archivés pré-#106-A : helper retourne [] → graceful, pas de bruit.
+  Array.prototype.push.apply(sections, _buildPostureProfilSectionsSynthese(d));
+
   // 3. Examen en charge / décharge (ssec-2, B1 #73) — réécriture structurée.
   //    Lecture CONDITIONNELLE des sous-valeurs : un sub-radio/sub-cb n'est lu
   //    que si son parent est dans l'état requis (neutralise toute valeur
@@ -13977,6 +14099,10 @@ function genererSyntheseSport() {
     neuroReader: id => document.getElementById('sn-' + id)?.checked
   };
   const sections = _collectSportSyntheseSections(d, readersDOM);
+  // #106-B fix2 — Insertion analyse posturale profil migrée DANS
+  // _collectSportSyntheseSections (juste après Morphostatique) → couvre synthèse
+  // écran ET rapport PDF via la même source. Ne PAS splicer ici (sinon doublon
+  // à l'écran). Le rapport sport hérite naturellement de la section.
   // #86 Fix E2E — section « ⚠️ Mesures à signaler » EN TÊTE (écran uniquement).
   // unshift ICI (pas dans _collectSportSyntheseSections) — pour éviter doublon
   // au rapport (qui a déjà un bloc autonome « Mesures à signaler » en tête, L5757).
