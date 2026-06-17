@@ -13,3 +13,13 @@ package-lock.json
 node_modules/
 assets/
 .git/
+
+# Claude Code / Kilo tooling
+.claude/
+.kilo/
+
+# Local / scratch (non versionné)
+index_backup.html
+Posture_*.md
+Roadmap_*.md
+supabase/.temp/

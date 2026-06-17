@@ -1994,6 +1994,8 @@ function nav(id) {
     renderParamsPratList();
     // #81 — rafraîchit le compteur Maintenance à l'ouverture de Paramètres
     if (typeof _runBackfillDryRun === 'function') _runBackfillDryRun();
+    // #106-A — peuple la card seuils analyse posturale (valeurs actuelles ou défauts)
+    if (typeof _renderPostureThresholdsPanel === 'function') _renderPostureThresholdsPanel();
   }
   if(id === 'pg-sport') {
     // Mettre à jour le sous-titre avec le patient courant
@@ -4486,15 +4488,142 @@ function loadVidFile(input) {
 // → migration auto Storage côté posturo (POSTURO_PHOTO_KEYS étendu, savePosturoBilan async).
 // Côté sport : Temps 2 brancher saveBilan async + migrateSportBilanDataPhotos.
 // Format : JPEG 0.88, ideal 1920×1080 (fallback gracieux navigateur), facingMode:environment.
-// #85-2d-fix2 — Seuils de neutralité pour les libellés cliniques.
-// Une valeur dont la magnitude (ou l'écart à une référence pour CVA) est ≤ seuil
-// est qualifiée de "neutre" ; au-delà, le signe détermine le libellé clinique
-// (antéversion/rétroversion, flessum/récurvatum, etc.). Centralisé ici pour
-// permettre l'ajustement à l'étape classification (#85-2e à venir).
-const POSTURE_NEUTRAL_THRESHOLDS = {
-  default: 3, // ±3° pour bassin, genou, épaules, hanche (mesures centrées sur 0)
-  cva: 2,     // ±2° autour de 50° (CVA est référencée à 50°, pas à 0°)
+// #106-A — Seuils analyse posturale profil. Structure complète configurable :
+//   - neutralite : zone de neutralité par mesure (mesures à zéro = neutre).
+//   - courbures  : bornes basse (rectitude) et haute (hyper) par segment rachis,
+//     sur la DÉVIATION (= 180 − calcAngle3).
+// Chargée depuis localStorage clé bm4-posture-thresholds avec fallback défauts.
+// Modifiable depuis Paramètres → « Seuils — analyse posturale (profil) ».
+const POSTURE_THRESHOLDS_KEY = 'bm4-posture-thresholds';
+const POSTURE_THRESHOLDS_DEFAULTS = {
+  neutralite: {
+    anteriorisation: 3, // Tête/Tronc/Cuisse/Jambe (segments d'orientation)
+    cva: 2,             // ±2° autour de 50° (CVA référencée à 50°, pas à 0°)
+    bassin: 3,
+    hanche: 3,          // hanche articulaire ET flexionHanche (Tronc)
+    genou: 3,           // genou centré 0 = neutre (flessum/récurvatum)
+    epaule: 3,
+  },
+  courbures: {
+    cervicale:  { rectitude: 10, hyper: 28 },
+    thoracique: { rectitude: 12, hyper: 32 },
+    lombaire:   { rectitude: 12, hyper: 35 },
+  },
 };
+
+// Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
+// partiel (ex. ajout d'un seuil dans une release future, ou JSON corrompu sur
+// une seule clé). Renvoie toujours une structure valide.
+function _loadPostureThresholds() {
+  try {
+    const raw = localStorage.getItem(POSTURE_THRESHOLDS_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
+    const stored = JSON.parse(raw);
+    return {
+      neutralite: { ...POSTURE_THRESHOLDS_DEFAULTS.neutralite, ...(stored.neutralite || {}) },
+      courbures: {
+        cervicale:  { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.cervicale,  ...(stored.courbures?.cervicale  || {}) },
+        thoracique: { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.thoracique, ...(stored.courbures?.thoracique || {}) },
+        lombaire:   { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.lombaire,   ...(stored.courbures?.lombaire   || {}) },
+      },
+    };
+  } catch (e) {
+    console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
+    return JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
+  }
+}
+let POSTURE_THRESHOLDS = _loadPostureThresholds();
+function _savePostureThresholds() {
+  try {
+    localStorage.setItem(POSTURE_THRESHOLDS_KEY, JSON.stringify(POSTURE_THRESHOLDS));
+  } catch (e) {
+    console.warn('[#106] Échec sauvegarde seuils :', e?.message);
+  }
+}
+function _resetPostureThresholds() {
+  POSTURE_THRESHOLDS = JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
+  try { localStorage.removeItem(POSTURE_THRESHOLDS_KEY); } catch (e) { /* noop */ }
+}
+
+// #106-A — Render du panneau Paramètres pour éditer les seuils. Appelé à
+// l'ouverture de pg-params (nav L1995). Inputs number, save live sur oninput.
+function _renderPostureThresholdsPanel() {
+  const container = document.getElementById('params-posture-thresholds');
+  if (!container) return;
+  const T = POSTURE_THRESHOLDS;
+  // Helper input numérique. `path` est l'argument dot-notation pour
+  // _updatePostureThreshold (ex. 'neutralite.bassin' ou 'courbures.cervicale.hyper').
+  const num = (label, val, path) =>
+    `<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;">
+      <span style="flex:1;color:#444;">${label}</span>
+      <input type="number" value="${val}" min="0" step="0.5"
+        onchange="_updatePostureThreshold('${path}', this.value)"
+        style="width:64px;padding:3px 6px;border:1px solid #cbd5e0;border-radius:3px;font-size:12px;text-align:right;">
+      <span style="color:#888;font-size:11px;">°</span>
+    </label>`;
+  const subHdr = `font-weight:600;color:#0e1f38;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;`;
+  const courbHdr = `font-size:10px;color:#666;margin:6px 0 3px;`;
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
+      <div>
+        <div style="${subHdr}">Zone de neutralité (±°)</div>
+        ${num('Antériorisation (Tête/Tronc/Cuisse/Jambe)', T.neutralite.anteriorisation, 'neutralite.anteriorisation')}
+        ${num('CVA (autour de 50°)',                       T.neutralite.cva,             'neutralite.cva')}
+        ${num('Bassin',                                    T.neutralite.bassin,          'neutralite.bassin')}
+        ${num('Hanche',                                    T.neutralite.hanche,          'neutralite.hanche')}
+        ${num('Genou (flessum/récurvatum)',                T.neutralite.genou,           'neutralite.genou')}
+        ${num('Épaule',                                    T.neutralite.epaule,          'neutralite.epaule')}
+      </div>
+      <div>
+        <div style="${subHdr}">Courbures rachidiennes (déviation, °)</div>
+        <div style="${courbHdr}">Cervicale</div>
+        ${num('Rectitude si déviation &lt;',              T.courbures.cervicale.rectitude,  'courbures.cervicale.rectitude')}
+        ${num('Hyperlordose si déviation &gt;',           T.courbures.cervicale.hyper,      'courbures.cervicale.hyper')}
+        <div style="${courbHdr}">Thoracique</div>
+        ${num('Rectitude si déviation &lt;',              T.courbures.thoracique.rectitude, 'courbures.thoracique.rectitude')}
+        ${num('Hypercyphose si déviation &gt;',           T.courbures.thoracique.hyper,     'courbures.thoracique.hyper')}
+        <div style="${courbHdr}">Lombaire</div>
+        ${num('Rectitude si déviation &lt;',              T.courbures.lombaire.rectitude,   'courbures.lombaire.rectitude')}
+        ${num('Hyperlordose si déviation &gt;',           T.courbures.lombaire.hyper,       'courbures.lombaire.hyper')}
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <button onclick="_resetPostureThresholdsAndRefresh()" class="btn" style="background:#888;color:#fff;font-size:11px;padding:6px 14px;">↺ Réinitialiser les valeurs par défaut</button>
+    </div>`;
+}
+
+// Met à jour un seuil par dot-path (ex. 'neutralite.bassin' ou
+// 'courbures.cervicale.hyper') et persiste immédiatement en localStorage.
+// Garde-fou courbures : rectitude STRICTEMENT < hyper sur chaque segment, sinon
+// la bande « normes » devient incohérente (vide ou ambiguë). Si la saisie casse
+// l'invariant, on refuse + re-render → l'input revient à la valeur valide.
+function _updatePostureThreshold(path, value) {
+  const n = parseFloat(value);
+  if (isNaN(n) || n < 0) return;
+  const parts = path.split('.');
+  if (parts[0] === 'courbures' && parts.length === 3) {
+    const sibling = POSTURE_THRESHOLDS.courbures?.[parts[1]];
+    if (sibling) {
+      const key = parts[2];
+      if (key === 'rectitude' && n >= sibling.hyper) { _renderPostureThresholdsPanel(); return; }
+      if (key === 'hyper'     && n <= sibling.rectitude) { _renderPostureThresholdsPanel(); return; }
+    }
+  }
+  const lastKey = parts.pop();
+  let target = POSTURE_THRESHOLDS;
+  for (const p of parts) {
+    if (!target[p]) return;
+    target = target[p];
+  }
+  target[lastKey] = n;
+  _savePostureThresholds();
+}
+
+// Reset + re-render du panneau pour réafficher les valeurs par défaut dans les inputs.
+function _resetPostureThresholdsAndRefresh() {
+  _resetPostureThresholds();
+  _renderPostureThresholdsPanel();
+}
 
 // #85-P2a — ratio largeur/hauteur du cadre de capture posturale (portrait).
 // Tunable : 3/4 conservateur (couvre patient debout plein corps avec marge
@@ -4656,6 +4785,11 @@ let _postureModalCtx = null;
 // calibration au lieu des markers. Auto-exit après placement du p2.
 let _postureCalibration = null;
 let _postureCalibrationMode = false;
+// #106-Final — Identité prefix/viewKey de la modale (utilisé par le panneau
+// pour relire _postureAnalysis depuis bd et alimenter les <select> courbures
+// avec curveInterp sauvegardé ou auto-mapping).
+let _postureModalPrefix = null;
+let _postureModalViewKey = null;
 
 // Compte les markers placés (nx/ny non nuls) pour la vue donnée.
 // Utilisé par le badge "✓ N/14 placés" dans _renderPostureSlot.
@@ -4918,6 +5052,227 @@ function _getPostureModalPlumbUp() {
   return { x: 0, y: -1 };
 }
 
+// #106-A — Classification posturale : applique les seuils POSTURE_THRESHOLDS
+// aux angles calculés pour produire une « proposition » de tendance par mesure.
+// Retour : { cva, tronc, cuisse, jambe, bassin, hanche, genou, epaule,
+//           cervicale, thoracique, lombaire } où chaque entrée est :
+//   - null si la mesure n'est pas calculable (point requis manquant) ;
+//   - { tendance: 'normes' }       si dans la zone de neutralité ;
+//   - { tendance: 'hors-normes' }  si hors zone (mesures à zéro) ;
+//   - { tendance: 'normes' | 'rectitude' | 'hyper', label: '<texte clinique>' }
+//     pour les courbures (rectitude / normes / hyperlordose / hypercyphose).
+// La signature accepte un thr custom pour permettre des tests unitaires sans
+// dépendance au global mutable POSTURE_THRESHOLDS.
+function _classifyPostureAngles(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  if (!angles) return {};
+  const n = thr.neutralite;
+  const out = {};
+  // Mesure centrée sur 0, zone de neutralité ±seuil.
+  const classifyNeutral = (val, seuil) => {
+    if (val === null || isNaN(val)) return null;
+    return { tendance: Math.abs(val) <= seuil ? 'normes' : 'hors-normes' };
+  };
+  // Courbure : déviation 180−angle. <rectitude → rectitude / [rectitude,hyper]
+  // → normes / >hyper → hyper. Libellé hyper distinct cervicale/lombaire
+  // (hyperlordose) vs thoracique (hypercyphose).
+  const classifyCurvature = (dev, bands, hyperLabel) => {
+    if (dev === null || isNaN(dev)) return null;
+    if (dev < bands.rectitude) return { tendance: 'rectitude', label: 'rectitude / perte de courbure' };
+    if (dev > bands.hyper)     return { tendance: 'hyper',     label: hyperLabel };
+    return { tendance: 'normes', label: 'normes' };
+  };
+  // CVA : référencée à 50° (norme). Zone neutre = |cva−50| ≤ n.cva.
+  if (angles.cva !== null && !isNaN(angles.cva)) {
+    out.cva = { tendance: Math.abs(angles.cva - 50) <= n.cva ? 'normes' : 'hors-normes' };
+  } else {
+    out.cva = null;
+  }
+  // Segments d'orientation (Tronc, Cuisse, Jambe) — tous seuil n.anteriorisation.
+  out.tronc  = classifyNeutral(angles.flexionHanche, n.anteriorisation);
+  out.cuisse = classifyNeutral(angles.cuisse,        n.anteriorisation);
+  // Jambe = angle d'antériorisation du genou depuis le fil à plomb à la cheville.
+  out.jambe  = classifyNeutral(angles.genou,         n.anteriorisation);
+  // Bassin / Hanche articulaire / Épaule.
+  out.bassin = classifyNeutral(angles.bassin, n.bassin);
+  out.hanche = classifyNeutral(angles.hanche, n.hanche);
+  out.epaule = classifyNeutral(angles.epaules, n.epaule);
+  // Genou flex/réc — utilise la valeur centrée (180−genouFlexion), comme l'affichage.
+  const genouCentered = (angles.genouFlexion === null || isNaN(angles.genouFlexion))
+    ? null : 180 - angles.genouFlexion;
+  out.genou = classifyNeutral(genouCentered, n.genou);
+  // Courbures rachidiennes (libellés cliniques par segment).
+  out.cervicale  = classifyCurvature(angles.deviationCervicale,  thr.courbures.cervicale,  'hyperlordose');
+  out.thoracique = classifyCurvature(angles.deviationThoracique, thr.courbures.thoracique, 'hypercyphose');
+  out.lombaire   = classifyCurvature(angles.deviationLombaire,   thr.courbures.lombaire,   'hyperlordose');
+  return out;
+}
+
+// #106-B — Construit la phrase de Conclusion (ordre bas→haut : jambe → cuisse
+// → tronc → tête). Renvoie '' si tous les segments sont dans leur zone de
+// neutralité. Source de vérité unique pour la modale ET la synthèse/rapport
+// (évite la divergence si la logique évolue). CVA traité à part : référencée
+// à 50° avec son seuil propre n.cva, pas à 0 comme les autres.
+function _buildPostureConclusion(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  if (!angles) return '';
+  const n = thr.neutralite;
+  const parts = [];
+  const addAnter = (val, origin) => {
+    if (val === null || isNaN(val) || Math.abs(val) <= n.anteriorisation) return;
+    parts.push((val > 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir ' + origin);
+  };
+  addAnter(angles.genou,         'des chevilles'); // Jambe
+  addAnter(angles.cuisse,        'des genoux');    // Cuisse
+  addAnter(angles.flexionHanche, 'du bassin');     // Tronc
+  if (angles.cva !== null && !isNaN(angles.cva)) {
+    const delta = angles.cva - 50;
+    if (Math.abs(delta) > n.cva) {
+      parts.push((delta < 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir des cervicales');
+    }
+  }
+  return parts.join(' · ');
+}
+
+// #106-B — Liste des mesures hors-normes + conclusion, pour intégration dans
+// la synthèse posturo et le rapport PDF. Format :
+//   { horsNormes: [{ mesure: 'Tronc', detail: 'antérieur' }, ...],
+//     conclusion: 'Antériorisation à partir du bassin · …' | '' }
+// Le caller décide du marquage « dans les normes » si horsNormes + conclusion
+// sont tous deux vides (cf brief : « Posture profil dans les normes — aucune
+// tendance marquée »). Libellés cliniques alignés sur ceux affichés en modale.
+function _buildPostureFindings(angles, thr, analysis) {
+  thr = thr || POSTURE_THRESHOLDS;
+  const empty = { horsNormes: [], conclusion: '' };
+  if (!angles) return empty;
+  const cls = _classifyPostureAngles(angles, thr);
+  const horsNormes = [];
+  const push = (mesure, detail) => horsNormes.push({ mesure, detail });
+  // Tête (CVA) — libellé spécifique antépulsion/rétropulsion + dir antérieur/postérieur.
+  if (cls.cva && cls.cva.tendance !== 'normes') {
+    const delta = angles.cva - 50;
+    push('Tête (CVA)', delta < 0
+      ? 'antérieur (antépulsion de tête)'
+      : 'postérieur (rétropulsion de tête)');
+  }
+  // Segments d'orientation (Tronc/Cuisse/Jambe) — antérieur/postérieur par signe.
+  if (cls.tronc  && cls.tronc.tendance  !== 'normes') push('Tronc',  angles.flexionHanche > 0 ? 'antérieur' : 'postérieur');
+  if (cls.cuisse && cls.cuisse.tendance !== 'normes') push('Cuisse', angles.cuisse        > 0 ? 'antérieur' : 'postérieur');
+  if (cls.jambe  && cls.jambe.tendance  !== 'normes') push('Jambe',  angles.genou         > 0 ? 'antérieur' : 'postérieur');
+  // Bassin / Hanche articulaire / Genou flex-réc / Épaule.
+  if (cls.bassin && cls.bassin.tendance !== 'normes') push('Bassin', angles.bassin > 0 ? 'antéversion' : 'rétroversion');
+  if (cls.hanche && cls.hanche.tendance !== 'normes') push('Hanche', angles.hanche > 0 ? 'flexion de hanche' : 'extension de hanche');
+  if (cls.genou  && cls.genou.tendance  !== 'normes') {
+    const genouCentered = 180 - angles.genouFlexion;
+    push('Genou', genouCentered > 0 ? 'flessum' : 'récurvatum');
+  }
+  // Épaule : libellé clinique défini uniquement pour valeur positive (enroulement
+  // antérieur). Valeurs négatives n'ont pas de terme conventionnel → on skip,
+  // ne polluons pas la liste avec « hors-normes » sans libellé.
+  if (cls.epaule && cls.epaule.tendance !== 'normes' && angles.epaules > 0) {
+    push('Épaule', 'enroulement antérieur');
+  }
+  // #106-Final Volet 3e — Courbures : utilise l'interprétation du praticien
+  // (curveInterp) si présente, sinon mapping auto depuis la tendance. Règle
+  // « hors-normes seulement » : on affiche la courbure UNIQUEMENT si l'interp
+  // n'est pas « Normale ». Format direct (« Hyperlordose »), sans « proposition ».
+  ['cervicale', 'thoracique', 'lombaire'].forEach(courbure => {
+    const interp = _resolveCurveInterp(analysis, cls, courbure);
+    if (interp && interp !== 'Normale') {
+      const label = courbure.charAt(0).toUpperCase() + courbure.slice(1);
+      push(label, interp);
+    }
+  });
+  return { horsNormes, conclusion: _buildPostureConclusion(angles, thr) };
+}
+
+// #106-B fix — Helper synthèse partagé (posturo + sport). Renvoie le tableau
+// des sections « 📐 Analyse posturale — profil <gauche|droit> (propositions à
+// valider) » pour chaque vue placée. Une section vide n'est PAS pushée (pas de
+// vue analysée = pas de bruit). Appelé par genererSynthese (posturo, d = currentPatient.
+// bilanDataPosturo) ET genererSyntheseSport (sport, d = bilanData global) — l'identité
+// d'objet est différente mais la lecture _postureAnalysis y est symétrique :
+// _validatePosturePlacement écrit dans bd via _getPostureBilanData(prefix), qui
+// renvoie le MÊME objet (bilanData pour 'sp', currentPatient.bilanDataPosturo pour 'po').
+// #106-Final Volet 3 — Interprétation courbures éditable par le praticien.
+// Les options dépendent du segment : cervicale et lombaire sont lordoses
+// normales → hyper = Hyperlordose ; thoracique est cyphose normale → hyper =
+// Hypercyphose. L'option « Inversion » (rare : cyphose cervicale, lordose
+// thoracique) n'est jamais proposée automatiquement, uniquement choisie par
+// le praticien.
+const POSTURE_COURBURE_OPTIONS = {
+  cervicale:  ['Hyperlordose', 'Normale', 'Rectitude', 'Inversion'],
+  thoracique: ['Hypercyphose', 'Normale', 'Rectitude', 'Inversion'],
+  lombaire:   ['Hyperlordose', 'Normale', 'Rectitude', 'Inversion'],
+};
+const POSTURE_COURBURE_HYPER_LABEL = {
+  cervicale:  'Hyperlordose',
+  thoracique: 'Hypercyphose',
+  lombaire:   'Hyperlordose',
+};
+
+// Mappe la tendance auto (cls[courbure].tendance) vers le label de l'option
+// sélectionnée. null si la mesure n'est pas calculable (point manquant).
+function _autoCurveInterp(cls, courbure) {
+  if (!cls || !cls[courbure]) return null;
+  const tendance = cls[courbure].tendance;
+  if (tendance === 'hyper')      return POSTURE_COURBURE_HYPER_LABEL[courbure];
+  if (tendance === 'rectitude')  return 'Rectitude';
+  if (tendance === 'normes')     return 'Normale';
+  return null;
+}
+
+// Résout l'interprétation courante : praticien (si curveInterp défini), sinon auto.
+function _resolveCurveInterp(analysis, cls, courbure) {
+  const saved = analysis?.curveInterp?.[courbure];
+  if (saved) return saved;
+  return _autoCurveInterp(cls, courbure);
+}
+
+// Handler onchange des 3 <select>. Mutation partielle (préserve markers/
+// calibration/angles existants) + auto-save selon préfixe. Pattern miroir
+// _onPostureCalibrationChange + _validatePosturePlacement save flow.
+async function _onCurveInterpChange(prefix, viewKey, courbure, value) {
+  const bd = _getPostureBilanData(prefix);
+  if (!bd) return;
+  if (!bd._postureAnalysis) bd._postureAnalysis = {};
+  if (!bd._postureAnalysis[viewKey]) bd._postureAnalysis[viewKey] = {};
+  if (!bd._postureAnalysis[viewKey].curveInterp) bd._postureAnalysis[viewKey].curveInterp = {};
+  bd._postureAnalysis[viewKey].curveInterp[courbure] = value;
+  try {
+    if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
+      await saveBilanSilent();
+    } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
+      await savePosturoBilan(true);
+    }
+  } catch (e) {
+    console.warn('[#106-Final] auto-save curveInterp posture échoué :', e?.message);
+  }
+}
+
+function _buildPostureProfilSectionsSynthese(d) {
+  const out = [];
+  ['profilG', 'profilD'].forEach(function(viewKey) {
+    const analysis = d && d._postureAnalysis && d._postureAnalysis[viewKey];
+    if (!analysis || !analysis.angles) return;
+    // #106-Final Volet 3e — _buildPostureFindings reçoit `analysis` pour pouvoir
+    // appliquer curveInterp (interprétation praticien sur les courbures, qui
+    // remplace la classification auto). Mesures non-courbures inchangées.
+    const findings = _buildPostureFindings(analysis.angles, undefined, analysis);
+    const items = [];
+    findings.horsNormes.forEach(function(f) { items.push(f.mesure + ' : ' + f.detail); });
+    if (findings.conclusion) items.push('Conclusion : ' + findings.conclusion);
+    if (!items.length) items.push('Posture profil dans les normes — aucune tendance marquée');
+    const side = viewKey === 'profilG' ? 'gauche' : 'droit';
+    // #106-Final Volet 2 — titre nettoyé : plus de « (propositions à valider) ».
+    out.push({
+      titre: '📐 Analyse posturale — profil ' + side,
+      items: items,
+    });
+  });
+  return out;
+}
+
 // Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
 // _redrawPostureModal (live durant drag) ET à chaque _renderPostureMarkerList
 // (changement de sélection/placement). Vert si +, rouge si −, gris si null.
@@ -4940,33 +5295,47 @@ function _renderPosturePlacementResults() {
   const fmtCurve = dev => dev === null || isNaN(dev)
     ? `<span style="color:#94a3b8;">—</span>`
     : `<span style="color:#0e1f38;font-weight:700;">${dev.toFixed(1)}°</span>`;
-  // #85-2d-fix2 — Factory de libellés cliniques centrée sur 0. Renvoie span vide
-  // si valeur null/NaN OU si pos→null (ex. épaules pour valeurs négatives sans
-  // terme clinique défini). Couleurs harmonisées : bleu = direction "positive"
-  // attendue (antéversion, flessum, etc.), rouge = "négative", gris = neutre.
-  const T = POSTURE_NEUTRAL_THRESHOLDS;
+  // #106-Final Volet 2 — Factory de libellés cliniques. Couleurs harmonisées :
+  // vert (#10b981) = mesure dans la zone de neutralité ; orange (#ea580c) =
+  // hors zone. Le mot « (neutre) » est conservé comme indication clinique
+  // mais avec la couleur verte signifiant « dans les normes ». Aucun mot
+  // « proposition / normes / hors-normes ».
+  const N = POSTURE_THRESHOLDS.neutralite;
   const _lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
   const mkLbl = (threshold, posText, negText) => v => {
     if (v === null || isNaN(v)) return '';
-    if (Math.abs(v) <= threshold) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
-    if (v > 0) return `<span style="${_lblStyle('#3b82f6')}">${posText}</span>`;
-    return negText ? `<span style="${_lblStyle('#dc2626')}">${negText}</span>` : '';
+    if (Math.abs(v) <= threshold) return `<span style="${_lblStyle('#10b981')}">(neutre)</span>`;
+    if (v > 0) return `<span style="${_lblStyle('#ea580c')}">${posText}</span>`;
+    return negText ? `<span style="${_lblStyle('#ea580c')}">${negText}</span>` : '';
   };
-  const lblBassin     = mkLbl(T.default, '(antéversion)',             '(rétroversion)');
-  const lblGenouFR    = mkLbl(T.default, '(flessum)',                 '(récurvatum)');
-  const lblEpaules    = mkLbl(T.default, '(enroulement antérieur)',   null); // pas de libellé clinique défini pour < 0
-  const lblHanche     = mkLbl(T.default, '(flexion de hanche)',       '(extension de hanche)');
-  const lblAnterPoint = mkLbl(T.default, '(antérieur)',               '(postérieur)');
-  // #85-2d-segments — CVA en section 1 (Antériorisation) avec vocabulaire segment
-  // unifié (antérieur/postérieur), pas l'ancien (antépulsion/rétropulsion).
-  // Référence 50° (norme clinique), seuil T.cva : low delta = tête forward.
+  const lblBassin     = mkLbl(N.bassin,          '(antéversion)',             '(rétroversion)');
+  const lblGenouFR    = mkLbl(N.genou,           '(flessum)',                 '(récurvatum)');
+  const lblEpaules    = mkLbl(N.epaule,          '(enroulement antérieur)',   null); // pas de libellé clinique défini pour < 0
+  const lblHanche     = mkLbl(N.hanche,          '(flexion de hanche)',       '(extension de hanche)');
+  const lblAnterPoint = mkLbl(N.anteriorisation, '(antérieur)',               '(postérieur)');
+  // CVA référencée à 50°, seuil N.cva. Même schéma de couleurs.
   const lblCvaAnter = v => {
     if (v === null || isNaN(v)) return '';
     const delta = v - 50;
-    if (Math.abs(delta) <= T.cva) return `<span style="${_lblStyle('#94a3b8')}">(neutre)</span>`;
+    if (Math.abs(delta) <= N.cva) return `<span style="${_lblStyle('#10b981')}">(neutre)</span>`;
     return delta < 0
-      ? `<span style="${_lblStyle('#3b82f6')}">(antérieur)</span>`
-      : `<span style="${_lblStyle('#dc2626')}">(postérieur)</span>`;
+      ? `<span style="${_lblStyle('#ea580c')}">(antérieur)</span>`
+      : `<span style="${_lblStyle('#ea580c')}">(postérieur)</span>`;
+  };
+  const cls = _classifyPostureAngles(a);
+  // #106-Final Volet 3 — Selects éditables pour les 3 courbures. Pré-sélection
+  // depuis curveInterp sauvegardé (praticien), sinon mapping auto depuis tendance.
+  // Lu via _postureModalPrefix/_postureModalViewKey (set à l'ouverture modale).
+  const bdModal = _postureModalPrefix ? _getPostureBilanData(_postureModalPrefix) : null;
+  const analysisModal = bdModal?._postureAnalysis?.[_postureModalViewKey];
+  const _selectStyle = `font-size:11px;color:#0e1f38;border:1px solid #cbd5e0;border-radius:3px;padding:1px 4px;margin-left:4px;background:#fff;cursor:pointer;`;
+  const renderCurveSelect = (courbure) => {
+    if (!_postureModalPrefix || !_postureModalViewKey) return '';
+    const current = _resolveCurveInterp(analysisModal, cls, courbure);
+    const opts = POSTURE_COURBURE_OPTIONS[courbure].map(opt =>
+      `<option value="${opt}" ${opt === current ? 'selected' : ''}>${opt}</option>`
+    ).join('');
+    return `<select id="posture-curve-interp-${courbure}" onchange="_onCurveInterpChange('${_postureModalPrefix}','${_postureModalViewKey}','${courbure}', this.value)" style="${_selectStyle}">${opts}</select>`;
   };
   const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
   const lbl = `color:#64748b;`;
@@ -4977,23 +5346,11 @@ function _renderPosturePlacementResults() {
   // par « · ». Ordre bas→haut (jambe → cuisse → tronc → tête) cohérent avec la
   // lecture clinique d'une chaîne posturale. Si tous neutres/null → message
   // d'alignement. CVA traité à part (référence 50°, pas 0).
-  const conclusionParts = [];
-  const addAnterPart = (val, origin) => {
-    if (val === null || isNaN(val) || Math.abs(val) <= T.default) return;
-    conclusionParts.push((val > 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir ' + origin);
-  };
-  addAnterPart(a.genou,         'des chevilles');  // Jambe
-  addAnterPart(a.cuisse,        'des genoux');     // Cuisse
-  addAnterPart(a.flexionHanche, 'du bassin');      // Tronc
-  if (a.cva !== null && !isNaN(a.cva)) {
-    const delta = a.cva - 50;
-    if (Math.abs(delta) > T.cva) {
-      conclusionParts.push((delta < 0 ? 'Antériorisation' : 'Postériorisation') + ' à partir des cervicales');
-    }
-  }
-  const conclusionText = conclusionParts.length > 0
-    ? conclusionParts.join(' · ')
-    : 'Alignement global — pas de tendance antérieure/postérieure marquée';
+  // #106-B — Conclusion extraite vers _buildPostureConclusion (source unique
+  // partagée avec la synthèse + rapport). La fonction renvoie '' si tout est
+  // aligné ; on ajoute ici le texte fallback spécifique à l'affichage modale.
+  const conclusionText = _buildPostureConclusion(a)
+    || 'Alignement global — pas de tendance antérieure/postérieure marquée';
   panel.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
       <div>
@@ -5009,9 +5366,9 @@ function _renderPosturePlacementResults() {
       </div>
       <div>
         <div style="${groupHdr}">Courbures</div>
-        <div><span style="${lbl}">Cervicale :</span> ${fmtCurve(a.deviationCervicale)}</div>
-        <div><span style="${lbl}">Thoracique :</span> ${fmtCurve(a.deviationThoracique)}</div>
-        <div><span style="${lbl}">Lombaire :</span> ${fmtCurve(a.deviationLombaire)}</div>
+        <div><span style="${lbl}">Cervicale :</span> ${fmtCurve(a.deviationCervicale)} ${renderCurveSelect('cervicale')}</div>
+        <div><span style="${lbl}">Thoracique :</span> ${fmtCurve(a.deviationThoracique)} ${renderCurveSelect('thoracique')}</div>
+        <div><span style="${lbl}">Lombaire :</span> ${fmtCurve(a.deviationLombaire)} ${renderCurveSelect('lombaire')}</div>
       </div>
       <div>
         <div style="${groupHdr}">Bassin / Hanche / Genou</div>
@@ -5291,6 +5648,10 @@ function openPosturePlacementModal(prefix, viewKey) {
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   const dataUrl = bd[key];
   if (!dataUrl) { alert('Capture d\'abord la photo profil avant de placer les points.'); return; }
+  // #106-Final — Identité modale exposée au panneau pour lire curveInterp et
+  // câbler les onchange des <select> avec le bon prefix/viewKey.
+  _postureModalPrefix = prefix;
+  _postureModalViewKey = viewKey;
   // Init markers : clone template (x:null, y:null), puis injection des coords
   // sauvegardées par nom (résilient au réordo / renommage futur des points).
   _postureModalMarkers = cloneMarkers('posture-profil');
@@ -5383,6 +5744,8 @@ function _cancelPosturePlacement() {
   _postureModalCtx = null;
   _postureCalibration = null;
   _postureCalibrationMode = false;
+  _postureModalPrefix = null;
+  _postureModalViewKey = null;
 }
 
 // Persiste les coords en NORMALISÉ nx/ny ∈ [0,1] dans bd._postureAnalysis[viewKey].
@@ -5401,6 +5764,21 @@ async function _validatePosturePlacement(prefix, viewKey) {
   // de refaire le calcul à chaque affichage rapport / liste / résumé).
   const angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
   if (!bd._postureAnalysis) bd._postureAnalysis = {};
+  // #106-Final Volet 3d — curveInterp = source de vérité depuis les 3 <select>.
+  // Si le select n'existe pas (état dégradé), on retombe sur la valeur sauvegardée
+  // ou l'auto-mapping. cls calculé à partir des angles pour l'auto-mapping.
+  const cls = _classifyPostureAngles(angles);
+  const existing = bd._postureAnalysis[viewKey] || {};
+  const readSelect = (courbure) => {
+    const el = document.getElementById('posture-curve-interp-' + courbure);
+    if (el && el.value) return el.value;
+    return existing.curveInterp?.[courbure] || _autoCurveInterp(cls, courbure) || null;
+  };
+  const curveInterp = {
+    cervicale:  readSelect('cervicale'),
+    thoracique: readSelect('thoracique'),
+    lombaire:   readSelect('lombaire'),
+  };
   bd._postureAnalysis[viewKey] = {
     markers: _postureModalMarkers.map(m => ({
       name: m.name,
@@ -5414,6 +5792,7 @@ async function _validatePosturePlacement(prefix, viewKey) {
       p2: _postureCalibration.p2 ? { nx: _postureCalibration.p2.x / W, ny: _postureCalibration.p2.y / H } : null,
     } : null,
     angles,
+    curveInterp,
   };
   _cancelPosturePlacement();
   _renderPostureSlot(prefix, viewKey);
@@ -6783,6 +7162,14 @@ const sections = [];
     }
   }
 
+  // #106-Final Volet 1 — l'analyse posturale profil n'est plus insérée dans le
+  // corps Morphostatique. Elle apparaît UNE fois dans le rapport, via la section
+  // « 8. Synthèse clinique » (alimentée par d._synthese généré par
+  // genererSynthese, qui appelle _buildPostureProfilSectionsSynthese). Évite la
+  // duplication entre body et synthèse clinique. Sport déjà en synthèse clinique
+  // seule (via _collectSportSyntheseSections injecté dans _buildSportSyntheseHTML-
+  // ForRapport L8858) — comportement symétrique entre sport et posturo.
+
   // 3. Bilan dynamique
   // #96 — Clés alignées sur savePosturoBilan / synthèse. Référence pour la logique
   // conditionnelle : genererSynthese L9956-10038 (DOM-direct, mêmes IDs que save).
@@ -7633,7 +8020,20 @@ function buildPhotoMini(data,side,t) {
 //
 // Cas 0 image (bd vide ou aucune clé canvas) : callback({}) immédiat synchrone,
 // pas de setTimeout (cohérent avec pattern posturo).
-function _resolveSportRapportImages(bd, callback) {
+// #106 fix rapport sport morpho — Path-aware. Préexistant à #106 (régression
+// #81/#85 migration Storage) : après un save, la dataURL `bd._morpho_face` est
+// strippée de currentPatient.bilanData (seul `_morpho_facePath` reste), donc
+// l'ancien filtre `bd[t.key]` éliminait toutes les entrées migrées → dessins
+// invisibles au rapport (template vierge seul). On résout d'abord chaque clé
+// vers une dataURL : (a) si en RAM, on l'utilise ; (b) sinon si Path Storage,
+// on fetch via prefetchPhotoToDataUrl (helper existant L195 storage.js, jamais
+// throw — { ok, dataUrl } | { ok:false, error }) ; (c) sinon entrée ignorée.
+// Fallback gracieux préservé : si prefetch échoue (offline/Storage), pas de
+// crash — l'entrée est simplement absente de composites, le caller retombe sur
+// le template vierge (cf src = composites[k] || imgjs-*.src L8315).
+// Mutation IN PLACE de bd évitée — on utilise un objet local drawingUrls pour
+// ne pas re-peupler `currentPatient.bilanData` (laissé décidé par saveBilanSilent).
+async function _resolveSportRapportImages(bd, callback) {
   const TODO = [
     { key: '_morpho_face',    baseId: 'imgjs-morpho-face'    },
     { key: '_morpho_face2',   baseId: 'imgjs-morpho-face2'   },
@@ -7641,7 +8041,22 @@ function _resolveSportRapportImages(bd, callback) {
     { key: '_morpho_profilD', baseId: 'imgjs-morpho-profilD' },
     { key: '_pieds',          baseId: 'sp-pieds-img'         }
   ];
-  const toResolve = TODO.filter(t => bd[t.key]);
+  // Résolution dataURL (RAM ou Storage) en parallèle. Une entrée sans dataURL
+  // ni Path est simplement absente de drawingUrls (skip propre).
+  const drawingUrls = {};
+  await Promise.all(TODO.map(async t => {
+    if (bd[t.key]) {
+      drawingUrls[t.key] = bd[t.key];
+      return;
+    }
+    const path = bd[t.key + 'Path'];
+    if (path && typeof prefetchPhotoToDataUrl === 'function') {
+      const r = await prefetchPhotoToDataUrl(path);
+      if (r.ok) drawingUrls[t.key] = r.dataUrl;
+      else console.warn('[rapport-sport] prefetch fail', t.key + 'Path', '→', r.error);
+    }
+  }));
+  const toResolve = TODO.filter(t => drawingUrls[t.key]);
   if(toResolve.length === 0) {
     callback({});
     return;
@@ -7658,14 +8073,20 @@ function _resolveSportRapportImages(bd, callback) {
     drawing.onload = () => {
       const baseEl = document.getElementById(baseId);
       if(!baseEl || !baseEl.complete || !baseEl.naturalWidth) {
-        finalize(bd[key]);
+        finalize(drawingUrls[key]);
         return;
       }
       try {
-        // #98 Fix transform — Wd × Hd = dims du dataURL = rect parent en px CSS
-        // au save (downscale par DPR par _serializeDrawCanvas L7763-7767). Composite
-        // dans ce repère pour préserver le dessin 1:1. Gabarit positionné/dimensionné
-        // selon la BOÎTE CSS de l'UI (parité visuelle exacte).
+        // #106 Fix géométrie — régression #83 (commit 2b3e1e0 « netteté dessins
+        // sérialisation pleine résolution »). Avant #83, _serializeDrawCanvas
+        // downscalait par DPR → Wd × Hd étaient en pixels CSS, et la constante
+        // hardcodée 200 (= max-height:200px CSS du template en éditeur) avait
+        // du sens. Post-#83, Wd × Hd sont en pixels INTERNES (= CSS × DPR), donc
+        // la constante CSS 200 doit être remplacée par Hd (canvas full height).
+        // Idem pour la constante 400 du branch _pieds (= max-width:400px CSS).
+        // Fix : scale dérivé de Hd / baseH (morpho) ou de min(Wd, Hd) × 0.8
+        // (pieds) → DPR-invariant : le template remplit le canvas exactement
+        // comme dans l'éditeur, à n'importe quel DPR.
         const Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
         const baseW = baseEl.naturalWidth, baseH = baseEl.naturalHeight;
         const tmp = document.createElement('canvas');
@@ -7675,12 +8096,35 @@ function _resolveSportRapportImages(bd, callback) {
         ctx.fillRect(0, 0, Wd, Hd);
         let dx, dy, dispW, dispH;
         if(key === '_pieds') {
-          dispW = Math.min((Wd - 16) * 0.8, 400);
+          // #106 Fix2 — Géométrie miroir éditeur (index.html L2515-2517) en
+          // fractions de Wd/Hd, DPR-invariant. Éditeur :
+          //   <img width:80% max-width:400px margin:0 auto> dans parent padding:8px
+          //   → canvas couvre parent entier ; image top-alignée avec petit padding,
+          //     centrée horizontalement.
+          // Fractions appliquées :
+          //   dispW = 0.80 × Wd        → ≈ width:80% éditeur
+          //   dispH = dispW × baseH/baseW  → préserve aspect template (cap si dépasse Hd)
+          //   dx = (Wd - dispW)/2      → ≈ 0.10 × Wd de chaque côté (centré H)
+          //   dy = Hd × 0.03           → top-aligné, fraction exacte éditeur (16/522 = 8/261 ≈ 0.0306)
+          // Note : la formule précédente `min(...,Hd/baseH) × 0.8` faisait Hd/baseH
+          // dominer pour les templates hauts (baseH > baseW), rétrécissant l'image
+          // sous l'attendu éditeur. Ici, dispW dérive directement de Wd sans cap
+          // par Hd (sauf garde-fou si l'aspect dépasse le canvas).
+          dispW = Wd * 0.8;
           dispH = dispW * (baseH / baseW);
-          dx = 8 + ((Wd - 16) - dispW) / 2;
-          dy = 8;
+          if (dispH > Hd * 0.96) {
+            // Garde-fou : aspect template très allongé + canvas peu haut → cap.
+            dispH = Hd * 0.96;
+            dispW = dispH * baseW / baseH;
+          }
+          dx = (Wd - dispW) / 2;
+          dy = Hd * 0.03;
         } else {
-          const scale = Math.min((Wd - 16) / baseW, 200 / baseH);
+          // Morpho : object-fit:contain équivalent. Hd remplace l'ancien 200 codé
+          // en dur (CSS pré-#83). Template occupe canvas-full ou plus petit selon
+          // baseH / baseW. Padding -16 internal (≈ 8-16 CSS px selon DPR) accepté
+          // car cosmétique mineur, pas d'impact géométrique sur l'alignement.
+          const scale = Math.min((Wd - 16) / baseW, Hd / baseH);
           dispW = baseW * scale;
           dispH = baseH * scale;
           dx = (Wd - dispW) / 2;
@@ -7690,14 +8134,14 @@ function _resolveSportRapportImages(bd, callback) {
         ctx.drawImage(drawing, 0, 0, Wd, Hd);
         finalize(tmp.toDataURL('image/png'));
       } catch(e) {
-        finalize(bd[key]);
+        finalize(drawingUrls[key]);
       }
     };
     drawing.onerror = () => {
       // CRITIQUE — sans cette branche, dessin cassé = callback jamais appelée.
-      finalize(bd[key]);
+      finalize(drawingUrls[key]);
     };
-    drawing.src = bd[key];
+    drawing.src = drawingUrls[key];
   });
 }
 
@@ -12428,6 +12872,12 @@ async function genererSynthese() {
   if(romParts.length) morphoItems.push('Romberg: '+romParts.join(', '));
   if(morphoItems.length) sections.push({titre:'🧍 Morphostatique', items:[morphoItems.join(' · ')]});
 
+  // #106-B — Analyse posturale profil : juste après Morphostatique pour
+  // continuité visuelle avec les captures + placement 14 points. Helper
+  // _buildPostureProfilSectionsSynthese partagé avec genererSyntheseSport
+  // (anti-divergence). Posturo lit currentPatient.bilanDataPosturo (= d).
+  Array.prototype.push.apply(sections, _buildPostureProfilSectionsSynthese(d));
+
   // Bilan dynamique (psec-2)
   const dynItems = [];
   // Observations libres
@@ -13446,6 +13896,12 @@ function _collectSportSyntheseSections(d, readers) {
   if(d.chaine_musculaire) morpho.push('Hypothèse chaîne musculaire: ' + d.chaine_musculaire);
   if(morpho.length) sections.push({ titre: '🧍 Morphostatique', items: [morpho.join(' · ')] });
 
+  // #106-B fix2 — Analyse posturale profil DANS la source partagée (synthèse +
+  // rapport sport). _buildSportSyntheseHTMLForRapport reçoit currentPatient.bilanData
+  // qui porte _postureAnalysis après saveBilanSilent (cf L9273 sync global → persisté).
+  // Pour les bilans archivés pré-#106-A : helper retourne [] → graceful, pas de bruit.
+  Array.prototype.push.apply(sections, _buildPostureProfilSectionsSynthese(d));
+
   // 3. Examen en charge / décharge (ssec-2, B1 #73) — réécriture structurée.
   //    Lecture CONDITIONNELLE des sous-valeurs : un sub-radio/sub-cb n'est lu
   //    que si son parent est dans l'état requis (neutralise toute valeur
@@ -13779,6 +14235,10 @@ function genererSyntheseSport() {
     neuroReader: id => document.getElementById('sn-' + id)?.checked
   };
   const sections = _collectSportSyntheseSections(d, readersDOM);
+  // #106-B fix2 — Insertion analyse posturale profil migrée DANS
+  // _collectSportSyntheseSections (juste après Morphostatique) → couvre synthèse
+  // écran ET rapport PDF via la même source. Ne PAS splicer ici (sinon doublon
+  // à l'écran). Le rapport sport hérite naturellement de la section.
   // #86 Fix E2E — section « ⚠️ Mesures à signaler » EN TÊTE (écran uniquement).
   // unshift ICI (pas dans _collectSportSyntheseSections) — pour éviter doublon
   // au rapport (qui a déjà un bloc autonome « Mesures à signaler » en tête, L5757).
