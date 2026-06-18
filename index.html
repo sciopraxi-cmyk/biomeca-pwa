@@ -644,6 +644,10 @@
           <input type="range" min="80" max="255" value="200" id="sens-sl" style="flex:1;" oninput="sensThr=+this.value;document.getElementById('sens-lbl').textContent='Seuil:'+this.value"/>
           <span style="font-size:10px;color:var(--mut);min-width:60px;" id="sens-lbl">Seuil:200</span>
         </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <input type="range" min="0.3" max="1.5" step="0.05" value="0.55" id="marker-size-sl-photo" class="marker-size-slider" style="flex:1;" oninput="setMarkerSizeFactor(this.value)"/>
+          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="marker-size-lbl-photo" class="marker-size-label">Taille:0.55</span>
+        </div>
         <div class="sep"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div class="stitle" style="margin:0;">Photos du test</div>
@@ -677,6 +681,10 @@
           
         </div>
         <input type="range" min="0" max="1000" value="0" id="timeline" oninput="seekVid(this.value)" style="width:100%;"/>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <input type="range" min="0.3" max="1.5" step="0.05" value="0.55" id="marker-size-sl-vid" class="marker-size-slider" style="flex:1;" oninput="setMarkerSizeFactor(this.value)"/>
+          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="marker-size-lbl-vid" class="marker-size-label">Taille:0.55</span>
+        </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:4px;">
           <div style="font-size:10px;color:var(--mut);">Frames (<span id="frame-count">0</span>)</div>
           <button class="btn" onclick="resetAllFrames()" style="font-size:10px;padding:3px 8px;">Effacer tout</button>
