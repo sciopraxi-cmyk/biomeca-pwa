@@ -1680,6 +1680,28 @@ let camStream = null, animId = null;
 let autoLive = false;
 let sensThr = 200;
 
+// feat-biomec-capteurs (A) — facteur de taille des marqueurs dessinés (point,
+// halo, label) appliqué à drawOverlay + findMarkerAt. Persisté en localStorage
+// clé bm4-marker-size pour rester appliqué entre sessions / PWA reloads.
+// Range slider 0.3–1.5 (step 0.05) ; défaut 0.55 (réduction pour coller aux
+// petites pastilles réfléchissantes). Loader fail-safe avec clamp + fallback.
+const MARKER_SIZE_KEY = 'bm4-marker-size';
+const MARKER_SIZE_DEFAULT = 0.55;
+const MARKER_SIZE_MIN = 0.3;
+const MARKER_SIZE_MAX = 1.5;
+function _loadMarkerSize() {
+  try {
+    const raw = localStorage.getItem(MARKER_SIZE_KEY);
+    if (!raw) return MARKER_SIZE_DEFAULT;
+    const n = parseFloat(raw);
+    if (isNaN(n)) return MARKER_SIZE_DEFAULT;
+    return Math.min(MARKER_SIZE_MAX, Math.max(MARKER_SIZE_MIN, n));
+  } catch (e) {
+    return MARKER_SIZE_DEFAULT;
+  }
+}
+let markerSizeFactor = _loadMarkerSize();
+
 // Caméra vidéo
 let vidStream = null, mediaRec = null, recChunks = [], isRecording = false;
 let vAutoDetect = false;
@@ -6228,8 +6250,44 @@ function canvasXY(e, canvas) {
   return {x:(e.clientX-rect.left)*canvas.width/rect.width, y:(e.clientY-rect.top)*canvas.height/rect.height};
 }
 
+// feat-biomec-capteurs (A) — Handler oninput des sliders « Taille points ».
+// Source de vérité unique = markerSizeFactor + clé localStorage. Sync visuelle
+// des sliders et labels (photo + vidéo) pour cohérence quand l'utilisateur
+// switch de mode. Redraw immédiat des canvases pour feedback live, même en
+// pause vidéo (rAF du live cam couvre naturellement les cas actifs).
+function setMarkerSizeFactor(val) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return;
+  markerSizeFactor = Math.min(MARKER_SIZE_MAX, Math.max(MARKER_SIZE_MIN, n));
+  try { localStorage.setItem(MARKER_SIZE_KEY, String(markerSizeFactor)); } catch (e) { /* noop */ }
+  // Sync sliders (au cas où un autre slider est visible aussi).
+  document.querySelectorAll('.marker-size-slider').forEach(el => {
+    if (parseFloat(el.value) !== markerSizeFactor) el.value = markerSizeFactor;
+  });
+  document.querySelectorAll('.marker-size-label').forEach(el => {
+    el.textContent = 'Taille:' + markerSizeFactor.toFixed(2);
+  });
+  // Redraw immédiat — pour vidéo paused (live cam = rAF s'en charge).
+  const view = (typeof TESTS !== 'undefined' && TESTS[currentTestId]?.view) || 'face';
+  const vEl = document.getElementById('vid-el');
+  const vC  = document.getElementById('vid-canvas');
+  if (vEl && vC && vC.width > 0 && vEl.readyState >= 2) {
+    const ctx = vC.getContext('2d');
+    ctx.drawImage(vEl, 0, 0, vC.width, vC.height);
+    drawOverlay(ctx, vC, vidMarkers, selectedVidMkrIdx, view);
+  }
+  // Photo : repeint juste l'overlay markers (live cam rAF couvre l'underlying).
+  const phC = document.getElementById('ph-canvas');
+  if (phC && phC.width > 0) {
+    drawOverlay(phC.getContext('2d'), phC, liveMarkers, selectedMkrIdx, view);
+  }
+}
+
 function findMarkerAt(x, y, markers, cw) {
-  const r=Math.max(14,cw/40);
+  // feat-biomec-capteurs (A) — hit-test scalé par markerSizeFactor MAIS avec
+  // plancher confortable au touch (12px min). Le marqueur visuel rétrécit, on
+  // doit toujours pouvoir l'attraper au doigt même quand markerSizeFactor=0.3.
+  const r = Math.max(12, (cw / 40) * markerSizeFactor);
   for(let i=markers.length-1;i>=0;i--){
     const m=markers[i]; if(m.x===null)continue;
     if(Math.hypot(m.x-x,m.y-y)<r) return i;
@@ -6360,19 +6418,26 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
   });
 
   // Points marqueurs
+  // feat-biomec-capteurs (A) — rayon, halo et label scalés par markerSizeFactor.
+  // Planchers (4 px rayon, 8 px label) garantissent la lisibilité même à 0.3.
+  // Halo : ratio +4 d'origine remplacé par +Math.max(2, 4*factor) pour suivre
+  // proportionnellement la réduction du point (un halo +4 sur un point de 4 px
+  // dominerait visuellement le point lui-même).
   markers.forEach((m,i)=>{
     if(m.x===null) return;
-    const r=Math.max(6,W/72);
+    const r = Math.max(4, (W / 72) * markerSizeFactor);
+    const haloPad = Math.max(2, 4 * markerSizeFactor);
     const isSel=selIdx===i;
     ctx.save();
-    ctx.beginPath(); ctx.arc(m.x,m.y,r+4,0,2*Math.PI);
+    ctx.beginPath(); ctx.arc(m.x, m.y, r + haloPad, 0, 2 * Math.PI);
     ctx.fillStyle=isSel?'rgba(245,166,35,.3)':'rgba(255,255,255,.15)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(m.x,m.y,r,0,2*Math.PI);
+    ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
     ctx.fillStyle=m.color; ctx.fill();
     ctx.strokeStyle=isSel?'#f5a623':'#fff'; ctx.lineWidth=isSel?2.5:1.5; ctx.stroke();
     ctx.restore();
-    ctx.fillStyle='#fff'; ctx.font=`bold ${Math.max(9,W/60)}px DM Sans,sans-serif`;
-    ctx.fillText(m.name,m.x+r+3,m.y+3);
+    ctx.fillStyle='#fff';
+    ctx.font = `bold ${Math.max(8, (W / 60) * markerSizeFactor)}px DM Sans,sans-serif`;
+    ctx.fillText(m.name, m.x + r + 3, m.y + 3);
   });
 
   // Arc d'angle pour chaque groupe de 3
@@ -15510,6 +15575,18 @@ function populateSportSysOptions() {
   });
 }
 document.addEventListener('DOMContentLoaded', populateSportSysOptions);
+
+// feat-biomec-capteurs (A) — synchroniser les sliders « Taille points » avec
+// markerSizeFactor chargé depuis localStorage au boot (les value="" du HTML
+// sont 0.55 par défaut, ne reflètent pas un override utilisateur persisté).
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.marker-size-slider').forEach(el => {
+    el.value = markerSizeFactor;
+  });
+  document.querySelectorAll('.marker-size-label').forEach(el => {
+    el.textContent = 'Taille:' + markerSizeFactor.toFixed(2);
+  });
+});
 // #85 Phase 1 — peuple le container Analyse posturale en tête de ssec-1
 // (sport HTML statique → injection au boot). Posturo n'a pas d'équivalent : son
 // markup est régénéré à chaque ouverture via getBilanPosturoHTML (interpolation
