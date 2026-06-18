@@ -3422,6 +3422,26 @@ async function prefetchSportPhotos(mesuresEntry) {
   }));
 }
 
+// Fix rapport-sport-test-photos — prefetch des dataURLs de TOUS les tests
+// de p.mesures (pas seulement le test en cours d'édition). Couvre le flux
+// « PWA reload → ouvrir patient → générer rapport SANS rouvrir aucun test » :
+// sans ce prefetch, les entries n'ont que .path (post-strip persistence),
+// buildPrintPhotos filtre `ph?.dataUrl ?…` → aucune image rendue.
+// Itération par testId (skip clés `_*` comme `_bilanId`). Chaque test est
+// délégué à prefetchSportPhotos existante (réutilisation, pas de duplication).
+// Fallback gracieux : si un fetch Storage échoue, l'entry reste sans dataURL
+// → image absente mais pas de crash (cf comportement existant).
+async function _prefetchAllSportMesuresPhotos(mesures) {
+  if (!mesures) return;
+  const promises = [];
+  for (const tid in mesures) {
+    if (tid.startsWith('_')) continue; // skip _bilanId et autres méta
+    const entry = mesures[tid];
+    if (entry) promises.push(prefetchSportPhotos(entry));
+  }
+  await Promise.all(promises);
+}
+
 // Migre les photos/frames d'un mesuresEntry vers Storage. Stash les dataUrls
 // upfront (pour restauration RAM via restoreSportPhotosStash après save) ;
 // upload uniquement les entries `dataUrl set + path null` (replacements et
@@ -7757,14 +7777,26 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
 
 }
 
-function buildRapport() {
+async function buildRapport() {
   if(!currentPatient){
     document.getElementById('rpt-body').innerHTML='<div style="color:var(--mut);text-align:center;padding:20px;">Aucun patient sélectionné.</div>';
     return;
   }
-  // #86 Fix E2E — Sauvegarde silencieuse en amont (parité printReport L5723) pour
-  // que l'aperçu reflète l'état UI courant, pas le dernier save sur disque.
-  saveBilanSilent();
+  // Fix rapport-sport-test-photos — AWAIT le cycle save complet AVANT de
+  // résoudre / rendre. Sans await, saveBilanSilent (async, async migrate +
+  // savePatients strip-restore) pouvait s'exécuter EN PARALLÈLE avec
+  // _resolveSportRapportImages (devenu async au #106), causant une race où le
+  // strip de p.mesures dataURLs pouvait coïncider avec leur lecture HTML.
+  // L'await garantit l'ordre : strip → persist → restore COMPLET avant lecture.
+  // Puis prefetch Path-aware des photos de tests pour couvrir le cas où les
+  // tests n'ont pas été ouverts dans la session (pas de prefetch déclenché par
+  // launchTest L2302) → buildPrintPhotos voit les dataURLs et rend les images.
+  try {
+    await saveBilanSilent();
+    await _prefetchAllSportMesuresPhotos(currentPatient.mesures);
+  } catch (e) {
+    console.warn('[fix rapport-sport] save/prefetch a échoué :', e?.message);
+  }
   const p = currentPatient;
   document.getElementById('rpt-sub').textContent = p.prenom+' '+p.nom+' · '+(p.sport||'—')+' · '+p.date;
 
@@ -8329,15 +8361,24 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   return { pratHTML, patientHTML, bodyHTML };
 }
 
-function printReport() {
+async function printReport() {
   // Gating task #57 — bloque l'impression si pas full access.
   if (window._accessLevel && window._accessLevel !== 'full') {
     showAccessRestrictedModal('export_pdf');
     return;
   }
   if(!currentPatient){alert('Aucun patient sélectionné.');return;}
-  // Sauvegarder automatiquement le bilan avant d'imprimer
-  saveBilanSilent();
+  // Fix rapport-sport-test-photos — AWAIT save complet + prefetch test photos
+  // avant rendu + window.print(). Sans cela, race possible entre saveBilanSilent
+  // async (strip-restore p.mesures) et _resolveSportRapportImages async (#106),
+  // plus PWA cold flow où launchTest n'a pas pré-rempli les dataURLs.
+  // L'await garantit que les dataURLs sont en RAM au moment de buildPrintPhotos.
+  try {
+    await saveBilanSilent();
+    await _prefetchAllSportMesuresPhotos(currentPatient.mesures);
+  } catch (e) {
+    console.warn('[fix rapport-sport] save/prefetch a échoué :', e?.message);
+  }
   const p=currentPatient;
   // #86 Fix E2E — alignement résolution praticien sur posturo L4779 (`|| {}`).
   // Smart default 1-cabinet : si p.pratId ne matche pas ET praticiens.length === 1,
