@@ -1702,6 +1702,27 @@ function _loadMarkerSize() {
 }
 let markerSizeFactor = _loadMarkerSize();
 
+// feat-biomec-capteurs (B) — opacité globale du remplissage des marqueurs
+// (point + segments). Le contour (stroke) et le label restent opaques pour
+// repérer le centre exact même quand la pastille est visible à travers.
+// Persistance localStorage clé bm4-marker-opacity, même contrat que la taille.
+const MARKER_OPACITY_KEY = 'bm4-marker-opacity';
+const MARKER_OPACITY_DEFAULT = 0.5;
+const MARKER_OPACITY_MIN = 0.15;
+const MARKER_OPACITY_MAX = 1.0;
+function _loadMarkerOpacity() {
+  try {
+    const raw = localStorage.getItem(MARKER_OPACITY_KEY);
+    if (!raw) return MARKER_OPACITY_DEFAULT;
+    const n = parseFloat(raw);
+    if (isNaN(n)) return MARKER_OPACITY_DEFAULT;
+    return Math.min(MARKER_OPACITY_MAX, Math.max(MARKER_OPACITY_MIN, n));
+  } catch (e) {
+    return MARKER_OPACITY_DEFAULT;
+  }
+}
+let markerOpacity = _loadMarkerOpacity();
+
 // Caméra vidéo
 let vidStream = null, mediaRec = null, recChunks = [], isRecording = false;
 let vAutoDetect = false;
@@ -4489,6 +4510,7 @@ async function toggleVCam() {
       document.getElementById('vid-info').textContent=`Live ${vcanvas.width}×${vcanvas.height}`;
       document.getElementById('btn-vrec').style.display='';
       document.getElementById('btn-vauto').style.display='';
+      document.getElementById('btn-vsnap').style.display='';
       document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
       document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
       vAutoDetect=true; document.getElementById('btn-vauto').textContent='Auto : ON'; document.getElementById('btn-vauto').className='btn btn-green';
@@ -4503,6 +4525,7 @@ function stopVCam() {
   if(vidStream) vidStream.getTracks().forEach(t=>t.stop()); vidStream=null;
   document.getElementById('btn-vcam').textContent='Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
   document.getElementById('btn-vrec').style.display='none'; document.getElementById('btn-vauto').style.display='none';
+  document.getElementById('btn-vsnap').style.display='none';
   document.getElementById('vcam-st').textContent='Inactive'; document.getElementById('vcam-st').className='badge bd';
 }
 
@@ -4515,6 +4538,7 @@ function loadVidFile(input) {
     vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
     document.getElementById('vid-info').textContent=`${player.videoWidth}×${player.videoHeight} · ${player.duration.toFixed(1)}s`;
     document.getElementById('btn-vauto').style.display='';
+    document.getElementById('btn-vsnap').style.display='';
     vAutoDetect=true; document.getElementById('btn-vauto').textContent='Auto : ON'; document.getElementById('btn-vauto').className='btn btn-green';
     document.getElementById('vcam-st').textContent='Vidéo'; document.getElementById('vcam-st').className='badge bb';
     setupVidCanvas(player,vcanvas);
@@ -6283,6 +6307,35 @@ function setMarkerSizeFactor(val) {
   }
 }
 
+// feat-biomec-capteurs (B) — Handler oninput des sliders « Opacité ». Même
+// contrat que setMarkerSizeFactor : clamp, persistance localStorage, sync des
+// sliders + labels (photo + vidéo), redraw immédiat pour feedback live et pour
+// les frames vidéo en pause (le rAF live cam couvre les flux actifs).
+function setMarkerOpacity(val) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return;
+  markerOpacity = Math.min(MARKER_OPACITY_MAX, Math.max(MARKER_OPACITY_MIN, n));
+  try { localStorage.setItem(MARKER_OPACITY_KEY, String(markerOpacity)); } catch (e) { /* noop */ }
+  document.querySelectorAll('.marker-opacity-slider').forEach(el => {
+    if (parseFloat(el.value) !== markerOpacity) el.value = markerOpacity;
+  });
+  document.querySelectorAll('.marker-opacity-label').forEach(el => {
+    el.textContent = 'Opacité:' + markerOpacity.toFixed(2);
+  });
+  const view = (typeof TESTS !== 'undefined' && TESTS[currentTestId]?.view) || 'face';
+  const vEl = document.getElementById('vid-el');
+  const vC  = document.getElementById('vid-canvas');
+  if (vEl && vC && vC.width > 0 && vEl.readyState >= 2) {
+    const ctx = vC.getContext('2d');
+    ctx.drawImage(vEl, 0, 0, vC.width, vC.height);
+    drawOverlay(ctx, vC, vidMarkers, selectedVidMkrIdx, view);
+  }
+  const phC = document.getElementById('ph-canvas');
+  if (phC && phC.width > 0) {
+    drawOverlay(phC.getContext('2d'), phC, liveMarkers, selectedMkrIdx, view);
+  }
+}
+
 function findMarkerAt(x, y, markers, cw) {
   // feat-biomec-capteurs (A) — hit-test scalé par markerSizeFactor MAIS avec
   // plancher confortable au touch (12px min). Le marqueur visuel rétrécit, on
@@ -6295,6 +6348,93 @@ function findMarkerAt(x, y, markers, cw) {
   return -1;
 }
 
+// feat-biomec-capteurs (B) — Détecteur partagé de pastilles réfléchissantes.
+// Flood-fill near-white blobs ; filtres tight par défaut pour matcher les
+// pastilles argent/blanc (et exclure les gros reflets sol clair / bandes).
+// Réutilisé par detectMarkersAuto (auto live) et snapMarkersToReflectiveBlobs.
+// `data` est un Uint8ClampedArray (.data d'ImageData). Renvoie [{x,y,size}].
+function _detectReflectiveBlobs(data, W, H, opts) {
+  const o = opts || {};
+  const lumMin = o.lumMin !== undefined ? o.lumMin : sensThr;
+  const satMax = o.satMax !== undefined ? o.satMax : 25;
+  const sizeMin = o.sizeMin !== undefined ? o.sizeMin : 5;
+  const sizeMax = o.sizeMax !== undefined ? o.sizeMax : 200;
+  const step = o.step !== undefined ? o.step : 2;
+  // Tolérance flood-fill : -35 lum / +30 sat pour autoriser le bord du blob
+  // (gradient) sans noyer en cas de pastille brillante mais bord moins net.
+  const ffLumMin = lumMin - 35;
+  const ffSatMax = satMax + 30;
+  const blobs = [];
+  const vis = new Uint8Array(W * H);
+  for (let y = 2; y < H - 2; y += step) {
+    for (let x = 2; x < W - 2; x += step) {
+      const i = (y * W + x) * 4;
+      const br = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      const sat = Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+      if (br > lumMin && sat < satMax && !vis[y * W + x]) {
+        let sx = 0, sy2 = 0, cnt = 0;
+        const stack = [[x, y]];
+        while (stack.length && cnt < 800) {
+          const [cx, cy] = stack.pop();
+          if (cx < 0 || cy < 0 || cx >= W || cy >= H || vis[cy * W + cx]) continue;
+          const pi = (cy * W + cx) * 4;
+          const pb = (data[pi] + data[pi + 1] + data[pi + 2]) / 3;
+          const ps = Math.max(data[pi], data[pi + 1], data[pi + 2]) - Math.min(data[pi], data[pi + 1], data[pi + 2]);
+          if (pb < ffLumMin || ps > ffSatMax) { vis[cy * W + cx] = 1; continue; }
+          vis[cy * W + cx] = 1;
+          sx += cx; sy2 += cy; cnt++;
+          stack.push([cx + 2, cy], [cx - 2, cy], [cx, cy + 2], [cx, cy - 2]);
+        }
+        if (cnt >= sizeMin && cnt <= sizeMax) blobs.push({ x: sx / cnt, y: sy2 / cnt, size: cnt });
+      }
+    }
+  }
+  return blobs;
+}
+
+// feat-biomec-capteurs (B) — Layout prior par test pour les marqueurs sans
+// position connue. Retourne une fn (marker, idxInSide) → {x,y}|null. Source de
+// vérité unique : detectMarkersAuto et snapMarkersToReflectiveBlobs s'y
+// appuient pour le fallback de référence de matching.
+function _getMarkerPriorPositions(testId, W, H) {
+  const t = TESTS[testId];
+  if (!t) return () => null;
+  const type = t.markers || '';
+  // KFPPA face : EIAS→Rotule→Tarse, côté D = gauche image, G = droite image.
+  if (type === 'genou-bi') {
+    const xD = W * 0.25, xG = W * 0.75;
+    const ys = [H * 0.20, H * 0.50, H * 0.80];
+    return (m, idxInSide) => ({
+      x: m.side === 'D' ? xD : xG,
+      y: ys[idxInSide] !== undefined ? ys[idxInSide] : ys[0],
+    });
+  }
+  // MLA profil : FMHp à gauche, TN sommet, CAp à droite (résolution par nom).
+  if (type === 'mla') {
+    const byPrefix = {
+      FMHp: { x: W * 0.20, y: H * 0.65 },
+      TN:   { x: W * 0.50, y: H * 0.30 },
+      CAp:  { x: W * 0.80, y: H * 0.65 },
+    };
+    return (m) => {
+      for (const key of Object.keys(byPrefix)) {
+        if (m.name === key || m.name.startsWith(key)) return byPrefix[key];
+      }
+      return null;
+    };
+  }
+  // AP-BI dos : 4 points par côté de haut en bas (Milieu mollet → Calca inf).
+  if (type === 'ap-bi') {
+    const xD = W * 0.70, xG = W * 0.30;
+    const yStart = H * 0.20, yStep = H * 0.20;
+    return (m, idxInSide) => ({
+      x: m.side === 'D' ? xD : xG,
+      y: yStart + idxInSide * yStep,
+    });
+  }
+  return () => null;
+}
+
 // Détection automatique des marqueurs réfléchissants
 function detectMarkersAuto(ctx, canvas, markers, view, cb) {
   // Placement automatique intelligent selon le type de test
@@ -6302,85 +6442,28 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
   const testId = currentTestId || '';
   const markersType = TESTS[testId]?.markers || '';
 
-  // ─── KFPPA (vue face) : lignes verticales EIAS→Rotule→Tarse
-  // Vue face : côté D de la personne = gauche de l'image, côté G = droite
-  if(markersType === 'genou-bi') {
-    const midX = W / 2;
-    // Côté D : ligne verticale à gauche de l'image (x ~25% de W)
-    const xD = W * 0.25;
-    const xG = W * 0.75;
-    // EIAS en haut (y ~20%), Rotule au centre (y ~50%), Tarse en bas (y ~80%)
-    const yTop = H * 0.20, yMid = H * 0.50, yBot = H * 0.80;
-
-    const placed = { D: [{x:xD,y:yTop},{x:xD,y:yMid},{x:xD,y:yBot}],
-                     G: [{x:xG,y:yTop},{x:xG,y:yMid},{x:xG,y:yBot}] };
-    ['D','G'].forEach(side => {
-      const mkrs = markers.filter(m=>m.side===side);
-      placed[side].forEach((pos,i) => {
-        // Ne placer que si pas encore placé manuellement
-        if(mkrs[i] && mkrs[i].x===null) { mkrs[i].x=pos.x; mkrs[i].y=pos.y; }
-      });
+  // ─── KFPPA / MLA / AP-BI : placement par prior layout (pas de détection).
+  // feat-biomec-capteurs (B) — délégué à _getMarkerPriorPositions pour rester
+  // aligné avec snapMarkersToReflectiveBlobs (source unique).
+  if (markersType === 'genou-bi' || markersType === 'mla' || markersType === 'ap-bi') {
+    const priorFn = _getMarkerPriorPositions(testId, W, H);
+    const idxBySide = { D: 0, G: 0, '': 0 };
+    markers.forEach((m) => {
+      const j = idxBySide[m.side] !== undefined ? idxBySide[m.side]++ : 0;
+      if (m.x === null) {
+        const p = priorFn(m, j);
+        if (p) { m.x = p.x; m.y = p.y; }
+      }
     });
-    if(cb) cb(); return;
-  }
-
-  // ─── MLA (vue profil) : angle à sommet supérieur FMHp - TN - CAp
-  // Ordre dans le template : CAp, TN, FMHp
-  // FMHp à gauche, TN au sommet (haut centre), CAp à droite
-  if(markersType === 'mla') {
-    const fmhp = markers.find(m=>m.name.startsWith('FMHp')||m.name==='FMHp');
-    const tn   = markers.find(m=>m.name.startsWith('TN')||m.name==='TN');
-    const cap  = markers.find(m=>m.name.startsWith('CAp')||m.name==='CAp');
-    if(fmhp && tn && cap) {
-      if(fmhp.x===null){fmhp.x=W*0.20;fmhp.y=H*0.65;}
-      if(tn.x===null){tn.x=W*0.50;tn.y=H*0.30;}
-      if(cap.x===null){cap.x=W*0.80;cap.y=H*0.65;}
-    }
-    if(cb) cb(); return;
-  }
-
-  // ─── AP-BI (vue dos) : lignes verticales point1→4
-  // Vue dos : côté D = droite image, côté G = gauche image
-  // Point 1 (Milieu mollet) en haut, point 4 (Calca inf) en bas
-  if(markersType === 'ap-bi') {
-    const xD = W * 0.70; // droite image = côté D personne (vue dos)
-    const xG = W * 0.30; // gauche image = côté G personne (vue dos)
-    const yStep = H * 0.20;
-    const yStart = H * 0.20;
-
-    ['D','G'].forEach(side => {
-      const xPos = side==='D' ? xD : xG;
-      const mkrs = markers.filter(m=>m.side===side);
-      // Ne placer que si pas encore placé manuellement
-      mkrs.forEach((m,i) => { if(m.x===null) { m.x = xPos; m.y = yStart + i * yStep; } });
-    });
-    if(cb) cb(); return;
+    if (cb) cb(); return;
   }
 
   // ─── Détection visuelle générique (blobs lumineux)
-  const data=ctx.getImageData(0,0,W,H).data;
-  const blobs=[]; const vis=new Uint8Array(W*H);
-  for(let y=2;y<H-2;y+=2){
-    for(let x=2;x<W-2;x+=2){
-      const i=(y*W+x)*4;
-      const br=(data[i]+data[i+1]+data[i+2])/3;
-      const sat=Math.max(data[i],data[i+1],data[i+2])-Math.min(data[i],data[i+1],data[i+2]);
-      if(br>sensThr&&sat<45&&!vis[y*W+x]){
-        let sx=0,sy2=0,cnt=0;const stack=[[x,y]];
-        while(stack.length&&cnt<800){
-          const[cx,cy]=stack.pop();
-          if(cx<0||cy<0||cx>=W||cy>=H||vis[cy*W+cx])continue;
-          const pi=(cy*W+cx)*4;
-          const pb=(data[pi]+data[pi+1]+data[pi+2])/3;
-          const ps=Math.max(data[pi],data[pi+1],data[pi+2])-Math.min(data[pi],data[pi+1],data[pi+2]);
-          if(pb<sensThr-35||ps>55){vis[cy*W+cx]=1;continue;}
-          vis[cy*W+cx]=1;sx+=cx;sy2+=cy;cnt++;
-          stack.push([cx+2,cy],[cx-2,cy],[cx,cy+2],[cx,cy-2]);
-        }
-        if(cnt>3&&cnt<4000) blobs.push({x:sx/cnt,y:sy2/cnt,s:cnt});
-      }
-    }
-  }
+  // feat-biomec-capteurs (B) — délégué à _detectReflectiveBlobs (filtres tight
+  // par défaut). Le tri/assignation par index reste séquentiel (legacy path
+  // peu utilisé : tous les TESTS actuels sortent par les branches priors).
+  const data = ctx.getImageData(0, 0, W, H).data;
+  const blobs = _detectReflectiveBlobs(data, W, H);
 
   const midX=W/2;
   if(view==='face'||view==='dos') {
@@ -6399,6 +6482,88 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
     blobs.slice(0,unplaced.length).forEach((b,i)=>{if(unplaced[i]){unplaced[i].x=b.x;unplaced[i].y=b.y;}});
   }
   if(cb) cb();
+}
+
+// feat-biomec-capteurs (B) — Snap des marqueurs vidéo sur les pastilles
+// réfléchissantes détectées dans la frame courante. Référence par marqueur :
+// position actuelle si placé sinon le prior layout du test. Assignation
+// greedy par distance croissante (un blob = un marqueur), tolérance
+// max(40, W/15). Pas de blob → marqueur conservé. Drag manuel intact.
+function snapMarkersToReflectiveBlobs() {
+  const vEl = document.getElementById('vid-el');
+  const vC  = document.getElementById('vid-canvas');
+  if (!vEl || !vC || vC.width <= 0 || vEl.readyState < 2) {
+    alert('Activez ou importez une vidéo, puis mettez en pause sur la frame à calibrer.');
+    return;
+  }
+  const W = vC.width, H = vC.height;
+  const view = TESTS[currentTestId]?.view || 'face';
+
+  // 1) Frame PROPRE sur tmp canvas (overlay exclu) — getImageData direct sur
+  //    vid-canvas mélangerait les marqueurs déjà dessinés avec la frame vidéo.
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  const tctx = tmp.getContext('2d');
+  tctx.drawImage(vEl, 0, 0, W, H);
+  const data = tctx.getImageData(0, 0, W, H).data;
+
+  // 2) Blobs réfléchissants (filtres tight par défaut — pastilles argent/blanc).
+  const blobs = _detectReflectiveBlobs(data, W, H);
+  if (blobs.length === 0) {
+    alert('Aucune pastille détectée. Vérifiez l\'éclairage ou ajustez le seuil de sensibilité.');
+    return;
+  }
+
+  // 3) Référence par marqueur : sa position actuelle (déjà placé) ou le prior
+  //    layout du test. idxInSide compte l'ordre dans la liste filtrée par côté
+  //    pour résoudre EIAS/Rotule/Tarse (genou-bi) ou points 1-4 (ap-bi).
+  const priorFn = _getMarkerPriorPositions(currentTestId, W, H);
+  const idxBySide = { D: 0, G: 0, '': 0 };
+  const refs = [];
+  vidMarkers.forEach((m, i) => {
+    const j = idxBySide[m.side] !== undefined ? idxBySide[m.side]++ : 0;
+    let ref = null;
+    if (m.x !== null && m.y !== null) ref = { x: m.x, y: m.y };
+    else ref = priorFn(m, j);
+    if (ref) refs.push({ markerIdx: i, refX: ref.x, refY: ref.y });
+  });
+
+  // 4) Assignation greedy : on construit toutes les paires (marqueur, blob)
+  //    dans la tolérance, on trie par distance ASC, on consomme en gardant un
+  //    Set d'usage côté marqueurs ET côté blobs (assignation unique).
+  const tol = Math.max(40, W / 15);
+  const pairs = [];
+  refs.forEach((r) => {
+    blobs.forEach((b, bi) => {
+      const d = Math.hypot(b.x - r.refX, b.y - r.refY);
+      if (d <= tol) pairs.push({ markerIdx: r.markerIdx, blobIdx: bi, d });
+    });
+  });
+  pairs.sort((a, b) => a.d - b.d);
+  const usedMkr = new Set();
+  const usedBlob = new Set();
+  let assigned = 0;
+  pairs.forEach((p) => {
+    if (usedMkr.has(p.markerIdx) || usedBlob.has(p.blobIdx)) return;
+    const b = blobs[p.blobIdx];
+    vidMarkers[p.markerIdx].x = b.x;
+    vidMarkers[p.markerIdx].y = b.y;
+    usedMkr.add(p.markerIdx);
+    usedBlob.add(p.blobIdx);
+    assigned++;
+  });
+
+  // 5) Redessine overlay + rafraîchit la liste / résultats. Frame de fond
+  //    redrawn depuis <video> (l'imageData de tmp ne sert qu'à la détection).
+  const ctx = vC.getContext('2d');
+  ctx.drawImage(vEl, 0, 0, W, H);
+  drawOverlay(ctx, vC, vidMarkers, selectedVidMkrIdx, view);
+  updateAngleOverlay('vid-angles', vidMarkers, view);
+  renderMkrList();
+  updateResults();
+  if (assigned === 0) {
+    alert('Aucun marqueur n\'a pu être calé dans la tolérance (' + Math.round(tol) + ' px). Rapprochez les capteurs de leur position attendue ou ajustez le seuil.');
+  }
 }
 
 // Dessin overlay avec SEGMENTS RECTANGULAIRES (style OPS)
@@ -6429,10 +6594,17 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     const haloPad = Math.max(2, 4 * markerSizeFactor);
     const isSel=selIdx===i;
     ctx.save();
+    // Halo : alpha déjà très bas (0.15/0.3) — conservé tel quel pour repère.
     ctx.beginPath(); ctx.arc(m.x, m.y, r + haloPad, 0, 2 * Math.PI);
     ctx.fillStyle=isSel?'rgba(245,166,35,.3)':'rgba(255,255,255,.15)'; ctx.fill();
+    // feat-biomec-capteurs (B) — remplissage coloré du point modulé par
+    // markerOpacity (voir la pastille au travers) ; contour + label restent
+    // pleine intensité pour conserver le repère exact du centre.
     ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
-    ctx.fillStyle=m.color; ctx.fill();
+    ctx.fillStyle=m.color;
+    ctx.globalAlpha = markerOpacity;
+    ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.strokeStyle=isSel?'#f5a623':'#fff'; ctx.lineWidth=isSel?2.5:1.5; ctx.stroke();
     ctx.restore();
     ctx.fillStyle='#fff';
@@ -6463,6 +6635,9 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
 }
 
 // Dessiner un segment rectangulaire entre 2 points (style OPS)
+// feat-biomec-capteurs (B) — fill du segment modulé par markerOpacity ;
+// contour blanc fin reste à pleine intensité pour conserver le tracé visible
+// (le contour est l'indication de direction, indépendant du remplissage).
 function drawSegmentRect(ctx, p1, p2, w, color) {
   const dx=p2.x-p1.x, dy=p2.y-p1.y;
   const len=Math.sqrt(dx*dx+dy*dy);
@@ -6475,7 +6650,10 @@ function drawSegmentRect(ctx, p1, p2, w, color) {
   ctx.lineTo(p2.x-nx,p2.y-ny);
   ctx.lineTo(p1.x-nx,p1.y-ny);
   ctx.closePath();
-  ctx.fillStyle=color; ctx.fill();
+  ctx.fillStyle=color;
+  ctx.globalAlpha = markerOpacity;
+  ctx.fill();
+  ctx.globalAlpha = 1;
   ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
   ctx.restore();
 }
@@ -15585,6 +15763,13 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   document.querySelectorAll('.marker-size-label').forEach(el => {
     el.textContent = 'Taille:' + markerSizeFactor.toFixed(2);
+  });
+  // feat-biomec-capteurs (B) — même contrat pour les sliders « Opacité ».
+  document.querySelectorAll('.marker-opacity-slider').forEach(el => {
+    el.value = markerOpacity;
+  });
+  document.querySelectorAll('.marker-opacity-label').forEach(el => {
+    el.textContent = 'Opacité:' + markerOpacity.toFixed(2);
   });
 });
 // #85 Phase 1 — peuple le container Analyse posturale en tête de ssec-1
