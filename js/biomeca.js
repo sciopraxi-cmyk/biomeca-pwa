@@ -520,41 +520,13 @@ async function loadSupabaseData() {
           migrated = true;
         }
       }
-      // Fix doublon bilan sport — CLEANUP one-shot des doublons existants
-      // produits par la migration pré-garde-fou. CONSERVATEUR : on ne dédupe
-      // QUE les entrées `type:'initial'` partageant un même `mesures._bilanId`
-      // (jamais 2 initiaux légitimement différents). Sans `_bilanId`, on ne
-      // touche à rien. Stratégie de conservation : on garde l'entrée avec une
-      // `date` non vide (= l'initial finalisé par finalizeBilanSport, qui
-      // assigne new Date().toLocaleDateString). Le phantom de migration
-      // (date = p.bilanInitialDate || '', souvent vide) est supprimé. Si
-      // toutes les dates sont vides ou toutes pleines, on garde la dernière
-      // occurrence (la plus récente dans l'ordre d'insertion).
-      if(Array.isArray(p.bilansSport) && p.bilansSport.length > 1) {
-        const initials = p.bilansSport
-          .map((b, idx) => ({ b, idx }))
-          .filter(({ b }) => b.type === 'initial' && b.mesures && b.mesures._bilanId);
-        const byBilanId = new Map();
-        initials.forEach(({ b, idx }) => {
-          const k = b.mesures._bilanId;
-          if(!byBilanId.has(k)) byBilanId.set(k, []);
-          byBilanId.get(k).push({ b, idx });
-        });
-        const toRemoveIdx = new Set();
-        byBilanId.forEach(group => {
-          if(group.length < 2) return;
-          const withDate = group.filter(({ b }) => b.date && b.date.length > 0);
-          let keepIdx;
-          if(withDate.length === 1) keepIdx = withDate[0].idx;
-          else keepIdx = group[group.length - 1].idx; // dernière occurrence
-          group.forEach(({ idx }) => { if(idx !== keepIdx) toRemoveIdx.add(idx); });
-        });
-        if(toRemoveIdx.size > 0) {
-          p.bilansSport = p.bilansSport.filter((_, idx) => !toRemoveIdx.has(idx));
-          migrated = true;
-          console.log('[fix-doublon] Cleanup', toRemoveIdx.size, 'doublon(s) initial bilansSport patient', p.id);
-        }
-      }
+      // hotfix — CLEANUP one-shot retiré : avait supprimé une vraie entrée
+      // de bilan en prod (l'heuristique date-vide + dernière-occurrence ne
+      // distinguait pas fiablement un phantom de migration d'une entrée
+      // finalisée légitime). La déduplication sera ré-implémentée plus tard
+      // avec sauvegarde préalable et validation explicite. Le garde-fou
+      // !p.currentBilanSportSousType ci-dessus prévient toute NOUVELLE
+      // création de phantom — c'est suffisant pour stopper la régression.
     });
     // Migration #39 (29 avril 2026) : currentBilanType + currentBilanSousType
     // → currentBilanSportSousType / currentBilanPosturoSousType (indépendants).
