@@ -10440,13 +10440,19 @@ function setupSportTttAutoReport() {
 // baseSnapshot de saveBilan. En centralisant ici, save ET load utilisent la
 // même logique de filtrage pixel.
 //
-// Note : la soustraction porte sur RGB uniquement (alpha non pris en compte
-// volontairement — un pixel noir pur user RGB=0,0,0 sur baseSnapshot transparent
-// RGB=0,0,0 sera donc effacé ; limitation acceptable car dessiner en noir pur
-// est très rare sur ce type de canvas et c'était déjà la sémantique pré-fix).
+// Fix dessin noir invisible — short-circuit alpha base : un pixel où le
+// baseSnapshot est transparent (alpha=0) n'a RIEN à soustraire. Tout pixel
+// courant opaque y est forcément un trait user (le canvas part d'un fond
+// transparent post-#91 / drawPiedsTemplate / initMorphoCanvas). Sans ce
+// check, le baseSnapshot RGBA=(0,0,0,0) — RGB noir + alpha 0 par défaut
+// HTML5 — faisait que le diff RGB nul vs un trait noir pur user (0,0,0,255)
+// passait sous le seuil 20 et l'alpha était mis à 0 → trait noir devenu
+// invisible (fond blanc du <img> template transparaissait à la restauration).
+// Les autres couleurs sont restées préservées (diff ≥ 20 sur ≥ 1 canal).
 function _subtractBaseSnapshot(imageData, baseSnapshot) {
   const cd = imageData.data, bd = baseSnapshot.data;
   for(let i = 0; i < cd.length; i += 4) {
+    if(bd[i+3] === 0) continue;
     const dr = Math.abs(cd[i] - bd[i]);
     const dg = Math.abs(cd[i+1] - bd[i+1]);
     const db = Math.abs(cd[i+2] - bd[i+2]);
