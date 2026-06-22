@@ -1702,6 +1702,27 @@ function _loadMarkerSize() {
 }
 let markerSizeFactor = _loadMarkerSize();
 
+// feat-biomec-capteurs (B) — opacité globale du remplissage des marqueurs
+// (point + segments). Le contour (stroke) et le label restent opaques pour
+// repérer le centre exact même quand la pastille est visible à travers.
+// Persistance localStorage clé bm4-marker-opacity, même contrat que la taille.
+const MARKER_OPACITY_KEY = 'bm4-marker-opacity';
+const MARKER_OPACITY_DEFAULT = 0.5;
+const MARKER_OPACITY_MIN = 0.15;
+const MARKER_OPACITY_MAX = 1.0;
+function _loadMarkerOpacity() {
+  try {
+    const raw = localStorage.getItem(MARKER_OPACITY_KEY);
+    if (!raw) return MARKER_OPACITY_DEFAULT;
+    const n = parseFloat(raw);
+    if (isNaN(n)) return MARKER_OPACITY_DEFAULT;
+    return Math.min(MARKER_OPACITY_MAX, Math.max(MARKER_OPACITY_MIN, n));
+  } catch (e) {
+    return MARKER_OPACITY_DEFAULT;
+  }
+}
+let markerOpacity = _loadMarkerOpacity();
+
 // Caméra vidéo
 let vidStream = null, mediaRec = null, recChunks = [], isRecording = false;
 let vAutoDetect = false;
@@ -6283,6 +6304,35 @@ function setMarkerSizeFactor(val) {
   }
 }
 
+// feat-biomec-capteurs (B) — Handler oninput des sliders « Opacité ». Même
+// contrat que setMarkerSizeFactor : clamp, persistance localStorage, sync des
+// sliders + labels (photo + vidéo), redraw immédiat pour feedback live et pour
+// les frames vidéo en pause (le rAF live cam couvre les flux actifs).
+function setMarkerOpacity(val) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return;
+  markerOpacity = Math.min(MARKER_OPACITY_MAX, Math.max(MARKER_OPACITY_MIN, n));
+  try { localStorage.setItem(MARKER_OPACITY_KEY, String(markerOpacity)); } catch (e) { /* noop */ }
+  document.querySelectorAll('.marker-opacity-slider').forEach(el => {
+    if (parseFloat(el.value) !== markerOpacity) el.value = markerOpacity;
+  });
+  document.querySelectorAll('.marker-opacity-label').forEach(el => {
+    el.textContent = 'Opacité:' + markerOpacity.toFixed(2);
+  });
+  const view = (typeof TESTS !== 'undefined' && TESTS[currentTestId]?.view) || 'face';
+  const vEl = document.getElementById('vid-el');
+  const vC  = document.getElementById('vid-canvas');
+  if (vEl && vC && vC.width > 0 && vEl.readyState >= 2) {
+    const ctx = vC.getContext('2d');
+    ctx.drawImage(vEl, 0, 0, vC.width, vC.height);
+    drawOverlay(ctx, vC, vidMarkers, selectedVidMkrIdx, view);
+  }
+  const phC = document.getElementById('ph-canvas');
+  if (phC && phC.width > 0) {
+    drawOverlay(phC.getContext('2d'), phC, liveMarkers, selectedMkrIdx, view);
+  }
+}
+
 function findMarkerAt(x, y, markers, cw) {
   // feat-biomec-capteurs (A) — hit-test scalé par markerSizeFactor MAIS avec
   // plancher confortable au touch (12px min). Le marqueur visuel rétrécit, on
@@ -6429,10 +6479,17 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     const haloPad = Math.max(2, 4 * markerSizeFactor);
     const isSel=selIdx===i;
     ctx.save();
+    // Halo : alpha déjà très bas (0.15/0.3) — conservé tel quel pour repère.
     ctx.beginPath(); ctx.arc(m.x, m.y, r + haloPad, 0, 2 * Math.PI);
     ctx.fillStyle=isSel?'rgba(245,166,35,.3)':'rgba(255,255,255,.15)'; ctx.fill();
+    // feat-biomec-capteurs (B) — remplissage coloré du point modulé par
+    // markerOpacity (voir la pastille au travers) ; contour + label restent
+    // pleine intensité pour conserver le repère exact du centre.
     ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
-    ctx.fillStyle=m.color; ctx.fill();
+    ctx.fillStyle=m.color;
+    ctx.globalAlpha = markerOpacity;
+    ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.strokeStyle=isSel?'#f5a623':'#fff'; ctx.lineWidth=isSel?2.5:1.5; ctx.stroke();
     ctx.restore();
     ctx.fillStyle='#fff';
@@ -6463,6 +6520,9 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
 }
 
 // Dessiner un segment rectangulaire entre 2 points (style OPS)
+// feat-biomec-capteurs (B) — fill du segment modulé par markerOpacity ;
+// contour blanc fin reste à pleine intensité pour conserver le tracé visible
+// (le contour est l'indication de direction, indépendant du remplissage).
 function drawSegmentRect(ctx, p1, p2, w, color) {
   const dx=p2.x-p1.x, dy=p2.y-p1.y;
   const len=Math.sqrt(dx*dx+dy*dy);
@@ -6475,7 +6535,10 @@ function drawSegmentRect(ctx, p1, p2, w, color) {
   ctx.lineTo(p2.x-nx,p2.y-ny);
   ctx.lineTo(p1.x-nx,p1.y-ny);
   ctx.closePath();
-  ctx.fillStyle=color; ctx.fill();
+  ctx.fillStyle=color;
+  ctx.globalAlpha = markerOpacity;
+  ctx.fill();
+  ctx.globalAlpha = 1;
   ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
   ctx.restore();
 }
@@ -15585,6 +15648,13 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   document.querySelectorAll('.marker-size-label').forEach(el => {
     el.textContent = 'Taille:' + markerSizeFactor.toFixed(2);
+  });
+  // feat-biomec-capteurs (B) — même contrat pour les sliders « Opacité ».
+  document.querySelectorAll('.marker-opacity-slider').forEach(el => {
+    el.value = markerOpacity;
+  });
+  document.querySelectorAll('.marker-opacity-label').forEach(el => {
+    el.textContent = 'Opacité:' + markerOpacity.toFixed(2);
   });
 });
 // #85 Phase 1 — peuple le container Analyse posturale en tête de ssec-1
