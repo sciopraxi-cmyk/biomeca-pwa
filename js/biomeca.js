@@ -495,8 +495,18 @@ async function loadSupabaseData() {
         }));
         migrated = true;
       }
-      // Migrer bilan initial (p.mesures) s'il existe et pas encore dans bilansSport
-      if(p.mesures && Object.keys(p.mesures).length > 0) {
+      // Migrer bilan initial (p.mesures) s'il existe et pas encore dans bilansSport.
+      // Fix doublon bilan sport — GARDE-FOU : && !p.currentBilanSportSousType.
+      // Cette migration legacy ne cible que des p.mesures orphelins (schema
+      // pré-bilansSport, sans flag de cycle de vie). Si l'utilisateur a un
+      // bilan en cours actif (currentBilanSportSousType set), c'est le flow
+      // moderne creer/finalize qui gère l'archivage — la migration ne doit
+      // PAS injecter un phantom initial qui sera dupliqué par finalize.
+      // Sans ce garde, le `_bilanId` lazy-créé par saveBilanSilent rend
+      // `Object.keys(p.mesures).length > 0` truthy dès la 1re saisie clinique,
+      // déclenchant la migration au prochain reload PWA → doublon « Sportif
+      // Initial » après Finaliser.
+      if(p.mesures && Object.keys(p.mesures).length > 0 && !p.currentBilanSportSousType) {
         if(!p.bilansSport) p.bilansSport = [];
         const hasInitial = p.bilansSport.some(b => b.type === 'initial');
         if(!hasInitial) {
@@ -508,6 +518,41 @@ async function loadSupabaseData() {
             bilanData: JSON.parse(JSON.stringify(p.bilanData||{}))
           });
           migrated = true;
+        }
+      }
+      // Fix doublon bilan sport — CLEANUP one-shot des doublons existants
+      // produits par la migration pré-garde-fou. CONSERVATEUR : on ne dédupe
+      // QUE les entrées `type:'initial'` partageant un même `mesures._bilanId`
+      // (jamais 2 initiaux légitimement différents). Sans `_bilanId`, on ne
+      // touche à rien. Stratégie de conservation : on garde l'entrée avec une
+      // `date` non vide (= l'initial finalisé par finalizeBilanSport, qui
+      // assigne new Date().toLocaleDateString). Le phantom de migration
+      // (date = p.bilanInitialDate || '', souvent vide) est supprimé. Si
+      // toutes les dates sont vides ou toutes pleines, on garde la dernière
+      // occurrence (la plus récente dans l'ordre d'insertion).
+      if(Array.isArray(p.bilansSport) && p.bilansSport.length > 1) {
+        const initials = p.bilansSport
+          .map((b, idx) => ({ b, idx }))
+          .filter(({ b }) => b.type === 'initial' && b.mesures && b.mesures._bilanId);
+        const byBilanId = new Map();
+        initials.forEach(({ b, idx }) => {
+          const k = b.mesures._bilanId;
+          if(!byBilanId.has(k)) byBilanId.set(k, []);
+          byBilanId.get(k).push({ b, idx });
+        });
+        const toRemoveIdx = new Set();
+        byBilanId.forEach(group => {
+          if(group.length < 2) return;
+          const withDate = group.filter(({ b }) => b.date && b.date.length > 0);
+          let keepIdx;
+          if(withDate.length === 1) keepIdx = withDate[0].idx;
+          else keepIdx = group[group.length - 1].idx; // dernière occurrence
+          group.forEach(({ idx }) => { if(idx !== keepIdx) toRemoveIdx.add(idx); });
+        });
+        if(toRemoveIdx.size > 0) {
+          p.bilansSport = p.bilansSport.filter((_, idx) => !toRemoveIdx.has(idx));
+          migrated = true;
+          console.log('[fix-doublon] Cleanup', toRemoveIdx.size, 'doublon(s) initial bilansSport patient', p.id);
         }
       }
     });
