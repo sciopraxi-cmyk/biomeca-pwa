@@ -4695,6 +4695,19 @@ const POSTURE_THRESHOLDS_DEFAULTS = {
     ouvertureMax: 25,
     lateralisation: 2,   // ° d'inclinaison latérale par étage (conclusion)
   },
+  // #108 Dos étape 3a — seuils dos configurables. Promus depuis les constantes
+  // inline de _renderDosPlacementResults / _buildDosConclusion / _computeDosAngles
+  // (seuilSecondaire rachis). Tous en degrés sauf rachis/sillon/triangles en %
+  // (% de la largeur d'épaules pour rachis et triangles, % de la largeur d'EIPS
+  // pour sillon inter-fessier).
+  dos: {
+    tete: 2, epaules: 2, bassin: 2,   // ° — inclinaison/rotation tête ; ligne épaules + asymétrie scapulas ; bascule
+    scapulaMin: 5, scapulaMax: 10,    // ° — bande physiologique orientation scapulaire (< min = rot. interne ; > max = rot. externe)
+    scapulaAsym: 3,                   // ° — asymétrie orientation D−G
+    rachis: 5,                        // % largeur d'épaules — offset par étage + seuil apex scoliose
+    sillon: 3, triangles: 3,          // % — sillon inter-fessier ; triangles de la taille
+    calcaneen: 3, axeJambier: 3,      // ° — angle calcanéen ; axe jambier
+  },
 };
 
 // Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
@@ -4716,6 +4729,8 @@ function _loadPostureThresholds() {
       // (utilisateurs qui ont déjà personnalisé leurs seuils profil avant la
       // release face → la section face manquera, on retombe sur les défauts).
       face: { ...POSTURE_THRESHOLDS_DEFAULTS.face, ...(stored.face || {}) },
+      // #108 Dos étape 3a — merge profond dos, même contrat fail-safe que face.
+      dos:  { ...POSTURE_THRESHOLDS_DEFAULTS.dos,  ...(stored.dos  || {}) },
     };
   } catch (e) {
     console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
@@ -4788,6 +4803,20 @@ function _renderPostureThresholdsPanel() {
         ${num('Pied — fermeture si <',                     T.face.ouvertureMin,   'face.ouvertureMin')}
         ${num('Pied — ouverture si >',                     T.face.ouvertureMax,   'face.ouvertureMax')}
         ${num('Latéralisation par étage (conclusion)',     T.face.lateralisation, 'face.lateralisation')}
+      </div>
+      <div>
+        <div style="${subHdr}">Seuils — analyse dos</div>
+        ${num('Tête (inclinaison / rotation)',             T.dos.tete,         'dos.tete')}
+        ${num('Ligne épaules + asymétrie scapulas',        T.dos.epaules,      'dos.epaules')}
+        ${num('Bascule du bassin (EIPS)',                  T.dos.bassin,       'dos.bassin')}
+        ${num('Scapula — rot. interne si <',               T.dos.scapulaMin,   'dos.scapulaMin')}
+        ${num('Scapula — rot. externe si >',               T.dos.scapulaMax,   'dos.scapulaMax')}
+        ${num('Asymétrie orientation scapulaire (D−G)',    T.dos.scapulaAsym,  'dos.scapulaAsym')}
+        ${num('Rachis — offset par étage + apex (% largeur épaules)', T.dos.rachis,    'dos.rachis',    '%')}
+        ${num('Sillon inter-fessier (% largeur EIPS)',     T.dos.sillon,       'dos.sillon',    '%')}
+        ${num('Triangles de la taille (% largeur épaules)', T.dos.triangles,   'dos.triangles', '%')}
+        ${num('Angle calcanéen',                           T.dos.calcaneen,    'dos.calcaneen')}
+        ${num('Axe jambier',                               T.dos.axeJambier,   'dos.axeJambier')}
       </div>
     </div>
     <div style="margin-top:12px;">
@@ -5806,8 +5835,9 @@ function _computeDosAngles(markers, calibration) {
       out.rachisConvexite = apexOffset > 0 ? 'D' : 'G';
       out.rachisRegion    = REGION[apexLvl.key];
       // Secondaire : parmi les autres étages, plus grand |offset| de signe
-      // opposé ET au-dessus du seuil provisoire. Sinon null (courbure unique).
-      const seuilSecondaire = 5; // % de shoulderW, provisoire (étape 3a).
+      // opposé ET au-dessus du seuil rachis configuré. Sinon null (courbure unique).
+      // #108 Dos étape 3a — promu depuis constante locale vers POSTURE_THRESHOLDS.
+      const seuilSecondaire = POSTURE_THRESHOLDS.dos.rachis;
       const opposites = placedLvls
         .filter(l => l.key !== apexLvl.key)
         .filter(l => Math.sign(out.rachisOffsets[l.key]) !== Math.sign(apexOffset))
@@ -5900,7 +5930,9 @@ function _computeDosAngles(markers, calibration) {
 // Sinon → « Rachis aligné — pas de déviation marquée ».
 function _buildDosConclusion(angles) {
   if (!angles) return '';
-  const seuilRachis = 5; // % de la largeur d'épaules, provisoire étape 3a.
+  // #108 Dos étape 3a — seuil rachis lu depuis POSTURE_THRESHOLDS.dos.rachis
+  // (% de la largeur d'épaules). Promu depuis la constante locale étape 2.
+  const seuilRachis = POSTURE_THRESHOLDS.dos.rachis;
   const sideWord = c => c === 'D' ? 'droite' : 'gauche';
   if (angles.rachisApex === null || angles.rachisRegion === null) return '';
   const apexOffset = angles.rachisOffsets[angles.rachisApex];
@@ -6354,23 +6386,26 @@ function _renderFacePlacementResults(panel, f) {
 // l'étape 3a. Les 4 décalages rachis sont en % de la largeur d'épaules,
 // avec un encart « Apex / Convexité » dérivé directement de l'angles.rachis*.
 function _renderDosPlacementResults(panel, d) {
-  // Seuils inline (étape 3a : POSTURE_THRESHOLDS.dos configurables).
-  const SEUIL_TETE      = 2;   // ° pour inclinaison / rotation
-  const SEUIL_EPAULES   = 2;   // ° pour ligne épaules / asymétrie scapulas
-  const SEUIL_BASSIN    = 2;   // ° pour bascule
+  // #108 Dos étape 3a — seuils lus depuis POSTURE_THRESHOLDS.dos (configurables
+  // depuis Paramètres). Mapping : tete→tete, ligne épaules + asymétrie scapulas
+  // → epaules, bascule→bassin, orientation scapulaire → scapulaMin/scapulaMax,
+  // asymétrie orientation → scapulaAsym, rachis→rachis, sillon→sillon,
+  // triangles→triangles, calcaneen→calcaneen, axeJambier→axeJambier.
+  const Td = POSTURE_THRESHOLDS.dos;
+  const SEUIL_TETE      = Td.tete;
+  const SEUIL_EPAULES   = Td.epaules;
+  const SEUIL_BASSIN    = Td.bassin;
   // Orientation scapulaire = bande physiologique [SCAP_MIN, SCAP_MAX] non
   // centrée sur 0. < min = rotation interne / rétropulsion d'épaule ;
   // > max = rotation externe / enroulement antérieur d'épaule.
-  // SEUIL_SCAP_ASYM = seuil sur la différence D − G (asymétrie d'orientation).
-  // Provisoires inline (étape 3a → POSTURE_THRESHOLDS.dos).
-  const SCAP_MIN        = 5;
-  const SCAP_MAX        = 10;
-  const SEUIL_SCAP_ASYM = 3;
-  const SEUIL_RACHIS    = 5;   // % de la largeur d'épaules pour offsets rachis
-  const SEUIL_SILLON    = 3;   // % de la largeur d'EIPS pour sillon inter-fessier
-  const SEUIL_TRIANGLES = 3;   // % de la largeur d'épaules pour triangles taille
-  const SEUIL_CALC      = 3;   // ° pour angle calcanéen
-  const SEUIL_AXE_JAMB  = 3;   // ° pour axe jambier
+  const SCAP_MIN        = Td.scapulaMin;
+  const SCAP_MAX        = Td.scapulaMax;
+  const SEUIL_SCAP_ASYM = Td.scapulaAsym;
+  const SEUIL_RACHIS    = Td.rachis;
+  const SEUIL_SILLON    = Td.sillon;
+  const SEUIL_TRIANGLES = Td.triangles;
+  const SEUIL_CALC      = Td.calcaneen;
+  const SEUIL_AXE_JAMB  = Td.axeJambier;
   const lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
   const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
   const lbl = `color:#64748b;`;
