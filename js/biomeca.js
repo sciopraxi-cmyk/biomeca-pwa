@@ -4630,6 +4630,25 @@ const POSTURE_THRESHOLDS_DEFAULTS = {
     thoracique: { rectitude: 12, hyper: 32 },
     lombaire:   { rectitude: 12, hyper: 35 },
   },
+  // #108 Étape 3a — seuils face configurables. Tous en degrés sauf
+  // `translation` en % (largeur d'appui). Repris des constantes inline étape 2
+  // (SEUIL_TETE, SEUIL_EPAULES, etc. dans _renderFacePlacementResults et
+  // _buildFaceConclusion → désormais lus depuis POSTURE_THRESHOLDS.face).
+  face: {
+    tete: 2,             // inclinaison / rotation / mandibule / inclinaison tronc
+    epaules: 2,          // ligne épaules (asymétrie haut-bas)
+    bassin: 2,           // bascule bassin (EIAS)
+    translation: 3,      // % de la largeur d'appui (thorax / bassin)
+    valgumVarum: 3,      // ° de déviation au genou
+    // Angle de Fick / progression du pied — zone physiologique 15-25° de
+    // rotation externe (le pied est NATURELLEMENT en rotation externe, pas
+    // centré sur 0). < ouvertureMin = pied en fermeture ; > ouvertureMax =
+    // pied en ouverture ; entre les deux = physiologique. Réglables /
+    // calibrables si trop de faux « fermeture » sur une population donnée.
+    ouvertureMin: 15,
+    ouvertureMax: 25,
+    lateralisation: 2,   // ° d'inclinaison latérale par étage (conclusion)
+  },
 };
 
 // Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
@@ -4647,6 +4666,10 @@ function _loadPostureThresholds() {
         thoracique: { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.thoracique, ...(stored.courbures?.thoracique || {}) },
         lombaire:   { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.lombaire,   ...(stored.courbures?.lombaire   || {}) },
       },
+      // #108 Étape 3a — merge profond face : tolère un stockage partiel
+      // (utilisateurs qui ont déjà personnalisé leurs seuils profil avant la
+      // release face → la section face manquera, on retombe sur les défauts).
+      face: { ...POSTURE_THRESHOLDS_DEFAULTS.face, ...(stored.face || {}) },
     };
   } catch (e) {
     console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
@@ -4674,13 +4697,15 @@ function _renderPostureThresholdsPanel() {
   const T = POSTURE_THRESHOLDS;
   // Helper input numérique. `path` est l'argument dot-notation pour
   // _updatePostureThreshold (ex. 'neutralite.bassin' ou 'courbures.cervicale.hyper').
-  const num = (label, val, path) =>
+  // `unit` (par défaut '°') permet d'afficher '%' pour les seuils en pourcentage
+  // (ex. face.translation = % de la largeur d'appui).
+  const num = (label, val, path, unit = '°') =>
     `<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;">
       <span style="flex:1;color:#444;">${label}</span>
       <input type="number" value="${val}" min="0" step="0.5"
         onchange="_updatePostureThreshold('${path}', this.value)"
         style="width:64px;padding:3px 6px;border:1px solid #cbd5e0;border-radius:3px;font-size:12px;text-align:right;">
-      <span style="color:#888;font-size:11px;">°</span>
+      <span style="color:#888;font-size:11px;">${unit}</span>
     </label>`;
   const subHdr = `font-weight:600;color:#0e1f38;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;`;
   const courbHdr = `font-size:10px;color:#666;margin:6px 0 3px;`;
@@ -4706,6 +4731,17 @@ function _renderPostureThresholdsPanel() {
         <div style="${courbHdr}">Lombaire</div>
         ${num('Rectitude si déviation &lt;',              T.courbures.lombaire.rectitude,   'courbures.lombaire.rectitude')}
         ${num('Hyperlordose si déviation &gt;',           T.courbures.lombaire.hyper,       'courbures.lombaire.hyper')}
+      </div>
+      <div>
+        <div style="${subHdr}">Seuils — analyse face</div>
+        ${num('Tête (inclinaison / rotation / mandibule)', T.face.tete,           'face.tete')}
+        ${num('Ligne épaules (asymétrie)',                 T.face.epaules,        'face.epaules')}
+        ${num('Bascule du bassin (EIAS)',                  T.face.bassin,         'face.bassin')}
+        ${num('Translation latérale (% largeur d\'appui)', T.face.translation,    'face.translation', '%')}
+        ${num('Valgum / Varum du genou',                   T.face.valgumVarum,    'face.valgumVarum')}
+        ${num('Pied — fermeture si <',                     T.face.ouvertureMin,   'face.ouvertureMin')}
+        ${num('Pied — ouverture si >',                     T.face.ouvertureMax,   'face.ouvertureMax')}
+        ${num('Latéralisation par étage (conclusion)',     T.face.lateralisation, 'face.lateralisation')}
       </div>
     </div>
     <div style="margin-top:12px;">
@@ -5379,9 +5415,10 @@ function _computeFaceAngles(markers, calibration) {
     }
   }
   // Fermeture viscérale : EIAS haute du côté X + acromion bas du côté X → fermeture X.
-  // Seuils inline (étape 3 → POSTURE_THRESHOLDS.face configurables).
-  const seuilBascule = 2;
-  const seuilEpaule  = 2;
+  // Seuils lus depuis POSTURE_THRESHOLDS.face (étape 3a) — cohérent avec
+  // les seuils utilisés pour la bascule du bassin et la ligne épaules ailleurs.
+  const seuilBascule = POSTURE_THRESHOLDS.face.bassin;
+  const seuilEpaule  = POSTURE_THRESHOLDS.face.epaules;
   if (out.basculeBassin !== null && out.ligneEpaules !== null) {
     const eiasHigh   = out.basculeBassin >  seuilBascule ? 'D'
                      : out.basculeBassin < -seuilBascule ? 'G' : null;
@@ -5489,12 +5526,13 @@ function _computeFaceAngles(markers, calibration) {
 
 // #108 Étape 2 — Conclusion latéralisée face. Identifie le segment le plus
 // bas hors zone neutre comme origine de la latéralisation, puis ajoute en
-// déviations distinctes l'inclinaison du tronc et de la tête. Seuils inline
-// (étape 3 → POSTURE_THRESHOLDS.face). Joint par « · ». Vide si tout neutre.
+// déviations distinctes l'inclinaison du tronc et de la tête. Seuils lus
+// depuis POSTURE_THRESHOLDS.face (étape 3a). Joint par « · ». Vide si tout neutre.
 function _buildFaceConclusion(angles) {
   if (!angles) return '';
-  const seuilLat  = 2; // ° d'inclinaison latérale par étage
-  const seuilTete = 2;
+  const Tf = POSTURE_THRESHOLDS.face;
+  const seuilLat  = Tf.lateralisation; // ° d'inclinaison latérale par étage
+  const seuilTete = Tf.tete;
   const sideLabel = v => v > 0 ? 'à D' : 'à G';
   const segments = [
     { val: angles.tiltCheGen, origin: 'des chevilles' },
@@ -5762,13 +5800,19 @@ function _buildPostureProfilSectionsSynthese(d) {
 // Pas de classification éditable à ce stade (étape 3 = POSTURE_THRESHOLDS.face
 // configurable + selects), juste affichage des valeurs et de l'inclinaison.
 function _renderFacePlacementResults(panel, f) {
-  // Seuils inline (à promouvoir en POSTURE_THRESHOLDS.face à l'étape 3).
-  const SEUIL_TETE      = 2;   // ° pour inclinaison/rotation/mandibule
-  const SEUIL_EPAULES   = 2;
-  const SEUIL_BASSIN    = 2;
-  const SEUIL_TRANSL    = 3;   // % de la largeur d'appui
-  const SEUIL_VALG_VAR  = 3;   // ° de déviation au genou
-  const SEUIL_OUVERTURE = 5;   // ° d'ouverture du pied
+  // #108 Étape 3a — seuils lus depuis POSTURE_THRESHOLDS.face (configurables
+  // depuis Paramètres). Les anciennes constantes inline (étape 2) ont été
+  // promues dans POSTURE_THRESHOLDS_DEFAULTS.face.
+  const Tf = POSTURE_THRESHOLDS.face;
+  const SEUIL_TETE      = Tf.tete;        // ° pour inclinaison/rotation/mandibule
+  const SEUIL_EPAULES   = Tf.epaules;
+  const SEUIL_BASSIN    = Tf.bassin;
+  const SEUIL_TRANSL    = Tf.translation; // % de la largeur d'appui
+  const SEUIL_VALG_VAR  = Tf.valgumVarum; // ° de déviation au genou
+  // Ouverture du pas = bande physiologique [OUV_MIN, OUV_MAX] non centrée sur 0
+  // (angle de Fick : le pied est naturellement en rotation externe).
+  const OUV_MIN         = Tf.ouvertureMin;
+  const OUV_MAX         = Tf.ouvertureMax;
   const lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
   const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
   const lbl = `color:#64748b;`;
@@ -5793,7 +5837,16 @@ function _renderFacePlacementResults(panel, f) {
   const lblBassin       = v => sideLbl(v, SEUIL_BASSIN, '(D plus haute)', '(G plus haute)');
   const lblTranslat     = v => sideLbl(v, SEUIL_TRANSL, '(décalé à D)', '(décalé à G)');
   const lblValgVar      = v => sideLbl(v, SEUIL_VALG_VAR, '(valgum)', '(varum)');
-  const lblOuverture    = v => sideLbl(v, SEUIL_OUVERTURE, '(ouvert)', '(fermé)');
+  // Ouverture du pas : classification en bande physiologique [OUV_MIN, OUV_MAX].
+  // Hors bande = orange (fermé / ouvert) ; dans bande = vert (physiologique).
+  // Le code couleur bleu(+)/rouge(−)/gris(null) de fmtDeg reste inchangé sur
+  // la valeur numérique elle-même — seul le libellé entre parenthèses suit la bande.
+  const lblOuverture = v => {
+    if (v === null || isNaN(v)) return '';
+    if (v < OUV_MIN) return `<span style="${lblStyle('#ea580c')}">(fermé)</span>`;
+    if (v > OUV_MAX) return `<span style="${lblStyle('#ea580c')}">(ouvert)</span>`;
+    return `<span style="${lblStyle('#10b981')}">(physiologique)</span>`;
+  };
   const lblTroncIncl    = v => sideLbl(v, SEUIL_TETE, '(incliné à D)', '(incliné à G)');
   const fermLbl = f.fermetureViscerale
     ? `<span style="${lblStyle('#ea580c')}">(fermeture ${f.fermetureViscerale})</span>`
