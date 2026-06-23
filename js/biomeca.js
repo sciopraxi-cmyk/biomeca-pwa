@@ -5950,6 +5950,89 @@ function _buildDosConclusion(angles) {
   return phrase;
 }
 
+// #108 Dos étape 3b — Findings dos (miroir _buildFaceFindings). Liste les
+// mesures hors zone neutre + conclusion scoliose, format identique pour
+// intégration dans la synthèse et le rapport :
+//   { horsNormes: [{ mesure: 'Tête (inclinaison)', detail: 'inclinée à D' }, ...],
+//     conclusion: 'Attitude scoliotique … (proposition)' | '' }
+// Règle « hors-normes seulement » : on n'émet QUE si hors zone neutre (cf
+// seuils Td.tete/.epaules/.bassin/.scapulaMin/Max/.scapulaAsym/.sillon/
+// .triangles/.calcaneen/.axeJambier). null/NaN → skip silencieux (point non
+// placé). La conclusion `Rachis aligné — pas de déviation marquée` est vidée
+// pour permettre au caller d'afficher le fallback « dans les normes » global.
+function _buildDosFindings(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  const Td = thr.dos;
+  const empty = { horsNormes: [], conclusion: '' };
+  if (!angles) return empty;
+  const horsNormes = [];
+  const push = (mesure, detail) => horsNormes.push({ mesure, detail });
+  const sideD = (v, posTxt, negTxt) => v > 0 ? posTxt : negTxt;
+  // Tête (inclinaison / rotation) — seuil unique Td.tete.
+  if (angles.inclinaisonTete !== null && !isNaN(angles.inclinaisonTete) && Math.abs(angles.inclinaisonTete) > Td.tete) {
+    push('Tête (inclinaison)', sideD(angles.inclinaisonTete, 'inclinée à D', 'inclinée à G'));
+  }
+  if (angles.rotationTete !== null && !isNaN(angles.rotationTete) && Math.abs(angles.rotationTete) > Td.tete) {
+    push('Tête (rotation)', sideD(angles.rotationTete, 'rotation à D', 'rotation à G'));
+  }
+  // Ligne épaules / asymétrie scapulas (en hauteur) — seuil Td.epaules.
+  if (angles.ligneEpaules !== null && !isNaN(angles.ligneEpaules) && Math.abs(angles.ligneEpaules) > Td.epaules) {
+    push('Ligne épaules', sideD(angles.ligneEpaules, 'D plus haute', 'G plus haute'));
+  }
+  if (angles.asymetrieScapula !== null && !isNaN(angles.asymetrieScapula) && Math.abs(angles.asymetrieScapula) > Td.epaules) {
+    push('Asymétrie scapulas (hauteur)', sideD(angles.asymetrieScapula, 'D plus haute', 'G plus haute'));
+  }
+  // Orientation scapulaire : bande physiologique [Td.scapulaMin, Td.scapulaMax].
+  // Hors bande = libellé clinique (rot. interne sous min, rot. externe au-dessus
+  // de max). Dans bande = neutre → skip (pas de finding).
+  const scapulaBand = v => {
+    if (v < Td.scapulaMin) return 'rotation interne (rétropulsion d\'épaule)';
+    if (v > Td.scapulaMax) return 'rotation externe (enroulement antérieur d\'épaule)';
+    return null;
+  };
+  if (angles.orientationScapulaD !== null && !isNaN(angles.orientationScapulaD)) {
+    const dD = scapulaBand(angles.orientationScapulaD);
+    if (dD) push('Scapula D', dD);
+  }
+  if (angles.orientationScapulaG !== null && !isNaN(angles.orientationScapulaG)) {
+    const dG = scapulaBand(angles.orientationScapulaG);
+    if (dG) push('Scapula G', dG);
+  }
+  // Asymétrie orientation scapulaire D − G — seuil Td.scapulaAsym.
+  if (angles.asymetrieOrientationScapula !== null && !isNaN(angles.asymetrieOrientationScapula) && Math.abs(angles.asymetrieOrientationScapula) > Td.scapulaAsym) {
+    push('Asymétrie orientation scapulaire', sideD(angles.asymetrieOrientationScapula, 'D plus externe', 'G plus externe'));
+  }
+  // Bassin — bascule (Td.bassin) + sillon (Td.sillon) + triangles (Td.triangles).
+  if (angles.basculeBassin !== null && !isNaN(angles.basculeBassin) && Math.abs(angles.basculeBassin) > Td.bassin) {
+    push('Bascule bassin', sideD(angles.basculeBassin, 'D plus haute', 'G plus haute'));
+  }
+  if (angles.sillonInterfessier !== null && !isNaN(angles.sillonInterfessier) && Math.abs(angles.sillonInterfessier) > Td.sillon) {
+    push('Sillon inter-fessier', sideD(angles.sillonInterfessier, 'à D', 'à G'));
+  }
+  if (angles.trianglesTaille !== null && !isNaN(angles.trianglesTaille) && Math.abs(angles.trianglesTaille) > Td.triangles) {
+    push('Triangles de la taille', sideD(angles.trianglesTaille, 'D plus ouvert', 'G plus ouvert'));
+  }
+  // Membre inférieur — calcanéen (Td.calcaneen) valgus/varus + axe jambier
+  // (Td.axeJambier) dévié à D/G (repère absolu patient — voir _computeDosAngles).
+  if (angles.angleCalcaneenD !== null && !isNaN(angles.angleCalcaneenD) && Math.abs(angles.angleCalcaneenD) > Td.calcaneen) {
+    push('Calcanéum D', sideD(angles.angleCalcaneenD, 'valgus', 'varus'));
+  }
+  if (angles.angleCalcaneenG !== null && !isNaN(angles.angleCalcaneenG) && Math.abs(angles.angleCalcaneenG) > Td.calcaneen) {
+    push('Calcanéum G', sideD(angles.angleCalcaneenG, 'valgus', 'varus'));
+  }
+  if (angles.axeJambierD !== null && !isNaN(angles.axeJambierD) && Math.abs(angles.axeJambierD) > Td.axeJambier) {
+    push('Axe jambier D', sideD(angles.axeJambierD, 'dévié à D', 'dévié à G'));
+  }
+  if (angles.axeJambierG !== null && !isNaN(angles.axeJambierG) && Math.abs(angles.axeJambierG) > Td.axeJambier) {
+    push('Axe jambier G', sideD(angles.axeJambierG, 'dévié à D', 'dévié à G'));
+  }
+  // Conclusion scoliose — vidée si « Rachis aligné » pour ne pas empêcher
+  // le fallback « Posture dos dans les normes » côté caller.
+  let conclusion = _buildDosConclusion(angles);
+  if (conclusion.startsWith('Rachis aligné')) conclusion = '';
+  return { horsNormes, conclusion };
+}
+
 // #108 Étape 3b — Findings face (miroir _buildPostureFindings). Liste les
 // mesures hors zone neutre + conclusion latéralisée, format identique pour
 // intégration dans la synthèse et le rapport :
@@ -6276,6 +6359,22 @@ function _buildPostureProfilSectionsSynthese(d) {
     if (!items.length) items.push('Posture face dans les normes — aucune tendance marquée');
     out.push({
       titre: '📐 Analyse posturale — face',
+      items: items,
+    });
+  }
+  // #108 Dos étape 3b — Bloc dos (placement étape 1, mesures étape 2, seuils
+  // configurables étape 3a, findings étape 3b). Même schéma que profil et face :
+  // angles persistés par _validatePosturePlacement, hors-normes + conclusion
+  // scoliose via _buildDosFindings. Ordre cosmétique : profil → face → dos.
+  const da = d && d._postureAnalysis && d._postureAnalysis.dos;
+  if (da && da.angles) {
+    const df = _buildDosFindings(da.angles);
+    const items = [];
+    df.horsNormes.forEach(function(x) { items.push(x.mesure + ' : ' + x.detail); });
+    if (df.conclusion) items.push('Conclusion : ' + df.conclusion);
+    if (!items.length) items.push('Posture dos dans les normes — aucune tendance marquée');
+    out.push({
+      titre: '📐 Analyse posturale — dos',
       items: items,
     });
   }
