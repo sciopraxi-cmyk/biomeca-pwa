@@ -2045,6 +2045,49 @@ const MARKER_TEMPLATES = {
     {name:'2e orteil D',      color:'#a16207', side:'D', hint:'base du 2e orteil droit (axe de référence du pied)'},
     {name:'2e orteil G',      color:'#ca8a04', side:'G', hint:'base du 2e orteil gauche (axe de référence du pied)'},
   ],
+  // #108 Dos — Posture vue postérieure, 28 points anatomiques. Ordre haut→bas
+  // pour le placement guidé (tête → ceinture scapulaire → rachis thoracique
+  // → ceinture pelvienne → membres inférieurs → calcanéum). Les couleurs des
+  // points partagés avec la face (Oreille sup D/G, Acromion D/G, Genou D/G)
+  // sont conservées pour repérage visuel cross-vue.
+  // Étape 1 (cette branche) = placement seul. Étape 2 ajoutera _computeDosAngles.
+  'posture-dos': [
+    // Tête / cervicales (5)
+    {name:'Base du crâne',                color:'#f04060', side:'',  hint:'protubérance occipitale externe (inion), à la base de l\'os occipital'},
+    {name:'Oreille sup D',                color:'#d97706', side:'D', hint:'sommet du pavillon de l\'oreille droite (hélix supérieur)'},
+    {name:'Oreille sup G',                color:'#f59e0b', side:'G', hint:'sommet du pavillon de l\'oreille gauche (hélix supérieur)'},
+    {name:'Épineuse C3',                  color:'#f5762a', side:'',  hint:'apophyse épineuse de C3, milieu de la lordose cervicale postérieure'},
+    {name:'Épineuse C7',                  color:'#f5a623', side:'',  hint:'épineuse la plus proéminente à la base du cou (tête fléchie pour repérer)'},
+    // Ceinture scapulaire (6)
+    {name:'Acromion D',                   color:'#4a9eff', side:'D', hint:'bord externe et postérieur de l\'épaule droite (sommet osseux)'},
+    {name:'Acromion G',                   color:'#60afff', side:'G', hint:'bord externe et postérieur de l\'épaule gauche (sommet osseux)'},
+    {name:'Angle supéro-médial scapula D', color:'#3b82f6', side:'D', hint:'angle supérieur et médial (interne) de l\'omoplate droite'},
+    {name:'Angle supéro-médial scapula G', color:'#60a5fa', side:'G', hint:'angle supérieur et médial (interne) de l\'omoplate gauche'},
+    {name:'Pointe inférieure scapula D',  color:'#06b6d4', side:'D', hint:'angle inférieur de l\'omoplate droite (~TH7-TH8)'},
+    {name:'Pointe inférieure scapula G',  color:'#22d3ee', side:'G', hint:'angle inférieur de l\'omoplate gauche (~TH7-TH8)'},
+    // Rachis thoracique / taille (4)
+    {name:'Épineuse TH6',                 color:'#6366f1', side:'',  hint:'apophyse épineuse de TH6, au milieu du dos (~entre les pointes des omoplates)'},
+    {name:'Épineuse TH12',                color:'#818cf8', side:'',  hint:'apophyse épineuse de TH12 (au niveau de la dernière côte palpable)'},
+    {name:'Pli de la taille D',           color:'#8b5cf6', side:'D', hint:'pli latéral droit à la taille (creux le plus marqué)'},
+    {name:'Pli de la taille G',           color:'#a78bfa', side:'G', hint:'pli latéral gauche à la taille (creux le plus marqué)'},
+    // Rachis lombaire / sacrum (2)
+    {name:'Épineuse L3',                  color:'#7c3aed', side:'',  hint:'apophyse épineuse de L3, au milieu de la lordose lombaire'},
+    {name:'Base du sacrum',               color:'#4f46e5', side:'',  hint:'jonction L5-S1, juste au-dessus du sacrum'},
+    // Ceinture pelvienne (3)
+    {name:'EIPS D',                       color:'#10b981', side:'D', hint:'épine iliaque postéro-supérieure droite (fossette latérale du sacrum)'},
+    {name:'EIPS G',                       color:'#3ecf72', side:'G', hint:'épine iliaque postéro-supérieure gauche (fossette latérale du sacrum)'},
+    {name:'Sommet du pli inter-fessier',  color:'#059669', side:'',  hint:'point supérieur du sillon inter-fessier (axe médian)'},
+    // Membres inférieurs (4)
+    {name:'Genou D',                      color:'#ec4899', side:'D', hint:'centre du creux poplité (face postérieure du genou droit)'},
+    {name:'Genou G',                      color:'#f472b6', side:'G', hint:'centre du creux poplité (face postérieure du genou gauche)'},
+    {name:'Mi-mollet D',                  color:'#14b8a6', side:'D', hint:'milieu du triceps sural, point le plus saillant du mollet droit'},
+    {name:'Mi-mollet G',                  color:'#2dd4bf', side:'G', hint:'milieu du triceps sural, point le plus saillant du mollet gauche'},
+    // Calcanéum (4)
+    {name:'Calcanéum supérieur D',        color:'#8892a4', side:'D', hint:'sommet du tendon d\'Achille à l\'insertion calcanéenne (pied droit)'},
+    {name:'Calcanéum supérieur G',        color:'#aab0bc', side:'G', hint:'sommet du tendon d\'Achille à l\'insertion calcanéenne (pied gauche)'},
+    {name:'Calcanéum inférieur D',        color:'#a16207', side:'D', hint:'point le plus inférieur et postérieur du talon droit'},
+    {name:'Calcanéum inférieur G',        color:'#ca8a04', side:'G', hint:'point le plus inférieur et postérieur du talon gauche'},
+  ],
 };
 
 function cloneMarkers(type) {
@@ -4866,13 +4909,13 @@ function _renderPostureSlot(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   const dataUrl = bd?.[key];
-  // #85-2b + #108 Étape 1 — bouton 🎯 placement points sur profil G/D (14 pts)
-  // ET face (23 pts). Badge "✓ N/total placés" indique l'avancement.
-  // Total dérivé du template via _posturePointsTotal (face=23, profil=14).
-  // Dos non couvert : pas de template posture-dos à cette étape.
+  // #85-2b + #108 — bouton 🎯 placement points sur profil G/D (14 pts), face
+  // (25 pts), dos (28 pts). Badge "✓ N/total placés" indique l'avancement.
+  // Total dérivé du template via _posturePointsTotal.
   const isProfil = viewKey === 'profilG' || viewKey === 'profilD';
   const isFace = viewKey === 'face';
-  const hasPlacement = isProfil || isFace;
+  const isDos = viewKey === 'dos';
+  const hasPlacement = isProfil || isFace || isDos;
   const totalPoints = _posturePointsTotal(viewKey);
   const markerCount = hasPlacement ? _countPostureMarkers(bd, viewKey) : 0;
   const placementBtn = (dataUrl && hasPlacement)
@@ -4958,10 +5001,11 @@ function _countPostureMarkers(bd, viewKey) {
   return markers.filter(m => m.nx != null && m.ny != null).length;
 }
 
-// #108 Étape 1 — résolution du template MARKER_TEMPLATES par viewKey.
-// face → 23 pts ; profilG/profilD → 14 pts ; dos non couvert.
+// #108 — résolution du template MARKER_TEMPLATES par viewKey.
+// face → 25 pts ; dos → 28 pts ; profilG/profilD → 14 pts.
 function _postureTemplateName(viewKey) {
   if (viewKey === 'face') return 'posture-face';
+  if (viewKey === 'dos')  return 'posture-dos';
   return 'posture-profil';
 }
 function _posturePointsTotal(viewKey) {
@@ -5999,6 +6043,17 @@ function _renderPosturePlacementResults() {
     _renderFacePlacementResults(panel, f);
     return;
   }
+  // #108 Dos étape 1 — placement seul, pas encore de _computeDosAngles.
+  // Affiche un placeholder explicite pour éviter d'appeler _computePostureAngles
+  // sur des points dos (Tragus/C7/etc. absents → null partout + warns).
+  // Le panneau d'analyse dos arrivera à l'étape 2.
+  if (_postureModalViewKey === 'dos') {
+    panel.innerHTML = `<div style="padding:8px 4px;font-size:12px;color:#64748b;line-height:1.45;">
+      <div style="font-weight:600;color:#0e1f38;margin-bottom:4px;">📐 Mesures dos — à venir</div>
+      <div>Le placement des 28 points sera persisté à la validation. Les mesures et la classification seront calculées à l'étape suivante.</div>
+    </div>`;
+    return;
+  }
   const a = _computePostureAngles(_postureModalMarkers, _postureCalibration);
   // #85-2d — fmt signé (bleu = +, rouge = −, gris = null) pour antériorisation/
   // bassin/épaules ; fmt unsigned pour CVA/courbures/genouFlexion (pas de signe
@@ -6180,16 +6235,23 @@ function _redrawPostureModal() {
   const ctx = _postureModalCtx;
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
   ctx.drawImage(_postureModalImg, 0, 0);
-  // #85-2c-angles + #108 Étape 2 — fil à plomb gris-bleu neutre passant par
-  // l'ancrage du repère « cheville ». Profil : Réf. cheville (unique).
-  // Face : milieu(Cheville D, Cheville G) (= C_chevilles utilisé pour les
-  // translations dans _computeFaceAngles, donc cohérent visuellement).
+  // #85-2c-angles + #108 — fil à plomb gris-bleu neutre passant par l'ancrage
+  // du repère « cheville ». Profil : Réf. cheville (unique). Face : milieu
+  // (Cheville D, Cheville G). Dos : milieu(Calcanéum inférieur D, Calcanéum
+  // inférieur G) (équivalent postérieur du repère cheville en face).
+  // Pour face et dos, si une moitié de la paire manque → pas d'ancre (idem face).
   let plumbAnchor = null;
   if (_postureModalViewKey === 'face') {
     const chD = _postureModalMarkers.find(m => m.name === 'Cheville D');
     const chG = _postureModalMarkers.find(m => m.name === 'Cheville G');
     if (chD && chD.x !== null && chD.y !== null && chG && chG.x !== null && chG.y !== null) {
       plumbAnchor = { x: (chD.x + chG.x) / 2, y: (chD.y + chG.y) / 2 };
+    }
+  } else if (_postureModalViewKey === 'dos') {
+    const cD = _postureModalMarkers.find(m => m.name === 'Calcanéum inférieur D');
+    const cG = _postureModalMarkers.find(m => m.name === 'Calcanéum inférieur G');
+    if (cD && cD.x !== null && cD.y !== null && cG && cG.x !== null && cG.y !== null) {
+      plumbAnchor = { x: (cD.x + cG.x) / 2, y: (cD.y + cG.y) / 2 };
     }
   } else {
     const cheville = _postureModalMarkers.find(m => m.name === 'Réf. cheville');
@@ -6402,7 +6464,7 @@ function openPosturePlacementModal(prefix, viewKey) {
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
   overlay.innerHTML = `<div style="background:#fff;border-radius:8px;padding:12px;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des ${_postureModalMarkers.length} points — ${viewKey === 'face' ? 'Face' : 'Profil ' + (viewKey === 'profilG' ? 'G' : 'D')}</div>
+        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des ${_postureModalMarkers.length} points — ${viewKey === 'face' ? 'Face' : viewKey === 'dos' ? 'Dos' : 'Profil ' + (viewKey === 'profilG' ? 'G' : 'D')}</div>
         <div style="display:flex;gap:6px;">
           <button class="btn" onclick="_cancelPosturePlacement()" style="font-size:11px;background:#888;color:#fff;padding:5px 12px;">Annuler</button>
           <button class="btn" onclick="_validatePosturePlacement('${prefix}','${viewKey}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">✓ Valider</button>
@@ -6493,15 +6555,21 @@ async function _validatePosturePlacement(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
-  // #108 Étape 2 — face : _computeFaceAngles persiste les 11 mesures.
-  // Pas de curveInterp pour la face (sémantique courbures rachidiennes
-  // spécifique au profil — la classification face viendra étape 3).
+  // #108 — face : _computeFaceAngles persiste les 11 mesures.
+  // dos étape 1 : placement seul, angles null (étape 2 ajoutera _computeDosAngles).
+  // Pas de curveInterp pour face/dos (sémantique courbures rachidiennes
+  // spécifique au profil — sera évaluée à part).
   // Profil G/D : flow inchangé — angles + curveInterp calculés au save.
   const isFace = viewKey === 'face';
+  const isDos  = viewKey === 'dos';
   let angles = null;
   let curveInterp = null;
   if (isFace) {
     angles = _computeFaceAngles(_postureModalMarkers, _postureCalibration);
+  } else if (isDos) {
+    // Placement seul à cette étape — angles reste null par défaut. La synthèse
+    // et le rapport gardent `if (analysis.angles)` donc la section dos
+    // n'apparaîtra pas tant que les mesures ne sont pas implémentées (voulu).
   } else {
     // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
     // moment depuis markers + calibration ; on les stocke quand même pour éviter
