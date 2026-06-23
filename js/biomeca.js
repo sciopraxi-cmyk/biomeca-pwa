@@ -5555,6 +5555,82 @@ function _buildFaceConclusion(angles) {
   return parts.join(' · ');
 }
 
+// #108 Étape 3b — Findings face (miroir _buildPostureFindings). Liste les
+// mesures hors zone neutre + conclusion latéralisée, format identique pour
+// intégration dans la synthèse et le rapport :
+//   { horsNormes: [{ mesure: 'Tête (inclinaison)', detail: 'inclinée à D' }, ...],
+//     conclusion: 'Latéralisation à partir … · Tête inclinée à D' | '' }
+// Règle « hors-normes seulement » : on n'émet QUE si hors zone neutre (cf
+// seuils Tf.tete/.epaules/.bassin/.translation/.valgumVarum/.ouvertureMin/Max).
+// null/NaN → skip silencieux (point non placé). Le caller décide du message
+// « dans les normes » si horsNormes ET conclusion sont vides.
+function _buildFaceFindings(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  const Tf = thr.face;
+  const empty = { horsNormes: [], conclusion: '' };
+  if (!angles) return empty;
+  const horsNormes = [];
+  const push = (mesure, detail) => horsNormes.push({ mesure, detail });
+  const sideD = (v, posTxt, negTxt) => v > 0 ? posTxt : negTxt;
+  // Tête (inclinaison / rotation / mandibule) — seuil unique Tf.tete.
+  if (angles.inclinaisonTete !== null && !isNaN(angles.inclinaisonTete) && Math.abs(angles.inclinaisonTete) > Tf.tete) {
+    push('Tête (inclinaison)', sideD(angles.inclinaisonTete, 'inclinée à D', 'inclinée à G'));
+  }
+  if (angles.rotationTete !== null && !isNaN(angles.rotationTete) && Math.abs(angles.rotationTete) > Tf.tete) {
+    push('Tête (rotation)', sideD(angles.rotationTete, 'rotation à D', 'rotation à G'));
+  }
+  if (angles.deviationMandibule !== null && !isNaN(angles.deviationMandibule) && Math.abs(angles.deviationMandibule) > Tf.tete) {
+    push('Mandibule', sideD(angles.deviationMandibule, 'déviation à D', 'déviation à G'));
+  }
+  if (angles.nezTordu === true) {
+    push('Nez', 'désaxé sans rotation de tête (à vérifier)');
+  }
+  // Épaules / Bassin — seuils dédiés.
+  if (angles.ligneEpaules !== null && !isNaN(angles.ligneEpaules) && Math.abs(angles.ligneEpaules) > Tf.epaules) {
+    push('Ligne épaules', sideD(angles.ligneEpaules, 'D plus haute', 'G plus haute'));
+  }
+  if (angles.basculeBassin !== null && !isNaN(angles.basculeBassin) && Math.abs(angles.basculeBassin) > Tf.bassin) {
+    push('Bascule bassin', sideD(angles.basculeBassin, 'D plus haute', 'G plus haute'));
+  }
+  // Fermeture viscérale = string 'D' | 'G' | null (déjà classifiée par _computeFaceAngles).
+  if (angles.fermetureViscerale) {
+    push('Fermeture viscérale', 'fermeture ' + angles.fermetureViscerale);
+  }
+  // Translations — seuil Tf.translation (en %).
+  if (angles.translationThorax !== null && !isNaN(angles.translationThorax) && Math.abs(angles.translationThorax) > Tf.translation) {
+    push('Translation thorax', sideD(angles.translationThorax, 'décalé à D', 'décalé à G'));
+  }
+  if (angles.translationBassin !== null && !isNaN(angles.translationBassin) && Math.abs(angles.translationBassin) > Tf.translation) {
+    push('Translation bassin', sideD(angles.translationBassin, 'décalé à D', 'décalé à G'));
+  }
+  // Tronc (Nombril → Fourchette) — réutilise Tf.tete (inclinaison latérale).
+  if (angles.inclinaisonTronc !== null && !isNaN(angles.inclinaisonTronc) && Math.abs(angles.inclinaisonTronc) > Tf.tete) {
+    push('Tronc (inclinaison)', sideD(angles.inclinaisonTronc, 'incliné à D', 'incliné à G'));
+  }
+  // Genoux — Tf.valgumVarum. + = valgum / − = varum (sémantique _computeFaceAngles).
+  if (angles.valgumVarumD !== null && !isNaN(angles.valgumVarumD) && Math.abs(angles.valgumVarumD) > Tf.valgumVarum) {
+    push('Genou D', sideD(angles.valgumVarumD, 'valgum', 'varum'));
+  }
+  if (angles.valgumVarumG !== null && !isNaN(angles.valgumVarumG) && Math.abs(angles.valgumVarumG) > Tf.valgumVarum) {
+    push('Genou G', sideD(angles.valgumVarumG, 'valgum', 'varum'));
+  }
+  // Pieds — bande physiologique [Tf.ouvertureMin, Tf.ouvertureMax] (angle de Fick).
+  const ouvertureBand = v => {
+    if (v < Tf.ouvertureMin) return 'en fermeture';
+    if (v > Tf.ouvertureMax) return 'en ouverture';
+    return null;
+  };
+  if (angles.ouverturePasD !== null && !isNaN(angles.ouverturePasD)) {
+    const dD = ouvertureBand(angles.ouverturePasD);
+    if (dD) push('Pied D', dD);
+  }
+  if (angles.ouverturePasG !== null && !isNaN(angles.ouverturePasG)) {
+    const dG = ouvertureBand(angles.ouverturePasG);
+    if (dG) push('Pied G', dG);
+  }
+  return { horsNormes, conclusion: _buildFaceConclusion(angles) };
+}
+
 // Calcule le vecteur plumb_up affichable (réutilisé pour le tracé du fil à plomb).
 // Logique identique à _computePostureAngles (DRY évité car appelée dans la boucle
 // de redraw — duplication contrôlée < 10 lignes pour éviter un getter dédié).
@@ -5791,6 +5867,23 @@ function _buildPostureProfilSectionsSynthese(d) {
       items: items,
     });
   });
+  // #108 Étape 3b — Bloc face (placement seul à étape 1, mesures étape 2,
+  // findings étape 3b). Même schéma que profil : on lit les angles persistés
+  // par _validatePosturePlacement, on bâtit la liste hors-normes + conclusion
+  // via _buildFaceFindings, et on pousse une section unique. L'ordre cosmétique
+  // (profil puis face) garde la cohérence visuelle « profil d'abord ».
+  const fa = d && d._postureAnalysis && d._postureAnalysis.face;
+  if (fa && fa.angles) {
+    const ff = _buildFaceFindings(fa.angles);
+    const items = [];
+    ff.horsNormes.forEach(function(x) { items.push(x.mesure + ' : ' + x.detail); });
+    if (ff.conclusion) items.push('Conclusion : ' + ff.conclusion);
+    if (!items.length) items.push('Posture face dans les normes — aucune tendance marquée');
+    out.push({
+      titre: '📐 Analyse posturale — face',
+      items: items,
+    });
+  }
   return out;
 }
 
