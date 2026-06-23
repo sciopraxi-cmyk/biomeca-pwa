@@ -2004,6 +2004,44 @@ const MARKER_TEMPLATES = {
     {name:'Genou (milieu lat.)', color:'#ec4899', side:'', hint:'milieu de l\'interligne articulaire latérale du genou'},
     {name:'Réf. cheville',       color:'#8892a4', side:'', hint:'juste en avant de la malléole latérale (fibula distale)'},
   ],
+  // #108 Étape 1 — Posture face : 23 points anatomiques, vue antérieure.
+  // Ordre haut→bas pour le placement guidé (tête → épaules → tronc → bassin
+  // → bras → jambes → pieds). Couleurs distinctes par point, paires D/G en
+  // teintes voisines (ex. bleu D / bleu clair G) pour repère visuel. Pas de
+  // calcul d'angles à cette étape : _computePostureAngles reste profil-only
+  // (skip côté results / validate via guard viewKey === 'face').
+  'posture-face': [
+    // Tête (5)
+    {name:'Glabelle',         color:'#f04060', side:'',  hint:'point médian entre les sourcils, au-dessus de la racine du nez'},
+    {name:'Œil D',            color:'#f5762a', side:'D', hint:'centre de la pupille / canthus médial de l\'œil droit du patient'},
+    {name:'Œil G',            color:'#f59324', side:'G', hint:'centre de la pupille / canthus médial de l\'œil gauche du patient'},
+    {name:'Bout du nez',      color:'#f5a623', side:'',  hint:'pointe inférieure du nez (sous-nasal)'},
+    {name:'Pointe menton',    color:'#e0c020', side:'',  hint:'point le plus inférieur et antérieur du menton (gnathion)'},
+    // Épaules (2)
+    {name:'Acromion D',       color:'#4a9eff', side:'D', hint:'bord externe de l\'épaule droite du patient (sommet osseux)'},
+    {name:'Acromion G',       color:'#60afff', side:'G', hint:'bord externe de l\'épaule gauche du patient (sommet osseux)'},
+    // Tronc (4)
+    {name:'Fourchette sternale', color:'#3b82f6', side:'',  hint:'échancrure du manubrium sternal, à la base du cou'},
+    {name:'Nombril',          color:'#6366f1', side:'',  hint:'centre de l\'ombilic'},
+    {name:'Pli flanc D',      color:'#8b5cf6', side:'D', hint:'pli latéral du flanc droit au niveau de la taille'},
+    {name:'Pli flanc G',      color:'#a78bfa', side:'G', hint:'pli latéral du flanc gauche au niveau de la taille'},
+    // Bassin (2)
+    {name:'EIAS D',           color:'#10b981', side:'D', hint:'épine iliaque antéro-supérieure droite (saillie osseuse antérieure du bassin)'},
+    {name:'EIAS G',           color:'#3ecf72', side:'G', hint:'épine iliaque antéro-supérieure gauche (saillie osseuse antérieure du bassin)'},
+    // Bras (2)
+    {name:'Poignet D',        color:'#0d9488', side:'D', hint:'milieu du pli du poignet droit (face antérieure)'},
+    {name:'Poignet G',        color:'#14b8a6', side:'G', hint:'milieu du pli du poignet gauche (face antérieure)'},
+    // Jambes (6)
+    {name:'Tête fémorale D',  color:'#6edfaa', side:'D', hint:'projection antérieure de la tête fémorale droite (~ pli inguinal milieu)'},
+    {name:'Tête fémorale G',  color:'#86efac', side:'G', hint:'projection antérieure de la tête fémorale gauche (~ pli inguinal milieu)'},
+    {name:'Genou D',          color:'#ec4899', side:'D', hint:'centre de la rotule droite'},
+    {name:'Genou G',          color:'#f472b6', side:'G', hint:'centre de la rotule gauche'},
+    {name:'Cheville D',       color:'#8892a4', side:'D', hint:'milieu de l\'interligne tibio-tarsienne (entre les malléoles), pied droit'},
+    {name:'Cheville G',       color:'#aab0bc', side:'G', hint:'milieu de l\'interligne tibio-tarsienne (entre les malléoles), pied gauche'},
+    // Pieds (2)
+    {name:'2e orteil D',      color:'#a16207', side:'D', hint:'base du 2e orteil droit (axe de référence du pied)'},
+    {name:'2e orteil G',      color:'#ca8a04', side:'G', hint:'base du 2e orteil gauche (axe de référence du pied)'},
+  ],
 };
 
 function cloneMarkers(type) {
@@ -4789,17 +4827,20 @@ function _renderPostureSlot(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   const dataUrl = bd?.[key];
-  // #85-2b — bouton 🎯 placement points sur les vues profil (G/D) seulement,
-  // une fois la photo capturée. Badge "✓ N/14 placés" indique l'avancement
-  // de l'analyse pour cette vue. Aucun bouton pour face/dos (pas de template
-  // posture-face/posture-dos pour ce périmètre — placement seul, vue profil).
+  // #85-2b + #108 Étape 1 — bouton 🎯 placement points sur profil G/D (14 pts)
+  // ET face (23 pts). Badge "✓ N/total placés" indique l'avancement.
+  // Total dérivé du template via _posturePointsTotal (face=23, profil=14).
+  // Dos non couvert : pas de template posture-dos à cette étape.
   const isProfil = viewKey === 'profilG' || viewKey === 'profilD';
-  const markerCount = isProfil ? _countPostureMarkers(bd, viewKey) : 0;
-  const placementBtn = (dataUrl && isProfil)
-    ? `<button class="btn" onclick="openPosturePlacementModal('${prefix}','${viewKey}')" title="Placer les 14 points anatomiques" style="font-size:9px;padding:2px 6px;background:#7c3aed;color:#fff;">🎯</button>`
+  const isFace = viewKey === 'face';
+  const hasPlacement = isProfil || isFace;
+  const totalPoints = _posturePointsTotal(viewKey);
+  const markerCount = hasPlacement ? _countPostureMarkers(bd, viewKey) : 0;
+  const placementBtn = (dataUrl && hasPlacement)
+    ? `<button class="btn" onclick="openPosturePlacementModal('${prefix}','${viewKey}')" title="Placer les ${totalPoints} points anatomiques" style="font-size:9px;padding:2px 6px;background:#7c3aed;color:#fff;">🎯</button>`
     : '';
   const placementBadge = (markerCount > 0)
-    ? `<div style="font-size:9px;color:#10b981;font-weight:600;margin-top:2px;">✓ ${markerCount}/14 placés</div>`
+    ? `<div style="font-size:9px;color:#10b981;font-weight:600;margin-top:2px;">✓ ${markerCount}/${totalPoints} placés</div>`
     : '';
   // #85-2c-import — input file caché + bouton/label cliquable. Pattern label-for-input
   // pour éviter un onclick programmatique (compat iOS Safari : trigger click sur
@@ -4876,6 +4917,16 @@ let _postureModalViewKey = null;
 function _countPostureMarkers(bd, viewKey) {
   const markers = bd?._postureAnalysis?.[viewKey]?.markers || [];
   return markers.filter(m => m.nx != null && m.ny != null).length;
+}
+
+// #108 Étape 1 — résolution du template MARKER_TEMPLATES par viewKey.
+// face → 23 pts ; profilG/profilD → 14 pts ; dos non couvert.
+function _postureTemplateName(viewKey) {
+  if (viewKey === 'face') return 'posture-face';
+  return 'posture-profil';
+}
+function _posturePointsTotal(viewKey) {
+  return (MARKER_TEMPLATES[_postureTemplateName(viewKey)] || []).length;
 }
 
 // #85-2c-angles — calcul des 4 angles posturaux + global.
@@ -5359,6 +5410,17 @@ function _buildPostureProfilSectionsSynthese(d) {
 function _renderPosturePlacementResults() {
   const panel = document.getElementById('posture-placement-results');
   if (!panel) return;
+  // #108 Étape 1 — la face est en placement seul à ce stade (pas encore de
+  // _computeFaceAngles). Affiche un placeholder explicite pour ne pas appeler
+  // _computePostureAngles sur des points face (Tragus/C7/etc. absents → null
+  // partout + warns intempestifs). Le panneau d'analyse face arrivera étape 2.
+  if (_postureModalViewKey === 'face') {
+    panel.innerHTML = `<div style="padding:8px 4px;font-size:12px;color:#64748b;line-height:1.45;">
+      <div style="font-weight:600;color:#0e1f38;margin-bottom:4px;">📐 Mesures face — à venir</div>
+      <div>Le placement des 23 points sera persisté à la validation. Les angles et la classification seront calculés à l'étape suivante.</div>
+    </div>`;
+    return;
+  }
   const a = _computePostureAngles(_postureModalMarkers, _postureCalibration);
   // #85-2d — fmt signé (bleu = +, rouge = −, gris = null) pour antériorisation/
   // bassin/épaules ; fmt unsigned pour CVA/courbures/genouFlexion (pas de signe
@@ -5734,7 +5796,9 @@ function openPosturePlacementModal(prefix, viewKey) {
   _postureModalViewKey = viewKey;
   // Init markers : clone template (x:null, y:null), puis injection des coords
   // sauvegardées par nom (résilient au réordo / renommage futur des points).
-  _postureModalMarkers = cloneMarkers('posture-profil');
+  // #108 Étape 1 — template dépend du viewKey : face → posture-face (23 pts),
+  // profilG/profilD → posture-profil (14 pts). Source unique via helper.
+  _postureModalMarkers = cloneMarkers(_postureTemplateName(viewKey));
   const saved = bd._postureAnalysis?.[viewKey]?.markers || [];
   const savedByName = Object.fromEntries(saved.map(m => [m.name, m]));
   // #85-2c-angles — reset calibration au moment de l'ouverture. Restauration
@@ -5748,7 +5812,7 @@ function openPosturePlacementModal(prefix, viewKey) {
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
   overlay.innerHTML = `<div style="background:#fff;border-radius:8px;padding:12px;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des 14 points — Profil ${viewKey === 'profilG' ? 'G' : 'D'}</div>
+        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des ${_postureModalMarkers.length} points — ${viewKey === 'face' ? 'Face' : 'Profil ' + (viewKey === 'profilG' ? 'G' : 'D')}</div>
         <div style="display:flex;gap:6px;">
           <button class="btn" onclick="_cancelPosturePlacement()" style="font-size:11px;background:#888;color:#fff;padding:5px 12px;">Annuler</button>
           <button class="btn" onclick="_validatePosturePlacement('${prefix}','${viewKey}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">✓ Valider</button>
@@ -5839,26 +5903,36 @@ async function _validatePosturePlacement(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
-  // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
-  // moment depuis markers + calibration ; on les stocke quand même pour éviter
-  // de refaire le calcul à chaque affichage rapport / liste / résumé).
-  const angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  // #108 Étape 1 — face : on persiste UNIQUEMENT les markers (placement seul).
+  // Pas d'angles ni de curveInterp à ce stade : _computePostureAngles est
+  // spécifique au profil (lookup Tragus/C7/cheville/etc. absents en face →
+  // null partout + warns intempestifs). _computeFaceAngles arrivera étape 2.
+  // Profil G/D : flow inchangé — angles + curveInterp calculés au save.
+  const isFace = viewKey === 'face';
+  let angles = null;
+  let curveInterp = null;
+  if (!isFace) {
+    // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
+    // moment depuis markers + calibration ; on les stocke quand même pour éviter
+    // de refaire le calcul à chaque affichage rapport / liste / résumé).
+    angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+    // #106-Final Volet 3d — curveInterp = source de vérité depuis les 3 <select>.
+    // Si le select n'existe pas (état dégradé), on retombe sur la valeur sauvegardée
+    // ou l'auto-mapping. cls calculé à partir des angles pour l'auto-mapping.
+    const cls = _classifyPostureAngles(angles);
+    const existing = bd._postureAnalysis?.[viewKey] || {};
+    const readSelect = (courbure) => {
+      const el = document.getElementById('posture-curve-interp-' + courbure);
+      if (el && el.value) return el.value;
+      return existing.curveInterp?.[courbure] || _autoCurveInterp(cls, courbure) || null;
+    };
+    curveInterp = {
+      cervicale:  readSelect('cervicale'),
+      thoracique: readSelect('thoracique'),
+      lombaire:   readSelect('lombaire'),
+    };
+  }
   if (!bd._postureAnalysis) bd._postureAnalysis = {};
-  // #106-Final Volet 3d — curveInterp = source de vérité depuis les 3 <select>.
-  // Si le select n'existe pas (état dégradé), on retombe sur la valeur sauvegardée
-  // ou l'auto-mapping. cls calculé à partir des angles pour l'auto-mapping.
-  const cls = _classifyPostureAngles(angles);
-  const existing = bd._postureAnalysis[viewKey] || {};
-  const readSelect = (courbure) => {
-    const el = document.getElementById('posture-curve-interp-' + courbure);
-    if (el && el.value) return el.value;
-    return existing.curveInterp?.[courbure] || _autoCurveInterp(cls, courbure) || null;
-  };
-  const curveInterp = {
-    cervicale:  readSelect('cervicale'),
-    thoracique: readSelect('thoracique'),
-    lombaire:   readSelect('lombaire'),
-  };
   bd._postureAnalysis[viewKey] = {
     markers: _postureModalMarkers.map(m => ({
       name: m.name,
