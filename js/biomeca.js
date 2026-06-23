@@ -2004,6 +2004,47 @@ const MARKER_TEMPLATES = {
     {name:'Genou (milieu lat.)', color:'#ec4899', side:'', hint:'milieu de l\'interligne articulaire latérale du genou'},
     {name:'Réf. cheville',       color:'#8892a4', side:'', hint:'juste en avant de la malléole latérale (fibula distale)'},
   ],
+  // #108 Étape 2 — Posture face : 25 points anatomiques, vue antérieure.
+  // Ordre haut→bas pour le placement guidé (tête → épaules → tronc → bassin
+  // → bras → jambes → pieds). Couleurs distinctes par point, paires D/G en
+  // teintes voisines (ex. bleu D / bleu clair G) pour repère visuel.
+  // Les oreilles sont utilisées par _computeFaceAngles pour la rotation de
+  // tête (asymétrie distance perpendiculaire à l'axe facial central) ; sans
+  // elles, fallback nez/menton (cf logique HIÉRARCHIQUE dans le compute).
+  'posture-face': [
+    // Tête (7)
+    {name:'Glabelle',         color:'#f04060', side:'',  hint:'point médian entre les sourcils, au-dessus de la racine du nez'},
+    {name:'Œil D',            color:'#f5762a', side:'D', hint:'centre de la pupille / canthus médial de l\'œil droit du patient'},
+    {name:'Œil G',            color:'#f59324', side:'G', hint:'centre de la pupille / canthus médial de l\'œil gauche du patient'},
+    {name:'Bout du nez',      color:'#f5a623', side:'',  hint:'pointe inférieure du nez (sous-nasal)'},
+    {name:'Pointe menton',    color:'#e0c020', side:'',  hint:'point le plus inférieur et antérieur du menton (gnathion)'},
+    {name:'Oreille sup D',    color:'#d97706', side:'D', hint:'sommet du pavillon de l\'oreille droite (hélix supérieur)'},
+    {name:'Oreille sup G',    color:'#f59e0b', side:'G', hint:'sommet du pavillon de l\'oreille gauche (hélix supérieur)'},
+    // Épaules (2)
+    {name:'Acromion D',       color:'#4a9eff', side:'D', hint:'bord externe de l\'épaule droite du patient (sommet osseux)'},
+    {name:'Acromion G',       color:'#60afff', side:'G', hint:'bord externe de l\'épaule gauche du patient (sommet osseux)'},
+    // Tronc (4)
+    {name:'Fourchette sternale', color:'#3b82f6', side:'',  hint:'échancrure du manubrium sternal, à la base du cou'},
+    {name:'Nombril',          color:'#6366f1', side:'',  hint:'centre de l\'ombilic'},
+    {name:'Pli flanc D',      color:'#8b5cf6', side:'D', hint:'pli latéral du flanc droit au niveau de la taille'},
+    {name:'Pli flanc G',      color:'#a78bfa', side:'G', hint:'pli latéral du flanc gauche au niveau de la taille'},
+    // Bassin (2)
+    {name:'EIAS D',           color:'#10b981', side:'D', hint:'épine iliaque antéro-supérieure droite (saillie osseuse antérieure du bassin)'},
+    {name:'EIAS G',           color:'#3ecf72', side:'G', hint:'épine iliaque antéro-supérieure gauche (saillie osseuse antérieure du bassin)'},
+    // Bras (2)
+    {name:'Poignet D',        color:'#0d9488', side:'D', hint:'milieu du pli du poignet droit (face antérieure)'},
+    {name:'Poignet G',        color:'#14b8a6', side:'G', hint:'milieu du pli du poignet gauche (face antérieure)'},
+    // Jambes (6)
+    {name:'Tête fémorale D',  color:'#6edfaa', side:'D', hint:'projection antérieure de la tête fémorale droite (~ pli inguinal milieu)'},
+    {name:'Tête fémorale G',  color:'#86efac', side:'G', hint:'projection antérieure de la tête fémorale gauche (~ pli inguinal milieu)'},
+    {name:'Genou D',          color:'#ec4899', side:'D', hint:'centre de la rotule droite'},
+    {name:'Genou G',          color:'#f472b6', side:'G', hint:'centre de la rotule gauche'},
+    {name:'Cheville D',       color:'#8892a4', side:'D', hint:'milieu de l\'interligne tibio-tarsienne (entre les malléoles), pied droit'},
+    {name:'Cheville G',       color:'#aab0bc', side:'G', hint:'milieu de l\'interligne tibio-tarsienne (entre les malléoles), pied gauche'},
+    // Pieds (2)
+    {name:'2e orteil D',      color:'#a16207', side:'D', hint:'base du 2e orteil droit (axe de référence du pied)'},
+    {name:'2e orteil G',      color:'#ca8a04', side:'G', hint:'base du 2e orteil gauche (axe de référence du pied)'},
+  ],
 };
 
 function cloneMarkers(type) {
@@ -4589,6 +4630,25 @@ const POSTURE_THRESHOLDS_DEFAULTS = {
     thoracique: { rectitude: 12, hyper: 32 },
     lombaire:   { rectitude: 12, hyper: 35 },
   },
+  // #108 Étape 3a — seuils face configurables. Tous en degrés sauf
+  // `translation` en % (largeur d'appui). Repris des constantes inline étape 2
+  // (SEUIL_TETE, SEUIL_EPAULES, etc. dans _renderFacePlacementResults et
+  // _buildFaceConclusion → désormais lus depuis POSTURE_THRESHOLDS.face).
+  face: {
+    tete: 2,             // inclinaison / rotation / mandibule / inclinaison tronc
+    epaules: 2,          // ligne épaules (asymétrie haut-bas)
+    bassin: 2,           // bascule bassin (EIAS)
+    translation: 3,      // % de la largeur d'appui (thorax / bassin)
+    valgumVarum: 3,      // ° de déviation au genou
+    // Angle de Fick / progression du pied — zone physiologique 15-25° de
+    // rotation externe (le pied est NATURELLEMENT en rotation externe, pas
+    // centré sur 0). < ouvertureMin = pied en fermeture ; > ouvertureMax =
+    // pied en ouverture ; entre les deux = physiologique. Réglables /
+    // calibrables si trop de faux « fermeture » sur une population donnée.
+    ouvertureMin: 15,
+    ouvertureMax: 25,
+    lateralisation: 2,   // ° d'inclinaison latérale par étage (conclusion)
+  },
 };
 
 // Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
@@ -4606,6 +4666,10 @@ function _loadPostureThresholds() {
         thoracique: { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.thoracique, ...(stored.courbures?.thoracique || {}) },
         lombaire:   { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.lombaire,   ...(stored.courbures?.lombaire   || {}) },
       },
+      // #108 Étape 3a — merge profond face : tolère un stockage partiel
+      // (utilisateurs qui ont déjà personnalisé leurs seuils profil avant la
+      // release face → la section face manquera, on retombe sur les défauts).
+      face: { ...POSTURE_THRESHOLDS_DEFAULTS.face, ...(stored.face || {}) },
     };
   } catch (e) {
     console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
@@ -4633,13 +4697,15 @@ function _renderPostureThresholdsPanel() {
   const T = POSTURE_THRESHOLDS;
   // Helper input numérique. `path` est l'argument dot-notation pour
   // _updatePostureThreshold (ex. 'neutralite.bassin' ou 'courbures.cervicale.hyper').
-  const num = (label, val, path) =>
+  // `unit` (par défaut '°') permet d'afficher '%' pour les seuils en pourcentage
+  // (ex. face.translation = % de la largeur d'appui).
+  const num = (label, val, path, unit = '°') =>
     `<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;">
       <span style="flex:1;color:#444;">${label}</span>
       <input type="number" value="${val}" min="0" step="0.5"
         onchange="_updatePostureThreshold('${path}', this.value)"
         style="width:64px;padding:3px 6px;border:1px solid #cbd5e0;border-radius:3px;font-size:12px;text-align:right;">
-      <span style="color:#888;font-size:11px;">°</span>
+      <span style="color:#888;font-size:11px;">${unit}</span>
     </label>`;
   const subHdr = `font-weight:600;color:#0e1f38;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;`;
   const courbHdr = `font-size:10px;color:#666;margin:6px 0 3px;`;
@@ -4665,6 +4731,17 @@ function _renderPostureThresholdsPanel() {
         <div style="${courbHdr}">Lombaire</div>
         ${num('Rectitude si déviation &lt;',              T.courbures.lombaire.rectitude,   'courbures.lombaire.rectitude')}
         ${num('Hyperlordose si déviation &gt;',           T.courbures.lombaire.hyper,       'courbures.lombaire.hyper')}
+      </div>
+      <div>
+        <div style="${subHdr}">Seuils — analyse face</div>
+        ${num('Tête (inclinaison / rotation / mandibule)', T.face.tete,           'face.tete')}
+        ${num('Ligne épaules (asymétrie)',                 T.face.epaules,        'face.epaules')}
+        ${num('Bascule du bassin (EIAS)',                  T.face.bassin,         'face.bassin')}
+        ${num('Translation latérale (% largeur d\'appui)', T.face.translation,    'face.translation', '%')}
+        ${num('Valgum / Varum du genou',                   T.face.valgumVarum,    'face.valgumVarum')}
+        ${num('Pied — fermeture si <',                     T.face.ouvertureMin,   'face.ouvertureMin')}
+        ${num('Pied — ouverture si >',                     T.face.ouvertureMax,   'face.ouvertureMax')}
+        ${num('Latéralisation par étage (conclusion)',     T.face.lateralisation, 'face.lateralisation')}
       </div>
     </div>
     <div style="margin-top:12px;">
@@ -4789,17 +4866,20 @@ function _renderPostureSlot(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   const dataUrl = bd?.[key];
-  // #85-2b — bouton 🎯 placement points sur les vues profil (G/D) seulement,
-  // une fois la photo capturée. Badge "✓ N/14 placés" indique l'avancement
-  // de l'analyse pour cette vue. Aucun bouton pour face/dos (pas de template
-  // posture-face/posture-dos pour ce périmètre — placement seul, vue profil).
+  // #85-2b + #108 Étape 1 — bouton 🎯 placement points sur profil G/D (14 pts)
+  // ET face (23 pts). Badge "✓ N/total placés" indique l'avancement.
+  // Total dérivé du template via _posturePointsTotal (face=23, profil=14).
+  // Dos non couvert : pas de template posture-dos à cette étape.
   const isProfil = viewKey === 'profilG' || viewKey === 'profilD';
-  const markerCount = isProfil ? _countPostureMarkers(bd, viewKey) : 0;
-  const placementBtn = (dataUrl && isProfil)
-    ? `<button class="btn" onclick="openPosturePlacementModal('${prefix}','${viewKey}')" title="Placer les 14 points anatomiques" style="font-size:9px;padding:2px 6px;background:#7c3aed;color:#fff;">🎯</button>`
+  const isFace = viewKey === 'face';
+  const hasPlacement = isProfil || isFace;
+  const totalPoints = _posturePointsTotal(viewKey);
+  const markerCount = hasPlacement ? _countPostureMarkers(bd, viewKey) : 0;
+  const placementBtn = (dataUrl && hasPlacement)
+    ? `<button class="btn" onclick="openPosturePlacementModal('${prefix}','${viewKey}')" title="Placer les ${totalPoints} points anatomiques" style="font-size:9px;padding:2px 6px;background:#7c3aed;color:#fff;">🎯</button>`
     : '';
   const placementBadge = (markerCount > 0)
-    ? `<div style="font-size:9px;color:#10b981;font-weight:600;margin-top:2px;">✓ ${markerCount}/14 placés</div>`
+    ? `<div style="font-size:9px;color:#10b981;font-weight:600;margin-top:2px;">✓ ${markerCount}/${totalPoints} placés</div>`
     : '';
   // #85-2c-import — input file caché + bouton/label cliquable. Pattern label-for-input
   // pour éviter un onclick programmatique (compat iOS Safari : trigger click sur
@@ -4876,6 +4956,16 @@ let _postureModalViewKey = null;
 function _countPostureMarkers(bd, viewKey) {
   const markers = bd?._postureAnalysis?.[viewKey]?.markers || [];
   return markers.filter(m => m.nx != null && m.ny != null).length;
+}
+
+// #108 Étape 1 — résolution du template MARKER_TEMPLATES par viewKey.
+// face → 23 pts ; profilG/profilD → 14 pts ; dos non couvert.
+function _postureTemplateName(viewKey) {
+  if (viewKey === 'face') return 'posture-face';
+  return 'posture-profil';
+}
+function _posturePointsTotal(viewKey) {
+  return (MARKER_TEMPLATES[_postureTemplateName(viewKey)] || []).length;
 }
 
 // #85-2c-angles — calcul des 4 angles posturaux + global.
@@ -5114,6 +5204,433 @@ function _computePostureAngles(markers, calibration) {
   return out;
 }
 
+// #108 Étape 2 — Calcul des 11 mesures faciales sur le modèle de
+// _computePostureAngles. Repères :
+//   - plumbUp = vertical-image (0,-1) sauf si calibration sol → perpendiculaire
+//     à (p2−p1) orientée Y<0 en canvas (identique au profil).
+//   - horiz   = perpendiculaire à plumbUp, orientation arbitraire jusqu'à
+//     déduction du « côté patient-D » via _deducePatientRightDir.
+//   - patientRightDir = unit horizontal pointing vers patient-D, déduit de
+//     la 1re paire D/G placée (acromions → EIAS → poignets → yeux → chevilles).
+//     Sans paire exploitable, fallback +horiz + console.warn.
+// Convention de signe pour TOUTES les mesures latéralisées :
+//   + = côté patient-D ; − = côté patient-G ; null si point requis manquant.
+function _computeFaceAngles(markers, calibration) {
+  const byName = Object.fromEntries(markers.map(m => [m.name, m]));
+  const isPlaced = m => m && m.x !== null && m.y !== null;
+  // 1. plumbUp + horiz (identique au profil) -----------------------------
+  let plumbUp;
+  if (calibration && calibration.p1 && calibration.p2) {
+    const dx = calibration.p2.x - calibration.p1.x;
+    const dy = calibration.p2.y - calibration.p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      let perp = { x: -dy / len, y: dx / len };
+      if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+      plumbUp = perp;
+    } else {
+      plumbUp = { x: 0, y: -1 };
+    }
+  } else {
+    plumbUp = { x: 0, y: -1 };
+  }
+  const horiz = { x: -plumbUp.y, y: plumbUp.x };
+  // 2. patientRightDir — direction horizontale vers patient-D (côté droit du
+  // patient = côté gauche de l'image quand patient face caméra). Auto-dérivée
+  // via 1re paire D/G placée. Ordre de priorité : acromions, EIAS, poignets,
+  // yeux, chevilles (les plus discriminants en haut de liste).
+  const dot = (a, b) => a.x * b.x + a.y * b.y;
+  const pairs = [
+    [byName['Acromion D'], byName['Acromion G']],
+    [byName['EIAS D'],     byName['EIAS G']],
+    [byName['Poignet D'],  byName['Poignet G']],
+    [byName['Œil D'],      byName['Œil G']],
+    [byName['Cheville D'], byName['Cheville G']],
+  ];
+  let patientRightDir = null;
+  for (const [D, G] of pairs) {
+    if (!isPlaced(D) || !isPlaced(G)) continue;
+    const v = { x: D.x - G.x, y: D.y - G.y };
+    const proj = dot(v, horiz);
+    if (Math.abs(proj) > 1e-9) {
+      const sign = Math.sign(proj);
+      patientRightDir = { x: horiz.x * sign, y: horiz.y * sign };
+      break;
+    }
+  }
+  if (!patientRightDir) {
+    patientRightDir = { x: horiz.x, y: horiz.y };
+  }
+  // 3. Output skeleton — null partout par défaut ------------------------
+  const out = {
+    // Tête
+    inclinaisonTete:    null,  // +D / -G (côté de l'œil le plus bas)
+    rotationTete:       null,  // +D / -G ; null si classification ≠ rotation
+    deviationMandibule: null,  // +D / -G ; null si classification ≠ mandibule
+    nezTordu:           false, // boolean
+    // Épaules / Bassin
+    ligneEpaules:       null,  // +D / -G (épaule la plus haute)
+    basculeBassin:      null,  // +D / -G (EIAS la plus haute)
+    fermetureViscerale: null,  // 'D' | 'G' | null
+    // Translations (% de la largeur d'appui)
+    translationThorax:  null,
+    translationBassin:  null,
+    // Genoux
+    valgumVarumD:       null,  // + valgum / - varum
+    valgumVarumG:       null,
+    // Pieds
+    ouverturePasD:      null,  // + = rotation externe (pied ouvert)
+    ouverturePasG:      null,
+    // Tronc (Nombril → Fourchette) — diagnostic latéral
+    inclinaisonTronc:   null,  // +D / -G
+    // Inclinaisons inter-étages (centres bas→haut) pour la conclusion
+    tiltCheGen:  null, // chevilles → milieu genoux
+    tiltGenBas:  null, // genoux → milieu bassin
+    tiltBasFla:  null, // bassin → milieu flancs
+    tiltFlaEpa:  null, // flancs → milieu épaules
+    tiltEpaTet:  null, // épaules → tête (Glabelle ou milieu yeux)
+    // Mémorise patientRightDir signe (utile pour debug / tests) — non rendu.
+    _patientRightDir: patientRightDir,
+  };
+  // 4. Mesures TÊTE -----------------------------------------------------
+  const eyeD = byName['Œil D'], eyeG = byName['Œil G'];
+  const glab = byName['Glabelle'], nez = byName['Bout du nez'], menton = byName['Pointe menton'];
+  // 4a. inclinaisonTete = angle vec(eyeD - eyeG) vs horizontale, +D = D plus bas.
+  if (isPlaced(eyeD) && isPlaced(eyeG)) {
+    const vec = { x: eyeD.x - eyeG.x, y: eyeD.y - eyeG.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projRight) > 1e-9) {
+      // -projUp > 0 quand eyeD est plus bas que eyeG (= tête inclinée à D).
+      out.inclinaisonTete = Math.atan2(-projUp, Math.abs(projRight)) * 180 / Math.PI;
+    }
+  }
+  // 4b/4c. rotationTete (oreilles, hiérarchique) vs deviationMandibule / nezTordu
+  // --------------------------------------------------------------------
+  // headHoriz = direction œil D → œil G (axe inter-orbitaire, NON patientRight :
+  // c'est le repère propre à la tête, qui suit son inclinaison). Sert d'axe de
+  // projection à la fois pour les oreilles (rotation) et pour nez/menton.
+  // Conversion ratio → angle (asin) : faceScale = bras de levier.
+  // Signe : patient-D positif. headHoriz pointe nativement de D vers G ;
+  // donc projections > 0 sur headHoriz = côté G en headHoriz → on flippe le
+  // signe via flip = -sign(headHoriz · patientRightDir) pour que + = D.
+  if (isPlaced(eyeD) && isPlaced(eyeG) && isPlaced(glab)) {
+    const headHorizRaw = { x: eyeG.x - eyeD.x, y: eyeG.y - eyeD.y };
+    const headHorizLen = Math.hypot(headHorizRaw.x, headHorizRaw.y);
+    const headHoriz = headHorizLen > 0
+      ? { x: headHorizRaw.x / headHorizLen, y: headHorizRaw.y / headHorizLen }
+      : null;
+    if (headHoriz) {
+      const headRightProj = dot(headHoriz, patientRightDir);
+      const flip = headRightProj > 0 ? 1 : -1;
+      const toDeg = r => Math.asin(Math.max(-1, Math.min(1, r))) * 180 / Math.PI;
+      // PRIORITÉ ROTATION = oreilles. dist(oreille, axe central par Glabelle ⊥
+      // ligne des yeux) = |(oreille − Glabelle) · headHoriz| en valeur algébrique
+      // signée (positive si oreille côté G headHoriz natif, négative côté D).
+      // distD = projection signée de l'oreille D ; distG idem oreille G.
+      // Asymétrie normalisée par l'écart inter-oreilles (distG − distD positif
+      // par construction d'une tête de face normale ; si rotation à D, oreille D
+      // se rapproche de l'axe et |distD| diminue relativement à |distG|).
+      const oreilleD = byName['Oreille sup D'];
+      const oreilleG = byName['Oreille sup G'];
+      let rotationFromEars = null;
+      if (isPlaced(oreilleD) && isPlaced(oreilleG)) {
+        const projD = dot({ x: oreilleD.x - glab.x, y: oreilleD.y - glab.y }, headHoriz);
+        const projG = dot({ x: oreilleG.x - glab.x, y: oreilleG.y - glab.y }, headHoriz);
+        // En tête de face neutre : projD < 0 (D côté patient → côté gauche image,
+        // soit projection négative sur headHoriz qui pointe vers G) et projG > 0.
+        // Distances absolues à l'axe central :
+        const distD = Math.abs(projD);
+        const distG = Math.abs(projG);
+        const sumDist = distD + distG;
+        if (sumDist > 0) {
+          // Asymétrie : + = oreille D plus proche de l'axe (distD < distG) ⇒
+          // patient tourne la tête à D (l'oreille D recule, donc apparaît plus
+          // près de la ligne médiane projetée). Règle : oreille la plus proche
+          // de l'axe = côté de la rotation.
+          // PAS de flip ici : distD et distG sont des distances absolues
+          // rattachées aux points D/G (déjà en repère patient via leur nommage).
+          // Appliquer flip inverserait le sens à tort. Le flip reste utilisé
+          // plus bas pour les projections signées nez/menton sur headHoriz.
+          const asym = (distG - distD) / sumDist;
+          const sEars = 0.06;
+          if (Math.abs(asym) > sEars) rotationFromEars = toDeg(asym);
+        }
+      }
+      // Fallback nez/menton — sert UNIQUEMENT pour la rotation si une oreille
+      // manque (ne pas tout bloquer). Si les 2 oreilles sont placées et donnent
+      // un asym < seuil, on considère « oreilles symétriques » → on évalue
+      // alors la branche mandibule/nez-tordu.
+      const earsBothPlaced = isPlaced(oreilleD) && isPlaced(oreilleG);
+      if (rotationFromEars !== null) {
+        // HIÉRARCHIE : rotation oreilles dominante ⇒ on n'évalue PAS mandibule/
+        // nez-tordu (mis à null/false). Cohérent cliniquement : une rotation
+        // de tête déplace ensemble nez et menton, leur asymétrie n'a alors
+        // plus de valeur diagnostique propre.
+        out.rotationTete = rotationFromEars;
+      } else if (isPlaced(menton)) {
+        const faceScale = Math.hypot(menton.x - glab.x, menton.y - glab.y);
+        if (faceScale > 0) {
+          const devNezRaw = isPlaced(nez)
+            ? (dot({ x: nez.x - glab.x, y: nez.y - glab.y }, headHoriz) / faceScale) * flip
+            : null;
+          const devMentonRaw =
+            (dot({ x: menton.x - glab.x, y: menton.y - glab.y }, headHoriz) / faceScale) * flip;
+          const s = 0.06;
+          const nezOut    = devNezRaw    !== null && Math.abs(devNezRaw)    > s;
+          const mentonOut = devMentonRaw !== null && Math.abs(devMentonRaw) > s;
+          if (!earsBothPlaced && nezOut && mentonOut && Math.sign(devNezRaw) === Math.sign(devMentonRaw)) {
+            // Fallback rotation via nez/menton (oreille(s) manquante(s)).
+            out.rotationTete = toDeg((devNezRaw + devMentonRaw) / 2);
+          } else if (!nezOut && mentonOut) {
+            // Déviation mandibulaire pure.
+            out.deviationMandibule = toDeg(devMentonRaw);
+          } else if (nezOut && !mentonOut) {
+            // Nez tordu : flag spécifique (ni rotation ni mandibule).
+            out.nezTordu = true;
+          }
+          // Sinon (nez et menton neutres OU signes opposés) → tête droite.
+        }
+      }
+    }
+  }
+  // 5. Mesures ÉPAULES / BASSIN ----------------------------------------
+  const acrD = byName['Acromion D'], acrG = byName['Acromion G'];
+  if (isPlaced(acrD) && isPlaced(acrG)) {
+    const vec = { x: acrD.x - acrG.x, y: acrD.y - acrG.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projRight) > 1e-9) {
+      // +projUp > 0 quand acrD est plus haut → épaule D plus haute.
+      out.ligneEpaules = Math.atan2(projUp, Math.abs(projRight)) * 180 / Math.PI;
+    }
+  }
+  const eiasD = byName['EIAS D'], eiasG = byName['EIAS G'];
+  if (isPlaced(eiasD) && isPlaced(eiasG)) {
+    const vec = { x: eiasD.x - eiasG.x, y: eiasD.y - eiasG.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projRight) > 1e-9) {
+      out.basculeBassin = Math.atan2(projUp, Math.abs(projRight)) * 180 / Math.PI;
+    }
+  }
+  // Fermeture viscérale : EIAS haute du côté X + acromion bas du côté X → fermeture X.
+  // Seuils lus depuis POSTURE_THRESHOLDS.face (étape 3a) — cohérent avec
+  // les seuils utilisés pour la bascule du bassin et la ligne épaules ailleurs.
+  const seuilBascule = POSTURE_THRESHOLDS.face.bassin;
+  const seuilEpaule  = POSTURE_THRESHOLDS.face.epaules;
+  if (out.basculeBassin !== null && out.ligneEpaules !== null) {
+    const eiasHigh   = out.basculeBassin >  seuilBascule ? 'D'
+                     : out.basculeBassin < -seuilBascule ? 'G' : null;
+    const acromionLow = out.ligneEpaules >  seuilEpaule  ? 'G'
+                      : out.ligneEpaules < -seuilEpaule  ? 'D' : null;
+    if (eiasHigh && eiasHigh === acromionLow) out.fermetureViscerale = eiasHigh;
+  }
+  // 6. Translations (% de la largeur d'appui = distance chevilles) -----
+  const chD = byName['Cheville D'], chG = byName['Cheville G'];
+  let cChevilles = null, stanceWidth = 0;
+  if (isPlaced(chD) && isPlaced(chG)) {
+    cChevilles = { x: (chD.x + chG.x) / 2, y: (chD.y + chG.y) / 2 };
+    stanceWidth = Math.hypot(chD.x - chG.x, chD.y - chG.y);
+  }
+  const fourchette = byName['Fourchette sternale'];
+  if (cChevilles && stanceWidth > 0 && isPlaced(fourchette)) {
+    const v = { x: fourchette.x - cChevilles.x, y: fourchette.y - cChevilles.y };
+    out.translationThorax = (dot(v, patientRightDir) / stanceWidth) * 100;
+  }
+  if (cChevilles && stanceWidth > 0 && isPlaced(eiasD) && isPlaced(eiasG)) {
+    const cBassin = { x: (eiasD.x + eiasG.x) / 2, y: (eiasD.y + eiasG.y) / 2 };
+    const v = { x: cBassin.x - cChevilles.x, y: cBassin.y - cChevilles.y };
+    out.translationBassin = (dot(v, patientRightDir) / stanceWidth) * 100;
+  }
+  // 7. Valgum/Varum par jambe ------------------------------------------
+  // calcAngle3([Tête fémorale, Genou, Cheville]) ; déviation mag = 180 − raw.
+  // Signe : projection (Genou − TêteFém) sur la perpendiculaire à l'axe
+  // TêteFém→Cheville orientée MÉDIALEMENT (vers le centre du corps).
+  //   Jambe D : médial = -patientRightDir (vers G en image, vers le centre)
+  //   Jambe G : médial = +patientRightDir
+  // dev > 0 = genou côté médial = VALGUM (+) ; dev < 0 = côté latéral = VARUM (−).
+  const computeValgumVarum = (femoral, genou, cheville, medialDir) => {
+    if (!isPlaced(femoral) || !isPlaced(genou) || !isPlaced(cheville)) return null;
+    const raw = calcAngle3([femoral, genou, cheville]);
+    if (raw === null) return null;
+    const mag = 180 - raw;
+    const axis = { x: cheville.x - femoral.x, y: cheville.y - femoral.y };
+    let perp = { x: -axis.y, y: axis.x };
+    const dotM = dot(perp, medialDir);
+    if (dotM < 0) perp = { x: -perp.x, y: -perp.y };
+    const vec = { x: genou.x - femoral.x, y: genou.y - femoral.y };
+    const dev = dot(vec, perp);
+    return dev >= 0 ? mag : -mag;
+  };
+  const medD = { x: -patientRightDir.x, y: -patientRightDir.y };
+  const medG = patientRightDir;
+  out.valgumVarumD = computeValgumVarum(byName['Tête fémorale D'], byName['Genou D'], chD, medD);
+  out.valgumVarumG = computeValgumVarum(byName['Tête fémorale G'], byName['Genou G'], chG, medG);
+  // 8. Ouverture du pas par pied ---------------------------------------
+  // Angle vec(orteil − cheville) vs verticale (plumbDown). + = pied tourné
+  // vers l'extérieur (rotation externe). Latéral = patientRightDir pour pied D,
+  // -patientRightDir pour pied G (sym. valgumVarum).
+  const computeOuverturePas = (cheville, orteil, lateralDir) => {
+    if (!isPlaced(cheville) || !isPlaced(orteil)) return null;
+    const vec = { x: orteil.x - cheville.x, y: orteil.y - cheville.y };
+    const projDown = -dot(vec, plumbUp);
+    const projLat  = dot(vec, lateralDir);
+    if (Math.abs(projDown) < 1e-9 && Math.abs(projLat) < 1e-9) return null;
+    return Math.atan2(projLat, projDown) * 180 / Math.PI;
+  };
+  out.ouverturePasD = computeOuverturePas(chD, byName['2e orteil D'], patientRightDir);
+  out.ouverturePasG = computeOuverturePas(chG, byName['2e orteil G'], { x: -patientRightDir.x, y: -patientRightDir.y });
+  // 9. Inclinaison du tronc (Nombril → Fourchette) — déviation latérale.
+  const nombril = byName['Nombril'];
+  if (isPlaced(nombril) && isPlaced(fourchette)) {
+    const vec = { x: fourchette.x - nombril.x, y: fourchette.y - nombril.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projUp) > 1e-9 || Math.abs(projRight) > 1e-9) {
+      // projUp > 0 (fourchette plus haute que nombril, normal) → tronc droit en
+      // projUp et projRight donne l'angle d'inclinaison latérale.
+      out.inclinaisonTronc = Math.atan2(projRight, projUp) * 180 / Math.PI;
+    }
+  }
+  // 10. Centres bas → haut pour la conclusion latéralisée par étage.
+  const cGenoux = (isPlaced(byName['Genou D']) && isPlaced(byName['Genou G']))
+    ? { x: (byName['Genou D'].x + byName['Genou G'].x) / 2, y: (byName['Genou D'].y + byName['Genou G'].y) / 2 } : null;
+  const cBassin = (isPlaced(eiasD) && isPlaced(eiasG))
+    ? { x: (eiasD.x + eiasG.x) / 2, y: (eiasD.y + eiasG.y) / 2 } : null;
+  const flcD = byName['Pli flanc D'], flcG = byName['Pli flanc G'];
+  const cFlancs = (isPlaced(flcD) && isPlaced(flcG))
+    ? { x: (flcD.x + flcG.x) / 2, y: (flcD.y + flcG.y) / 2 } : null;
+  const cEpaules = (isPlaced(acrD) && isPlaced(acrG))
+    ? { x: (acrD.x + acrG.x) / 2, y: (acrD.y + acrG.y) / 2 } : null;
+  const cTete = isPlaced(glab) ? { x: glab.x, y: glab.y }
+              : (isPlaced(eyeD) && isPlaced(eyeG))
+                ? { x: (eyeD.x + eyeG.x) / 2, y: (eyeD.y + eyeG.y) / 2 } : null;
+  // Inclinaison latérale d'un segment (lower → upper) : atan2(projRight, projUp).
+  // + = upper côté patient-D / − = upper côté patient-G.
+  const segmentTilt = (lower, upper) => {
+    if (!lower || !upper) return null;
+    const v = { x: upper.x - lower.x, y: upper.y - lower.y };
+    const projUp    = dot(v, plumbUp);
+    const projRight = dot(v, patientRightDir);
+    if (Math.abs(projUp) < 1e-9 && Math.abs(projRight) < 1e-9) return null;
+    return Math.atan2(projRight, projUp) * 180 / Math.PI;
+  };
+  out.tiltCheGen = segmentTilt(cChevilles, cGenoux);
+  out.tiltGenBas = segmentTilt(cGenoux,    cBassin);
+  out.tiltBasFla = segmentTilt(cBassin,    cFlancs);
+  out.tiltFlaEpa = segmentTilt(cFlancs,    cEpaules);
+  out.tiltEpaTet = segmentTilt(cEpaules,   cTete);
+  return out;
+}
+
+// #108 Étape 2 — Conclusion latéralisée face. Identifie le segment le plus
+// bas hors zone neutre comme origine de la latéralisation, puis ajoute en
+// déviations distinctes l'inclinaison du tronc et de la tête. Seuils lus
+// depuis POSTURE_THRESHOLDS.face (étape 3a). Joint par « · ». Vide si tout neutre.
+function _buildFaceConclusion(angles) {
+  if (!angles) return '';
+  const Tf = POSTURE_THRESHOLDS.face;
+  const seuilLat  = Tf.lateralisation; // ° d'inclinaison latérale par étage
+  const seuilTete = Tf.tete;
+  const sideLabel = v => v > 0 ? 'à D' : 'à G';
+  const segments = [
+    { val: angles.tiltCheGen, origin: 'des chevilles' },
+    { val: angles.tiltGenBas, origin: 'des genoux'    },
+    { val: angles.tiltBasFla, origin: 'du bassin'     },
+    { val: angles.tiltFlaEpa, origin: 'des flancs'    },
+    { val: angles.tiltEpaTet, origin: 'des épaules'   },
+  ];
+  const parts = [];
+  // Segment le plus bas hors zone neutre = origine principale.
+  const primary = segments.find(s => s.val !== null && !isNaN(s.val) && Math.abs(s.val) > seuilLat);
+  if (primary) parts.push('Latéralisation à partir ' + primary.origin + ' (' + sideLabel(primary.val) + ')');
+  // Déviations distinctes pour le tronc et la tête (au-delà du segment global).
+  if (angles.inclinaisonTronc !== null && !isNaN(angles.inclinaisonTronc) && Math.abs(angles.inclinaisonTronc) > seuilTete) {
+    parts.push('Tronc incliné ' + sideLabel(angles.inclinaisonTronc));
+  }
+  if (angles.inclinaisonTete !== null && !isNaN(angles.inclinaisonTete) && Math.abs(angles.inclinaisonTete) > seuilTete) {
+    parts.push('Tête inclinée ' + sideLabel(angles.inclinaisonTete));
+  }
+  return parts.join(' · ');
+}
+
+// #108 Étape 3b — Findings face (miroir _buildPostureFindings). Liste les
+// mesures hors zone neutre + conclusion latéralisée, format identique pour
+// intégration dans la synthèse et le rapport :
+//   { horsNormes: [{ mesure: 'Tête (inclinaison)', detail: 'inclinée à D' }, ...],
+//     conclusion: 'Latéralisation à partir … · Tête inclinée à D' | '' }
+// Règle « hors-normes seulement » : on n'émet QUE si hors zone neutre (cf
+// seuils Tf.tete/.epaules/.bassin/.translation/.valgumVarum/.ouvertureMin/Max).
+// null/NaN → skip silencieux (point non placé). Le caller décide du message
+// « dans les normes » si horsNormes ET conclusion sont vides.
+function _buildFaceFindings(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  const Tf = thr.face;
+  const empty = { horsNormes: [], conclusion: '' };
+  if (!angles) return empty;
+  const horsNormes = [];
+  const push = (mesure, detail) => horsNormes.push({ mesure, detail });
+  const sideD = (v, posTxt, negTxt) => v > 0 ? posTxt : negTxt;
+  // Tête (inclinaison / rotation / mandibule) — seuil unique Tf.tete.
+  if (angles.inclinaisonTete !== null && !isNaN(angles.inclinaisonTete) && Math.abs(angles.inclinaisonTete) > Tf.tete) {
+    push('Tête (inclinaison)', sideD(angles.inclinaisonTete, 'inclinée à D', 'inclinée à G'));
+  }
+  if (angles.rotationTete !== null && !isNaN(angles.rotationTete) && Math.abs(angles.rotationTete) > Tf.tete) {
+    push('Tête (rotation)', sideD(angles.rotationTete, 'rotation à D', 'rotation à G'));
+  }
+  if (angles.deviationMandibule !== null && !isNaN(angles.deviationMandibule) && Math.abs(angles.deviationMandibule) > Tf.tete) {
+    push('Mandibule', sideD(angles.deviationMandibule, 'déviation à D', 'déviation à G'));
+  }
+  if (angles.nezTordu === true) {
+    push('Nez', 'désaxé sans rotation de tête (à vérifier)');
+  }
+  // Épaules / Bassin — seuils dédiés.
+  if (angles.ligneEpaules !== null && !isNaN(angles.ligneEpaules) && Math.abs(angles.ligneEpaules) > Tf.epaules) {
+    push('Ligne épaules', sideD(angles.ligneEpaules, 'D plus haute', 'G plus haute'));
+  }
+  if (angles.basculeBassin !== null && !isNaN(angles.basculeBassin) && Math.abs(angles.basculeBassin) > Tf.bassin) {
+    push('Bascule bassin', sideD(angles.basculeBassin, 'D plus haute', 'G plus haute'));
+  }
+  // Fermeture viscérale = string 'D' | 'G' | null (déjà classifiée par _computeFaceAngles).
+  if (angles.fermetureViscerale) {
+    push('Fermeture viscérale', 'fermeture ' + angles.fermetureViscerale);
+  }
+  // Translations — seuil Tf.translation (en %).
+  if (angles.translationThorax !== null && !isNaN(angles.translationThorax) && Math.abs(angles.translationThorax) > Tf.translation) {
+    push('Translation thorax', sideD(angles.translationThorax, 'décalé à D', 'décalé à G'));
+  }
+  if (angles.translationBassin !== null && !isNaN(angles.translationBassin) && Math.abs(angles.translationBassin) > Tf.translation) {
+    push('Translation bassin', sideD(angles.translationBassin, 'décalé à D', 'décalé à G'));
+  }
+  // Tronc (Nombril → Fourchette) — réutilise Tf.tete (inclinaison latérale).
+  if (angles.inclinaisonTronc !== null && !isNaN(angles.inclinaisonTronc) && Math.abs(angles.inclinaisonTronc) > Tf.tete) {
+    push('Tronc (inclinaison)', sideD(angles.inclinaisonTronc, 'incliné à D', 'incliné à G'));
+  }
+  // Genoux — Tf.valgumVarum. + = valgum / − = varum (sémantique _computeFaceAngles).
+  if (angles.valgumVarumD !== null && !isNaN(angles.valgumVarumD) && Math.abs(angles.valgumVarumD) > Tf.valgumVarum) {
+    push('Genou D', sideD(angles.valgumVarumD, 'valgum', 'varum'));
+  }
+  if (angles.valgumVarumG !== null && !isNaN(angles.valgumVarumG) && Math.abs(angles.valgumVarumG) > Tf.valgumVarum) {
+    push('Genou G', sideD(angles.valgumVarumG, 'valgum', 'varum'));
+  }
+  // Pieds — bande physiologique [Tf.ouvertureMin, Tf.ouvertureMax] (angle de Fick).
+  const ouvertureBand = v => {
+    if (v < Tf.ouvertureMin) return 'en fermeture';
+    if (v > Tf.ouvertureMax) return 'en ouverture';
+    return null;
+  };
+  if (angles.ouverturePasD !== null && !isNaN(angles.ouverturePasD)) {
+    const dD = ouvertureBand(angles.ouverturePasD);
+    if (dD) push('Pied D', dD);
+  }
+  if (angles.ouverturePasG !== null && !isNaN(angles.ouverturePasG)) {
+    const dG = ouvertureBand(angles.ouverturePasG);
+    if (dG) push('Pied G', dG);
+  }
+  return { horsNormes, conclusion: _buildFaceConclusion(angles) };
+}
+
 // Calcule le vecteur plumb_up affichable (réutilisé pour le tracé du fil à plomb).
 // Logique identique à _computePostureAngles (DRY évité car appelée dans la boucle
 // de redraw — duplication contrôlée < 10 lignes pour éviter un getter dédié).
@@ -5350,7 +5867,122 @@ function _buildPostureProfilSectionsSynthese(d) {
       items: items,
     });
   });
+  // #108 Étape 3b — Bloc face (placement seul à étape 1, mesures étape 2,
+  // findings étape 3b). Même schéma que profil : on lit les angles persistés
+  // par _validatePosturePlacement, on bâtit la liste hors-normes + conclusion
+  // via _buildFaceFindings, et on pousse une section unique. L'ordre cosmétique
+  // (profil puis face) garde la cohérence visuelle « profil d'abord ».
+  const fa = d && d._postureAnalysis && d._postureAnalysis.face;
+  if (fa && fa.angles) {
+    const ff = _buildFaceFindings(fa.angles);
+    const items = [];
+    ff.horsNormes.forEach(function(x) { items.push(x.mesure + ' : ' + x.detail); });
+    if (ff.conclusion) items.push('Conclusion : ' + ff.conclusion);
+    if (!items.length) items.push('Posture face dans les normes — aucune tendance marquée');
+    out.push({
+      titre: '📐 Analyse posturale — face',
+      items: items,
+    });
+  }
   return out;
+}
+
+// #108 Étape 2 — Panneau résultats face. Reçoit les 11 mesures déjà calculées,
+// les regroupe par étage anatomique. Sens latéralisé : libellé « (à D) » /
+// « (à G) » en orange si hors seuil neutre, « (neutre) » en vert sinon.
+// Pas de classification éditable à ce stade (étape 3 = POSTURE_THRESHOLDS.face
+// configurable + selects), juste affichage des valeurs et de l'inclinaison.
+function _renderFacePlacementResults(panel, f) {
+  // #108 Étape 3a — seuils lus depuis POSTURE_THRESHOLDS.face (configurables
+  // depuis Paramètres). Les anciennes constantes inline (étape 2) ont été
+  // promues dans POSTURE_THRESHOLDS_DEFAULTS.face.
+  const Tf = POSTURE_THRESHOLDS.face;
+  const SEUIL_TETE      = Tf.tete;        // ° pour inclinaison/rotation/mandibule
+  const SEUIL_EPAULES   = Tf.epaules;
+  const SEUIL_BASSIN    = Tf.bassin;
+  const SEUIL_TRANSL    = Tf.translation; // % de la largeur d'appui
+  const SEUIL_VALG_VAR  = Tf.valgumVarum; // ° de déviation au genou
+  // Ouverture du pas = bande physiologique [OUV_MIN, OUV_MAX] non centrée sur 0
+  // (angle de Fick : le pied est naturellement en rotation externe).
+  const OUV_MIN         = Tf.ouvertureMin;
+  const OUV_MAX         = Tf.ouvertureMax;
+  const lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
+  const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
+  const lbl = `color:#64748b;`;
+  const fmtDeg = v => (v === null || isNaN(v))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:${v > 0 ? '#3b82f6' : v < 0 ? '#dc2626' : '#0e1f38'};font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)}°</span>`;
+  const fmtPct = v => (v === null || isNaN(v))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:${v > 0 ? '#3b82f6' : v < 0 ? '#dc2626' : '#0e1f38'};font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)} %</span>`;
+  // Libellé de sens patient-D / patient-G avec zone neutre.
+  const sideLbl = (v, seuil, posTxt, negTxt) => {
+    if (v === null || isNaN(v)) return '';
+    if (Math.abs(v) <= seuil) return `<span style="${lblStyle('#10b981')}">(neutre)</span>`;
+    if (v > 0) return `<span style="${lblStyle('#ea580c')}">${posTxt}</span>`;
+    return `<span style="${lblStyle('#ea580c')}">${negTxt}</span>`;
+  };
+  // Variants courts.
+  const lblTeteIncl     = v => sideLbl(v, SEUIL_TETE, '(inclinée à D)', '(inclinée à G)');
+  const lblRotation     = v => sideLbl(v, SEUIL_TETE, '(rotation à D)', '(rotation à G)');
+  const lblMandibule    = v => sideLbl(v, SEUIL_TETE, '(déviation à D)', '(déviation à G)');
+  const lblEpaules      = v => sideLbl(v, SEUIL_EPAULES, '(D plus haute)', '(G plus haute)');
+  const lblBassin       = v => sideLbl(v, SEUIL_BASSIN, '(D plus haute)', '(G plus haute)');
+  const lblTranslat     = v => sideLbl(v, SEUIL_TRANSL, '(décalé à D)', '(décalé à G)');
+  const lblValgVar      = v => sideLbl(v, SEUIL_VALG_VAR, '(valgum)', '(varum)');
+  // Ouverture du pas : classification en bande physiologique [OUV_MIN, OUV_MAX].
+  // Hors bande = orange (fermé / ouvert) ; dans bande = vert (physiologique).
+  // Le code couleur bleu(+)/rouge(−)/gris(null) de fmtDeg reste inchangé sur
+  // la valeur numérique elle-même — seul le libellé entre parenthèses suit la bande.
+  const lblOuverture = v => {
+    if (v === null || isNaN(v)) return '';
+    if (v < OUV_MIN) return `<span style="${lblStyle('#ea580c')}">(fermé)</span>`;
+    if (v > OUV_MAX) return `<span style="${lblStyle('#ea580c')}">(ouvert)</span>`;
+    return `<span style="${lblStyle('#10b981')}">(physiologique)</span>`;
+  };
+  const lblTroncIncl    = v => sideLbl(v, SEUIL_TETE, '(incliné à D)', '(incliné à G)');
+  const fermLbl = f.fermetureViscerale
+    ? `<span style="${lblStyle('#ea580c')}">(fermeture ${f.fermetureViscerale})</span>`
+    : `<span style="${lblStyle('#10b981')}">(neutre)</span>`;
+  const nezTorduAlert = f.nezTordu
+    ? `<div style="margin-top:4px;padding:4px 6px;background:#fff7ed;border-left:3px solid #ea580c;font-size:11px;color:#9a3412;">⚠ Nez désaxé sans rotation de la tête (à vérifier cliniquement).</div>`
+    : '';
+  // Conclusion (latéralisation par étage).
+  const conclusionText = _buildFaceConclusion(f) || 'Alignement global — pas de latéralisation marquée';
+  panel.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
+      <div>
+        <div style="${groupHdr}">Tête</div>
+        <div><span style="${lbl}">Inclinaison :</span> ${fmtDeg(f.inclinaisonTete)} ${lblTeteIncl(f.inclinaisonTete)}</div>
+        <div><span style="${lbl}">Rotation :</span> ${fmtDeg(f.rotationTete)} ${lblRotation(f.rotationTete)}</div>
+        <div><span style="${lbl}">Mandibule :</span> ${fmtDeg(f.deviationMandibule)} ${lblMandibule(f.deviationMandibule)}</div>
+        ${nezTorduAlert}
+      </div>
+      <div>
+        <div style="${groupHdr}">Épaules / Bassin</div>
+        <div><span style="${lbl}">Ligne épaules :</span> ${fmtDeg(f.ligneEpaules)} ${lblEpaules(f.ligneEpaules)}</div>
+        <div><span style="${lbl}">Bascule bassin :</span> ${fmtDeg(f.basculeBassin)} ${lblBassin(f.basculeBassin)}</div>
+        <div><span style="${lbl}">Fermeture viscérale :</span> ${fermLbl}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Translations latérales</div>
+        <div><span style="${lbl}">Thorax :</span> ${fmtPct(f.translationThorax)} ${lblTranslat(f.translationThorax)}</div>
+        <div><span style="${lbl}">Bassin :</span> ${fmtPct(f.translationBassin)} ${lblTranslat(f.translationBassin)}</div>
+        <div><span style="${lbl}">Tronc (Nombril→Fourchette) :</span> ${fmtDeg(f.inclinaisonTronc)} ${lblTroncIncl(f.inclinaisonTronc)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Genoux / Pieds</div>
+        <div><span style="${lbl}">Valgum/Varum D :</span> ${fmtDeg(f.valgumVarumD)} ${lblValgVar(f.valgumVarumD)}</div>
+        <div><span style="${lbl}">Valgum/Varum G :</span> ${fmtDeg(f.valgumVarumG)} ${lblValgVar(f.valgumVarumG)}</div>
+        <div><span style="${lbl}">Ouverture pas D :</span> ${fmtDeg(f.ouverturePasD)} ${lblOuverture(f.ouverturePasD)}</div>
+        <div><span style="${lbl}">Ouverture pas G :</span> ${fmtDeg(f.ouverturePasG)} ${lblOuverture(f.ouverturePasG)}</div>
+      </div>
+      <div style="grid-column:1/-1;border-top:1px solid #cbd5e0;padding-top:5px;color:#0e1f38;line-height:1.45;">
+        <span style="font-weight:700;">Conclusion :</span>
+        <span>${conclusionText}</span>
+      </div>
+    </div>
+  `;
 }
 
 // Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
@@ -5359,6 +5991,14 @@ function _buildPostureProfilSectionsSynthese(d) {
 function _renderPosturePlacementResults() {
   const panel = document.getElementById('posture-placement-results');
   if (!panel) return;
+  // #108 Étape 2 — branche face : _computeFaceAngles (11 mesures) + groupes
+  // structurés. Libellés de sens vert (neutre) / orange (hors zone) inline,
+  // mêmes conventions que le profil (étape 3 pour classification éditable).
+  if (_postureModalViewKey === 'face') {
+    const f = _computeFaceAngles(_postureModalMarkers, _postureCalibration);
+    _renderFacePlacementResults(panel, f);
+    return;
+  }
   const a = _computePostureAngles(_postureModalMarkers, _postureCalibration);
   // #85-2d — fmt signé (bleu = +, rouge = −, gris = null) pour antériorisation/
   // bassin/épaules ; fmt unsigned pour CVA/courbures/genouFlexion (pas de signe
@@ -5540,20 +6180,32 @@ function _redrawPostureModal() {
   const ctx = _postureModalCtx;
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
   ctx.drawImage(_postureModalImg, 0, 0);
-  // #85-2c-angles — fil à plomb passant par la Réf. cheville (si placée).
-  // Trait gris-bleu neutre pour ne pas concurrencer les couleurs des 14 points.
-  // Étendu hors canvas par un t large → garantit que la ligne traverse toute
-  // la photo quelle que soit l'inclinaison (cas calibration sol).
-  const cheville = _postureModalMarkers.find(m => m.name === 'Réf. cheville');
-  if (cheville && cheville.x !== null && cheville.y !== null) {
+  // #85-2c-angles + #108 Étape 2 — fil à plomb gris-bleu neutre passant par
+  // l'ancrage du repère « cheville ». Profil : Réf. cheville (unique).
+  // Face : milieu(Cheville D, Cheville G) (= C_chevilles utilisé pour les
+  // translations dans _computeFaceAngles, donc cohérent visuellement).
+  let plumbAnchor = null;
+  if (_postureModalViewKey === 'face') {
+    const chD = _postureModalMarkers.find(m => m.name === 'Cheville D');
+    const chG = _postureModalMarkers.find(m => m.name === 'Cheville G');
+    if (chD && chD.x !== null && chD.y !== null && chG && chG.x !== null && chG.y !== null) {
+      plumbAnchor = { x: (chD.x + chG.x) / 2, y: (chD.y + chG.y) / 2 };
+    }
+  } else {
+    const cheville = _postureModalMarkers.find(m => m.name === 'Réf. cheville');
+    if (cheville && cheville.x !== null && cheville.y !== null) {
+      plumbAnchor = { x: cheville.x, y: cheville.y };
+    }
+  }
+  if (plumbAnchor) {
     const up = _getPostureModalPlumbUp();
     const t = Math.max(W, H) * 2;
     ctx.save();
     ctx.strokeStyle = 'rgba(100,116,139,0.75)';
     ctx.lineWidth = Math.max(1.5, W / 400);
     ctx.beginPath();
-    ctx.moveTo(cheville.x - up.x * t, cheville.y - up.y * t);
-    ctx.lineTo(cheville.x + up.x * t, cheville.y + up.y * t);
+    ctx.moveTo(plumbAnchor.x - up.x * t, plumbAnchor.y - up.y * t);
+    ctx.lineTo(plumbAnchor.x + up.x * t, plumbAnchor.y + up.y * t);
     ctx.stroke();
     ctx.restore();
   }
@@ -5734,7 +6386,9 @@ function openPosturePlacementModal(prefix, viewKey) {
   _postureModalViewKey = viewKey;
   // Init markers : clone template (x:null, y:null), puis injection des coords
   // sauvegardées par nom (résilient au réordo / renommage futur des points).
-  _postureModalMarkers = cloneMarkers('posture-profil');
+  // #108 Étape 1 — template dépend du viewKey : face → posture-face (23 pts),
+  // profilG/profilD → posture-profil (14 pts). Source unique via helper.
+  _postureModalMarkers = cloneMarkers(_postureTemplateName(viewKey));
   const saved = bd._postureAnalysis?.[viewKey]?.markers || [];
   const savedByName = Object.fromEntries(saved.map(m => [m.name, m]));
   // #85-2c-angles — reset calibration au moment de l'ouverture. Restauration
@@ -5748,7 +6402,7 @@ function openPosturePlacementModal(prefix, viewKey) {
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
   overlay.innerHTML = `<div style="background:#fff;border-radius:8px;padding:12px;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des 14 points — Profil ${viewKey === 'profilG' ? 'G' : 'D'}</div>
+        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des ${_postureModalMarkers.length} points — ${viewKey === 'face' ? 'Face' : 'Profil ' + (viewKey === 'profilG' ? 'G' : 'D')}</div>
         <div style="display:flex;gap:6px;">
           <button class="btn" onclick="_cancelPosturePlacement()" style="font-size:11px;background:#888;color:#fff;padding:5px 12px;">Annuler</button>
           <button class="btn" onclick="_validatePosturePlacement('${prefix}','${viewKey}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">✓ Valider</button>
@@ -5839,26 +6493,37 @@ async function _validatePosturePlacement(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
-  // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
-  // moment depuis markers + calibration ; on les stocke quand même pour éviter
-  // de refaire le calcul à chaque affichage rapport / liste / résumé).
-  const angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  // #108 Étape 2 — face : _computeFaceAngles persiste les 11 mesures.
+  // Pas de curveInterp pour la face (sémantique courbures rachidiennes
+  // spécifique au profil — la classification face viendra étape 3).
+  // Profil G/D : flow inchangé — angles + curveInterp calculés au save.
+  const isFace = viewKey === 'face';
+  let angles = null;
+  let curveInterp = null;
+  if (isFace) {
+    angles = _computeFaceAngles(_postureModalMarkers, _postureCalibration);
+  } else {
+    // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
+    // moment depuis markers + calibration ; on les stocke quand même pour éviter
+    // de refaire le calcul à chaque affichage rapport / liste / résumé).
+    angles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+    // #106-Final Volet 3d — curveInterp = source de vérité depuis les 3 <select>.
+    // Si le select n'existe pas (état dégradé), on retombe sur la valeur sauvegardée
+    // ou l'auto-mapping. cls calculé à partir des angles pour l'auto-mapping.
+    const cls = _classifyPostureAngles(angles);
+    const existing = bd._postureAnalysis?.[viewKey] || {};
+    const readSelect = (courbure) => {
+      const el = document.getElementById('posture-curve-interp-' + courbure);
+      if (el && el.value) return el.value;
+      return existing.curveInterp?.[courbure] || _autoCurveInterp(cls, courbure) || null;
+    };
+    curveInterp = {
+      cervicale:  readSelect('cervicale'),
+      thoracique: readSelect('thoracique'),
+      lombaire:   readSelect('lombaire'),
+    };
+  }
   if (!bd._postureAnalysis) bd._postureAnalysis = {};
-  // #106-Final Volet 3d — curveInterp = source de vérité depuis les 3 <select>.
-  // Si le select n'existe pas (état dégradé), on retombe sur la valeur sauvegardée
-  // ou l'auto-mapping. cls calculé à partir des angles pour l'auto-mapping.
-  const cls = _classifyPostureAngles(angles);
-  const existing = bd._postureAnalysis[viewKey] || {};
-  const readSelect = (courbure) => {
-    const el = document.getElementById('posture-curve-interp-' + courbure);
-    if (el && el.value) return el.value;
-    return existing.curveInterp?.[courbure] || _autoCurveInterp(cls, courbure) || null;
-  };
-  const curveInterp = {
-    cervicale:  readSelect('cervicale'),
-    thoracique: readSelect('thoracique'),
-    lombaire:   readSelect('lombaire'),
-  };
   bd._postureAnalysis[viewKey] = {
     markers: _postureModalMarkers.map(m => ({
       name: m.name,
