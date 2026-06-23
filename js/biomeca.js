@@ -2045,6 +2045,52 @@ const MARKER_TEMPLATES = {
     {name:'2e orteil D',      color:'#a16207', side:'D', hint:'base du 2e orteil droit (axe de référence du pied)'},
     {name:'2e orteil G',      color:'#ca8a04', side:'G', hint:'base du 2e orteil gauche (axe de référence du pied)'},
   ],
+  // #108 Dos — Posture vue postérieure, 28 points anatomiques. Ordre haut→bas
+  // pour le placement guidé (tête → ceinture scapulaire → rachis thoracique
+  // → ceinture pelvienne → membres inférieurs → calcanéum). Les couleurs des
+  // points partagés avec la face (Oreille sup D/G, Acromion D/G, Genou D/G)
+  // sont conservées pour repérage visuel cross-vue.
+  // Étape 1 (cette branche) = placement seul. Étape 2 ajoutera _computeDosAngles.
+  'posture-dos': [
+    // Tête / cervicales (5)
+    {name:'Base du crâne',                color:'#f04060', side:'',  hint:'protubérance occipitale externe (inion), à la base de l\'os occipital'},
+    {name:'Oreille sup D',                color:'#d97706', side:'D', hint:'sommet du pavillon de l\'oreille droite (hélix supérieur)'},
+    {name:'Oreille sup G',                color:'#f59e0b', side:'G', hint:'sommet du pavillon de l\'oreille gauche (hélix supérieur)'},
+    {name:'Épineuse C3',                  color:'#f5762a', side:'',  hint:'apophyse épineuse de C3, milieu de la lordose cervicale postérieure'},
+    {name:'Épineuse C7',                  color:'#f5a623', side:'',  hint:'épineuse la plus proéminente à la base du cou (tête fléchie pour repérer)'},
+    // Ceinture scapulaire (6)
+    {name:'Acromion D',                   color:'#4a9eff', side:'D', hint:'bord externe et postérieur de l\'épaule droite (sommet osseux)'},
+    {name:'Acromion G',                   color:'#60afff', side:'G', hint:'bord externe et postérieur de l\'épaule gauche (sommet osseux)'},
+    {name:'Angle supéro-médial scapula D', color:'#3b82f6', side:'D', hint:'angle supérieur et médial (interne) de l\'omoplate droite'},
+    {name:'Angle supéro-médial scapula G', color:'#60a5fa', side:'G', hint:'angle supérieur et médial (interne) de l\'omoplate gauche'},
+    {name:'Pointe inférieure scapula D',  color:'#06b6d4', side:'D', hint:'angle inférieur de l\'omoplate droite (~TH7-TH8)'},
+    {name:'Pointe inférieure scapula G',  color:'#22d3ee', side:'G', hint:'angle inférieur de l\'omoplate gauche (~TH7-TH8)'},
+    // Rachis thoracique / taille (4)
+    {name:'Épineuse TH6',                 color:'#6366f1', side:'',  hint:'apophyse épineuse de TH6, au milieu du dos (~entre les pointes des omoplates)'},
+    {name:'Épineuse TH12',                color:'#818cf8', side:'',  hint:'apophyse épineuse de TH12 (au niveau de la dernière côte palpable)'},
+    {name:'Pli de la taille D',           color:'#8b5cf6', side:'D', hint:'pli latéral droit à la taille (creux le plus marqué)'},
+    {name:'Pli de la taille G',           color:'#a78bfa', side:'G', hint:'pli latéral gauche à la taille (creux le plus marqué)'},
+    // Coudes (2) — utilisés par _computeDosAngles pour les triangles de la taille.
+    {name:'Coude D',                      color:'#9f1239', side:'D', hint:'pointe du coude droit (olécrâne), bras au repos le long du corps'},
+    {name:'Coude G',                      color:'#e11d48', side:'G', hint:'pointe du coude gauche (olécrâne), bras au repos le long du corps'},
+    // Rachis lombaire / sacrum (2)
+    {name:'Épineuse L3',                  color:'#7c3aed', side:'',  hint:'apophyse épineuse de L3, au milieu de la lordose lombaire'},
+    {name:'Base du sacrum',               color:'#4f46e5', side:'',  hint:'jonction L5-S1, juste au-dessus du sacrum'},
+    // Ceinture pelvienne (3)
+    {name:'EIPS D',                       color:'#10b981', side:'D', hint:'épine iliaque postéro-supérieure droite (fossette latérale du sacrum)'},
+    {name:'EIPS G',                       color:'#3ecf72', side:'G', hint:'épine iliaque postéro-supérieure gauche (fossette latérale du sacrum)'},
+    {name:'Sommet du pli inter-fessier',  color:'#059669', side:'',  hint:'point supérieur du sillon inter-fessier (axe médian)'},
+    // Membres inférieurs (4)
+    {name:'Genou D',                      color:'#ec4899', side:'D', hint:'centre du creux poplité (face postérieure du genou droit)'},
+    {name:'Genou G',                      color:'#f472b6', side:'G', hint:'centre du creux poplité (face postérieure du genou gauche)'},
+    {name:'Mi-mollet D',                  color:'#14b8a6', side:'D', hint:'milieu du triceps sural, point le plus saillant du mollet droit'},
+    {name:'Mi-mollet G',                  color:'#2dd4bf', side:'G', hint:'milieu du triceps sural, point le plus saillant du mollet gauche'},
+    // Calcanéum (4)
+    {name:'Calcanéum supérieur D',        color:'#8892a4', side:'D', hint:'sommet du tendon d\'Achille à l\'insertion calcanéenne (pied droit)'},
+    {name:'Calcanéum supérieur G',        color:'#aab0bc', side:'G', hint:'sommet du tendon d\'Achille à l\'insertion calcanéenne (pied gauche)'},
+    {name:'Calcanéum inférieur D',        color:'#a16207', side:'D', hint:'point le plus inférieur et postérieur du talon droit'},
+    {name:'Calcanéum inférieur G',        color:'#ca8a04', side:'G', hint:'point le plus inférieur et postérieur du talon gauche'},
+  ],
 };
 
 function cloneMarkers(type) {
@@ -4649,6 +4695,19 @@ const POSTURE_THRESHOLDS_DEFAULTS = {
     ouvertureMax: 25,
     lateralisation: 2,   // ° d'inclinaison latérale par étage (conclusion)
   },
+  // #108 Dos étape 3a — seuils dos configurables. Promus depuis les constantes
+  // inline de _renderDosPlacementResults / _buildDosConclusion / _computeDosAngles
+  // (seuilSecondaire rachis). Tous en degrés sauf rachis/sillon/triangles en %
+  // (% de la largeur d'épaules pour rachis et triangles, % de la largeur d'EIPS
+  // pour sillon inter-fessier).
+  dos: {
+    tete: 2, epaules: 2, bassin: 2,   // ° — inclinaison/rotation tête ; ligne épaules + asymétrie scapulas ; bascule
+    scapulaMin: 5, scapulaMax: 10,    // ° — bande physiologique orientation scapulaire (< min = rot. interne ; > max = rot. externe)
+    scapulaAsym: 3,                   // ° — asymétrie orientation D−G
+    rachis: 5,                        // % largeur d'épaules — offset par étage + seuil apex scoliose
+    sillon: 3, triangles: 3,          // % — sillon inter-fessier ; triangles de la taille
+    calcaneen: 3, axeJambier: 3,      // ° — angle calcanéen ; axe jambier
+  },
 };
 
 // Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
@@ -4670,6 +4729,8 @@ function _loadPostureThresholds() {
       // (utilisateurs qui ont déjà personnalisé leurs seuils profil avant la
       // release face → la section face manquera, on retombe sur les défauts).
       face: { ...POSTURE_THRESHOLDS_DEFAULTS.face, ...(stored.face || {}) },
+      // #108 Dos étape 3a — merge profond dos, même contrat fail-safe que face.
+      dos:  { ...POSTURE_THRESHOLDS_DEFAULTS.dos,  ...(stored.dos  || {}) },
     };
   } catch (e) {
     console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
@@ -4742,6 +4803,20 @@ function _renderPostureThresholdsPanel() {
         ${num('Pied — fermeture si <',                     T.face.ouvertureMin,   'face.ouvertureMin')}
         ${num('Pied — ouverture si >',                     T.face.ouvertureMax,   'face.ouvertureMax')}
         ${num('Latéralisation par étage (conclusion)',     T.face.lateralisation, 'face.lateralisation')}
+      </div>
+      <div>
+        <div style="${subHdr}">Seuils — analyse dos</div>
+        ${num('Tête (inclinaison / rotation)',             T.dos.tete,         'dos.tete')}
+        ${num('Ligne épaules + asymétrie scapulas',        T.dos.epaules,      'dos.epaules')}
+        ${num('Bascule du bassin (EIPS)',                  T.dos.bassin,       'dos.bassin')}
+        ${num('Scapula — rot. interne si <',               T.dos.scapulaMin,   'dos.scapulaMin')}
+        ${num('Scapula — rot. externe si >',               T.dos.scapulaMax,   'dos.scapulaMax')}
+        ${num('Asymétrie orientation scapulaire (D−G)',    T.dos.scapulaAsym,  'dos.scapulaAsym')}
+        ${num('Rachis — offset par étage + apex (% largeur épaules)', T.dos.rachis,    'dos.rachis',    '%')}
+        ${num('Sillon inter-fessier (% largeur EIPS)',     T.dos.sillon,       'dos.sillon',    '%')}
+        ${num('Triangles de la taille (% largeur épaules)', T.dos.triangles,   'dos.triangles', '%')}
+        ${num('Angle calcanéen',                           T.dos.calcaneen,    'dos.calcaneen')}
+        ${num('Axe jambier',                               T.dos.axeJambier,   'dos.axeJambier')}
       </div>
     </div>
     <div style="margin-top:12px;">
@@ -4866,13 +4941,13 @@ function _renderPostureSlot(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   const dataUrl = bd?.[key];
-  // #85-2b + #108 Étape 1 — bouton 🎯 placement points sur profil G/D (14 pts)
-  // ET face (23 pts). Badge "✓ N/total placés" indique l'avancement.
-  // Total dérivé du template via _posturePointsTotal (face=23, profil=14).
-  // Dos non couvert : pas de template posture-dos à cette étape.
+  // #85-2b + #108 — bouton 🎯 placement points sur profil G/D (14 pts), face
+  // (25 pts), dos (28 pts). Badge "✓ N/total placés" indique l'avancement.
+  // Total dérivé du template via _posturePointsTotal.
   const isProfil = viewKey === 'profilG' || viewKey === 'profilD';
   const isFace = viewKey === 'face';
-  const hasPlacement = isProfil || isFace;
+  const isDos = viewKey === 'dos';
+  const hasPlacement = isProfil || isFace || isDos;
   const totalPoints = _posturePointsTotal(viewKey);
   const markerCount = hasPlacement ? _countPostureMarkers(bd, viewKey) : 0;
   const placementBtn = (dataUrl && hasPlacement)
@@ -4958,10 +5033,11 @@ function _countPostureMarkers(bd, viewKey) {
   return markers.filter(m => m.nx != null && m.ny != null).length;
 }
 
-// #108 Étape 1 — résolution du template MARKER_TEMPLATES par viewKey.
-// face → 23 pts ; profilG/profilD → 14 pts ; dos non couvert.
+// #108 — résolution du template MARKER_TEMPLATES par viewKey.
+// face → 25 pts ; dos → 28 pts ; profilG/profilD → 14 pts.
 function _postureTemplateName(viewKey) {
   if (viewKey === 'face') return 'posture-face';
+  if (viewKey === 'dos')  return 'posture-dos';
   return 'posture-profil';
 }
 function _posturePointsTotal(viewKey) {
@@ -5555,6 +5631,408 @@ function _buildFaceConclusion(angles) {
   return parts.join(' · ');
 }
 
+// #108 Dos étape 2 — Mesures vue postérieure. Mêmes scaffolding (plumbUp /
+// horiz / patientRightDir auto) et conventions de signe (+ = patient-D) que
+// _computeFaceAngles, pour cohérence cross-vue. Reprend pour la tête / épaules
+// / bassin les MÊMES formules + sens que la face (Œil ↔ Oreille, EIAS ↔ EIPS).
+// Cœur : rachis = décalage horizontal de C7/TH6/TH12/L3 par rapport au plomb
+// ancré au sacrum, exprimé en % de la largeur d'épaules. Identification de
+// l'apex (offset max) et de la courbure secondaire opposée pour repérer une
+// éventuelle scoliose en S.
+function _computeDosAngles(markers, calibration) {
+  const byName = Object.fromEntries(markers.map(m => [m.name, m]));
+  const isPlaced = m => m && m.x !== null && m.y !== null;
+  // 1. plumbUp + horiz (identique au profil/face) ------------------------
+  let plumbUp;
+  if (calibration && calibration.p1 && calibration.p2) {
+    const dx = calibration.p2.x - calibration.p1.x;
+    const dy = calibration.p2.y - calibration.p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      let perp = { x: -dy / len, y: dx / len };
+      if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+      plumbUp = perp;
+    } else {
+      plumbUp = { x: 0, y: -1 };
+    }
+  } else {
+    plumbUp = { x: 0, y: -1 };
+  }
+  const horiz = { x: -plumbUp.y, y: plumbUp.x };
+  // 2. patientRightDir — vue dos : patient face caméra (de dos), patient-D
+  // = côté DROIT de l'image. Convention inversée vs la face. La dérivation
+  // automatique via paire D/G placée donne le bon signe quelle que soit la
+  // vue (D - G donne le sens), donc la même heuristique fonctionne ici.
+  // Ordre de priorité : acromions (les plus discriminants), EIPS, oreilles,
+  // calcanéum inférieur (le plus bas, repère de stabilité).
+  const dot = (a, b) => a.x * b.x + a.y * b.y;
+  const pairs = [
+    [byName['Acromion D'],            byName['Acromion G']],
+    [byName['EIPS D'],                byName['EIPS G']],
+    [byName['Oreille sup D'],         byName['Oreille sup G']],
+    [byName['Calcanéum inférieur D'], byName['Calcanéum inférieur G']],
+  ];
+  let patientRightDir = null;
+  for (const [D, G] of pairs) {
+    if (!isPlaced(D) || !isPlaced(G)) continue;
+    const v = { x: D.x - G.x, y: D.y - G.y };
+    const proj = dot(v, horiz);
+    if (Math.abs(proj) > 1e-9) {
+      const sign = Math.sign(proj);
+      patientRightDir = { x: horiz.x * sign, y: horiz.y * sign };
+      break;
+    }
+  }
+  if (!patientRightDir) {
+    patientRightDir = { x: horiz.x, y: horiz.y };
+  }
+  // 3. Output skeleton -------------------------------------------------
+  const out = {
+    // Tête
+    inclinaisonTete: null, // + = D plus bas (= inclinée à D), comme la face
+    rotationTete:    null, // + = côté de la distance la plus grande (D si distD > distG)
+    // Épaules / Scapulas
+    ligneEpaules:      null, // + = D plus haute (idem face)
+    basculeBassin:     null, // + = D plus haute (idem face, sur EIPS)
+    asymetrieScapula:  null, // tilt pointe inf scapula D→G, + = D plus haute
+    orientationScapulaD: null, // + = abduction / rotation externe
+    orientationScapulaG: null,
+    asymetrieOrientationScapula: null, // D − G ; + = D plus en rotation externe que G
+    // Rachis
+    rachisOffsets:    { C7: null, TH6: null, TH12: null, L3: null }, // % signés
+    rachisApex:       null, // 'C7' | 'TH6' | 'TH12' | 'L3' | null
+    rachisConvexite:  null, // 'D' | 'G' | null
+    rachisRegion:     null, // 'cervicale' | 'thoracique' | 'thoraco-lombaire' | 'lombaire' | null
+    rachisSecondaire: null, // { region, convexite, apex, offset } | null
+    // Bassin
+    sillonInterfessier: null, // + = à D
+    trianglesTaille:    null, // + = D plus ouvert
+    // Membre inférieur
+    angleCalcaneenD: null, // + = valgus (talon en dehors)
+    angleCalcaneenG: null,
+    axeJambierD:     null, // déviation latérale axe pli poplité → mi-mollet → calc. sup
+    axeJambierG:     null,
+    _patientRightDir: patientRightDir,
+  };
+  // 4. Tête — inclinaison oreilles + rotation oreilles (axe Base crâne → C7)
+  const orD = byName['Oreille sup D'], orG = byName['Oreille sup G'];
+  // 4a. inclinaisonTete = tilt (OreilleD − OreilleG), + = D plus bas (cf face).
+  if (isPlaced(orD) && isPlaced(orG)) {
+    const vec = { x: orD.x - orG.x, y: orD.y - orG.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projRight) > 1e-9) {
+      out.inclinaisonTete = Math.atan2(-projUp, Math.abs(projRight)) * 180 / Math.PI;
+    }
+  }
+  // 4b. rotationTete — axe médian = ligne Base du crâne → C7 (au lieu de
+  // l'axe facial). distD/distG = distance perpendiculaire à cet axe.
+  // asym = (distD − distG)/(distD + distG) — + = côté de la distance la
+  // plus grande (= rotation vers ce côté, inverse de la face où l'oreille
+  // la plus proche de l'axe donnait le sens). Pas de fallback nez/menton.
+  const baseCrane = byName['Base du crâne'], c7 = byName['Épineuse C7'];
+  if (isPlaced(orD) && isPlaced(orG) && isPlaced(baseCrane) && isPlaced(c7)) {
+    const axis = { x: c7.x - baseCrane.x, y: c7.y - baseCrane.y };
+    const axisLen = Math.hypot(axis.x, axis.y);
+    if (axisLen > 0) {
+      // Perpendiculaire à l'axe ; le signe est sans importance (on prend la
+      // distance algébrique signée, puis valeur absolue pour distD/distG).
+      const perpAxis = { x: -axis.y / axisLen, y: axis.x / axisLen };
+      const projD = dot({ x: orD.x - baseCrane.x, y: orD.y - baseCrane.y }, perpAxis);
+      const projG = dot({ x: orG.x - baseCrane.x, y: orG.y - baseCrane.y }, perpAxis);
+      const distD = Math.abs(projD);
+      const distG = Math.abs(projG);
+      const sumDist = distD + distG;
+      if (sumDist > 0) {
+        const asym = (distD - distG) / sumDist;
+        const sEars = 0.06;
+        if (Math.abs(asym) > sEars) {
+          out.rotationTete = Math.asin(Math.max(-1, Math.min(1, asym))) * 180 / Math.PI;
+        }
+      }
+    }
+  }
+  // 5. Épaules / Bassin / Scapulas (tilts) ----------------------------
+  const acrD = byName['Acromion D'], acrG = byName['Acromion G'];
+  if (isPlaced(acrD) && isPlaced(acrG)) {
+    const vec = { x: acrD.x - acrG.x, y: acrD.y - acrG.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projRight) > 1e-9) {
+      out.ligneEpaules = Math.atan2(projUp, Math.abs(projRight)) * 180 / Math.PI;
+    }
+  }
+  const eipsD = byName['EIPS D'], eipsG = byName['EIPS G'];
+  if (isPlaced(eipsD) && isPlaced(eipsG)) {
+    const vec = { x: eipsD.x - eipsG.x, y: eipsD.y - eipsG.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projRight) > 1e-9) {
+      out.basculeBassin = Math.atan2(projUp, Math.abs(projRight)) * 180 / Math.PI;
+    }
+  }
+  const scapInfD = byName['Pointe inférieure scapula D'];
+  const scapInfG = byName['Pointe inférieure scapula G'];
+  if (isPlaced(scapInfD) && isPlaced(scapInfG)) {
+    const vec = { x: scapInfD.x - scapInfG.x, y: scapInfD.y - scapInfG.y };
+    const projUp    = dot(vec, plumbUp);
+    const projRight = dot(vec, patientRightDir);
+    if (Math.abs(projRight) > 1e-9) {
+      out.asymetrieScapula = Math.atan2(projUp, Math.abs(projRight)) * 180 / Math.PI;
+    }
+  }
+  // 6. Orientation des scapulas (Sup médial → Pointe inf) -------------
+  // + = abduction (pointe en dehors), − = adduction (pointe vers les épineuses).
+  const orientationScapula = (supMed, pointeInf, lateralDir) => {
+    if (!isPlaced(supMed) || !isPlaced(pointeInf)) return null;
+    const vec = { x: pointeInf.x - supMed.x, y: pointeInf.y - supMed.y };
+    const projDown = -dot(vec, plumbUp);
+    const projLat  = dot(vec, lateralDir);
+    if (Math.abs(projDown) < 1e-9 && Math.abs(projLat) < 1e-9) return null;
+    return Math.atan2(projLat, projDown) * 180 / Math.PI;
+  };
+  out.orientationScapulaD = orientationScapula(
+    byName['Angle supéro-médial scapula D'], scapInfD, patientRightDir);
+  out.orientationScapulaG = orientationScapula(
+    byName['Angle supéro-médial scapula G'], scapInfG, { x: -patientRightDir.x, y: -patientRightDir.y });
+  // Asymétrie D − G : + = D plus en rotation externe que G ; G plus externe
+  // que D donne une valeur négative. null si une des deux orientations manque.
+  out.asymetrieOrientationScapula =
+    (out.orientationScapulaD !== null && out.orientationScapulaG !== null)
+      ? out.orientationScapulaD - out.orientationScapulaG : null;
+  // 7. Rachis (cœur de la mesure) -------------------------------------
+  // Pour chaque étage P : offset latéral = (P − sacrum)·patientRightDir,
+  // normalisé en % de la largeur d'épaules. + = à D / − = à G.
+  // Identification scoliose : apex = offset max, secondaire = max opposé.
+  const sacrum = byName['Base du sacrum'];
+  let shoulderW = 0;
+  if (isPlaced(acrD) && isPlaced(acrG)) {
+    shoulderW = Math.hypot(acrD.x - acrG.x, acrD.y - acrG.y);
+  }
+  if (isPlaced(sacrum) && shoulderW > 0) {
+    const levels = [
+      { key: 'C7',   m: c7 },
+      { key: 'TH6',  m: byName['Épineuse TH6']  },
+      { key: 'TH12', m: byName['Épineuse TH12'] },
+      { key: 'L3',   m: byName['Épineuse L3']   },
+    ];
+    levels.forEach(lvl => {
+      if (isPlaced(lvl.m)) {
+        const v = { x: lvl.m.x - sacrum.x, y: lvl.m.y - sacrum.y };
+        out.rachisOffsets[lvl.key] = (dot(v, patientRightDir) / shoulderW) * 100;
+      }
+    });
+    // Apex = niveau au plus grand |offset|.
+    const placedLvls = levels.filter(l => out.rachisOffsets[l.key] !== null);
+    if (placedLvls.length > 0) {
+      const REGION = { C7: 'cervicale', TH6: 'thoracique', TH12: 'thoraco-lombaire', L3: 'lombaire' };
+      let apexLvl = placedLvls[0];
+      for (const l of placedLvls) {
+        if (Math.abs(out.rachisOffsets[l.key]) > Math.abs(out.rachisOffsets[apexLvl.key])) apexLvl = l;
+      }
+      const apexOffset = out.rachisOffsets[apexLvl.key];
+      out.rachisApex      = apexLvl.key;
+      out.rachisConvexite = apexOffset > 0 ? 'D' : 'G';
+      out.rachisRegion    = REGION[apexLvl.key];
+      // Secondaire : parmi les autres étages, plus grand |offset| de signe
+      // opposé ET au-dessus du seuil rachis configuré. Sinon null (courbure unique).
+      // #108 Dos étape 3a — promu depuis constante locale vers POSTURE_THRESHOLDS.
+      const seuilSecondaire = POSTURE_THRESHOLDS.dos.rachis;
+      const opposites = placedLvls
+        .filter(l => l.key !== apexLvl.key)
+        .filter(l => Math.sign(out.rachisOffsets[l.key]) !== Math.sign(apexOffset))
+        .filter(l => Math.abs(out.rachisOffsets[l.key]) > seuilSecondaire);
+      if (opposites.length > 0) {
+        let secLvl = opposites[0];
+        for (const l of opposites) {
+          if (Math.abs(out.rachisOffsets[l.key]) > Math.abs(out.rachisOffsets[secLvl.key])) secLvl = l;
+        }
+        out.rachisSecondaire = {
+          apex:       secLvl.key,
+          region:     REGION[secLvl.key],
+          convexite:  out.rachisOffsets[secLvl.key] > 0 ? 'D' : 'G',
+          offset:     out.rachisOffsets[secLvl.key],
+        };
+      }
+    }
+  }
+  // 8. Bassin — sillon inter-fessier + triangles de la taille ---------
+  const sommetPli = byName['Sommet du pli inter-fessier'];
+  if (isPlaced(sommetPli) && isPlaced(sacrum) && isPlaced(eipsD) && isPlaced(eipsG)) {
+    const eipsW = Math.hypot(eipsD.x - eipsG.x, eipsD.y - eipsG.y);
+    if (eipsW > 0) {
+      const v = { x: sommetPli.x - sacrum.x, y: sommetPli.y - sacrum.y };
+      out.sillonInterfessier = (dot(v, patientRightDir) / eipsW) * 100;
+    }
+  }
+  const coudeD = byName['Coude D'], coudeG = byName['Coude G'];
+  const tailleD = byName['Pli de la taille D'], tailleG = byName['Pli de la taille G'];
+  if (isPlaced(coudeD) && isPlaced(coudeG) && isPlaced(tailleD) && isPlaced(tailleG) && shoulderW > 0) {
+    const distD = Math.hypot(coudeD.x - tailleD.x, coudeD.y - tailleD.y);
+    const distG = Math.hypot(coudeG.x - tailleG.x, coudeG.y - tailleG.y);
+    out.trianglesTaille = ((distD - distG) / shoulderW) * 100;
+  }
+  // 9. Membre inférieur — angle calcanéen + axe jambier --------------
+  // angleCalcaneen : décalage latéral du calcanéum inf vs axe (mi-mollet →
+  // calc. sup) dans le repère pied. + = valgus (talon en dehors), − = varus.
+  const computeAngleCalcaneen = (miMollet, calcSup, calcInf, lateralDir) => {
+    if (!isPlaced(miMollet) || !isPlaced(calcSup) || !isPlaced(calcInf)) return null;
+    const uL = { x: calcSup.x - miMollet.x, y: calcSup.y - miMollet.y };
+    const uLen = Math.hypot(uL.x, uL.y);
+    if (uLen < 1e-9) return null;
+    const uLn = { x: uL.x / uLen, y: uL.y / uLen };
+    const vC = { x: calcInf.x - calcSup.x, y: calcInf.y - calcSup.y };
+    const projAlong = dot(vC, uLn);
+    const projLat   = dot(vC, lateralDir);
+    if (Math.abs(projAlong) < 1e-9 && Math.abs(projLat) < 1e-9) return null;
+    return Math.atan2(projLat, projAlong) * 180 / Math.PI;
+  };
+  out.angleCalcaneenD = computeAngleCalcaneen(
+    byName['Mi-mollet D'], byName['Calcanéum supérieur D'], byName['Calcanéum inférieur D'],
+    patientRightDir);
+  out.angleCalcaneenG = computeAngleCalcaneen(
+    byName['Mi-mollet G'], byName['Calcanéum supérieur G'], byName['Calcanéum inférieur G'],
+    { x: -patientRightDir.x, y: -patientRightDir.y });
+  // axeJambier : déviation latérale axe (pli poplité → mi-mollet) vs
+  // (mi-mollet → calc. sup). « Genou D/G » du template = pli poplité (vue dos).
+  const computeAxeJambier = (pliPoplite, miMollet, calcSup, lateralDir) => {
+    if (!isPlaced(pliPoplite) || !isPlaced(miMollet) || !isPlaced(calcSup)) return null;
+    const uL = { x: miMollet.x - pliPoplite.x, y: miMollet.y - pliPoplite.y };
+    const uLen = Math.hypot(uL.x, uL.y);
+    if (uLen < 1e-9) return null;
+    const uLn = { x: uL.x / uLen, y: uL.y / uLen };
+    const vC = { x: calcSup.x - miMollet.x, y: calcSup.y - miMollet.y };
+    const projAlong = dot(vC, uLn);
+    const projLat   = dot(vC, lateralDir);
+    if (Math.abs(projAlong) < 1e-9 && Math.abs(projLat) < 1e-9) return null;
+    return Math.atan2(projLat, projAlong) * 180 / Math.PI;
+  };
+  // Convention de signe axe jambier : + = jambe déviée vers patient-D, − = vers
+  // patient-G. C'est une mesure en repère patient ABSOLU (le segment jambier
+  // dans son ensemble penche vers un côté), pas relative au pied. Les deux
+  // côtés utilisent donc le MÊME lateralDir (= -patientRightDir, choisi pour
+  // que projLat > 0 corresponde au côté D). C'est différent de l'angle
+  // calcanéen qui est relatif au pied (D/G opposés volontairement).
+  const axeJambierLat = { x: -patientRightDir.x, y: -patientRightDir.y };
+  out.axeJambierD = computeAxeJambier(
+    byName['Genou D'], byName['Mi-mollet D'], byName['Calcanéum supérieur D'],
+    axeJambierLat);
+  out.axeJambierG = computeAxeJambier(
+    byName['Genou G'], byName['Mi-mollet G'], byName['Calcanéum supérieur G'],
+    axeJambierLat);
+  return out;
+}
+
+// #108 Dos étape 2 — Conclusion scoliose. Seuil provisoire (à promouvoir
+// en POSTURE_THRESHOLDS.dos à l'étape 3a). Si |offset apex| > seuilRachis →
+// « Attitude scoliotique [région] à convexité [droite/gauche] (proposition) »
+// + si rachisSecondaire → « · 2ᵉ courbure [région] convexité [D/G] ».
+// Sinon → « Rachis aligné — pas de déviation marquée ».
+function _buildDosConclusion(angles) {
+  if (!angles) return '';
+  // #108 Dos étape 3a — seuil rachis lu depuis POSTURE_THRESHOLDS.dos.rachis
+  // (% de la largeur d'épaules). Promu depuis la constante locale étape 2.
+  const seuilRachis = POSTURE_THRESHOLDS.dos.rachis;
+  const sideWord = c => c === 'D' ? 'droite' : 'gauche';
+  if (angles.rachisApex === null || angles.rachisRegion === null) return '';
+  const apexOffset = angles.rachisOffsets[angles.rachisApex];
+  if (apexOffset === null || isNaN(apexOffset)) return '';
+  if (Math.abs(apexOffset) <= seuilRachis) {
+    return 'Rachis aligné — pas de déviation marquée';
+  }
+  let phrase = 'Attitude scoliotique ' + angles.rachisRegion
+             + ' à convexité ' + sideWord(angles.rachisConvexite)
+             + ' (proposition)';
+  if (angles.rachisSecondaire) {
+    phrase += ' · 2ᵉ courbure ' + angles.rachisSecondaire.region
+            + ' convexité ' + angles.rachisSecondaire.convexite;
+  }
+  return phrase;
+}
+
+// #108 Dos étape 3b — Findings dos (miroir _buildFaceFindings). Liste les
+// mesures hors zone neutre + conclusion scoliose, format identique pour
+// intégration dans la synthèse et le rapport :
+//   { horsNormes: [{ mesure: 'Tête (inclinaison)', detail: 'inclinée à D' }, ...],
+//     conclusion: 'Attitude scoliotique … (proposition)' | '' }
+// Règle « hors-normes seulement » : on n'émet QUE si hors zone neutre (cf
+// seuils Td.tete/.epaules/.bassin/.scapulaMin/Max/.scapulaAsym/.sillon/
+// .triangles/.calcaneen/.axeJambier). null/NaN → skip silencieux (point non
+// placé). La conclusion `Rachis aligné — pas de déviation marquée` est vidée
+// pour permettre au caller d'afficher le fallback « dans les normes » global.
+function _buildDosFindings(angles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  const Td = thr.dos;
+  const empty = { horsNormes: [], conclusion: '' };
+  if (!angles) return empty;
+  const horsNormes = [];
+  const push = (mesure, detail) => horsNormes.push({ mesure, detail });
+  const sideD = (v, posTxt, negTxt) => v > 0 ? posTxt : negTxt;
+  // Tête (inclinaison / rotation) — seuil unique Td.tete.
+  if (angles.inclinaisonTete !== null && !isNaN(angles.inclinaisonTete) && Math.abs(angles.inclinaisonTete) > Td.tete) {
+    push('Tête (inclinaison)', sideD(angles.inclinaisonTete, 'inclinée à D', 'inclinée à G'));
+  }
+  if (angles.rotationTete !== null && !isNaN(angles.rotationTete) && Math.abs(angles.rotationTete) > Td.tete) {
+    push('Tête (rotation)', sideD(angles.rotationTete, 'rotation à D', 'rotation à G'));
+  }
+  // Ligne épaules / asymétrie scapulas (en hauteur) — seuil Td.epaules.
+  if (angles.ligneEpaules !== null && !isNaN(angles.ligneEpaules) && Math.abs(angles.ligneEpaules) > Td.epaules) {
+    push('Ligne épaules', sideD(angles.ligneEpaules, 'D plus haute', 'G plus haute'));
+  }
+  if (angles.asymetrieScapula !== null && !isNaN(angles.asymetrieScapula) && Math.abs(angles.asymetrieScapula) > Td.epaules) {
+    push('Asymétrie scapulas (hauteur)', sideD(angles.asymetrieScapula, 'D plus haute', 'G plus haute'));
+  }
+  // Orientation scapulaire : bande physiologique [Td.scapulaMin, Td.scapulaMax].
+  // Hors bande = libellé clinique (rot. interne sous min, rot. externe au-dessus
+  // de max). Dans bande = neutre → skip (pas de finding).
+  const scapulaBand = v => {
+    if (v < Td.scapulaMin) return 'rotation interne (rétropulsion d\'épaule)';
+    if (v > Td.scapulaMax) return 'rotation externe (enroulement antérieur d\'épaule)';
+    return null;
+  };
+  if (angles.orientationScapulaD !== null && !isNaN(angles.orientationScapulaD)) {
+    const dD = scapulaBand(angles.orientationScapulaD);
+    if (dD) push('Scapula D', dD);
+  }
+  if (angles.orientationScapulaG !== null && !isNaN(angles.orientationScapulaG)) {
+    const dG = scapulaBand(angles.orientationScapulaG);
+    if (dG) push('Scapula G', dG);
+  }
+  // Asymétrie orientation scapulaire D − G — seuil Td.scapulaAsym.
+  if (angles.asymetrieOrientationScapula !== null && !isNaN(angles.asymetrieOrientationScapula) && Math.abs(angles.asymetrieOrientationScapula) > Td.scapulaAsym) {
+    push('Asymétrie orientation scapulaire', sideD(angles.asymetrieOrientationScapula, 'D plus externe', 'G plus externe'));
+  }
+  // Bassin — bascule (Td.bassin) + sillon (Td.sillon) + triangles (Td.triangles).
+  if (angles.basculeBassin !== null && !isNaN(angles.basculeBassin) && Math.abs(angles.basculeBassin) > Td.bassin) {
+    push('Bascule bassin', sideD(angles.basculeBassin, 'D plus haute', 'G plus haute'));
+  }
+  if (angles.sillonInterfessier !== null && !isNaN(angles.sillonInterfessier) && Math.abs(angles.sillonInterfessier) > Td.sillon) {
+    push('Sillon inter-fessier', sideD(angles.sillonInterfessier, 'à D', 'à G'));
+  }
+  if (angles.trianglesTaille !== null && !isNaN(angles.trianglesTaille) && Math.abs(angles.trianglesTaille) > Td.triangles) {
+    push('Triangles de la taille', sideD(angles.trianglesTaille, 'D plus ouvert', 'G plus ouvert'));
+  }
+  // Membre inférieur — calcanéen (Td.calcaneen) valgus/varus + axe jambier
+  // (Td.axeJambier) dévié à D/G (repère absolu patient — voir _computeDosAngles).
+  if (angles.angleCalcaneenD !== null && !isNaN(angles.angleCalcaneenD) && Math.abs(angles.angleCalcaneenD) > Td.calcaneen) {
+    push('Calcanéum D', sideD(angles.angleCalcaneenD, 'valgus', 'varus'));
+  }
+  if (angles.angleCalcaneenG !== null && !isNaN(angles.angleCalcaneenG) && Math.abs(angles.angleCalcaneenG) > Td.calcaneen) {
+    push('Calcanéum G', sideD(angles.angleCalcaneenG, 'valgus', 'varus'));
+  }
+  if (angles.axeJambierD !== null && !isNaN(angles.axeJambierD) && Math.abs(angles.axeJambierD) > Td.axeJambier) {
+    push('Axe jambier D', sideD(angles.axeJambierD, 'dévié à D', 'dévié à G'));
+  }
+  if (angles.axeJambierG !== null && !isNaN(angles.axeJambierG) && Math.abs(angles.axeJambierG) > Td.axeJambier) {
+    push('Axe jambier G', sideD(angles.axeJambierG, 'dévié à D', 'dévié à G'));
+  }
+  // Conclusion scoliose — vidée si « Rachis aligné » pour ne pas empêcher
+  // le fallback « Posture dos dans les normes » côté caller.
+  let conclusion = _buildDosConclusion(angles);
+  if (conclusion.startsWith('Rachis aligné')) conclusion = '';
+  return { horsNormes, conclusion };
+}
+
 // #108 Étape 3b — Findings face (miroir _buildPostureFindings). Liste les
 // mesures hors zone neutre + conclusion latéralisée, format identique pour
 // intégration dans la synthèse et le rapport :
@@ -5884,6 +6362,22 @@ function _buildPostureProfilSectionsSynthese(d) {
       items: items,
     });
   }
+  // #108 Dos étape 3b — Bloc dos (placement étape 1, mesures étape 2, seuils
+  // configurables étape 3a, findings étape 3b). Même schéma que profil et face :
+  // angles persistés par _validatePosturePlacement, hors-normes + conclusion
+  // scoliose via _buildDosFindings. Ordre cosmétique : profil → face → dos.
+  const da = d && d._postureAnalysis && d._postureAnalysis.dos;
+  if (da && da.angles) {
+    const df = _buildDosFindings(da.angles);
+    const items = [];
+    df.horsNormes.forEach(function(x) { items.push(x.mesure + ' : ' + x.detail); });
+    if (df.conclusion) items.push('Conclusion : ' + df.conclusion);
+    if (!items.length) items.push('Posture dos dans les normes — aucune tendance marquée');
+    out.push({
+      titre: '📐 Analyse posturale — dos',
+      items: items,
+    });
+  }
   return out;
 }
 
@@ -5985,6 +6479,128 @@ function _renderFacePlacementResults(panel, f) {
   `;
 }
 
+// #108 Dos étape 2 — Panneau résultats dos. Même style que la face (mêmes
+// codes couleur valeur, mêmes libellés vert (neutre) / orange (hors-zone)).
+// Seuils inline provisoires — à promouvoir en POSTURE_THRESHOLDS.dos à
+// l'étape 3a. Les 4 décalages rachis sont en % de la largeur d'épaules,
+// avec un encart « Apex / Convexité » dérivé directement de l'angles.rachis*.
+function _renderDosPlacementResults(panel, d) {
+  // #108 Dos étape 3a — seuils lus depuis POSTURE_THRESHOLDS.dos (configurables
+  // depuis Paramètres). Mapping : tete→tete, ligne épaules + asymétrie scapulas
+  // → epaules, bascule→bassin, orientation scapulaire → scapulaMin/scapulaMax,
+  // asymétrie orientation → scapulaAsym, rachis→rachis, sillon→sillon,
+  // triangles→triangles, calcaneen→calcaneen, axeJambier→axeJambier.
+  const Td = POSTURE_THRESHOLDS.dos;
+  const SEUIL_TETE      = Td.tete;
+  const SEUIL_EPAULES   = Td.epaules;
+  const SEUIL_BASSIN    = Td.bassin;
+  // Orientation scapulaire = bande physiologique [SCAP_MIN, SCAP_MAX] non
+  // centrée sur 0. < min = rotation interne / rétropulsion d'épaule ;
+  // > max = rotation externe / enroulement antérieur d'épaule.
+  const SCAP_MIN        = Td.scapulaMin;
+  const SCAP_MAX        = Td.scapulaMax;
+  const SEUIL_SCAP_ASYM = Td.scapulaAsym;
+  const SEUIL_RACHIS    = Td.rachis;
+  const SEUIL_SILLON    = Td.sillon;
+  const SEUIL_TRIANGLES = Td.triangles;
+  const SEUIL_CALC      = Td.calcaneen;
+  const SEUIL_AXE_JAMB  = Td.axeJambier;
+  const lblStyle = c => `color:${c};font-size:11px;margin-left:4px;`;
+  const groupHdr = `font-weight:600;color:#0e1f38;margin-bottom:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;`;
+  const lbl = `color:#64748b;`;
+  const fmtDeg = v => (v === null || isNaN(v))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:${v > 0 ? '#3b82f6' : v < 0 ? '#dc2626' : '#0e1f38'};font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)}°</span>`;
+  const fmtPct = v => (v === null || isNaN(v))
+    ? `<span style="color:#94a3b8;">—</span>`
+    : `<span style="color:${v > 0 ? '#3b82f6' : v < 0 ? '#dc2626' : '#0e1f38'};font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)} %</span>`;
+  const sideLbl = (v, seuil, posTxt, negTxt) => {
+    if (v === null || isNaN(v)) return '';
+    if (Math.abs(v) <= seuil) return `<span style="${lblStyle('#10b981')}">(neutre)</span>`;
+    if (v > 0) return `<span style="${lblStyle('#ea580c')}">${posTxt}</span>`;
+    return `<span style="${lblStyle('#ea580c')}">${negTxt}</span>`;
+  };
+  const lblTeteIncl = v => sideLbl(v, SEUIL_TETE,    '(inclinée à D)', '(inclinée à G)');
+  const lblRotation = v => sideLbl(v, SEUIL_TETE,    '(rotation à D)', '(rotation à G)');
+  const lblEpaules  = v => sideLbl(v, SEUIL_EPAULES, '(D plus haute)', '(G plus haute)');
+  const lblBassin   = v => sideLbl(v, SEUIL_BASSIN,  '(D plus haute)', '(G plus haute)');
+  const lblScapAsym = v => sideLbl(v, SEUIL_EPAULES, '(D plus haute)', '(G plus haute)');
+  // Orientation scapulaire : classification en bande physiologique [SCAP_MIN,
+  // SCAP_MAX]. Hors bande = orange (rotation interne / externe avec libellé
+  // clinique court) ; dans bande = vert (physiologique). Le code couleur de
+  // fmtDeg sur la valeur numérique reste inchangé (bleu+/rouge−/gris null).
+  const lblScapOri = v => {
+    if (v === null || isNaN(v)) return '';
+    if (v < SCAP_MIN) return `<span style="${lblStyle('#ea580c')}">(rotation interne — rétropulsion d'épaule)</span>`;
+    if (v > SCAP_MAX) return `<span style="${lblStyle('#ea580c')}">(rotation externe — enroulement antérieur d'épaule)</span>`;
+    return `<span style="${lblStyle('#10b981')}">(physiologique)</span>`;
+  };
+  // Asymétrie D − G de l'orientation scapulaire : + = D plus en rotation
+  // externe que G (= D plus enroulée antérieurement). Seuil SEUIL_SCAP_ASYM.
+  const lblScapAsymOri = v => sideLbl(v, SEUIL_SCAP_ASYM, '(D plus externe)', '(G plus externe)');
+  const lblRachisOff = v => sideLbl(v, SEUIL_RACHIS, '(à D)',          '(à G)');
+  const lblSillon    = v => sideLbl(v, SEUIL_SILLON, '(à D)',          '(à G)');
+  const lblTriangles = v => sideLbl(v, SEUIL_TRIANGLES, '(D plus ouvert)', '(G plus ouvert)');
+  const lblCalc      = v => sideLbl(v, SEUIL_CALC,   '(valgus)',       '(varus)');
+  const lblAxeJamb   = v => sideLbl(v, SEUIL_AXE_JAMB, '(à D)',        '(à G)');
+  // Apex / convexité — affichage dérivé, pas de libellé latéralisé classique.
+  const apexBlock = d.rachisApex
+    ? `<div style="${lbl}">Apex :</div>
+       <div style="font-weight:700;color:#0e1f38;">${d.rachisRegion} (${d.rachisApex})
+         <span style="color:#ea580c;font-weight:700;margin-left:4px;">→ convexité ${d.rachisConvexite}</span>
+       </div>`
+    : `<div style="${lbl}">Apex :</div><div style="color:#94a3b8;">—</div>`;
+  const secBlock = d.rachisSecondaire
+    ? `<div style="margin-top:3px;font-size:11px;color:#666;">2ᵉ courbure : ${d.rachisSecondaire.region} (${d.rachisSecondaire.apex}) → convexité ${d.rachisSecondaire.convexite}</div>`
+    : '';
+  const conclusionText = _buildDosConclusion(d) || 'Rachis aligné — pas de déviation marquée';
+  panel.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
+      <div>
+        <div style="${groupHdr}">Tête</div>
+        <div><span style="${lbl}">Inclinaison :</span> ${fmtDeg(d.inclinaisonTete)} ${lblTeteIncl(d.inclinaisonTete)}</div>
+        <div><span style="${lbl}">Rotation :</span> ${fmtDeg(d.rotationTete)} ${lblRotation(d.rotationTete)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Épaules / Scapulas</div>
+        <div><span style="${lbl}">Ligne épaules :</span> ${fmtDeg(d.ligneEpaules)} ${lblEpaules(d.ligneEpaules)}</div>
+        <div><span style="${lbl}">Asymétrie scapulas :</span> ${fmtDeg(d.asymetrieScapula)} ${lblScapAsym(d.asymetrieScapula)}</div>
+        <div><span style="${lbl}">Orientation scapula D :</span> ${fmtDeg(d.orientationScapulaD)} ${lblScapOri(d.orientationScapulaD)}</div>
+        <div><span style="${lbl}">Orientation scapula G :</span> ${fmtDeg(d.orientationScapulaG)} ${lblScapOri(d.orientationScapulaG)}</div>
+        <div><span style="${lbl}">Asymétrie orientation scapulaire (D−G) :</span> ${fmtDeg(d.asymetrieOrientationScapula)} ${lblScapAsymOri(d.asymetrieOrientationScapula)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Rachis</div>
+        <div><span style="${lbl}">C7 :</span> ${fmtPct(d.rachisOffsets.C7)} ${lblRachisOff(d.rachisOffsets.C7)}</div>
+        <div><span style="${lbl}">TH6 :</span> ${fmtPct(d.rachisOffsets.TH6)} ${lblRachisOff(d.rachisOffsets.TH6)}</div>
+        <div><span style="${lbl}">TH12 :</span> ${fmtPct(d.rachisOffsets.TH12)} ${lblRachisOff(d.rachisOffsets.TH12)}</div>
+        <div><span style="${lbl}">L3 :</span> ${fmtPct(d.rachisOffsets.L3)} ${lblRachisOff(d.rachisOffsets.L3)}</div>
+        <div style="margin-top:4px;padding-top:4px;border-top:1px dashed #e2e8f0;">
+          ${apexBlock}
+          ${secBlock}
+        </div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Bassin</div>
+        <div><span style="${lbl}">Bascule :</span> ${fmtDeg(d.basculeBassin)} ${lblBassin(d.basculeBassin)}</div>
+        <div><span style="${lbl}">Sillon inter-fessier :</span> ${fmtPct(d.sillonInterfessier)} ${lblSillon(d.sillonInterfessier)}</div>
+        <div><span style="${lbl}">Triangles de la taille :</span> ${fmtPct(d.trianglesTaille)} ${lblTriangles(d.trianglesTaille)}</div>
+      </div>
+      <div>
+        <div style="${groupHdr}">Membre inférieur</div>
+        <div><span style="${lbl}">Angle calcanéen D :</span> ${fmtDeg(d.angleCalcaneenD)} ${lblCalc(d.angleCalcaneenD)}</div>
+        <div><span style="${lbl}">Angle calcanéen G :</span> ${fmtDeg(d.angleCalcaneenG)} ${lblCalc(d.angleCalcaneenG)}</div>
+        <div><span style="${lbl}">Axe jambier D :</span> ${fmtDeg(d.axeJambierD)} ${lblAxeJamb(d.axeJambierD)}</div>
+        <div><span style="${lbl}">Axe jambier G :</span> ${fmtDeg(d.axeJambierG)} ${lblAxeJamb(d.axeJambierG)}</div>
+      </div>
+      <div style="grid-column:1/-1;border-top:1px solid #cbd5e0;padding-top:5px;color:#0e1f38;line-height:1.45;">
+        <span style="font-weight:700;">Conclusion :</span>
+        <span>${conclusionText}</span>
+      </div>
+    </div>
+  `;
+}
+
 // Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
 // _redrawPostureModal (live durant drag) ET à chaque _renderPostureMarkerList
 // (changement de sélection/placement). Vert si +, rouge si −, gris si null.
@@ -5997,6 +6613,15 @@ function _renderPosturePlacementResults() {
   if (_postureModalViewKey === 'face') {
     const f = _computeFaceAngles(_postureModalMarkers, _postureCalibration);
     _renderFacePlacementResults(panel, f);
+    return;
+  }
+  // #108 Dos étape 2 — branche dos : _computeDosAngles (mesures vue postérieure)
+  // + groupes structurés (Tête, Épaules/Scapulas, Rachis avec apex/convexité,
+  // Bassin, Membre inférieur, Conclusion). Mêmes conventions visuelles que la
+  // face, libellés vert (neutre) / orange (hors-zone).
+  if (_postureModalViewKey === 'dos') {
+    const dd = _computeDosAngles(_postureModalMarkers, _postureCalibration);
+    _renderDosPlacementResults(panel, dd);
     return;
   }
   const a = _computePostureAngles(_postureModalMarkers, _postureCalibration);
@@ -6180,16 +6805,23 @@ function _redrawPostureModal() {
   const ctx = _postureModalCtx;
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
   ctx.drawImage(_postureModalImg, 0, 0);
-  // #85-2c-angles + #108 Étape 2 — fil à plomb gris-bleu neutre passant par
-  // l'ancrage du repère « cheville ». Profil : Réf. cheville (unique).
-  // Face : milieu(Cheville D, Cheville G) (= C_chevilles utilisé pour les
-  // translations dans _computeFaceAngles, donc cohérent visuellement).
+  // #85-2c-angles + #108 — fil à plomb gris-bleu neutre passant par l'ancrage
+  // du repère « cheville ». Profil : Réf. cheville (unique). Face : milieu
+  // (Cheville D, Cheville G). Dos : milieu(Calcanéum inférieur D, Calcanéum
+  // inférieur G) (équivalent postérieur du repère cheville en face).
+  // Pour face et dos, si une moitié de la paire manque → pas d'ancre (idem face).
   let plumbAnchor = null;
   if (_postureModalViewKey === 'face') {
     const chD = _postureModalMarkers.find(m => m.name === 'Cheville D');
     const chG = _postureModalMarkers.find(m => m.name === 'Cheville G');
     if (chD && chD.x !== null && chD.y !== null && chG && chG.x !== null && chG.y !== null) {
       plumbAnchor = { x: (chD.x + chG.x) / 2, y: (chD.y + chG.y) / 2 };
+    }
+  } else if (_postureModalViewKey === 'dos') {
+    const cD = _postureModalMarkers.find(m => m.name === 'Calcanéum inférieur D');
+    const cG = _postureModalMarkers.find(m => m.name === 'Calcanéum inférieur G');
+    if (cD && cD.x !== null && cD.y !== null && cG && cG.x !== null && cG.y !== null) {
+      plumbAnchor = { x: (cD.x + cG.x) / 2, y: (cD.y + cG.y) / 2 };
     }
   } else {
     const cheville = _postureModalMarkers.find(m => m.name === 'Réf. cheville');
@@ -6402,7 +7034,7 @@ function openPosturePlacementModal(prefix, viewKey) {
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;';
   overlay.innerHTML = `<div style="background:#fff;border-radius:8px;padding:12px;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des ${_postureModalMarkers.length} points — ${viewKey === 'face' ? 'Face' : 'Profil ' + (viewKey === 'profilG' ? 'G' : 'D')}</div>
+        <div style="font-weight:700;color:#0e1f38;font-size:13px;">🎯 Placement des ${_postureModalMarkers.length} points — ${viewKey === 'face' ? 'Face' : viewKey === 'dos' ? 'Dos' : 'Profil ' + (viewKey === 'profilG' ? 'G' : 'D')}</div>
         <div style="display:flex;gap:6px;">
           <button class="btn" onclick="_cancelPosturePlacement()" style="font-size:11px;background:#888;color:#fff;padding:5px 12px;">Annuler</button>
           <button class="btn" onclick="_validatePosturePlacement('${prefix}','${viewKey}')" style="font-size:11px;background:#2a7a4e;color:#fff;padding:5px 12px;">✓ Valider</button>
@@ -6493,15 +7125,20 @@ async function _validatePosturePlacement(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
   const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
-  // #108 Étape 2 — face : _computeFaceAngles persiste les 11 mesures.
-  // Pas de curveInterp pour la face (sémantique courbures rachidiennes
-  // spécifique au profil — la classification face viendra étape 3).
+  // #108 — face : _computeFaceAngles persiste les 11 mesures.
+  // dos étape 2 : _computeDosAngles persiste les mesures vue postérieure
+  // (tête, épaules/scapulas, rachis avec apex/convexité, bassin, membre inf.).
+  // Pas de curveInterp pour face/dos (sémantique courbures rachidiennes
+  // spécifique au profil — sera évaluée à part).
   // Profil G/D : flow inchangé — angles + curveInterp calculés au save.
   const isFace = viewKey === 'face';
+  const isDos  = viewKey === 'dos';
   let angles = null;
   let curveInterp = null;
   if (isFace) {
     angles = _computeFaceAngles(_postureModalMarkers, _postureCalibration);
+  } else if (isDos) {
+    angles = _computeDosAngles(_postureModalMarkers, _postureCalibration);
   } else {
     // #85-2c-angles — angles recalculés au moment du save (recalculables à tout
     // moment depuis markers + calibration ; on les stocke quand même pour éviter
