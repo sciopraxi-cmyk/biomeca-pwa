@@ -2065,7 +2065,8 @@ const MARKER_TEMPLATES = {
     {name:'Angle supéro-médial scapula G', color:'#60a5fa', side:'G', hint:'angle supérieur et médial (interne) de l\'omoplate gauche'},
     {name:'Pointe inférieure scapula D',  color:'#06b6d4', side:'D', hint:'angle inférieur de l\'omoplate droite (~TH7-TH8)'},
     {name:'Pointe inférieure scapula G',  color:'#22d3ee', side:'G', hint:'angle inférieur de l\'omoplate gauche (~TH7-TH8)'},
-    // Rachis thoracique / taille (4)
+    // Rachis thoracique / taille (5)
+    {name:'Épineuse TH3',                 color:'#4338ca', side:'',  hint:'apophyse épineuse de TH3 (~niveau épine de la scapula)'},
     {name:'Épineuse TH6',                 color:'#6366f1', side:'',  hint:'apophyse épineuse de TH6, au milieu du dos (~entre les pointes des omoplates)'},
     {name:'Épineuse TH12',                color:'#818cf8', side:'',  hint:'apophyse épineuse de TH12 (au niveau de la dernière côte palpable)'},
     {name:'Pli de la taille D',           color:'#8b5cf6', side:'D', hint:'pli latéral droit à la taille (creux le plus marqué)'},
@@ -4708,6 +4709,13 @@ const POSTURE_THRESHOLDS_DEFAULTS = {
     sillon: 3, triangles: 3,          // % — sillon inter-fessier ; triangles de la taille
     calcaneen: 3, axeJambier: 3,      // ° — angle calcanéen ; axe jambier
   },
+  // #108 Étape 4 — couplage face+dos. Seuil utilisé par _buildCrossViewFindings
+  // pour décider si une déviation antérieure (face) ou postérieure (dos) est
+  // significative. Signes opposés → rotation antérieure du côté postérieur ;
+  // même sens → translation / latéralisation du côté commun.
+  crossView: {
+    seuil: 3, // % de la largeur d'appui (face) ou de la largeur d'épaules (dos)
+  },
 };
 
 // Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
@@ -4731,6 +4739,8 @@ function _loadPostureThresholds() {
       face: { ...POSTURE_THRESHOLDS_DEFAULTS.face, ...(stored.face || {}) },
       // #108 Dos étape 3a — merge profond dos, même contrat fail-safe que face.
       dos:  { ...POSTURE_THRESHOLDS_DEFAULTS.dos,  ...(stored.dos  || {}) },
+      // #108 Étape 4 — merge profond couplage face+dos, idem fail-safe.
+      crossView: { ...POSTURE_THRESHOLDS_DEFAULTS.crossView, ...(stored.crossView || {}) },
     };
   } catch (e) {
     console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
@@ -4817,6 +4827,10 @@ function _renderPostureThresholdsPanel() {
         ${num('Triangles de la taille (% largeur épaules)', T.dos.triangles,   'dos.triangles', '%')}
         ${num('Angle calcanéen',                           T.dos.calcaneen,    'dos.calcaneen')}
         ${num('Axe jambier',                               T.dos.axeJambier,   'dos.axeJambier')}
+      </div>
+      <div>
+        <div style="${subHdr}">Seuils — couplage face+dos</div>
+        ${num('Rotation antérieure / Translation (% largeur)', T.crossView.seuil, 'crossView.seuil', '%')}
       </div>
     </div>
     <div style="margin-top:12px;">
@@ -5351,6 +5365,7 @@ function _computeFaceAngles(markers, calibration) {
     // Translations (% de la largeur d'appui)
     translationThorax:  null,
     translationBassin:  null,
+    devNombril:         null, // % de la largeur d'appui ; + = à D (couplage face+dos)
     // Genoux
     valgumVarumD:       null,  // + valgum / - varum
     valgumVarumG:       null,
@@ -5518,6 +5533,15 @@ function _computeFaceAngles(markers, calibration) {
     const cBassin = { x: (eiasD.x + eiasG.x) / 2, y: (eiasD.y + eiasG.y) / 2 };
     const v = { x: cBassin.x - cChevilles.x, y: cBassin.y - cChevilles.y };
     out.translationBassin = (dot(v, patientRightDir) / stanceWidth) * 100;
+  }
+  // #108 Étape 4 — devNombril : décalage horizontal signé du nombril vs le
+  // plomb des chevilles, normalisé par la largeur d'appui. Réutilisé par
+  // _buildCrossViewFindings comme proxy ANTÉRIEUR du bassin (couplage face+dos
+  // : croisé avec dosAngles.rachisOffsets.L3 = proxy POSTÉRIEUR du bassin).
+  const nombrilPt = byName['Nombril'];
+  if (cChevilles && stanceWidth > 0 && isPlaced(nombrilPt)) {
+    const v = { x: nombrilPt.x - cChevilles.x, y: nombrilPt.y - cChevilles.y };
+    out.devNombril = (dot(v, patientRightDir) / stanceWidth) * 100; // + = à D
   }
   // 7. Valgum/Varum par jambe ------------------------------------------
   // calcAngle3([Tête fémorale, Genou, Cheville]) ; déviation mag = 180 − raw.
@@ -5699,7 +5723,7 @@ function _computeDosAngles(markers, calibration) {
     orientationScapulaG: null,
     asymetrieOrientationScapula: null, // D − G ; + = D plus en rotation externe que G
     // Rachis
-    rachisOffsets:    { C7: null, TH6: null, TH12: null, L3: null }, // % signés
+    rachisOffsets:    { C7: null, TH3: null, TH6: null, TH12: null, L3: null }, // % signés
     rachisApex:       null, // 'C7' | 'TH6' | 'TH12' | 'L3' | null
     rachisConvexite:  null, // 'D' | 'G' | null
     rachisRegion:     null, // 'cervicale' | 'thoracique' | 'thoraco-lombaire' | 'lombaire' | null
@@ -5812,6 +5836,7 @@ function _computeDosAngles(markers, calibration) {
   if (isPlaced(sacrum) && shoulderW > 0) {
     const levels = [
       { key: 'C7',   m: c7 },
+      { key: 'TH3',  m: byName['Épineuse TH3']  },
       { key: 'TH6',  m: byName['Épineuse TH6']  },
       { key: 'TH12', m: byName['Épineuse TH12'] },
       { key: 'L3',   m: byName['Épineuse L3']   },
@@ -5825,7 +5850,7 @@ function _computeDosAngles(markers, calibration) {
     // Apex = niveau au plus grand |offset|.
     const placedLvls = levels.filter(l => out.rachisOffsets[l.key] !== null);
     if (placedLvls.length > 0) {
-      const REGION = { C7: 'cervicale', TH6: 'thoracique', TH12: 'thoraco-lombaire', L3: 'lombaire' };
+      const REGION = { C7: 'cervicale', TH3: 'thoracique haute', TH6: 'thoracique', TH12: 'thoraco-lombaire', L3: 'lombaire' };
       let apexLvl = placedLvls[0];
       for (const l of placedLvls) {
         if (Math.abs(out.rachisOffsets[l.key]) > Math.abs(out.rachisOffsets[apexLvl.key])) apexLvl = l;
@@ -6031,6 +6056,49 @@ function _buildDosFindings(angles, thr) {
   let conclusion = _buildDosConclusion(angles);
   if (conclusion.startsWith('Rachis aligné')) conclusion = '';
   return { horsNormes, conclusion };
+}
+
+// #108 Étape 4 — Couplage face+dos : détection de rotations antérieures et
+// translations par ceinture (pelvienne / tronc / scapulaire). Principe : on
+// croise un repère ANTÉRIEUR (face : devNombril, translationThorax) avec le
+// repère POSTÉRIEUR correspondant (dos : rachisOffsets.L3/TH6/TH3/C7) au même
+// étage. Les SIGNES OPPOSÉS révèlent une rotation autour de l'axe vertical
+// (le côté du repère postérieur indique vers où la ceinture s'est tournée en
+// avant) ; les SIGNES IDENTIQUES révèlent une translation/latéralisation pure
+// (la ceinture entière est décalée du côté commun).
+// Seuil POSTURE_THRESHOLDS.crossView.seuil applicable aux 2 valeurs : si l'une
+// ou l'autre est sous le seuil, on n'émet rien (pas d'asymétrie significative).
+// Retour : liste plate de chaînes prêtes à pousser dans items synthèse/rapport.
+function _buildCrossViewFindings(faceAngles, dosAngles, thr) {
+  thr = thr || POSTURE_THRESHOLDS;
+  const seuil = thr.crossView.seuil;
+  const avg2 = (a, b) => (a === null || b === null || isNaN(a) || isNaN(b)) ? null : (a + b) / 2;
+  const beltFinding = (A, P, labelRot, labelTrans) => {
+    if (A === null || P === null || isNaN(A) || isNaN(P)) return null;
+    if (Math.abs(A) <= seuil || Math.abs(P) <= seuil) return null;
+    const w = s => s > 0 ? 'droite' : 'gauche';
+    // Sens opposés → rotation antérieure du côté POSTÉRIEUR (= signe de P).
+    if (Math.sign(A) !== Math.sign(P)) return labelRot + ' ' + w(P);
+    // Même sens → translation / latéralisation du côté commun.
+    return labelTrans + ' ' + w(A);
+  };
+  const out = [];
+  const f = (x) => { if (x) out.push(x); };
+  // Ceinture pelvienne : Nombril (antérieur) vs L3 (postérieur).
+  f(beltFinding(
+    faceAngles.devNombril, dosAngles.rachisOffsets.L3,
+    'Bassin en rotation antérieure', 'Translation du bassin à'));
+  // Tronc : moyenne (Nombril, FourchetteSternale) antérieur vs moyenne (L3, TH6) postérieur.
+  f(beltFinding(
+    avg2(faceAngles.devNombril, faceAngles.translationThorax),
+    avg2(dosAngles.rachisOffsets.L3, dosAngles.rachisOffsets.TH6),
+    'Tronc en rotation antérieure', 'Latéralisation du tronc à'));
+  // Ceinture scapulaire : FourchetteSternale (antérieur) vs moyenne (C7, TH3) postérieur.
+  f(beltFinding(
+    faceAngles.translationThorax,
+    avg2(dosAngles.rachisOffsets.C7, dosAngles.rachisOffsets.TH3),
+    'Ceinture scapulaire en rotation antérieure', 'Latéralisation de la ceinture scapulaire à'));
+  return out;
 }
 
 // #108 Étape 3b — Findings face (miroir _buildPostureFindings). Liste les
@@ -6378,6 +6446,21 @@ function _buildPostureProfilSectionsSynthese(d) {
       items: items,
     });
   }
+  // #108 Étape 4 — Bloc couplage face+dos : rotations/translations par ceinture
+  // (pelvienne, tronc, scapulaire). Apparaît UNIQUEMENT si les deux vues sont
+  // placées (faceAngles ET dosAngles présents). Sinon impossible à raisonner.
+  const fa2 = d && d._postureAnalysis && d._postureAnalysis.face;
+  const da2 = d && d._postureAnalysis && d._postureAnalysis.dos;
+  if (fa2 && fa2.angles && da2 && da2.angles) {
+    const cv = _buildCrossViewFindings(fa2.angles, da2.angles);
+    const items = cv.length
+      ? cv.slice()
+      : ['Pas de rotation ni de translation marquée (face + dos cohérents)'];
+    out.push({
+      titre: '📐 Analyse posturale — rotations (face + dos)',
+      items: items,
+    });
+  }
   return out;
 }
 
@@ -6572,6 +6655,7 @@ function _renderDosPlacementResults(panel, d) {
       <div>
         <div style="${groupHdr}">Rachis</div>
         <div><span style="${lbl}">C7 :</span> ${fmtPct(d.rachisOffsets.C7)} ${lblRachisOff(d.rachisOffsets.C7)}</div>
+        <div><span style="${lbl}">TH3 :</span> ${fmtPct(d.rachisOffsets.TH3)} ${lblRachisOff(d.rachisOffsets.TH3)}</div>
         <div><span style="${lbl}">TH6 :</span> ${fmtPct(d.rachisOffsets.TH6)} ${lblRachisOff(d.rachisOffsets.TH6)}</div>
         <div><span style="${lbl}">TH12 :</span> ${fmtPct(d.rachisOffsets.TH12)} ${lblRachisOff(d.rachisOffsets.TH12)}</div>
         <div><span style="${lbl}">L3 :</span> ${fmtPct(d.rachisOffsets.L3)} ${lblRachisOff(d.rachisOffsets.L3)}</div>
