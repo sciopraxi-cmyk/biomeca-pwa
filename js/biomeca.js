@@ -464,6 +464,7 @@ async function loadSupabaseData() {
       patients = d.patients || [];
       praticiens = d.praticiens || [];
       _dataLoaded = true;  // Task #64 — patients global est peuplé, saveToSupabase peut écrire
+      _loadedFromFallback = false; // #114-1a — mémoire vient du cloud confirmé.
       // Appliquer les modules depuis user_metadata Supabase (fraîches, task #58).
       // Refonte enum droits → array modules : la source de vérité est désormais
       // user_metadata.modules (array de 'postural'|'podopedia'|'podo_sport').
@@ -481,6 +482,7 @@ async function loadSupabaseData() {
       patients = [];
       praticiens = [];
       _dataLoaded = true;  // Task #64 — nouvel user légitimement vide, saves autorisés
+      _loadedFromFallback = false; // #114-1a — pas de cloud row mais Supabase atteint.
     }
     // Migration : anciens bilans (p.bilans[]) → p.bilansSport[]
     let migrated = false;
@@ -545,6 +547,7 @@ async function loadSupabaseData() {
       try { localStorage.setItem('bm4-patients', JSON.stringify(patients)); } catch(_) {}
     }
     _dataLoaded = true;  // Task #64 — fallback considéré comme valide, saves autorisés
+    _loadedFromFallback = true; // #114-1a — mémoire issue du cache local non confirmée.
   }
 
   currentPatient = null; bilanData = {};
@@ -569,6 +572,38 @@ async function saveToSupabase() {
       praticiensCount: praticiens.length,
     });
     return;
+  }
+  // #114-1a — Reconcile fallback : si la mémoire vient du cache local non
+  // confirmé (catch de loadSupabaseData → cloud injoignable au boot), on
+  // re-tente une lecture cloud AVANT d'écrire. Si le cloud est plus riche
+  // (count d'unités > mémoire), refuse d'écraser et propose un reload pour
+  // récupérer la version cloud. Sinon → flag levé, save normal poursuit.
+  // Si cloud toujours injoignable au reconcile, on ne bloque PAS (l'utilisateur
+  // doit pouvoir continuer à travailler hors-ligne ; le save écrira au moins
+  // le localStorage canonique via #65).
+  if (_loadedFromFallback) {
+    try {
+      const rows = await supa.loadData('user_data');
+      const myRow = rows.find(r => r.user_id === pwaUser.id);
+      const cloud = myRow?.data ? (typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data) : null;
+      if (cloud && Array.isArray(cloud.patients)) {
+        const cloudUnits = _countDataUnits(cloud.patients);
+        const memUnits   = _countDataUnits(patients);
+        if (cloudUnits > memUnits) {
+          const reload = confirm(
+            '⚠️ Le serveur contient une version PLUS complète de vos données que celle ' +
+            'chargée au démarrage (probablement à cause d\'une coupure réseau).\n\n' +
+            'Pour éviter d\'écraser des données, la sauvegarde a été suspendue.\n\n' +
+            'Recharger maintenant pour récupérer la version du serveur ?'
+          );
+          if (reload) location.reload();
+          return; // NE PAS écraser le cloud
+        }
+      }
+      _loadedFromFallback = false; // cloud confirmé non plus riche → sûr pour la suite.
+    } catch (e) {
+      console.warn('[#114-1a] reconcile cloud injoignable, save local poursuivi :', e?.message);
+    }
   }
   const data = { patients, praticiens };
   // Task #38 — message banner uniforme entre les 2 paths fail.
@@ -1681,6 +1716,11 @@ let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
 // pour empêcher d'écraser user_data.data en DB avec patients=[] en RAM avant
 // que le chargement initial ait peuplé les globales depuis Supabase.
 let _dataLoaded = false;
+// #114-1a — true quand la mémoire en cours vient du fallback localStorage
+// (catch de loadSupabaseData) et n'a PAS été confirmée contre le cloud cette
+// session. saveToSupabase fait un reconcile préventif avant d'écrire pour
+// éviter d'écraser un cloud plus riche par une copie locale périmée.
+let _loadedFromFallback = false;
 // Flag sync error banner (task #38) — track si bannière sync error active pour
 // log 'sync_recovered' uniquement post-fail (évite spam log au quotidien).
 // Reset par _hideSyncErrorBanner (dismiss user OU recovery automatique).
@@ -2599,6 +2639,28 @@ function _stripDataURLsForPersist(patientsArr) {
     }
   }
   return stash;
+}
+
+// #114-1a — Compte des « unités de travail » comparables entre deux snapshots
+// patients[] : nombre de patients + total bilans sport + total bilans posturo
+// + markers posturaux placés + photos posturales (dataURL inline ou Path).
+// Utilisé par le reconcile fallback de saveToSupabase pour décider si le cloud
+// est PLUS RICHE que la mémoire locale (donc à ne pas écraser). Métriques
+// volontairement insensibles aux clés méta (_bilanId, etc.) qui ne représentent
+// pas du travail clinique.
+function _countDataUnits(arr) {
+  if (!Array.isArray(arr)) return 0;
+  let n = arr.length;
+  for (const p of arr) {
+    n += (p.bilansSport?.length || 0) + (p.bilansPosturo?.length || 0);
+    for (const bd of [p.bilanData, p.bilanDataPosturo]) {
+      if (!bd) continue;
+      const pa = bd._postureAnalysis || {};
+      for (const vk in pa) n += (pa[vk]?.markers?.filter(m => m && m.nx != null).length) || 0;
+      ['Face','Dos','ProfilG','ProfilD'].forEach(v => { if (bd['_posture'+v] || bd['_posture'+v+'Path']) n += 1; });
+    }
+  }
+  return n;
 }
 
 function _restoreDataURLsAfterPersist(stash) {
