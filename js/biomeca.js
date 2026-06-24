@@ -3231,6 +3231,34 @@ function renderPatientList() {
 }
 
 // ══════════════════════════════════════════════════════
+// #114-export — EXPORT JSON COMPLET (sauvegarde manuelle)
+// ══════════════════════════════════════════════════════
+// L'export contient la donnée structurée RAM : texte clinique, points
+// posturaux (nx/ny + angles), références (Path) des photos posturales/morpho.
+// Les BLOBS photos eux-mêmes restent dans Supabase Storage et NE sont PAS
+// inclus dans ce fichier (volume + cycle de vie distinct du JSON structuré).
+// L'import / restauration est volontairement séparé : opération d'écriture
+// sensible (risque d'écraser la donnée courante), gardée pour une tâche dédiée
+// avec confirmations + bilan préalable des différences.
+function exportAllDataJSON() {
+  try {
+    const payload = { exportedAt: new Date().toISOString(), app: 'BioMéca', patients, praticiens };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const stamp = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    a.href = url;
+    a.download = 'biomeca-sauvegarde-' + stamp + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    alert('✅ Sauvegarde téléchargée : ' + (patients?.length || 0) + ' patient(s) exporté(s).\n\nConservez ce fichier en lieu sûr.');
+  } catch (e) {
+    alert('⚠️ Échec de l\'export : ' + (e?.message || 'erreur inconnue'));
+  }
+}
+
+// ══════════════════════════════════════════════════════
 // PRATICIENS
 // ══════════════════════════════════════════════════════
 function savePraticiens() {

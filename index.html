@@ -523,6 +523,15 @@
       <button onclick="_runBackfillExecution()" class="btn" style="background:#0e1f38;color:#fff;font-size:12px;padding:6px 14px;">🚀 Lancer la migration</button>
     </div>
 
+    <!-- #114-export — Export JSON complet (sauvegarde manuelle) -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle">💾 Sauvegarde de mes données</div>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
+        Téléchargez une copie complète de tous vos patients et bilans (texte clinique, points posturaux, références photos). Conservez-la en lieu sûr et refaites-la régulièrement — c'est votre sauvegarde de secours.
+      </p>
+      <button onclick="exportAllDataJSON()" class="btn" style="background:#0e1f38;color:#fff;font-size:12px;padding:6px 14px;">💾 Exporter toutes mes données</button>
+    </div>
+
     <!-- Modal lock UI pendant la migration (couvre l'écran, empêche tout clic) -->
     <div id="backfill-lock-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;align-items:center;justify-content:center;flex-direction:column;">
       <div style="background:#fff;padding:24px;border-radius:8px;max-width:420px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
