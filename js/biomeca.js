@@ -6808,6 +6808,57 @@ async function _buildAnnotatedPosturePhoto(viewKey, bd, maxWidth) {
   return tmp.toDataURL('image/png');
 }
 
+// #109-A3 — Collecte les vues posturales annotées pour intégration en rapport.
+// Pré-génère 4 vues max (profilG, profilD, face, dos) via Promise.all, filtre
+// les non-null, enrichit chaque entrée du label affichable + de la string HTML
+// du panneau de mesures (`_buildPosturePanelHTML`). Tolérant aux erreurs :
+// try/catch interne → retourne [] si Promise.all échoue. Retourne aussi []
+// si aucune vue n'a de photo + de markers placés.
+async function _collectAnnotatedPostureViews(bd, maxWidth) {
+  if (!bd) return [];
+  const VIEW_LABELS = { profilG: 'Profil gauche', profilD: 'Profil droit', face: 'Face', dos: 'Dos' };
+  const VIEW_ORDER = ['profilG', 'profilD', 'face', 'dos'];
+  const annotatedViews = [];
+  try {
+    const results = await Promise.all(VIEW_ORDER.map(vk =>
+      _buildAnnotatedPosturePhoto(vk, bd, maxWidth).then(dataUrl => ({ vk, dataUrl }))
+    ));
+    results.forEach(r => {
+      if (r.dataUrl) {
+        annotatedViews.push({
+          viewKey:           r.vk,
+          label:             VIEW_LABELS[r.vk],
+          annotatedDataUrl:  r.dataUrl,
+          panelHtml:         _buildPosturePanelHTML(r.vk, bd._postureAnalysis ? bd._postureAnalysis[r.vk] : null),
+        });
+      }
+    });
+  } catch (e) {
+    console.warn('[#109-A3] _collectAnnotatedPostureViews échoué :', e?.message);
+    return [];
+  }
+  return annotatedViews;
+}
+
+// #109-A3 — Construit la string HTML de la grille 2 colonnes des vues
+// posturales annotées. Chaque cellule = label + photo annotée width:100% +
+// panneau de mesures dessous. `break-inside:avoid` limite les coupures intra-
+// cellule à l'impression. Retourne '' si entries vide → le caller peut faire
+// un append direct sans tester la longueur séparément.
+function _buildAnnotatedViewsGridHTML(entries) {
+  if (!entries || entries.length === 0) return '';
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:10px 0;">';
+  entries.forEach(function(entry) {
+    html += '<div style="break-inside:avoid;page-break-inside:avoid;">';
+    html += '<div style="font-size:10px;color:#9ca3af;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;text-align:center;font-weight:700;">'+entry.label+'</div>';
+    html += '<img src="'+entry.annotatedDataUrl+'" style="width:100%;border-radius:4px;display:block;margin-bottom:8px;"/>';
+    if (entry.panelHtml) html += '<div style="font-size:11px;line-height:1.4;color:#1f2937;">'+entry.panelHtml+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 // #109-A1 — Branche profil du dispatcher extraite : retourne le HTML du
 // panneau profil à partir des angles uniquement. Lit `_postureModalPrefix`
 // et `_postureModalViewKey` (module-level) pour câbler les selects courbures
@@ -8709,31 +8760,10 @@ async function buildRapportPosturo() {
   const prat = praticiens.find(pr => pr.id == p.pratId) || {};
   const logo = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
 
-  // #109-A2 — Pré-génération des photos posturales annotées (4 vues max).
-  // Doit précéder le push de la section dans `sections`. Plafond 850px pour
-  // un bon ratio lisibilité (2 photos / ligne en A4) / poids du PDF.
-  // _buildAnnotatedPosturePhoto retourne null si pas de photo ou pas de
-  // markers placés → on ignore silencieusement la vue manquante.
-  const VIEW_LABELS = { profilG: 'Profil gauche', profilD: 'Profil droit', face: 'Face', dos: 'Dos' };
-  const VIEW_ORDER = ['profilG', 'profilD', 'face', 'dos'];
-  const annotatedViews = [];
-  try {
-    const results = await Promise.all(VIEW_ORDER.map(vk =>
-      _buildAnnotatedPosturePhoto(vk, d, 850).then(dataUrl => ({ vk, dataUrl }))
-    ));
-    results.forEach(r => {
-      if (r.dataUrl) {
-        annotatedViews.push({
-          viewKey:           r.vk,
-          label:             VIEW_LABELS[r.vk],
-          annotatedDataUrl:  r.dataUrl,
-          panelHtml:         _buildPosturePanelHTML(r.vk, d._postureAnalysis ? d._postureAnalysis[r.vk] : null),
-        });
-      }
-    });
-  } catch (e) {
-    console.warn('[#109-A2] échec génération photos annotées :', e?.message);
-  }
+  // #109-A2 + A3 — Pré-génération des photos posturales annotées via helper
+  // partagé (extrait pour réutilisation côté rapport sport). 850 px de large
+  // max pour équilibre lisibilité (2 photos/ligne en A4) / poids PDF.
+  const annotatedViews = await _collectAnnotatedPostureViews(d, 850);
 
     let bodyHtml = `<style>\n    *{margin:0;padding:0;box-sizing:border-box;}\n    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}\n    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}\n    @media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.no-print{display:none !important;}.section,.patient-card,.header,.footer{break-inside:avoid;}.img-container,img{break-inside:avoid;page-break-inside:avoid;}.header,.titre-rapport,.patient-card,.section-title,.section-num,.tag,.tag-navy,.tag-ok,.tag-warn,.tag-alert,.footer{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}}\n\n    /* HEADER */\n    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .logo{height:50px;object-fit:contain;}\n    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}\n    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}\n\n    /* BAND */\n    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}\n    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}\n\n    /* PATIENT */\n    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:0;}\n    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}\n    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}\n    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}\n    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}\n    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}\n    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}\n\n    /* METRICS */\n    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}\n    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}\n    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}\n    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}\n\n    /* SECTIONS */\n    .section{margin:0;break-inside:avoid;padding:0 24px;}\n    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}\n    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0.5px;}\n    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .section-line{flex:1;height:1px;background:#eaeaea;}\n    .section-body{padding:0;}\n\n    /* ROWS */\n    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}\n    .item:last-child{border-bottom:none;}\n    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;padding-top:1px;}\n    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}\n    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;line-height:1.4;}\n\n    /* TAGS */\n    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}\n    .tag-navy{background:#e8edf5;color:#0e1f38;}\n    .tag-ok{background:#ecfdf5;color:#065f46;}\n    .tag-warn{background:#fffbeb;color:#92400e;}\n    .tag-alert{background:#fef2f2;color:#991b1b;}\n\n    /* IMAGES */\n    .img-container{position:relative;text-align:center;}\n    .img-base{max-width:100%;border-radius:4px;}\n    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}\n\n    /* FOOTER */\n    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}\n    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}\n\n    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}\n  </style>`;
 const sections = [];
@@ -8865,24 +8895,13 @@ const sections = [];
         profilDImg: document.getElementById(bgIds3[0]) ? document.getElementById(bgIds3[0]).src : null,
         face2Img:   document.getElementById(bgIds3[1]) ? document.getElementById(bgIds3[1]).src : null,
         faceImg:    document.getElementById(bgIds3[2]) ? document.getElementById(bgIds3[2]).src : null,
-        profilGImg: document.getElementById(bgIds3[3]) ? document.getElementById(bgIds3[3]).src : null
+        profilGImg: document.getElementById(bgIds3[3]) ? document.getElementById(bgIds3[3]).src : null,
+        // #109-A4 — Vues posturales annotées intégrées DANS la section
+        // Morphostatique (silhouettes), rendues juste après les silhouettes
+        // par la branche `bonhommes` de _doBuildRapport.
+        annotatedViews: annotatedViews,
       });
     }
-  }
-
-  // #109-A2 — Section « vues annotées » insérée APRÈS les bonhommes morpho :
-  // 2 colonnes, chaque cellule = label (« Profil gauche / droit, Face, Dos »)
-  // + photo annotée (fil à plomb + 14/25/14/30 points) + panneau de mesures
-  // (_buildPosturePanelHTML). Sections non placées (photo absente OU markers
-  // pas placés) déjà filtrées par _buildAnnotatedPosturePhoto → annotatedViews
-  // ne contient QUE les vues exploitables. Skip total si rien à montrer.
-  if (annotatedViews.length > 0) {
-    sections.push({
-      titre: 'Analyse posturale — vues annotées',
-      color: '#7c3aed',
-      type:  'postureViews',
-      entries: annotatedViews,
-    });
   }
 
   // #106-Final Volet 1 — l'analyse posturale profil n'est plus insérée dans le
@@ -9406,25 +9425,22 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
         bodyHtml += '</div>';
       });
       bodyHtml += '</div>';
+      // #109-A4 — Vues posturales annotées injectées dans la MÊME section
+      // Morphostatique (silhouettes), juste après les 4 bonhommes. Sous-titre
+      // pour distinguer visuellement du bloc silhouettes. Skip total si pas
+      // de vues placées (helper retourne '').
+      if (s.annotatedViews && s.annotatedViews.length > 0) {
+        bodyHtml += '<div style="margin-top:10px;break-inside:avoid;">';
+        bodyHtml += '<div style="font-size:11px;font-weight:700;color:#0e1f38;margin-bottom:6px;">📐 Analyse posturale — vues annotées</div>';
+        bodyHtml += _buildAnnotatedViewsGridHTML(s.annotatedViews);
+        bodyHtml += '</div>';
+      }
     } else if(s.type === 'pieds') {
       if(s.piedsImg) {
         bodyHtml += '<div style="text-align:center;padding:10px 0;">';
         bodyHtml += '<img src="'+s.piedsImg+'" style="max-width:60%;border-radius:4px;display:block;margin:0 auto;"/>';
         bodyHtml += '</div>';
       }
-    } else if(s.type === 'postureViews') {
-      // #109-A2 — Grille 2 colonnes des vues annotées. Chaque cellule garde
-      // sa photo grande (width:100% du tiers de page) + le panneau de mesures
-      // au-dessous. break-inside:avoid limite les coupures de page intra-cellule.
-      bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:10px 0;">';
-      s.entries.forEach(function(entry) {
-        bodyHtml += '<div style="break-inside:avoid;page-break-inside:avoid;">';
-        bodyHtml += '<div style="font-size:10px;color:#9ca3af;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;text-align:center;font-weight:700;">'+entry.label+'</div>';
-        bodyHtml += '<img src="'+entry.annotatedDataUrl+'" style="width:100%;border-radius:4px;display:block;margin-bottom:8px;"/>';
-        if (entry.panelHtml) bodyHtml += '<div style="font-size:11px;line-height:1.4;color:#1f2937;">'+entry.panelHtml+'</div>';
-        bodyHtml += '</div>';
-      });
-      bodyHtml += '</div>';
     } else if(s.type === 'img') {
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-width:70%;border-radius:4px;display:block;margin:0 auto;"/></div>';
     } else if(s.type === 'empreinte') {
@@ -9525,12 +9541,17 @@ async function buildRapport() {
   const prat = praticiens.find(pr => pr.id == p.pratId)
     || (praticiens.length === 1 ? praticiens[0] : {});
 
+  // #109-A3 — Pré-génère les vues posturales annotées (helper partagé avec
+  // le rapport posturo). Plafond 850 px (cohérent avec A2). Tolérant aux
+  // erreurs : helper retourne [] sur échec, la section est alors absente.
+  const annotatedViews = await _collectAnnotatedPostureViews(p.bilanData || {}, 850);
+
   // #88-B Chaînage : composites #98 + fiches annexes 88-B. Pas de window.print()
   // dans buildRapport (aperçu écran uniquement) — l'utilisateur peut voir les
   // annexes en faisant défiler l'aperçu.
   _resolveSportRapportImages(p.bilanData || {}, composites => {
     _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews);
 
       // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
       // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
@@ -10016,7 +10037,10 @@ function _resolvePosturoFichesImages(d, callback) {
 // (buildBilanPrintSection — qui contient désormais la synthèse clinique en clôture).
 // #98 — composites propagé à buildBilanPrintSection (canvas morpho/pieds).
 // #88-B — fichesPages propagé en suffixe bodyHTML (annexes 1 page par dataURL).
-function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = []) {
+// #109-A3 — annotatedViews (déjà collectées via _collectAnnotatedPostureViews
+// par les call-sites buildRapport / printReport) propagées en injection sous
+// bilanSection (voisinage de la synthèse clinique posturale).
+function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [], annotatedViews = []) {
   // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
@@ -10061,8 +10085,10 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
 
   // Bilan clinique (sections cliniques + synthèse clinique en clôture #86 Point 2)
   // #98 — composites propagés à buildBilanPrintSection (PNG composites morpho/pieds).
+  // #109-A4 — annotatedViews propagées : injectées DANS la sous-section
+  // Bilan Morphostatique de buildBilanPrintSection (cohérent avec posturo).
   const bilanSection = (typeof buildBilanPrintSection === 'function' && p && p.bilanData)
-    ? buildBilanPrintSection(p.bilanData, composites) : '';
+    ? buildBilanPrintSection(p.bilanData, composites, annotatedViews) : '';
 
   // #88-B Annexes PDF fiches d'exercices — 1 page imprimable par dataURL retourné
   // par _resolveSportFichesImages (déjà aplaties multi-pages). page-break-before
@@ -10073,6 +10099,9 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
     `<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="${dataURL}" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>`
   ).join('');
 
+  // #109-A4 — Les vues posturales annotées sont désormais injectées DANS la
+  // sous-section Bilan Morphostatique (cf. buildBilanPrintSection ci-dessus),
+  // juste après les silhouettes. Plus de bloc séparé entre bilanSection et annexes.
   const bodyHTML = sectionsHTML + concluHTML + bilanSection + annexesHTML;
   return { pratHTML, patientHTML, bodyHTML };
 }
@@ -10103,6 +10132,10 @@ async function printReport() {
   const prat = praticiens.find(pr => pr.id == p.pratId)
     || (praticiens.length === 1 ? praticiens[0] : {});
 
+  // #109-A3 — Pré-génère les vues posturales annotées avant le chaînage
+  // composites/fiches. Plafond 850 px (cohérent avec A2). Tolérant aux erreurs.
+  const annotatedViews = await _collectAnnotatedPostureViews(p.bilanData || {}, 850);
+
   // #88-B Chaînage : composites canvas (#98) PUIS fiches PDF annexes (88-B) AVANT
   // build + injection + window.print(). Imbrication intentionnelle (pas Promise.all)
   // pour garder le pattern callback existant + éviter la complexité async/await à
@@ -10111,7 +10144,7 @@ async function printReport() {
     _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
       // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
       // (source unique commune avec buildRapport, parité visuelle garantie).
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews);
       document.getElementById('rp-prat-block').innerHTML = pratHTML;
       document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
       document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
@@ -10128,7 +10161,10 @@ async function printReport() {
   });
 }
 
-function buildBilanPrintSection(bd, composites = {}) {
+// #109-A4 — annotatedViews (3ᵉ param) : vues posturales annotées injectées
+// DANS la sous-section Bilan Morphostatique, juste après les 4 silhouettes.
+// Cohérent avec le rapport posturo (#109-A4 même placement).
+function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
   if(!bd||!Object.keys(bd).length) return '';
   const f = (k,def) => (bd[k]!==undefined && bd[k]!=='' && bd[k]!==null) ? bd[k] : (def||'—');
   const yn = (k) => bd[k]==='oui'
@@ -10191,8 +10227,12 @@ function buildBilanPrintSection(bd, composites = {}) {
   h += '</table>';
 
   // ─── BILAN MORPHOSTATIQUE ───
+  // #109-A4 — La section est désormais visible si silhouettes OU chaîne
+  // musculaire OU vues posturales annotées : les vues annotées sont
+  // intégrées dans cette même section après les silhouettes.
   const hasMorpho = bd._morpho_face||bd._morpho_face2||bd._morpho_profilG||bd._morpho_profilD;
-  if(hasMorpho||bd.chaine_musculaire) {
+  const hasAnnotatedViews = annotatedViews && annotatedViews.length > 0;
+  if(hasMorpho||bd.chaine_musculaire||hasAnnotatedViews) {
     h += sec('Bilan Morphostatique');
     // #98 Option B — toujours rendre les 4 silhouettes quand la section est visible.
     // Source par vue : composites[k] (composite gabarit + dessin user) si pré-résolu,
@@ -10210,6 +10250,15 @@ function buildBilanPrintSection(bd, composites = {}) {
     });
     h += '</div>';
     if(bd.chaine_musculaire) h += '<p style="font-size:9px;"><strong>Hypothèse chaîne musculaire:</strong> '+bd.chaine_musculaire+'</p>';
+    // #109-A4 — Vues posturales annotées injectées DANS la sous-section
+    // Morphostatique, juste après les silhouettes. Sous-titre pour distinguer
+    // visuellement du bloc silhouettes. Skip si pas de vues placées.
+    if (hasAnnotatedViews) {
+      h += '<div style="margin-top:10px;break-inside:avoid;page-break-inside:avoid;">';
+      h += '<div style="font-size:11px;font-weight:700;color:#0e1f38;margin-bottom:6px;">📐 Analyse posturale — vues annotées</div>';
+      h += _buildAnnotatedViewsGridHTML(annotatedViews);
+      h += '</div>';
+    }
   }
 
   // ─── NEUROLOGIE FONCTIONNELLE ───
