@@ -6469,7 +6469,10 @@ function _buildPostureProfilSectionsSynthese(d) {
 // « (à G) » en orange si hors seuil neutre, « (neutre) » en vert sinon.
 // Pas de classification éditable à ce stade (étape 3 = POSTURE_THRESHOLDS.face
 // configurable + selects), juste affichage des valeurs et de l'inclinaison.
-function _renderFacePlacementResults(panel, f) {
+// #109-A1 — Signature refactorée : retourne une string HTML au lieu d'écrire
+// directement `panel.innerHTML`. Le dispatcher (`_renderPosturePlacementResults`)
+// et l'helper unifié (`_buildPosturePanelHTML`) consomment la string.
+function _renderFacePlacementResults(f) {
   // #108 Étape 3a — seuils lus depuis POSTURE_THRESHOLDS.face (configurables
   // depuis Paramètres). Les anciennes constantes inline (étape 2) ont été
   // promues dans POSTURE_THRESHOLDS_DEFAULTS.face.
@@ -6526,7 +6529,7 @@ function _renderFacePlacementResults(panel, f) {
     : '';
   // Conclusion (latéralisation par étage).
   const conclusionText = _buildFaceConclusion(f) || 'Alignement global — pas de latéralisation marquée';
-  panel.innerHTML = `
+  return `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
       <div>
         <div style="${groupHdr}">Tête</div>
@@ -6567,7 +6570,8 @@ function _renderFacePlacementResults(panel, f) {
 // Seuils inline provisoires — à promouvoir en POSTURE_THRESHOLDS.dos à
 // l'étape 3a. Les 4 décalages rachis sont en % de la largeur d'épaules,
 // avec un encart « Apex / Convexité » dérivé directement de l'angles.rachis*.
-function _renderDosPlacementResults(panel, d) {
+// #109-A1 — Même refactor que face : signature angles seul, retour string.
+function _renderDosPlacementResults(d) {
   // #108 Dos étape 3a — seuils lus depuis POSTURE_THRESHOLDS.dos (configurables
   // depuis Paramètres). Mapping : tete→tete, ligne épaules + asymétrie scapulas
   // → epaules, bascule→bassin, orientation scapulaire → scapulaMin/scapulaMax,
@@ -6637,7 +6641,7 @@ function _renderDosPlacementResults(panel, d) {
     ? `<div style="margin-top:3px;font-size:11px;color:#666;">2ᵉ courbure : ${d.rachisSecondaire.region} (${d.rachisSecondaire.apex}) → convexité ${d.rachisSecondaire.convexite}</div>`
     : '';
   const conclusionText = _buildDosConclusion(d) || 'Rachis aligné — pas de déviation marquée';
-  panel.innerHTML = `
+  return `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
       <div>
         <div style="${groupHdr}">Tête</div>
@@ -6688,27 +6692,118 @@ function _renderDosPlacementResults(panel, d) {
 // Panneau résultats sous le bandeau : 4 angles + global. Recalculé à chaque
 // _redrawPostureModal (live durant drag) ET à chaque _renderPostureMarkerList
 // (changement de sélection/placement). Vert si +, rouge si −, gris si null.
+// #109-A1 — Dispatcher de panneau modal : route selon viewKey vers la fonction
+// de rendu correspondante (face/dos/profilG/profilD), puis injecte la string
+// HTML dans le DOM. Les 3 sous-fonctions retournent la string ; le dispatcher
+// est l'unique site qui touche `panel.innerHTML` côté modale.
 function _renderPosturePlacementResults() {
   const panel = document.getElementById('posture-placement-results');
   if (!panel) return;
-  // #108 Étape 2 — branche face : _computeFaceAngles (11 mesures) + groupes
-  // structurés. Libellés de sens vert (neutre) / orange (hors zone) inline,
-  // mêmes conventions que le profil (étape 3 pour classification éditable).
   if (_postureModalViewKey === 'face') {
     const f = _computeFaceAngles(_postureModalMarkers, _postureCalibration);
-    _renderFacePlacementResults(panel, f);
+    panel.innerHTML = _renderFacePlacementResults(f);
     return;
   }
-  // #108 Dos étape 2 — branche dos : _computeDosAngles (mesures vue postérieure)
-  // + groupes structurés (Tête, Épaules/Scapulas, Rachis avec apex/convexité,
-  // Bassin, Membre inférieur, Conclusion). Mêmes conventions visuelles que la
-  // face, libellés vert (neutre) / orange (hors-zone).
   if (_postureModalViewKey === 'dos') {
     const dd = _computeDosAngles(_postureModalMarkers, _postureCalibration);
-    _renderDosPlacementResults(panel, dd);
+    panel.innerHTML = _renderDosPlacementResults(dd);
     return;
   }
   const a = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  panel.innerHTML = _renderProfilPlacementResults(a);
+}
+
+// #109-A1 — Helper unifié pour rendre un panneau à partir d'un objet analysis
+// persisté (`bd._postureAnalysis[viewKey]`). Réutilisable en rapport sans
+// dépendre du contexte modale. Retourne '' si l'analyse ou ses angles manquent.
+function _buildPosturePanelHTML(viewKey, analysis) {
+  if (!analysis || !analysis.angles) return '';
+  if (viewKey === 'face') return _renderFacePlacementResults(analysis.angles);
+  if (viewKey === 'dos')  return _renderDosPlacementResults(analysis.angles);
+  if (viewKey === 'profilG' || viewKey === 'profilD') return _renderProfilPlacementResults(analysis.angles);
+  return '';
+}
+
+// #109-A1 — Construit une photo posturale annotée (PNG dataURL) à partir du
+// dataURL de la photo brute + des markers normalisés persistés. Réutilise
+// `_drawPosturePlumb` + `_drawMarkersOnly` (helpers partagés modale/rapport).
+// Étapes :
+//   1) Résout le dataURL : bd[_postureXxx] direct, ou prefetch depuis path Storage.
+//   2) Lit `bd._postureAnalysis[viewKey]` ; sans markers placés → null (le
+//      caller affichera la photo brute non annotée).
+//   3) Charge l'image en pleine résolution native, draw sur canvas tmp.
+//   4) Reconstruit des markers locaux : template (couleurs) + nx/ny denormalisés.
+//      Idem calibration.
+//   5) Délègue le tracé aux helpers partagés, retourne le PNG.
+// Retourne null si photo absente, markers non placés, ou erreur de chargement.
+async function _buildAnnotatedPosturePhoto(viewKey, bd) {
+  if (!bd || !viewKey) return null;
+  const keyName = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
+  let dataUrl = bd[keyName];
+  if (!dataUrl) {
+    const path = bd[keyName + 'Path'];
+    if (path && typeof prefetchPhotoToDataUrl === 'function') {
+      try {
+        const r = await prefetchPhotoToDataUrl(path);
+        if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
+      } catch (e) { /* silencieux : on retombe sur null si la photo brute manque */ }
+    }
+  }
+  if (!dataUrl) return null;
+  const analysis = bd._postureAnalysis && bd._postureAnalysis[viewKey];
+  if (!analysis || !Array.isArray(analysis.markers)) return null;
+  const placedCount = analysis.markers.filter(m => m.nx != null && m.ny != null).length;
+  if (placedCount === 0) return null;
+  // Charge l'image — Promise wrapper sur Image.onload pour await propre.
+  let img;
+  try {
+    img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('failed to load posture image'));
+      i.src = dataUrl;
+    });
+  } catch (e) {
+    console.warn('[#109-A1] _buildAnnotatedPosturePhoto — chargement image échoué :', e?.message);
+    return null;
+  }
+  const W = img.naturalWidth, H = img.naturalHeight;
+  if (W <= 0 || H <= 0) return null;
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  const ctx = tmp.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  // Reconstruit les markers locaux : on part du template (qui porte les couleurs
+  // + side originaux) et on injecte les coords sauvegardées par NOM (résilient
+  // au réordo / renommage futur, miroir openPosturePlacementModal L5786).
+  const template = cloneMarkers(_postureTemplateName(viewKey));
+  const savedByName = Object.fromEntries(analysis.markers.map(m => [m.name, m]));
+  const localMarkers = template.map(t => {
+    const s = savedByName[t.name];
+    return {
+      ...t,
+      x: s && s.nx != null ? s.nx * W : null,
+      y: s && s.ny != null ? s.ny * H : null,
+    };
+  });
+  const savedCalib = analysis.calibration;
+  const localCalib = (savedCalib && (savedCalib.p1 || savedCalib.p2)) ? {
+    p1: savedCalib.p1 && savedCalib.p1.nx != null
+      ? { x: savedCalib.p1.nx * W, y: savedCalib.p1.ny * H } : null,
+    p2: savedCalib.p2 && savedCalib.p2.nx != null
+      ? { x: savedCalib.p2.nx * W, y: savedCalib.p2.ny * H } : null,
+  } : null;
+  _drawPosturePlumb(ctx, W, H, localMarkers, localCalib, viewKey);
+  _drawMarkersOnly(ctx, tmp, localMarkers, -1);
+  return tmp.toDataURL('image/png');
+}
+
+// #109-A1 — Branche profil du dispatcher extraite : retourne le HTML du
+// panneau profil à partir des angles uniquement. Lit `_postureModalPrefix`
+// et `_postureModalViewKey` (module-level) pour câbler les selects courbures
+// — en hors-modale (rapport), ces globales sont null et `renderCurveSelect`
+// retourne '' silencieusement (panneau rendu sans selects, comportement OK).
+function _renderProfilPlacementResults(a) {
   // #85-2d — fmt signé (bleu = +, rouge = −, gris = null) pour antériorisation/
   // bassin/épaules ; fmt unsigned pour CVA/courbures/genouFlexion (pas de signe
   // sémantique au niveau de la valeur brute — la classification viendra plus tard).
@@ -6780,7 +6875,7 @@ function _renderPosturePlacementResults() {
   // aligné ; on ajoute ici le texte fallback spécifique à l'affichage modale.
   const conclusionText = _buildPostureConclusion(a)
     || 'Alignement global — pas de tendance antérieure/postérieure marquée';
-  panel.innerHTML = `
+  return `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;width:100%;font-size:12px;line-height:1.55;">
       <div>
         <div style="${groupHdr}">Antériorisation / Postériorisation</div>
@@ -6884,63 +6979,74 @@ function _drawMarkersOnly(ctx, canvas, markers, selIdx) {
 // que le hit-test reste précis et que les labels restent lisibles). Appelé à
 // chaque mouvement/placement (équivalent du startLiveDraw pour mesures, mais
 // déclenché par événement au lieu de rAF — la photo est statique).
-function _redrawPostureModal() {
-  if (!_postureModalCanvas || !_postureModalImg || !_postureModalCtx) return;
-  const ctx = _postureModalCtx;
-  const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
-  ctx.drawImage(_postureModalImg, 0, 0);
-  // #85-2c-angles + #108 — fil à plomb gris-bleu neutre passant par l'ancrage
-  // du repère « cheville ». Profil : Réf. cheville (unique). Face : milieu
-  // (Cheville D, Cheville G). Dos : milieu(Calcanéum inférieur D, Calcanéum
-  // inférieur G) (équivalent postérieur du repère cheville en face).
-  // Pour face et dos, si une moitié de la paire manque → pas d'ancre (idem face).
+// #109-A1 — Helper partagé du tracé fil à plomb (gris-bleu neutre) + ligne
+// de calibration sol (orange tiretée). Réutilisé par la modale ET par
+// `_buildAnnotatedPosturePhoto` (rapports). Ancrage du plomb par vue :
+//   face   → milieu(Cheville D, Cheville G)
+//   dos    → milieu(Calcanéum inférieur D, Calcanéum inférieur G)
+//   profil → Réf. cheville
+// Si la paire / le point manque → pas d'ancre, pas de plomb dessiné.
+// `markers` portent x/y en pixel dans le repère du canvas cible ; `calibration`
+// idem (objets { p1: {x,y} | null, p2: {x,y} | null } | null). Le helper ne
+// dépend d'aucune globale — entièrement portable hors modale.
+function _drawPosturePlumb(ctx, W, H, markers, calibration, viewKey) {
   let plumbAnchor = null;
-  if (_postureModalViewKey === 'face') {
-    const chD = _postureModalMarkers.find(m => m.name === 'Cheville D');
-    const chG = _postureModalMarkers.find(m => m.name === 'Cheville G');
+  if (viewKey === 'face') {
+    const chD = markers.find(m => m.name === 'Cheville D');
+    const chG = markers.find(m => m.name === 'Cheville G');
     if (chD && chD.x !== null && chD.y !== null && chG && chG.x !== null && chG.y !== null) {
       plumbAnchor = { x: (chD.x + chG.x) / 2, y: (chD.y + chG.y) / 2 };
     }
-  } else if (_postureModalViewKey === 'dos') {
-    const cD = _postureModalMarkers.find(m => m.name === 'Calcanéum inférieur D');
-    const cG = _postureModalMarkers.find(m => m.name === 'Calcanéum inférieur G');
+  } else if (viewKey === 'dos') {
+    const cD = markers.find(m => m.name === 'Calcanéum inférieur D');
+    const cG = markers.find(m => m.name === 'Calcanéum inférieur G');
     if (cD && cD.x !== null && cD.y !== null && cG && cG.x !== null && cG.y !== null) {
       plumbAnchor = { x: (cD.x + cG.x) / 2, y: (cD.y + cG.y) / 2 };
     }
   } else {
-    const cheville = _postureModalMarkers.find(m => m.name === 'Réf. cheville');
+    const cheville = markers.find(m => m.name === 'Réf. cheville');
     if (cheville && cheville.x !== null && cheville.y !== null) {
       plumbAnchor = { x: cheville.x, y: cheville.y };
     }
   }
+  // Vecteur plumb_up depuis la calibration (pure, pas d'accès _postureCalibration).
+  let plumbUp = { x: 0, y: -1 };
+  if (calibration && calibration.p1 && calibration.p2) {
+    const dx = calibration.p2.x - calibration.p1.x;
+    const dy = calibration.p2.y - calibration.p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      let perp = { x: -dy / len, y: dx / len };
+      if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+      plumbUp = perp;
+    }
+  }
   if (plumbAnchor) {
-    const up = _getPostureModalPlumbUp();
     const t = Math.max(W, H) * 2;
     ctx.save();
     ctx.strokeStyle = 'rgba(100,116,139,0.75)';
     ctx.lineWidth = Math.max(1.5, W / 400);
     ctx.beginPath();
-    ctx.moveTo(plumbAnchor.x - up.x * t, plumbAnchor.y - up.y * t);
-    ctx.lineTo(plumbAnchor.x + up.x * t, plumbAnchor.y + up.y * t);
+    ctx.moveTo(plumbAnchor.x - plumbUp.x * t, plumbAnchor.y - plumbUp.y * t);
+    ctx.lineTo(plumbAnchor.x + plumbUp.x * t, plumbAnchor.y + plumbUp.y * t);
     ctx.stroke();
     ctx.restore();
   }
-  // #85-2c-angles — ligne calibration sol (orange tireté) + 2 puces orange.
-  // Distinct des 14 points (couleur réservée). Affichée même partiellement
-  // placée (1 puce seulement) pour feedback intermédiaire.
-  if (_postureCalibration && (_postureCalibration.p1 || _postureCalibration.p2)) {
+  // Calibration sol — affichée même partiellement placée (1 puce seulement)
+  // pour feedback intermédiaire en modale ; intégrée à la photo annotée.
+  if (calibration && (calibration.p1 || calibration.p2)) {
     ctx.save();
-    if (_postureCalibration.p1 && _postureCalibration.p2) {
+    if (calibration.p1 && calibration.p2) {
       ctx.strokeStyle = 'rgba(249,115,22,0.9)';
       ctx.lineWidth = Math.max(1.5, W / 400);
       ctx.setLineDash([Math.max(6, W / 100), Math.max(3, W / 200)]);
       ctx.beginPath();
-      ctx.moveTo(_postureCalibration.p1.x, _postureCalibration.p1.y);
-      ctx.lineTo(_postureCalibration.p2.x, _postureCalibration.p2.y);
+      ctx.moveTo(calibration.p1.x, calibration.p1.y);
+      ctx.lineTo(calibration.p2.x, calibration.p2.y);
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    [_postureCalibration.p1, _postureCalibration.p2].forEach(p => {
+    [calibration.p1, calibration.p2].forEach(p => {
       if (!p) return;
       ctx.beginPath();
       ctx.arc(p.x, p.y, Math.max(5, W / 90), 0, 2 * Math.PI);
@@ -6952,6 +7058,16 @@ function _redrawPostureModal() {
     });
     ctx.restore();
   }
+}
+
+function _redrawPostureModal() {
+  if (!_postureModalCanvas || !_postureModalImg || !_postureModalCtx) return;
+  const ctx = _postureModalCtx;
+  const W = _postureModalCanvas.width, H = _postureModalCanvas.height;
+  ctx.drawImage(_postureModalImg, 0, 0);
+  // #109-A1 — Plomb + calibration déléguées à `_drawPosturePlumb` (helper
+  // partagé avec `_buildAnnotatedPosturePhoto`).
+  _drawPosturePlumb(ctx, W, H, _postureModalMarkers, _postureCalibration, _postureModalViewKey);
   _drawMarkersOnly(ctx, _postureModalCanvas, _postureModalMarkers, _postureModalSelIdx);
   // Résultats live : recalculés à chaque redraw → mise à jour fluide pendant drag.
   _renderPosturePlacementResults();
