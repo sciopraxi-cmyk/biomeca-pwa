@@ -6940,6 +6940,10 @@ async function _buildAnnotatedPosturePhoto(viewKey, bd, maxWidth) {
       ? { x: savedCalib.p2.nx * W, y: savedCalib.p2.ny * H } : null,
   } : null;
   _drawPosturePlumb(ctx, W, H, localMarkers, localCalib, viewKey);
+  // #109-B — Lignes de mesure 2 couleurs (rouge hors-norme / vert dans-norme).
+  // Utilise les angles stockés dans `analysis` (sauvegardés lors de la
+  // dernière édition modale → pas de recalcul nécessaire en rapport).
+  _drawPostureLines(ctx, W, H, localMarkers, localCalib, viewKey, analysis.angles);
   _drawMarkersOnly(ctx, tmp, localMarkers, -1);
   return tmp.toDataURL('image/png');
 }
@@ -7257,6 +7261,134 @@ function _drawPosturePlumb(ctx, W, H, markers, calibration, viewKey) {
   }
 }
 
+// #109-B — Lignes de mesure 2 couleurs (rouge = hors-norme / vert = dans-norme).
+// Dessinées entre `_drawPosturePlumb` et `_drawMarkersOnly` pour que les
+// marqueurs (pastilles) restent au-dessus. Chaque segment prend la couleur de
+// SA mesure : on s'appuie sur `_classifyPostureAngles` (profil) ou un compare
+// direct au seuil POSTURE_THRESHOLDS (face/dos) pour décider rouge vs vert.
+// Helper `over(v, s)` : true si v existe et |v| > s. `col(hn)` : RED si hors-
+// norme, GREEN sinon. `seg(a, b, c)` trace une ligne avec gap-safe (au moins
+// un point manquant → skip). `poly(names, c)` chaîne plusieurs points avec
+// `prev=null` pour reprendre proprement après un trou. `dashSeg` pour les
+// translations (face : Fourchette/EIAS → projection sur le plomb).
+function _drawPostureLines(ctx, W, H, markers, calibration, viewKey, angles) {
+  const RED = 'rgba(220,38,38,0.95)';
+  const GREEN = 'rgba(22,163,74,0.95)';
+  const HALO = 'rgba(255,255,255,0.7)';
+  const lineWidth = Math.max(2.5, W / 240);
+  const haloWidth = lineWidth + Math.max(2, W / 170);
+  const byName = Object.fromEntries(markers.map(m => [m.name, m]));
+  const pt = (name) => {
+    const m = byName[name];
+    return (m && m.x !== null && m.y !== null) ? { x: m.x, y: m.y } : null;
+  };
+  const over = (v, s) => v != null && !isNaN(v) && Math.abs(v) > s;
+  const col = (hn) => hn ? RED : GREEN;
+  const strokeLine = (a, b, color, width, dash) => {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    if (dash) ctx.setLineDash(dash); else ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.restore();
+  };
+  const seg = (aName, bName, color) => {
+    const a = pt(aName), b = pt(bName);
+    if (!a || !b) return;
+    strokeLine(a, b, HALO,  haloWidth, null);
+    strokeLine(a, b, color, lineWidth, null);
+  };
+  const poly = (names, color) => {
+    // Deux passes : halo blanc plein dessous, trait coloré dessus. On résout
+    // d'abord la chaîne de segments (gap-safe via prev=null) puis on stroke
+    // chaque segment en halo + couleur — évite que le halo d'un segment écrase
+    // la couleur d'un segment voisin.
+    const pairs = [];
+    let prev = null;
+    names.forEach((name) => {
+      const p = pt(name);
+      if (!p) { prev = null; return; }
+      if (prev) pairs.push([prev, p]);
+      prev = p;
+    });
+    pairs.forEach(([a, b]) => strokeLine(a, b, HALO,  haloWidth, null));
+    pairs.forEach(([a, b]) => strokeLine(a, b, color, lineWidth, null));
+  };
+  const dashSeg = (p, q, color) => {
+    if (!p || !q) return;
+    const dashPattern = [Math.max(4, W / 150), Math.max(3, W / 250)];
+    // Halo en plein (non tireté) pour mieux ressortir sous le tireté coloré.
+    strokeLine(p, q, HALO,  haloWidth, null);
+    strokeLine(p, q, color, lineWidth, dashPattern);
+  };
+  if (!angles) return;
+  if (viewKey === 'profilG' || viewKey === 'profilD' || viewKey === 'profil') {
+    const cls = _classifyPostureAngles(angles, POSTURE_THRESHOLDS);
+    const tend = (k) => cls && cls[k] && cls[k].tendance && cls[k].tendance !== 'normes';
+    poly(['Base crâne', 'Apex cervical', 'C7'],            col(tend('cervicale')));
+    poly(['C7', 'Apex thoracique', 'T12'],                 col(tend('thoracique')));
+    poly(['T12', 'Apex lombaire', 'Base sacrum'],          col(tend('lombaire')));
+    seg('C7', 'Tragus',                                    col(tend('cva')));
+    return;
+  }
+  if (viewKey === 'face') {
+    const Tf = POSTURE_THRESHOLDS.face;
+    seg('Acromion D',     'Acromion G',     col(over(angles.ligneEpaules,  Tf.epaules)));
+    seg('EIAS D',         'EIAS G',         col(over(angles.basculeBassin, Tf.bassin)));
+    seg('Oreille sup D',  'Oreille sup G',  col(over(angles.inclinaisonTete, Tf.tete)));
+    poly(['Tête fémorale D', 'Genou D', 'Cheville D'], col(over(angles.valgumVarumD, Tf.valgumVarum)));
+    poly(['Tête fémorale G', 'Genou G', 'Cheville G'], col(over(angles.valgumVarumG, Tf.valgumVarum)));
+    // Translations — projection perpendiculaire sur le fil à plomb ancré au
+    // milieu des chevilles. plumb_up vient de la calibration (sinon { 0, -1 }).
+    let plumbUp = { x: 0, y: -1 };
+    if (calibration && calibration.p1 && calibration.p2) {
+      const dx = calibration.p2.x - calibration.p1.x;
+      const dy = calibration.p2.y - calibration.p1.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 0) {
+        let perp = { x: -dy / len, y: dx / len };
+        if (perp.y > 0) perp = { x: -perp.x, y: -perp.y };
+        plumbUp = perp;
+      }
+    }
+    const chD = pt('Cheville D'), chG = pt('Cheville G');
+    const anchor = (chD && chG) ? { x: (chD.x + chG.x) / 2, y: (chD.y + chG.y) / 2 } : null;
+    const footOf = (p) => {
+      if (!p || !anchor) return null;
+      const v = { x: p.x - anchor.x, y: p.y - anchor.y };
+      const along = v.x * plumbUp.x + v.y * plumbUp.y;
+      return { x: anchor.x + plumbUp.x * along, y: anchor.y + plumbUp.y * along };
+    };
+    const fourchette = pt('Fourchette sternale');
+    dashSeg(fourchette, footOf(fourchette), col(over(angles.translationThorax, Tf.translation)));
+    const eD = pt('EIAS D'), eG = pt('EIAS G');
+    const midEIAS = (eD && eG) ? { x: (eD.x + eG.x) / 2, y: (eD.y + eG.y) / 2 } : null;
+    dashSeg(midEIAS, footOf(midEIAS), col(over(angles.translationBassin, Tf.translation)));
+    return;
+  }
+  if (viewKey === 'dos') {
+    const Td = POSTURE_THRESHOLDS.dos;
+    // Rachis : verdict global = apex au-dessus du seuil rachis (= scoliose).
+    const rachisHN = !!(angles.rachisApex && angles.rachisOffsets
+      && over(angles.rachisOffsets[angles.rachisApex], Td.rachis));
+    poly([
+      'Base du crâne', 'Épineuse C3', 'Épineuse C7',
+      'Épineuse TH3', 'Épineuse TH6', 'Épineuse TH12',
+      'Épineuse L3', 'Base du sacrum',
+    ], col(rachisHN));
+    seg('Acromion D', 'Acromion G', col(over(angles.ligneEpaules,  Td.epaules)));
+    seg('EIPS D',     'EIPS G',     col(over(angles.basculeBassin, Td.bassin)));
+    poly(['Genou D', 'Mi-mollet D', 'Calcanéum supérieur D'], col(over(angles.axeJambierD, Td.axeJambier)));
+    poly(['Genou G', 'Mi-mollet G', 'Calcanéum supérieur G'], col(over(angles.axeJambierG, Td.axeJambier)));
+    seg('Calcanéum supérieur D', 'Calcanéum inférieur D', col(over(angles.angleCalcaneenD, Td.calcaneen)));
+    seg('Calcanéum supérieur G', 'Calcanéum inférieur G', col(over(angles.angleCalcaneenG, Td.calcaneen)));
+    return;
+  }
+}
+
 function _redrawPostureModal() {
   if (!_postureModalCanvas || !_postureModalImg || !_postureModalCtx) return;
   const ctx = _postureModalCtx;
@@ -7265,6 +7397,17 @@ function _redrawPostureModal() {
   // #109-A1 — Plomb + calibration déléguées à `_drawPosturePlumb` (helper
   // partagé avec `_buildAnnotatedPosturePhoto`).
   _drawPosturePlumb(ctx, W, H, _postureModalMarkers, _postureCalibration, _postureModalViewKey);
+  // #109-B — Lignes de mesure 2 couleurs. Recalcul des angles à chaque redraw
+  // (live update pendant drag : la couleur suit immédiatement la position).
+  let liveAngles = null;
+  if (_postureModalViewKey === 'face') {
+    liveAngles = _computeFaceAngles(_postureModalMarkers, _postureCalibration);
+  } else if (_postureModalViewKey === 'dos') {
+    liveAngles = _computeDosAngles(_postureModalMarkers, _postureCalibration);
+  } else {
+    liveAngles = _computePostureAngles(_postureModalMarkers, _postureCalibration);
+  }
+  _drawPostureLines(ctx, W, H, _postureModalMarkers, _postureCalibration, _postureModalViewKey, liveAngles);
   _drawMarkersOnly(ctx, _postureModalCanvas, _postureModalMarkers, _postureModalSelIdx);
   // Résultats live : recalculés à chaque redraw → mise à jour fluide pendant drag.
   _renderPosturePlacementResults();
