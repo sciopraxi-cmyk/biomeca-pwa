@@ -533,12 +533,16 @@ async function loadSupabaseData() {
     const flagsMigrated = migrateBilanFlags(patients);
     if(migrated || flagsMigrated) { console.log('Migration bilans OK'); savePatients(); }
   } catch(e) {
-    // Fallback localStorage si Supabase indisponible
-    patients = JSON.parse(localStorage.getItem('bm4-patients-pwa') || '[]');
-    praticiens = JSON.parse(localStorage.getItem('bm4-praticiens-pwa') || '[]');
+    // Fallback localStorage si Supabase indisponible.
+    // #65 — clé localStorage unifiée sur bm4-patients/bm4-praticiens : le
+    // fallback lit désormais la même clé que savePatients écrit (avant : -pwa,
+    // écrite seulement sur échec Supabase → périmée → écrasait la bonne
+    // version au reload hors-ligne).
+    patients = JSON.parse(localStorage.getItem('bm4-patients') || '[]');
+    praticiens = JSON.parse(localStorage.getItem('bm4-praticiens') || '[]');
     // Migration #39 sur le fallback aussi
     if (migrateBilanFlags(patients)) {
-      try { localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients)); } catch(_) {}
+      try { localStorage.setItem('bm4-patients', JSON.stringify(patients)); } catch(_) {}
     }
     _dataLoaded = true;  // Task #64 — fallback considéré comme valide, saves autorisés
   }
@@ -577,8 +581,9 @@ async function saveToSupabase() {
     });
     if(!ok) {
       // Path !ok (response API non OK) — task #38.
-      localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients));
-      localStorage.setItem('bm4-praticiens-pwa', JSON.stringify(praticiens));
+      // #65 — clé unifiée bm4-patients/bm4-praticiens (cf fallback ci-dessus).
+      localStorage.setItem('bm4-patients', JSON.stringify(patients));
+      localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
       console.error('[#38] saveToSupabase failed', {
         event: 'sync_failed_response_not_ok',
         email: pwaUser?.email,
@@ -603,8 +608,9 @@ async function saveToSupabase() {
     }
   } catch(e) {
     // Path exception (réseau, RLS, etc.) — task #38.
-    localStorage.setItem('bm4-patients-pwa', JSON.stringify(patients));
-    localStorage.setItem('bm4-praticiens-pwa', JSON.stringify(praticiens));
+    // #65 — clé unifiée bm4-patients/bm4-praticiens (cf fallback ci-dessus).
+    localStorage.setItem('bm4-patients', JSON.stringify(patients));
+    localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
     console.error('[#38] saveToSupabase exception', {
       event: 'sync_failed_exception',
       email: pwaUser?.email,
