@@ -2155,6 +2155,18 @@ function getMkrsBySet(markers, targetSet) {
 // NAVIGATION
 // ══════════════════════════════════════════════════════
 function nav(id) {
+  // #116 — Capture-avant-quitter : si on quitte un bilan vers une autre page,
+  // capturer le DOM dans bilanData/bilanDataPosturo AVANT de le masquer. Sinon
+  // la saisie texte non capturée est perdue au retour (loadBilan re-rend depuis
+  // les données). saveBilanSilent / savePosturoBilan font un sweep DOM SYNCHRONE
+  // en début d'exécution → la capture a lieu avant le masquage malgré l'async
+  // (la partie sweep DOM s'exécute avant le 1er await, fire-and-forget OK).
+  const _leavingPage = document.querySelector('.page.active');
+  const _leavingId = _leavingPage ? _leavingPage.id : null;
+  if (_leavingId && _leavingId !== id) {
+    if (_leavingId === 'pg-bilan' && typeof saveBilanSilent === 'function') saveBilanSilent();
+    else if (_leavingId === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
+  }
   // Déplacer toutes les pages orphelines dans .main
   const mainEl = document.querySelector('.main');
   if(mainEl) {
@@ -17401,6 +17413,26 @@ document.addEventListener('DOMContentLoaded', function() {
 // markup est régénéré à chaque ouverture via getBilanPosturoHTML (interpolation
 // directe `${_buildPostureCaptureBlockHTML('po')}`).
 document.addEventListener('DOMContentLoaded', populateSportPostureCaptureBlock);
+
+// #116 — Auto-save débouncé sur saisie texte des bilans (sport + posturo).
+// Délégation sur document → robuste à l'injection dynamique de pg-bilan-posturo
+// (markup régénéré à chaque ouverture via getBilanPosturoHTML cf L17413-14).
+// L'assignation programmatique de .value (loadBilan) ne déclenche PAS 'input',
+// donc pas d'auto-save parasite au chargement (l'événement 'input' ne se déclenche
+// qu'à la frappe utilisateur réelle). ~1 s après la dernière frappe.
+// Les fonctions silencieuses ne modifient PAS les <input> (sweep en LECTURE,
+// écrit dans bilanData/bilanDataPosturo) → pas de feedback loop possible.
+let _bilanAutosaveTimer = null;
+document.addEventListener('input', function(e) {
+  const inSport   = e.target.closest && e.target.closest('#pg-bilan');
+  const inPosturo = e.target.closest && e.target.closest('#pg-bilan-posturo');
+  if (!inSport && !inPosturo) return;
+  clearTimeout(_bilanAutosaveTimer);
+  _bilanAutosaveTimer = setTimeout(function() {
+    if (inSport && typeof saveBilanSilent === 'function') saveBilanSilent();
+    else if (inPosturo && typeof savePosturoBilan === 'function') savePosturoBilan(true);
+  }, 1000);
+});
 
 // ===== STRIPE + MODULES =====
 var _stripeInstance = null;
