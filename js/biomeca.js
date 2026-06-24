@@ -2676,6 +2676,34 @@ function savePatients() {
   // d'afficher les dataURLs pour les renderers ; localStorage est propre.
   const _stripStash = _stripDataURLsForPersist(patients);
   try {
+  // #114-1b — Garde de richesse : refuse une chute brutale de données sans
+  // confirmation explicite (filet anti-effacement façon Maeva). Compare la
+  // mémoire à la dernière version localStorage (post-strip des deux côtés
+  // → comparaison cohérente, sans inflation par les dataURLs présentes
+  // seulement en RAM). Déclenche si on perd un patient entier OU >= 8 unités
+  // de travail. return false → le try/finally restaure les dataURLs en RAM.
+  try {
+    const storedRaw = localStorage.getItem('bm4-patients');
+    if (storedRaw) {
+      const stored = JSON.parse(storedRaw);
+      if (Array.isArray(stored)) {
+        const storedUnits = _countDataUnits(stored);
+        const newUnits = _countDataUnits(patients);
+        const lostPatient = patients.length < stored.length;
+        const bigDrop = (storedUnits - newUnits) >= 8;
+        if (lostPatient || bigDrop) {
+          const ok = confirm(
+            '⚠️  Cette sauvegarde va RÉDUIRE vos données par rapport à la dernière version enregistrée\n' +
+            '(' + stored.length + ' patient(s) / ' + storedUnits + ' éléments → ' +
+            patients.length + ' / ' + newUnits + ').\n\n' +
+            'Si vous venez de supprimer un patient ou un bilan, c\'est normal — cliquez OK.\n' +
+            'Sinon, cliquez Annuler pour protéger vos données (rien ne sera modifié).'
+          );
+          if (!ok) return false; // abort — le finally restaure les dataURLs en RAM
+        }
+      }
+    }
+  } catch (e) { /* parse échoué → on ne bloque pas, save normal */ }
   const beforeBytes = getBioMecaStorageBytes();
 
   // Calcul de la taille future après sérialisation : seul bm4-patients change.
