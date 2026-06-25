@@ -597,6 +597,31 @@
   </div>
 </div>
 
+<!-- ══ COMPARAISON BILANS SPORT (#117 Étape A) ══ -->
+
+<div class="page" id="pg-compare">
+  <div class="home-hdr" style="position:relative;">
+    <button onclick="nav('pg-patients')" style="position:absolute;left:0;top:0;background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
+    <h1 style="color:var(--blue);">🔄 Comparaison de bilans</h1>
+    <p id="compare-patient-name">—</p>
+  </div>
+  <div class="section">
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px;">Bilan A</div>
+          <select id="compare-sel-a" class="inp" style="width:100%;font-size:13px;"></select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px;">Bilan B</div>
+          <select id="compare-sel-b" class="inp" style="width:100%;font-size:13px;"></select>
+        </div>
+      </div>
+      <div id="compare-content"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ PRATICIENS ══ -->
 
 <div class="page" id="pg-praticiens">
