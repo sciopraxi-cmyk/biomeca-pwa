@@ -3165,6 +3165,14 @@ function renderPatientList() {
         </div>`).join('')}
       </div>` : '';
 
+    // #117 Étape A — Bouton « Comparer les bilans » : ≥ 2 bilans sport (archives
+    // + bilan en cours). Lecture seule, ouvre pg-compare.
+    const nbSportComparables = bilansSport.length + (hasBilanEnCours ? 1 : 0);
+    const compareSportHtml = nbSportComparables >= 2 ? `
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+        <button onclick="openCompareSport(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(55,138,221,0.18);color:#9cc4ed;border:1px solid rgba(55,138,221,0.3);">🔄 Comparer les bilans</button>
+      </div>` : '';
+
     const bilansPosturoHtml = bilansPosturo.length ? `
       <div style="margin-top:10px;">
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans posturaux</div>
@@ -3247,7 +3255,7 @@ function renderPatientList() {
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:${hasBilanEnCours||hasBilanPosturoEnCours||bilansSport.length||bilansPosturo.length?'4px':'0'};">
           ${modPosturo}${modSport}${modPodo}
         </div>
-        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilansPosturoHtml}${bilansSportHtml}
+        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilansPosturoHtml}${bilansSportHtml}${compareSportHtml}
       </div>
     </div>`;
   }).join('');
@@ -16430,21 +16438,189 @@ function genererSyntheseSport() {
 // classification) dans la synthèse de clôture. Itération dans l'ordre canonique
 // L5746 pour parité d'affichage avec le bloc détaillé.
 function _buildSportSyntheseHTMLForRapport(bd) {
+  // #117 Étape A — délègue à _extractSportSections (helper partagé avec la
+  // comparaison de bilans). Le rapport utilise currentPatient.mesures comme
+  // source d'alertes (cf. invariant : currentPatient.mesures est l'archive
+  // ouverte si rapport sur archive, ou le bilan en cours sinon).
+  const sections = _extractSportSections(bd, currentPatient?.mesures);
+  return _renderSportSyntheseHTML(sections);
+}
+
+// #117 Étape A — Extraction pure des sections synthèse sport pour un couple
+// (bilanData, mesures) explicite. Inclut « ⚠️ Mesures à signaler » (mode
+// condensé) en tête si des alertes existent. Aucune lecture DOM, aucune
+// lecture currentPatient — pure. Utilisé par _buildSportSyntheseHTMLForRapport
+// (rapport, où mesures = currentPatient.mesures) ET par renderCompareSport
+// (comparaison côte-à-côte, où mesures = bilan.mesures d'une archive).
+function _extractSportSections(bilanData, mesures) {
+  const bd = bilanData || {};
+  const m = mesures || {};
   const readersBD = {
     rad: name => bd[name],
     chk: id => !!bd[CHK_ID_TO_BD_KEY[id]],
     neuroReader: id => !!bd[id.replace(/-/g, '_')]
   };
   const sections = _collectSportSyntheseSections(bd, readersBD);
-  // Mesures à signaler condensées en tête (résumé — doublon volontaire avec le
-  // bloc détaillé printReport L5757)
   const mesAlerts = [];
-  const _mes = currentPatient?.mesures || {};
   ['kfppa-marche','kfppa-course','kfppa-sldj','verrou','mobilite','mla-marche','mla-course','amorti-marche','amorti-course'].forEach(testId => {
-    if(_mes[testId]) mesAlerts.push(..._collectTestAlerts(TESTS[testId], _mes[testId], { condensed: true }));
+    if(m[testId]) mesAlerts.push(..._collectTestAlerts(TESTS[testId], m[testId], { condensed: true }));
   });
   if(mesAlerts.length) sections.unshift({ titre: '⚠️ Mesures à signaler', items: mesAlerts });
-  return _renderSportSyntheseHTML(sections);
+  return sections;
+}
+
+// #117 Étape A — Ouvre la page de comparaison côte-à-côte de 2 bilans sport.
+// Peuple les 2 <select> avec les options (bilan en cours s'il existe + chaque
+// archive bilansSport), branche onchange → renderCompareSport. Lecture seule :
+// pas d'écriture sur le store patient, juste un selectPatient pour activer le
+// contexte global currentPatient (header + scope mesures pour le rendu).
+function openCompareSport(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  selectPatient(p);
+  const selA = document.getElementById('compare-sel-a');
+  const selB = document.getElementById('compare-sel-b');
+  if (!selA || !selB) return;
+  // Ordre des options : archives en ordre push (le plus ancien en premier,
+  // bilansSport[0] = Initial, puis Contrôle 1, 2…) PUIS « Bilan en cours »
+  // à la fin (= le plus récent). Permet le défaut A=plus ancien, B=plus récent
+  // avec selA.value = options[0], selB.value = options[last].
+  const options = [];
+  (p.bilansSport || []).forEach((b, idx) => {
+    options.push({ value: 'archive:' + idx, label: (b.label || 'Bilan'), date: b.date || '' });
+  });
+  if (p.currentBilanSportSousType) {
+    options.push({ value: 'current', label: 'Bilan en cours', date: '' });
+  }
+  const optionsHtml = options.map(o =>
+    '<option value="' + o.value + '">' + o.label + (o.date ? ' — ' + o.date : '') + '</option>'
+  ).join('');
+  selA.innerHTML = optionsHtml;
+  selB.innerHTML = optionsHtml;
+  if (options.length >= 2) {
+    selA.value = options[0].value;
+    selB.value = options[options.length - 1].value;
+  }
+  selA.onchange = renderCompareSport;
+  selB.onchange = renderCompareSport;
+  const nameEl = document.getElementById('compare-patient-name');
+  if (nameEl) nameEl.textContent = (p.prenom || '') + ' ' + (p.nom || '');
+  nav('pg-compare');
+  renderCompareSport();
+}
+
+// #117 Étape A — Résout une valeur de <select> ('current' ou 'archive:N') vers
+// { label, bilanData, mesures }. Le label inclut la date pour les archives ;
+// « Bilan en cours » n'a pas de date affichée. Renvoie null si la value est
+// invalide ou l'archive disparue (cas edge : suppression entre 2 selects).
+function _resolveCompareBilan(p, value) {
+  if (!p || !value) return null;
+  if (value === 'current') {
+    return {
+      label:     'Bilan en cours',
+      bilanData: p.bilanData || {},
+      mesures:   p.mesures   || {},
+    };
+  }
+  const m = value.match(/^archive:(\d+)$/);
+  if (!m) return null;
+  const b = (p.bilansSport || [])[parseInt(m[1], 10)];
+  if (!b) return null;
+  return {
+    label:     (b.label || 'Bilan') + (b.date ? ' — ' + b.date : ''),
+    bilanData: b.bilanData || {},
+    mesures:   b.mesures   || {},
+  };
+}
+
+// #117 Étape A — Rendu du tableau de comparaison 3 colonnes (Champ | A | B).
+// Aligne les sections par titre (union, ordre = A puis B-only), puis aligne
+// les lignes par label (parse « Label : valeur » sur le 1er « : »). Lignes
+// différentes : fond orange clair #fff7ed + texte sombre pour contraste, delta
+// signé si les 2 valeurs portent un nombre. Valeurs manquantes (champ absent
+// dans un seul bilan) : « — » + ligne surlignée.
+function renderCompareSport() {
+  const content = document.getElementById('compare-content');
+  if (!content) return;
+  if (!currentPatient) {
+    content.innerHTML = '<div style="color:#888;font-style:italic;padding:8px 0;">Aucun patient sélectionné.</div>';
+    return;
+  }
+  const selA = document.getElementById('compare-sel-a');
+  const selB = document.getElementById('compare-sel-b');
+  if (!selA || !selB) return;
+  const a = _resolveCompareBilan(currentPatient, selA.value);
+  const b = _resolveCompareBilan(currentPatient, selB.value);
+  if (!a || !b) {
+    content.innerHTML = '<div style="color:#888;font-style:italic;padding:8px 0;">Sélectionnez 2 bilans à comparer.</div>';
+    return;
+  }
+  const sectionsA = _extractSportSections(a.bilanData, a.mesures);
+  const sectionsB = _extractSportSections(b.bilanData, b.mesures);
+  const byTitleA = Object.fromEntries(sectionsA.map(s => [s.titre, s.items]));
+  const byTitleB = Object.fromEntries(sectionsB.map(s => [s.titre, s.items]));
+  // Union des titres, ordre = A puis ajouts de B.
+  const allTitles = [];
+  sectionsA.forEach(s => allTitles.push(s.titre));
+  sectionsB.forEach(s => { if (!allTitles.includes(s.titre)) allTitles.push(s.titre); });
+  // Parse « Label : valeur » sur le 1er « : ». Pas de « : » → item entier =
+  // label, value = '' (booléen affiché « ✓ »). Multiples « : » → la 1ʳᵉ seule
+  // sépare (le reste fait partie de la valeur).
+  const parseItem = (s) => {
+    const idx = s.indexOf(':');
+    if (idx < 0) return { label: s.trim(), value: '' };
+    return { label: s.slice(0, idx).trim(), value: s.slice(idx + 1).trim() };
+  };
+  const extractNumber = (str) => {
+    const mm = String(str).match(/-?\d+([.,]\d+)?/);
+    return mm ? parseFloat(mm[0].replace(',', '.')) : null;
+  };
+  const displayValue = (v) => v == null ? '—' : (v === '' ? '✓' : v);
+  let html = '<div style="font-size:11px;color:#888;margin-bottom:10px;font-style:italic;">Lignes surlignées = différences entre les deux bilans.</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr style="background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);text-align:left;">';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);width:30%;">Champ</th>';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);">' + a.label + '</th>';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);">' + b.label + '</th>';
+  html += '</tr></thead><tbody>';
+  allTitles.forEach(titre => {
+    html += '<tr><td colspan="3" style="padding:10px 10px 6px;font-weight:700;color:#2a7a4e;background:rgba(45,212,191,0.06);border-top:1px solid rgba(255,255,255,0.08);">' + titre + '</td></tr>';
+    const parsedA = (byTitleA[titre] || []).map(parseItem);
+    const parsedB = (byTitleB[titre] || []).map(parseItem);
+    const labels = [];
+    parsedA.forEach(p => labels.push(p.label));
+    parsedB.forEach(p => { if (!labels.includes(p.label)) labels.push(p.label); });
+    labels.forEach(label => {
+      const aEntry = parsedA.find(p => p.label === label);
+      const bEntry = parsedB.find(p => p.label === label);
+      const valA = aEntry ? aEntry.value : null;
+      const valB = bEntry ? bEntry.value : null;
+      const different = (valA !== valB);
+      // Delta signé si les 2 valeurs contiennent un nombre. v1 : pas de jugement
+      // amélioration / dégradation (selon la mesure, + peut être bon ou mauvais).
+      let deltaHtml = '';
+      if (different && valA != null && valB != null) {
+        const nA = extractNumber(valA);
+        const nB = extractNumber(valB);
+        if (nA != null && nB != null) {
+          const d = nB - nA;
+          const sign = d > 0 ? '+' : '';
+          const fmt = (Math.abs(d) < 1e-9) ? '0' : (d % 1 === 0 ? String(d) : d.toFixed(2));
+          deltaHtml = '<span style="color:#9a3412;font-size:11px;margin-left:6px;font-weight:600;">(Δ ' + sign + fmt + ')</span>';
+        }
+      }
+      const rowStyle = different
+        ? 'background:#fff7ed;color:#1f2937;'
+        : 'color:rgba(255,255,255,0.85);';
+      html += '<tr style="' + rowStyle + '">';
+      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);">' + label + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);">' + displayValue(valA) + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);">' + displayValue(valB) + deltaHtml + '</td>';
+      html += '</tr>';
+    });
+  });
+  html += '</tbody></table>';
+  content.innerHTML = html;
 }
 
 function toggleCLVF(enabled) {
