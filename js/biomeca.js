@@ -10218,29 +10218,12 @@ async function _resolveSportRapportImages(bd, callback) {
         ctx.fillRect(0, 0, Wd, Hd);
         let dx, dy, dispW, dispH;
         if(key === '_pieds') {
-          // #106 Fix2 — Géométrie miroir éditeur (index.html L2515-2517) en
-          // fractions de Wd/Hd, DPR-invariant. Éditeur :
-          //   <img width:80% max-width:400px margin:0 auto> dans parent padding:8px
-          //   → canvas couvre parent entier ; image top-alignée avec petit padding,
-          //     centrée horizontalement.
-          // Fractions appliquées :
-          //   dispW = 0.80 × Wd        → ≈ width:80% éditeur
-          //   dispH = dispW × baseH/baseW  → préserve aspect template (cap si dépasse Hd)
-          //   dx = (Wd - dispW)/2      → ≈ 0.10 × Wd de chaque côté (centré H)
-          //   dy = Hd × 0.03           → top-aligné, fraction exacte éditeur (16/522 = 8/261 ≈ 0.0306)
-          // Note : la formule précédente `min(...,Hd/baseH) × 0.8` faisait Hd/baseH
-          // dominer pour les templates hauts (baseH > baseW), rétrécissant l'image
-          // sous l'attendu éditeur. Ici, dispW dérive directement de Wd sans cap
-          // par Hd (sauf garde-fou si l'aspect dépasse le canvas).
-          dispW = Wd * 0.8;
-          dispH = dispW * (baseH / baseW);
-          if (dispH > Hd * 0.96) {
-            // Garde-fou : aspect template très allongé + canvas peu haut → cap.
-            dispH = Hd * 0.96;
-            dispW = dispH * baseW / baseH;
-          }
-          dx = (Wd - dispW) / 2;
-          dy = Hd * 0.03;
+          // #119 — canvas pieds = overlay 1:1 sur l'image depuis la refonte. Le
+          // dessin (Wd×Hd) recouvre exactement l'image → dans le composite,
+          // l'image remplit tout le canvas et le dessin se pose par-dessus à
+          // l'identique. Plus de constantes 0.8/0.03 (qui reproduisaient
+          // l'ancien éditeur : canvas couvrant le conteneur, image 80% centrée).
+          dispW = Wd; dispH = Hd; dx = 0; dy = 0;
         } else {
           // Morpho : object-fit:contain équivalent. Hd remplace l'ancien 200 codé
           // en dur (CSS pré-#83). Template occupe canvas-full ou plus petit selon
@@ -10583,7 +10566,11 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
   // #109-A4 — La section est désormais visible si silhouettes OU chaîne
   // musculaire OU vues posturales annotées : les vues annotées sont
   // intégrées dans cette même section après les silhouettes.
-  const hasMorpho = bd._morpho_face||bd._morpho_face2||bd._morpho_profilG||bd._morpho_profilD;
+  // #119 — Porte path-aware : après migration Storage, la dataURL est strippée
+  // du persisté (seul le …Path subsiste). Sans tester les Paths, un bilan dont
+  // les 4 silhouettes ont été migrées paraît « sans morpho » → section masquée.
+  const hasMorpho = bd._morpho_face||bd._morpho_face2||bd._morpho_profilG||bd._morpho_profilD
+    ||bd._morpho_facePath||bd._morpho_face2Path||bd._morpho_profilGPath||bd._morpho_profilDPath;
   const hasAnnotatedViews = annotatedViews && annotatedViews.length > 0;
   if(hasMorpho||bd.chaine_musculaire||hasAnnotatedViews) {
     h += sec('Bilan Morphostatique');
@@ -11111,7 +11098,9 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
   // ttt déjà déclaré au début de Plan de Traitement (1ère utilisation #86 Batch 4).
   const hasMateriaux = ttt.materiaux && ttt.materiaux.length;
   const hasRecouvr   = ttt.recouvrement && ttt.recouvrement.length;
-  if(bd._pieds || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
+  // #119 — Porte path-aware : idem hasMorpho. Sans tester _piedsPath, un bilan
+  // dont le dessin pieds a été migré paraît « sans pieds » → section masquée.
+  if(bd._pieds || bd._piedsPath || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
     h += sec('Plan de Semelles');
     // #98 Option B — toujours rendre le gabarit pieds quand la section est visible.
     const piedsSrc = composites._pieds || (document.getElementById('sp-pieds-img')?.src || '');
@@ -11873,6 +11862,13 @@ function setupDrawCanvas(canvas, canvasId) {
       // post-migrate supprime la nouvelle dataURL = édition perdue au reload).
       // _userDirty n'est jamais reset par les opérations de restauration DOM.
       canvas._userDirty = true;
+      // #119 — Auto-save au dessin (parité #116). Déduit le bilan cible depuis
+      // l'id du canvas : posturo-body-canvas / posturo-feet-canvas → posturo ;
+      // pieds-canvas / morpho-* → sport. saveBilanSilent / savePosturoBilan
+      // lisent le DOM sans modifier d'input ni de canvas → pas de feedback loop.
+      if (typeof _scheduleBilanAutosave === 'function') {
+        _scheduleBilanAutosave(canvas.id.indexOf('posturo-') !== 0);
+      }
     }
     drawing = false;
     canvas._tempSnap = null;
@@ -12527,23 +12523,27 @@ async function saveBilan() {
   // préserve la valeur existante de bilanData[key] (cf doc _serializeDrawCanvas).
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
+    // #119 — préserve le dessin stocké si canvas non dessiné (vierge post-reload).
+    // Sans cette garde, un sweep saveBilan déclenché alors que le canvas vient
+    // d'être ré-initialisé (drawTemplate post-prefetch, switch onglet idx===9)
+    // écrasait bilanData[key] par le PNG transparent vide → dessin perdu.
+    if (!c || !c._userDirty) return;
     const png = _serializeDrawCanvas(c);
     if(png !== null) {
       const key = '_' + id.replace(/-/g,'_');
       bilanData[key] = png;
-      // #99 + Bug édition perdue (option iii) — invalide le Path sur édition
-      // utilisateur réelle. _userDirty est insensible aux ré-init DOM (init/draw
-      // restoration), contrairement à _history.length qui était reset par
-      // drawPiedsTemplate/initMorphoCanvas au reload async post-prefetch et au
-      // re-nav vers pg-bilan, causant la perte silencieuse des éditions.
-      if (c && c._userDirty) delete bilanData[key + 'Path'];
+      // Édition utilisateur réelle confirmée → invalide le Path (force ré-upload).
+      delete bilanData[key + 'Path'];
     }
   });
   const pCanvas = document.getElementById('pieds-canvas');
-  const piedsPng = _serializeDrawCanvas(pCanvas);
-  if(piedsPng !== null) {
-    bilanData._pieds = piedsPng;
-    if (pCanvas && pCanvas._userDirty) delete bilanData._piedsPath;
+  // #119 — idem : on n'écrase pas un dessin pieds stocké avec un canvas vierge.
+  if (pCanvas && pCanvas._userDirty) {
+    const piedsPng = _serializeDrawCanvas(pCanvas);
+    if(piedsPng !== null) {
+      bilanData._pieds = piedsPng;
+      delete bilanData._piedsPath;
+    }
   }
   // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
   // Prépare le prochain cycle d'édition (un nouveau mouseup re-marquera dirty).
@@ -12894,19 +12894,26 @@ async function saveBilanSilent() {
   // bilanData[key].
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD'].forEach(id => {
     const c = document.getElementById(id);
+    // #119 — préserve le dessin stocké si canvas non dessiné (vierge post-reload).
+    // Miroir saveBilan : sans cette garde, un autosave (capture/import photo,
+    // capture-avant-quitter #116) qui s'exécute pendant la fenêtre de ré-init
+    // canvas écraserait bilanData[key] par le PNG transparent vide.
+    if (!c || !c._userDirty) return;
     const png = _serializeDrawCanvas(c);
     if(png !== null) {
       const key = '_' + id.replace(/-/g,'_');
       bilanData[key] = png;
-      // #99 + Bug édition perdue (option iii) — miroir saveBilan : check _userDirty.
-      if (c && c._userDirty) delete bilanData[key + 'Path'];
+      delete bilanData[key + 'Path']; // édition réelle → invalide le Path
     }
   });
   const pc = document.getElementById('pieds-canvas');
-  const piedsPng = _serializeDrawCanvas(pc);
-  if(piedsPng !== null) {
-    bilanData._pieds = piedsPng;
-    if (pc && pc._userDirty) delete bilanData._piedsPath;
+  // #119 — idem : on n'écrase pas un dessin pieds stocké avec un canvas vierge.
+  if (pc && pc._userDirty) {
+    const piedsPng = _serializeDrawCanvas(pc);
+    if(piedsPng !== null) {
+      bilanData._pieds = piedsPng;
+      delete bilanData._piedsPath;
+    }
   }
   // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
@@ -12932,6 +12939,14 @@ function clearPiedsCanvas() {
   // #99 + Bug édition perdue — clear user-triggered = édition (cf clearAllMorpho).
   c._userDirty = true;
   drawPiedsTemplate();
+  // #119 — Auto-save (parité dessin). Sans ça, effacer tout puis quitter sans
+  // toucher au clavier laisserait l'ancien dessin persisté tant que la capture-
+  // avant-quitter #116 ne tire pas (nav directe vers une page hors-bilan OK,
+  // mais un refresh dur perdrait le clear). _userDirty=true reste valide jusqu'au
+  // sweep (drawPiedsTemplate ne reset que _history/_baseSnapshot/_tempSnap).
+  if (typeof _scheduleBilanAutosave === 'function') {
+    _scheduleBilanAutosave(true);
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -17851,15 +17866,21 @@ document.addEventListener('DOMContentLoaded', populateSportPostureCaptureBlock);
 // Les fonctions silencieuses ne modifient PAS les <input> (sweep en LECTURE,
 // écrit dans bilanData/bilanDataPosturo) → pas de feedback loop possible.
 let _bilanAutosaveTimer = null;
+// #119 — Helper extrait pour partager le déclencheur d'auto-save entre l'event
+// 'input' (frappe clavier #116) et le mouseup des canvas dessinés (#119 étape 3).
+// `isSport` true → saveBilanSilent ; false → savePosturoBilan(silent).
+function _scheduleBilanAutosave(isSport) {
+  clearTimeout(_bilanAutosaveTimer);
+  _bilanAutosaveTimer = setTimeout(function() {
+    if (isSport) { if (typeof saveBilanSilent === 'function') saveBilanSilent(); }
+    else { if (typeof savePosturoBilan === 'function') savePosturoBilan(true); }
+  }, 1000);
+}
 document.addEventListener('input', function(e) {
   const inSport   = e.target.closest && e.target.closest('#pg-bilan');
   const inPosturo = e.target.closest && e.target.closest('#pg-bilan-posturo');
   if (!inSport && !inPosturo) return;
-  clearTimeout(_bilanAutosaveTimer);
-  _bilanAutosaveTimer = setTimeout(function() {
-    if (inSport && typeof saveBilanSilent === 'function') saveBilanSilent();
-    else if (inPosturo && typeof savePosturoBilan === 'function') savePosturoBilan(true);
-  }, 1000);
+  _scheduleBilanAutosave(!!inSport);
 });
 
 // ===== STRIPE + MODULES =====
