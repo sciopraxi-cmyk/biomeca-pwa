@@ -11753,6 +11753,13 @@ function drawSilhouetteProfil(ctx, W, H, facingRight) {
   ctx.restore();
 }
 
+// #119 — Résolution interne FIXE pour le canvas pieds. Dimensions natives du
+// gabarit `plan-semelles-schema-plantaire.png` → backing store stable, indépendant
+// du layout/CSS (qui peut varier selon la largeur du conteneur, le devicePixelRatio,
+// etc.). Le mapping coordonnées client→backing se fait dans getPos via le flag
+// `_backingScaled` quand celui-ci est positionné par drawPiedsTemplate.
+const PIEDS_REF_W = 520, PIEDS_REF_H = 520;
+
 function setupDrawCanvas(canvas, canvasId) {
   if(!canvas._history) canvas._history = [];
   // Snapshot de base après le rendu initial (pour la gomme)
@@ -11767,7 +11774,14 @@ function setupDrawCanvas(canvas, canvasId) {
   const getPos = e => {
     const rect = canvas.getBoundingClientRect();
     const src2 = e.touches ? e.touches[0] : e;
-    return {x: src2.clientX - rect.left, y: src2.clientY - rect.top};
+    const cx = src2.clientX - rect.left, cy = src2.clientY - rect.top;
+    // #119 — Scaling client→backing UNIQUEMENT pour les canvas marqués
+    // _backingScaled (résolution interne fixe découplée du CSS). Les autres
+    // canvas conservent le comportement antérieur (byte-identique).
+    if (canvas._backingScaled && rect.width && rect.height) {
+      return { x: cx * (canvas.width / rect.width), y: cy * (canvas.height / rect.height) };
+    }
+    return { x: cx, y: cy };
   };
 
   canvas.onmousedown = e => {
@@ -12073,17 +12087,17 @@ function drawPiedsTemplate(savedData, onReady) {
   // retry implicite au prochain switch onglet 9 si le premier essai échoue.
   const canvas = document.getElementById('pieds-canvas');
   if(!canvas) return;
-  const parent = canvas.parentElement;
-  if(!parent) return;
-  const r = parent.getBoundingClientRect();
-  if(r.width === 0) return;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(r.width * dpr);
-  canvas.height = Math.round(r.height * dpr);
-  canvas.style.width = r.width + 'px';
-  canvas.style.height = r.height + 'px';
+  // #119 — Backing store FIXE (520×520 = dims natives du gabarit). Découplé du
+  // layout/CSS : le canvas peut être redimensionné via CSS sans réinitialiser
+  // l'espace interne. Plus de dépendance à parent.getBoundingClientRect (qui
+  // retourne 0 sur page non-active, source d'early-return historique) ni à
+  // devicePixelRatio (les browsers gèrent le up-scaling CSS sans surcoût visible
+  // sur un gabarit déjà à 520px). Scaling client→backing dans getPos via flag.
+  canvas.width  = PIEDS_REF_W;
+  canvas.height = PIEDS_REF_H;
+  canvas._backingScaled = true;
   const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   canvas._history = []; canvas._baseSnapshot = null; canvas._tempSnap = null;
   setupDrawCanvas(canvas, 'pieds-canvas');
   // _baseSnapshot = canvas vide/transparent. undoPieds (post #89) restaure cet
@@ -12097,7 +12111,8 @@ function drawPiedsTemplate(savedData, onReady) {
   if(savedData) {
     const saved = new Image();
     saved.onload = () => {
-      ctx.drawImage(saved, 0, 0, r.width, r.height);
+      // #119 — dessin restauré dans l'espace backing fixe PIEDS_REF_W×H.
+      ctx.drawImage(saved, 0, 0, PIEDS_REF_W, PIEDS_REF_H);
       // Fix #94 auto-réparation — efface fond noir éventuel des bilans corrompus
       // pré-fix (saveBilanSilent JPEG produisait noir intégral sur canvas overlay
       // transparent). Idempotent sur PNG transparent propre.
