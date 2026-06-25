@@ -2563,8 +2563,10 @@
       <textarea class="inp" id="sp-semelles-desc" rows="3" placeholder="Description du plan de semelles..." style="background:#fff;color:#222;"></textarea>
       <div class="field-lbl" style="margin-top:10px;">✏️ Dessin sur les pieds</div>
       <div style="position:relative;margin:8px 0;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:8px;text-align:center;">
-        <img id="sp-pieds-img" src="assets/plan-semelles-schema-plantaire.png" style="width:80%;max-width:400px;display:block;margin:0 auto;"/>
-        <canvas id="pieds-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"></canvas>
+        <div id="sp-pieds-wrap" style="position:relative;display:inline-block;width:80%;max-width:400px;margin:0 auto;line-height:0;">
+          <img id="sp-pieds-img" src="assets/plan-semelles-schema-plantaire.png" style="display:block;width:100%;height:auto;"/>
+          <canvas id="pieds-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"></canvas>
+        </div>
         <span style="position:absolute;left:27%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">G</span>
         <span style="position:absolute;left:73%;bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:bold;color:#555;pointer-events:none;">D</span>
       </div>
