@@ -1735,6 +1735,14 @@ let currentOpenedBilanIdx = null;
 // Set par ouvrirBilanPosturo, reset par creerBilanPosturo, finalizeBilanPosturo,
 // abandonnerBilanPosturo et selectPatient.
 let currentOpenedBilanPosturoIdx = null;
+// #117-incident — Drapeau « réduction volontaire ». Levé par les handlers qui
+// suppriment intentionnellement des données (deletePatient, suppression d'un
+// bilan archivé, abandon d'un bilan en cours, remplacement d'une photo posturale).
+// Suppress la garde de richesse de savePatients (#114-1b) pour ces saves : sans
+// ça, l'utilisateur voit la pop-up « Sauvegarde qui réduit vos données » à
+// chaque action de suppression légitime, ce qui crée du bruit et risque de
+// désensibiliser au vrai signal (perte de données non sollicitée).
+let _intentionalReduction = false;
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -2660,17 +2668,30 @@ function _stripDataURLsForPersist(patientsArr) {
 // est PLUS RICHE que la mémoire locale (donc à ne pas écraser). Métriques
 // volontairement insensibles aux clés méta (_bilanId, etc.) qui ne représentent
 // pas du travail clinique.
+// #117-incident — Compte aussi les unités (markers + photos) des bilans
+// ARCHIVÉS, pas seulement du bilan courant. Sinon archiver (finalize) ou
+// créer un Contrôle (qui copie + reset le courant) déplace le travail
+// clinique du courant vers une archive, comptabilisé seulement comme +1
+// (l'archive) tandis que les markers/photos du courant disparaissent du
+// total → faux positif « réduction » de la garde de richesse. Helper
+// countBd factorisé pour appliquer la même règle au courant ET à chaque
+// archive de manière symétrique.
 function _countDataUnits(arr) {
   if (!Array.isArray(arr)) return 0;
+  const countBd = (bd) => {
+    if (!bd) return 0;
+    let c = 0;
+    const pa = bd._postureAnalysis || {};
+    for (const vk in pa) c += (pa[vk]?.markers?.filter(m => m && m.nx != null).length) || 0;
+    ['Face','Dos','ProfilG','ProfilD'].forEach(v => { if (bd['_posture'+v] || bd['_posture'+v+'Path']) c += 1; });
+    return c;
+  };
   let n = arr.length;
   for (const p of arr) {
     n += (p.bilansSport?.length || 0) + (p.bilansPosturo?.length || 0);
-    for (const bd of [p.bilanData, p.bilanDataPosturo]) {
-      if (!bd) continue;
-      const pa = bd._postureAnalysis || {};
-      for (const vk in pa) n += (pa[vk]?.markers?.filter(m => m && m.nx != null).length) || 0;
-      ['Face','Dos','ProfilG','ProfilD'].forEach(v => { if (bd['_posture'+v] || bd['_posture'+v+'Path']) n += 1; });
-    }
+    n += countBd(p.bilanData) + countBd(p.bilanDataPosturo);
+    (p.bilansSport || []).forEach(b => { n += countBd(b.bilanData); });
+    (p.bilansPosturo || []).forEach(b => { n += countBd(b.bilanDataPosturo); });
   }
   return n;
 }
@@ -2703,13 +2724,16 @@ function savePatients() {
         const newUnits = _countDataUnits(patients);
         const lostPatient = patients.length < stored.length;
         const bigDrop = (storedUnits - newUnits) >= 8;
-        if (lostPatient || bigDrop) {
+        // #117-incident — Skip la garde si la réduction est VOLONTAIRE (drapeau
+        // levé par le handler qui supprime). Sinon la pop-up devient du bruit
+        // sur chaque suppression légitime.
+        if ((lostPatient || bigDrop) && !_intentionalReduction) {
           const ok = confirm(
-            '⚠️  Cette sauvegarde va RÉDUIRE vos données par rapport à la dernière version enregistrée\n' +
-            '(' + stored.length + ' patient(s) / ' + storedUnits + ' éléments → ' +
-            patients.length + ' / ' + newUnits + ').\n\n' +
-            'Si vous venez de supprimer un patient ou un bilan, c\'est normal — cliquez OK.\n' +
-            'Sinon, cliquez Annuler pour protéger vos données (rien ne sera modifié).'
+            '⚠️  SAUVEGARDE QUI RÉDUIT VOS DONNÉES\n\n' +
+            'Cette sauvegarde supprimerait des données par rapport à la dernière version enregistrée\n' +
+            '(' + stored.length + ' patient(s) / ' + storedUnits + ' éléments → ' + patients.length + ' / ' + newUnits + ').\n\n' +
+            '➡️  Cliquez ANNULER pour PROTÉGER vos données (recommandé).\n' +
+            'Ne cliquez OK QUE si vous venez VOLONTAIREMENT de supprimer un patient ou un bilan.'
           );
           if (!ok) return false; // abort — le finally restaure les dataURLs en RAM
         }
@@ -3008,7 +3032,11 @@ async function deletePatient(i) {
     if(!r.ok) console.warn('[deletePatient] Storage cleanup failed:', r.error);
   }
   if(currentPatient && currentPatient.id===patient.id) currentPatient=null;
-  patients.splice(i,1); savePatients(); renderPatientList();
+  patients.splice(i,1);
+  // #117-incident — Suppression VOLONTAIRE d'un patient → suppress la garde.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
+  renderPatientList();
 }
 
 // Détermine si bilanData contient au moins une valeur non vide.
@@ -3360,7 +3388,9 @@ function abandonnerBilanSport(patIdx) {
   p.bilanData = {};
   delete p.currentBilanSportSousType;
   currentOpenedBilanIdx = null;
-  savePatients();
+  // #117-incident — Abandon VOLONTAIRE d'un bilan en cours → suppress la garde.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   renderPatientList();
 }
 
@@ -3420,7 +3450,9 @@ function abandonnerBilanPosturo(patIdx) {
   p.bilanDataPosturo = {};
   delete p.currentBilanPosturoSousType;
   currentOpenedBilanPosturoIdx = null;
-  savePatients();
+  // #117-incident — Abandon VOLONTAIRE d'un bilan posturo en cours → suppress la garde.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   renderPatientList();
 }
 
@@ -3526,6 +3558,11 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   selectPatient(p);
   currentPatient.mesures = JSON.parse(JSON.stringify(bilan.mesures||{}));
   currentPatient.bilanData = JSON.parse(JSON.stringify(bilan.bilanData||{}));
+  // #117-incident — Resync IMMÉDIATE de la globale bilanData avec l'archive chargée,
+  // sinon une sauvegarde déclenchée AVANT loadBilan (capture/import depuis pg-sport,
+  // auto-save) écraserait currentPatient.bilanData par une globale périmée sans
+  // _postureAnalysis → perte des points de posture.
+  bilanData = JSON.parse(JSON.stringify(currentPatient.bilanData));
   currentOpenedBilanIdx = bilanIdx;
   currentOpenedBilanPosturoIdx = null;  // Task #69 bonus — symétrie cross-modal avec ouvrirBilanPosturo L3180
   // Task #69.3 — Reset flag "bilan en cours" sport pour éviter état hybride
@@ -3598,7 +3635,9 @@ async function supprimerBilanSport(patIdx, bilanIdx) {
     if(!r.ok) console.warn('[supprimerBilanSport] Storage cleanup failed:', r.error);
   }
   p.bilansSport.splice(bilanIdx, 1);
-  savePatients();
+  // #117-incident — Suppression VOLONTAIRE d'une archive sport → suppress la garde.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   renderPatientList();
 }
 
@@ -3609,7 +3648,9 @@ function supprimerBilanPosturo(patIdx, bilanIdx) {
   if(!bilan) return;
   if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
   p.bilansPosturo.splice(bilanIdx, 1);
-  savePatients();
+  // #117-incident — Suppression VOLONTAIRE d'une archive posturo → suppress la garde.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   renderPatientList();
 }
 
@@ -7868,9 +7909,21 @@ async function deletePostureView(prefix, viewKey) {
   const key = '_posture' + viewKey.charAt(0).toUpperCase() + viewKey.slice(1);
   delete bd[key];
   if (bd[key + 'Path']) delete bd[key + 'Path'];
+  // #117-incident — Effacer aussi les points de la vue (markers nx/ny, calibration,
+  // angles calculés). Sans ça, ré-importer une photo fait réapparaître les markers
+  // de la session précédente sur la nouvelle photo (mauvais cadrage anatomique →
+  // angles faux). Ciblé sur viewKey uniquement — les autres vues conservent leurs
+  // points et l'objet _postureAnalysis racine est préservé.
+  if (bd._postureAnalysis && bd._postureAnalysis[viewKey]) {
+    delete bd._postureAnalysis[viewKey];
+  }
   _renderPostureSlot(prefix, viewKey);
   // #85 — auto-save silencieux : la suppression doit persister immédiatement
   // (sinon refresh ramène la capture supprimée depuis le bilan persisté).
+  // #117-incident — Suppression VOLONTAIRE d'une vue posturale → suppress la garde
+  // de richesse. Flag tenu pendant tout l'await (la sync part de savePatients
+  // se déclenche après les awaits de migration photo).
+  _intentionalReduction = true;
   try {
     if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
       await saveBilanSilent();
@@ -7879,6 +7932,8 @@ async function deletePostureView(prefix, viewKey) {
     }
   } catch (e) {
     console.warn('[#85] auto-save delete posture échoué :', e?.message);
+  } finally {
+    _intentionalReduction = false;
   }
 }
 
@@ -7967,7 +8022,16 @@ async function importPostureView(prefix, viewKey, input) {
   bd[key] = dataUrl;
   // Path Storage obsolète : la nouvelle image doit ré-uploader au prochain save.
   if (bd[key + 'Path']) delete bd[key + 'Path'];
+  // #117-incident — Une nouvelle photo invalide les anciens points (cadrage
+  // différent). Effacer les points de la vue → repart vierge, cohérent avec
+  // deletePostureView. Évite les points fantômes sur une nouvelle photo.
+  if (bd._postureAnalysis && bd._postureAnalysis[viewKey]) {
+    delete bd._postureAnalysis[viewKey];
+  }
   _renderPostureSlot(prefix, viewKey);
+  // #117-incident — Réduction VOLONTAIRE (nouvelle photo qui remplace l'ancienne).
+  // Suppress la garde de richesse pour ce save autosauve uniquement.
+  _intentionalReduction = true;
   try {
     if (prefix === 'sp' && typeof saveBilanSilent === 'function') {
       await saveBilanSilent();
@@ -7976,6 +8040,8 @@ async function importPostureView(prefix, viewKey, input) {
     }
   } catch (e) {
     console.warn('[#85] auto-save import posture échoué :', e?.message);
+  } finally {
+    _intentionalReduction = false;
   }
 }
 
