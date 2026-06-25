@@ -3504,10 +3504,19 @@ function creerBilanSport(patIdx, type) {
   // Sauvegarder bilan courant si données existantes ET bilan effectivement en cours
   // (sousType set). Task #69.4 — sans ce check sousType, les mesures résiduelles
   // d'une archive ouverte par ouvrirBilanSport déclencheraient un faux confirm
-  // "bilan en cours" puis push doublon de l'archive. Parité avec creerBilanPosturo.
-  if(p.currentBilanSportSousType && p.mesures && Object.keys(p.mesures).length > 0) {
-    const nbTests = Object.keys(p.mesures).length;
-    const confirmMsg = 'Vous avez un bilan en cours avec ' + nbTests + ' test(s) saisi(s).\n\n' +
+  // "bilan en cours" puis push doublon de l'archive.
+  // #118 — Aligne sur finalizeBilanSport : un bilan contenant UNIQUEMENT de la
+  // posture / des dessins / de la saisie clinique (sans aucun test mesuré) doit
+  // aussi être archivé. Sans ce fix, créer un Contrôle écrasait silencieusement
+  // les données cliniques du bilan en cours qui n'avait pas de mesures.
+  const _hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
+  const _hasBilanData = hasBilanDataContent(p.bilanData);
+  if(p.currentBilanSportSousType && (_hasMesures || _hasBilanData)) {
+    const _parts = [];
+    if (_hasMesures) _parts.push(Object.keys(p.mesures).length + ' test(s) saisi(s)');
+    if (_hasBilanData) _parts.push('saisie clinique / posture');
+    const _desc = _parts.join(' + ');
+    const confirmMsg = 'Vous avez un bilan en cours avec ' + _desc + '.\n\n' +
       'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
       '• OK : finalise et archive le bilan en cours, puis démarre un nouveau bilan ' + (type === 'initial' ? 'initial' : 'de contrôle') + '.\n' +
       '• Annuler : retour à la fiche patient pour utiliser le bouton "Finaliser et archiver" du bilan en cours.';
@@ -3530,7 +3539,12 @@ function creerBilanSport(patIdx, type) {
   p.bilanData = {};
   p.currentBilanSportSousType = type;
   // NE PAS toucher currentBilanPosturoSousType — laisse l'autre bilan en cours intact.
-  savePatients();
+  // #118 v2 — Création VOLONTAIRE d'un nouveau bilan → suppress la garde de
+  // richesse. Le contenu réinitialisé est soit déjà archivé (sousType set →
+  // archivé par la condition ci-dessus), soit une copie de consultation
+  // (sousType undefined → l'original est dans les archives, on n'a rien perdu).
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   currentOpenedBilanIdx = null;
   selectPatient(p);
   nav('pg-sport');
@@ -3618,7 +3632,12 @@ function creerBilanPosturo(patIdx, type) {
   p.bilanDataPosturo = {};
   p.currentBilanPosturoSousType = type;
   // NE PAS toucher currentBilanSportSousType — laisse l'autre bilan en cours intact.
-  savePatients();
+  // #118 v2 — Création VOLONTAIRE d'un nouveau bilan posturo → suppress la garde
+  // de richesse (parité creerBilanSport). Le contenu réinitialisé est soit déjà
+  // archivé (isInProgress && hasData → archivé ci-dessus), soit une copie de
+  // consultation (l'original est dans les archives, on n'a rien perdu).
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   currentOpenedBilanPosturoIdx = null;
   selectPatient(p);
   nav('pg-bilan-posturo');
