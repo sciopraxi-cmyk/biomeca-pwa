@@ -12624,6 +12624,93 @@ function genererSynthesePedicurie(){
   out.innerHTML='<div style="background:rgba(217,119,6,0.04);border:1px solid rgba(217,119,6,0.18);border-radius:8px;padding:12px 14px;">'+html+'</div>';
 }
 
+// #121 Phase 5b — Builder du rapport pédicurie. Compose un document HTML
+// autonome avec header sciopraxi (logo + cartouche praticien), bandeau titre
+// ambre, carte patient (initiales + chips + métriques), corps = synthèse
+// générée, footer marque. Réutilisé par printRapportPedicurie via iframe.
+function buildPedicurieRapportHTML(){
+  var p = (typeof currentPatient !== 'undefined' && currentPatient) ? currentPatient : {};
+  var prat = (typeof praticiens !== 'undefined' && praticiens)
+    ? (praticiens.find(function(pr){ return pr.id == p.pratId; }) || (praticiens.length === 1 ? praticiens[0] : {}))
+    : {};
+  var logo = (document.getElementById('imgjs-logo-sciopraxi') || {}).src || '';
+  var synthEl = document.getElementById('pedicurie-synthese-result');
+  var synth = (synthEl && synthEl.innerHTML) ? synthEl.innerHTML : '<p style="font-style:italic;color:#666;">Aucune donnée renseignée.</p>';
+  var dateStr = new Date().toLocaleDateString('fr-FR');
+  var initiales = (((p.prenom || '?')[0]) + ((p.nom || '?')[0])).toUpperCase();
+  var age = p.ddn ? Math.floor((Date.now() - new Date(p.ddn)) / 31557600000) : '';
+  var pratName = (_pedEscapeHtml(prat.nom || '') + ' ' + _pedEscapeHtml(prat.prenom || '') + (prat.titre ? ' — ' + _pedEscapeHtml(prat.titre) : '')).trim();
+  var pratInfo = '<div class="prat-info"><div class="prat-name">' + (pratName || '&nbsp;') + '</div>';
+  if (prat.cabinet) pratInfo += '<div>' + _pedEscapeHtml(prat.cabinet) + '</div>';
+  if (prat.adresse) pratInfo += '<div>' + _pedEscapeHtml(prat.adresse) + '</div>';
+  if (prat.tel)     pratInfo += '<div>' + _pedEscapeHtml(prat.tel) + '</div>';
+  if (prat.email)   pratInfo += '<div>' + _pedEscapeHtml(prat.email) + '</div>';
+  pratInfo += '</div>';
+  var details = '';
+  if (p.ddn) { var dn = new Date(p.ddn); if (!isNaN(dn.getTime())) details += 'Né(e) le ' + dn.toLocaleDateString('fr-FR'); }
+  var chips = '';
+  if (p.sport)  chips += '<span class="pt-chip">' + _pedEscapeHtml(p.sport) + '</span>';
+  if (p.metier) chips += '<span class="pt-chip">' + _pedEscapeHtml(p.metier) + '</span>';
+  if (p.lat)    chips += '<span class="pt-chip">' + _pedEscapeHtml(p.lat) + '</span>';
+  var metrics = '';
+  if (age)      metrics += '<div class="metric"><div class="metric-val">' + age + '</div><div class="metric-lbl">ans</div></div>';
+  if (p.poids)  metrics += '<div class="metric"><div class="metric-val">' + _pedEscapeHtml(String(p.poids)) + '</div><div class="metric-lbl">kg</div></div>';
+  if (p.taille) metrics += '<div class="metric"><div class="metric-val">' + _pedEscapeHtml(String(p.taille)) + '</div><div class="metric-lbl">cm</div></div>';
+  var css = '<style>'
+    + '*{margin:0;padding:0;box-sizing:border-box;}'
+    + 'body{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}'
+    + '.rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}'
+    + '@media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.header,.titre-rapport,.patient-card,.footer{break-inside:avoid;}}'
+    + '.header{background:#3a2606;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;}'
+    + '.logo{height:64px;object-fit:contain;}'
+    + '.prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.55);line-height:1.7;}'
+    + '.prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}'
+    + '.titre-rapport{background:#b7740a;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}'
+    + '.titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:2px;text-transform:uppercase;}'
+    + '.titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.7);letter-spacing:1px;}'
+    + '.patient-card{background:#fdf6ec;border-bottom:1px solid #f0e4cf;padding:16px 24px;display:flex;align-items:center;gap:16px;}'
+    + '.patient-avatar{width:44px;height:44px;border-radius:50%;background:#d97706;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}'
+    + '.patient-name{font-size:16px;font-weight:300;color:#7a4d05;letter-spacing:0.5px;}'
+    + '.patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}'
+    + '.patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}'
+    + '.pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #e3cfa3;color:#7a4d05;font-weight:500;}'
+    + '.patient-metrics{display:flex;gap:8px;flex-shrink:0;}'
+    + '.metric{background:#fff;border:1px solid #f0e4cf;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}'
+    + '.metric-val{font-size:18px;font-weight:300;color:#b7740a;line-height:1;}'
+    + '.metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}'
+    + '.rp-body{padding:16px 24px;} .rp-body ul{margin:0;padding-left:18px;}'
+    + '.footer{background:#fdf6ec;border-top:2px solid #b7740a;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;}'
+    + '.footer-brand{font-size:8px;font-weight:700;color:#b7740a;letter-spacing:2px;text-transform:uppercase;}'
+    + '.footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}'
+    + '</style>';
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bilan de Pédicurie</title>' + css + '</head><body style="margin:0;padding:0;">'
+    + '<div class="rp-page">'
+    + '<div class="header"><img class="logo" src="' + logo + '" alt="Sciopraxi"/>' + pratInfo + '</div>'
+    + '<div class="titre-rapport"><h1>Bilan de Pédicurie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
+    + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _pedEscapeHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
+    + '<div class="rp-body">' + synth + '</div>'
+    + '<div class="footer"><div class="footer-brand">Sciopraxi</div><div class="footer-info">Bilan de Pédicurie · ' + dateStr + '</div></div>'
+    + '</div></body></html>';
+}
+// #121 Phase 5b — Impression du rapport pédicurie via iframe masquée (pattern
+// sport/posturo). Évite les soucis de pop-ups bloquées + transmet le contexte
+// d'auth/Storage natif (les images du logo et autres ressources résolvent depuis
+// le même origin). Gate d'abonnement comme les autres impressions.
+function printRapportPedicurie(){
+  if (window._accessLevel && window._accessLevel !== 'full') { showAccessRestrictedModal('export_pdf'); return; }
+  if (typeof genererSynthesePedicurie === 'function') genererSynthesePedicurie();
+  var wrap = document.getElementById('pedicurie-rapport-iframe-wrap');
+  if (!wrap) { alert('Aperçu du rapport indisponible. Ouvrez l\'onglet Synthèse puis réessayez.'); return; }
+  var html = buildPedicurieRapportHTML();
+  wrap.innerHTML = '';
+  var iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:absolute;width:0;height:0;border:none;';
+  wrap.appendChild(iframe);
+  var idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open(); idoc.write(html); idoc.close();
+  setTimeout(function(){ try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e){ console.error('Print iframe pédicurie:', e); alert('Erreur lors de l\'impression. Réessayez ou Cmd/Ctrl+P.'); } }, 300);
+}
+
 // ───────────────────────────────────────────
 // Sport ttt — Traitements (Sprint A4 #73)
 // 8 fonctions + 1 flag réentrant pour smart-detach Échauffement.

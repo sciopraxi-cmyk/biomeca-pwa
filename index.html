@@ -1185,10 +1185,13 @@
       <div class="card sport-card-orange">
         <div class="sport-block-title c-orange">📄 Synthèse</div>
         <div style="font-size:11px;color:#666;margin-bottom:10px;font-style:italic;">Compte-rendu généré à partir des champs renseignés. Seuls les éléments saisis sont repris.</div>
-        <div style="margin-bottom:12px;"><button onclick="genererSynthesePedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔄 Générer la synthèse</button></div>
+        <div style="margin-bottom:12px;"><button onclick="genererSynthesePedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔄 Générer la synthèse</button><button onclick="printRapportPedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;margin-left:6px;">🖨️ Imprimer / PDF</button></div>
         <div id="pedicurie-synthese-result"></div>
       </div>
     </div>
+
+    <!-- #121 Phase 5b — Conteneur masqué pour l'iframe d'impression du rapport pédicurie. -->
+    <div id="pedicurie-rapport-iframe-wrap" style="display:none;"></div>
 
   </div>
 </div>
