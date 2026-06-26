@@ -504,6 +504,7 @@
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(2)" id="pdtab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🦶 Ongles</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(3)" id="pdtab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🩸 Vasculaire</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(4)" id="pdtab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🧠 Neuro</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(5)" id="pdtab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📊 Gradation</button>
     </div>
 
     <!-- Section 1 — Anamnèse -->
@@ -1017,6 +1018,37 @@
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_conclusion" value="absente"/> Pas de neuropathie</label>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_conclusion" value="presente"/> Neuropathie sensitive</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 6 — Gradation HAS du risque podologique (#121 Phase 2b) -->
+    <div class="sport-section pedicurie-section" id="pdsec-6">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">📊 Gradation du risque podologique (HAS)</div>
+
+        <!-- Sous-section : Critère complémentaire -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Critère complémentaire</div>
+        <div style="margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_grade_deformation"/> Déformation significative du pied (hallux valgus, griffes d'orteils, pied de Charcot…)</label>
+        </div>
+
+        <!-- Bandeau de suggestion (rempli par computePedicurieGrade) -->
+        <div id="ped-grade-suggestion" style="padding:10px 12px;border-radius:8px;margin:10px 0;font-size:13px;"></div>
+
+        <!-- Actions -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+          <button onclick="computePedicurieGrade()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">↻ Recalculer</button>
+          <button onclick="applyPedicurieGradeSuggestion()" class="btn" style="font-size:12px;padding:6px 14px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">✓ Appliquer le grade suggéré</button>
+        </div>
+
+        <!-- Sous-section : Grade retenu -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Grade retenu</div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="0"/> <strong>0</strong> — population générale (pas de neuropathie, pas d'artériopathie)</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="1"/> <strong>1</strong> — neuropathie OU artériopathie isolée</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="2"/> <strong>2</strong> — neuropathie + déformation et/ou artériopathie</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="3"/> <strong>3</strong> — antécédent de plaie ou d'amputation</label>
         </div>
       </div>
     </div>

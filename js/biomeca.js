@@ -12511,6 +12511,71 @@ function showPedicurieSection(idx) {
     t.style.color       = active ? '#fff'    : '#d97706';
     t.style.borderColor = '#d97706';
   });
+  // #121 Phase 2b — Recalcule la suggestion à chaque bascule pour refléter
+  // immédiatement les saisies des sections précédentes. Robuste si le bandeau
+  // n'existe pas (return null en interne).
+  if (typeof computePedicurieGrade === 'function') computePedicurieGrade();
+}
+
+// #121 Phase 2b — Calcule le grade HAS suggéré à partir des saisies neuro,
+// vasculaire, antécédents et critère complémentaire « déformation ». Met à
+// jour le bandeau #ped-grade-suggestion (couleur de fond selon le grade,
+// signification + liste des critères déclencheurs). Stocke le grade suggéré
+// dans `dataset.suggested` pour applyPedicurieGradeSuggestion. Retourne le
+// grade (Number 0..3) ou null si le bandeau n'existe pas (page non chargée).
+function computePedicurieGrade() {
+  const banner = document.getElementById('ped-grade-suggestion');
+  if (!banner) return null;
+  const cb  = (f) => !!document.querySelector('#pg-pedicurie [data-field="' + f + '"]')?.checked;
+  const rad = (n) => document.querySelector('#pg-pedicurie input[name="' + n + '"]:checked')?.value || '';
+  const neuropathie  = rad('ped_neuro_conclusion') === 'presente';
+  const arteriopathie = cb('ped_atcd_aomi') || rad('ped_vasc_conclusion') === 'suspicion_aomi';
+  const deformation  = cb('ped_grade_deformation');
+  const plaie        = cb('ped_atcdp_plaie_4sem');
+  const amputation   = cb('ped_atcdp_amputation');
+  let grade;
+  if (plaie || amputation) grade = 3;
+  else if (neuropathie && (deformation || arteriopathie)) grade = 2;
+  else if (neuropathie || arteriopathie) grade = 1;
+  else grade = 0;
+  const signification = {
+    0: 'population générale (pas de neuropathie, pas d\'artériopathie)',
+    1: 'neuropathie OU artériopathie isolée',
+    2: 'neuropathie + déformation et/ou artériopathie',
+    3: 'antécédent de plaie ou d\'amputation',
+  }[grade];
+  // Couleurs par grade. Texte sombre #1f2937 lisible sur tous les fonds.
+  const palette = {
+    0: { bg: 'rgba(34,197,94,0.12)',  border: '#22c55e' },
+    1: { bg: 'rgba(217,119,6,0.12)',  border: '#d97706' },
+    2: { bg: 'rgba(234,88,12,0.14)',  border: '#ea580c' },
+    3: { bg: 'rgba(220,38,38,0.14)',  border: '#dc2626' },
+  }[grade];
+  const critPush = [];
+  if (plaie)         critPush.push('plaie &gt; 4 semaines');
+  if (amputation)    critPush.push('amputation');
+  if (neuropathie)   critPush.push('neuropathie sensitive');
+  if (arteriopathie) critPush.push('artériopathie / suspicion AOMI');
+  if (deformation)   critPush.push('déformation significative');
+  const critereStr = critPush.length
+    ? '<div style="font-size:11px;margin-top:4px;color:#444;">Critères déclencheurs : ' + critPush.join(' · ') + '.</div>'
+    : '<div style="font-size:11px;margin-top:4px;color:#444;">Aucun critère de risque retenu — grade 0 par défaut.</div>';
+  banner.style.background  = palette.bg;
+  banner.style.borderLeft  = '4px solid ' + palette.border;
+  banner.style.color       = '#1f2937';
+  banner.innerHTML = '<strong style="color:' + palette.border + ';">Grade suggéré : ' + grade + '</strong> — ' + signification + critereStr;
+  banner.dataset.suggested = String(grade);
+  return grade;
+}
+
+// #121 Phase 2b — Applique le grade suggéré : coche le radio ped_grade_value
+// correspondant + déclenche un save silencieux pour persister immédiatement.
+function applyPedicurieGradeSuggestion() {
+  const g = computePedicurieGrade();
+  if (g == null) return;
+  const target = document.querySelector('#pg-pedicurie input[name="ped_grade_value"][value="' + g + '"]');
+  if (target) target.checked = true;
+  if (typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
 }
 
 // ───────────────────────────────────────────
