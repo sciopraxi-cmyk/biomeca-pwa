@@ -22,4 +22,6 @@ assets/
 index_backup.html
 Posture_*.md
 Roadmap_*.md
+Spec_*.md
+Bilan_*.md
 supabase/.temp/
