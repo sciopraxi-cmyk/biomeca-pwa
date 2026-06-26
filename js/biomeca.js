@@ -1075,6 +1075,7 @@ function applyReadOnlyUI(level) {
     '[onclick*="openNewPatientModal"]',
     '[onclick*="creerBilanSport"]',
     '[onclick*="creerBilanPosturo"]',
+    '[onclick*="creerBilanPedicurie"]', // #121 Phase 0 — cohérent avec posturo/sport pour gate abonnement.
     '[onclick*="printRapportPosturo"]',
     '[onclick*="printReport"]',
     '[onclick*="printBilan"]',
@@ -1743,6 +1744,10 @@ let currentOpenedBilanPosturoIdx = null;
 // chaque action de suppression légitime, ce qui crée du bruit et risque de
 // désensibiliser au vrai signal (perte de données non sollicitée).
 let _intentionalReduction = false;
+// #121 Phase 0 — Idem pour les bilans pédicurie (currentPatient.bilansPedicurie).
+// Set par ouvrirBilanPedicurie, reset par creerBilanPedicurie, finalizeBilanPedicurie,
+// abandonnerBilanPedicurie et selectPatient.
+let currentOpenedBilanPedicurieIdx = null;
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -2174,6 +2179,9 @@ function nav(id) {
   if (_leavingId && _leavingId !== id) {
     if (_leavingId === 'pg-bilan' && typeof saveBilanSilent === 'function') saveBilanSilent();
     else if (_leavingId === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
+    // #121 Phase 0 — capture-avant-quitter pédicurie (savePedicurieBilan non
+    // async, silent — pas de migration Storage en Phase 0).
+    else if (_leavingId === 'pg-pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
   }
   // Déplacer toutes les pages orphelines dans .main
   const mainEl = document.querySelector('.main');
@@ -2222,6 +2230,13 @@ function nav(id) {
   if(id === 'pg-posturo') {
     const pinfo = document.getElementById('posturo-patient-info');
     if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom+' · '+(currentPatient.sport||'—');
+  }
+  if(id === 'pg-pedicurie') {
+    // #121 Phase 0 — Mise à jour du sous-titre patient + restauration éventuelle
+    // depuis bilanDataPedicurie (no-op en Phase 0 car loadPedicurieBilan est stub).
+    const pinfo = document.getElementById('pedicurie-patient-info');
+    if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom;
+    setTimeout(loadPedicurieBilan, 50);
   }
   if(id === 'pg-bilan-posturo') {
     injectBilanPosturoPage();
@@ -2688,10 +2703,15 @@ function _countDataUnits(arr) {
   };
   let n = arr.length;
   for (const p of arr) {
-    n += (p.bilansSport?.length || 0) + (p.bilansPosturo?.length || 0);
-    n += countBd(p.bilanData) + countBd(p.bilanDataPosturo);
+    n += (p.bilansSport?.length || 0) + (p.bilansPosturo?.length || 0) + (p.bilansPedicurie?.length || 0);
+    n += countBd(p.bilanData) + countBd(p.bilanDataPosturo) + countBd(p.bilanDataPedicurie);
     (p.bilansSport || []).forEach(b => { n += countBd(b.bilanData); });
     (p.bilansPosturo || []).forEach(b => { n += countBd(b.bilanDataPosturo); });
+    // #121 Phase 0 — Comptage symétrique pour les archives pédicurie. countBd
+    // retourne 0 sur la coquille actuelle (pas de champs posturaux/photos) :
+    // c'est suffisant — le but est de compter les archives (présence d'objet)
+    // pour ne pas déclencher la fausse pop-up de richesse à la finalisation.
+    (p.bilansPedicurie || []).forEach(b => { n += countBd(b.bilanDataPedicurie); });
   }
   return n;
 }
@@ -2966,6 +2986,7 @@ function createPatient() {
 function selectPatient(p) {
   currentOpenedBilanIdx = null;
   currentOpenedBilanPosturoIdx = null;
+  currentOpenedBilanPedicurieIdx = null;
   currentPatient = p;
   const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
   if(document.getElementById('tb-av')) document.getElementById('tb-av').textContent = init;
@@ -3103,6 +3124,7 @@ function renderPatientList() {
     // Bilans existants
     const bilansSport = p.bilansSport || [];
     const bilansPosturo = p.bilansPosturo || [];
+    const bilansPedicurie = p.bilansPedicurie || []; // #121 Phase 0
 
     // Carte "Bilan en cours" — affichée dès qu'un bilan est démarré
     // (currentBilanSportSousType non null), même si aucune donnée n'a encore été saisie.
@@ -3152,6 +3174,23 @@ function renderPatientList() {
         </div>
       </div>` : '';
 
+    // #121 Phase 0 — Bandeau « bilan pédicurie en cours » (miroir posturo).
+    const hasBilanPedicurieData = hasBilanDataContent(p.bilanDataPedicurie);
+    const hasBilanPedicurieEnCours = p.currentBilanPedicurieSousType != null;
+    const typePedicurieLabel = p.currentBilanPedicurieSousType === 'controle' ? 'de Contrôle' : 'Initial';
+    const sousLibellePedicurie = hasBilanPedicurieData ? 'saisie clinique en cours' : 'aucune donnée encore saisie';
+    const bilanPedicurieEnCoursHtml = hasBilanPedicurieEnCours ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:rgba(247,165,40,0.85);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⏳ Bilan pédicurie en cours</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(247,165,40,0.08);border:1px solid rgba(247,165,40,0.30);border-radius:8px;margin-bottom:5px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#f7a528;flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">Bilan ${typePedicurieLabel} · ${sousLibellePedicurie}</span>
+          <button onclick="ouvrirBilanPedicurie(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
+          <button onclick="abandonnerBilanPedicurie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(240,64,96,0.9);color:#fff;">🗑️ Abandonner</button>
+          <button onclick="finalizeBilanPedicurie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
+        </div>
+      </div>` : '';
+
     const bilansSportHtml = bilansSport.length ? `
       <div style="margin-top:10px;">
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans sportifs</div>
@@ -3183,6 +3222,20 @@ function renderPatientList() {
           <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
           <button onclick="ouvrirBilanPosturo(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">Ouvrir</button>
           <button onclick="supprimerBilanPosturo(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
+        </div>`).join('')}
+      </div>` : '';
+
+    // #121 Phase 0 — Liste des archives pédicurie (miroir posturo, palette ambre).
+    const bilansPedicurieHtml = bilansPedicurie.length ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans pédicurie</div>
+        ${bilansPedicurie.map((b,bi) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.18);border-radius:8px;margin-bottom:5px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#d97706;flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
+          <button onclick="ouvrirBilanPedicurie(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#b45309;color:#fff;">Ouvrir</button>
+          <button onclick="supprimerBilanPedicurie(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
         </div>`).join('')}
       </div>` : '';
 
@@ -3240,9 +3293,32 @@ function renderPatientList() {
         </div>
       </div>`;
 
+    // #121 Phase 0 — Carte Pédicurie. PAS de check module (gratuit/inclus) →
+    // boutons TOUJOURS actifs. Le gate _accessLevel se gère dans creerBilanPedicurie
+    // + via applyReadOnlyUI (cf. selector ajouté dans la liste applyReadOnlyUI).
+    const modPedicurie = `
+      <div style="border-radius:12px;overflow:hidden;background:#3d2410;border:1px solid #7c3a0e;">
+        <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(217,119,6,0.35),transparent);"></div>
+          <span style="font-size:42px;position:relative;z-index:1;">🦶</span>
+        </div>
+        <div style="padding:10px 12px;">
+          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;">Pédicurie</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Soin des pieds · inclus</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            <button onclick="creerBilanPedicurie(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#d97706;color:#fff;">Initial</button>
+            <button onclick="creerBilanPedicurie(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#7c3a0e;">Contrôle</button>
+          </div>
+        </div>
+      </div>`;
+
+    // #121 Phase 0 — Coin arrondi du header : actif si UN bandeau « en cours »
+    // ou UNE liste d'archives est présent, peu importe le type (sport/posturo/pédicurie).
+    const _hasAnyExpandedBilan = hasBilanEnCours || hasBilanPosturoEnCours || hasBilanPedicurieEnCours
+      || bilansSport.length || bilansPosturo.length || bilansPedicurie.length;
     return `
     <div style="margin-bottom:10px;">
-      <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:${hasBilanEnCours||hasBilanPosturoEnCours||bilansSport.length||bilansPosturo.length?'12px 12px 0 0':'12px'};">
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:${_hasAnyExpandedBilan?'12px 12px 0 0':'12px'};">
         <div class="av" style="width:44px;height:44px;flex-shrink:0;">${init}</div>
         <div style="flex:1;">
           <div style="font-size:14px;font-weight:700;color:#fff;">${p.prenom} ${p.nom}</div>
@@ -3252,10 +3328,10 @@ function renderPatientList() {
         <button onclick="deletePatient(${i})" style="background:rgba(240,64,96,0.08);border:1px solid rgba(240,64,96,0.2);color:#f04060;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✕</button>
       </div>
       <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-top:none;border-radius:0 0 12px 12px;padding:14px;">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:${hasBilanEnCours||hasBilanPosturoEnCours||bilansSport.length||bilansPosturo.length?'4px':'0'};">
-          ${modPosturo}${modSport}${modPodo}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:${_hasAnyExpandedBilan?'4px':'0'};">
+          ${modPosturo}${modSport}${modPedicurie}${modPodo}
         </div>
-        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilansPosturoHtml}${bilansSportHtml}${compareSportHtml}
+        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilansPosturoHtml}${bilansPedicurieHtml}${bilansSportHtml}${compareSportHtml}
       </div>
     </div>`;
   }).join('');
@@ -3676,6 +3752,137 @@ function supprimerBilanPosturo(patIdx, bilanIdx) {
   if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
   p.bilansPosturo.splice(bilanIdx, 1);
   // #117-incident — Suppression VOLONTAIRE d'une archive posturo → suppress la garde.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
+  renderPatientList();
+}
+
+// ══════════════════════════════════════════════════════
+// #121 Phase 0 — BILAN PÉDICURIE (miroir posturo, sans photos)
+// ══════════════════════════════════════════════════════
+// Module GRATUIT et inclus → PAS de check `modules.includes(...)`. Le gate
+// _accessLevel !== 'full' reste pour aligner avec sport/posturo (essai/quota).
+// Phase 0 = scaffolding cycle de vie + persistance. Pas de page UI (Commit 2),
+// pas de photos (savePedicurieBilan non async). La structure est prête pour
+// y greffer le markup du bilan ultérieurement sans toucher au modèle.
+
+function abandonnerBilanPedicurie(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  const hasBilanPedicurieData = hasBilanDataContent(p.bilanDataPedicurie);
+  let confirmMsg;
+  if (hasBilanPedicurieData) {
+    confirmMsg = 'Abandonner le bilan pédicurie en cours ?\n\nVous allez perdre : saisie clinique.\n\nCette action est irréversible.';
+  } else {
+    confirmMsg = 'Abandonner le bilan pédicurie en cours ?\n\nLe bilan est actuellement vide (aucune donnée saisie). Cette action supprimera le bilan démarré.';
+  }
+  if (!confirm(confirmMsg)) return;
+  p.bilanDataPedicurie = {};
+  delete p.currentBilanPedicurieSousType;
+  currentOpenedBilanPedicurieIdx = null;
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
+  renderPatientList();
+}
+
+// Archive le bilan pédicurie en cours dans bilansPedicurie[] sans démarrer un nouveau bilan.
+function finalizeBilanPedicurie(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  const hasBilanPedicurieData = hasBilanDataContent(p.bilanDataPedicurie);
+  if (!hasBilanPedicurieData) {
+    alert('Aucune saisie clinique n\'a été effectuée dans le bilan pédicurie en cours.');
+    return;
+  }
+  if (!p.bilansPedicurie) p.bilansPedicurie = [];
+  const existingCount = p.bilansPedicurie.length;
+  const label = existingCount === 0 ? 'Pédicurie Initial' : 'Pédicurie Contrôle ' + existingCount;
+  const archivedType = existingCount === 0 ? 'initial' : 'controle';
+  p.bilansPedicurie.push({
+    label: label,
+    type: archivedType,
+    date: new Date().toLocaleDateString('fr-FR'),
+    bilanDataPedicurie: JSON.parse(JSON.stringify(p.bilanDataPedicurie))
+  });
+  p.bilanDataPedicurie = {};
+  delete p.currentBilanPedicurieSousType;
+  currentOpenedBilanPedicurieIdx = null;
+  savePatients();
+  renderPatientList();
+  alert('✓ Bilan "' + label + '" archivé avec succès.');
+}
+
+function creerBilanPedicurie(patIdx, type) {
+  // Gate abonnement uniquement (PAS de check module : pédicurie est inclus/gratuit).
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_bilan');
+    return;
+  }
+  const p = patients[patIdx];
+  if(!p) return;
+  // Archiver UNIQUEMENT si in-progress (sousType set), pas si viewing-only
+  // (data chargée par ouvrirBilanPedicurie SANS sousType set).
+  const isInProgress = p.currentBilanPedicurieSousType != null;
+  const hasData = p.bilanDataPedicurie && Object.keys(p.bilanDataPedicurie).length > 0;
+  if(isInProgress && hasData) {
+    const confirmMsg = 'Vous avez un bilan pédicurie en cours.\n\n' +
+      'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
+      '• OK : finalise et archive le bilan en cours, puis démarre un nouveau bilan.\n' +
+      '• Annuler : retour à la fiche patient pour utiliser le bouton "Finaliser et archiver" du bilan en cours.';
+    if (!confirm(confirmMsg)) return;
+    if(!p.bilansPedicurie) p.bilansPedicurie = [];
+    const existingCount = p.bilansPedicurie.length;
+    const archiveLabel = existingCount === 0 ? 'Pédicurie Initial' : 'Pédicurie Contrôle ' + existingCount;
+    const archiveType = existingCount === 0 ? 'initial' : 'controle';
+    p.bilansPedicurie.push({
+      label: archiveLabel,
+      type: archiveType,
+      date: new Date().toLocaleDateString('fr-FR'),
+      bilanDataPedicurie: JSON.parse(JSON.stringify(p.bilanDataPedicurie))
+    });
+  }
+  // Reset état pour démarrer un nouveau bilan vide
+  p.bilanDataPedicurie = {};
+  p.currentBilanPedicurieSousType = type;
+  // NE PAS toucher currentBilanSportSousType / currentBilanPosturoSousType.
+  // #118 v2 — Création VOLONTAIRE → suppress la garde de richesse.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
+  currentOpenedBilanPedicurieIdx = null;
+  selectPatient(p);
+  nav('pg-pedicurie');
+}
+
+// Phase 0 — SIMPLIFIÉ vs ouvrirBilanPosturo : pas de prefetch photos, pas de
+// restauration neuro4. Synchrone (aucun await nécessaire).
+function ouvrirBilanPedicurie(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if(!p) return;
+  const bilan = p.bilansPedicurie?.[bilanIdx];
+  if(!bilan) {
+    // Bilan courant
+    currentOpenedBilanPedicurieIdx = null;
+    selectPatient(p);
+    nav('pg-pedicurie');
+    return;
+  }
+  selectPatient(p);
+  currentPatient.bilanDataPedicurie = JSON.parse(JSON.stringify(bilan.bilanDataPedicurie||{}));
+  currentOpenedBilanPedicurieIdx = bilanIdx;
+  // Reset flag bilan en cours (mirror sport/posturo).
+  delete p.currentBilanPedicurieSousType;
+  nav('pg-pedicurie');
+  setTimeout(loadPedicurieBilan, 50);
+}
+
+function supprimerBilanPedicurie(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if(!p) return;
+  const bilan = p.bilansPedicurie?.[bilanIdx];
+  if(!bilan) return;
+  if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
+  p.bilansPedicurie.splice(bilanIdx, 1);
+  // Phase 0 — pas de cleanup Storage (pas de photos).
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
   renderPatientList();
@@ -12228,6 +12435,39 @@ function syncOpenedBilanPosturoToHistory() {
   target.bilanDataPosturo = JSON.parse(JSON.stringify(currentPatient.bilanDataPosturo || {}));
 }
 
+// #121 Phase 0 — Mirror pédicurie : synchronise les modifications du bilan
+// pédicurie en cours d'édition vers son entrée dans bilansPedicurie[].
+function syncOpenedBilanPedicurieToHistory() {
+  if (currentOpenedBilanPedicurieIdx == null) return;
+  if (!currentPatient || !currentPatient.bilansPedicurie) return;
+  const target = currentPatient.bilansPedicurie[currentOpenedBilanPedicurieIdx];
+  if (!target) return;
+  target.bilanDataPedicurie = JSON.parse(JSON.stringify(currentPatient.bilanDataPedicurie || {}));
+}
+
+// #121 Phase 0 — Sauvegarde du bilan pédicurie. NON async (pas de photos donc
+// pas de migration Storage). La coquille de sweep est vide pour l'instant ;
+// les champs viendront avec le markup du bilan (Commit 2+).
+function savePedicurieBilan(silent) {
+  if (!currentPatient) { if (!silent) alert('Sélectionnez un patient'); return; }
+  if (!currentPatient.bilanDataPedicurie) currentPatient.bilanDataPedicurie = {};
+  const d = currentPatient.bilanDataPedicurie;
+  if (!d.id) d.id = crypto.randomUUID();
+  // Sweep des champs du bilan pédicurie — coquille vide en Phase 0.
+  // Les futurs champs (getPedVal('ped-*'), checkboxes, radios) viendront ici.
+  syncOpenedBilanPedicurieToHistory();
+  savePatients();
+  if (!silent) alert('✓ Bilan pédicurie sauvegardé');
+}
+
+// #121 Phase 0 — Restauration depuis bilanDataPedicurie. No-op en Phase 0
+// (structure prête pour les futurs setPedVal / setPedicurieRadio / etc.).
+function loadPedicurieBilan() {
+  const d = currentPatient?.bilanDataPedicurie;
+  if (!d) return;
+  // Sweep de restauration — coquille vide en Phase 0.
+}
+
 // ───────────────────────────────────────────
 // Sport ttt — Traitements (Sprint A4 #73)
 // 8 fonctions + 1 flag réentrant pour smart-detach Échauffement.
@@ -17887,19 +18127,26 @@ document.addEventListener('DOMContentLoaded', populateSportPostureCaptureBlock);
 let _bilanAutosaveTimer = null;
 // #119 — Helper extrait pour partager le déclencheur d'auto-save entre l'event
 // 'input' (frappe clavier #116) et le mouseup des canvas dessinés (#119 étape 3).
-// `isSport` true → saveBilanSilent ; false → savePosturoBilan(silent).
-function _scheduleBilanAutosave(isSport) {
+// #121 Phase 0 — Généralisé à 3 cibles : flavor ∈ {'sport','posturo','pedicurie'}.
+// Rétro-compat : un boolean (true=sport, false=posturo) est encore accepté pour
+// éviter de toucher aux 2 call-sites canvas existants (qui passent un boolean).
+function _scheduleBilanAutosave(flavor) {
+  // Normalisation rétro-compat boolean → flavor string.
+  if (flavor === true)  flavor = 'sport';
+  if (flavor === false) flavor = 'posturo';
   clearTimeout(_bilanAutosaveTimer);
   _bilanAutosaveTimer = setTimeout(function() {
-    if (isSport) { if (typeof saveBilanSilent === 'function') saveBilanSilent(); }
-    else { if (typeof savePosturoBilan === 'function') savePosturoBilan(true); }
+    if (flavor === 'sport' && typeof saveBilanSilent === 'function') saveBilanSilent();
+    else if (flavor === 'posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
+    else if (flavor === 'pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
   }, 1000);
 }
 document.addEventListener('input', function(e) {
-  const inSport   = e.target.closest && e.target.closest('#pg-bilan');
-  const inPosturo = e.target.closest && e.target.closest('#pg-bilan-posturo');
-  if (!inSport && !inPosturo) return;
-  _scheduleBilanAutosave(!!inSport);
+  const inSport     = e.target.closest && e.target.closest('#pg-bilan');
+  const inPosturo   = e.target.closest && e.target.closest('#pg-bilan-posturo');
+  const inPedicurie = e.target.closest && e.target.closest('#pg-pedicurie');
+  if (!inSport && !inPosturo && !inPedicurie) return;
+  _scheduleBilanAutosave(inSport ? 'sport' : (inPosturo ? 'posturo' : 'pedicurie'));
 });
 
 // ===== STRIPE + MODULES =====
