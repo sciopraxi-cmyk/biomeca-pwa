@@ -507,6 +507,7 @@
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(5)" id="pdtab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📊 Gradation</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(6)" id="pdtab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🦴 Morpho/Chaussage</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(7)" id="pdtab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">💊 Soins</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(8)" id="pdtab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📄 Synthèse</button>
     </div>
 
     <!-- Section 1 — Anamnèse -->
@@ -1176,6 +1177,16 @@
         <div>
           <input class="inp pedicurie-field" data-field="ped_soin_autre_txt" placeholder="Précisions libres..."/>
         </div>
+      </div>
+    </div>
+
+    <!-- Section Synthèse — Compte-rendu généré (#121 Phase 5a) -->
+    <div class="sport-section pedicurie-section" id="pdsec-9">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">📄 Synthèse</div>
+        <div style="font-size:11px;color:#666;margin-bottom:10px;font-style:italic;">Compte-rendu généré à partir des champs renseignés. Seuls les éléments saisis sont repris.</div>
+        <div style="margin-bottom:12px;"><button onclick="genererSynthesePedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔄 Générer la synthèse</button></div>
+        <div id="pedicurie-synthese-result"></div>
       </div>
     </div>
 

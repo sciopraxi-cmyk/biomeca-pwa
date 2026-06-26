@@ -12515,6 +12515,10 @@ function showPedicurieSection(idx) {
   // immédiatement les saisies des sections précédentes. Robuste si le bandeau
   // n'existe pas (return null en interne).
   if (typeof computePedicurieGrade === 'function') computePedicurieGrade();
+  // #121 Phase 5a — Idem pour la synthèse : régénérée à chaque bascule pour
+  // refléter immédiatement les saisies des autres sections (no-op si le
+  // conteneur #pedicurie-synthese-result n'existe pas).
+  if (typeof genererSynthesePedicurie === 'function') genererSynthesePedicurie();
 }
 
 // #121 Phase 2b — Calcule le grade HAS suggéré à partir des saisies neuro,
@@ -12576,6 +12580,48 @@ function applyPedicurieGradeSuggestion() {
   const target = document.querySelector('#pg-pedicurie input[name="ped_grade_value"][value="' + g + '"]');
   if (target) target.checked = true;
   if (typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
+}
+
+// #121 Phase 5a — Générateur de synthèse pédicurie. Compile un compte-rendu
+// HTML à partir du DOM courant : seuls les champs renseignés sont repris.
+// Lit les cases/radios/selects/textes via leurs sélecteurs natifs ; pas de
+// dépendance à bilanDataPedicurie (le DOM est l'état de vérité au moment de
+// la génération, après le balayage save/load). Aucune écriture parasite.
+function _pedEscapeHtml(s){ if(s==null)return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+var _PED_TXT_LABELS={ped_motif_autre_txt:'Autre motif',ped_hba1c:'HbA1c',ped_chaussage_autre_txt:'Chaussage (autre)',ped_profession:'Profession',ped_ttt_autre_txt:'Traitement (autre)',ped_derm_eva:'Douleur (EVA)',ped_derm_autre_txt:'Dermato (précisions)',ped_chaussex_autre_txt:'Chaussage (autre)',ped_suivi_freq:'Fréquence de suivi',ped_suivi_rdv:'Prochain RDV',ped_adress_motif:"Motif d'adressage",ped_soin_autre_txt:'Précisions'};
+var _PED_RADIO_LABELS={ped_diabete_type:'Diabète — type',ped_diabete_equilibre:'Diabète — équilibre',ped_autonomie:'Autonomie soin des pieds',ped_vue:'Vue',ped_derm_cor_type:'Cor — type',ped_derm_etat:'État cutané',ped_derm_trophicite:'Coloration (trophicité)',ped_vasc_pedieux_d:'Pouls pédieux (D)',ped_vasc_pedieux_g:'Pouls pédieux (G)',ped_vasc_tibial_d:'Pouls tibial post. (D)',ped_vasc_tibial_g:'Pouls tibial post. (G)',ped_vasc_trc:'TRC',ped_vasc_temp:'Température des téguments',ped_vasc_conclusion:'Conclusion vasculaire',ped_neuro_mono_d:'Monofilament 10 g (D)',ped_neuro_mono_g:'Monofilament 10 g (G)',ped_neuro_vibra_d:'Sensibilité vibratoire (D)',ped_neuro_vibra_g:'Sensibilité vibratoire (G)',ped_neuro_conclusion:'Conclusion neuro'};
+var _PED_ONGLE_LABELS={mycose:'Onychomycose',epaissi:'Onychauxis',decolle:'Onycholyse',incarne:'Onychocryptose',hematome:'Hématome',courb:'Hypercourbure',perionyxis:'Périonyxis',suspect:'Lésion suspecte'};
+var _PED_ONGLE_ORDER=['mycose','epaissi','decolle','incarne','hematome','courb','perionyxis','suspect'];
+var _PED_GRADE_SIGN={'0':"population générale (pas de neuropathie, pas d'artériopathie)",'1':'neuropathie OU artériopathie isolée','2':'neuropathie + déformation et/ou artériopathie','3':"antécédent de plaie ou d'amputation"};
+var _PED_ALERTE_FIELDS={ped_derm_ulceration:1,ped_derm_malperf:1};
+function genererSynthesePedicurie(){
+  var out=document.getElementById('pedicurie-synthese-result'); if(!out)return;
+  var root=document.getElementById('pg-pedicurie'); if(!root){out.innerHTML='';return;}
+  function labelOf(el){var lab=el.closest('label');var txt=lab?lab.textContent:'';return txt.replace(/\s+/g,' ').trim();}
+  function checkedBoxes(){var res=[];root.querySelectorAll('input[type="checkbox"].pedicurie-field').forEach(function(cb){if(!cb.checked)return;var f=cb.getAttribute('data-field')||'';if(f.indexOf('ped_ongle_')===0)return;res.push({field:f,label:labelOf(cb)});});return res;}
+  function radioVal(name){var el=root.querySelector('input[name="'+name+'"]:checked');return el?{value:el.value,label:labelOf(el)}:null;}
+  function fieldVal(f){var el=root.querySelector('[data-field="'+f+'"]');if(!el)return '';return (el.value||'').trim();}
+  function selectText(f){var el=root.querySelector('select[data-field="'+f+'"]');if(!el||!el.value)return '';var opt=el.options[el.selectedIndex];return opt?opt.textContent.trim():el.value;}
+  var blocks=[];
+  function section(title,items){var real=items.filter(function(x){return x&&x.trim()!=='';});if(!real.length)return '';var lis=real.map(function(it){return '<li style="margin:2px 0;">'+it+'</li>';}).join('');return '<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#b7740a;border-bottom:1px solid rgba(217,119,6,0.25);padding-bottom:3px;margin-bottom:6px;">'+title+'</div><ul style="margin:0;padding-left:18px;list-style:disc;font-size:13px;color:#222;line-height:1.5;">'+lis+'</ul></div>';}
+  function kv(label,value){return '<strong>'+label+'</strong> : '+_pedEscapeHtml(value);}
+  function chk(field,label){var safe=_pedEscapeHtml(label);if(_PED_ALERTE_FIELDS[field]||/⚠/.test(label)){return '<span style="color:#c0392b;font-weight:600;">'+safe+'</span>';}return safe;}
+  function boxesItems(predicate){return checkedBoxes().filter(predicate).map(function(b){return chk(b.field,b.label);});}
+  function radioItem(name){var r=radioVal(name);if(!r)return '';return kv(_PED_RADIO_LABELS[name]||name,r.label);}
+  function txtItem(f){var v=(f==='ped_suivi_freq')?selectText(f):fieldVal(f);if(!v)return '';if(f==='ped_suivi_rdv'){var d=new Date(v+'T00:00:00');if(!isNaN(d.getTime()))v=d.toLocaleDateString('fr-FR');}return kv(_PED_TXT_LABELS[f]||f,v);}
+  function pfx(){var prefixes=Array.prototype.slice.call(arguments);return function(b){return prefixes.some(function(p){return b.field.indexOf(p)===0;});};}
+  function ongleItems(){var items=[];var orteilLabel={1:'O1 (Hallux)',2:'O2',3:'O3',4:'O4',5:'O5'};[['d','Pied D'],['g','Pied G']].forEach(function(pied){var side=pied[0],sideLbl=pied[1];for(var o=1;o<=5;o++){var anomalies=[];_PED_ONGLE_ORDER.forEach(function(suf){var f='ped_ongle_'+side+o+'_'+suf;var el=root.querySelector('[data-field="'+f+'"]');if(el&&el.checked){var lbl=_PED_ONGLE_LABELS[suf];anomalies.push(suf==='suspect'?'<span style="color:#c0392b;font-weight:600;">⚠ '+lbl+'</span>':lbl);}});if(anomalies.length){items.push('<strong>'+sideLbl+' — '+orteilLabel[o]+'</strong> : '+anomalies.join(', '));}}var prec=fieldVal('ped_ongle_'+side+'_autre_txt');if(prec)items.push('<em>'+sideLbl+' — précisions</em> : '+_pedEscapeHtml(prec));});return items;}
+  blocks.push(section('📋 Anamnèse',[].concat(boxesItems(pfx('ped_motif_')).length?['<strong>Motif</strong> : '+boxesItems(pfx('ped_motif_')).join(', ')]:[],[txtItem('ped_motif_autre_txt')],boxesItems(pfx('ped_atcd_')).length?['<strong>ATCD médicaux</strong> : '+boxesItems(pfx('ped_atcd_')).join(', ')]:[],[radioItem('ped_diabete_type'),radioItem('ped_diabete_equilibre'),txtItem('ped_hba1c')],boxesItems(pfx('ped_atcdp_')).length?['<strong>ATCD podologiques</strong> : '+boxesItems(pfx('ped_atcdp_')).join(', ')]:[],[radioItem('ped_autonomie'),radioItem('ped_vue')],boxesItems(pfx('ped_hygiene_')).length?['<strong>Hygiène</strong> : '+boxesItems(pfx('ped_hygiene_')).join(', ')]:[],boxesItems(pfx('ped_chaussage_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussage_')).join(', ')]:[],[txtItem('ped_chaussage_autre_txt')],boxesItems(pfx('ped_activite_')).length?['<strong>Activité</strong> : '+boxesItems(pfx('ped_activite_')).join(', ')]:[],[txtItem('ped_profession')],boxesItems(pfx('ped_ttt_')).length?['<strong>Traitements</strong> : '+boxesItems(pfx('ped_ttt_')).join(', ')]:[],[txtItem('ped_ttt_autre_txt')])));
+  blocks.push(section('🔬 Examen dermatologique',[].concat(boxesItems(pfx('ped_derm_')),[radioItem('ped_derm_cor_type'),txtItem('ped_derm_eva'),radioItem('ped_derm_etat'),radioItem('ped_derm_trophicite'),txtItem('ped_derm_autre_txt')])));
+  blocks.push(section('🦶 Examen unguéal',ongleItems()));
+  blocks.push(section('🩸 Dépistage vasculaire',[radioItem('ped_vasc_pedieux_d'),radioItem('ped_vasc_pedieux_g'),radioItem('ped_vasc_tibial_d'),radioItem('ped_vasc_tibial_g'),radioItem('ped_vasc_trc'),radioItem('ped_vasc_temp')].concat(boxesItems(pfx('ped_vasc_')).length?['<strong>Autres signes</strong> : '+boxesItems(pfx('ped_vasc_')).join(', ')]:[],[radioItem('ped_vasc_conclusion')])));
+  blocks.push(section('🧠 Dépistage neurologique',[radioItem('ped_neuro_mono_d'),radioItem('ped_neuro_mono_g'),radioItem('ped_neuro_vibra_d'),radioItem('ped_neuro_vibra_g'),radioItem('ped_neuro_conclusion')]));
+  var gradeItems=[];boxesItems(pfx('ped_grade_')).forEach(function(it){gradeItems.push(it);});var gradeR=radioVal('ped_grade_value');if(gradeR){var sign=_PED_GRADE_SIGN[gradeR.value]||'';gradeItems.push('<span style="display:inline-block;background:rgba(217,119,6,0.12);border-left:4px solid #d97706;border-radius:4px;padding:3px 8px;font-weight:700;color:#1f2937;">Grade retenu : '+_pedEscapeHtml(gradeR.value)+' — '+_pedEscapeHtml(sign)+'</span>');}blocks.push(section('📊 Gradation du risque (HAS)',gradeItems));
+  blocks.push(section('🦴 Morphostatique & chaussage',[].concat(boxesItems(pfx('ped_morpho_hallux_valgus','ped_morpho_griffes','ped_morpho_quintus','ped_morpho_pied_')).length?['<strong>Déformations</strong> : '+boxesItems(pfx('ped_morpho_hallux_valgus','ped_morpho_griffes','ped_morpho_quintus','ped_morpho_pied_')).join(', ')]:[],boxesItems(pfx('ped_morpho_appui_')).length?['<strong>Hyperappui</strong> : '+boxesItems(pfx('ped_morpho_appui_')).join(', ')]:[],boxesItems(pfx('ped_chaussex_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussex_')).join(', ')]:[],[txtItem('ped_chaussex_autre_txt')])));
+  blocks.push(section('💊 Soins & projet thérapeutique',[].concat(boxesItems(pfx('ped_soin_')).length?['<strong>Soins réalisés</strong> : '+boxesItems(pfx('ped_soin_')).join(', ')]:[],boxesItems(pfx('ped_appar_')).length?['<strong>Appareillages</strong> : '+boxesItems(pfx('ped_appar_')).join(', ')]:[],boxesItems(pfx('ped_conseil_')).length?['<strong>Conseils</strong> : '+boxesItems(pfx('ped_conseil_')).join(', ')]:[],[txtItem('ped_suivi_freq'),txtItem('ped_suivi_rdv')],boxesItems(pfx('ped_adress_')).length?['<strong>Adressage</strong> : '+boxesItems(pfx('ped_adress_')).join(', ')]:[],[txtItem('ped_adress_motif')],boxesItems(function(b){return b.field==='ped_consentement';}),[txtItem('ped_soin_autre_txt')])));
+  var html=blocks.filter(function(b){return b;}).join('');
+  if(!html){out.innerHTML='<div style="font-size:13px;color:#666;font-style:italic;padding:8px 0;">Aucune donnée renseignée pour le moment.</div>';return;}
+  out.innerHTML='<div style="background:rgba(217,119,6,0.04);border:1px solid rgba(217,119,6,0.18);border-radius:8px;padding:12px 14px;">'+html+'</div>';
 }
 
 // ───────────────────────────────────────────
