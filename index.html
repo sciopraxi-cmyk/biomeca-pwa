@@ -502,6 +502,8 @@
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(0)" id="pdtab-0" style="font-size:11px;padding:5px 12px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📋 Anamnèse</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(1)" id="pdtab-1" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔬 Examen dermatologique</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(2)" id="pdtab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🦶 Ongles</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(3)" id="pdtab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🩸 Vasculaire</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(4)" id="pdtab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🧠 Neuro</button>
     </div>
 
     <!-- Section 1 — Anamnèse -->
@@ -911,6 +913,110 @@
         </div>
         <div>
           <input class="inp pedicurie-field" data-field="ped_ongle_g_autre_txt" placeholder="Précisions (stade incarné, lignes de Beau, autre)..."/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4 — Dépistage vasculaire (#121 Phase 2a) -->
+    <div class="sport-section pedicurie-section" id="pdsec-4">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">🩸 Dépistage vasculaire</div>
+
+        <!-- Sous-section : Pouls -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Pouls périphériques</div>
+        <div style="font-weight:600;color:#222;font-size:12px;margin-bottom:4px;">Pouls pédieux</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied D :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_pedieux_d" value="present"/> Présent</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_pedieux_d" value="diminue"/> Diminué</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_pedieux_d" value="aboli"/> Aboli</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied G :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_pedieux_g" value="present"/> Présent</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_pedieux_g" value="diminue"/> Diminué</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_pedieux_g" value="aboli"/> Aboli</label>
+        </div>
+        <div style="font-weight:600;color:#222;font-size:12px;margin-bottom:4px;">Pouls tibial postérieur</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied D :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_tibial_d" value="present"/> Présent</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_tibial_d" value="diminue"/> Diminué</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_tibial_d" value="aboli"/> Aboli</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied G :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_tibial_g" value="present"/> Présent</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_tibial_g" value="diminue"/> Diminué</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_tibial_g" value="aboli"/> Aboli</label>
+        </div>
+
+        <!-- Sous-section : Autres signes -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Autres signes</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">TRC (temps de recoloration) :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_trc" value="normal"/> Normal (&lt; 3 s)</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_trc" value="allonge"/> Allongé (&gt; 3 s)</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Température des téguments :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_temp" value="normale"/> Normale</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_temp" value="froide"/> Froide</label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_vasc_oedeme"/> Œdème</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_vasc_varices"/> Varices</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_vasc_troubles_trophiques"/> Troubles trophiques</label>
+        </div>
+
+        <!-- Sous-section : Conclusion vasculaire -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Conclusion vasculaire</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_conclusion" value="normale"/> Normale</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_conclusion" value="suspicion_aomi"/> Suspicion AOMI</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_conclusion" value="suspicion_iv"/> Suspicion insuffisance veineuse</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5 — Dépistage neurologique (#121 Phase 2a) -->
+    <div class="sport-section pedicurie-section" id="pdsec-5">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">🧠 Dépistage neurologique</div>
+
+        <!-- Sous-section : Monofilament 10 g -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Monofilament 10 g (Semmes-Weinstein)</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied D :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_mono_d" value="normal"/> Perçu partout</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_mono_d" value="anormal"/> ≥ 1 point non perçu</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied G :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_mono_g" value="normal"/> Perçu partout</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_mono_g" value="anormal"/> ≥ 1 point non perçu</label>
+        </div>
+
+        <!-- Sous-section : Sensibilité vibratoire -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Sensibilité vibratoire (diapason 128 Hz)</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied D :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_vibra_d" value="normale"/> Normale</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_vibra_d" value="diminuee"/> Diminuée</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_vibra_d" value="abolie"/> Abolie</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied G :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_vibra_g" value="normale"/> Normale</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_vibra_g" value="diminuee"/> Diminuée</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_vibra_g" value="abolie"/> Abolie</label>
+        </div>
+
+        <!-- Sous-section : Conclusion neurologique (alimentera la gradation HAS — Phase 2b) -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Conclusion neurologique</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_conclusion" value="absente"/> Pas de neuropathie</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_conclusion" value="presente"/> Neuropathie sensitive</label>
         </div>
       </div>
     </div>
