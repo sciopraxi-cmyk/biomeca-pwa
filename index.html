@@ -505,6 +505,8 @@
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(3)" id="pdtab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🩸 Vasculaire</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(4)" id="pdtab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🧠 Neuro</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(5)" id="pdtab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📊 Gradation</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(6)" id="pdtab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🦴 Morpho/Chaussage</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(7)" id="pdtab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">💊 Soins</button>
     </div>
 
     <!-- Section 1 — Anamnèse -->
@@ -1049,6 +1051,130 @@
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="1"/> <strong>1</strong> — neuropathie OU artériopathie isolée</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="2"/> <strong>2</strong> — neuropathie + déformation et/ou artériopathie</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="3"/> <strong>3</strong> — antécédent de plaie ou d'amputation</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 7 — Morphostatique & chaussage (#121 Phase 4) -->
+    <div class="sport-section pedicurie-section" id="pdsec-7">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">🦴 Morphostatique &amp; chaussage</div>
+
+        <!-- Sous-section : Déformations -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Déformations</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_hallux_valgus"/> Hallux valgus</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_griffes"/> Griffes / marteaux d'orteils</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_quintus"/> Quintus varus</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_pied_creux"/> Pied creux</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_pied_plat"/> Pied plat</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_pied_valgus"/> Pied valgus</label>
+        </div>
+
+        <!-- Sous-section : Zones d'hyperappui -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Zones d'hyperappui</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_appui_avant"/> Avant-pied</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_appui_medio"/> Médio-pied</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_appui_talon"/> Talon</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_appui_tetes_meta"/> Têtes métatarsiennes</label>
+        </div>
+
+        <!-- Sous-section : Examen du chaussage -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Examen du chaussage</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_usure_asym"/> Usure asymétrique</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_usure_anormale"/> Usure anormale</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_trop_court"/> Trop court</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_trop_etroit"/> Trop étroit</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_conflit"/> Conflit (dorsal…)</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_therapeutique"/> Chaussage thérapeutique</label>
+        </div>
+        <div>
+          <input class="inp pedicurie-field" data-field="ped_chaussex_autre_txt" placeholder="Autre — préciser..."/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 9 — Soins & projet thérapeutique (#121 Phase 4) -->
+    <div class="sport-section pedicurie-section" id="pdsec-8">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">💊 Soins &amp; projet thérapeutique</div>
+
+        <!-- Sous-section : Soins réalisés -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Soins réalisés</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_abrasion"/> Abrasion hyperkératoses</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_enucleation"/> Énucléation de cor</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_ongles"/> Soins d'ongles (coupe/fraisage)</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_onychocryptose"/> Traitement ongle incarné (méchage/spicule)</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_orthonyxie_pose"/> Pose orthonyxie</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_detersion"/> Détersion</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_pansement"/> Pansement</label>
+        </div>
+
+        <!-- Sous-section : Appareillages -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Appareillages</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_appar_orthonyxie"/> Orthonyxie</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_appar_orthoplastie"/> Orthoplastie</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_appar_orthese"/> Orthèse plantaire (→ podologie)</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_appar_pansement"/> Pansement prescrit</label>
+        </div>
+
+        <!-- Sous-section : Conseils -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Conseils</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_hygiene"/> Hygiène</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_hydratation"/> Hydratation / émollients</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_chaussage"/> Chaussage adapté</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_autosurv"/> Auto-surveillance (pied à risque)</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_mycose"/> Prévention mycose</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_tabac"/> Arrêt tabac</label>
+        </div>
+
+        <!-- Sous-section : Suivi -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Suivi</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div>
+            <div class="field-lbl">Fréquence de suivi</div>
+            <select class="inp pedicurie-field" data-field="ped_suivi_freq">
+              <option value="">—</option>
+              <option value="1m">1 mois</option>
+              <option value="2m">2 mois</option>
+              <option value="3m">3 mois</option>
+              <option value="6m">6 mois</option>
+              <option value="annuel">Annuel</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-lbl">Prochain RDV</div>
+            <input type="date" class="inp pedicurie-field" data-field="ped_suivi_rdv"/>
+          </div>
+        </div>
+
+        <!-- Sous-section : Adressage -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Adressage</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_adress_medecin"/> Médecin traitant</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_adress_diabeto"/> Diabétologue</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_adress_dermato"/> Dermatologue</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_adress_chirurgien"/> Chirurgien</label>
+        </div>
+        <div style="margin-bottom:14px;">
+          <input class="inp pedicurie-field" data-field="ped_adress_motif" placeholder="Motif d'adressage..."/>
+        </div>
+
+        <!-- Sous-section : Consentement -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Consentement</div>
+        <div style="margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_consentement"/> Consentement du patient au projet thérapeutique</label>
+        </div>
+
+        <!-- Précisions libres -->
+        <div class="field-lbl" style="color:#222;margin-bottom:4px;">Autre / précisions</div>
+        <div>
+          <input class="inp pedicurie-field" data-field="ped_soin_autre_txt" placeholder="Précisions libres..."/>
         </div>
       </div>
     </div>
