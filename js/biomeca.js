@@ -2232,11 +2232,13 @@ function nav(id) {
     if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom+' · '+(currentPatient.sport||'—');
   }
   if(id === 'pg-pedicurie') {
-    // #121 Phase 0 — Mise à jour du sous-titre patient + restauration éventuelle
-    // depuis bilanDataPedicurie (no-op en Phase 0 car loadPedicurieBilan est stub).
+    // #121 Phase 0 — Mise à jour du sous-titre patient + restauration depuis
+    // bilanDataPedicurie. Phase 1a — injection des boutons 🎤 sur les champs
+    // texte (idempotent via _micInjected, donc pas de doublon au re-nav).
     const pinfo = document.getElementById('pedicurie-patient-info');
     if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom;
     setTimeout(loadPedicurieBilan, 50);
+    if(typeof _injectPedicurieMicButtons === 'function') setTimeout(_injectPedicurieMicButtons, 50);
   }
   if(id === 'pg-bilan-posturo') {
     injectBilanPosturoPage();
@@ -12445,27 +12447,50 @@ function syncOpenedBilanPedicurieToHistory() {
   target.bilanDataPedicurie = JSON.parse(JSON.stringify(currentPatient.bilanDataPedicurie || {}));
 }
 
-// #121 Phase 0 — Sauvegarde du bilan pédicurie. NON async (pas de photos donc
-// pas de migration Storage). La coquille de sweep est vide pour l'instant ;
-// les champs viendront avec le markup du bilan (Commit 2+).
+// #121 Phase 0/1a — Sauvegarde du bilan pédicurie. NON async (pas de photos
+// donc pas de migration Storage). Balayage générique : tous les champs
+// `.pedicurie-field` (text/textarea/select/checkbox avec `data-field`) +
+// tous les radios `name="ped_*"` dans `#pg-pedicurie`. Pas besoin de toucher
+// à cette fonction quand on ajoute des sections — il suffit d'ajouter les
+// champs avec la classe et l'attribut idoines.
 function savePedicurieBilan(silent) {
   if (!currentPatient) { if (!silent) alert('Sélectionnez un patient'); return; }
   if (!currentPatient.bilanDataPedicurie) currentPatient.bilanDataPedicurie = {};
   const d = currentPatient.bilanDataPedicurie;
   if (!d.id) d.id = crypto.randomUUID();
-  // Sweep des champs du bilan pédicurie — coquille vide en Phase 0.
-  // Les futurs champs (getPedVal('ped-*'), checkboxes, radios) viendront ici.
+  document.querySelectorAll('#pg-pedicurie .pedicurie-field').forEach(el => {
+    const f = el.dataset.field;
+    if (!f) return;
+    if (el.type === 'checkbox') d[f] = el.checked;
+    else d[f] = el.value;
+  });
+  document.querySelectorAll('#pg-pedicurie input[type=radio]').forEach(el => {
+    if (el.checked && el.name) d[el.name] = el.value;
+  });
   syncOpenedBilanPedicurieToHistory();
   savePatients();
   if (!silent) alert('✓ Bilan pédicurie sauvegardé');
 }
 
-// #121 Phase 0 — Restauration depuis bilanDataPedicurie. No-op en Phase 0
-// (structure prête pour les futurs setPedVal / setPedicurieRadio / etc.).
+// #121 Phase 1a — Restauration AUTORITATIVE : reflète l'état complet de
+// bilanDataPedicurie sur le DOM, y compris pour les clés ABSENTES (écrit '' /
+// false / radio décoché). Sans ça, un nouveau bilan (d = {}) héritait des
+// valeurs DOM du bilan précédent — fuite cross-bilan. loadPedicurieBilan est
+// déjà appelé après creerBilanPedicurie via le hook nav('pg-pedicurie') → le
+// reset visuel se déclenche automatiquement.
 function loadPedicurieBilan() {
   const d = currentPatient?.bilanDataPedicurie;
   if (!d) return;
-  // Sweep de restauration — coquille vide en Phase 0.
+  document.querySelectorAll('#pg-pedicurie .pedicurie-field').forEach(el => {
+    const f = el.dataset.field;
+    if (!f) return;
+    if (el.type === 'checkbox') el.checked = !!d[f];
+    else el.value = d[f] !== undefined ? d[f] : '';
+  });
+  document.querySelectorAll('#pg-pedicurie input[type=radio]').forEach(el => {
+    if (!el.name) return;
+    el.checked = (d[el.name] !== undefined && el.value === d[el.name]);
+  });
 }
 
 // ───────────────────────────────────────────
@@ -17986,6 +18011,35 @@ function _injectSportMicButtons() {
       var df = el.dataset.field;
       if(!df) return;
       el.id = 'spf-' + df;
+    }
+    el._micInjected = true;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = 'Dicter dans ce champ';
+    btn.innerHTML = '&#127908;';
+    btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:50%;opacity:0.6;vertical-align:middle;';
+    btn.onclick = (function(fieldId, b) {
+      return function() { startDictation(fieldId, b); };
+    })(el.id, btn);
+    el.parentNode.insertBefore(btn, el.nextSibling);
+  });
+}
+
+// #121 Phase 1a — Miroir EXACT de _injectSportMicButtons, ciblant la page
+// pédicurie. Cible texte/textarea/select (exclut checkbox, date, range). Id
+// stable préfixé `pdf-` pour éviter toute collision avec `spf-` (sport).
+// Garde `_micInjected` → idempotent au re-nav.
+function _injectPedicurieMicButtons() {
+  var fields = document.querySelectorAll(
+    '#pg-pedicurie textarea.pedicurie-field, ' +
+    '#pg-pedicurie input.pedicurie-field:not([type="checkbox"]):not([type="date"]):not([type="range"])'
+  );
+  fields.forEach(function(el) {
+    if(el._micInjected) return;
+    if(!el.id) {
+      var df = el.dataset.field;
+      if(!df) return;
+      el.id = 'pdf-' + df;
     }
     el._micInjected = true;
     var btn = document.createElement('button');

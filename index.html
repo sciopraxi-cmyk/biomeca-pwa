@@ -484,22 +484,113 @@
   </div>
 </div>
 
-<!-- ══ PÉDICURIE (#121 Phase 0 — coquille) ══ -->
+<!-- ══ PÉDICURIE (#121 Phase 1a — Anamnèse) ══ -->
 <div class="page" id="pg-pedicurie">
-  <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
+  <div style="padding:16px 20px;max-width:900px;margin:0 auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
-      <h2 style="margin:0;font-size:18px;color:#d97706;">🦶 Bilan Pédicurie</h2>
+      <h2 style="margin:0;font-size:18px;color:#d97706;flex:1;">🦶 Bilan Pédicurie</h2>
+      <button onclick="savePedicurieBilan()" class="btn" style="background:#d97706;color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
     </div>
     <div id="pedicurie-patient-info" style="background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--mut);">
       Aucun patient sélectionné
     </div>
-    <!-- Conteneur prêt à recevoir le formulaire du bilan (commits ultérieurs). -->
-    <div id="pedicurie-content" style="background:var(--card);border:1px dashed var(--bord);border-radius:10px;padding:30px;text-align:center;color:var(--mut);">
-      <div style="font-size:36px;margin-bottom:12px;">🚧</div>
-      <div style="font-size:15px;font-weight:600;">Coquille en place</div>
-      <div style="font-size:13px;margin-top:6px;">Le formulaire clinique pédicurie sera ajouté dans les prochains commits.</div>
+
+    <!-- Section 1 — Anamnèse -->
+    <div class="sport-section" id="pdsec-1">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">📋 Anamnèse</div>
+
+        <!-- Sous-section : Motif de consultation -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Motif de consultation</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 12px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_entretien"/> Entretien régulier</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_douleur"/> Douleur</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_cor"/> Cor / durillon</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_ongle_incarne"/> Ongle incarné</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_ongle_epais"/> Ongle épais</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_mycose"/> Mycose</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_fissure"/> Fissure / crevasse</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_verrue"/> Verrue plantaire</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_lesion"/> Lésion / plaie</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_suivi_risque"/> Suivi pied à risque</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_autre"/> Autre</label>
+        </div>
+        <div style="margin-bottom:14px;">
+          <input class="inp pedicurie-field" data-field="ped_motif_autre_txt" placeholder="Si autre, préciser..."/>
+        </div>
+
+        <!-- Sous-section : Antécédents médicaux -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Antécédents médicaux</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_diabete"/> Diabète</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_aomi"/> AOMI / artériopathie</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_neuropathie"/> Neuropathie</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_insuf_veineuse"/> Insuffisance veineuse</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_rhumatisme"/> Rhumatisme inflammatoire</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_immunodep"/> Immunodépression</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_anticoag"/> Anticoagulants</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_tabac"/> Tabac</label>
+        </div>
+        <!-- Précisions diabète (toujours visibles ; le sweep ne lit que les checked) -->
+        <div style="background:rgba(217,119,6,0.06);border-left:3px solid #d97706;border-radius:6px;padding:8px 12px;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:600;color:#b7740a;margin-bottom:6px;">Si diabète — précisions :</div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+            <span class="field-lbl" style="white-space:nowrap;color:#222;">Type :</span>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_diabete_type" value="1"/> Type 1</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_diabete_type" value="2"/> Type 2</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+            <span class="field-lbl" style="white-space:nowrap;color:#222;">Équilibre :</span>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_diabete_equilibre" value="bon"/> Bon</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_diabete_equilibre" value="moyen"/> Moyen</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_diabete_equilibre" value="desequilibre"/> Déséquilibre</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="field-lbl" style="white-space:nowrap;color:#222;">HbA1c :</span>
+            <input class="inp pedicurie-field" data-field="ped_hba1c" placeholder="Ex: 7,2 %" style="flex:1;min-width:160px;"/>
+          </div>
+        </div>
+
+        <!-- Sous-section : Antécédents podologiques -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Antécédents podologiques</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_plaie"/> Antécédent de plaie</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_plaie_4sem"/> Plaie &gt; 4 semaines</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_amputation"/> Amputation</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_chirurgie"/> Chirurgie du pied</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_ongle_recidivant"/> Ongle incarné récidivant</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_mycose_recidivante"/> Mycose récidivante</label>
+        </div>
+
+        <!-- Sous-section : Autonomie & habitudes -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Autonomie &amp; habitudes</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Autonomie soin des pieds :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_autonomie" value="oui"/> Oui</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_autonomie" value="limitee"/> Limitée</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_autonomie" value="non"/> Non</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Vue :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vue" value="ok"/> Correcte</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vue" value="limitee"/> Limitée</label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+          <div style="grid-column:1/-1;"><div class="field-lbl">Hygiène (lavage, séchage, fréquence)</div><textarea class="inp pedicurie-field" rows="2" data-field="ped_hygiene" placeholder="Ex: lavage quotidien, séchage entre orteils..."></textarea></div>
+          <div><div class="field-lbl">Chaussage habituel</div><input class="inp pedicurie-field" data-field="ped_chaussage_habituel" placeholder="Type, marque, talon..."/></div>
+          <div><div class="field-lbl">Activité</div><input class="inp pedicurie-field" data-field="ped_activite" placeholder="Marche, sport, station debout..."/></div>
+          <div style="grid-column:1/-1;"><div class="field-lbl">Profession</div><input class="inp pedicurie-field" data-field="ped_profession" placeholder="Profession exercée..."/></div>
+        </div>
+
+        <!-- Sous-section : Traitements en cours -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Traitements en cours</div>
+        <div>
+          <textarea class="inp pedicurie-field" rows="3" data-field="ped_traitements" placeholder="Anticoagulants, antibiotiques, corticoïdes, antifongiques, traitement du diabète..."></textarea>
+        </div>
+      </div>
     </div>
+
   </div>
 </div>
 
