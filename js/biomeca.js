@@ -2235,10 +2235,12 @@ function nav(id) {
     // #121 Phase 0 — Mise à jour du sous-titre patient + restauration depuis
     // bilanDataPedicurie. Phase 1a — injection des boutons 🎤 sur les champs
     // texte (idempotent via _micInjected, donc pas de doublon au re-nav).
+    // Phase 1b — ouverture par défaut sur la 1ʳᵉ section (Anamnèse).
     const pinfo = document.getElementById('pedicurie-patient-info');
     if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom;
     setTimeout(loadPedicurieBilan, 50);
     if(typeof _injectPedicurieMicButtons === 'function') setTimeout(_injectPedicurieMicButtons, 50);
+    setTimeout(() => showPedicurieSection(0), 50);
   }
   if(id === 'pg-bilan-posturo') {
     injectBilanPosturoPage();
@@ -12490,6 +12492,24 @@ function loadPedicurieBilan() {
   document.querySelectorAll('#pg-pedicurie input[type=radio]').forEach(el => {
     if (!el.name) return;
     el.checked = (d[el.name] !== undefined && el.value === d[el.name]);
+  });
+}
+
+// #121 Phase 1b — Bascule de section pédicurie. Affiche la idx-ième
+// `.pedicurie-section` et masque les autres, met à jour l'état actif/inactif
+// des `.pedicurie-tab` (rempli ambre / contour ambre). Robuste si idx hors borne.
+// Note : le balayage save/load et l'injection 🎤 parcourent TOUS les champs
+// même cachés (display:none) → aucune section ne perd ses données ni son mic
+// quand elle n'est pas affichée.
+function showPedicurieSection(idx) {
+  const sections = document.querySelectorAll('#pg-pedicurie .pedicurie-section');
+  if (!sections.length || idx < 0 || idx >= sections.length) return;
+  sections.forEach((s, i) => { s.style.display = i === idx ? '' : 'none'; });
+  document.querySelectorAll('#pg-pedicurie .pedicurie-tab').forEach((t, i) => {
+    const active = (i === idx);
+    t.style.background  = active ? '#d97706' : 'transparent';
+    t.style.color       = active ? '#fff'    : '#d97706';
+    t.style.borderColor = '#d97706';
   });
 }
 

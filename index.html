@@ -496,8 +496,15 @@
       Aucun patient sélectionné
     </div>
 
+    <!-- #121 Phase 1b — Barre d'onglets sections (sticky), miroir du bilan posturo en palette ambre.
+         Tabs : style initial inactif (contour ambre) ; l'état actif est appliqué par showPedicurieSection. -->
+    <div id="pedicurie-tabs" style="display:flex;gap:6px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0;margin-bottom:12px;z-index:5;border-bottom:1px solid rgba(217,119,6,0.18);">
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(0)" id="pdtab-0" style="font-size:11px;padding:5px 12px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📋 Anamnèse</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(1)" id="pdtab-1" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔬 Examen dermatologique</button>
+    </div>
+
     <!-- Section 1 — Anamnèse -->
-    <div class="sport-section" id="pdsec-1">
+    <div class="sport-section pedicurie-section" id="pdsec-1">
       <div class="card sport-card-orange">
         <div class="sport-block-title c-orange">📋 Anamnèse</div>
 
@@ -576,17 +583,151 @@
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vue" value="ok"/> Correcte</label>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vue" value="limitee"/> Limitée</label>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
-          <div style="grid-column:1/-1;"><div class="field-lbl">Hygiène (lavage, séchage, fréquence)</div><textarea class="inp pedicurie-field" rows="2" data-field="ped_hygiene" placeholder="Ex: lavage quotidien, séchage entre orteils..."></textarea></div>
-          <div><div class="field-lbl">Chaussage habituel</div><input class="inp pedicurie-field" data-field="ped_chaussage_habituel" placeholder="Type, marque, talon..."/></div>
-          <div><div class="field-lbl">Activité</div><input class="inp pedicurie-field" data-field="ped_activite" placeholder="Marche, sport, station debout..."/></div>
-          <div style="grid-column:1/-1;"><div class="field-lbl">Profession</div><input class="inp pedicurie-field" data-field="ped_profession" placeholder="Profession exercée..."/></div>
+        <!-- #121 Phase 1b — Hygiène en cases -->
+        <div class="field-lbl" style="color:#222;margin-bottom:4px;">Hygiène</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_hygiene_lavage"/> Lavage quotidien</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_hygiene_sechage"/> Séchage interdigital</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_hygiene_hydratation"/> Hydratation régulière</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_hygiene_insuffisante"/> Hygiène insuffisante</label>
         </div>
 
-        <!-- Sous-section : Traitements en cours -->
+        <!-- #121 Phase 1b — Chaussage en cases + champ texte « autre » -->
+        <div class="field-lbl" style="color:#222;margin-bottom:4px;">Chaussage</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussage_adapte"/> Adapté</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussage_etroit"/> Trop étroit / pointu</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussage_talon"/> Talon haut</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussage_securite"/> Chaussures de sécurité</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussage_piedsnus"/> Souvent pieds nus</label>
+        </div>
+        <div style="margin-bottom:10px;">
+          <input class="inp pedicurie-field" data-field="ped_chaussage_autre_txt" placeholder="Autre — préciser..."/>
+        </div>
+
+        <!-- #121 Phase 1b — Activité en cases -->
+        <div class="field-lbl" style="color:#222;margin-bottom:4px;">Activité</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_activite_sedentaire"/> Sédentaire</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_activite_marche"/> Marche régulière</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_activite_station"/> Station debout prolongée</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_activite_sport"/> Sport</label>
+        </div>
+
+        <!-- Profession (texte court conservé) -->
+        <div style="margin-bottom:14px;">
+          <div class="field-lbl">Profession</div>
+          <input class="inp pedicurie-field" data-field="ped_profession" placeholder="Profession exercée..."/>
+        </div>
+
+        <!-- Sous-section : Traitements en cours (cases + autre texte) -->
         <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Traitements en cours</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_anticoag"/> Anticoagulants</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_antiagregant"/> Antiagrégants</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_corticoides"/> Corticoïdes</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_immunosuppr"/> Immunosuppresseurs</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_antifongique"/> Antifongiques</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_antibiotique"/> Antibiotiques</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_antidiabetique"/> Antidiabétiques</label>
+        </div>
         <div>
-          <textarea class="inp pedicurie-field" rows="3" data-field="ped_traitements" placeholder="Anticoagulants, antibiotiques, corticoïdes, antifongiques, traitement du diabète..."></textarea>
+          <input class="inp pedicurie-field" data-field="ped_ttt_autre_txt" placeholder="Autre — préciser..."/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2 — Examen dermatologique (#121 Phase 1b) -->
+    <div class="sport-section pedicurie-section" id="pdsec-2">
+      <div class="card sport-card-orange">
+        <div class="sport-block-title c-orange">🔬 Examen dermatologique</div>
+
+        <!-- Sous-section : Hyperkératoses -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Hyperkératoses</div>
+<div style="margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_durillon"/> Durillon (tylome)</label>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;margin-bottom:4px;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_cor"/> Cor (hélome)</label>
+          <div style="margin-left:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <span class="field-lbl" style="white-space:nowrap;color:#222;">Type :</span>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_cor_type" value="dur"/> Dur</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_cor_type" value="mou"/> Mou</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_cor_type" value="vasculaire"/> Vasculaire</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_cor_type" value="neurovasculaire"/> Neurovasculaire</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_cor_type" value="miliaire"/> Miliaire</label>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Douleur (EVA) :</span>
+          <select class="inp pedicurie-field" data-field="ped_derm_eva" style="min-width:80px;">
+            <option value="">—</option>
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option><option value="5">5</option>
+            <option value="6">6</option><option value="7">7</option><option value="8">8</option>
+            <option value="9">9</option><option value="10">10</option>
+          </select>
+        </div>
+
+        <!-- Sous-section : Fissures & état cutané -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Fissures &amp; état cutané</div>
+        <div style="margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;margin-bottom:4px;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_fissure"/> Fissures / crevasses</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;margin-left:22px;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_fissure_saignement"/> Profonde / saignement</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">État cutané :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_etat" value="normal"/> Normal</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_etat" value="sec"/> Sec / xérose</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_etat" value="hyperhidrose"/> Hyperhidrose</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_etat" value="maceration"/> Macération</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_etat" value="anhidrose"/> Anhidrose</label>
+        </div>
+
+        <!-- Sous-section : Espaces interdigitaux -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Espaces interdigitaux</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_intertrigo"/> Intertrigo</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_mycose"/> Mycose</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_hyperk"/> Hyperkératose</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_fissure"/> Fissuration</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Espace(s) :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_e1"/> 1ᵉʳ</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_e2"/> 2ᵉ</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_e3"/> 3ᵉ</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_e4"/> 4ᵉ</label>
+        </div>
+
+        <!-- Sous-section : Lésions particulières -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Lésions particulières</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_verrue"/> Verrue plantaire</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_phlyctene"/> Phlyctène / bulle</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#c0392b;font-weight:600;background:#ffeaea;border:1px solid #f5b5b5;border-radius:5px;padding:3px 6px;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_ulceration"/> ⚠ Ulcération</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#c0392b;font-weight:600;background:#ffeaea;border:1px solid #f5b5b5;border-radius:5px;padding:3px 6px;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_malperf"/> ⚠ Mal perforant plantaire</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_erytheme"/> Érythème</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_autre"/> Autre</label>
+        </div>
+
+        <!-- #121 Phase 1b — Trophicité en radios + cb dermite ocre -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Trophicité</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+          <span class="field-lbl" style="white-space:nowrap;color:#222;">Coloration :</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_trophicite" value="normale"/> Normale</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_trophicite" value="paleur"/> Pâleur</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_trophicite" value="cyanose"/> Cyanose</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_trophicite" value="erythrose"/> Érythrose</label>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_dermite_ocre"/> Dermite ocre</label>
+        </div>
+
+        <!-- #121 Phase 1b — un seul champ « Autre / précisions » en fin de section -->
+        <div class="field-lbl" style="color:#222;margin-bottom:4px;">Autre / précisions</div>
+        <div>
+          <input class="inp pedicurie-field" data-field="ped_derm_autre_txt" placeholder="Précisions libres..."/>
         </div>
       </div>
     </div>
