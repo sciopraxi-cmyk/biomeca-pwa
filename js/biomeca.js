@@ -12744,6 +12744,43 @@ function printRapportPedicurie(){
   setTimeout(function(){ try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e){ console.error('Print iframe pédicurie:', e); alert('Erreur lors de l\'impression. Réessayez ou Cmd/Ctrl+P.'); } }, 300);
 }
 
+// #123 — Envoi du rapport par mail (approche mailto : ouvre le client mail du
+// praticien avec le patient pré-rempli en destinataire ; le praticien attache
+// le PDF lui-même. Aucune donnée de santé ne transite par notre serveur — RGPD).
+function envoyerRapportMail() {
+  var p = (typeof currentPatient !== 'undefined') ? currentPatient : null;
+  if (!p) { alert('Aucun patient sélectionné.'); return; }
+  var mail = (p.email || '').trim();
+  if (!mail) {
+    alert("⚠️ Aucune adresse e-mail n'est renseignée pour ce patient.\n\nAjoutez-la dans la fiche patient (Modifier) avant d'envoyer le rapport.");
+    return;
+  }
+  var nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim();
+  var prat = (typeof praticiens !== 'undefined' && praticiens)
+    ? praticiens.find(function (pr) { return pr.id == p.pratId; }) : null;
+  var sigLines = [];
+  if (prat) {
+    var ligneNom = ((prat.prenom || '') + ' ' + (prat.nom || '')).trim();
+    if (prat.titre) ligneNom += (ligneNom ? ' — ' : '') + prat.titre;
+    if (ligneNom) sigLines.push(ligneNom);
+    if (prat.cabinet) sigLines.push(prat.cabinet);
+    if (prat.adresse) sigLines.push(prat.adresse);
+    if (prat.tel) sigLines.push('Tél : ' + prat.tel);
+    if (prat.email) sigLines.push(prat.email);
+  }
+  var signature = sigLines.length ? '\n' + sigLines.join('\n') : '';
+  var sujet = 'Votre bilan' + (nom ? ' — ' + nom : '');
+  var corps = 'Bonjour' + (p.prenom ? ' ' + p.prenom : '') + ',\n\n'
+    + 'Veuillez trouver ci-joint votre bilan.\n\n'
+    + "N'hésitez pas à me contacter pour toute question.\n\nCordialement,"
+    + signature;
+  var url = 'mailto:' + encodeURIComponent(mail)
+    + '?subject=' + encodeURIComponent(sujet)
+    + '&body=' + encodeURIComponent(corps);
+  var a = document.createElement('a');
+  a.href = url; a.click();
+}
+
 // ───────────────────────────────────────────
 // Sport ttt — Traitements (Sprint A4 #73)
 // 8 fonctions + 1 flag réentrant pour smart-detach Échauffement.
