@@ -13722,10 +13722,10 @@ function getBilanPosturoHTML() {
   <div id="bilan-header-posturo" style="font-size:15px;font-weight:700;color:#04342C;background:#2dd4bf;padding:8px 14px;border-radius:8px;margin:10px 20px 10px;"></div>
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--bord);margin-bottom:16px;background:var(--bg);">
     <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;">← Patients</button>
-    <div style="font-size:15px;font-weight:700;color:#2a7a4e;">🧍 Bilan Global de la Posture</div>
+    <div style="font-size:15px;font-weight:700;color:#2dd4bf;">🧍 Bilan Global de la Posture</div>
     <div style="display:flex;gap:6px;">
-      <button class="btn" onclick="savePosturoBilan()" style="background:#2a7a4e;color:#fff;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>
-      <button class="btn" onclick="buildRapportPosturo()" style="background:var(--blue);color:#fff;font-size:12px;padding:5px 12px;">📄 Rapport</button>
+      <button class="btn" onclick="savePosturoBilan()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>
+      <button class="btn" onclick="buildRapportPosturo()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">📄 Rapport</button>
     </div>
   </div>
   <div style="display:flex;gap:4px;flex-wrap:wrap;padding:0 20px;margin-bottom:20px;" id="posturo-tabs">
@@ -14193,7 +14193,7 @@ function getBilanPosturoHTML() {
 
 
 <div class="posturo-section" id="psec-3" style="padding:0 20px;display:none;">
-  <div class="card" style="margin-bottom:16px;overflow-x:auto;">
+  <div class="card" style="margin-bottom:16px;overflow-x:auto;border-left:4px solid #2dd4bf;border-radius:8px;">
     <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:14px;">
       <div style="font-weight:700;color:#2a7a4e;font-size:14px;">🧠 Bilan neuro-fonctionnel</div>
     </div>
