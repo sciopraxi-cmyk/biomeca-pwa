@@ -505,3 +505,35 @@ body.printing #rpt-print{display:block!important;}
 .card.sport-card-orange { border-left: 4px solid #f0a500; background: linear-gradient(135deg, #fff9f0, #fff3e0); }
 .card.sport-card-violet { border-left: 4px solid #8e44ad; background: linear-gradient(135deg, #f5eeff, #ede0ff); }
 .card.sport-card-bleu   { border-left: 4px solid #3498db; background: linear-gradient(135deg, #eaf4ff, #dceeff); }
+
+/* ───────── #122 Phase 3a — Identité couleur par bilan ───────── */
+/* SPORT = bleu #378ADD (override uniforme des 5 variantes sport-card-*) */
+#pg-bilan .card[class*="sport-card-"]{
+  border-left-color:#378ADD !important;
+  background:linear-gradient(135deg,#eff5fd,#dfeefb) !important;
+}
+#pg-bilan .sport-block-title[class*="c-"]{ color:#1f6fb0 !important; }
+#pg-bilan .sport-tab{ background:transparent; color:#1f6fb0; border:1px solid #378ADD; }
+#pg-bilan .sport-tab.act{ background:#378ADD; color:#fff; border-color:#378ADD; }
+
+/* POSTURO = turquoise #2dd4bf (onglets : aujourd'hui non stylés) */
+#pg-bilan-posturo .posturo-tab{
+  background:transparent; color:#0d9488; border:1px solid #2dd4bf;
+  border-radius:var(--rs); font-size:11px; padding:4px 10px; cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+}
+#pg-bilan-posturo .posturo-tab.act{ background:#2dd4bf; color:#04342C; border-color:#2dd4bf; }
+
+/* #122 Phase 3b — POSTURO : liseré vertical + fond turquoise uniformes sur chaque
+   encadré de section (à l'image du liseré bleu uniforme du bilan sport) */
+#pg-bilan-posturo .posturo-section div[style*="border-left:4px solid"]{
+  border-left-color:#2dd4bf !important;
+  background:linear-gradient(135deg,#effbf9,#dbf7f1) !important;
+}
+
+/* #122 Phase 3b (sport) — SPORT : même override large des sous-blocs inline que
+   le posturo → liseré + fond bleu uniformes sur chaque encadré de section. */
+#pg-bilan .sport-section div[style*="border-left:4px solid"]{
+  border-left-color:#378ADD !important;
+  background:linear-gradient(135deg,#eff5fd,#dfeefb) !important;
+}
