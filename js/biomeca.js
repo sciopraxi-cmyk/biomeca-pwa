@@ -2232,15 +2232,18 @@ function nav(id) {
     if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom+' · '+(currentPatient.sport||'—');
   }
   if(id === 'pg-pedicurie') {
-    // #121 Phase 0 — Mise à jour du sous-titre patient + restauration depuis
-    // bilanDataPedicurie. Phase 1a — injection des boutons 🎤 sur les champs
-    // texte (idempotent via _micInjected, donc pas de doublon au re-nav).
-    // Phase 1b — ouverture par défaut sur la 1ʳᵉ section (Anamnèse).
-    const pinfo = document.getElementById('pedicurie-patient-info');
-    if(pinfo && currentPatient) pinfo.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom;
+    // #121 Phase 0 — Restauration depuis bilanDataPedicurie + injection 🎤
+    // (idempotent). Phase 1b — ouverture par défaut sur la 1ʳᵉ section.
+    // Le bandeau patient est géré par _updateBilanHeaders (cf hook unifié plus bas).
     setTimeout(loadPedicurieBilan, 50);
     if(typeof _injectPedicurieMicButtons === 'function') setTimeout(_injectPedicurieMicButtons, 50);
     setTimeout(() => showPedicurieSection(0), 50);
+  }
+  // Bandeau d'en-tête uniformisé sur les 3 bilans + landing pg-sport.
+  // setTimeout pour laisser le markup du posturo (injecté dynamiquement) se
+  // créer avant la mise à jour.
+  if(id==='pg-bilan' || id==='pg-bilan-posturo' || id==='pg-pedicurie' || id==='pg-sport') {
+    setTimeout(_updateBilanHeaders, 60);
   }
   if(id === 'pg-bilan-posturo') {
     injectBilanPosturoPage();
@@ -2985,6 +2988,36 @@ function createPatient() {
   ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille','np-motif'].forEach(id=>{document.getElementById(id).value='';});
   closeNewPatientModal();
   nav('pg-patients');
+}
+
+// Bandeau d'en-tête des bilans : « Nom Prénom — Intitulé du bilan ». Lit le
+// patient courant + l'index ou le sousType pour produire l'intitulé exact.
+// Robuste si appelé avant qu'un patient soit sélectionné (retourne '').
+function _bilanHeaderText(kind){
+  var p = (typeof currentPatient!=='undefined' && currentPatient) ? currentPatient : null;
+  if(!p) return '';
+  var nom = ((p.prenom||'') + ' ' + (p.nom||'')).trim() || 'Patient';
+  var label = '';
+  if(kind==='sport'){
+    if(typeof currentOpenedBilanIdx!=='undefined' && currentOpenedBilanIdx!=null && p.bilansSport && p.bilansSport[currentOpenedBilanIdx]) label = p.bilansSport[currentOpenedBilanIdx].label;
+    else if(p.currentBilanSportSousType) label = 'Sportif ' + (p.currentBilanSportSousType==='controle'?'Contrôle':'Initial') + ' (en cours)';
+    else label = 'Bilan sportif';
+  } else if(kind==='posturo'){
+    if(typeof currentOpenedBilanPosturoIdx!=='undefined' && currentOpenedBilanPosturoIdx!=null && p.bilansPosturo && p.bilansPosturo[currentOpenedBilanPosturoIdx]) label = p.bilansPosturo[currentOpenedBilanPosturoIdx].label;
+    else if(p.currentBilanPosturoSousType) label = 'Posturo ' + (p.currentBilanPosturoSousType==='controle'?'Contrôle':'Initial') + ' (en cours)';
+    else label = 'Bilan posturo';
+  } else if(kind==='pedicurie'){
+    if(typeof currentOpenedBilanPedicurieIdx!=='undefined' && currentOpenedBilanPedicurieIdx!=null && p.bilansPedicurie && p.bilansPedicurie[currentOpenedBilanPedicurieIdx]) label = p.bilansPedicurie[currentOpenedBilanPedicurieIdx].label;
+    else if(p.currentBilanPedicurieSousType) label = 'Pédicurie ' + (p.currentBilanPedicurieSousType==='controle'?'Contrôle':'Initial') + ' (en cours)';
+    else label = 'Bilan pédicurie';
+  }
+  return nom + (label ? '  —  ' + label : '');
+}
+function _updateBilanHeaders(){
+  var s = document.getElementById('bilan-header-sport'); if(s) s.textContent = _bilanHeaderText('sport');
+  var sl = document.getElementById('bilan-header-sport-landing'); if(sl) sl.textContent = _bilanHeaderText('sport');
+  var po = document.getElementById('bilan-header-posturo'); if(po) po.textContent = _bilanHeaderText('posturo');
+  var pe = document.getElementById('pedicurie-patient-info'); if(pe) pe.textContent = _bilanHeaderText('pedicurie');
 }
 
 function selectPatient(p) {
@@ -13686,6 +13719,7 @@ function injectBilanPosturoPage() {
 
 function getBilanPosturoHTML() {
   return `<div style="padding:0 0 40px 0;max-width:860px;margin:0 auto;">
+  <div id="bilan-header-posturo" style="font-size:15px;font-weight:700;color:#04342C;background:#2dd4bf;padding:8px 14px;border-radius:8px;margin:10px 20px 10px;"></div>
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--bord);margin-bottom:16px;background:var(--bg);">
     <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;">← Patients</button>
     <div style="font-size:15px;font-weight:700;color:#2a7a4e;">🧍 Bilan Global de la Posture</div>

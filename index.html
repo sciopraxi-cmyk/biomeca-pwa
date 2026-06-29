@@ -384,6 +384,7 @@
       <button onclick="nav('pg-rapport')" class="btn" style="background:var(--blue);color:#fff;padding:8px 18px;font-size:13px;">📄 Rapport Sportif</button>
     </div>
   </div>
+  <div id="bilan-header-sport-landing" style="font-size:15px;font-weight:700;color:#fff;background:#378ADD;padding:8px 14px;border-radius:8px;margin:0 20px 14px;"></div>
 
   <div class="tc-cat">Valgus dynamique du genou — KFPPA</div>
   <div class="tgrid">
@@ -492,7 +493,7 @@
       <h2 style="margin:0;font-size:18px;color:#d97706;flex:1;">🦶 Bilan Pédicurie</h2>
       <button onclick="savePedicurieBilan()" class="btn" style="background:#d97706;color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
     </div>
-    <div id="pedicurie-patient-info" style="background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--mut);">
+    <div id="pedicurie-patient-info" style="background:#d97706;color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
       Aucun patient sélectionné
     </div>
 
@@ -1486,11 +1487,13 @@
 <div class="page" id="pg-bilan">
   <div style="padding:14px 20px;max-width:980px;margin:0 auto;">
     <div style="margin-bottom:8px;"><button class="btn" onclick="nav('pg-sport')" style="font-size:12px;color:var(--mut);">← Podologie du Sport</button></div>
+    <div id="bilan-header-sport" style="font-size:15px;font-weight:700;color:#fff;background:#378ADD;padding:8px 14px;border-radius:8px;margin-bottom:10px;"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
       <div style="font-size:17px;font-weight:700;">Bilan Clinique — Podologie du Sportif</div>
       <div style="display:flex;gap:6px;">
         <button class="btn" onclick="saveBilan()" style="color:var(--green);border-color:var(--green);">💾 Sauvegarder</button>
         <button class="btn btn-blue" onclick="printBilan()">🖨 Imprimer</button>
+        <button class="btn btn-blue" onclick="nav('pg-rapport')">📄 Rapport</button>
         <button class="btn" id="btn-mic" onclick="toggleDictaphone()" title="Dictaphone">🎤 Dictaphone</button>
       </div>
     </div>
