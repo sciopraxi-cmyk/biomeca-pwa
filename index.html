@@ -99,7 +99,7 @@
   <div class="lp-modules">
     <div class="lp-mod" style="--mc:#1D9E75;"><div class="lp-mod-icon">🧍</div><div class="lp-mod-name">Bilan postural</div><div class="lp-mod-desc">Analyse complète en 9 sections, silhouettes annotées, rapport PDF.</div><span class="lp-mod-badge" style="background:rgba(45,212,191,0.15);color:#2dd4bf;">Disponible</span></div>
     <div class="lp-mod" style="--mc:#185FA5;"><div class="lp-mod-icon">🦶</div><div class="lp-mod-name">Podologie du sport</div><div class="lp-mod-desc">Analyse cinématique, bilan sportif, suivi de performance.</div><span class="lp-mod-badge" style="background:rgba(55,138,221,0.15);color:#85B7EB;">Disponible</span></div>
-    <div class="lp-mod" style="--mc:#7F77DD;"><div class="lp-mod-icon">👶</div><div class="lp-mod-name">Podopédiatrie</div><div class="lp-mod-desc">Bilan pédiatrique spécialisé, suivi de croissance.</div><span class="lp-mod-badge" style="background:rgba(127,119,221,0.15);color:#AFA9EC;">Prochainement</span></div>
+    <div class="lp-mod" style="--mc:#f472b6;"><div class="lp-mod-icon">👶</div><div class="lp-mod-name">Podopédiatrie</div><div class="lp-mod-desc">Bilan pédiatrique spécialisé, suivi de croissance.</div><span class="lp-mod-badge" style="background:rgba(244,114,182,0.15);color:#f9a8d4;">Prochainement</span></div>
   </div>
 
   <div id="lp-pricing-section" class="lp-sec-head"><div class="lp-sec-title">Tarifs</div><div class="lp-sec-sub">Sans engagement — résiliez à tout moment</div></div>
@@ -380,11 +380,11 @@
     <h1 style="color:var(--blue);">🦶 Podologie du Sport</h1>
     <p id="sport-sub">Sélectionnez un patient</p>
     <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
-      <button onclick="nav('pg-bilan')" class="btn" style="background:var(--blue);color:#fff;padding:8px 18px;font-size:13px;">📋 Bilan Clinique Sportif</button>
-      <button onclick="nav('pg-rapport')" class="btn" style="background:var(--blue);color:#fff;padding:8px 18px;font-size:13px;">📄 Rapport Sportif</button>
+      <button onclick="nav('pg-bilan')" class="btn" style="background:#378ADD;color:#fff;padding:8px 18px;font-size:13px;">📋 Bilan Clinique Sportif</button>
+      <button onclick="nav('pg-rapport')" class="btn" style="background:#378ADD;color:#fff;padding:8px 18px;font-size:13px;">📄 Rapport Sportif</button>
     </div>
   </div>
-  <div id="bilan-header-sport-landing" style="font-size:15px;font-weight:700;color:#fff;background:#378ADD;padding:8px 14px;border-radius:8px;margin:0 20px 14px;"></div>
+  <div id="bilan-header-sport-landing" style="font-size:15px;font-weight:700;color:#fff;background:rgba(55,138,221,0.3);border:1px solid rgba(55,138,221,0.55);padding:8px 14px;border-radius:8px;margin:0 20px 14px;"></div>
 
   <div class="tc-cat">Valgus dynamique du genou — KFPPA</div>
   <div class="tgrid">
@@ -493,7 +493,7 @@
       <h2 style="margin:0;font-size:18px;color:#d97706;flex:1;">🦶 Bilan Pédicurie</h2>
       <button onclick="savePedicurieBilan()" class="btn" style="background:#d97706;color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
     </div>
-    <div id="pedicurie-patient-info" style="background:#d97706;color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
+    <div id="pedicurie-patient-info" style="background:rgba(251,146,60,0.85);border:1px solid rgba(251,146,60,0.95);color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
       Aucun patient sélectionné
     </div>
 
@@ -1476,7 +1476,7 @@
     <div style="margin-bottom:8px;padding:8px 0 0 0;"><button class="btn" onclick="nav('pg-sport')" style="font-size:12px;color:var(--mut);">← Podologie du Sport</button></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
       <div><div style="font-size:17px;font-weight:700;">Rapport biomécanique</div><div style="font-size:11px;color:var(--mut);" id="rpt-sub">—</div></div>
-      <button class="btn btn-blue" onclick="printReport()">🖨 Imprimer / PDF</button>
+      <button class="btn" onclick="printReport()" style="background:#378ADD;color:#fff;">🖨 Imprimer / PDF</button>
     </div>
     <div id="rpt-body"></div>
   </div>
@@ -1487,7 +1487,7 @@
 <div class="page" id="pg-bilan">
   <div style="padding:14px 20px;max-width:980px;margin:0 auto;">
     <div style="margin-bottom:8px;"><button class="btn" onclick="nav('pg-sport')" style="font-size:12px;color:var(--mut);">← Podologie du Sport</button></div>
-    <div id="bilan-header-sport" style="font-size:15px;font-weight:700;color:#fff;background:#378ADD;padding:8px 14px;border-radius:8px;margin-bottom:10px;"></div>
+    <div id="bilan-header-sport" style="font-size:15px;font-weight:700;color:#fff;background:rgba(55,138,221,0.3);border:1px solid rgba(55,138,221,0.55);padding:8px 14px;border-radius:8px;margin-bottom:10px;"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
       <div style="font-size:17px;font-weight:700;color:#378ADD;">Bilan Clinique — Podologie du Sportif</div>
       <div style="display:flex;gap:6px;">
