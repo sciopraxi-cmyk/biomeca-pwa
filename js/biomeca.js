@@ -2884,7 +2884,7 @@ function editPatient(idx) {
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${p.motif||''}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
           <select class="inp" id="ep-prat">
-            ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${pr.nom||''} ${pr.prenom||''} — ${pr.titre||''}</option>`).join('')}
+            ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${_escHtml(pr.nom||'')} ${_escHtml(pr.prenom||'')} — ${_escHtml(pr.titre||'')}</option>`).join('')}
           </select></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px;">
@@ -3358,8 +3358,8 @@ function renderPatientList() {
       <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:${_hasAnyExpandedBilan?'12px 12px 0 0':'12px'};">
         <div class="av" style="width:44px;height:44px;flex-shrink:0;">${init}</div>
         <div style="flex:1;">
-          <div style="font-size:14px;font-weight:700;color:#fff;">${p.prenom} ${p.nom}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">${age} · ${p.sport||'—'}${prat?' · '+prat.nom:''}</div>
+          <div style="font-size:14px;font-weight:700;color:#fff;">${_escHtml(p.prenom)} ${_escHtml(p.nom)}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">${age} · ${_escHtml(p.sport||'—')}${prat?' · '+_escHtml(prat.nom):''}</div>
         </div>
         <button onclick="editPatient(${i})" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
         <button onclick="deletePatient(${i})" style="background:rgba(240,64,96,0.08);border:1px solid rgba(240,64,96,0.2);color:#f04060;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✕</button>
@@ -4621,8 +4621,8 @@ function renderPratList() {
   if (!praticiens.length) { el.innerHTML='<div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun praticien.</div>'; return; }
   el.innerHTML = praticiens.map((pr,i) => `
     <div class="prat-row">
-      <div style="flex:1;"><div style="font-size:12px;font-weight:500;">${pr.nom}</div>
-      <div style="font-size:10px;color:var(--mut);">${pr.titre||''}${pr.cabinet?' · '+pr.cabinet:''}${pr.adresse?' · '+pr.adresse:''}</div></div>
+      <div style="flex:1;"><div style="font-size:12px;font-weight:500;">${_escHtml(pr.nom)}</div>
+      <div style="font-size:10px;color:var(--mut);">${_escHtml(pr.titre||'')}${pr.cabinet?' · '+_escHtml(pr.cabinet):''}${pr.adresse?' · '+_escHtml(pr.adresse):''}</div></div>
       <button class="btn" style="font-size:11px;" onclick="editPraticien(${i})">✏️</button>
       <button class="btn" style="color:var(--red);font-size:11px;" onclick="deletePraticien(${i})">✕</button>
     </div>`).join('');
@@ -4673,7 +4673,7 @@ function populatePratSelect() {
   const sel = document.getElementById('np-prat');
   if (!sel) return;
   sel.innerHTML = '<option value="">— Choisir —</option>' +
-    praticiens.map(pr => `<option value="${pr.id}">${pr.nom}</option>`).join('');
+    praticiens.map(pr => `<option value="${pr.id}">${_escHtml(pr.nom)}</option>`).join('');
 }
 
 // ══════════════════════════════════════════════════════
@@ -4686,7 +4686,7 @@ function renderMkrList() {
     <div class="mkr-item ${selIdx===i?'sel':''}" onclick="selectMkr(${i})">
       <div class="mkr-dot" style="background:${m.color};"></div>
       ${m.side?`<span class="mkr-side ${m.side}">${m.side}</span>`:''}
-      <span style="flex:1;font-size:11px;font-weight:500;">${m.name}</span>
+      <span style="flex:1;font-size:11px;font-weight:500;">${_escHtml(m.name)}</span>
       <span style="font-size:9px;color:var(--dim);font-family:var(--fm);">${m.x!==null?`${Math.round(m.x)},${Math.round(m.y)}`:'—'}</span>
       <span>${m.x!==null?'<span class="badge bg">✓</span>':'<span class="badge bd">—</span>'}</span>
       ${m.x!==null?`<button onclick="event.stopPropagation();clearMkr(${i})" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:11px;">✕</button>`:''}
