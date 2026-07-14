@@ -9992,11 +9992,11 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
   bodyHtml += '<div class="rp-page">';
   bodyHtml += '<div class="header">';
   bodyHtml += '<img class="logo" src="'+logo+'" alt="Sciopraxi"/>';
-  bodyHtml += '<div class="prat-info"><div class="prat-name">'+(prat.nom||'')+' '+(prat.prenom||'')+' — '+(prat.titre||'')+'</div>';
-  if(prat.cabinet) bodyHtml += '<div>'+prat.cabinet+'</div>';
-  if(prat.adresse) bodyHtml += '<div>'+prat.adresse+'</div>';
-  if(prat.tel) bodyHtml += '<div>'+prat.tel+'</div>';
-  if(prat.email) bodyHtml += '<div>'+prat.email+'</div>';
+  bodyHtml += '<div class="prat-info"><div class="prat-name">'+_escHtml(prat.nom||'')+' '+_escHtml(prat.prenom||'')+' — '+_escHtml(prat.titre||'')+'</div>';
+  if(prat.cabinet) bodyHtml += '<div>'+_escHtml(prat.cabinet)+'</div>';
+  if(prat.adresse) bodyHtml += '<div>'+_escHtml(prat.adresse)+'</div>';
+  if(prat.tel) bodyHtml += '<div>'+_escHtml(prat.tel)+'</div>';
+  if(prat.email) bodyHtml += '<div>'+_escHtml(prat.email)+'</div>';
   bodyHtml += '</div></div>';
 
   // BANDEAU TITRE
@@ -10004,24 +10004,24 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
 
   // PATIENT
   bodyHtml += '<div class="patient-card">';
-  bodyHtml += '<div class="patient-avatar">'+initiales+'</div>';
+  bodyHtml += '<div class="patient-avatar">'+_escHtml(initiales)+'</div>';
   bodyHtml += '<div style="flex:1;">';
-  bodyHtml += '<div class="patient-name">'+p.prenom+' '+p.nom+'</div>';
+  bodyHtml += '<div class="patient-name">'+_escHtml(p.prenom)+' '+_escHtml(p.nom)+'</div>';
   bodyHtml += '<div class="patient-details">';
   if(p.ddn) bodyHtml += 'Né(e) le '+new Date(p.ddn).toLocaleDateString('fr-FR');
   if(d.dateConsult) bodyHtml += ' · Bilan du '+new Date(d.dateConsult).toLocaleDateString('fr-FR');
-  if(d.medecin) bodyHtml += ' · '+d.medecin;
+  if(d.medecin) bodyHtml += ' · '+_escHtml(d.medecin);
   bodyHtml += '</div>';
   bodyHtml += '<div class="patient-right">';
-  if(p.sport) bodyHtml += '<span class="pt-chip">'+p.sport+'</span>';
-  if(p.metier) bodyHtml += '<span class="pt-chip">'+p.metier+'</span>';
-  if(p.lat) bodyHtml += '<span class="pt-chip">'+p.lat+'</span>';
-  if(d.eva) bodyHtml += '<span class="pt-chip pt-chip-alert">EVA '+d.eva+'/10</span>';
+  if(p.sport) bodyHtml += '<span class="pt-chip">'+_escHtml(p.sport)+'</span>';
+  if(p.metier) bodyHtml += '<span class="pt-chip">'+_escHtml(p.metier)+'</span>';
+  if(p.lat) bodyHtml += '<span class="pt-chip">'+_escHtml(p.lat)+'</span>';
+  if(d.eva) bodyHtml += '<span class="pt-chip pt-chip-alert">EVA '+_escHtml(d.eva)+'/10</span>';
   bodyHtml += '</div></div>';
   bodyHtml += '<div class="patient-metrics">';
   if(age) bodyHtml += '<div class="metric"><div class="metric-val">'+age+'</div><div class="metric-lbl">ans</div></div>';
-  if(p.poids) bodyHtml += '<div class="metric"><div class="metric-val">'+p.poids+'</div><div class="metric-lbl">kg</div></div>';
-  if(p.taille) bodyHtml += '<div class="metric"><div class="metric-val">'+p.taille+'</div><div class="metric-lbl">cm</div></div>';
+  if(p.poids) bodyHtml += '<div class="metric"><div class="metric-val">'+_escHtml(p.poids)+'</div><div class="metric-lbl">kg</div></div>';
+  if(p.taille) bodyHtml += '<div class="metric"><div class="metric-val">'+_escHtml(p.taille)+'</div><div class="metric-lbl">cm</div></div>';
   bodyHtml += '</div></div>';
 
   // SECTIONS
@@ -10067,6 +10067,11 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
       function rpFormatVal(label, val) {
         if(!val || val==='') return '<span class="item-value">—</span>';
         var v = String(val).toLowerCase().trim();
+        // #74 lot 1d — Point de synchronisation unique : escape val ici, couvre
+        // automatiquement les 6 branches de retour (tronc/cervelet/tonique/phasique,
+        // préfixe numérique, fallback texte). Les .toUpperCase() qui suivent
+        // opèrent sur du texte échappé (pas de balise à préserver).
+        val = _escHtml(val);
         // Badges OUI/NON
         if(v==='oui') return '<span class="tag" style="background:#dcfce7;color:#166534;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">OUI</span>';
         if(v==='non') return '<span class="tag" style="background:#f1f5f9;color:#64748b;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;">NON</span>';
@@ -10092,14 +10097,14 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
       }
       s.items.forEach(function(item) {
         var label = item[0], val = item[1];
-        bodyHtml += '<div class="item"><span class="item-label">'+label+'</span>'+rpFormatVal(label,val)+'</div>';
+        bodyHtml += '<div class="item"><span class="item-label">'+_escHtml(label)+'</span>'+rpFormatVal(label,val)+'</div>';
       });
     }
     bodyHtml += '</div></div>';
   });
 
   // FOOTER
-  bodyHtml += '<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · '+p.prenom+' '+p.nom+' · '+dateStr+'</div></div>';
+  bodyHtml += '<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · '+_escHtml(p.prenom)+' '+_escHtml(p.nom)+' · '+dateStr+'</div></div>';
   // #88-C Annexes fiches d'exercices — markup miroir sport (#88-B,
   // _buildSportRapportContentHTML). page-break-before:always pour démarrer chaque
   // fiche sur une page A4 vierge. object-fit:contain pour respecter le ratio fiche
