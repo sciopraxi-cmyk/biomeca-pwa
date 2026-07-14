@@ -2866,22 +2866,22 @@ function editPatient(idx) {
     <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
       <div style="font-weight:700;font-size:16px;color:#2a7a4e;margin-bottom:16px;">✏️ Modifier le patient</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Nom *</div><input class="inp" id="ep-nom" value="${p.nom||''}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Prénom *</div><input class="inp" id="ep-prenom" value="${p.prenom||''}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Date de naissance</div><input class="inp" type="date" id="ep-ddn" value="${p.ddn||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Nom *</div><input class="inp" id="ep-nom" value="${_escHtml(p.nom||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Prénom *</div><input class="inp" id="ep-prenom" value="${_escHtml(p.prenom||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Date de naissance</div><input class="inp" type="date" id="ep-ddn" value="${_escHtml(p.ddn||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Latéralité</div>
           <select class="inp" id="ep-lat">
             <option ${(p.lat||'Droitier')==='Droitier'?'selected':''}>Droitier</option>
             <option ${p.lat==='Gaucher'?'selected':''}>Gaucher</option>
             <option ${p.lat==='Ambidextre'?'selected':''}>Ambidextre</option>
           </select></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Poids (kg)</div><input class="inp" id="ep-poids" value="${p.poids||''}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Taille (cm)</div><input class="inp" id="ep-taille" value="${p.taille||''}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${p.sport||''}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${p.metier||''}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${p.email||''}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${p.tel||''}"/></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${p.motif||''}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Poids (kg)</div><input class="inp" id="ep-poids" value="${_escHtml(p.poids||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Taille (cm)</div><input class="inp" id="ep-taille" value="${_escHtml(p.taille||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${_escHtml(p.sport||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${_escHtml(p.metier||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${_escHtml(p.email||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${_escHtml(p.tel||'')}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${_escHtml(p.motif||'')}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
           <select class="inp" id="ep-prat">
             ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${_escHtml(pr.nom||'')} ${_escHtml(pr.prenom||'')} — ${_escHtml(pr.titre||'')}</option>`).join('')}
