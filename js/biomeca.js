@@ -10644,16 +10644,16 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
   // + smart default 1-cabinet), donc prat n'est jamais null ici.
-  const pratHTML = `<strong>${prat.nom||''} ${prat.prenom||''}${prat.titre?' — '+prat.titre:''}</strong>${prat.cabinet?'<br>'+prat.cabinet:''}${prat.adresse?'<br>'+prat.adresse:''}${prat.tel?'<br>'+prat.tel:''}${prat.email?'<br>'+prat.email:''}`;
+  const pratHTML = `<strong>${_escHtml(prat.nom||'')} ${_escHtml(prat.prenom||'')}${prat.titre?' — '+_escHtml(prat.titre):''}</strong>${prat.cabinet?'<br>'+_escHtml(prat.cabinet):''}${prat.adresse?'<br>'+_escHtml(prat.adresse):''}${prat.tel?'<br>'+_escHtml(prat.tel):''}${prat.email?'<br>'+_escHtml(prat.email):''}`;
 
   // 2. Infos patient — identique à printReport L5734-5740
   const age = p.ddn ? Math.floor((Date.now()-new Date(p.ddn))/31557600000)+' ans' : '—';
   const patientHTML = `
-    <div class="rp-pt-item"><strong>Patient</strong>${p.prenom} ${p.nom}</div>
-    <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${p.lat||'—'}</div>
-    <div class="rp-pt-item"><strong>Sport</strong>${p.sport||'—'}</div>
-    <div class="rp-pt-item"><strong>Poids · Taille</strong>${p.poids||'—'} kg · ${p.taille||'—'} cm</div>
-    <div class="rp-pt-item"><strong>Motif</strong>${p.motif||'—'}</div>
+    <div class="rp-pt-item"><strong>Patient</strong>${_escHtml(p.prenom)} ${_escHtml(p.nom)}</div>
+    <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${_escHtml(p.lat||'—')}</div>
+    <div class="rp-pt-item"><strong>Sport</strong>${_escHtml(p.sport||'—')}</div>
+    <div class="rp-pt-item"><strong>Poids · Taille</strong>${_escHtml(p.poids||'—')} kg · ${_escHtml(p.taille||'—')} cm</div>
+    <div class="rp-pt-item"><strong>Motif</strong>${_escHtml(p.motif||'—')}</div>
     <div class="rp-pt-item"><strong>Date</strong>${p.date}</div>`;
 
   // 3. Corps : sectionsHTML (tests bioméca) + concluHTML + bilanSection
@@ -10813,7 +10813,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
     ['Activité quotidienne','activite_quot'],
     ['Notes complémentaires','notes_generales'],
   ].forEach(([lbl,k]) => {
-    if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:32%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+bd[k]+'</td></tr>';
+    if(bd[k]) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:32%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+_escHtml(bd[k])+'</td></tr>';
   });
   // Douleur présente (radio oui/non) — affiché seulement si 'oui' (parité synthèse)
   if(bd.douleur_oui_non === 'oui') h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Douleur</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Présente</td></tr>';
@@ -10822,7 +10822,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
   if(!isNaN(evaNum) && evaNum > 0) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">EVA Douleur</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+evaNum+'/10</td></tr>';
   // Consultation 1ère intention (radio) — affiché seulement si 'oui' (parité synthèse)
   if(bd['1ere_intention'] === 'oui') h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Consultation 1ère intention</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Oui</td></tr>';
-  if(bd.ttt_podo) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Traitement podologique</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+yn('ttt_podo')+(bd.ttt_podo_detail?' — '+bd.ttt_podo_detail:'')+'</td></tr>';
+  if(bd.ttt_podo) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Traitement podologique</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+yn('ttt_podo')+(bd.ttt_podo_detail?' — '+_escHtml(bd.ttt_podo_detail):'')+'</td></tr>';
   h += '</table>';
 
   // ─── BILAN MORPHOSTATIQUE ───
@@ -10852,7 +10852,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
       if(src) h += '<div style="text-align:center;flex:1;"><div style="font-size:8px;color:#888;margin-bottom:2px;">'+lbl+'</div><img src="'+src+'" style="max-width:100%;height:120px;object-fit:contain;border:1px solid #ddd;border-radius:4px;"/></div>';
     });
     h += '</div>';
-    if(bd.chaine_musculaire) h += '<p style="font-size:9px;"><strong>Hypothèse chaîne musculaire:</strong> '+bd.chaine_musculaire+'</p>';
+    if(bd.chaine_musculaire) h += '<p style="font-size:9px;"><strong>Hypothèse chaîne musculaire:</strong> '+_escHtml(bd.chaine_musculaire)+'</p>';
     // #109-A4 — Vues posturales annotées injectées DANS la sous-section
     // Morphostatique, juste après les silhouettes. Sous-titre pour distinguer
     // visuellement du bloc silhouettes. Skip si pas de vues placées.
@@ -11023,13 +11023,13 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
       if(ecRows.length) {
         h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN CHARGE</td></tr>';
         ecRows.forEach(([lbl, val]) => {
-          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
+          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+_escHtml(val)+'</td></tr>';
         });
       }
       if(dechRows.length) {
         h += '<tr><td colspan="2" style="padding:4px 6px;border:1px solid #e0e0e0;background:#f5f0e8;font-weight:700;font-size:9px;letter-spacing:0.5px;">PARTIE EN DÉCHARGE</td></tr>';
         dechRows.forEach(([lbl, val]) => {
-          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+val+'</td></tr>';
+          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:40%;font-size:9px;">'+lbl+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+_escHtml(val)+'</td></tr>';
         });
       }
       h += '</table>';
@@ -11142,13 +11142,13 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
     stabFields.forEach(([lbl,k]) => {
       if(bd[k+'_yo']||bd[k+'_yf']||bd[k+'_yom']||bd[k+'_yfm'])
         h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;font-weight:600;">'+lbl+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f(k+'_yo','')+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f(k+'_yf','')+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f(k+'_yom','')+'</td>'
-          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+f(k+'_yfm','')+'</td></tr>';
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+_escHtml(f(k+'_yo',''))+'</td>'
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+_escHtml(f(k+'_yf',''))+'</td>'
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+_escHtml(f(k+'_yom',''))+'</td>'
+          +'<td style="padding:2px 5px;border:1px solid #e0e0e0;text-align:center;font-size:9px;">'+_escHtml(f(k+'_yfm',''))+'</td></tr>';
     });
     h += '</table>';
-    if(bd.stabilo_conclusion) h += '<p style="font-size:9px;background:#f9f9f9;padding:5px 8px;border-radius:4px;"><strong>Conclusion:</strong> '+bd.stabilo_conclusion+'</p>';
+    if(bd.stabilo_conclusion) h += '<p style="font-size:9px;background:#f9f9f9;padding:5px 8px;border-radius:4px;"><strong>Conclusion:</strong> '+_escHtml(bd.stabilo_conclusion)+'</p>';
   }
 
   // ─── TESTS SCHÉMAS MOTEURS (B2 #73) ───
@@ -11248,7 +11248,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
         + '<div style="text-align:center;font-size:11px;font-weight:700;color:#222;">Profil : ' + libelle + '</div>'
         + '</div>';
     }
-    if(bd.schema_moteur_conclusion) h += '<p style="font-size:9px;"><strong>Conclusion :</strong> ' + bd.schema_moteur_conclusion + '</p>';
+    if(bd.schema_moteur_conclusion) h += '<p style="font-size:9px;"><strong>Conclusion :</strong> ' + _escHtml(bd.schema_moteur_conclusion) + '</p>';
   }
 
   // ─── SCHÉMAS DU PATIENT (ssec-10) ───
@@ -11288,7 +11288,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
     if(terrain.length)  h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Terrain</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + terrain.join(', ') + '</td></tr>';
     if(postural.length) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Postural</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + postural.join(', ') + '</td></tr>';
     if(npc.length)      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">NPC</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + npc.join(', ') + '</td></tr>';
-    if(bioMec)          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Bioméca / Articulaire / viscéral</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + bioMec + '</td></tr>';
+    if(bioMec)          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Bioméca / Articulaire / viscéral</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + _escHtml(bioMec) + '</td></tr>';
     h += '</table>';
   }
 
@@ -11316,13 +11316,13 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
     // lisible (data dict updateExerciceSubMenu L10660 — listes de strings localisées).
     const pairs = (exo.sys || []).map((s, i) => {
       if(!s) return '';
-      const sysLbl = SPORT_SYSTEMES_LABELS[s] || s;
-      const subVal = (exo.sub || [])[i] || '';
+      const sysLbl = _escHtml(SPORT_SYSTEMES_LABELS[s] || s);
+      const subVal = _escHtml((exo.sub || [])[i] || '');
       return subVal ? sysLbl + ' → ' + subVal : sysLbl;
     }).filter(Boolean);
-    let val = exo.libre || '—';
+    let val = _escHtml(exo.libre || '—');
     if(pairs.length) val += ' <span style="color:#666;">[' + pairs.join('] [') + ']</span>';
-    if(showRatio && exo.ratio) val += ' <span style="color:#666;">· ' + exo.ratio + '</span>';
+    if(showRatio && exo.ratio) val += ' <span style="color:#666;">· ' + _escHtml(exo.ratio) + '</span>';
     return '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:90px;white-space:nowrap;">'+durLbl+' ex.'+idx+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+val+'</td></tr>';
   };
   if(c1n || c2n || chn || ttt.prochainRdv) {
@@ -11368,7 +11368,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
     // #98 Option B — toujours rendre le gabarit pieds quand la section est visible.
     const piedsSrc = composites._pieds || (document.getElementById('sp-pieds-img')?.src || '');
     if(piedsSrc) h += '<img src="'+piedsSrc+'" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
-    if(ttt.semellesDesc) h += '<p style="font-size:9px;"><strong>Description :</strong> '+ttt.semellesDesc+'</p>';
+    if(ttt.semellesDesc) h += '<p style="font-size:9px;"><strong>Description :</strong> '+_escHtml(ttt.semellesDesc)+'</p>';
     if(hasMateriaux) h += '<p style="font-size:9px;"><strong>Matériaux :</strong> '+ttt.materiaux.join(', ')+'</p>';
     if(hasRecouvr) h += '<p style="font-size:9px;"><strong>Recouvrement :</strong> '+ttt.recouvrement.join(', ')+'</p>';
   }
@@ -16928,7 +16928,7 @@ function _collectSportSyntheseSections(d, readers) {
   if(ttt.materiaux && ttt.materiaux.length) tt.push('Matériaux: ' + ttt.materiaux.join(', '));
   if(ttt.recouvrement && ttt.recouvrement.length) tt.push('Recouvrement: ' + ttt.recouvrement.join(', '));
   if(ttt.semellesDesc) tt.push('Semelles: ' + ttt.semellesDesc);
-  if(ttt.prochainRdv) tt.push('Prochain RDV: ' + ttt.prochainRdv);
+  if(ttt.prochainRdv) tt.push('Prochain RDV: ' + _escHtml(ttt.prochainRdv));
   if(tt.length) sections.push({ titre: '💊 Traitements', items: [tt.join(' · ')] });
 
   // #93 — Tests avant/après (ssec-9, parité synthèse posturo Batch 4). Lecture
@@ -16981,7 +16981,7 @@ function _renderSportSyntheseHTML(sections) {
   sections.forEach(sec => {
     html += '<div style="margin-bottom:12px;"><div style="font-weight:700;color:#2a7a4e;margin-bottom:4px;">' + sec.titre + '</div>';
     sec.items.forEach(item => {
-      html += '<div style="margin-left:12px;color:#333;">' + item + '</div>';
+      html += '<div style="margin-left:12px;color:#333;">' + _escHtml(item) + '</div>';
     });
     html += '</div>';
   });
