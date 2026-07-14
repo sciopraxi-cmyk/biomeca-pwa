@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<script>
+  // #74 sécurité — anti-clickjacking : si la page est chargée dans une iframe
+  // (frame-ancestors non posable en meta sur GitHub Pages), on casse le cadre.
+  try { if (window.top !== window.self) { window.top.location = window.self.location.href; } }
+  catch (e) { document.documentElement.style.display = 'none'; }
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="BioMéca"/>
@@ -3480,11 +3486,11 @@
 <!-- #88-B pdf.js 3.x UMD — rendu canvas des fiches PDF en annexe du rapport sport
      (helper _resolveSportFichesImages). UMD volontaire (vs 4.x ESM-only) pour
      rester compatible <script src> simple. Worker hébergé sur le même CDN. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="assets/vendor/pdfjs/pdf.min.js"></script>
 <script>
   if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      'assets/vendor/pdfjs/pdf.worker.min.js';
   }
 </script>
 <script src="js/biomeca.js"></script>
