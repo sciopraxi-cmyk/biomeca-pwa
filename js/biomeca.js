@@ -848,15 +848,19 @@ async function tryStartTrial() {
   }
 }
 
-// #74 E2 — Source unique des champs d'abonnement : préfère app_metadata
-// (infalsifiable) et retombe sur user_metadata (compat pré-migration).
-// nom/prenom/titre/cabinet restent dans user_metadata (non concernés).
+// #74 E2 — Source des champs d'abonnement : app_metadata (infalsifiable,
+// écrit uniquement côté Edge avec la clé admin). nom/prenom/titre/cabinet
+// continuent de venir de user_metadata via le clone de base.
 function _aboMeta() {
   var um = (typeof pwaUser !== 'undefined' && pwaUser && pwaUser.user_metadata) ? pwaUser.user_metadata : {};
   var am = (typeof pwaUser !== 'undefined' && pwaUser && pwaUser.app_metadata) ? pwaUser.app_metadata : {};
   var out = Object.assign({}, um);
+  // #74 E2 phase 4 — VERROUILLAGE : app_metadata est désormais la source UNIQUE
+  // de ces 3 champs. Tout ce qu'un utilisateur forgerait dans user_metadata via
+  // PUT /auth/v1/user est donc purement ignoré. (nom/prenom/titre/cabinet
+  // continuent de venir de user_metadata via le clone de base.)
   ['modules', 'trial_start', 'acces'].forEach(function (k) {
-    if (am[k] !== undefined && am[k] !== null) out[k] = am[k];
+    out[k] = am[k];
   });
   return out;
 }
