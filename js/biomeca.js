@@ -849,7 +849,7 @@ async function tryStartTrial() {
 }
 
 // #74 E2 — Source des champs d'abonnement : app_metadata (infalsifiable,
-// écrit uniquement par service_role côté Edge). nom/prenom/titre/cabinet
+// écrit uniquement côté Edge avec la clé admin). nom/prenom/titre/cabinet
 // continuent de venir de user_metadata via le clone de base.
 function _aboMeta() {
   var um = (typeof pwaUser !== 'undefined' && pwaUser && pwaUser.user_metadata) ? pwaUser.user_metadata : {};
