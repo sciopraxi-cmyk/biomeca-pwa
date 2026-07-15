@@ -368,7 +368,7 @@ async function pwaLogin() {
     const data = await supa.signIn(email, pwd);
     if(data.access_token) {
       const isAdmin = email.toLowerCase() === 'sciopraxi@gmail.com';
-      pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin, user_metadata: data.user?.user_metadata || {} };
+      pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin, user_metadata: data.user?.user_metadata || {}, app_metadata: data.user?.app_metadata || {} };
       savePwaSession(data.access_token, data.refresh_token, pwaUser);
       await onPwaLoginSuccess();
     } else {
@@ -439,6 +439,7 @@ async function onPwaLoginSuccess() {
     const freshUser = await supa.getUser();
     if(freshUser?.user_metadata) {
       pwaUser.user_metadata = freshUser.user_metadata;
+      pwaUser.app_metadata = freshUser.app_metadata || {};
     }
   } catch(e) {}
   // Fetch user_data (licence_payee, formule, etc.) pour gating d'accès task #57.
@@ -474,9 +475,12 @@ async function loadSupabaseData() {
         const freshUser = await supa.getUser();
         const freshMeta = freshUser?.user_metadata || {};
         pwaUser.user_metadata = freshMeta;
-        window._userModules = Array.isArray(freshMeta.modules) ? freshMeta.modules : [];
+        pwaUser.app_metadata = freshUser?.app_metadata || {};
+        const abo = _aboMeta();
+        window._userModules = Array.isArray(abo.modules) ? abo.modules : [];
       } catch(e) {
-        window._userModules = Array.isArray(pwaUser?.user_metadata?.modules) ? pwaUser.user_metadata.modules : [];
+        const abo = _aboMeta();
+        window._userModules = Array.isArray(abo.modules) ? abo.modules : [];
       }
     } else {
       patients = [];
@@ -745,7 +749,7 @@ function showMonCompte() {
   modal.style.display = 'flex';
   loadAbonnementInfo();
   // Remplir les infos
-  const meta = pwaUser?.user_metadata || {};
+  const meta = _aboMeta();
   const nom = meta.nom || '';
   const prenom = meta.prenom || '';
   const titre = meta.titre || '';
@@ -816,6 +820,7 @@ async function tryStartTrial() {
         const fresh = await supa.getUser();
         if (fresh && fresh.user_metadata && pwaUser) {
           pwaUser.user_metadata = fresh.user_metadata;
+          pwaUser.app_metadata = fresh.app_metadata || {};
         }
       } catch (e) {
         console.warn('[access] re-fetch user post-409 failed:', e);
@@ -829,6 +834,19 @@ async function tryStartTrial() {
     console.error('[access] start-trial network error:', e);
     return { ok: false };
   }
+}
+
+// #74 E2 — Source unique des champs d'abonnement : préfère app_metadata
+// (infalsifiable) et retombe sur user_metadata (compat pré-migration).
+// nom/prenom/titre/cabinet restent dans user_metadata (non concernés).
+function _aboMeta() {
+  var um = (typeof pwaUser !== 'undefined' && pwaUser && pwaUser.user_metadata) ? pwaUser.user_metadata : {};
+  var am = (typeof pwaUser !== 'undefined' && pwaUser && pwaUser.app_metadata) ? pwaUser.app_metadata : {};
+  var out = Object.assign({}, um);
+  ['modules', 'trial_start', 'acces'].forEach(function (k) {
+    if (am[k] !== undefined && am[k] !== null) out[k] = am[k];
+  });
+  return out;
 }
 
 // computeAccessLevel — fonction pure, testable en unitaire (task #57).
@@ -924,7 +942,7 @@ function checkAccessStatus() {
     return;
   }
 
-  const meta = pwaUser?.user_metadata || {};
+  const meta = _aboMeta();
   const userData = pwaUser?.user_data;
   const level = computeAccessLevel({ isAdmin: false, meta, userData }, Date.now());
 
@@ -1666,7 +1684,7 @@ async function initPWA() {
       const userData = await supa.getUser();
       if(userData.id) {
         const isAdmin = session.user.email?.toLowerCase() === 'sciopraxi@gmail.com';
-        pwaUser = { ...session.user, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {} };
+        pwaUser = { ...session.user, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {}, app_metadata: session.user?.app_metadata || {} };
         await onPwaLoginSuccess();
         return;
       }
@@ -3148,7 +3166,7 @@ function renderPatientList() {
   // (badge "Prochainement", buttons disabled inconditionnels ligne ~2095-2110).
   // Quand l'UI podopédiatrie sera implémentée, ajouter :
   //   const canPodopedia = modules.includes('podopedia');
-  const modules = window._userModules || (Array.isArray(pwaUser?.user_metadata?.modules) ? pwaUser.user_metadata.modules : []);
+  const modules = window._userModules || (Array.isArray(_aboMeta().modules) ? _aboMeta().modules : []);
   const canSport = modules.includes('podo_sport');
   const canPosturo = modules.includes('postural');
 
