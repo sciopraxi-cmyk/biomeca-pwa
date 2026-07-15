@@ -92,14 +92,28 @@ Deno.serve(async (req) => {
   // NB : on écrase volontairement `modules` même si présent dans meta —
   // au stade trial, on n'a aucune raison d'avoir un set restreint, et
   // start-trial est gardé par anti-reset (trial_start absent + acces absent).
+  const trialStart = new Date().toISOString();
+  const accesEssai = 'essai';
+  const modulesFull = ['postural', 'podopedia', 'podo_sport'];
   const newMeta = {
     ...meta,
-    trial_start: new Date().toISOString(),
-    acces: 'essai',
-    modules: ['postural', 'podopedia', 'podo_sport'],
+    trial_start: trialStart,
+    acces: accesEssai,
+    modules: modulesFull,
+  };
+  // #74 E2 phase 1b — dual-write app_metadata (infalsifiable) avec les MÊMES
+  // valeurs. On préserve app_metadata existant (fusion), user_metadata reste
+  // écrit tel quel pour rester compatible avec les gardes/lectures pré-phase 2.
+  const currentAppMeta = (freshData.user.app_metadata ?? {}) as Record<string, unknown>;
+  const newAppMeta = {
+    ...currentAppMeta,
+    trial_start: trialStart,
+    acces: accesEssai,
+    modules: modulesFull,
   };
   const { error: updErr } = await supaAdmin.auth.admin.updateUserById(user.id, {
     user_metadata: newMeta,
+    app_metadata: newAppMeta,
   });
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
 

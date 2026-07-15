@@ -308,9 +308,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         // continue UPSERT base avec modules non-appliqués (cohérence cas A — state partiel ≫ no state)
       } else {
         const currentMeta = userResp.user.user_metadata ?? {};
+        const currentAppMeta = userResp.user.app_metadata ?? {};
         const finalModules = defaultModulesForPlan(planIdx);
         const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
           user_metadata: { ...currentMeta, modules: finalModules },
+          app_metadata: { ...currentAppMeta, modules: finalModules },
         });
         if (updErr) {
           console.error(
@@ -348,6 +350,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         });
       } else {
         const currentMeta = userResp.user.user_metadata ?? {};
+        const currentAppMeta = userResp.user.app_metadata ?? {};
         const currentModules: string[] = Array.isArray(currentMeta.modules)
           ? currentMeta.modules
           : [];
@@ -359,6 +362,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
         const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
           user_metadata: { ...currentMeta, modules: pendingModules },
+          app_metadata: { ...currentAppMeta, modules: pendingModules },
         });
 
         if (updErr) {
@@ -410,9 +414,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       // continue UPSERT base avec modules non-appliqués (cohérence cas A — state partiel ≫ no state)
     } else {
       const currentMeta = userResp.user.user_metadata ?? {};
+      const currentAppMeta = userResp.user.app_metadata ?? {};
       const finalModules = defaultModulesForPlan(planIdx);
       const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: { ...currentMeta, modules: finalModules },
+        app_metadata: { ...currentAppMeta, modules: finalModules },
       });
       if (updErr) {
         console.error(
