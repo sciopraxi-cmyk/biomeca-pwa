@@ -307,11 +307,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         );
         // continue UPSERT base avec modules non-appliqués (cohérence cas A — state partiel ≫ no state)
       } else {
-        const currentMeta = userResp.user.user_metadata ?? {};
+        // #74 E2 phase 4 — écriture UNIQUEMENT dans app_metadata (source unique).
         const currentAppMeta = userResp.user.app_metadata ?? {};
         const finalModules = defaultModulesForPlan(planIdx);
         const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          user_metadata: { ...currentMeta, modules: finalModules },
           app_metadata: { ...currentAppMeta, modules: finalModules },
         });
         if (updErr) {
@@ -349,10 +348,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
           error: getErr,
         });
       } else {
-        const currentMeta = userResp.user.user_metadata ?? {};
+        // #74 E2 phase 4 — lectures et écriture sur app_metadata uniquement.
         const currentAppMeta = userResp.user.app_metadata ?? {};
-        const currentModules: string[] = Array.isArray(currentMeta.modules)
-          ? currentMeta.modules
+        const currentModules: string[] = Array.isArray(currentAppMeta.modules)
+          ? (currentAppMeta.modules as string[])
           : [];
         const sortedCurrent = [...currentModules].sort();
         const sortedNew = [...pendingModules].sort();
@@ -361,7 +360,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
           sortedCurrent.some((m, i) => m !== sortedNew[i]);
 
         const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          user_metadata: { ...currentMeta, modules: pendingModules },
           app_metadata: { ...currentAppMeta, modules: pendingModules },
         });
 
@@ -413,11 +411,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       );
       // continue UPSERT base avec modules non-appliqués (cohérence cas A — state partiel ≫ no state)
     } else {
-      const currentMeta = userResp.user.user_metadata ?? {};
+      // #74 E2 phase 4 — écriture UNIQUEMENT dans app_metadata (source unique).
       const currentAppMeta = userResp.user.app_metadata ?? {};
       const finalModules = defaultModulesForPlan(planIdx);
       const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        user_metadata: { ...currentMeta, modules: finalModules },
         app_metadata: { ...currentAppMeta, modules: finalModules },
       });
       if (updErr) {

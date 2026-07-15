@@ -245,12 +245,10 @@ async function handleSetModules(body: Record<string, unknown>): Promise<Response
   const { data: getData, error: getErr } = await supaAdmin.auth.admin.getUserById(userId);
   if (getErr || !getData?.user) return json({ error: 'User not found' }, 404);
 
-  const newMeta = { ...(getData.user.user_metadata ?? {}), modules: uniqueModules };
-  // #74 E2 phase 1b — dual-write app_metadata (infalsifiable) avec la MÊME
-  // valeur de modules. app_metadata existant préservé par fusion.
+  // #74 E2 phase 4 — écriture UNIQUEMENT dans app_metadata (source unique
+  // infalsifiable). user_metadata n'est plus touché.
   const newAppMeta = { ...(getData.user.app_metadata ?? {}), modules: uniqueModules };
   const { error: updErr } = await supaAdmin.auth.admin.updateUserById(userId, {
-    user_metadata: newMeta,
     app_metadata: newAppMeta,
   });
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);

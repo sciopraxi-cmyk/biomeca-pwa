@@ -63,19 +63,23 @@ Deno.serve(async (req) => {
 
   // ─── Anti-reset : refus si trial déjà démarré ─────────────────────
   // GET preliminaire explicite — on lit l'état le plus récent côté serveur
-  // (le JWT pourrait avoir des claims périmées), et on prépare le merge.
+  // (le JWT pourrait avoir des claims périmées).
+  // #74 E2 phase 4 — VERROUILLAGE : les 3 champs (trial_start, acces, modules)
+  // vivent désormais UNIQUEMENT dans app_metadata (infalsifiable). Les gardes
+  // ci-dessous lisent app_metadata, plus user_metadata (que le user pouvait
+  // forger via PUT /auth/v1/user pour reset son propre trial).
   const { data: freshData, error: getErr } = await supaAdmin.auth.admin.getUserById(user.id);
   if (getErr || !freshData?.user) return json({ error: 'User lookup failed' }, 500);
-  const meta = (freshData.user.user_metadata ?? {}) as Record<string, unknown>;
+  const appMeta = (freshData.user.app_metadata ?? {}) as Record<string, unknown>;
 
-  if (meta.trial_start) {
+  if (appMeta.trial_start) {
     return json({ ok: false, error: 'trial_already_started' }, 409);
   }
   // Anti-double-trial : si acces est déjà set (gratuit, integral, essai créé
   // manuellement par l'admin, etc.), on respecte la décision admin et on refuse
   // l'auto-démarrage. Cohérent avec Q2 — le checkAccessStatus côté client a la
   // même garde, c'est juste une seconde ligne de défense.
-  if (meta.acces) {
+  if (appMeta.acces) {
     return json({ ok: false, error: 'acces_already_set' }, 409);
   }
 
@@ -95,32 +99,24 @@ Deno.serve(async (req) => {
   const trialStart = new Date().toISOString();
   const accesEssai = 'essai';
   const modulesFull = ['postural', 'podopedia', 'podo_sport'];
-  const newMeta = {
-    ...meta,
-    trial_start: trialStart,
-    acces: accesEssai,
-    modules: modulesFull,
-  };
-  // #74 E2 phase 1b — dual-write app_metadata (infalsifiable) avec les MÊMES
-  // valeurs. On préserve app_metadata existant (fusion), user_metadata reste
-  // écrit tel quel pour rester compatible avec les gardes/lectures pré-phase 2.
-  const currentAppMeta = (freshData.user.app_metadata ?? {}) as Record<string, unknown>;
+  // #74 E2 phase 4 — VERROUILLAGE : écriture UNIQUEMENT dans app_metadata.
+  // user_metadata n'est plus touché : les lectures serveur et client passent
+  // toutes par app_metadata depuis la phase 4.
   const newAppMeta = {
-    ...currentAppMeta,
+    ...appMeta,
     trial_start: trialStart,
     acces: accesEssai,
     modules: modulesFull,
   };
   const { error: updErr } = await supaAdmin.auth.admin.updateUserById(user.id, {
-    user_metadata: newMeta,
     app_metadata: newAppMeta,
   });
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
 
   return json({
     ok: true,
-    trial_start: newMeta.trial_start,
-    acces: 'essai',
-    modules: newMeta.modules,
+    trial_start: trialStart,
+    acces: accesEssai,
+    modules: modulesFull,
   });
 });

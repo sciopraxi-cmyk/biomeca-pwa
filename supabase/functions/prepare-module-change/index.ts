@@ -214,9 +214,10 @@ Deno.serve(async (req) => {
     : null;
   const planChanged = currentPlanIdx === null || currentPlanIdx !== planIdx;
 
-  // Détection changement modules vs metadata actuel
-  const currentModules: string[] = Array.isArray(user.user_metadata?.modules)
-    ? user.user_metadata!.modules
+  // Détection changement modules vs metadata actuel.
+  // #74 E2 phase 4 — lecture depuis app_metadata (source unique infalsifiable).
+  const currentModules: string[] = Array.isArray(user.app_metadata?.modules)
+    ? user.app_metadata!.modules
     : [];
   const sortedCurrent = [...currentModules].sort();
   const sortedNew = [...modules].sort();
