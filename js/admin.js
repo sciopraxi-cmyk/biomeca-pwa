@@ -67,6 +67,16 @@ async function adminSetModules(userId, modules) {
   return callAdminAction('setModules', { userId, modules });
 }
 
+// Set acces d'un user (task #74 E2 phase 3) — écrit UNIQUEMENT
+// app_metadata.acces côté serveur (infalsifiable). Utilisé par adminCreateUser
+// juste après le signUp pour que le nouveau compte ait dès sa naissance
+// une source de vérité app_metadata.
+// acces ∈ { gratuit | essai | postural | sport | duo | integral }.
+// Retourne { ok:true } ou { ok:false, error }.
+async function adminSetAcces(userId, acces) {
+  return callAdminAction('setAcces', { userId, acces });
+}
+
 // Alias rétrocompat (task #58) — convertit l'ancien enum droits ('all' |
 // 'sport' | 'posturo') en array modules CÔTÉ SERVEUR (cf. admin-users
 // handleSetDroits qui délègue à handleSetModules après mapping). Conservé

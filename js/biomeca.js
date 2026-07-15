@@ -684,6 +684,18 @@ async function adminCreateUser() {
   try {
     const data = await supa.signUp(email, pwd, { nom, prenom, acces });
     if(data.id || data.user?.id) {
+      // #74 E2 phase 3 — écrit aussi acces dans app_metadata (infalsifiable)
+      // via l'Edge setAcces. En cas d'échec, on ne bloque pas la création :
+      // le compte existe et acces reste dans user_metadata (repli _aboMeta).
+      try {
+        const newUserId = data.id || data.user?.id;
+        const r = await adminSetAcces(newUserId, acces);
+        if (!r || r.ok === false) {
+          console.warn('[adminCreateUser] setAcces failed:', r?.error);
+        }
+      } catch (e) {
+        console.warn('[adminCreateUser] setAcces threw:', e);
+      }
       okEl.textContent = `✓ Accès créé pour ${email} (${acces}). Un email de confirmation a été envoyé.`;
       okEl.style.display = 'block';
       document.getElementById('admin-email').value = '';

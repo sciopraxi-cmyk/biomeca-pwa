@@ -41,6 +41,9 @@ function json(body: unknown, status = 200): Response {
 
 const FORMULES = new Set(['formule_1', 'formule_2', 'formule_3', 'formule_4', 'formule_5']);
 const MODULES = new Set(['postural', 'podopedia', 'podo_sport']);
+// #74 E2 phase 3 — valeurs canoniques du champ acces (miroir des <option>
+// de #admin-acces dans index.html). setAcces écrit UNIQUEMENT app_metadata.
+const ACCES_VALUES = new Set(['gratuit', 'essai', 'postural', 'sport', 'duo', 'integral']);
 // Mapping rétrocompat de l'ancien enum droits → array modules (task #58).
 // Identique au mapping de la migration A0 : 'all'=tous, 'sport'=podo_sport,
 // 'posturo'=postural. Utilisé par l'alias setDroits pour convertir les
@@ -88,6 +91,8 @@ Deno.serve(async (req) => {
         return await handleSetFormule(body);
       case 'setModules':
         return await handleSetModules(body);
+      case 'setAcces':
+        return await handleSetAcces(body);
       case 'setDroits':
         // Alias rétrocompat (task #58) — convertit enum → array puis délègue.
         return await handleSetDroits(body);
@@ -246,6 +251,48 @@ async function handleSetModules(body: Record<string, unknown>): Promise<Response
   const newAppMeta = { ...(getData.user.app_metadata ?? {}), modules: uniqueModules };
   const { error: updErr } = await supaAdmin.auth.admin.updateUserById(userId, {
     user_metadata: newMeta,
+    app_metadata: newAppMeta,
+  });
+  if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
+
+  return json({ ok: true });
+}
+
+// Set acces (task #74 E2 phase 3) — écrit UNIQUEMENT app_metadata.acces
+// (infalsifiable) sans toucher user_metadata. Utilisé par adminCreateUser
+// juste après le signUp pour que le nouveau compte ait dès sa naissance
+// une source de vérité côté app_metadata. Les repli user_metadata côté
+// client (_aboMeta) ne verront rien changer pour les comptes existants.
+//
+// Le body accepte soit userId, soit email (avec resolveUserIdByEmail).
+// L'email est pratique pour les scripts admin ; adminCreateUser passe userId.
+async function handleSetAcces(body: Record<string, unknown>): Promise<Response> {
+  const userIdIn = typeof body.userId === 'string' ? body.userId : '';
+  const emailIn = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const acces = typeof body.acces === 'string' ? body.acces : '';
+  if (!userIdIn && !emailIn) return json({ error: 'Missing userId or email' }, 400);
+  if (!ACCES_VALUES.has(acces)) {
+    return json(
+      { error: 'Invalid acces (must be gratuit|essai|postural|sport|duo|integral)' },
+      400
+    );
+  }
+
+  let userId = userIdIn;
+  if (!userId) {
+    if (!EMAIL_RE.test(emailIn)) return json({ error: 'Invalid email' }, 400);
+    const { data: usersData, error: listErr } = await supaAdmin.auth.admin.listUsers();
+    if (listErr) return json({ error: 'listUsers: ' + listErr.message }, 500);
+    const found = (usersData.users ?? []).find((u) => (u.email ?? '').toLowerCase() === emailIn);
+    if (!found) return json({ error: 'User not found' }, 404);
+    userId = found.id;
+  }
+
+  const { data: getData, error: getErr } = await supaAdmin.auth.admin.getUserById(userId);
+  if (getErr || !getData?.user) return json({ error: 'User not found' }, 404);
+
+  const newAppMeta = { ...(getData.user.app_metadata ?? {}), acces };
+  const { error: updErr } = await supaAdmin.auth.admin.updateUserById(userId, {
     app_metadata: newAppMeta,
   });
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
