@@ -125,12 +125,20 @@ async function handleList(): Promise<Response> {
 
   const users = (usersData.users ?? []).map((u) => {
     const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+    const appMeta = (u.app_metadata ?? {}) as Record<string, unknown>;
     const extra = byEmail.get((u.email ?? '').toLowerCase()) ?? {};
     // modules : array depuis user_metadata.modules (task #58, ex-droits enum).
+    // #74 E2 phase 1b — préfère app_metadata.modules (infalsifiable), repli
+    // sur user_metadata.modules pour rester cohérent pendant la transition.
     // Fallback [] si absent : users créés avant la migration A0 OU via flow
     // landing public pré-task #63. La fonction renvoie maintenant un array
     // exploitable directement par l'UI admin (B1 affichera 3 checkboxes).
-    const modules: string[] = Array.isArray(meta.modules) ? (meta.modules as string[]) : [];
+    const rawModules = Array.isArray(appMeta.modules)
+      ? (appMeta.modules as unknown[])
+      : Array.isArray(meta.modules)
+        ? (meta.modules as unknown[])
+        : [];
+    const modules: string[] = rawModules.filter((m): m is string => typeof m === 'string');
     return {
       id: u.id,
       email: u.email,
@@ -233,8 +241,12 @@ async function handleSetModules(body: Record<string, unknown>): Promise<Response
   if (getErr || !getData?.user) return json({ error: 'User not found' }, 404);
 
   const newMeta = { ...(getData.user.user_metadata ?? {}), modules: uniqueModules };
+  // #74 E2 phase 1b — dual-write app_metadata (infalsifiable) avec la MÊME
+  // valeur de modules. app_metadata existant préservé par fusion.
+  const newAppMeta = { ...(getData.user.app_metadata ?? {}), modules: uniqueModules };
   const { error: updErr } = await supaAdmin.auth.admin.updateUserById(userId, {
     user_metadata: newMeta,
+    app_metadata: newAppMeta,
   });
   if (updErr) return json({ error: 'updateUser: ' + updErr.message }, 500);
 
