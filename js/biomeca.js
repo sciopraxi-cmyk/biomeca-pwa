@@ -448,6 +448,12 @@ async function onPwaLoginSuccess() {
   // Compute access level et mute le DOM (bandeau + overlay). Plus de setTimeout
   // 500ms : les awaits ci-dessus garantissent que pwaUser est complet.
   checkAccessStatus();
+  // Bug #125 Lot 2 — fetch les seuils posturaux depuis app_config (source de
+  // vérité serveur, réglage cabinet partagé par tous les praticiens). Placé
+  // AVANT loadSupabaseData pour que toute interprétation clinique postérieure
+  // parte des seuils du cabinet, pas des défauts. Fallback local en cas
+  // d'échec réseau (cf. _fetchPostureThresholds).
+  POSTURE_THRESHOLDS = await _fetchPostureThresholds();
   // Charger les données depuis Supabase
   await loadSupabaseData();
 }
@@ -5243,46 +5249,116 @@ const POSTURE_THRESHOLDS_DEFAULTS = {
   },
 };
 
-// Loader fail-safe : merge profond avec les défauts pour tolérer un stockage
-// partiel (ex. ajout d'un seuil dans une release future, ou JSON corrompu sur
-// une seule clé). Renvoie toujours une structure valide.
+// Merge profond avec les défauts pour tolérer un stockage partiel (ajout
+// d'un seuil dans une release future, JSON corrompu sur une seule clé,
+// serveur qui envoie une structure ancienne). Renvoie toujours une struct
+// valide. Factorisé (bug #125 Lot 2) pour être partagé entre le loader
+// localStorage (_loadPostureThresholds) et le fetch serveur (_fetchPostureThresholds).
+function _mergeThresholds(stored) {
+  const s = stored && typeof stored === 'object' ? stored : {};
+  return {
+    neutralite: { ...POSTURE_THRESHOLDS_DEFAULTS.neutralite, ...(s.neutralite || {}) },
+    courbures: {
+      cervicale:  { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.cervicale,  ...(s.courbures?.cervicale  || {}) },
+      thoracique: { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.thoracique, ...(s.courbures?.thoracique || {}) },
+      lombaire:   { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.lombaire,   ...(s.courbures?.lombaire   || {}) },
+    },
+    // #108 Étape 3a — merge profond face : tolère un stockage partiel
+    // (utilisateurs qui ont déjà personnalisé leurs seuils profil avant la
+    // release face → la section face manquera, on retombe sur les défauts).
+    face: { ...POSTURE_THRESHOLDS_DEFAULTS.face, ...(s.face || {}) },
+    // #108 Dos étape 3a — merge profond dos, même contrat fail-safe que face.
+    dos:  { ...POSTURE_THRESHOLDS_DEFAULTS.dos,  ...(s.dos  || {}) },
+    // #108 Étape 4 — merge profond couplage face+dos, idem fail-safe.
+    crossView: { ...POSTURE_THRESHOLDS_DEFAULTS.crossView, ...(s.crossView || {}) },
+  };
+}
+
+// Loader fail-safe localStorage — sert désormais UNIQUEMENT de FALLBACK
+// (bug #125 Lot 2) : la source de vérité est app_config côté serveur, fetché
+// dans _fetchPostureThresholds au login. Le cache local reste global (clé
+// non scopée) car les seuils sont un réglage cabinet, identique pour tous.
 function _loadPostureThresholds() {
   try {
     const raw = localStorage.getItem(POSTURE_THRESHOLDS_KEY);
     if (!raw) return JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
-    const stored = JSON.parse(raw);
-    return {
-      neutralite: { ...POSTURE_THRESHOLDS_DEFAULTS.neutralite, ...(stored.neutralite || {}) },
-      courbures: {
-        cervicale:  { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.cervicale,  ...(stored.courbures?.cervicale  || {}) },
-        thoracique: { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.thoracique, ...(stored.courbures?.thoracique || {}) },
-        lombaire:   { ...POSTURE_THRESHOLDS_DEFAULTS.courbures.lombaire,   ...(stored.courbures?.lombaire   || {}) },
-      },
-      // #108 Étape 3a — merge profond face : tolère un stockage partiel
-      // (utilisateurs qui ont déjà personnalisé leurs seuils profil avant la
-      // release face → la section face manquera, on retombe sur les défauts).
-      face: { ...POSTURE_THRESHOLDS_DEFAULTS.face, ...(stored.face || {}) },
-      // #108 Dos étape 3a — merge profond dos, même contrat fail-safe que face.
-      dos:  { ...POSTURE_THRESHOLDS_DEFAULTS.dos,  ...(stored.dos  || {}) },
-      // #108 Étape 4 — merge profond couplage face+dos, idem fail-safe.
-      crossView: { ...POSTURE_THRESHOLDS_DEFAULTS.crossView, ...(stored.crossView || {}) },
-    };
+    return _mergeThresholds(JSON.parse(raw));
   } catch (e) {
     console.warn('[#106] Seuils corrompus, fallback défauts :', e?.message);
     return JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
   }
 }
+
+// Fetch les seuils depuis app_config (source de vérité côté serveur, bug #125
+// Lot 2). Ladder de fallback en cas d'échec réseau ou de ligne absente :
+//   (1) serveur OK → merge + rafraîchit le cache local + retourne.
+//   (2) serveur KO ou ligne absente → cache local (clé globale bm4-posture-thresholds).
+//   (3) cache local absent → défauts.
+// Nécessite pwaUser.token (authFetch) — à n'appeler qu'après login.
+async function _fetchPostureThresholds() {
+  try {
+    const res = await authFetch(
+      SUPA_URL + '/rest/v1/app_config?key=eq.posture_thresholds&select=value'
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if (Array.isArray(rows) && rows.length > 0 && rows[0]?.value) {
+      const merged = _mergeThresholds(rows[0].value);
+      // Cache local (clé globale non scopée) pour fallback hors-ligne au prochain boot.
+      try { localStorage.setItem(POSTURE_THRESHOLDS_KEY, JSON.stringify(merged)); } catch (_) {}
+      return merged;
+    }
+    // Serveur atteint mais aucune ligne → repli local.
+    return _loadPostureThresholds();
+  } catch (e) {
+    console.warn('[posture-thresholds] fetch serveur KO, fallback local :', e?.message);
+    return _loadPostureThresholds();
+  }
+}
+
 let POSTURE_THRESHOLDS = _loadPostureThresholds();
 function _savePostureThresholds() {
+  // Cache local (clé globale). N'est plus la source de vérité (bug #125 Lot 2) :
+  // rafraîchit uniquement le cache hors-ligne après une écriture serveur réussie
+  // via adminSetPostureThresholds.
   try {
     localStorage.setItem(POSTURE_THRESHOLDS_KEY, JSON.stringify(POSTURE_THRESHOLDS));
   } catch (e) {
-    console.warn('[#106] Échec sauvegarde seuils :', e?.message);
+    console.warn('[#106] Échec cache local seuils :', e?.message);
   }
 }
 function _resetPostureThresholds() {
   POSTURE_THRESHOLDS = JSON.parse(JSON.stringify(POSTURE_THRESHOLDS_DEFAULTS));
-  try { localStorage.removeItem(POSTURE_THRESHOLDS_KEY); } catch (e) { /* noop */ }
+  // Bug #125 Lot 2 — persistance serveur des défauts. Sans ça, app_config
+  // garderait les anciennes valeurs et _fetchPostureThresholds les ramènerait
+  // au prochain login → reset annulé (mensonger, même famille que #126).
+  // Pas de removeItem : le cache local est réécrit avec les défauts par
+  // _scheduleServerPostureThresholdsSave APRÈS succès serveur (sinon on se
+  // retrouverait sans cache ET avec le serveur non mis à jour en cas d'échec).
+  _scheduleServerPostureThresholdsSave();
+}
+
+// Débounce Edge write depuis le panneau admin — l'utilisateur tape/incrémente
+// des inputs numériques, et chaque changement d'input déclencherait sinon un
+// aller-retour serveur. 800 ms est cohérent avec les autres autosaves du
+// codebase (sport/posturo/pédicurie). Le cache local est rafraîchi APRÈS
+// succès serveur pour ne pas mettre le cache en avance de phase.
+let _postureThresholdsServerTimer = null;
+function _scheduleServerPostureThresholdsSave() {
+  if (_postureThresholdsServerTimer) clearTimeout(_postureThresholdsServerTimer);
+  _postureThresholdsServerTimer = setTimeout(async () => {
+    _postureThresholdsServerTimer = null;
+    try {
+      const r = await adminSetPostureThresholds(POSTURE_THRESHOLDS);
+      if (!r || r.ok === false) {
+        console.warn('[posture-thresholds] Edge KO :', r?.error);
+        return;
+      }
+      _savePostureThresholds();
+    } catch (e) {
+      console.warn('[posture-thresholds] Edge threw :', e?.message);
+    }
+  }, 800);
 }
 
 // #106-A — Render du panneau Paramètres pour éditer les seuils. Appelé à
@@ -5387,7 +5463,10 @@ function _updatePostureThreshold(path, value) {
     target = target[p];
   }
   target[lastKey] = n;
-  _savePostureThresholds();
+  // Bug #125 Lot 2 — persistance serveur (source de vérité), débouncée
+  // pour ne pas hammer l'Edge à chaque frappe. Le cache local est refresh
+  // par _scheduleServerPostureThresholdsSave après succès serveur.
+  _scheduleServerPostureThresholdsSave();
 }
 
 // Reset + re-render du panneau pour réafficher les valeurs par défaut dans les inputs.

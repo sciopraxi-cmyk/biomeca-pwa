@@ -70,6 +70,9 @@ Deno.serve(async (req) => {
   if ((userData.user.email ?? '').toLowerCase() !== ADMIN_EMAIL) {
     return json({ error: 'Forbidden: admin only' }, 403);
   }
+  // Trace : id de l'admin authentifié, écrit dans app_config.updated_by par
+  // les actions qui pilotent la configuration clinique partagée.
+  const adminUserId = userData.user.id;
 
   // ─── Parse body ──────────────────────────────────────────────────────
   let body: Record<string, unknown>;
@@ -100,6 +103,8 @@ Deno.serve(async (req) => {
         return await handleSetResetModuleChangeLock(body);
       case 'setSubscriptionActive':
         return await handleSetSubscriptionActive(body);
+      case 'setPostureThresholds':
+        return await handleSetPostureThresholds(body, adminUserId);
       default:
         return json({ error: 'Unknown action: ' + String(action) }, 400);
     }
@@ -414,4 +419,41 @@ async function handleSetSubscriptionActive(body: Record<string, unknown>): Promi
     return json({ error: 'No user_data row for this email' }, 404);
   }
   return json({ ok: true, updated: data.length });
+}
+
+// Set posture thresholds (bug #125 Lot 2 — décision produit : les seuils
+// posturaux sont un réglage CLINIQUE partagé par TOUS les praticiens du
+// cabinet, défini par l'admin. Stockage centralisé dans app_config plutôt
+// que localStorage par-utilisateur.
+//
+// RLS sur app_config : lecture pour tout authenticated, aucune écriture
+// via JWT utilisateur → seul le service_role écrit (cette Edge Function).
+// La vérif d'email admin en début du handler ferme le chemin d'écriture
+// aux non-admins.
+//
+// updated_by : id de l'admin appelant (trace d'audit — ces seuils pilotent
+// l'interprétation « dans la norme » / « hors norme » des rapports).
+//
+// Pas de validation profonde de schéma : le client envoie la structure
+// complète, le merge fail-safe côté client (_mergeThresholds) tolère un
+// partiel. On vérifie seulement que c'est bien un objet non-null / non-array.
+async function handleSetPostureThresholds(
+  body: Record<string, unknown>,
+  adminUserId: string
+): Promise<Response> {
+  const thresholds = body.thresholds;
+  if (!thresholds || typeof thresholds !== 'object' || Array.isArray(thresholds)) {
+    return json({ error: 'Invalid thresholds (must be non-null object)' }, 400);
+  }
+  const { error: updErr } = await supaAdmin.from('app_config').upsert(
+    {
+      key: 'posture_thresholds',
+      value: thresholds,
+      updated_at: new Date().toISOString(),
+      updated_by: adminUserId,
+    },
+    { onConflict: 'key' }
+  );
+  if (updErr) return json({ error: 'upsert: ' + updErr.message }, 500);
+  return json({ ok: true });
 }
