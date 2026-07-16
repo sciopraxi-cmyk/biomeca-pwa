@@ -544,11 +544,16 @@ async function loadSupabaseData() {
     // fallback lit désormais la même clé que savePatients écrit (avant : -pwa,
     // écrite seulement sur échec Supabase → périmée → écrasait la bonne
     // version au reload hors-ligne).
-    patients = JSON.parse(localStorage.getItem('bm4-patients') || '[]');
-    praticiens = JSON.parse(localStorage.getItem('bm4-praticiens') || '[]');
+    // #125 — cloisonnement : on lit UNIQUEMENT la clé scopée au user courant
+    // (bm4-patients:<uid>). Sans user_id (jamais authentifié), on laisse la
+    // RAM vide plutôt que d'hériter du cache d'un autre compte.
+    const kPatients = _scopedKey('bm4-patients');
+    const kPraticiens = _scopedKey('bm4-praticiens');
+    patients = kPatients ? JSON.parse(localStorage.getItem(kPatients) || '[]') : [];
+    praticiens = kPraticiens ? JSON.parse(localStorage.getItem(kPraticiens) || '[]') : [];
     // Migration #39 sur le fallback aussi
-    if (migrateBilanFlags(patients)) {
-      try { localStorage.setItem('bm4-patients', JSON.stringify(patients)); } catch(_) {}
+    if (kPatients && migrateBilanFlags(patients)) {
+      try { localStorage.setItem(kPatients, JSON.stringify(patients)); } catch(_) {}
     }
     _dataLoaded = true;  // Task #64 — fallback considéré comme valide, saves autorisés
     _loadedFromFallback = true; // #114-1a — mémoire issue du cache local non confirmée.
@@ -621,8 +626,13 @@ async function saveToSupabase() {
     if(!ok) {
       // Path !ok (response API non OK) — task #38.
       // #65 — clé unifiée bm4-patients/bm4-praticiens (cf fallback ci-dessus).
-      localStorage.setItem('bm4-patients', JSON.stringify(patients));
-      localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
+      // #125 — écriture SCOPÉE (bm4-patients:<uid>). Si pas de user_id
+      // (rare, pwaUser vient d'être clear), on n'écrit RIEN plutôt que
+      // d'écraser une clé globale mal attribuée.
+      const kP = _scopedKey('bm4-patients');
+      const kPr = _scopedKey('bm4-praticiens');
+      if (kP) localStorage.setItem(kP, JSON.stringify(patients));
+      if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
       console.error('[#38] saveToSupabase failed', {
         event: 'sync_failed_response_not_ok',
         email: pwaUser?.email,
@@ -648,8 +658,12 @@ async function saveToSupabase() {
   } catch(e) {
     // Path exception (réseau, RLS, etc.) — task #38.
     // #65 — clé unifiée bm4-patients/bm4-praticiens (cf fallback ci-dessus).
-    localStorage.setItem('bm4-patients', JSON.stringify(patients));
-    localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
+    // #125 — écriture SCOPÉE (bm4-patients:<uid>). Si pas de user_id,
+    // on n'écrit RIEN plutôt que d'écraser une clé globale mal attribuée.
+    const kP = _scopedKey('bm4-patients');
+    const kPr = _scopedKey('bm4-praticiens');
+    if (kP) localStorage.setItem(kP, JSON.stringify(patients));
+    if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
     console.error('[#38] saveToSupabase exception', {
       event: 'sync_failed_exception',
       email: pwaUser?.email,
@@ -1743,8 +1757,12 @@ if ('serviceWorker' in navigator) {
 // ══════════════════════════════════════════════════════
 // ÉTAT GLOBAL
 // ══════════════════════════════════════════════════════
-let patients = JSON.parse(localStorage.getItem('bm4-patients')||'[]');
-let praticiens = JSON.parse(localStorage.getItem('bm4-praticiens')||'[]');
+// #125 — plus de lecture localStorage globale au boot. Avant, l'init lisait
+// 'bm4-patients' sans user_id → mélange des données entre comptes sur le même
+// navigateur. La lecture SCOPÉE (bm4-patients:<uid>) se fait désormais dans
+// loadSupabaseData, une fois pwaUser résolu. La RAM reste vide jusque-là.
+let patients = [];
+let praticiens = [];
 // Guard data race (task #64) : true uniquement après loadSupabaseData terminée
 // (path success, empty user, OU fallback localStorage). Reset à false au logout
 // + au début de onPwaLoginSuccess. saveToSupabase() early-return tant que false
@@ -2617,6 +2635,14 @@ async function launchTest(testId) {
 
 // Calcule en bytes la taille totale stockée par BioMéca dans localStorage.
 // Utilise la propriété character.length × 2 (UTF-16 en JS) comme approximation.
+// #125 — Cloisonnement par utilisateur des clés de données patient.
+// Sans user_id, un cache n'est PAS attribuable : on renvoie null et
+// l'appelant s'abstient (jamais de lecture/écriture non attribuée).
+function _scopedKey(base) {
+  var uid = (typeof pwaUser !== 'undefined' && pwaUser && pwaUser.id) ? pwaUser.id : null;
+  return uid ? base + ':' + uid : null;
+}
+
 function getBioMecaStorageBytes() {
   let total = 0;
   try {
@@ -2764,6 +2790,10 @@ function _restoreDataURLsAfterPersist(stash) {
 }
 
 function savePatients() {
+  // #125 — Garde attribuable : sans user_id, on n'écrit RIEN (aucune clé
+  // globale, aucune attribution incertaine). Cohérent avec le pattern
+  // _dataLoaded qui protège contre les saves prématurés.
+  if (!pwaUser?.id) return false;
   // #81 + Bug RAM-leak — strip in-place AVANT toute sérialisation. try/finally
   // GARANTIT la restauration RAM sur TOUS les chemins de sortie (return false
   // critique threshold, return false quota, throw, return normal). RAM continue
@@ -2777,7 +2807,9 @@ function savePatients() {
   // seulement en RAM). Déclenche si on perd un patient entier OU >= 8 unités
   // de travail. return false → le try/finally restaure les dataURLs en RAM.
   try {
-    const storedRaw = localStorage.getItem('bm4-patients');
+    // #125 — comparaison contre la version SCOPÉE au user courant. La garde
+    // en tête garantit un scoped key non-null ici.
+    const storedRaw = localStorage.getItem(_scopedKey('bm4-patients'));
     if (storedRaw) {
       const stored = JSON.parse(storedRaw);
       if (Array.isArray(stored)) {
@@ -2803,16 +2835,21 @@ function savePatients() {
   } catch (e) { /* parse échoué → on ne bloque pas, save normal */ }
   const beforeBytes = getBioMecaStorageBytes();
 
-  // Calcul de la taille future après sérialisation : seul bm4-patients change.
-  // (savePatients() n'écrit que bm4-patients ; bm4-praticiens est géré par savePraticiens.)
+  // Calcul de la taille future après sérialisation : seul bm4-patients:<uid> change.
+  // (savePatients() n'écrit que sa clé scopée ; bm4-praticiens:<uid> est géré par savePraticiens.)
   const futurePatientsBytes = JSON.stringify(patients).length * 2;
-  const futureKeyBytes = 'bm4-patients'.length * 2;
-  // Reconstituer la taille post-save totale du stockage BioMéca
+  const currentPatientsKey = _scopedKey('bm4-patients');
+  const futureKeyBytes = currentPatientsKey.length * 2;
+  // Reconstituer la taille post-save totale du stockage BioMéca.
+  // #125 — on continue de sommer TOUTES les clés bm4-* (quota navigateur
+  // = partagé par domaine), mais on exclut la clé SCOPÉE du user courant
+  // pour ne pas double-compter (ancienne + nouvelle) → sinon faux positif
+  // "STOCKAGE CRITIQUE" qui bloquerait les sauvegardes.
   let otherKeysBytes = 0;
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('bm4-') && key !== 'bm4-patients') {
+      if (key && key.startsWith('bm4-') && key !== currentPatientsKey) {
         const val = localStorage.getItem(key) || '';
         otherKeysBytes += (key.length + val.length) * 2;
       }
@@ -2840,7 +2877,9 @@ function savePatients() {
   }
 
   try {
-    localStorage.setItem('bm4-patients', JSON.stringify(patients));
+    // #125 — écriture SCOPÉE (bm4-patients:<uid>). currentPatientsKey non-null
+    // ici grâce à la garde en tête de savePatients.
+    localStorage.setItem(currentPatientsKey, JSON.stringify(patients));
   } catch(e) {
     if (e && (e.name === 'QuotaExceededError' || e.code === 22 || (e.message && e.message.toLowerCase().includes('quota')))) {
       alert(
@@ -3445,7 +3484,11 @@ function exportAllDataJSON() {
 // PRATICIENS
 // ══════════════════════════════════════════════════════
 function savePraticiens() {
-  localStorage.setItem('bm4-praticiens', JSON.stringify(praticiens));
+  // #125 — Garde attribuable + écriture SCOPÉE (bm4-praticiens:<uid>).
+  // Sans user_id, on n'écrit rien pour ne pas mélanger des comptes.
+  if (!pwaUser?.id) return;
+  const kPr = _scopedKey('bm4-praticiens');
+  if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
   saveToSupabase();
 }
 
