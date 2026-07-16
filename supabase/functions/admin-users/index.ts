@@ -160,13 +160,29 @@ async function handleList(): Promise<Response> {
   return json({ users });
 }
 
+// #126 — Résolution email → userId (auth.users), factorisée pour
+// setAcces / setLicencePayee / setFormule. Retourne soit un userId,
+// soit une Response prête à renvoyer (400 email invalide, 500 listUsers KO,
+// 404 introuvable). Le pattern discriminé avec Response évite au caller
+// de dupliquer les 3 branches d'erreur.
+async function resolveUserIdByEmail(email: string): Promise<Response | { userId: string }> {
+  if (!email || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
+  const { data: usersData, error: listErr } = await supaAdmin.auth.admin.listUsers();
+  if (listErr) return json({ error: 'listUsers: ' + listErr.message }, 500);
+  const found = (usersData.users ?? []).find((u) => (u.email ?? '').toLowerCase() === email);
+  if (!found) return json({ error: 'User not found' }, 404);
+  return { userId: found.id };
+}
+
 async function handleSetLicencePayee(body: Record<string, unknown>): Promise<Response> {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const value = body.value;
-  if (!email || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
   if (value !== true && value !== false) {
     return json({ error: 'Invalid value (must be boolean)' }, 400);
   }
+  const resolved = await resolveUserIdByEmail(email);
+  if (resolved instanceof Response) return resolved;
+  const { userId } = resolved;
 
   // Sur activation : on marque aussi engagement=admin_gratuit + date pour distinguer
   // des paiements Stripe (handleCheckoutCompleted écrit engagement='sans' ou '1_an').
@@ -178,12 +194,16 @@ async function handleSetLicencePayee(body: Record<string, unknown>): Promise<Res
     update.date_debut_abonnement = new Date().toISOString();
   }
 
+  // #126 — UPSERT par user_id (pattern identique à stripe-webhook L446-453) :
+  // certains comptes n'ont jamais de ligne user_data (jamais connectés, ou
+  // bloqués au paywall avant tout write) ; un UPDATE .eq('email', ...) renvoie
+  // silencieusement updated:0 et l'admin ne peut pas les débloquer. L'UPSERT
+  // crée la ligne à la volée si absente.
   const { data, error } = await supaAdmin
     .from('user_data')
-    .update(update)
-    .eq('email', email)
+    .upsert({ user_id: userId, email, ...update }, { onConflict: 'user_id' })
     .select('email');
-  if (error) return json({ error: 'update: ' + error.message }, 500);
+  if (error) return json({ error: 'upsert: ' + error.message }, 500);
 
   // Désactivation = action exceptionnelle (remboursement litige). Le client
   // doit alerter visuellement l'admin. Task #57 : la licence est un achat à vie.
@@ -197,17 +217,20 @@ async function handleSetLicencePayee(body: Record<string, unknown>): Promise<Res
 async function handleSetFormule(body: Record<string, unknown>): Promise<Response> {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const formule = typeof body.formule === 'string' ? body.formule : '';
-  if (!email || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
   if (!FORMULES.has(formule)) {
     return json({ error: 'Invalid formule (must be formule_1..formule_5)' }, 400);
   }
+  const resolved = await resolveUserIdByEmail(email);
+  if (resolved instanceof Response) return resolved;
+  const { userId } = resolved;
 
+  // #126 — UPSERT par user_id : même motif que setLicencePayee, un compte
+  // sans ligne user_data ne peut pas se voir imposer une formule via UPDATE.
   const { data, error } = await supaAdmin
     .from('user_data')
-    .update({ formule })
-    .eq('email', email)
+    .upsert({ user_id: userId, email, formule }, { onConflict: 'user_id' })
     .select('email');
-  if (error) return json({ error: 'update: ' + error.message }, 500);
+  if (error) return json({ error: 'upsert: ' + error.message }, 500);
   return json({ ok: true, updated: data?.length ?? 0 });
 }
 
@@ -278,12 +301,10 @@ async function handleSetAcces(body: Record<string, unknown>): Promise<Response> 
 
   let userId = userIdIn;
   if (!userId) {
-    if (!EMAIL_RE.test(emailIn)) return json({ error: 'Invalid email' }, 400);
-    const { data: usersData, error: listErr } = await supaAdmin.auth.admin.listUsers();
-    if (listErr) return json({ error: 'listUsers: ' + listErr.message }, 500);
-    const found = (usersData.users ?? []).find((u) => (u.email ?? '').toLowerCase() === emailIn);
-    if (!found) return json({ error: 'User not found' }, 404);
-    userId = found.id;
+    // #126 — utilise le helper factorisé (même logique qu'auparavant, inline).
+    const resolved = await resolveUserIdByEmail(emailIn);
+    if (resolved instanceof Response) return resolved;
+    userId = resolved.userId;
   }
 
   const { data: getData, error: getErr } = await supaAdmin.auth.admin.getUserById(userId);
@@ -347,7 +368,12 @@ async function handleSetResetModuleChangeLock(body: Record<string, unknown>): Pr
     .eq('email', email)
     .select('email');
   if (error) return json({ error: 'update: ' + error.message }, 500);
-  return json({ ok: true, updated: data?.length ?? 0 });
+  // #126 — 404 explicite : on ne peut pas "réinitialiser" un lock sur une
+  // ligne user_data inexistante. Le ok:true silencieux masquait l'action ratée.
+  if (!data || data.length === 0) {
+    return json({ error: 'No user_data row for this email' }, 404);
+  }
+  return json({ ok: true, updated: data.length });
 }
 
 // Suspension/réactivation manuelle de l'abonnement par l'admin (task #57).
@@ -380,5 +406,12 @@ async function handleSetSubscriptionActive(body: Record<string, unknown>): Promi
     .eq('email', email)
     .select('email');
   if (error) return json({ error: 'update: ' + error.message }, 500);
-  return json({ ok: true, updated: data?.length ?? 0 });
+  // #126 — 404 explicite : suspendre un abonnement inexistant est un no-op
+  // dangereux (ok:true masquait une action qui n'a rien fait). L'admin doit
+  // savoir que la ligne user_data manque avant de supposer que la suspension
+  // a réussi.
+  if (!data || data.length === 0) {
+    return json({ error: 'No user_data row for this email' }, 404);
+  }
+  return json({ ok: true, updated: data.length });
 }
