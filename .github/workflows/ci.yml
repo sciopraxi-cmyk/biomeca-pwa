@@ -14,6 +14,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Histoire complète pour la garde CACHE_VERSION (git diff BASE...HEAD
+          # nécessite le merge-base commun, indisponible en shallow clone).
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,6 +36,29 @@ jobs:
             exit 1
           fi
           echo "✓ No sensitive credentials detected in client code"
+
+      # #77 — force le bump CACHE_VERSION dès qu'une PR change du code applicatif.
+      # Sans ça, le service worker garde l'ancien CACHE_VERSION → activate ne
+      # purge pas → les clients continuent à servir index.html/js/**/css/** depuis
+      # le cache pourri. Guard PR-only : les pushes de branche seuls n'ont pas
+      # de base fiable et déclencheraient le check hors contexte.
+      - name: Require CACHE_VERSION bump when app code changes
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE="origin/${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          APP_CHANGED=$(echo "$CHANGED" | grep -E '^(index\.html|js/|css/)' || true)
+          if [ -z "$APP_CHANGED" ]; then
+            echo "✓ No app code changed (index.html, js/**, css/**) — CACHE_VERSION bump not required"
+            exit 0
+          fi
+          echo "App code changed :"
+          echo "$APP_CHANGED"
+          if ! git diff "$BASE"...HEAD -- service-worker.js | grep -E '^\+const CACHE_VERSION\s*=' > /dev/null; then
+            echo "❌ Bump CACHE_VERSION dans service-worker.js : sinon les utilisateurs continueront à exécuter l'ancien code depuis le cache du service worker"
+            exit 1
+          fi
+          echo "✓ CACHE_VERSION bump detected in service-worker.js"
 
       - name: Lint
         run: npm run lint

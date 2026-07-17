@@ -6,8 +6,19 @@
 // La version du cache est incrémentée manuellement à chaque déploiement notable.
 // ============================================================================
 
-const CACHE_VERSION = 'biomeca-v1';
+// #77 — bump v1→v2 : force la purge unique du cache pourri figé depuis avril
+// 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
+// clients sur du code de mois précédents). Toute évolution ultérieure du code
+// applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
+const CACHE_VERSION = 'biomeca-v2';
 const CACHE_PREFIX  = 'biomeca-';
+
+// #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur
+// GitHub Pages project page). Les règles de routage doivent raisonner en
+// chemin RELATIF au scope, sinon elles sont du code mort en prod.
+const BASE_PATH = self.location.pathname
+  .replace(/service-worker\.js$/, '')
+  .toLowerCase();
 
 // Ressources critiques précachées à l'install pour démarrage hors-ligne.
 const PRECACHE_URLS = [
@@ -31,8 +42,11 @@ const PRECACHE_URLS = [
 ];
 
 // Extensions reconnues comme assets statiques locaux (cache-first).
+// #77 — .css et .js retirés : le code applicatif passe désormais en
+// network-first (règle dédiée dans le fetch handler), pour ne plus geler
+// les utilisateurs sur un ancien bundle.
 const ASSET_EXTENSIONS = [
-  '.css', '.js', '.png', '.jpg', '.jpeg', '.svg',
+  '.png', '.jpg', '.jpeg', '.svg',
   '.ico', '.woff', '.woff2', '.webp'
 ];
 
@@ -71,6 +85,10 @@ self.addEventListener('activate', event => {
 
 // ============================================================================
 // FETCH — routage selon l'URL de la requête
+// ----------------------------------------------------------------------------
+// ⚠️ Miroir de test : js/sw-routing.mjs — répercuter toute modification de
+// ces règles dans le module miroir (sinon les tests Vitest passent en vert
+// alors que la prod dérive).
 // ============================================================================
 self.addEventListener('fetch', event => {
   const req = event.request;
@@ -101,8 +119,33 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // ─── 4. Assets locaux statiques : cache-first ───
   const path = url.pathname.toLowerCase();
+
+  // ─── 4a. Assets immuables (images, polices, pdf.js, Sentry auto-hébergé) : cache-first ───
+  // #77 — les fichiers sous /assets/ ou /vendor/ ont une adresse stable et un
+  // contenu figé (renommer un asset = changer son URL). Cache indéfini OK.
+  // Prime sur ASSET_EXTENSIONS parce qu'un .js sous /assets/vendor/ (pdf.js,
+  // Sentry bundle) est tiers et immuable — pas de raison de le re-fetcher.
+  // Comparaison RELATIVE au scope : sur GitHub Pages project page, le path
+  // réel est /biomeca-pwa/assets/... — startsWith('/assets/') seul serait du
+  // code mort en prod.
+  const rel = path.startsWith(BASE_PATH) ? path.slice(BASE_PATH.length) : path.replace(/^\//, '');
+  if (rel.startsWith('assets/') || rel.startsWith('vendor/')) {
+    event.respondWith(cacheFirst(req));
+    return;
+  }
+
+  // ─── 4b. Code applicatif (.js / .css hors /assets/) : network-first ───
+  // #77 — cause racine des « problèmes de cache » observés pendant la séquence
+  // sécurité : cache-first sur js/biomeca.js et css/biomeca.css gelait les
+  // utilisateurs sur du code d'il y a des semaines. Network-first met à jour
+  // à chaque online ; le cache reste comme filet hors-ligne uniquement.
+  if (path.endsWith('.js') || path.endsWith('.css')) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
+
+  // ─── 4c. Autres assets locaux (favicon.ico, etc.) : cache-first ───
   if (ASSET_EXTENSIONS.some(ext => path.endsWith(ext))) {
     event.respondWith(cacheFirst(req));
     return;
