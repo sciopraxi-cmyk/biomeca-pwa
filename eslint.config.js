@@ -78,6 +78,19 @@ export default [
     },
   },
 
+  // scripts/*.mjs : outils Node (healthchecks, one-shots). ES modules purs,
+  // pas de dépendance client — globals Node uniquement.
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+
   // Désactive les règles ESLint qui entrent en conflit avec Prettier
   prettier,
 ];

@@ -1,0 +1,34 @@
+name: Prod healthcheck
+
+# #128 — Détection quotidienne d'un login prod cassé. Ce workflow est SÉPARÉ
+# de ci.yml : ce n'est pas une garde de PR, c'est un radar de production qui
+# aurait détecté l'incident #77 (login mort du 28/04 au 17/07/2026) le
+# lendemain de la rupture au lieu de deux mois et demi plus tard.
+#
+# Le check reproduit le trajet utilisateur : fetch du bundle prod → extraction
+# de SUPA_KEY servie aux clients → tentative de login. Toute divergence entre
+# la clé bundle et la clé acceptée par l'API Supabase fait échouer le job.
+
+on:
+  schedule:
+    - cron: '0 7 * * *' # 07:00 UTC quotidien (~09:00 Paris été / 08:00 hiver)
+  workflow_dispatch: {}
+
+jobs:
+  auth-check:
+    name: Prod login check (bundle-served anon key)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run auth healthcheck
+        env:
+          PROD_CHECK_EMAIL: ${{ secrets.PROD_CHECK_EMAIL }}
+          PROD_CHECK_PASSWORD: ${{ secrets.PROD_CHECK_PASSWORD }}
+        run: node scripts/check-prod-auth.mjs
