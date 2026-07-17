@@ -77,6 +77,17 @@ async function adminSetAcces(userId, acces) {
   return callAdminAction('setAcces', { userId, acces });
 }
 
+// Écrit les seuils posturaux dans app_config (réglage clinique partagé,
+// défini par l'admin, appliqué à TOUS les praticiens). Décision produit
+// bug #125 Lot 2 : les seuils ne sont pas per-user mais per-cabinet.
+// L'Edge vérifie côté serveur que l'appelant est admin ; RLS app_config
+// bloque toute écriture via JWT utilisateur.
+// thresholds = objet complet (structure identique à POSTURE_THRESHOLDS côté client).
+// Retourne { ok:true } ou { ok:false, error }.
+async function adminSetPostureThresholds(thresholds) {
+  return callAdminAction('setPostureThresholds', { thresholds });
+}
+
 // Alias rétrocompat (task #58) — convertit l'ancien enum droits ('all' |
 // 'sport' | 'posturo') en array modules CÔTÉ SERVEUR (cf. admin-users
 // handleSetDroits qui délègue à handleSetModules après mapping). Conservé
