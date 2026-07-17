@@ -2,10 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { extractSupaKey } from '../scripts/check-prod-auth.mjs';
 
 // Fixture au format RÉEL de la clé prod : sb_publishable_* (nouveau format
-// Supabase, actif depuis la rotation post-incident #77). L'ancien format
-// eyJ... (JWT legacy) reste couvert par un test dédié pour prouver que la
-// regex est agnostique au format — un remplacement de format côté Supabase
-// ne doit pas casser le healthcheck.
+// Supabase). Chronologie : rotation eyJ→sb_publishable_* le 28/04/2026 suite
+// à l'incident #29. Le nouveau bundle a bien été publié sur GitHub Pages, MAIS
+// le SW cache-first + CACHE_VERSION jamais bumpée figeait les clients sur
+// l'ancien bundle avec l'ancienne clé — c'est ce que la découverte #77 a
+// révélé le 17/07 (2 mois et demi de login prod cassé, non détecté).
+// Localhost, sans SW ou avec un SW distinct, servait la bonne clé depuis
+// avril → c'est ce qui a masqué le bug.
+// L'ancien format eyJ... (JWT legacy) reste couvert par un test dédié pour
+// prouver que la regex est agnostique au format — un futur changement côté
+// Supabase ne doit pas casser le healthcheck.
 const FAKE_KEY_PUB = 'sb_publishable_abcdef1234567890abcdefgh';
 const FAKE_KEY_JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fake.signature';
 
