@@ -6,6 +6,20 @@
 const SUPA_URL = 'https://tzivizoacdyopwfzerrb.supabase.co';
 const SUPA_KEY = 'sb_publishable_aE4_BZYwz6bGGvby4XXAgw_k8ULnrYh';
 
+// #129 — URL de retour pour les mails d'auth (confirmation signup, reset
+// password). En prod l'app vit sur https://sciopraxi-cmyk.github.io/biomeca-pwa/
+// (project page), donc le Site URL Supabase seul NE SUFFIT PAS : lorsqu'il
+// est utilisé implicitement par GoTrue, il redirige vers la racine du domaine
+// et perd le sous-chemin /biomeca-pwa/ → 404 GitHub Pages. On dérive l'URL
+// à passer à chaque appel depuis window.location, ce qui gère localhost (dev)
+// et project page (prod) sans configuration.
+//
+// ⚠️ redirect_to est un paramètre de QUERY STRING dans l'API GoTrue, pas un
+// champ du body JSON. Mis dans le body il est silencieusement ignoré.
+function _authRedirectTo() {
+  return window.location.origin + window.location.pathname;
+}
+
 let pwaUser = null;
 
 // ─── Client Supabase léger (sans SDK) ───
@@ -23,7 +37,9 @@ const supa = {
   },
 
   async signUp(email, password, metadata) {
-    const res = await fetch(SUPA_URL + '/auth/v1/signup', {
+    // #129 — redirect_to en query string (pas dans le body, cf. helper).
+    const url = SUPA_URL + '/auth/v1/signup?redirect_to=' + encodeURIComponent(_authRedirectTo());
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
       body: JSON.stringify({ email, password, data: metadata })
@@ -253,7 +269,9 @@ async function showForgotPassword() {
     return;
   }
   try {
-    const res = await fetch(SUPA_URL + '/auth/v1/recover', {
+    // #129 — redirect_to en query string (pas dans le body, cf. helper).
+    const url = SUPA_URL + '/auth/v1/recover?redirect_to=' + encodeURIComponent(_authRedirectTo());
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
       body: JSON.stringify({ email: trimmedEmail })
