@@ -504,6 +504,18 @@ async function onPwaLoginSuccess() {
   // Reset guard data race (task #64) — si l'user fait logout puis re-login
   // rapidement, _dataLoaded pourrait être relicat true de la session précédente.
   _dataLoaded = false;
+  // #131 polish — Init/resume AudioContext dans le sillage du clic login
+  // (geste utilisateur requis par la politique autoplay). Sans ça, le bip
+  // d'inactivité 18 min plus tard reste silencieux. Fait AVANT tout await
+  // pour ne pas perdre le crédit de gesture. try/catch : audio indisponible
+  // = silence, pas d'erreur.
+  try {
+    var _Ctor = window.AudioContext || window.webkitAudioContext;
+    if (_Ctor && !_audioCtx) _audioCtx = new _Ctor();
+    if (_audioCtx && _audioCtx.state === 'suspended') {
+      _audioCtx.resume().catch(function () {});
+    }
+  } catch (e) {}
   // #85 Fix D — refresh préventif périodique (50 min, sous la durée standard
   // d'1h de l'access_token Supabase). clearInterval dans pwaLogout/clearPwaSession.
   if (_sessionRefreshTimer) clearInterval(_sessionRefreshTimer);
@@ -1768,11 +1780,50 @@ function _showAccessOverlay({ cause }) {
 // #131 — Verrouillage automatique après inactivité (contrainte clinique #131 :
 // un bilan dure 30-45 min avec des phases sans écran, donc PAS de déconnexion
 // par surprise — un avertissement à 2 min de la fin doit permettre d'annuler
-// d'un simple geste).
-function _idleLockKeepAlive() {
-  _lastActivity = Date.now();
-  var b = document.getElementById('idle-warn-banner');
-  if (b) b.style.display = 'none';
+// d'un simple geste). Le bandeau se masque sur tout mousemove, il n'y a donc
+// pas de bouton « Rester connecté » (il serait inatteignable — la souris
+// masquerait le bandeau avant d'atteindre le bouton).
+
+// État warning : re-bipe à la ré-entrée, bip toutes les 30 s tant qu'affiché.
+let _idleWarnActive = false;
+let _lastBeepAt = 0;
+// AudioContext lazy créé/débloqué dans onPwaLoginSuccess (contrainte autoplay :
+// le contexte doit être créé/resume dans le sillage d'un geste utilisateur,
+// sinon le bip d'inactivité 18 min plus tard sera muet).
+let _audioCtx = null;
+
+// Bip doux via Web Audio API : petit motif 2 notes 660→880 Hz, enveloppes
+// courtes pour éviter les clics, gain crête ~0.15 pour ne pas alarmer un
+// patient présent. Ne throw JAMAIS (audio indisponible = silence, pas d'erreur).
+function _idleBeep() {
+  try {
+    if (!_audioCtx) {
+      var Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return;
+      _audioCtx = new Ctor();
+    }
+    if (_audioCtx.state === 'suspended') {
+      _audioCtx.resume().catch(function () {});
+    }
+    var ctx = _audioCtx;
+    var t0 = ctx.currentTime;
+    var playNote = function (freq, start, dur) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      // Enveloppe : attack 15 ms, sustain, release 40 ms.
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.15, start + 0.015);
+      gain.gain.setValueAtTime(0.15, start + dur - 0.04);
+      gain.gain.linearRampToValueAtTime(0, start + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + dur + 0.02);
+    };
+    playNote(660, t0, 0.18);
+    playNote(880, t0 + 0.20, 0.18);
+  } catch (e) { /* audio indisponible — silence, pas d'erreur */ }
 }
 
 function _idleLockTick() {
@@ -1785,20 +1836,37 @@ function _idleLockTick() {
     _lockSession();
     return;
   }
-  if (elapsed >= cfg.idleMs - cfg.warnMs) {
+  var shouldWarn = elapsed >= cfg.idleMs - cfg.warnMs;
+  if (shouldWarn) {
     var remaining = Math.max(0, cfg.idleMs - elapsed);
     var min = Math.floor(remaining / 60000);
     var sec = Math.floor((remaining % 60000) / 1000);
     var countdown = document.getElementById('idle-warn-countdown');
     if (countdown) countdown.textContent = min + ':' + (sec < 10 ? '0' : '') + sec;
     if (banner) banner.style.display = 'flex';
+    // Bip à la transition masqué→affiché, puis toutes les 30 s tant qu'affiché.
+    if (!_idleWarnActive) {
+      _idleWarnActive = true;
+      _idleBeep();
+      _lastBeepAt = Date.now();
+    } else if (Date.now() - _lastBeepAt >= 30000) {
+      _idleBeep();
+      _lastBeepAt = Date.now();
+    }
   } else {
     if (banner && banner.style.display !== 'none') banner.style.display = 'none';
+    // Sortie de l'état warning (activité) — reset pour re-bipe à la prochaine entrée.
+    if (_idleWarnActive) {
+      _idleWarnActive = false;
+      _lastBeepAt = 0;
+    }
   }
 }
 
 function _startIdleLock() {
   _lastActivity = Date.now();
+  _idleWarnActive = false;
+  _lastBeepAt = 0;
   if (_idleLockTimer) clearInterval(_idleLockTimer);
   _idleLockTimer = setInterval(_idleLockTick, 1000);
 }

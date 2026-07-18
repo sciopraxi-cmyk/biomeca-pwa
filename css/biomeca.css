@@ -539,10 +539,11 @@ body.printing #rpt-print{display:block!important;}
 }
 
 /* #131 — Bandeau d'avertissement d'inactivité, injecté au sommet du body.
-   Passe en display:flex quand le JS l'affiche (cf. _idleLockTick). */
+   Passe en display:flex quand le JS l'affiche (cf. _idleLockTick).
+   Pas de bouton — bouger la souris masque le bandeau (cf. index.html). */
 #idle-warn-banner{
   position:fixed;top:0;left:0;right:0;z-index:10000;
-  align-items:center;justify-content:center;gap:14px;
+  align-items:center;justify-content:center;
   padding:10px 16px;
   background:rgba(217,154,60,0.96);
   color:#0b1e3d;
@@ -550,10 +551,3 @@ body.printing #rpt-print{display:block!important;}
   text-align:center;
   box-shadow:0 2px 8px rgba(0,0,0,0.25);
 }
-#idle-warn-banner button{
-  background:#0b1e3d;color:#f9c874;
-  border:none;border-radius:6px;
-  padding:6px 14px;font-size:13px;font-weight:600;
-  cursor:pointer;
-}
-#idle-warn-banner button:hover{ background:#0a1a35; }
