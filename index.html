@@ -68,10 +68,12 @@
 </head>
 <body>
 <!-- #131 — Bandeau d'avertissement d'inactivité (compte à rebours avant verrouillage).
-     Masqué par défaut, styles centralisés dans css/biomeca.css. -->
+     Masqué par défaut, styles centralisés dans css/biomeca.css.
+     Pas de bouton « Rester connecté » : il serait inatteignable — le bandeau
+     se masque sur tout mousemove, donc déplacer la souris vers le bouton
+     le fait disparaître avant le clic. Bouger la souris suffit. -->
 <div id="idle-warn-banner" style="display:none;">
-  <span>Session verrouillée dans <span id="idle-warn-countdown">2:00</span>. Bougez la souris pour rester connecté.</span>
-  <button type="button" onclick="_idleLockKeepAlive()">Rester connecté</button>
+  <span>Session verrouillée dans <span id="idle-warn-countdown">2:00</span>. Bougez la souris ou touchez l'écran pour rester connecté.</span>
 </div>
 <!-- ÉCRAN DE CONNEXION PWA -->
 <div id="pwa-login" style="position:fixed;inset:0;background:#0b1e3d;z-index:9999;display:flex;flex-direction:column;overflow:hidden;">
