@@ -20,6 +20,31 @@ function _authRedirectTo() {
   return window.location.origin + window.location.pathname;
 }
 
+// #127 — Classe l'erreur d'un /auth/v1/token entre « vrai échec d'identifiants »
+// (message générique flou, anti-énumération de comptes) et « panne infra »
+// (message déculpabilisant + log technique). Test-mirror : js/auth-error.mjs
+// — répercuter toute modification dans les DEUX fichiers.
+function _classifyAuthError(status, body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const msg = typeof b.message === 'string' ? b.message : '';
+  const msgAlt = typeof b.msg === 'string' ? b.msg : '';
+  const looksLikeCredentials =
+    status === 400 &&
+    (b.error_code === 'invalid_credentials' ||
+      b.error === 'invalid_grant' ||
+      /invalid login credentials/i.test(msg) ||
+      /invalid login credentials/i.test(msgAlt));
+  if (looksLikeCredentials) {
+    return { kind: 'credentials' };
+  }
+  const technical =
+    msg ||
+    msgAlt ||
+    (typeof b.error_description === 'string' ? b.error_description : '') ||
+    '(pas de message)';
+  return { kind: 'infra', status: status, technical: technical };
+}
+
 let pwaUser = null;
 
 // ─── Client Supabase léger (sans SDK) ───
@@ -33,7 +58,12 @@ const supa = {
       headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
       body: JSON.stringify({ email, password })
     });
-    return res.json();
+    // #127 — on remonte aussi le status HTTP pour permettre à handleLogin
+    // de distinguer un vrai échec d'identifiants (400 invalid_credentials)
+    // d'une panne infra (5xx, clé API refusée, endpoint mort). Sans ça,
+    // un incident type #77 se cache derrière « Email ou mot de passe incorrect ».
+    const body = await res.json().catch(() => ({}));
+    return { status: res.status, body };
   },
 
   async signUp(email, password, metadata) {
@@ -383,14 +413,36 @@ async function pwaLogin() {
   btn.disabled = true; btn.textContent = 'Connexion...';
 
   try {
-    const data = await supa.signIn(email, pwd);
-    if(data.access_token) {
+    const { status, body } = await supa.signIn(email, pwd);
+    if(body.access_token) {
       const isAdmin = email.toLowerCase() === 'sciopraxi@gmail.com';
-      pwaUser = { email, token: data.access_token, id: data.user?.id, isAdmin, user_metadata: data.user?.user_metadata || {}, app_metadata: data.user?.app_metadata || {} };
-      savePwaSession(data.access_token, data.refresh_token, pwaUser);
+      pwaUser = { email, token: body.access_token, id: body.user?.id, isAdmin, user_metadata: body.user?.user_metadata || {}, app_metadata: body.user?.app_metadata || {} };
+      savePwaSession(body.access_token, body.refresh_token, pwaUser);
       await onPwaLoginSuccess();
     } else {
-      errEl.textContent = data.error_description || data.msg || 'Email ou mot de passe incorrect.';
+      // #127 — 2 branches : vrai échec identifiants → message flou
+      // (anti-énumération) ; panne infra → message déculpabilisant + log
+      // technique (Sentry si dispo). Voir le mirror js/auth-error.mjs pour
+      // les cas couverts.
+      const classified = _classifyAuthError(status, body);
+      if (classified.kind === 'credentials') {
+        errEl.textContent = 'Email ou mot de passe incorrect.';
+      } else {
+        errEl.textContent =
+          'Connexion momentanément indisponible — ce n’est pas votre mot de passe. ' +
+          'Réessayez dans quelques instants ; si le problème persiste, contactez le support.';
+        console.error('[auth] login failed (non-credential)', {
+          status: classified.status,
+          message: classified.technical,
+        });
+        if (typeof Sentry !== 'undefined' && Sentry && typeof Sentry.captureMessage === 'function') {
+          Sentry.captureMessage('login failed (non-credential)', {
+            level: 'error',
+            tags: { event: 'auth_login_infra_failure' },
+            extra: { status: classified.status, technical: classified.technical },
+          });
+        }
+      }
       errEl.style.display = 'block';
       btn.disabled = false; btn.textContent = 'Se connecter';
     }
