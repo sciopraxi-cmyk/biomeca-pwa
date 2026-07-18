@@ -45,6 +45,23 @@ function _classifyAuthError(status, body) {
   return { kind: 'infra', status: status, technical: technical };
 }
 
+// #131 — verrouillage après inactivité. Délais volontairement en objet mutable
+// pour permettre l'ajustement à chaud (console) en E2E et le tuning futur.
+window._idleLockCfg = { idleMs: 20 * 60 * 1000, warnMs: 2 * 60 * 1000 };
+
+// Un seul horodatage global mis à jour par les écouteurs d'activité — pas de
+// throttle nécessaire, l'assignation d'un timestamp est triviale.
+let _lastActivity = Date.now();
+let _idleLockTimer = null;
+
+// Écouteurs en phase CAPTURE : le dessin sur canvas et les clics photo (les
+// vrais signaux de présence pendant un bilan) déclenchent souvent stopPropagation
+// sur leurs handlers. La capture garantit que _lastActivity est bien mis à jour
+// AVANT que l'event soit consommé. Passive pour ne pas gêner le compositeur.
+['mousemove', 'mousedown', 'keydown', 'touchstart', 'click', 'scroll'].forEach(function (ev) {
+  document.addEventListener(ev, function () { _lastActivity = Date.now(); }, { capture: true, passive: true });
+});
+
 let pwaUser = null;
 
 // ─── Client Supabase léger (sans SDK) ───
@@ -526,6 +543,9 @@ async function onPwaLoginSuccess() {
   POSTURE_THRESHOLDS = await _fetchPostureThresholds();
   // Charger les données depuis Supabase
   await loadSupabaseData();
+  // #131 — démarrer le compteur d'inactivité (masque toujours le banner
+  // d'avertissement s'il traînait d'une session précédente non nettoyée).
+  _startIdleLock();
 }
 
 // ─── Chargement des données ───
@@ -1745,11 +1765,83 @@ function _showAccessOverlay({ cause }) {
   }
 }
 
+// #131 — Verrouillage automatique après inactivité (contrainte clinique #131 :
+// un bilan dure 30-45 min avec des phases sans écran, donc PAS de déconnexion
+// par surprise — un avertissement à 2 min de la fin doit permettre d'annuler
+// d'un simple geste).
+function _idleLockKeepAlive() {
+  _lastActivity = Date.now();
+  var b = document.getElementById('idle-warn-banner');
+  if (b) b.style.display = 'none';
+}
+
+function _idleLockTick() {
+  // Safety net : si pwaUser a été clear en cours de route, on stoppe.
+  if (!pwaUser) { _stopIdleLock(); return; }
+  var cfg = window._idleLockCfg;
+  var elapsed = Date.now() - _lastActivity;
+  var banner = document.getElementById('idle-warn-banner');
+  if (elapsed >= cfg.idleMs) {
+    _lockSession();
+    return;
+  }
+  if (elapsed >= cfg.idleMs - cfg.warnMs) {
+    var remaining = Math.max(0, cfg.idleMs - elapsed);
+    var min = Math.floor(remaining / 60000);
+    var sec = Math.floor((remaining % 60000) / 1000);
+    var countdown = document.getElementById('idle-warn-countdown');
+    if (countdown) countdown.textContent = min + ':' + (sec < 10 ? '0' : '') + sec;
+    if (banner) banner.style.display = 'flex';
+  } else {
+    if (banner && banner.style.display !== 'none') banner.style.display = 'none';
+  }
+}
+
+function _startIdleLock() {
+  _lastActivity = Date.now();
+  if (_idleLockTimer) clearInterval(_idleLockTimer);
+  _idleLockTimer = setInterval(_idleLockTick, 1000);
+}
+
+function _stopIdleLock() {
+  if (_idleLockTimer) { clearInterval(_idleLockTimer); _idleLockTimer = null; }
+  var b = document.getElementById('idle-warn-banner');
+  if (b) b.style.display = 'none';
+}
+
+// Verrou : (1) capture la saisie en cours (même détection de page active que
+// nav() ~L2320 pour save-avant-quitter), (2) pose les flags, (3) delegate à
+// pwaLogout qui saute le confirm grâce à skip_logout_confirm.
+async function _lockSession() {
+  _stopIdleLock();  // stop d'abord pour éviter les re-entrées
+  var activePage = document.querySelector('.page.active');
+  var activeId = activePage ? activePage.id : null;
+  try {
+    if (activeId === 'pg-bilan' && typeof saveBilanSilent === 'function') saveBilanSilent();
+    else if (activeId === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
+    else if (activeId === 'pg-pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
+  } catch (e) { /* priorité verrouillage — on ne bloque pas sur un save qui casse */ }
+  sessionStorage.setItem('locked_by_idle', '1');
+  sessionStorage.setItem('skip_logout_confirm', '1');
+  await pwaLogout();
+}
+
+// Affiche le message dédié sur l'écran de connexion si un verrouillage vient
+// d'avoir lieu, puis retire le flag pour que la prochaine connexion ordinaire
+// ne le voie pas.
+function _showLockedByIdleMessageIfNeeded() {
+  if (sessionStorage.getItem('locked_by_idle') !== '1') return;
+  sessionStorage.removeItem('locked_by_idle');
+  var msg = document.getElementById('pwa-idle-locked-msg');
+  if (msg) msg.style.display = 'block';
+}
+
 async function pwaLogout() {
   if(!sessionStorage.getItem('skip_logout_confirm')) {
     if(!confirm('Se déconnecter ?')) return;
   }
   sessionStorage.removeItem('skip_logout_confirm');
+  _stopIdleLock();
   if(pwaUser?.token) {
     try { await supa.signOut(pwaUser.token); } catch(e) {}
   }
@@ -1778,6 +1870,9 @@ async function pwaLogout() {
   if(tb) tb.style.display = 'none';
   const ov = document.getElementById('trial-expired-overlay');
   if(ov) ov.style.display = 'none';
+  // #131 — si ce logout est un verrouillage automatique, afficher le message
+  // dédié SUR l'écran de connexion (pas de mensonge « déconnexion »).
+  _showLockedByIdleMessageIfNeeded();
   nav('pg-sport');
 }
 
@@ -1798,6 +1893,10 @@ async function initPWA() {
   }
   // Pas de session valide: afficher le login
   document.getElementById('pwa-login').style.display = 'flex';
+  // #131 — si l'utilisateur a rechargé la page alors que la session venait
+  // d'être verrouillée, le flag sessionStorage subsiste : on affiche le
+  // message dédié plutôt que d'ouvrir sur un écran de login muet.
+  _showLockedByIdleMessageIfNeeded();
   enumerateCameras('vcam-select');
   enumerateCameras('cam-select');
 }
