@@ -1736,7 +1736,145 @@
       </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-4" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">👣 FPI (Foot Posture Index) — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">👣 FPI — Foot Posture Index</div>
+          <div style="font-size:12px;color:var(--mut);margin-bottom:12px;">
+            Six items cotés de <strong>−2 à +2</strong> pour chaque pied. Trois items pour l'arrière-pied,
+            trois pour l'avant-pied. Total = somme des 6 items — classe automatique dès les 6 items renseignés.
+          </div>
+
+          <!-- ─── Arrière-pied ─── -->
+          <div class="podo-field-lbl" style="margin-top:0;color:#9f1239;">Arrière-pied</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <div style="font-size:12px;margin:6px 0 2px;">1. Palpation de la tête du talus <span style="color:#9f1239;font-size:10px;">(plan transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talus" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talus" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talus" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talus" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talus" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">2. Courbure sur/sous la malléole latérale <span style="color:#9f1239;font-size:10px;">(frontal/transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_malleole" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_malleole" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_malleole" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_malleole" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_malleole" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">3. Inversion/éversion du calcanéus <span style="color:#9f1239;font-size:10px;">(plan frontal)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_calcaneus" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_calcaneus" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_calcaneus" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_calcaneus" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_calcaneus" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <div style="font-size:12px;margin:6px 0 2px;">1. Palpation de la tête du talus <span style="color:#9f1239;font-size:10px;">(plan transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talus" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talus" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talus" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talus" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talus" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">2. Courbure sur/sous la malléole latérale <span style="color:#9f1239;font-size:10px;">(frontal/transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_malleole" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_malleole" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_malleole" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_malleole" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_malleole" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">3. Inversion/éversion du calcanéus <span style="color:#9f1239;font-size:10px;">(plan frontal)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_calcaneus" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_calcaneus" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_calcaneus" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_calcaneus" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_calcaneus" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── Avant-pied ─── -->
+          <div class="podo-field-lbl" style="color:#9f1239;">Avant-pied</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <div style="font-size:12px;margin:6px 0 2px;">4. Congruence talo-naviculaire <span style="color:#9f1239;font-size:10px;">(plan transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talonav" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talonav" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talonav" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talonav" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_talonav" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">5. Hauteur de l'arche médiale <span style="color:#9f1239;font-size:10px;">(plan sagittal)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_arche" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_arche" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_arche" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_arche" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_arche" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">6. Abduction/adduction de l'avant-pied <span style="color:#9f1239;font-size:10px;">(plan transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_avantpied" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_avantpied" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_avantpied" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_avantpied" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_g_avantpied" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div id="podo-fpi-g-total" style="font-size:12px;color:#9f1239;font-weight:600;margin-top:10px;min-height:16px;"></div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <div style="font-size:12px;margin:6px 0 2px;">4. Congruence talo-naviculaire <span style="color:#9f1239;font-size:10px;">(plan transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talonav" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talonav" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talonav" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talonav" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_talonav" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">5. Hauteur de l'arche médiale <span style="color:#9f1239;font-size:10px;">(plan sagittal)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_arche" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_arche" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_arche" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_arche" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_arche" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div style="font-size:12px;margin:6px 0 2px;">6. Abduction/adduction de l'avant-pied <span style="color:#9f1239;font-size:10px;">(plan transverse)</span></div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_avantpied" value="-2" onchange="_podoFpiInterpret()">−2</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_avantpied" value="-1" onchange="_podoFpiInterpret()">−1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_avantpied" value="0" onchange="_podoFpiInterpret()">0</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_avantpied" value="1" onchange="_podoFpiInterpret()">+1</label>
+                <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_fpi_d_avantpied" value="2" onchange="_podoFpiInterpret()">+2</label>
+              </div>
+              <div id="podo-fpi-d-total" style="font-size:12px;color:#9f1239;font-weight:600;margin-top:10px;min-height:16px;"></div>
+            </div>
+          </div>
+
+          <!-- ─── Barème rappel ─── -->
+          <div style="font-size:11px;color:var(--mut);background:#fecdd3;border-left:3px solid #9f1239;padding:8px 12px;border-radius:4px;">
+            <strong style="color:#9f1239;">Barème FPI</strong> — total sur 6 items :
+            <span style="margin-left:6px;">0 à +5 : Normal</span> ·
+            <span>+6 à +9 : En pronation</span> ·
+            <span>&gt; +9 : Hautement en pronation</span> ·
+            <span>−1 à −4 : En supination</span> ·
+            <span>−5 à −12 : Hautement en supination</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-5" data-periodes="II III IV" style="display:none;">
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">⚖️ Examen en charge — <em>Phase 0 : contenu à venir.</em></div></div>
