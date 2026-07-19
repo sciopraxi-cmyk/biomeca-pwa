@@ -2553,6 +2553,9 @@ function nav(id) {
     setTimeout(loadPodopediatrieBilan, 50);
     setTimeout(_applyPodopediatrieVisibilityForPeriode, 50);
     setTimeout(() => showPodopediatrieSection(0), 50);
+    // #140 Phase 1 — Post-load tweaks : reflète l'état conditionnel EVA + pré-remplit
+    // podo_sport avec currentPatient.sport si absent. Timing 60 ms > load.
+    setTimeout(_podoPostLoadTweaks, 60);
   }
   // Bandeau d'en-tête uniformisé sur les 3 bilans + landing pg-sport.
   // setTimeout pour laisser le markup du posturo (injecté dynamiquement) se
@@ -4519,6 +4522,7 @@ function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
   nav('pg-podopediatrie');
   setTimeout(loadPodopediatrieBilan, 50);
   setTimeout(_applyPodopediatrieVisibilityForPeriode, 50);
+  setTimeout(_podoPostLoadTweaks, 60); // #140 Phase 1 — miroir hook nav
 }
 
 function abandonnerBilanPodopediatrie(patIdx) {
@@ -13320,6 +13324,39 @@ function loadPodopediatrieBilan() {
 // - showPodopediatrieSection saute automatiquement à la 1ʳᵉ section visible
 //   si l'idx demandé est masqué (protège contre l'ouverture sur une section
 //   invisible pour la période).
+// #140 Phase 1 — Toggle du bloc conditionnel « Localisation / horaire de la
+// douleur ». Affiché uniquement si un radio EVA > 0 est sélectionné. Appelé
+// à chaque onchange des radios EVA (voir onchange dans index.html) et après
+// loadPodopediatrieBilan pour refléter l'état persisté au chargement.
+function _podoEvaChanged() {
+  const detail = document.getElementById('podo-doul-detail');
+  if (!detail) return;
+  const checked = document.querySelector('#pg-podopediatrie input[name="podo_douleur_eva"]:checked');
+  const val = checked ? parseFloat(checked.value) : NaN;
+  detail.style.display = (!isNaN(val) && val > 0) ? '' : 'none';
+}
+
+// #140 Phase 1 — Pré-remplit podo_sport avec currentPatient.sport UNIQUEMENT
+// si le champ n'a jamais été saisi pour ce bilan (data undefined). Une fois
+// saisi (même vide), on respecte le choix du praticien. Évite le piège du
+// re-remplissage à chaque nav si le praticien a volontairement effacé.
+function _podoPrefillSportDefault() {
+  if (!currentPatient) return;
+  const d = currentPatient.bilanDataPodopediatrie || {};
+  if (d.podo_sport !== undefined) return; // déjà saisi (même chaîne vide)
+  const patientSport = (currentPatient.sport || '').trim();
+  if (!patientSport) return;
+  const input = document.querySelector('#pg-podopediatrie [data-field="podo_sport"]');
+  if (input) input.value = patientSport;
+}
+
+// #140 Phase 1 — Post-load tweaks unifiés (EVA visibility + pré-remplissages).
+// Appelé après loadPodopediatrieBilan dans le nav hook et dans ouvrirBilanPodopediatrie.
+function _podoPostLoadTweaks() {
+  _podoEvaChanged();
+  _podoPrefillSportDefault();
+}
+
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
   const list = (el.dataset.periodes || '').trim();
   if (!list) return true; // pas d'attribut → visible partout

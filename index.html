@@ -1252,10 +1252,185 @@
          que son onglet pour un masquage cohérent. Le contenu clinique arrivera
          en phases suivantes. -->
     <div class="sport-section podopediatrie-section" id="pdpsec-0" data-periodes="II III IV">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📋 Interrogatoire — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">📋 Interrogatoire</div>
+
+          <!-- Motif de consultation -->
+          <div class="podo-field-lbl">Motif de consultation</div>
+          <div class="podo-check-grid">
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_douleur"/> Douleur</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_marche"/> Retard de marche</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_piedsplats"/> Pieds plats</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_pointes"/> Marche sur pointes</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_chutes"/> Chutes fréquentes</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_deformation"/> Déformation</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_suivi"/> Suivi</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_parentale"/> Demande parentale</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_motif_autre"/> Autre</label>
+          </div>
+          <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_motif_autre_txt" placeholder="Précision motif (autre)…" style="max-width:520px;"/>
+
+          <!-- Analyse de la douleur -->
+          <div class="podo-block-title">🩹 Analyse de la douleur (EVA)</div>
+          <div class="podo-radio-row" id="podo-eva-row">
+            <label class="podo-eva-face"><input type="radio" name="podo_douleur_eva" value="0" onchange="_podoEvaChanged()"><span class="val">0</span><span class="lbl">Aucune</span></label>
+            <label class="podo-eva-face"><input type="radio" name="podo_douleur_eva" value="2" onchange="_podoEvaChanged()"><span class="val">2</span><span class="lbl">Inconfort</span></label>
+            <label class="podo-eva-face"><input type="radio" name="podo_douleur_eva" value="4" onchange="_podoEvaChanged()"><span class="val">4</span><span class="lbl">Légère</span></label>
+            <label class="podo-eva-face"><input type="radio" name="podo_douleur_eva" value="6" onchange="_podoEvaChanged()"><span class="val">6</span><span class="lbl">Modérée</span></label>
+            <label class="podo-eva-face"><input type="radio" name="podo_douleur_eva" value="8" onchange="_podoEvaChanged()"><span class="val">8</span><span class="lbl">Intense</span></label>
+            <label class="podo-eva-face"><input type="radio" name="podo_douleur_eva" value="10" onchange="_podoEvaChanged()"><span class="val">10</span><span class="lbl">Intolérable</span></label>
+          </div>
+
+          <!-- Bloc Localisation / horaire — visible uniquement si EVA > 0 -->
+          <div id="podo-doul-detail" class="podo-conditional-block" style="display:none;">
+            <div class="podo-field-lbl" style="margin-top:0;">Localisation de la douleur</div>
+            <div class="podo-check-grid">
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_loc_avantpied"/> Avant-pied</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_loc_mediopied"/> Médio-pied</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_loc_arrierepied"/> Arrière-pied</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_loc_cheville"/> Cheville</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_loc_jambe"/> Jambe</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_loc_genou"/> Genou</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_loc_autre"/> Autre</label>
+            </div>
+            <div class="podo-field-lbl">Horaire de la douleur</div>
+            <div class="podo-check-grid" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr;">
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_horaire_matin"/> Matin</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_horaire_effort"/> À l'effort</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_horaire_soir"/> Soir</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_horaire_nocturne"/> Nocturne</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_doul_horaire_permanent"/> Permanente</label>
+            </div>
+          </div>
+
+          <!-- Antécédents -->
+          <div class="podo-block-title">📜 Antécédents</div>
+          <div class="podo-check-grid">
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_atcd_aucun"/> Aucun</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_atcd_familiaux"/> Familiaux</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_atcd_chirurgicaux"/> Chirurgicaux</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_atcd_traumatiques"/> Traumatiques</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_atcd_medicaux"/> Médicaux</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_atcd_prematurite"/> Prématurité</label>
+          </div>
+          <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_atcd_txt" placeholder="Précisions antécédents…" style="max-width:520px;"/>
+
+          <!-- Examens déjà réalisés -->
+          <div class="podo-block-title">🔬 Examens déjà réalisés</div>
+          <div class="podo-check-grid" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr;">
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_exam_aucun"/> Aucun</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_exam_radio"/> Radio</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_exam_echo"/> Écho</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_exam_podoscopie"/> Podoscopie</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_exam_autre"/> Autre</label>
+          </div>
+
+          <!-- Activité physique / sport (pré-rempli au load avec currentPatient.sport si vide) -->
+          <div class="podo-block-title">🏃 Activité physique / sport</div>
+          <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_sport" placeholder="Sport(s) pratiqué(s)…" style="max-width:520px;"/>
+
+          <!-- Traitements associés -->
+          <div class="podo-block-title">💊 Traitements associés</div>
+          <div class="podo-field-lbl" style="margin-top:0;">Suivi oculaire</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_oculaire" value="oui">Oui</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_oculaire" value="non">Non</label>
+          </div>
+          <div class="podo-field-lbl">Suivi dentaire</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_dentaire" value="oui">Oui</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_dentaire" value="non">Non</label>
+          </div>
+          <div class="podo-field-lbl">Cicatrice</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_cicatrice" value="oui">Oui</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_cicatrice" value="non">Non</label>
+          </div>
+          <div class="podo-field-lbl">Traitement podologique antérieur</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_podo" value="oui">Oui</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_trait_podo" value="non">Non</label>
+          </div>
+
+          <!-- Protocole réflexe archaïque (présent dans les 3 périodes — aucune enveloppe data-periodes). -->
+          <div class="podo-block-title">🧠 Protocole réflexe archaïque</div>
+          <div class="podo-field-lbl" style="margin-top:0;">Présence d'un réflexe non intégré</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_reflexe_archaique" value="oui">Oui</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_reflexe_archaique" value="non">Non</label>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-1" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🚶 Marche — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">🚶 Marche</div>
+
+          <div class="podo-field-lbl" style="margin-top:0;">Attaque du pas</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_attaque" value="talon">Talon</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_attaque" value="mediopied">Médio-pied</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_attaque" value="avantpied">Avant-pied</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_attaque" value="variable">Variable</label>
+          </div>
+
+          <div class="podo-field-lbl">Phase plantigrade</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_plantigrade" value="normale">Normale</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_plantigrade" value="perturbee">Perturbée</label>
+          </div>
+
+          <div class="podo-field-lbl">Phase digitigrade</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_digitigrade" value="normale">Normale</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_digitigrade" value="perturbee">Perturbée</label>
+          </div>
+
+          <div class="podo-field-lbl">Phase oscillatoire</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_oscillatoire" value="normale">Normale</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_oscillatoire" value="perturbee">Perturbée</label>
+          </div>
+
+          <div class="podo-field-lbl">Marche sur pointes</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_pointes" value="possible">Possible</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_pointes" value="difficile">Difficile</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_pointes" value="impossible">Impossible</label>
+          </div>
+
+          <div class="podo-field-lbl">Marche sur talons</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_talons" value="possible">Possible</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_talons" value="difficile">Difficile</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_talons" value="impossible">Impossible</label>
+          </div>
+
+          <div class="podo-field-lbl">Marche en varus</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_varus" value="possible">Possible</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_varus" value="difficile">Difficile</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_varus" value="impossible">Impossible</label>
+          </div>
+
+          <div class="podo-field-lbl">Marche en valgus</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_valgus" value="possible">Possible</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_valgus" value="difficile">Difficile</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_valgus" value="impossible">Impossible</label>
+          </div>
+
+          <div class="podo-field-lbl">Course</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_course" value="normale">Normale</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_course" value="anormale">Anormale</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_marche_course" value="non_evaluee">Non évaluée</label>
+          </div>
+          <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_marche_course_txt" placeholder="Précisions course…" style="max-width:520px;"/>
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-2" data-periodes="II III IV" style="display:none;">
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🦴 Morphostatique — <em>Phase 0 : contenu à venir.</em></div></div>
@@ -1270,7 +1445,47 @@
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🛌 Examen en décharge — <em>Phase 0 : contenu à venir.</em></div></div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-6" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">👟 Chaussure — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">👟 Chaussure</div>
+
+          <div class="podo-field-lbl" style="margin-top:0;">Type</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_type" value="ville">Ville</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_type" value="sport">Sport</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_type" value="sandale">Sandale</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_type" value="bottes">Bottes</label>
+          </div>
+
+          <div class="podo-field-lbl">Usure de la semelle</div>
+          <div class="podo-check-grid">
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_usure_symetrique"/> Symétrique</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_usure_asymetrique"/> Asymétrique</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_usure_interne"/> Interne</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_usure_externe"/> Externe</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_usure_anterieure"/> Antérieure</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_usure_posterieure"/> Postérieure</label>
+          </div>
+
+          <div class="podo-field-lbl">État</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_etat" value="neuve">Neuve</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_etat" value="usee">Usée</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_etat" value="adaptee">Adaptée</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_etat" value="inadaptee">Inadaptée</label>
+          </div>
+
+          <div class="podo-field-lbl">Contrefort</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_contrefort" value="bon">Bon maintien</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_chauss_contrefort" value="affaisse">Affaissé</label>
+          </div>
+
+          <!-- Pointure (présente dans les 3 périodes — aucune enveloppe data-periodes). -->
+          <div class="podo-field-lbl">Pointure</div>
+          <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_pointure" placeholder="Ex. 34…" style="max-width:120px;"/>
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-7" data-periodes="II III IV" style="display:none;">
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">💊 Traitement — <em>Phase 0 : contenu à venir.</em></div></div>
@@ -1279,7 +1494,28 @@
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📊 Synthèse — <em>Phase 0 : contenu à venir.</em></div></div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-9" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📄 Conclusion — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">📄 Conclusion</div>
+
+          <div class="podo-field-lbl" style="margin-top:0;">Diagnostic retenu (choix multiples)</div>
+          <div class="podo-check-grid">
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_platsouple"/> Pied plat souple</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_platrigide"/> Pied plat rigide</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_creux"/> Pied creux</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_valgus"/> Valgus</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_varus"/> Varus</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_rotinterne"/> Rot. interne</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_troublepostural"/> Trouble postural</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_inegalitemi"/> Inégalité MI</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_ras"/> R.A.S.</label>
+            <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_autre"/> Autre</label>
+          </div>
+
+          <div class="podo-field-lbl">Conclusion clinique</div>
+          <textarea class="podopediatrie-field podo-inline-input" data-field="podo_conclusion_txt" rows="4" placeholder="Synthèse clinique / recommandations…" style="max-width:800px;"></textarea>
+        </div>
+      </div>
     </div>
 
     <!-- #140 Phase 0b — Onglet Rapport (sortie, pas de saisie).
