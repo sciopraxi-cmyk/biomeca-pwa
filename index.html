@@ -1456,7 +1456,210 @@
       </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-3" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🦴 Morphostatique — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">🦴 Morphostatique</div>
+
+          <!-- #140 Phase 2b — Modules visuels (silhouettes cliquables Face/Dos/Profils,
+               photos posturales avec pose de points, Verticale de Barré) — à implémenter
+               dans une phase suivante. Les champs cliniques ci-dessous sont indépendants. -->
+
+          <!-- ─── Test de Jack (réductibilité) ─── -->
+          <div class="podo-field-lbl" style="margin-top:0;">Test de Jack — Réductibilité de l'affaissement</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_jack" value="oui">Oui (réductible)</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_jack" value="non">Non</label>
+          </div>
+
+          <!-- ─── Test de giration de bassin ─── -->
+          <div class="podo-field-lbl">Test de giration de bassin</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_giration" value="oui">Oui (asymétrie)</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_giration" value="non">Non</label>
+          </div>
+
+          <!-- ─── Axe calcanéen ─── -->
+          <div class="podo-block-title">🦶 Axe calcanéen</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn"><input type="radio" name="podo_axecalc_g_dir" value="valgus" onchange="_podoAxeCalcInterpret()">Valgus</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_axecalc_g_dir" value="varus" onchange="_podoAxeCalcInterpret()">Varus</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_axecalc_g_dir" value="neutre" onchange="_podoAxeCalcInterpret()">Neutre</label>
+              </div>
+              <select class="podopediatrie-field podo-inline-input" data-field="podo_axecalc_g_deg" onchange="_podoAxeCalcInterpret()" style="max-width:120px;">
+                <option value="">Degrés…</option>
+                <option value="0">0°</option><option value="1">1°</option><option value="2">2°</option>
+                <option value="3">3°</option><option value="4">4°</option><option value="5">5°</option>
+                <option value="6">6°</option><option value="7">7°</option><option value="8">8°</option>
+                <option value="9">9°</option><option value="10">10°</option><option value="11">11°</option>
+                <option value="12">12°</option><option value="13">13°</option><option value="14">14°</option>
+                <option value="15">15°</option>
+              </select>
+              <div id="podo-axecalc-g-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn"><input type="radio" name="podo_axecalc_d_dir" value="valgus" onchange="_podoAxeCalcInterpret()">Valgus</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_axecalc_d_dir" value="varus" onchange="_podoAxeCalcInterpret()">Varus</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_axecalc_d_dir" value="neutre" onchange="_podoAxeCalcInterpret()">Neutre</label>
+              </div>
+              <select class="podopediatrie-field podo-inline-input" data-field="podo_axecalc_d_deg" onchange="_podoAxeCalcInterpret()" style="max-width:120px;">
+                <option value="">Degrés…</option>
+                <option value="0">0°</option><option value="1">1°</option><option value="2">2°</option>
+                <option value="3">3°</option><option value="4">4°</option><option value="5">5°</option>
+                <option value="6">6°</option><option value="7">7°</option><option value="8">8°</option>
+                <option value="9">9°</option><option value="10">10°</option><option value="11">11°</option>
+                <option value="12">12°</option><option value="13">13°</option><option value="14">14°</option>
+                <option value="15">15°</option>
+              </select>
+              <div id="podo-axecalc-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+          </div>
+
+          <!-- ─── Hauteur naviculaire ─── -->
+          <div class="podo-block-title">📏 Hauteur naviculaire</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+                <span style="font-size:11px;color:var(--mut);min-width:60px;">En charge</span>
+                <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_g_charge" onchange="_podoNavicInterpret()" style="max-width:110px;">
+                  <option value="">— cm</option>
+                  <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
+                  <option value="2">2 cm</option><option value="2.5">2,5 cm</option><option value="3">3 cm</option><option value="3.5">3,5 cm</option>
+                  <option value="4">4 cm</option><option value="4.5">4,5 cm</option><option value="5">5 cm</option><option value="5.5">5,5 cm</option>
+                  <option value="6">6 cm</option><option value="6.5">6,5 cm</option><option value="7">7 cm</option><option value="7.5">7,5 cm</option>
+                  <option value="8">8 cm</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:11px;color:var(--mut);min-width:60px;">En décharge</span>
+                <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_g_decharge" onchange="_podoNavicInterpret()" style="max-width:110px;">
+                  <option value="">— cm</option>
+                  <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
+                  <option value="2">2 cm</option><option value="2.5">2,5 cm</option><option value="3">3 cm</option><option value="3.5">3,5 cm</option>
+                  <option value="4">4 cm</option><option value="4.5">4,5 cm</option><option value="5">5 cm</option><option value="5.5">5,5 cm</option>
+                  <option value="6">6 cm</option><option value="6.5">6,5 cm</option><option value="7">7 cm</option><option value="7.5">7,5 cm</option>
+                  <option value="8">8 cm</option>
+                </select>
+              </div>
+              <div id="podo-navic-g-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+                <span style="font-size:11px;color:var(--mut);min-width:60px;">En charge</span>
+                <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_d_charge" onchange="_podoNavicInterpret()" style="max-width:110px;">
+                  <option value="">— cm</option>
+                  <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
+                  <option value="2">2 cm</option><option value="2.5">2,5 cm</option><option value="3">3 cm</option><option value="3.5">3,5 cm</option>
+                  <option value="4">4 cm</option><option value="4.5">4,5 cm</option><option value="5">5 cm</option><option value="5.5">5,5 cm</option>
+                  <option value="6">6 cm</option><option value="6.5">6,5 cm</option><option value="7">7 cm</option><option value="7.5">7,5 cm</option>
+                  <option value="8">8 cm</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:11px;color:var(--mut);min-width:60px;">En décharge</span>
+                <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_d_decharge" onchange="_podoNavicInterpret()" style="max-width:110px;">
+                  <option value="">— cm</option>
+                  <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
+                  <option value="2">2 cm</option><option value="2.5">2,5 cm</option><option value="3">3 cm</option><option value="3.5">3,5 cm</option>
+                  <option value="4">4 cm</option><option value="4.5">4,5 cm</option><option value="5">5 cm</option><option value="5.5">5,5 cm</option>
+                  <option value="6">6 cm</option><option value="6.5">6,5 cm</option><option value="7">7 cm</option><option value="7.5">7,5 cm</option>
+                  <option value="8">8 cm</option>
+                </select>
+              </div>
+              <div id="podo-navic-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+          </div>
+
+          <!-- ─── Morphologie plantaire ─── -->
+          <div class="podo-block-title">🦶 Morphologie plantaire</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche (choix multiples)</div>
+              <div class="podo-check-grid" style="grid-template-columns:1fr 1fr;">
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_g_normal"/> Normal</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_g_plat"/> Plat</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_g_creux"/> Creux</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_g_valgus"/> Valgus</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_g_varus"/> Varus</label>
+              </div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit (choix multiples)</div>
+              <div class="podo-check-grid" style="grid-template-columns:1fr 1fr;">
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_d_normal"/> Normal</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_d_plat"/> Plat</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_d_creux"/> Creux</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_d_valgus"/> Valgus</label>
+                <label><input type="checkbox" class="podopediatrie-field" data-field="podo_morpho_d_varus"/> Varus</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── Test d'accroupissement ─── -->
+          <div class="podo-field-lbl" style="margin-top:14px;">Test d'accroupissement</div>
+          <div class="podo-radio-row">
+            <label class="podo-radio-btn"><input type="radio" name="podo_accroupissement" value="oui">Oui (réalisable)</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_accroupissement" value="non">Non</label>
+          </div>
+
+          <!-- ─── Périodes III + IV : Courbures rachidiennes + Test d'Adam ─── -->
+          <div data-periodes="III IV">
+            <div class="podo-block-title">🦴 Courbures rachidiennes (flèches sagittales)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div>
+                <div class="podo-field-lbl" style="margin-top:0;">Flèche cervicale <span style="text-transform:none;color:var(--mut);font-weight:400;">(norme 6–8 cm)</span></div>
+                <select class="podopediatrie-field podo-inline-input" data-field="podo_fleche_cervicale" onchange="_podoCourburesInterpret()" style="max-width:120px;">
+                  <option value="">— cm</option>
+                  <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
+                  <option value="2">2 cm</option><option value="2.5">2,5 cm</option><option value="3">3 cm</option><option value="3.5">3,5 cm</option>
+                  <option value="4">4 cm</option><option value="4.5">4,5 cm</option><option value="5">5 cm</option><option value="5.5">5,5 cm</option>
+                  <option value="6">6 cm</option><option value="6.5">6,5 cm</option><option value="7">7 cm</option><option value="7.5">7,5 cm</option>
+                  <option value="8">8 cm</option><option value="8.5">8,5 cm</option><option value="9">9 cm</option><option value="9.5">9,5 cm</option>
+                  <option value="10">10 cm</option><option value="10.5">10,5 cm</option><option value="11">11 cm</option><option value="11.5">11,5 cm</option>
+                  <option value="12">12 cm</option>
+                </select>
+                <div id="podo-fleche-cervicale-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+              </div>
+              <div>
+                <div class="podo-field-lbl" style="margin-top:0;">Flèche lombaire <span style="text-transform:none;color:var(--mut);font-weight:400;">(norme 4–6 cm)</span></div>
+                <select class="podopediatrie-field podo-inline-input" data-field="podo_fleche_lombaire" onchange="_podoCourburesInterpret()" style="max-width:120px;">
+                  <option value="">— cm</option>
+                  <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
+                  <option value="2">2 cm</option><option value="2.5">2,5 cm</option><option value="3">3 cm</option><option value="3.5">3,5 cm</option>
+                  <option value="4">4 cm</option><option value="4.5">4,5 cm</option><option value="5">5 cm</option><option value="5.5">5,5 cm</option>
+                  <option value="6">6 cm</option><option value="6.5">6,5 cm</option><option value="7">7 cm</option><option value="7.5">7,5 cm</option>
+                  <option value="8">8 cm</option><option value="8.5">8,5 cm</option><option value="9">9 cm</option><option value="9.5">9,5 cm</option>
+                  <option value="10">10 cm</option><option value="10.5">10,5 cm</option><option value="11">11 cm</option><option value="11.5">11,5 cm</option>
+                  <option value="12">12 cm</option>
+                </select>
+                <div id="podo-fleche-lombaire-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+              </div>
+            </div>
+
+            <div class="podo-block-title">🔬 Test d'Adam</div>
+            <div class="podo-field-lbl" style="margin-top:0;">Gibbosité observée</div>
+            <div class="podo-radio-row">
+              <label class="podo-radio-btn"><input type="radio" name="podo_adam_gibbosite" value="oui" onchange="_podoAdamChanged()">Oui</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_adam_gibbosite" value="non" onchange="_podoAdamChanged()">Non</label>
+            </div>
+            <div id="podo-adam-detail" class="podo-conditional-block" style="display:none;">
+              <div class="podo-field-lbl" style="margin-top:0;">Localisation</div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn"><input type="radio" name="podo_adam_localisation" value="lombaire">Lombaire</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_adam_localisation" value="dorso_lombaire">Dorso-lombaire</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_adam_localisation" value="dorsale">Dorsale</label>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-4" data-periodes="II III IV" style="display:none;">
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">👣 FPI (Foot Posture Index) — <em>Phase 0 : contenu à venir.</em></div></div>
