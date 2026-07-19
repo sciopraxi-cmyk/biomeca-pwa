@@ -13133,22 +13133,19 @@ const _PODO_MORPHO_CANVAS_IDS = ['podo-morpho-face', 'podo-morpho-face2', 'podo-
 function initPodoMorphoCanvas(canvasId) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-  // Diagnostic Phase 2b1 (à retirer une fois validé) — trace init state.
-  const _pDbg = canvas.parentElement ? canvas.parentElement.getBoundingClientRect().width : 0;
-  console.log('[podo-morpho-init] initPodoMorphoCanvas(' + canvasId + ') parent.width=' + _pDbg);
   initMorphoCanvas(canvasId); // taille DPR + _baseSnapshot + setupDrawCanvas
   canvas._undoOrderStack = _podoMorphoUndoOrder; // OVERRIDE — pile dédiée
-  console.log('[podo-morpho-init] ' + canvasId + ' post-init: width=' + canvas.width + ' history=' + Array.isArray(canvas._history) + ' onmousedown=' + typeof canvas.onmousedown + ' restoreReady=' + canvas._restoreReady);
 }
 
-// Init idempotente + RETRY ROBUSTE — l'ancien init "one-shot" échouait
-// silencieusement quand parent.getBoundingClientRect().width === 0 au moment
-// du setTimeout(50 ms) : initMorphoCanvas bail-out avant setupDrawCanvas,
-// aucun onmousedown attaché, canvas mort. La cause exacte du 0-width n'est
-// pas déterministe (paint/layout timing après display:'' de la section
-// pdpsec-3), donc au lieu de deviner un délai magique, on retente jusqu'à
-// ce que `_history` soit un tableau (indicateur fiable de setupDrawCanvas
+// Init idempotente + RETRY DÉFENSIF — en pratique l'init réussit dès le
+// premier essai (parent.getBoundingClientRect().width > 0 au setTimeout
+// 50 ms observé sur desktop). La boucle de retry est un filet de sécurité
+// pour appareils lents où le layout pourrait ne pas être stabilisé à ce
+// moment-là : initMorphoCanvas bail-out silencieusement quand r.width===0,
+// laissant un canvas sans onmousedown. On retente jusqu'à ce que
+// `_history` soit un tableau (indicateur fiable que setupDrawCanvas a été
 // atteint). Cap à 20 essais (2 s max) pour ne pas boucler indéfiniment.
+// Coût nul quand tout va bien : la première passe skip immédiatement.
 function _initPodoMorphoCanvasesIfNeeded(retryCount) {
   retryCount = retryCount || 0;
   const _MAX_RETRIES = 20;
@@ -13164,16 +13161,13 @@ function _initPodoMorphoCanvasesIfNeeded(retryCount) {
     // Vérif post-init : si toujours pas de _history array, r.width était 0.
     if (c.width === 0 || !Array.isArray(c._history)) {
       allInited = false;
-      console.log('[podo-morpho-init] ' + id + ' init RATÉE (retry #' + retryCount + ')');
     }
   });
   if (!allInited && retryCount < _MAX_RETRIES) {
     // Retry après le prochain paint + délai — laisse le layout se stabiliser.
     requestAnimationFrame(() => setTimeout(() => _initPodoMorphoCanvasesIfNeeded(retryCount + 1), 100));
   } else if (!allInited) {
-    console.warn('[podo-morpho-init] échec après ' + retryCount + ' retries — abandon');
-  } else if (retryCount > 0) {
-    console.log('[podo-morpho-init] succès après ' + retryCount + ' retry(s)');
+    console.warn('[podo-morpho] init incomplète après ' + retryCount + ' retries — abandon');
   }
 }
 
