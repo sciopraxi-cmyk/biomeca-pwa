@@ -13369,6 +13369,15 @@ function showPodopediatrieSection(idx) {
     t.style.color       = active ? '#fff'    : '#e11d48';
     t.style.borderColor = '#e11d48';
   });
+  // #140 Phase 0b — Onglet Rapport (idx 10) : régénère l'aperçu à chaque
+  // activation. Le body est reflété tel qu'il sortirait à l'impression :
+  // toute donnée saisie dans les autres onglets sera visible ici.
+  if (target === 10) {
+    const bodyEl = document.getElementById('podopediatrie-rapport-body');
+    if (bodyEl && typeof buildPodopediatrieRapportHTML === 'function') {
+      bodyEl.innerHTML = buildPodopediatrieRapportHTML();
+    }
+  }
 }
 
 function showPedicurieSection(idx) {
@@ -13579,6 +13588,108 @@ function printRapportPedicurie(){
   var idoc = iframe.contentDocument || iframe.contentWindow.document;
   idoc.open(); idoc.write(html); idoc.close();
   setTimeout(function(){ try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e){ console.error('Print iframe pédicurie:', e); alert('Erreur lors de l\'impression. Réessayez ou Cmd/Ctrl+P.'); } }, 300);
+}
+
+// #140 Phase 0b — Builder du rapport podopédiatrie. Miroir strict de
+// buildPedicurieRapportHTML : header sciopraxi + cartouche praticien,
+// bandeau titre rose, carte patient (avec période et âge), corps
+// placeholder en Phase 0, footer marque. Réutilise _escHtml (global
+// partagé, cf. #74 durcissement XSS). L'iframe d'impression est réutilisé
+// par printRapportPodopediatrie. Aucune écriture parasite dans le DOM
+// de #pg-podopediatrie (rapport = sortie, pas de saisie).
+function buildPodopediatrieRapportHTML() {
+  var p = (typeof currentPatient !== 'undefined' && currentPatient) ? currentPatient : {};
+  var prat = (typeof praticiens !== 'undefined' && praticiens)
+    ? (praticiens.find(function (pr) { return pr.id == p.pratId; }) || (praticiens.length === 1 ? praticiens[0] : {}))
+    : {};
+  var logo = (document.getElementById('imgjs-logo-sciopraxi') || {}).src || '';
+  var d = p.bilanDataPodopediatrie || {};
+  var periode = d.periode || '—';
+  var ageStr = '';
+  if (d.ageMonths != null && typeof _formatAgeFromMonths === 'function') {
+    ageStr = _formatAgeFromMonths(d.ageMonths);
+  } else if (p.ddn) {
+    var yr = Math.floor((Date.now() - new Date(p.ddn)) / 31557600000);
+    if (!isNaN(yr)) ageStr = yr + ' an' + (yr > 1 ? 's' : '');
+  }
+  var dateStr = new Date().toLocaleDateString('fr-FR');
+  var initiales = (((p.prenom || '?')[0]) + ((p.nom || '?')[0])).toUpperCase();
+  var pratName = (_escHtml(prat.nom || '') + ' ' + _escHtml(prat.prenom || '') + (prat.titre ? ' — ' + _escHtml(prat.titre) : '')).trim();
+  var pratInfo = '<div class="prat-info"><div class="prat-name">' + (pratName || '&nbsp;') + '</div>';
+  if (prat.cabinet) pratInfo += '<div>' + _escHtml(prat.cabinet) + '</div>';
+  if (prat.adresse) pratInfo += '<div>' + _escHtml(prat.adresse) + '</div>';
+  if (prat.tel)     pratInfo += '<div>' + _escHtml(prat.tel) + '</div>';
+  if (prat.email)   pratInfo += '<div>' + _escHtml(prat.email) + '</div>';
+  pratInfo += '</div>';
+  var details = '';
+  if (p.ddn) {
+    var dn = new Date(p.ddn);
+    if (!isNaN(dn.getTime())) details += 'Né(e) le ' + dn.toLocaleDateString('fr-FR');
+  }
+  if (ageStr) details += (details ? ' · ' : '') + ageStr;
+  var chips = '<span class="pt-chip">Période ' + _escHtml(periode) + '</span>';
+  if (p.sport)  chips += '<span class="pt-chip">' + _escHtml(p.sport) + '</span>';
+  if (p.metier) chips += '<span class="pt-chip">' + _escHtml(p.metier) + '</span>';
+  if (p.lat)    chips += '<span class="pt-chip">' + _escHtml(p.lat) + '</span>';
+  var metrics = '';
+  if (p.poids)  metrics += '<div class="metric"><div class="metric-val">' + _escHtml(String(p.poids)) + '</div><div class="metric-lbl">kg</div></div>';
+  if (p.taille) metrics += '<div class="metric"><div class="metric-val">' + _escHtml(String(p.taille)) + '</div><div class="metric-lbl">cm</div></div>';
+  // Corps placeholder en Phase 0 — le contenu clinique arrivera avec les sections.
+  var body = '<p style="font-style:italic;color:#666;">Contenu clinique à venir (Phase suivante).</p>';
+  var css = '<style>'
+    + '*{margin:0;padding:0;box-sizing:border-box;}'
+    + 'body{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}'
+    + '.rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}'
+    + '@media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.header,.titre-rapport,.patient-card,.footer{break-inside:avoid;}}'
+    + '.header{background:#4c0519;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;}'
+    + '.logo{height:64px;object-fit:contain;}'
+    + '.prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.55);line-height:1.7;}'
+    + '.prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}'
+    + '.titre-rapport{background:#9f1239;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}'
+    + '.titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:2px;text-transform:uppercase;}'
+    + '.titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.7);letter-spacing:1px;}'
+    + '.patient-card{background:#fff5f7;border-bottom:1px solid #fecdd3;padding:16px 24px;display:flex;align-items:center;gap:16px;}'
+    + '.patient-avatar{width:44px;height:44px;border-radius:50%;background:#e11d48;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}'
+    + '.patient-name{font-size:16px;font-weight:300;color:#9f1239;letter-spacing:0.5px;}'
+    + '.patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}'
+    + '.patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}'
+    + '.pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #fecdd3;color:#9f1239;font-weight:500;}'
+    + '.patient-metrics{display:flex;gap:8px;flex-shrink:0;}'
+    + '.metric{background:#fff;border:1px solid #fecdd3;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}'
+    + '.metric-val{font-size:18px;font-weight:300;color:#9f1239;line-height:1;}'
+    + '.metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}'
+    + '.rp-body{padding:16px 24px;} .rp-body ul{margin:0;padding-left:18px;}'
+    + '.footer{background:#fff5f7;border-top:2px solid #9f1239;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;}'
+    + '.footer-brand{font-size:8px;font-weight:700;color:#9f1239;letter-spacing:2px;text-transform:uppercase;}'
+    + '.footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}'
+    + '</style>';
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bilan de Podopédiatrie</title>' + css + '</head><body style="margin:0;padding:0;">'
+    + '<div class="rp-page">'
+    + '<div class="header"><img class="logo" src="' + logo + '" alt="Sciopraxi"/>' + pratInfo + '</div>'
+    + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
+    + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
+    + '<div class="rp-body">' + body + '</div>'
+    + '<div class="footer"><div class="footer-brand">Sciopraxi</div><div class="footer-info">Bilan de Podopédiatrie · ' + dateStr + '</div></div>'
+    + '</div></body></html>';
+}
+
+// #140 Phase 0b — Impression via iframe masquée. Gate _accessLevel comme
+// les autres export_pdf. Timeout 300 ms pour laisser l'iframe se charger.
+function printRapportPodopediatrie() {
+  if (window._accessLevel && window._accessLevel !== 'full') { showAccessRestrictedModal('export_pdf'); return; }
+  var wrap = document.getElementById('podopediatrie-rapport-iframe-wrap');
+  if (!wrap) { alert('Aperçu du rapport indisponible.'); return; }
+  var html = buildPodopediatrieRapportHTML();
+  wrap.innerHTML = '';
+  var iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:absolute;width:0;height:0;border:none;';
+  wrap.appendChild(iframe);
+  var idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open(); idoc.write(html); idoc.close();
+  setTimeout(function () {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch (e) { console.error('Print iframe podopédiatrie:', e); alert('Erreur lors de l\'impression. Réessayez ou Cmd/Ctrl+P.'); }
+  }, 300);
 }
 
 // #123 — Envoi du rapport par mail (approche mailto : ouvre le client mail du
