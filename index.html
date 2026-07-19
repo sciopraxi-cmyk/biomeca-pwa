@@ -1245,6 +1245,7 @@
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(7)" id="pdptab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">💊 Traitement</button>
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(8)" id="pdptab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📊 Synthèse</button>
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(9)" id="pdptab-9" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📄 Conclusion</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(10)" id="pdptab-10" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📄 Rapport</button>
     </div>
 
     <!-- Sections (vides en Phase 0). Chaque section porte les mêmes data-periodes
@@ -1280,6 +1281,27 @@
     <div class="sport-section podopediatrie-section" id="pdpsec-9" data-periodes="II III IV" style="display:none;">
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📄 Conclusion — <em>Phase 0 : contenu à venir.</em></div></div>
     </div>
+
+    <!-- #140 Phase 0b — Onglet Rapport (sortie, pas de saisie).
+         Miroir du rapport Pédicurie, mais exposé comme onglet dédié plutôt
+         qu'un simple bouton. Aucun .podopediatrie-field ici — la fonction
+         savePodopediatrieBilan ne polluera donc pas bilanDataPodopediatrie
+         avec des champs du rapport. -->
+    <div class="sport-section podopediatrie-section" id="pdpsec-10" data-periodes="II III IV" style="display:none;">
+      <div class="card">
+        <div style="padding:12px 16px;border-bottom:1px solid rgba(225,29,72,0.15);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button onclick="envoyerRapportMail()" class="btn" style="background:#9f1239;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">✉️ Envoyer par mail</button>
+          <button onclick="printRapportPodopediatrie()" class="btn" style="background:#e11d48;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
+        </div>
+        <div id="podopediatrie-rapport-body" style="padding:16px;font-size:13px;color:#333;">
+          <em style="color:var(--mut);">Aperçu du rapport disponible à l'ouverture de cet onglet.</em>
+        </div>
+      </div>
+    </div>
+
+    <!-- #140 Phase 0b — Conteneur masqué pour l'iframe d'impression du rapport
+         podopédiatrie (miroir #pedicurie-rapport-iframe-wrap). -->
+    <div id="podopediatrie-rapport-iframe-wrap" style="display:none;"></div>
   </div>
 </div>
 
