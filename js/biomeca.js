@@ -2557,7 +2557,7 @@ function nav(id) {
   // Bandeau d'en-tête uniformisé sur les 3 bilans + landing pg-sport.
   // setTimeout pour laisser le markup du posturo (injecté dynamiquement) se
   // créer avant la mise à jour.
-  if(id==='pg-bilan' || id==='pg-bilan-posturo' || id==='pg-pedicurie' || id==='pg-sport') {
+  if(id==='pg-bilan' || id==='pg-bilan-posturo' || id==='pg-pedicurie' || id==='pg-sport' || id==='pg-podopediatrie') {
     setTimeout(_updateBilanHeaders, 60);
   }
   if(id === 'pg-bilan-posturo') {
