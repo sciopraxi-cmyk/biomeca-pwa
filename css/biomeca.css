@@ -647,3 +647,11 @@ body.printing #rpt-print{display:block!important;}
   font-family:inherit;
 }
 .podo-inline-input:focus { outline:none; border-color:#e11d48; }
+
+/* #140 Phase 2b1 — Toolbar dessin Podopédiatrie Morphostatique (silhouettes).
+   Applique le fond rose à l'outil actif sans changer la structure du <button>. */
+.podo-tool-active {
+  background:#e11d48 !important;
+  color:#fff !important;
+  border-color:#e11d48 !important;
+}
