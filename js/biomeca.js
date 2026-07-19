@@ -13406,10 +13406,12 @@ function showPodopediatrieSection(idx) {
     t.style.color       = active ? '#fff'    : '#e11d48';
     t.style.borderColor = '#e11d48';
   });
-  // #140 Phase 0b — Onglet Rapport (idx 10) : régénère l'aperçu à chaque
-  // activation. Le body est reflété tel qu'il sortirait à l'impression :
-  // toute donnée saisie dans les autres onglets sera visible ici.
-  if (target === 10) {
+  // #140 Phase 0b — Onglet Rapport : régénère l'aperçu à chaque activation.
+  // Le body est reflété tel qu'il sortirait à l'impression : toute donnée
+  // saisie dans les autres onglets sera visible ici.
+  // #140 Phase 1b — Rapport est passé de la position 10 à la position 11
+  // après insertion de l'onglet « Réflexes » en position 1.
+  if (target === 11) {
     const bodyEl = document.getElementById('podopediatrie-rapport-body');
     if (bodyEl && typeof buildPodopediatrieRapportHTML === 'function') {
       bodyEl.innerHTML = buildPodopediatrieRapportHTML();
