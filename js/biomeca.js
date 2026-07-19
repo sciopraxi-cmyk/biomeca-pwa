@@ -13411,6 +13411,22 @@ function _podoCourburesInterpret() {
   check('podo_fleche_lombaire', 'podo-fleche-lombaire-interpret', 4, 6);
 }
 
+// #140 Phase 2a fix — Suspicion d'Achille court : la combinaison marche sur
+// talons impossible + accroupissement impossible est un signal classique.
+// podo_marche_talons est dans l'onglet Marche mais dans le même DOM
+// #pg-podopediatrie, lisible via querySelector même si son onglet est
+// inactif. Ressert en Phase 4 (Synthèse).
+function _podoAchilleInterpret() {
+  var el = document.getElementById('podo-achille-interpret');
+  if (!el) return;
+  var talons = document.querySelector('#pg-podopediatrie input[name="podo_marche_talons"]:checked');
+  var accroup = document.querySelector('#pg-podopediatrie input[name="podo_accroupissement"]:checked');
+  var isImpossible = talons && talons.value === 'impossible' && accroup && accroup.value === 'non';
+  el.textContent = isImpossible
+    ? '⚠️ Suspicion d\'Achille court (marche sur talons impossible + accroupissement impossible)'
+    : '';
+}
+
 // #140 Phase 2a — Toggle du bloc de localisation du test d'Adam. Visible
 // uniquement si Gibbosité = « oui ». Appelé à chaque onchange des radios
 // et au chargement (via _podoPostLoadTweaks).
@@ -13432,6 +13448,7 @@ function _podoPostLoadTweaks() {
   _podoNavicInterpret();
   _podoCourburesInterpret();
   _podoAdamChanged();
+  _podoAchilleInterpret();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
@@ -13483,6 +13500,12 @@ function showPodopediatrieSection(idx) {
     t.style.color       = active ? '#fff'    : '#e11d48';
     t.style.borderColor = '#e11d48';
   });
+  // #140 Phase 2a fix — Onglet Morphostatique : rafraîchit la suspicion
+  // d'Achille court. podo_marche_talons peut avoir été modifié dans l'onglet
+  // Marche entre-temps ; le bandeau de suspicion doit refléter l'état courant.
+  if (target === 3 && typeof _podoAchilleInterpret === 'function') {
+    _podoAchilleInterpret();
+  }
   // #140 Phase 0b — Onglet Rapport : régénère l'aperçu à chaque activation.
   // Le body est reflété tel qu'il sortirait à l'impression : toute donnée
   // saisie dans les autres onglets sera visible ici.
