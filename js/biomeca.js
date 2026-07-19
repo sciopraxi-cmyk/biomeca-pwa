@@ -4504,14 +4504,17 @@ function _confirmPodopediatrieOuvrir() {
   nav('pg-podopediatrie');
 }
 
-function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
+async function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
   const p = patients[patIdx];
   if (!p) return;
   const bilan = p.bilansPodopediatrie?.[bilanIdx];
   if (!bilan) {
-    // Bilan courant
+    // Bilan courant — prefetch aussi (peut contenir des Path si migration s'est produite).
     currentOpenedBilanPodopediatrieIdx = null;
     selectPatient(p);
+    if (p.bilanDataPodopediatrie) {
+      try { await prefetchPodopediatriePhotos(p.bilanDataPodopediatrie); } catch (e) {}
+    }
     nav('pg-podopediatrie');
     return;
   }
@@ -4519,6 +4522,10 @@ function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
   currentPatient.bilanDataPodopediatrie = JSON.parse(JSON.stringify(bilan.bilanDataPodopediatrie || {}));
   currentOpenedBilanPodopediatrieIdx = bilanIdx;
   delete p.currentBilanPodopediatrieSousType;
+  // #140 Phase 2b1 — Prefetch AVANT nav : rehydrate les Path Storage en dataURLs
+  // en RAM pour que _restorePodopediatrieCanvasesFromSource (dans le hook
+  // showPodopediatrieSection target===3) trouve les dataURLs.
+  try { await prefetchPodopediatriePhotos(currentPatient.bilanDataPodopediatrie); } catch (e) {}
   nav('pg-podopediatrie');
   setTimeout(loadPodopediatrieBilan, 50);
   setTimeout(_applyPodopediatrieVisibilityForPeriode, 50);
@@ -4638,6 +4645,53 @@ async function migratePosturoPhotos(d, patientId, bilanId) {
   // (no-op, path déjà set), mais sans ce delete la dataUrl serait re-persistée.
   // Le stash capturé en début de fonction garantit la restauration RAM par le caller.
   for (const k of POSTURO_PHOTO_KEYS) {
+    if (d[k + 'Path'] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
+      delete d[k];
+    }
+  }
+  return stash;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Helpers Storage — bilan podopédiatrie (#140 Phase 2b1)
+// ───────────────────────────────────────────────────────────────────
+// Pattern miroir strict POSTURO_PHOTO_KEYS : `_xxx` = dataUrl RAM, `_xxxPath`
+// = path Storage. Uniquement les 4 silhouettes morpho en Phase 2b1 ; les
+// photos posturales viendront en Phase 2b2.
+const PODOPEDIATRIE_PHOTO_KEYS = [
+  '_podo_morpho_face', '_podo_morpho_face2', '_podo_morpho_profilG', '_podo_morpho_profilD'
+];
+
+async function prefetchPodopediatriePhotos(d) {
+  if (!d) return;
+  await ensureSession();
+  await Promise.all(PODOPEDIATRIE_PHOTO_KEYS.map(async k => {
+    const pathKey = k + 'Path';
+    if (!d[pathKey] || d[k]) return;
+    const r = await prefetchPhotoToDataUrl(d[pathKey]);
+    if (r.ok) d[k] = r.dataUrl;
+    else console.warn('[podopediatrie] prefetch fail', pathKey, '→', r.error);
+  }));
+}
+
+async function migratePodopediatriePhotos(d, patientId, bilanId) {
+  await ensureSession();
+  const stash = {};
+  for (const k of PODOPEDIATRIE_PHOTO_KEYS) {
+    if (d[k] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
+      stash[k] = d[k];
+    }
+  }
+  if (Object.keys(stash).length === 0) return stash;
+  const pathArgs = { userId: pwaUser?.id, patientId, type: 'podopediatrie', bilanId };
+  const results = await Promise.all(
+    PODOPEDIATRIE_PHOTO_KEYS.map(k => migratePhotoEntry(d, k, pathArgs))
+  );
+  results.forEach((r, i) => {
+    if (!r.ok) console.warn('[podopediatrie] migrate fail', PODOPEDIATRIE_PHOTO_KEYS[i], '→', r.error);
+  });
+  // Cleanup double-save (miroir posturo).
+  for (const k of PODOPEDIATRIE_PHOTO_KEYS) {
     if (d[k + 'Path'] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
       delete d[k];
     }
@@ -12861,10 +12915,14 @@ function setupDrawCanvas(canvas, canvasId) {
       canvas._userDirty = true;
       // #119 — Auto-save au dessin (parité #116). Déduit le bilan cible depuis
       // l'id du canvas : posturo-body-canvas / posturo-feet-canvas → posturo ;
-      // pieds-canvas / morpho-* → sport. saveBilanSilent / savePosturoBilan
-      // lisent le DOM sans modifier d'input ni de canvas → pas de feedback loop.
+      // #140 Phase 2b1 — podo-morpho-* → podopediatrie ; pieds-canvas / morpho-* → sport.
+      // saveXBilan(true) lisent le DOM sans modifier d'input ni de canvas → pas de
+      // feedback loop possible.
       if (typeof _scheduleBilanAutosave === 'function') {
-        _scheduleBilanAutosave(canvas.id.indexOf('posturo-') !== 0);
+        var _autoFlavor = 'sport';
+        if (canvas.id.indexOf('posturo-') === 0) _autoFlavor = 'posturo';
+        else if (canvas.id.indexOf('podo-') === 0) _autoFlavor = 'podopediatrie';
+        _scheduleBilanAutosave(_autoFlavor);
       }
     }
     drawing = false;
@@ -12940,6 +12998,17 @@ function _markMorphoTool(activeId) {
   });
 }
 
+// #140 Phase 2b1 — helper marquage état actif boutons morpho podopédiatrie
+// (scope strict #pg-podopediatrie). Miroir de _markMorphoTool : liste fermée
+// des 6 IDs préfixés podo- ; toggle .podo-tool-active (rose #e11d48) sur
+// l'actif. Aucun ID sport/posturo/plantaire dans la liste → noop ailleurs.
+function _markPodoMorphoTool(activeId) {
+  ['podo-tool-pen','podo-tool-arrow','podo-tool-arrow-curve','podo-tool-circle','podo-tool-erase','podo-btn-curve-inv-morpho'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('podo-tool-active', id === activeId);
+  });
+}
+
 // Fix #90 — helper marquage état actif boutons posturo body (scope strict psec-*).
 // Symétrique à _markMorphoTool / _markPlantaireTool : liste fermée des 6 IDs body ;
 // reset tous puis marque l'actif. Aucun ID morpho (sans suffixe), plantaire
@@ -12984,6 +13053,11 @@ function setDrawTool(tool) {
   // Fix #90 — marquage additif posturo feet. Mêmes IDs que body avec suffixe "-feet".
   const _posturoFeetMap = {'line':'ptool-pen-feet','arrow':'ptool-arrow-feet','arrow-curve':'ptool-arrow-curve-feet','circle':'ptool-circle-feet','erase':'ptool-erase-feet'};
   _markPosturoFeetTool(_posturoFeetMap[tool] || '');
+  // #140 Phase 2b1 — marquage additif podo-morpho. Mapping outil interne → ID
+  // préfixé "podo-". Les helpers sport/posturo ci-dessus ne touchent pas les IDs
+  // podo- → additif strict.
+  const _podoMorphoMap = {'line':'podo-tool-pen','arrow':'podo-tool-arrow','arrow-curve':'podo-tool-arrow-curve','circle':'podo-tool-circle','erase':'podo-tool-erase'};
+  _markPodoMorphoTool(_podoMorphoMap[tool] || '');
 }
 
 function setDrawToolCurveInv() {
@@ -12997,6 +13071,8 @@ function setDrawToolCurveInv() {
   _markPosturoBodyTool('btn-curve-inv-posturo-body');
   // Fix #90 — marqueur actif sur ↩ Courbée inv posturo feet (scope strict psec-8)
   _markPosturoFeetTool('btn-curve-inv-posturo-feet');
+  // #140 Phase 2b1 — marqueur actif sur ↩ Courbée inv podo-morpho (scope strict #pg-podopediatrie)
+  _markPodoMorphoTool('podo-btn-curve-inv-morpho');
 }
 
 function clearAllMorpho() {
@@ -13037,6 +13113,100 @@ function undoMorpho() {
   } else if(c._baseSnapshot) {
     ctx.putImageData(c._baseSnapshot, 0, 0);
   }
+}
+
+// #140 Phase 2b1 — PODOPÉDIATRIE MORPHOSTATIQUE (silhouettes dessinables)
+// ─────────────────────────────────────────────────────────────────────
+// Pile d'undo dédiée (bug #89 : pile partagée entre canvas de bilans distincts
+// = source de corruptions cross-bilan). initPodoMorphoCanvas délègue à
+// initMorphoCanvas puis OVERRIDE canvas._undoOrderStack pour pointer sur
+// cette pile privée, sans forker le moteur de dessin.
+let _podoMorphoUndoOrder = [];
+
+const _PODO_MORPHO_CANVAS_IDS = ['podo-morpho-face', 'podo-morpho-face2', 'podo-morpho-profilG', 'podo-morpho-profilD'];
+
+function initPodoMorphoCanvas(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  initMorphoCanvas(canvasId); // taille DPR + _baseSnapshot + setupDrawCanvas
+  canvas._undoOrderStack = _podoMorphoUndoOrder; // OVERRIDE — pile dédiée
+}
+
+// Init idempotente : re-appelable quand l'onglet Morpho devient actif.
+// Ne re-init PAS un canvas déjà setup (width>0 et _history array), pour
+// préserver l'historique d'édition et la restauration en cours.
+function _initPodoMorphoCanvasesIfNeeded() {
+  _PODO_MORPHO_CANVAS_IDS.forEach(id => {
+    const c = document.getElementById(id);
+    if (!c) return;
+    if (c.width > 0 && Array.isArray(c._history)) return; // déjà setup
+    initPodoMorphoCanvas(id);
+  });
+}
+
+function undoPodoMorpho() {
+  if (_podoMorphoUndoOrder.length === 0) return;
+  const canvasId = _podoMorphoUndoOrder.pop();
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  if (c._history && c._history.length > 0) {
+    c._history.pop();
+    const prev = c._history.length > 0 ? c._history[c._history.length - 1] : c._baseSnapshot;
+    if (prev) ctx.putImageData(prev, 0, 0);
+  } else if (c._baseSnapshot) {
+    ctx.putImageData(c._baseSnapshot, 0, 0);
+  }
+}
+
+function clearAllPodoMorpho() {
+  _podoMorphoUndoOrder.length = 0;
+  _PODO_MORPHO_CANVAS_IDS.forEach(id => {
+    const c = document.getElementById(id);
+    if (c) {
+      c._history = [];
+      c._baseSnapshot = null;
+      c._tempSnap = null;
+      c._userDirty = true; // force invalidation au prochain save
+    }
+    initPodoMorphoCanvas(id);
+  });
+  // Déclenche autosave débouncée — le prochain savePodopediatrieBilan invalidera
+  // les 4 clés + leurs Path.
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('podopediatrie');
+}
+
+// Restaure les 4 canvases depuis les dataURLs stockées. Miroir strict de
+// _drawMorphoCanvasesFromSource (gating _restoreReady=false → true dans
+// Image.onload, fallback onerror, ouverture immédiate pour canvas sans source).
+function _restorePodopediatrieCanvasesFromSource(source, posesReadyFlag) {
+  if (!source) return;
+  const pairs = [
+    ['podo-morpho-face',    '_podo_morpho_face'],
+    ['podo-morpho-face2',   '_podo_morpho_face2'],
+    ['podo-morpho-profilG', '_podo_morpho_profilG'],
+    ['podo-morpho-profilD', '_podo_morpho_profilD']
+  ];
+  pairs.forEach(([canvasId, key]) => {
+    const cvs = document.getElementById(canvasId);
+    if (!cvs || cvs.width === 0) return;
+    if (!source[key]) {
+      if (posesReadyFlag) cvs._restoreReady = true;
+      return;
+    }
+    cvs._restoreReady = false;
+    const img = new Image();
+    img.onload = () => {
+      const dpr = window.devicePixelRatio || 1;
+      cvs.getContext('2d').drawImage(img, 0, 0, cvs.width / dpr, cvs.height / dpr);
+      cvs._restoreReady = true;
+    };
+    img.onerror = () => { cvs._restoreReady = true; };
+    img.src = source[key];
+    // Fallback timeout — si img reste bloqué (dataURL corrompue et onerror non tiré),
+    // rouvre le gate au bout de 3 s pour ne pas figer l'édition indéfiniment.
+    setTimeout(() => { if (cvs._restoreReady === false) cvs._restoreReady = true; }, 3000);
+  });
 }
 
 function undoPieds() {
@@ -13282,7 +13452,7 @@ function syncOpenedBilanPodopediatrieToHistory() {
 // En Phase 0 les sections sont vides, la fonction ne trouvera que
 // bilanDataPodopediatrie.periode / .ageMonths déjà écrits à la création.
 // Cette signature est utilisée par le sweep-avant-quitter de nav().
-function savePodopediatrieBilan(silent) {
+async function savePodopediatrieBilan(silent) {
   if (!currentPatient) { if (!silent) alert('Sélectionnez un patient'); return; }
   if (!currentPatient.bilanDataPodopediatrie) currentPatient.bilanDataPodopediatrie = {};
   const d = currentPatient.bilanDataPodopediatrie;
@@ -13296,6 +13466,36 @@ function savePodopediatrieBilan(silent) {
   document.querySelectorAll('#pg-podopediatrie input[type=radio]').forEach(el => {
     if (el.checked && el.name) d[el.name] = el.value;
   });
+  // #140 Phase 2b1 — Sérialisation des 4 canvas silhouettes. Garde _userDirty
+  // (bugs #94/#103 : sans elle, un re-init post-nav écraserait le dessin stocké
+  // par le PNG transparent vide). Miroir strict de saveBilanSilent L14189.
+  [
+    ['podo-morpho-face',    '_podo_morpho_face'],
+    ['podo-morpho-face2',   '_podo_morpho_face2'],
+    ['podo-morpho-profilG', '_podo_morpho_profilG'],
+    ['podo-morpho-profilD', '_podo_morpho_profilD']
+  ].forEach(([canvasId, key]) => {
+    const c = document.getElementById(canvasId);
+    if (!c || !c._userDirty) return;
+    const png = _serializeDrawCanvas(c);
+    if (png !== null) {
+      d[key] = png;
+      delete d[key + 'Path']; // édition confirmée → invalide Path
+    }
+  });
+  // Reset _userDirty pour les 4 canvas APRÈS sweep, préparer prochain cycle.
+  ['podo-morpho-face','podo-morpho-face2','podo-morpho-profilG','podo-morpho-profilD'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c) c._userDirty = false;
+  });
+  // Migration Storage — miroir savePosturoBilan. Try/catch : un échec de migration
+  // ne doit pas bloquer la sauvegarde des champs cliniques (les dataURLs restent
+  // en RAM et retryent au prochain save).
+  try {
+    await migratePodopediatriePhotos(d, currentPatient.id, d.id);
+  } catch (e) {
+    console.warn('[podopediatrie] migrate error', e);
+  }
   syncOpenedBilanPodopediatrieToHistory();
   savePatients();
   if (!silent) alert('✓ Bilan podopédiatrie sauvegardé');
@@ -13503,8 +13703,17 @@ function showPodopediatrieSection(idx) {
   // #140 Phase 2a fix — Onglet Morphostatique : rafraîchit la suspicion
   // d'Achille court. podo_marche_talons peut avoir été modifié dans l'onglet
   // Marche entre-temps ; le bandeau de suspicion doit refléter l'état courant.
-  if (target === 3 && typeof _podoAchilleInterpret === 'function') {
-    _podoAchilleInterpret();
+  // #140 Phase 2b1 — Init idempotente des 4 silhouettes + restauration depuis
+  // bilanDataPodopediatrie (dataURLs déjà réhydratées par prefetch de
+  // ouvrirBilanPodopediatrie). setTimeout 50 ms > peinture DOM section.
+  if (target === 3) {
+    if (typeof _podoAchilleInterpret === 'function') _podoAchilleInterpret();
+    setTimeout(() => {
+      if (typeof _initPodoMorphoCanvasesIfNeeded === 'function') _initPodoMorphoCanvasesIfNeeded();
+      if (typeof _restorePodopediatrieCanvasesFromSource === 'function') {
+        _restorePodopediatrieCanvasesFromSource(currentPatient?.bilanDataPodopediatrie, true);
+      }
+    }, 50);
   }
   // #140 Phase 0b — Onglet Rapport : régénère l'aperçu à chaque activation.
   // Le body est reflété tel qu'il sortirait à l'impression : toute donnée
@@ -19558,8 +19767,9 @@ let _bilanAutosaveTimer = null;
 // #119 — Helper extrait pour partager le déclencheur d'auto-save entre l'event
 // 'input' (frappe clavier #116) et le mouseup des canvas dessinés (#119 étape 3).
 // #121 Phase 0 — Généralisé à 3 cibles : flavor ∈ {'sport','posturo','pedicurie'}.
+// #140 Phase 2b1 — Ajouté 'podopediatrie' pour le dessin sur silhouettes morpho podo.
 // Rétro-compat : un boolean (true=sport, false=posturo) est encore accepté pour
-// éviter de toucher aux 2 call-sites canvas existants (qui passent un boolean).
+// les call-sites qui n'ont pas migré vers la string flavor.
 function _scheduleBilanAutosave(flavor) {
   // Normalisation rétro-compat boolean → flavor string.
   if (flavor === true)  flavor = 'sport';
@@ -19569,6 +19779,7 @@ function _scheduleBilanAutosave(flavor) {
     if (flavor === 'sport' && typeof saveBilanSilent === 'function') saveBilanSilent();
     else if (flavor === 'posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
     else if (flavor === 'pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
+    else if (flavor === 'podopediatrie' && typeof savePodopediatrieBilan === 'function') savePodopediatrieBilan(true);
   }, 1000);
 }
 document.addEventListener('input', function(e) {

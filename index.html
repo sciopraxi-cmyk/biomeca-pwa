@@ -1460,9 +1460,68 @@
         <div style="padding:16px;">
           <div class="podo-block-title">🦴 Morphostatique</div>
 
-          <!-- #140 Phase 2b — Modules visuels (silhouettes cliquables Face/Dos/Profils,
-               photos posturales avec pose de points, Verticale de Barré) — à implémenter
-               dans une phase suivante. Les champs cliniques ci-dessous sont indépendants. -->
+          <!-- #140 Phase 2b1 — 4 silhouettes dessinables (Face, Dos, Profil G, Profil D).
+               ATTENTION : le libellé Face ↔ Dos ne correspond pas 1:1 aux clés de la
+               morpho sport (où « face2 » = Face postérieure = Dos). Ici on mappe
+               proprement : podo-morpho-face = Face ANTÉRIEURE, podo-morpho-face2 = Dos
+               (Face POSTÉRIEURE). Les 2 autres modules visuels (photos posturales avec
+               pose de points, Verticale de Barré) sont Phase 2b2. -->
+          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;align-items:flex-end;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:16px;">
+            <div style="flex:1;min-width:100px;text-align:center;">
+              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Face</div>
+              <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
+                <img src="assets/morpho-face-anterieure.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="podo-morpho-face-img"/>
+                <canvas id="podo-morpho-face" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
+              </div>
+            </div>
+            <div style="flex:1;min-width:100px;text-align:center;">
+              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Dos</div>
+              <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
+                <img src="assets/morpho-face-posterieure.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="podo-morpho-face2-img"/>
+                <canvas id="podo-morpho-face2" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
+              </div>
+            </div>
+            <div style="flex:1;min-width:80px;text-align:center;">
+              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Profil gauche</div>
+              <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
+                <img src="assets/morpho-profil-gauche.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="podo-morpho-profilG-img"/>
+                <canvas id="podo-morpho-profilG" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
+              </div>
+            </div>
+            <div style="flex:1;min-width:80px;text-align:center;">
+              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Profil droit</div>
+              <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
+                <img src="assets/morpho-profil-droit.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="podo-morpho-profilD-img"/>
+                <canvas id="podo-morpho-profilD" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+            <button class="btn" id="podo-tool-pen" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
+            <button class="btn" id="podo-tool-arrow" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
+            <button class="btn" id="podo-tool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée">↪ Courbée</button>
+            <button class="btn" id="podo-btn-curve-inv-morpho" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
+            <button class="btn" id="podo-tool-circle" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
+            <button class="btn" id="podo-tool-erase" onclick="setDrawTool('erase')">🧹 Gomme</button>
+            <select id="podo-draw-color-sel" class="inp" style="width:80px;" onchange="drawColor=this.value;">
+              <option value="#e74c3c">Rouge</option>
+              <option value="#2980b9">Bleu</option>
+              <option value="#27ae60">Vert</option>
+              <option value="#f39c12">Orange</option>
+              <option value="#111111">Noir</option>
+            </select>
+            <select id="podo-draw-size-sel" class="inp" style="width:90px;" onchange="drawSize=+this.value;">
+              <option value="2">Fin</option>
+              <option value="4" selected>Normal</option>
+              <option value="8">Épais</option>
+            </select>
+            <button class="btn" onclick="undoPodoMorpho()" style="background:#9f1239;color:#fff;">↩ Annuler</button>
+            <button class="btn" onclick="clearAllPodoMorpho()" style="background:transparent;color:#9f1239;border:1px solid #9f1239;">🗑 Tout effacer</button>
+          </div>
+
+          <!-- #140 Phase 2b2 — À implémenter dans une phase suivante :
+               photos posturales avec pose de points, Verticale de Barré. Les champs
+               cliniques ci-dessous sont indépendants et déjà en place (Phase 2a). -->
 
           <!-- ─── Réductibilité de l'affaissement plantaire (Jack + giration) ─── -->
           <div class="podo-block-title">🔄 Réductibilité de l'affaissement plantaire</div>
