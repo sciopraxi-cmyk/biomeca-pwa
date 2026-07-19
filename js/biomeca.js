@@ -4702,6 +4702,20 @@ async function migratePodopediatriePhotos(d, patientId, bilanId) {
   return stash;
 }
 
+// Restaure les dataUrls retirées par migratePodopediatriePhotos. Miroir strict
+// de restoreSportBilanDataPhotosStash L4892 (helper dédié pour clarifier le
+// call-site dans savePodopediatrieBilan). La garde `if (!d[k])` protège une
+// dataUrl plus récente écrite entre migrate et restore (nouvelle capture ou
+// import concurrent) : on ne stomp pas la valeur en RAM.
+// Sans cette restauration, les slots posturaux (photos 4 vues + placement points)
+// et les 4 silhouettes morpho perdent leur affichage RAM après save — l'utilisateur
+// doit refresh pour re-fetcher depuis Storage (bug #140 Phase 2b2).
+function restorePodopediatriePhotosStash(d, stash) {
+  for (const k in stash) {
+    if (!d[k]) d[k] = stash[k];
+  }
+}
+
 // ───────────────────────────────────────────────────────────────────
 // Helpers Storage — bilan sport (Task #53 PR B2)
 // ───────────────────────────────────────────────────────────────────
@@ -13539,13 +13553,23 @@ async function savePodopediatrieBilan(silent) {
   // Migration Storage — miroir savePosturoBilan. Try/catch : un échec de migration
   // ne doit pas bloquer la sauvegarde des champs cliniques (les dataURLs restent
   // en RAM et retryent au prochain save).
+  // #140 Phase 2b2 fix — CAPTURER le stash retourné par migratePodopediatriePhotos.
+  // Après upload Storage, migrate fait `delete d[k]` sur les dataUrls (cleanup
+  // anti-bloat localStorage). Sans restore ci-dessous, la RAM perd les 8 dataUrls
+  // (4 silhouettes morpho + 4 photos posturales) → clic « Placer les points » sur
+  // une photo tout juste importée alerte « Capture d'abord la photo… ». Miroir
+  // strict de saveBilanSilent L14855-14861 (sport) et savePosturoBilan L19352/19362.
+  let photoStash = {};
   try {
-    await migratePodopediatriePhotos(d, currentPatient.id, d.id);
+    photoStash = await migratePodopediatriePhotos(d, currentPatient.id, d.id) || {};
   } catch (e) {
     console.warn('[podopediatrie] migrate error', e);
   }
   syncOpenedBilanPodopediatrieToHistory();
   savePatients();
+  // Restaure les dataUrls migrées en RAM pour conserver l'affichage courant
+  // (slots posturaux, silhouettes morpho) sans re-fetcher depuis Storage.
+  restorePodopediatriePhotosStash(d, photoStash);
   if (!silent) alert('✓ Bilan podopédiatrie sauvegardé');
 }
 
