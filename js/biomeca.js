@@ -4656,10 +4656,13 @@ async function migratePosturoPhotos(d, patientId, bilanId) {
 // Helpers Storage — bilan podopédiatrie (#140 Phase 2b1)
 // ───────────────────────────────────────────────────────────────────
 // Pattern miroir strict POSTURO_PHOTO_KEYS : `_xxx` = dataUrl RAM, `_xxxPath`
-// = path Storage. Uniquement les 4 silhouettes morpho en Phase 2b1 ; les
-// photos posturales viendront en Phase 2b2.
+// = path Storage. 4 silhouettes morpho (Phase 2b1) + 4 photos posturales
+// (Phase 2b2). Note : _postureAnalysis (markers nx/ny, calibration, angles)
+// reste stocké INLINE dans bilanDataPodopediatrie — objet ~1-2 Ko, non migré
+// vers Storage, décision alignée avec sport/posturo (cf. _validatePosturePlacement).
 const PODOPEDIATRIE_PHOTO_KEYS = [
-  '_podo_morpho_face', '_podo_morpho_face2', '_podo_morpho_profilG', '_podo_morpho_profilD'
+  '_podo_morpho_face', '_podo_morpho_face2', '_podo_morpho_profilG', '_podo_morpho_profilD',
+  '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD'
 ];
 
 async function prefetchPodopediatriePhotos(d) {
@@ -6114,7 +6117,7 @@ const POSTURE_VIEWS = [
   { key: 'profilG', label: 'Profil G' },
   { key: 'profilD', label: 'Profil D' }
 ];
-const _postureStreams = { sp: null, po: null };
+const _postureStreams = { sp: null, po: null, pp: null };
 
 // Renvoie l'objet bilanData (sport) ou bilanDataPosturo (posturo) selon prefix.
 // Pendant l'édition : ces objets sont en RAM dans currentPatient (sport) ou
@@ -6123,6 +6126,14 @@ const _postureStreams = { sp: null, po: null };
 function _getPostureBilanData(prefix) {
   if (prefix === 'sp') return (typeof bilanData !== 'undefined' && bilanData) ? bilanData : null;
   if (prefix === 'po') return currentPatient?.bilanDataPosturo || null;
+  // #140 Phase 2b2 — Podopédiatrie : lazy-init du conteneur en RAM comme
+  // savePodopediatrieBilan L13484 (parité avec posturo qui initialise
+  // bilanDataPosturo en ouverture). Retourne null si aucun patient sélectionné.
+  if (prefix === 'pp') {
+    if (!currentPatient) return null;
+    if (!currentPatient.bilanDataPodopediatrie) currentPatient.bilanDataPodopediatrie = {};
+    return currentPatient.bilanDataPodopediatrie;
+  }
   return null;
 }
 
@@ -7618,6 +7629,8 @@ async function _onCurveInterpChange(prefix, viewKey, courbure, value) {
       await saveBilanSilent();
     } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
       await savePosturoBilan(true);
+    } else if (prefix === 'pp' && typeof savePodopediatrieBilan === 'function') {
+      await savePodopediatrieBilan(true);
     }
   } catch (e) {
     console.warn('[#106-Final] auto-save curveInterp posture échoué :', e?.message);
@@ -8819,6 +8832,8 @@ async function _validatePosturePlacement(prefix, viewKey) {
       await saveBilanSilent();
     } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
       await savePosturoBilan(true);
+    } else if (prefix === 'pp' && typeof savePodopediatrieBilan === 'function') {
+      await savePodopediatrieBilan(true);
     }
   } catch (e) {
     console.warn('[#85-2b] save silent posture analysis a échoué :', e?.message);
@@ -8951,6 +8966,8 @@ async function capturePostureView(prefix, viewKey) {
       await saveBilanSilent();
     } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
       await savePosturoBilan(true);
+    } else if (prefix === 'pp' && typeof savePodopediatrieBilan === 'function') {
+      await savePodopediatrieBilan(true);
     }
   } catch (e) {
     console.warn('[#85] auto-save capture posture échoué :', e?.message);
@@ -8983,6 +9000,8 @@ async function deletePostureView(prefix, viewKey) {
       await saveBilanSilent();
     } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
       await savePosturoBilan(true);
+    } else if (prefix === 'pp' && typeof savePodopediatrieBilan === 'function') {
+      await savePodopediatrieBilan(true);
     }
   } catch (e) {
     console.warn('[#85] auto-save delete posture échoué :', e?.message);
@@ -9091,6 +9110,8 @@ async function importPostureView(prefix, viewKey, input) {
       await saveBilanSilent();
     } else if (prefix === 'po' && typeof savePosturoBilan === 'function') {
       await savePosturoBilan(true);
+    } else if (prefix === 'pp' && typeof savePodopediatrieBilan === 'function') {
+      await savePodopediatrieBilan(true);
     }
   } catch (e) {
     console.warn('[#85] auto-save import posture échoué :', e?.message);
@@ -13735,6 +13756,19 @@ function showPodopediatrieSection(idx) {
   // ouvrirBilanPodopediatrie). setTimeout 50 ms > peinture DOM section.
   if (target === 3) {
     if (typeof _podoAchilleInterpret === 'function') _podoAchilleInterpret();
+    // #140 Phase 2b2 — Injection idempotente du bloc photos posturales
+    // (capture caméra + import + placement points). Marker `_pp_injected`
+    // sur le conteneur pour éviter la ré-injection (perte des <video>,
+    // reset des <select> caméra, écrasement des slots) sur ré-activation
+    // de l'onglet. Puis _renderAllPostureSlots('pp') repeuple les 4 slots
+    // à partir des dataURLs déjà réhydratées par prefetchPodopediatriePhotos
+    // (appelé côté ouvrirBilanPodopediatrie / selectPatient).
+    const ppContainer = document.getElementById('pp-posture-capture-container');
+    if (ppContainer && !ppContainer._pp_injected && typeof _buildPostureCaptureBlockHTML === 'function') {
+      ppContainer.innerHTML = _buildPostureCaptureBlockHTML('pp');
+      ppContainer._pp_injected = true;
+    }
+    if (typeof _renderAllPostureSlots === 'function') _renderAllPostureSlots('pp');
     setTimeout(() => {
       if (typeof _initPodoMorphoCanvasesIfNeeded === 'function') _initPodoMorphoCanvasesIfNeeded();
       if (typeof _restorePodopediatrieCanvasesFromSource === 'function') {
