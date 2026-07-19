@@ -13350,11 +13350,88 @@ function _podoPrefillSportDefault() {
   if (input) input.value = patientSport;
 }
 
+// #140 Phase 2a — Interprétation Axe calcanéen (par pied). Seuil physiologique
+// < 2° / significatif ≥ 2°. Ligne affichée sous le select des degrés. Rejoue à
+// chaque onchange direction/degrés + au chargement (via _podoPostLoadTweaks).
+function _podoAxeCalcInterpret() {
+  ['g', 'd'].forEach(function (side) {
+    var el = document.getElementById('podo-axecalc-' + side + '-interpret');
+    if (!el) return;
+    var dirEl = document.querySelector('#pg-podopediatrie input[name="podo_axecalc_' + side + '_dir"]:checked');
+    var dir = dirEl ? dirEl.value : '';
+    var degEl = document.querySelector('#pg-podopediatrie [data-field="podo_axecalc_' + side + '_deg"]');
+    var degRaw = degEl ? degEl.value : '';
+    if (!dir || dir === 'neutre') { el.textContent = dir === 'neutre' ? 'Axe neutre' : ''; return; }
+    if (degRaw === '' || degRaw == null) { el.textContent = 'Tendance ' + dir + ' — précisez les degrés'; return; }
+    var deg = parseFloat(degRaw);
+    var qualif = (deg < 2) ? 'physiologique (< 2°)' : 'significatif (≥ 2°)';
+    el.textContent = 'Tendance ' + dir + ' ' + deg + '° — ' + qualif;
+  });
+}
+
+// #140 Phase 2a — Interprétation Hauteur naviculaire (par pied). Écart absolu
+// charge − décharge : normal si < 1 cm, défaut de maintien de l'arche médiale
+// si ≥ 1 cm. Ne s'affiche que si les 2 mesures sont saisies.
+function _podoNavicInterpret() {
+  ['g', 'd'].forEach(function (side) {
+    var el = document.getElementById('podo-navic-' + side + '-interpret');
+    if (!el) return;
+    var chEl = document.querySelector('#pg-podopediatrie [data-field="podo_navic_' + side + '_charge"]');
+    var deEl = document.querySelector('#pg-podopediatrie [data-field="podo_navic_' + side + '_decharge"]');
+    var ch = chEl ? chEl.value : '';
+    var de = deEl ? deEl.value : '';
+    if (ch === '' || de === '') { el.textContent = ''; return; }
+    var ecart = Math.abs(parseFloat(ch) - parseFloat(de));
+    // Formatage FR (virgule décimale) pour cohérence avec les options select.
+    var ecartTxt = (Math.round(ecart * 10) / 10).toString().replace('.', ',');
+    var qualif = (ecart < 1) ? 'normal (< 1 cm)' : 'défaut de maintien de l\'arche médiale (≥ 1 cm)';
+    el.textContent = 'Écart ' + ecartTxt + ' cm — ' + qualif;
+  });
+}
+
+// #140 Phase 2a — Interprétation Courbures rachidiennes. Flèche cervicale
+// normale si 6–8 cm, flèche lombaire normale si 4–6 cm, sinon hors normes.
+// Une ligne par flèche sous son select.
+function _podoCourburesInterpret() {
+  var check = function (fieldId, elId, min, max) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var input = document.querySelector('#pg-podopediatrie [data-field="' + fieldId + '"]');
+    var raw = input ? input.value : '';
+    if (raw === '') { el.textContent = ''; return; }
+    var v = parseFloat(raw);
+    var vTxt = v.toString().replace('.', ',');
+    var normale = (v >= min && v <= max);
+    var qualif = normale
+      ? 'normale (norme ' + min + '–' + max + ' cm)'
+      : 'hors normes (norme ' + min + '–' + max + ' cm)';
+    el.textContent = vTxt + ' cm — ' + qualif;
+  };
+  check('podo_fleche_cervicale', 'podo-fleche-cervicale-interpret', 6, 8);
+  check('podo_fleche_lombaire', 'podo-fleche-lombaire-interpret', 4, 6);
+}
+
+// #140 Phase 2a — Toggle du bloc de localisation du test d'Adam. Visible
+// uniquement si Gibbosité = « oui ». Appelé à chaque onchange des radios
+// et au chargement (via _podoPostLoadTweaks).
+function _podoAdamChanged() {
+  var detail = document.getElementById('podo-adam-detail');
+  if (!detail) return;
+  var checked = document.querySelector('#pg-podopediatrie input[name="podo_adam_gibbosite"]:checked');
+  detail.style.display = (checked && checked.value === 'oui') ? '' : 'none';
+}
+
 // #140 Phase 1 — Post-load tweaks unifiés (EVA visibility + pré-remplissages).
 // Appelé après loadPodopediatrieBilan dans le nav hook et dans ouvrirBilanPodopediatrie.
+// #140 Phase 2a — Étendu pour reflater les interprétations Morphostatique et
+// le toggle du test d'Adam au chargement d'un bilan archivé.
 function _podoPostLoadTweaks() {
   _podoEvaChanged();
   _podoPrefillSportDefault();
+  _podoAxeCalcInterpret();
+  _podoNavicInterpret();
+  _podoCourburesInterpret();
+  _podoAdamChanged();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
