@@ -1481,15 +1481,23 @@
                 <canvas id="podo-morpho-face2" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
               </div>
             </div>
+            <!-- ⚠️ INVERSION VOLONTAIRE des libellés Profil gauche/droit — les assets
+                 sont MAL NOMMÉS : morpho-profil-gauche.png représente en réalité un
+                 profil DROIT et morpho-profil-droit.png un profil GAUCHE. On corrige
+                 l'affichage en inversant les libellés (convention alignée sur le
+                 posturo, biomeca.js L15164/L15182, et le sport index.html L2290).
+                 NE PAS "corriger" cette inversion : les ids de canvas
+                 (podo-morpho-profilG/D) et les clés de données
+                 (_podo_morpho_profilG/D) restent inchangés. -->
             <div style="flex:1;min-width:80px;text-align:center;">
-              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Profil gauche</div>
+              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Profil droit</div>
               <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
                 <img src="assets/morpho-profil-gauche.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="podo-morpho-profilG-img"/>
                 <canvas id="podo-morpho-profilG" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
               </div>
             </div>
             <div style="flex:1;min-width:80px;text-align:center;">
-              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Profil droit</div>
+              <div style="font-size:10px;color:#9f1239;margin-bottom:6px;font-weight:600;">Profil gauche</div>
               <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
                 <img src="assets/morpho-profil-droit.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="podo-morpho-profilD-img"/>
                 <canvas id="podo-morpho-profilD" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
@@ -2287,15 +2295,22 @@
             <canvas id="morpho-face2" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
           </div>
         </div>
+        <!-- ⚠️ INVERSION VOLONTAIRE des libellés Profil G/D — les assets sont MAL
+             NOMMÉS : morpho-profil-gauche.png représente en réalité un profil DROIT
+             et morpho-profil-droit.png un profil GAUCHE. On corrige l'affichage en
+             inversant les libellés (convention alignée sur le posturo, biomeca.js
+             L15164 et L15182). NE PAS "corriger" cette inversion : les ids de
+             canvas (morpho-profilG/D) et les clés de données (_morpho_profilG/D)
+             restent inchangés — des bilans réels dépendent de ce mapping. -->
         <div style="flex:1;min-width:80px;text-align:center;">
-          <div style="font-size:10px;color:#2a7a4e;margin-bottom:6px;font-weight:600;">Profil G</div>
+          <div style="font-size:10px;color:#2a7a4e;margin-bottom:6px;font-weight:600;">Profil D</div>
           <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
             <img src="assets/morpho-profil-gauche.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="morpho-profilG-img"/>
             <canvas id="morpho-profilG" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
           </div>
         </div>
         <div style="flex:1;min-width:80px;text-align:center;">
-          <div style="font-size:10px;color:#8892a4;margin-bottom:6px;font-weight:500;">Profil D</div>
+          <div style="font-size:10px;color:#8892a4;margin-bottom:6px;font-weight:500;">Profil G</div>
           <div style="position:relative;background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
             <img src="assets/morpho-profil-droit.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;" id="morpho-profilD-img"/>
             <canvas id="morpho-profilD" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:4px;"></canvas>
