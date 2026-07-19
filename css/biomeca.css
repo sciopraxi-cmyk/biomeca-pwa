@@ -551,3 +551,10 @@ body.printing #rpt-print{display:block!important;}
   text-align:center;
   box-shadow:0 2px 8px rgba(0,0,0,0.25);
 }
+
+/* #140 Phase 0 — Palette identitaire rose de la Podopédiatrie (miroir #122 pour ambre/pédicurie).
+   Applique les couleurs rose aux sections/cartes de #pg-podopediatrie sans affecter le reste. */
+#pg-podopediatrie .card {
+  border-left:4px solid #e11d48;
+  background:linear-gradient(135deg,#fff5f7,#ffe4e9) !important;
+}

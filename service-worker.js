@@ -10,7 +10,7 @@
 // 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
 // clients sur du code de mois précédents). Toute évolution ultérieure du code
 // applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
-const CACHE_VERSION = 'biomeca-v6';
+const CACHE_VERSION = 'biomeca-v7';
 const CACHE_PREFIX  = 'biomeca-';
 
 // #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur

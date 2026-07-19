@@ -1213,6 +1213,113 @@
   </div>
 </div>
 
+<!-- #140 Phase 0 — Bilan Podopédiatrie. Palette rose (identité #122).
+     Coquille à onglets, sections vides — le contenu clinique arrive en phases
+     suivantes. Le masquage périodique (data-periodes) est posé dès Phase 0. -->
+<div class="page" id="pg-podopediatrie">
+  <div style="padding:16px 20px;max-width:900px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
+      <h2 style="margin:0;font-size:18px;color:#e11d48;flex:1;">👶 Bilan Podopédiatrie</h2>
+      <button onclick="savePodopediatrieBilan()" class="btn" style="background:#e11d48;color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
+    </div>
+    <div id="podopediatrie-patient-info" style="background:rgba(225,29,72,0.85);border:1px solid rgba(225,29,72,0.95);color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
+      Aucun patient sélectionné
+    </div>
+
+    <!-- Barre d'onglets (sticky) — miroir pédicurie palette rose.
+         data-periodes indique dans quelles périodes chaque onglet est visible.
+         Phase 0 : les 10 sections sont présentes dans les 3 périodes (les fiches
+         cliniques Période II/III/IV confirment FPI, charge et décharge dès II).
+         La différenciation II/III/IV se fera à l'intérieur des sections via des
+         sous-blocs [data-periodes] (ex. Romberg = « III IV », Maddox = « IV »)
+         dans les phases de contenu à venir. -->
+    <div id="podopediatrie-tabs" style="display:flex;gap:6px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0;margin-bottom:12px;z-index:5;border-bottom:1px solid rgba(225,29,72,0.18);">
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(0)" id="pdptab-0" style="font-size:11px;padding:5px 12px;background:#e11d48;color:#fff;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📋 Interrogatoire</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(1)" id="pdptab-1" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🚶 Marche</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(2)" id="pdptab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🦴 Morphostatique</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(3)" id="pdptab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">👣 FPI</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(4)" id="pdptab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">⚖️ Charge</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(5)" id="pdptab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🛌 Décharge</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(6)" id="pdptab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">👟 Chaussure</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(7)" id="pdptab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">💊 Traitement</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(8)" id="pdptab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📊 Synthèse</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(9)" id="pdptab-9" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📄 Conclusion</button>
+    </div>
+
+    <!-- Sections (vides en Phase 0). Chaque section porte les mêmes data-periodes
+         que son onglet pour un masquage cohérent. Le contenu clinique arrivera
+         en phases suivantes. -->
+    <div class="sport-section podopediatrie-section" id="pdpsec-0" data-periodes="II III IV">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📋 Interrogatoire — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-1" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🚶 Marche — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-2" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🦴 Morphostatique — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-3" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">👣 FPI (Foot Posture Index) — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-4" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">⚖️ Examen en charge — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-5" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🛌 Examen en décharge — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-6" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">👟 Chaussure — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-7" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">💊 Traitement — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-8" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📊 Synthèse — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+    <div class="sport-section podopediatrie-section" id="pdpsec-9" data-periodes="II III IV" style="display:none;">
+      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📄 Conclusion — <em>Phase 0 : contenu à venir.</em></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- #140 Phase 0 — Modale d'âge présentée AVANT la création d'un bilan podopédiatrie.
+     Auto-sélectionne la période à partir de la date de naissance (ou fallback
+     saisie manuelle si ddn absente). L'utilisateur peut override via les 3 boutons. -->
+<div id="modal-podopediatrie-age" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:16px;padding:24px;width:90%;max-width:460px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:16px;font-weight:700;color:#e11d48;">👶 Bilan Podopédiatrie</div>
+      <button onclick="_closePodopediatrieAgeModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">×</button>
+    </div>
+    <div id="podopediatrie-age-info" style="font-size:13px;color:var(--fg);margin-bottom:16px;line-height:1.55;"></div>
+    <div id="podopediatrie-age-fallback" style="display:none;margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input id="podopediatrie-age-years" type="number" min="0" max="99" class="inp" style="width:80px;" placeholder="0"/>
+        <span style="font-size:12px;color:var(--mut);">an(s)</span>
+        <input id="podopediatrie-age-months" type="number" min="0" max="11" class="inp" style="width:80px;" placeholder="0"/>
+        <span style="font-size:12px;color:var(--mut);">mois</span>
+        <button onclick="_updatePodopediatriePeriodeFromInput()" class="btn" style="margin-left:auto;background:#e11d48;color:#fff;font-size:11px;padding:6px 14px;">Calculer</button>
+      </div>
+    </div>
+    <div id="podopediatrie-periode-choice" style="display:none;margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:6px;">Période retenue (modifiable) :</div>
+      <div style="display:flex;gap:8px;">
+        <button class="podo-periode-btn" data-periode="II"  onclick="_selectPodopediatriePeriode('II')"  style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:8px;cursor:pointer;">Période II<br><span style="font-size:9px;font-weight:400;">14 mois – 6 ans</span></button>
+        <button class="podo-periode-btn" data-periode="III" onclick="_selectPodopediatriePeriode('III')" style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:8px;cursor:pointer;">Période III<br><span style="font-size:9px;font-weight:400;">6 – 9 ans</span></button>
+        <button class="podo-periode-btn" data-periode="IV"  onclick="_selectPodopediatriePeriode('IV')"  style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:8px;cursor:pointer;">Période IV<br><span style="font-size:9px;font-weight:400;">≥ 9 ans</span></button>
+      </div>
+    </div>
+    <div id="podopediatrie-too-young" style="display:none;margin-bottom:16px;background:rgba(217,119,6,0.15);border:1px solid rgba(217,119,6,0.35);border-radius:8px;padding:12px;font-size:12px;color:#f9c874;line-height:1.5;">
+      ⚠️ Pas de bilan podopédiatrie avant 14 mois — stade 1 (la structure du pied est encore en cours de formation).
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="_closePodopediatrieAgeModal()" class="btn" style="background:transparent;color:var(--mut);border:1px solid rgba(255,255,255,0.15);padding:8px 14px;font-size:12px;">Annuler</button>
+      <button id="podopediatrie-age-confirm-btn" onclick="_confirmPodopediatrieOuvrir()" class="btn" style="background:#e11d48;color:#fff;padding:8px 16px;font-size:12px;font-weight:700;">Ouvrir le bilan</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="pg-params">
   <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
     <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">⚙️ Paramètres</h2>

@@ -1232,6 +1232,7 @@ function applyReadOnlyUI(level) {
     '[onclick*="creerBilanSport"]',
     '[onclick*="creerBilanPosturo"]',
     '[onclick*="creerBilanPedicurie"]', // #121 Phase 0 — cohérent avec posturo/sport pour gate abonnement.
+    '[onclick*="creerBilanPodopediatrie"]', // #140 Phase 0 — même gate abonnement + gate module (canPodopedia).
     '[onclick*="printRapportPosturo"]',
     '[onclick*="printReport"]',
     '[onclick*="printBilan"]',
@@ -1488,7 +1489,7 @@ function msRenderModules() {
   //   - autres → disabled + opacity réduite ("non disponible dans ce plan")
   const modules = [
     { id: 'postural',   label: 'Postural' },
-    { id: 'podopedia',  label: 'Podopédiatrie', suffix: ' (en développement)' },
+    { id: 'podopedia',  label: 'Podopédiatrie' },
     { id: 'podo_sport', label: 'Sport' },
   ];
   el.innerHTML = modules.map(m => {
@@ -2043,6 +2044,16 @@ let _intentionalReduction = false;
 // Set par ouvrirBilanPedicurie, reset par creerBilanPedicurie, finalizeBilanPedicurie,
 // abandonnerBilanPedicurie et selectPatient.
 let currentOpenedBilanPedicurieIdx = null;
+// #140 Phase 0 — Idem pour les bilans podopédiatrie. Miroir strict de la
+// Pédicurie ; les fonctions creer/ouvrir/finalize/abandonner tiennent à jour
+// ce global exactement de la même façon.
+let currentOpenedBilanPodopediatrieIdx = null;
+// #140 Phase 0 — État transitoire de la pop-up d'âge (contenu injecté par
+// creerBilanPodopediatrie, consommé par _confirmPodopediatrieOuvrir).
+let _pendingPodopediatriePatIdx = null;
+let _pendingPodopediatrieType = null;
+let _pendingPodopediatriePeriode = null;
+let _pendingPodopediatrieAgeMonths = null;
 let currentTestId = null;
 let testMode = 'photo';
 
@@ -2477,6 +2488,8 @@ function nav(id) {
     // #121 Phase 0 — capture-avant-quitter pédicurie (savePedicurieBilan non
     // async, silent — pas de migration Storage en Phase 0).
     else if (_leavingId === 'pg-pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
+    // #140 Phase 0 — miroir podopédiatrie (savePodopediatrieBilan non async).
+    else if (_leavingId === 'pg-podopediatrie' && typeof savePodopediatrieBilan === 'function') savePodopediatrieBilan(true);
   }
   // Déplacer toutes les pages orphelines dans .main
   const mainEl = document.querySelector('.main');
@@ -2533,6 +2546,13 @@ function nav(id) {
     setTimeout(loadPedicurieBilan, 50);
     if(typeof _injectPedicurieMicButtons === 'function') setTimeout(_injectPedicurieMicButtons, 50);
     setTimeout(() => showPedicurieSection(0), 50);
+  }
+  if(id === 'pg-podopediatrie') {
+    // #140 Phase 0 — Restauration depuis bilanDataPodopediatrie + masquage
+    // sections selon periode (posé maintenant, sections vides en Phase 0).
+    setTimeout(loadPodopediatrieBilan, 50);
+    setTimeout(_applyPodopediatrieVisibilityForPeriode, 50);
+    setTimeout(() => showPodopediatrieSection(0), 50);
   }
   // Bandeau d'en-tête uniformisé sur les 3 bilans + landing pg-sport.
   // setTimeout pour laisser le markup du posturo (injecté dynamiquement) se
@@ -2685,7 +2705,7 @@ function openEditUserModal(idx) {
           </label>
           <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="eu-mod-podopedia" ${(u.modules||[]).includes('podopedia') ? 'checked' : ''}/>
-            Podopédiatrie <span style="font-size:10px;color:var(--mut);">(en développement)</span>
+            Podopédiatrie
           </label>
           <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="eu-mod-podo_sport" ${(u.modules||[]).includes('podo_sport') ? 'checked' : ''}/>
@@ -3013,8 +3033,8 @@ function _countDataUnits(arr) {
   };
   let n = arr.length;
   for (const p of arr) {
-    n += (p.bilansSport?.length || 0) + (p.bilansPosturo?.length || 0) + (p.bilansPedicurie?.length || 0);
-    n += countBd(p.bilanData) + countBd(p.bilanDataPosturo) + countBd(p.bilanDataPedicurie);
+    n += (p.bilansSport?.length || 0) + (p.bilansPosturo?.length || 0) + (p.bilansPedicurie?.length || 0) + (p.bilansPodopediatrie?.length || 0);
+    n += countBd(p.bilanData) + countBd(p.bilanDataPosturo) + countBd(p.bilanDataPedicurie) + countBd(p.bilanDataPodopediatrie);
     (p.bilansSport || []).forEach(b => { n += countBd(b.bilanData); });
     (p.bilansPosturo || []).forEach(b => { n += countBd(b.bilanDataPosturo); });
     // #121 Phase 0 — Comptage symétrique pour les archives pédicurie. countBd
@@ -3022,6 +3042,8 @@ function _countDataUnits(arr) {
     // c'est suffisant — le but est de compter les archives (présence d'objet)
     // pour ne pas déclencher la fausse pop-up de richesse à la finalisation.
     (p.bilansPedicurie || []).forEach(b => { n += countBd(b.bilanDataPedicurie); });
+    // #140 Phase 0 — Comptage symétrique podopédiatrie (miroir pédicurie).
+    (p.bilansPodopediatrie || []).forEach(b => { n += countBd(b.bilanDataPodopediatrie); });
   }
   return n;
 }
@@ -3326,6 +3348,15 @@ function _bilanHeaderText(kind){
     if(typeof currentOpenedBilanPedicurieIdx!=='undefined' && currentOpenedBilanPedicurieIdx!=null && p.bilansPedicurie && p.bilansPedicurie[currentOpenedBilanPedicurieIdx]) label = p.bilansPedicurie[currentOpenedBilanPedicurieIdx].label;
     else if(p.currentBilanPedicurieSousType) label = 'Pédicurie ' + (p.currentBilanPedicurieSousType==='controle'?'Contrôle':'Initial') + ' (en cours)';
     else label = 'Bilan pédicurie';
+  } else if(kind==='podopediatrie'){
+    // #140 Phase 0 — mirror pédicurie. Le libellé archivé inclut déjà la
+    // période (« Podopédiatrie Initial — Période III ») via finalizeBilanPodopediatrie.
+    if(typeof currentOpenedBilanPodopediatrieIdx!=='undefined' && currentOpenedBilanPodopediatrieIdx!=null && p.bilansPodopediatrie && p.bilansPodopediatrie[currentOpenedBilanPodopediatrieIdx]) label = p.bilansPodopediatrie[currentOpenedBilanPodopediatrieIdx].label;
+    else if(p.currentBilanPodopediatrieSousType) {
+      var _per = p.bilanDataPodopediatrie && p.bilanDataPodopediatrie.periode ? ' — Période ' + p.bilanDataPodopediatrie.periode : '';
+      label = 'Podopédiatrie ' + (p.currentBilanPodopediatrieSousType==='controle'?'Contrôle':'Initial') + _per + ' (en cours)';
+    }
+    else label = 'Bilan podopédiatrie';
   }
   return nom + (label ? '  —  ' + label : '');
 }
@@ -3334,12 +3365,14 @@ function _updateBilanHeaders(){
   var sl = document.getElementById('bilan-header-sport-landing'); if(sl) sl.textContent = _bilanHeaderText('sport');
   var po = document.getElementById('bilan-header-posturo'); if(po) po.textContent = _bilanHeaderText('posturo');
   var pe = document.getElementById('pedicurie-patient-info'); if(pe) pe.textContent = _bilanHeaderText('pedicurie');
+  var pd = document.getElementById('podopediatrie-patient-info'); if(pd) pd.textContent = _bilanHeaderText('podopediatrie');
 }
 
 function selectPatient(p) {
   currentOpenedBilanIdx = null;
   currentOpenedBilanPosturoIdx = null;
   currentOpenedBilanPedicurieIdx = null;
+  currentOpenedBilanPodopediatrieIdx = null; // #140 Phase 0
   currentPatient = p;
   const init = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
   if(document.getElementById('tb-av')) document.getElementById('tb-av').textContent = init;
@@ -3459,14 +3492,13 @@ function renderPatientList() {
   // Gating runtime modules (task #58) — remplace l'ancien enum droits.
   // window._userModules est initialisé au login (cf. ligne ~310). Fallback
   // sur user_metadata frais puis [] si absent (cas user pas encore initialisé).
-  //
-  // Note : pas de canPodopedia ici. Le module Podopédiatrie est UI-placeholder
-  // (badge "Prochainement", buttons disabled inconditionnels ligne ~2095-2110).
-  // Quand l'UI podopédiatrie sera implémentée, ajouter :
-  //   const canPodopedia = modules.includes('podopedia');
   const modules = window._userModules || (Array.isArray(_aboMeta().modules) ? _aboMeta().modules : []);
   const canSport = modules.includes('podo_sport');
   const canPosturo = modules.includes('postural');
+  // #140 Phase 0 — Podopédiatrie devient un module payant (contrairement à
+  // la pédicurie qui est gratuite). Gate double : accessLevel dans
+  // creerBilanPodopediatrie + module ici pour l'affichage des boutons.
+  const canPodopedia = modules.includes('podopedia');
 
   el.innerHTML = filtered.map(p => {
     const i = patients.indexOf(p);
@@ -3478,6 +3510,7 @@ function renderPatientList() {
     const bilansSport = p.bilansSport || [];
     const bilansPosturo = p.bilansPosturo || [];
     const bilansPedicurie = p.bilansPedicurie || []; // #121 Phase 0
+    const bilansPodopediatrie = p.bilansPodopediatrie || []; // #140 Phase 0
 
     // Carte "Bilan en cours" — affichée dès qu'un bilan est démarré
     // (currentBilanSportSousType non null), même si aucune donnée n'a encore été saisie.
@@ -3524,6 +3557,24 @@ function renderPatientList() {
           <button onclick="ouvrirBilanPosturo(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanPosturo(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(240,64,96,0.9);color:#fff;">🗑️ Abandonner</button>
           <button onclick="finalizeBilanPosturo(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
+        </div>
+      </div>` : '';
+
+    // #140 Phase 0 — Bandeau « bilan podopédiatrie en cours » (miroir pédicurie).
+    const hasBilanPodopediatrieData = hasBilanDataContent(p.bilanDataPodopediatrie);
+    const hasBilanPodopediatrieEnCours = p.currentBilanPodopediatrieSousType != null;
+    const typePodopediatrieLabel = p.currentBilanPodopediatrieSousType === 'controle' ? 'de Contrôle' : 'Initial';
+    const sousLibellePodopediatrie = hasBilanPodopediatrieData ? 'saisie clinique en cours' : 'aucune donnée encore saisie';
+    const periodePodopediatrieLabel = p.bilanDataPodopediatrie?.periode ? ' · Période ' + p.bilanDataPodopediatrie.periode : '';
+    const bilanPodopediatrieEnCoursHtml = hasBilanPodopediatrieEnCours ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:rgba(247,165,40,0.85);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⏳ Bilan podopédiatrie en cours</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(247,165,40,0.08);border:1px solid rgba(247,165,40,0.30);border-radius:8px;margin-bottom:5px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#f7a528;flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">Bilan ${typePodopediatrieLabel}${periodePodopediatrieLabel} · ${sousLibellePodopediatrie}</span>
+          <button onclick="ouvrirBilanPodopediatrie(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
+          <button onclick="abandonnerBilanPodopediatrie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(240,64,96,0.9);color:#fff;">🗑️ Abandonner</button>
+          <button onclick="finalizeBilanPodopediatrie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
@@ -3592,6 +3643,20 @@ function renderPatientList() {
         </div>`).join('')}
       </div>` : '';
 
+    // #140 Phase 0 — Liste des archives podopédiatrie (miroir pédicurie, palette rose).
+    const bilansPodopediatrieHtml = bilansPodopediatrie.length ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans podopédiatrie</div>
+        ${bilansPodopediatrie.map((b,bi) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(225,29,72,0.06);border:1px solid rgba(225,29,72,0.18);border-radius:8px;margin-bottom:5px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#e11d48;flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
+          <button onclick="ouvrirBilanPodopediatrie(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#9f1239;color:#fff;">Ouvrir</button>
+          <button onclick="supprimerBilanPodopediatrie(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
+        </div>`).join('')}
+      </div>` : '';
+
     // Modules bilans
     const modPosturo = `
       <div style="border-radius:12px;overflow:hidden;background:#0d4a32;border:1px solid #1a7a52;">
@@ -3629,19 +3694,24 @@ function renderPatientList() {
         </div>
       </div>`;
 
+    // #140 Phase 0 — Podopédiatrie devient un vrai module cliquable.
+    // Gate module (canPodopedia) : boutons grisés si le module n'est pas
+    // dans le plan de l'utilisateur (comme sport/posturo). Le gate abonnement
+    // (accessLevel) est vérifié serveur-side dans creerBilanPodopediatrie.
     const modPodo = `
-      <div style="border-radius:12px;overflow:hidden;background:#9f1239;border:1px solid #e11d48;opacity:0.7;">
+      <div style="border-radius:12px;overflow:hidden;background:#9f1239;border:1px solid #e11d48;">
         <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
           <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(251,113,133,0.4),transparent);"></div>
           <span style="font-size:42px;position:relative;z-index:1;">👶</span>
         </div>
         <div style="padding:10px 12px;">
           <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;">Podopédiatrie</div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:6px;">Bilan pédiatrique</div>
-          <div style="display:inline-block;font-size:9px;background:rgba(251,113,133,0.2);color:#fecdd3;border:1px solid rgba(251,113,133,0.4);padding:2px 7px;border-radius:8px;margin-bottom:6px;font-weight:600;">Prochainement</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Bilan pédiatrique · 4 périodes</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
-            <button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(251,113,133,0.3);color:#fff;opacity:0.5;">Initial</button>
-            <button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:#fff;color:#9f1239;opacity:0.5;">Contrôle</button>
+            ${canPodopedia
+              ? `<button onclick="creerBilanPodopediatrie(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#e11d48;color:#fff;">Initial</button>
+                 <button onclick="creerBilanPodopediatrie(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#9f1239;">Contrôle</button>`
+              : `<button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.3);grid-column:1/-1;">Non disponible</button>`}
           </div>
         </div>
       </div>`;
@@ -3665,10 +3735,11 @@ function renderPatientList() {
         </div>
       </div>`;
 
-    // #121 Phase 0 — Coin arrondi du header : actif si UN bandeau « en cours »
-    // ou UNE liste d'archives est présent, peu importe le type (sport/posturo/pédicurie).
-    const _hasAnyExpandedBilan = hasBilanEnCours || hasBilanPosturoEnCours || hasBilanPedicurieEnCours
-      || bilansSport.length || bilansPosturo.length || bilansPedicurie.length;
+    // #121 Phase 0 / #140 Phase 0 — Coin arrondi du header : actif si UN
+    // bandeau « en cours » OU UNE liste d'archives est présent, peu importe
+    // le type (sport/posturo/pédicurie/podopédiatrie).
+    const _hasAnyExpandedBilan = hasBilanEnCours || hasBilanPosturoEnCours || hasBilanPedicurieEnCours || hasBilanPodopediatrieEnCours
+      || bilansSport.length || bilansPosturo.length || bilansPedicurie.length || bilansPodopediatrie.length;
     return `
     <div style="margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:${_hasAnyExpandedBilan?'12px 12px 0 0':'12px'};">
@@ -3684,7 +3755,7 @@ function renderPatientList() {
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:${_hasAnyExpandedBilan?'4px':'0'};">
           ${modPosturo}${modSport}${modPedicurie}${modPodo}
         </div>
-        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilansPosturoHtml}${bilansPedicurieHtml}${bilansSportHtml}${compareSportHtml}
+        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilanPodopediatrieEnCoursHtml}${bilansPosturoHtml}${bilansPedicurieHtml}${bilansPodopediatrieHtml}${bilansSportHtml}${compareSportHtml}
       </div>
     </div>`;
   }).join('');
@@ -4240,6 +4311,267 @@ function supprimerBilanPedicurie(patIdx, bilanIdx) {
   if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
   p.bilansPedicurie.splice(bilanIdx, 1);
   // Phase 0 — pas de cleanup Storage (pas de photos).
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
+  renderPatientList();
+}
+
+// ══════════════════════════════════════════════════════
+// #140 Phase 0 — PODOPÉDIATRIE
+// ══════════════════════════════════════════════════════
+// Miroir strict de la Pédicurie, avec une seule vraie nouveauté : la pop-up
+// d'âge présentée AVANT la création. Les périodes cliniques :
+//   Stade 1 : 0 – 14 mois → aucun bilan (structure du pied encore en formation)
+//   Période II  : 14 mois – 6 ans
+//   Période III : 6 – 9 ans
+//   Période IV  : ≥ 9 ans
+// Le seuil 14 mois impose de raisonner en MOIS, pas en années entières.
+
+function _computeAgeInMonths(ddn) {
+  if (!ddn) return null;
+  const d = new Date(ddn);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  if (now.getDate() < d.getDate()) months -= 1;
+  if (months < 0) return null; // date de naissance dans le futur
+  return months;
+}
+
+function _periodeFromMonths(months) {
+  if (months == null || months < 14) return null; // stade 1 : pas de bilan
+  if (months < 72) return 'II';
+  if (months < 108) return 'III';
+  return 'IV';
+}
+
+function _formatAgeFromMonths(months) {
+  if (months == null) return '';
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0) return m + ' mois';
+  if (m === 0) return y + ' an' + (y > 1 ? 's' : '');
+  return y + ' an' + (y > 1 ? 's' : '') + ' ' + m + ' mois';
+}
+
+// Entrée dans le flow : ouvre la pop-up d'âge. La création réelle a lieu
+// dans _confirmPodopediatrieOuvrir (bouton « Ouvrir le bilan » de la modale).
+function creerBilanPodopediatrie(patIdx, type) {
+  // Gate abonnement (miroir pédicurie).
+  if (window._accessLevel && window._accessLevel !== 'full') {
+    showAccessRestrictedModal('create_bilan');
+    return;
+  }
+  const p = patients[patIdx];
+  if (!p) return;
+  _pendingPodopediatriePatIdx = patIdx;
+  _pendingPodopediatrieType = type;
+  _pendingPodopediatriePeriode = null;
+  _pendingPodopediatrieAgeMonths = _computeAgeInMonths(p.ddn);
+  _renderPodopediatrieAgeModal();
+  const modal = document.getElementById('modal-podopediatrie-age');
+  if (modal) modal.style.display = 'flex';
+}
+
+// Re-rend le contenu variable de la pop-up : info d'âge, périodes, boutons.
+// Peut être appelée à chaque changement de sélection (choix manuel ou re-calcul).
+function _renderPodopediatrieAgeModal() {
+  const info = document.getElementById('podopediatrie-age-info');
+  const fallback = document.getElementById('podopediatrie-age-fallback');
+  const choice = document.getElementById('podopediatrie-periode-choice');
+  const tooYoung = document.getElementById('podopediatrie-too-young');
+  const confirmBtn = document.getElementById('podopediatrie-age-confirm-btn');
+  if (!info || !fallback || !choice || !tooYoung || !confirmBtn) return;
+
+  const p = patients[_pendingPodopediatriePatIdx];
+  const hasDdn = p && p.ddn;
+  const months = _pendingPodopediatrieAgeMonths;
+  const suggestedPeriode = _periodeFromMonths(months);
+
+  if (!hasDdn && months == null) {
+    // Fallback : demander l'âge à la main.
+    info.innerHTML = `Ce patient n'a pas de date de naissance renseignée. Saisissez son âge pour déterminer la période clinique :`;
+    fallback.style.display = '';
+    choice.style.display = 'none';
+    tooYoung.style.display = 'none';
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = '0.5';
+    confirmBtn.style.cursor = 'not-allowed';
+    return;
+  }
+
+  fallback.style.display = 'none';
+  const ageLabel = _formatAgeFromMonths(months);
+  const typeLabel = _pendingPodopediatrieType === 'controle' ? 'Contrôle' : 'Initial';
+  info.innerHTML = `Bilan <strong>${typeLabel}</strong> — Patient : <strong>${_escHtml(p.prenom||'')} ${_escHtml(p.nom||'')}</strong> (${ageLabel})`;
+
+  // < 14 mois : refus, message stade 1.
+  if (suggestedPeriode == null) {
+    choice.style.display = 'none';
+    tooYoung.style.display = '';
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = '0.5';
+    confirmBtn.style.cursor = 'not-allowed';
+    return;
+  }
+
+  // Auto-sélection si aucun override manuel n'est encore posé.
+  if (_pendingPodopediatriePeriode == null) _pendingPodopediatriePeriode = suggestedPeriode;
+  choice.style.display = '';
+  tooYoung.style.display = 'none';
+  confirmBtn.disabled = false;
+  confirmBtn.style.opacity = '1';
+  confirmBtn.style.cursor = 'pointer';
+
+  // Peindre l'état actif du bouton période sélectionné.
+  document.querySelectorAll('.podo-periode-btn').forEach(function (btn) {
+    const active = (btn.dataset.periode === _pendingPodopediatriePeriode);
+    btn.style.background = active ? '#e11d48' : 'transparent';
+    btn.style.color = active ? '#fff' : '#e11d48';
+  });
+}
+
+function _selectPodopediatriePeriode(periode) {
+  _pendingPodopediatriePeriode = periode;
+  _renderPodopediatrieAgeModal();
+}
+
+function _updatePodopediatriePeriodeFromInput() {
+  const yEl = document.getElementById('podopediatrie-age-years');
+  const mEl = document.getElementById('podopediatrie-age-months');
+  const y = yEl ? parseInt(yEl.value, 10) : NaN;
+  const m = mEl ? parseInt(mEl.value, 10) : NaN;
+  const yVal = isNaN(y) || y < 0 ? 0 : y;
+  const mVal = isNaN(m) || m < 0 ? 0 : m;
+  _pendingPodopediatrieAgeMonths = yVal * 12 + mVal;
+  _pendingPodopediatriePeriode = null; // reset pour re-auto-sélection
+  _renderPodopediatrieAgeModal();
+}
+
+function _closePodopediatrieAgeModal() {
+  const modal = document.getElementById('modal-podopediatrie-age');
+  if (modal) modal.style.display = 'none';
+  _pendingPodopediatriePatIdx = null;
+  _pendingPodopediatrieType = null;
+  _pendingPodopediatriePeriode = null;
+  _pendingPodopediatrieAgeMonths = null;
+}
+
+// Bouton « Ouvrir le bilan » de la modale : reproduit la mécanique de
+// creerBilanPedicurie (archive si en cours + hasData, reset, nav).
+function _confirmPodopediatrieOuvrir() {
+  const patIdx = _pendingPodopediatriePatIdx;
+  const type = _pendingPodopediatrieType;
+  const periode = _pendingPodopediatriePeriode;
+  const ageMonths = _pendingPodopediatrieAgeMonths;
+  if (patIdx == null || !type || !periode) return;
+  const p = patients[patIdx];
+  if (!p) return;
+
+  const isInProgress = p.currentBilanPodopediatrieSousType != null;
+  const hasData = p.bilanDataPodopediatrie && Object.keys(p.bilanDataPodopediatrie).length > 0;
+  if (isInProgress && hasData) {
+    const confirmMsg = 'Vous avez un bilan podopédiatrie en cours.\n\n' +
+      'Voulez-vous le finaliser et archiver maintenant, puis démarrer un nouveau bilan ?\n\n' +
+      '• OK : finalise et archive le bilan en cours, puis démarre un nouveau bilan.\n' +
+      '• Annuler : retour à la fiche patient pour utiliser le bouton "Finaliser et archiver" du bilan en cours.';
+    if (!confirm(confirmMsg)) return;
+    if (!p.bilansPodopediatrie) p.bilansPodopediatrie = [];
+    const existingCount = p.bilansPodopediatrie.length;
+    const archiveType = existingCount === 0 ? 'initial' : 'controle';
+    const archivePeriode = p.bilanDataPodopediatrie?.periode || '?';
+    const archiveLabel = (existingCount === 0 ? 'Podopédiatrie Initial' : 'Podopédiatrie Contrôle ' + existingCount) + ' — Période ' + archivePeriode;
+    p.bilansPodopediatrie.push({
+      label: archiveLabel,
+      type: archiveType,
+      date: new Date().toLocaleDateString('fr-FR'),
+      bilanDataPodopediatrie: JSON.parse(JSON.stringify(p.bilanDataPodopediatrie))
+    });
+  }
+
+  // Reset état pour démarrer un nouveau bilan vide, avec periode + age
+  // écrits dès la création (pas de save différé).
+  p.bilanDataPodopediatrie = { periode: periode, ageMonths: ageMonths };
+  p.currentBilanPodopediatrieSousType = type;
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
+  currentOpenedBilanPodopediatrieIdx = null;
+  selectPatient(p);
+  _closePodopediatrieAgeModal();
+  nav('pg-podopediatrie');
+}
+
+function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  const bilan = p.bilansPodopediatrie?.[bilanIdx];
+  if (!bilan) {
+    // Bilan courant
+    currentOpenedBilanPodopediatrieIdx = null;
+    selectPatient(p);
+    nav('pg-podopediatrie');
+    return;
+  }
+  selectPatient(p);
+  currentPatient.bilanDataPodopediatrie = JSON.parse(JSON.stringify(bilan.bilanDataPodopediatrie || {}));
+  currentOpenedBilanPodopediatrieIdx = bilanIdx;
+  delete p.currentBilanPodopediatrieSousType;
+  nav('pg-podopediatrie');
+  setTimeout(loadPodopediatrieBilan, 50);
+  setTimeout(_applyPodopediatrieVisibilityForPeriode, 50);
+}
+
+function abandonnerBilanPodopediatrie(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  const hasData = hasBilanDataContent(p.bilanDataPodopediatrie);
+  const confirmMsg = hasData
+    ? 'Abandonner le bilan podopédiatrie en cours ?\n\nVous allez perdre : saisie clinique.\n\nCette action est irréversible.'
+    : 'Abandonner le bilan podopédiatrie en cours ?\n\nLe bilan est actuellement vide (aucune donnée saisie). Cette action supprimera le bilan démarré.';
+  if (!confirm(confirmMsg)) return;
+  p.bilanDataPodopediatrie = {};
+  delete p.currentBilanPodopediatrieSousType;
+  currentOpenedBilanPodopediatrieIdx = null;
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
+  renderPatientList();
+}
+
+function finalizeBilanPodopediatrie(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  const hasData = hasBilanDataContent(p.bilanDataPodopediatrie);
+  if (!hasData) {
+    alert('Aucune saisie clinique n\'a été effectuée dans le bilan podopédiatrie en cours.');
+    return;
+  }
+  if (!p.bilansPodopediatrie) p.bilansPodopediatrie = [];
+  const existingCount = p.bilansPodopediatrie.length;
+  const archivedType = existingCount === 0 ? 'initial' : 'controle';
+  const periode = p.bilanDataPodopediatrie?.periode || '?';
+  // Le label archivé inclut TOUJOURS la période (contrainte Lot 3).
+  const label = (existingCount === 0 ? 'Podopédiatrie Initial' : 'Podopédiatrie Contrôle ' + existingCount) + ' — Période ' + periode;
+  p.bilansPodopediatrie.push({
+    label: label,
+    type: archivedType,
+    date: new Date().toLocaleDateString('fr-FR'),
+    bilanDataPodopediatrie: JSON.parse(JSON.stringify(p.bilanDataPodopediatrie))
+  });
+  p.bilanDataPodopediatrie = {};
+  delete p.currentBilanPodopediatrieSousType;
+  currentOpenedBilanPodopediatrieIdx = null;
+  savePatients();
+  renderPatientList();
+  alert('✓ Bilan "' + label + '" archivé avec succès.');
+}
+
+function supprimerBilanPodopediatrie(patIdx, bilanIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  const bilan = p.bilansPodopediatrie?.[bilanIdx];
+  if (!bilan) return;
+  if (!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
+  p.bilansPodopediatrie.splice(bilanIdx, 1);
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
   renderPatientList();
@@ -12932,6 +13264,113 @@ function loadPedicurieBilan() {
 // Note : le balayage save/load et l'injection 🎤 parcourent TOUS les champs
 // même cachés (display:none) → aucune section ne perd ses données ni son mic
 // quand elle n'est pas affichée.
+// #140 Phase 0 — Miroir strict pédicurie pour la Podopédiatrie.
+function syncOpenedBilanPodopediatrieToHistory() {
+  if (currentOpenedBilanPodopediatrieIdx == null) return;
+  if (!currentPatient || !currentPatient.bilansPodopediatrie) return;
+  const target = currentPatient.bilansPodopediatrie[currentOpenedBilanPodopediatrieIdx];
+  if (!target) return;
+  target.bilanDataPodopediatrie = JSON.parse(JSON.stringify(currentPatient.bilanDataPodopediatrie || {}));
+}
+
+// Sauvegarde synchrone. Balayage générique tous les `.podopediatrie-field`
+// (data-field) + tous les radios `input[type=radio]` dans `#pg-podopediatrie`.
+// En Phase 0 les sections sont vides, la fonction ne trouvera que
+// bilanDataPodopediatrie.periode / .ageMonths déjà écrits à la création.
+// Cette signature est utilisée par le sweep-avant-quitter de nav().
+function savePodopediatrieBilan(silent) {
+  if (!currentPatient) { if (!silent) alert('Sélectionnez un patient'); return; }
+  if (!currentPatient.bilanDataPodopediatrie) currentPatient.bilanDataPodopediatrie = {};
+  const d = currentPatient.bilanDataPodopediatrie;
+  if (!d.id) d.id = crypto.randomUUID();
+  document.querySelectorAll('#pg-podopediatrie .podopediatrie-field').forEach(el => {
+    const f = el.dataset.field;
+    if (!f) return;
+    if (el.type === 'checkbox') d[f] = el.checked;
+    else d[f] = el.value;
+  });
+  document.querySelectorAll('#pg-podopediatrie input[type=radio]').forEach(el => {
+    if (el.checked && el.name) d[el.name] = el.value;
+  });
+  syncOpenedBilanPodopediatrieToHistory();
+  savePatients();
+  if (!silent) alert('✓ Bilan podopédiatrie sauvegardé');
+}
+
+// Restauration AUTORITATIVE (miroir loadPedicurieBilan).
+function loadPodopediatrieBilan() {
+  const d = currentPatient?.bilanDataPodopediatrie;
+  if (!d) return;
+  document.querySelectorAll('#pg-podopediatrie .podopediatrie-field').forEach(el => {
+    const f = el.dataset.field;
+    if (!f) return;
+    if (el.type === 'checkbox') el.checked = !!d[f];
+    else el.value = d[f] !== undefined ? d[f] : '';
+  });
+  document.querySelectorAll('#pg-podopediatrie input[type=radio]').forEach(el => {
+    if (!el.name) return;
+    el.checked = (d[el.name] !== undefined && el.value === d[el.name]);
+  });
+}
+
+// Bascule de section podopédiatrie + masquage périodique.
+// - Chaque onglet et chaque section porte data-periodes="II III IV" (ou subset).
+// - _applyPodopediatrieVisibilityForPeriode masque les onglets/sections qui
+//   ne concernent pas la période courante.
+// - showPodopediatrieSection saute automatiquement à la 1ʳᵉ section visible
+//   si l'idx demandé est masqué (protège contre l'ouverture sur une section
+//   invisible pour la période).
+function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
+  const list = (el.dataset.periodes || '').trim();
+  if (!list) return true; // pas d'attribut → visible partout
+  return list.split(/\s+/).includes(periode);
+}
+function _applyPodopediatrieVisibilityForPeriode() {
+  const periode = currentPatient?.bilanDataPodopediatrie?.periode;
+  if (!periode) return;
+  // Balayage GÉNÉRIQUE : tout élément porteur d'un data-periodes dans la page
+  // podopédiatrie est masqué s'il ne concerne pas la période courante. Couvre
+  // à la fois les onglets, les sections (Phase 0) ET les sous-blocs internes
+  // qui arriveront dans les phases de contenu (Romberg = « III IV », Maddox
+  // = « IV », etc.). Les sections restent gérées par showPodopediatrieSection
+  // pour le swap une-visible-à-la-fois quand elles sont périodiquement OK.
+  document.querySelectorAll('#pg-podopediatrie [data-periodes]').forEach(el => {
+    const ok = _isPodopediatrieSectionVisibleForPeriode(el, periode);
+    if (!ok) {
+      el.style.display = 'none';
+      return;
+    }
+    // Section : c'est showPodopediatrieSection qui décide (une seule visible).
+    // Autres (onglets, sous-blocs) : on restaure l'affichage.
+    if (!el.classList.contains('podopediatrie-section')) el.style.display = '';
+  });
+}
+function showPodopediatrieSection(idx) {
+  const sections = document.querySelectorAll('#pg-podopediatrie .podopediatrie-section');
+  if (!sections.length) return;
+  const periode = currentPatient?.bilanDataPodopediatrie?.periode || 'IV';
+  // Si la section demandée est masquée pour la période, cherche la 1ʳᵉ visible.
+  let target = idx;
+  if (target < 0 || target >= sections.length || !_isPodopediatrieSectionVisibleForPeriode(sections[target], periode)) {
+    target = -1;
+    for (let i = 0; i < sections.length; i++) {
+      if (_isPodopediatrieSectionVisibleForPeriode(sections[i], periode)) { target = i; break; }
+    }
+  }
+  if (target < 0) return;
+  sections.forEach((s, i) => {
+    if (!_isPodopediatrieSectionVisibleForPeriode(s, periode)) { s.style.display = 'none'; return; }
+    s.style.display = i === target ? '' : 'none';
+  });
+  document.querySelectorAll('#pg-podopediatrie .podopediatrie-tab').forEach((t, i) => {
+    if (!_isPodopediatrieSectionVisibleForPeriode(t, periode)) return; // laisse le display:none posé plus haut
+    const active = (i === target);
+    t.style.background  = active ? '#e11d48' : 'transparent';
+    t.style.color       = active ? '#fff'    : '#e11d48';
+    t.style.borderColor = '#e11d48';
+  });
+}
+
 function showPedicurieSection(idx) {
   const sections = document.querySelectorAll('#pg-pedicurie .pedicurie-section');
   if (!sections.length || idx < 0 || idx >= sections.length) return;
