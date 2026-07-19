@@ -13699,6 +13699,41 @@ function _podoAchilleInterpret() {
     : '';
 }
 
+// #140 Phase 3a — FPI (Foot Posture Index). Somme des 6 items cotés −2..+2
+// par pied. Tant que les 6 ne sont pas renseignés : affiche le total partiel
+// sans classer. Barème (une fois complet) : 0..+5 Normal · +6..+9 En pronation
+// · > +9 Hautement en pronation · −1..−4 En supination · −5..−12 Hautement
+// en supination. Rejoue à chaque onchange radio + au chargement d'un bilan
+// (via _podoPostLoadTweaks). Sélecteur radios plutôt que data-field parce que
+// c'est un name+value radio (savePodopediatrieBilan L13509 sweep les radios).
+function _podoFpiInterpret() {
+  var items = ['talus', 'malleole', 'calcaneus', 'talonav', 'arche', 'avantpied'];
+  ['g', 'd'].forEach(function (side) {
+    var el = document.getElementById('podo-fpi-' + side + '-total');
+    if (!el) return;
+    var sum = 0, filled = 0;
+    items.forEach(function (item) {
+      var name = 'podo_fpi_' + side + '_' + item;
+      var checked = document.querySelector('#pg-podopediatrie input[name="' + name + '"]:checked');
+      if (checked) {
+        sum += parseInt(checked.value, 10);
+        filled++;
+      }
+    });
+    if (filled < 6) {
+      el.textContent = filled + '/6 items renseignés — total partiel : ' + (sum > 0 ? '+' : '') + sum;
+      return;
+    }
+    var classe;
+    if (sum >= 0 && sum <= 5) classe = 'Normal';
+    else if (sum >= 6 && sum <= 9) classe = 'En pronation';
+    else if (sum > 9) classe = 'Hautement en pronation';
+    else if (sum >= -4 && sum <= -1) classe = 'En supination';
+    else classe = 'Hautement en supination'; // sum ∈ [−12, −5]
+    el.textContent = 'Total : ' + (sum > 0 ? '+' : '') + sum + ' — ' + classe;
+  });
+}
+
 // #140 Phase 2a — Toggle du bloc de localisation du test d'Adam. Visible
 // uniquement si Gibbosité = « oui ». Appelé à chaque onchange des radios
 // et au chargement (via _podoPostLoadTweaks).
@@ -13721,6 +13756,7 @@ function _podoPostLoadTweaks() {
   _podoCourburesInterpret();
   _podoAdamChanged();
   _podoAchilleInterpret();
+  _podoFpiInterpret();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
