@@ -1464,17 +1464,16 @@
                photos posturales avec pose de points, Verticale de Barré) — à implémenter
                dans une phase suivante. Les champs cliniques ci-dessous sont indépendants. -->
 
-          <!-- ─── Test de Jack (réductibilité) ─── -->
-          <div class="podo-field-lbl" style="margin-top:0;">Test de Jack — Réductibilité de l'affaissement</div>
+          <!-- ─── Réductibilité de l'affaissement plantaire (Jack + giration) ─── -->
+          <div class="podo-block-title">🔄 Réductibilité de l'affaissement plantaire</div>
+          <div class="podo-field-lbl" style="margin-top:0;">Test de Jack — réductibilité de l'affaissement plantaire</div>
           <div class="podo-radio-row">
             <label class="podo-radio-btn"><input type="radio" name="podo_jack" value="oui">Oui (réductible)</label>
             <label class="podo-radio-btn"><input type="radio" name="podo_jack" value="non">Non</label>
           </div>
-
-          <!-- ─── Test de giration de bassin ─── -->
           <div class="podo-field-lbl">Test de giration de bassin</div>
           <div class="podo-radio-row">
-            <label class="podo-radio-btn"><input type="radio" name="podo_giration" value="oui">Oui (asymétrie)</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_giration" value="oui">Oui (réductible)</label>
             <label class="podo-radio-btn"><input type="radio" name="podo_giration" value="non">Non</label>
           </div>
 
@@ -1525,7 +1524,7 @@
             <div>
               <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
-                <span style="font-size:11px;color:var(--mut);min-width:60px;">En charge</span>
+                <span style="font-size:11px;color:#9f1239;font-weight:600;min-width:60px;">En charge</span>
                 <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_g_charge" onchange="_podoNavicInterpret()" style="max-width:110px;">
                   <option value="">— cm</option>
                   <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
@@ -1536,7 +1535,7 @@
                 </select>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <span style="font-size:11px;color:var(--mut);min-width:60px;">En décharge</span>
+                <span style="font-size:11px;color:#9f1239;font-weight:600;min-width:60px;">En décharge</span>
                 <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_g_decharge" onchange="_podoNavicInterpret()" style="max-width:110px;">
                   <option value="">— cm</option>
                   <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
@@ -1551,7 +1550,7 @@
             <div>
               <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
-                <span style="font-size:11px;color:var(--mut);min-width:60px;">En charge</span>
+                <span style="font-size:11px;color:#9f1239;font-weight:600;min-width:60px;">En charge</span>
                 <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_d_charge" onchange="_podoNavicInterpret()" style="max-width:110px;">
                   <option value="">— cm</option>
                   <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
@@ -1562,7 +1561,7 @@
                 </select>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <span style="font-size:11px;color:var(--mut);min-width:60px;">En décharge</span>
+                <span style="font-size:11px;color:#9f1239;font-weight:600;min-width:60px;">En décharge</span>
                 <select class="podopediatrie-field podo-inline-input" data-field="podo_navic_d_decharge" onchange="_podoNavicInterpret()" style="max-width:110px;">
                   <option value="">— cm</option>
                   <option value="0">0 cm</option><option value="0.5">0,5 cm</option><option value="1">1 cm</option><option value="1.5">1,5 cm</option>
@@ -1604,9 +1603,12 @@
           <!-- ─── Test d'accroupissement ─── -->
           <div class="podo-field-lbl" style="margin-top:14px;">Test d'accroupissement</div>
           <div class="podo-radio-row">
-            <label class="podo-radio-btn"><input type="radio" name="podo_accroupissement" value="oui">Oui (réalisable)</label>
-            <label class="podo-radio-btn"><input type="radio" name="podo_accroupissement" value="non">Non</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_accroupissement" value="oui" onchange="_podoAchilleInterpret()">Oui (réalisable)</label>
+            <label class="podo-radio-btn"><input type="radio" name="podo_accroupissement" value="non" onchange="_podoAchilleInterpret()">Non</label>
           </div>
+          <!-- #140 Phase 2a fix — Suspicion d'Achille court : marche sur talons impossible
+               (podo_marche_talons dans l'onglet Marche) + accroupissement impossible. -->
+          <div id="podo-achille-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
 
           <!-- ─── Périodes III + IV : Courbures rachidiennes + Test d'Adam ─── -->
           <div data-periodes="III IV">
