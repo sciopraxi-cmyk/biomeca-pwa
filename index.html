@@ -1527,9 +1527,14 @@
             <button class="btn" onclick="clearAllPodoMorpho()" style="background:transparent;color:#9f1239;border:1px solid #9f1239;">🗑 Tout effacer</button>
           </div>
 
-          <!-- #140 Phase 2b2 — À implémenter dans une phase suivante :
-               photos posturales avec pose de points, Verticale de Barré. Les champs
-               cliniques ci-dessous sont indépendants et déjà en place (Phase 2a). -->
+          <!-- #140 Phase 2b2 — Photos posturales + placement de points (Verticale
+               de Barré). Le markup est injecté à la volée par showPodopediatrieSection
+               (target === 3) via _buildPostureCaptureBlockHTML('pp') + _renderAllPostureSlots('pp').
+               Injection idempotente (skip si déjà présent). Le moteur (capture,
+               placement, angles, calibration, seuils) est partagé avec sport ('sp')
+               et posturo ('po'), routé par le préfixe. Verticale de Barré : voir
+               _computePostureAngles (calibration 2 points sol → plumb_up). -->
+          <div id="pp-posture-capture-container" style="margin-top:14px;"></div>
 
           <!-- ─── Réductibilité de l'affaissement plantaire (Jack + giration) ─── -->
           <div class="podo-block-title">🔄 Réductibilité de l'affaissement plantaire</div>
