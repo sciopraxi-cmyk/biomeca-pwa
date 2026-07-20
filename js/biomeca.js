@@ -19948,11 +19948,21 @@ function _scheduleBilanAutosave(flavor) {
   }, 1000);
 }
 document.addEventListener('input', function(e) {
-  const inSport     = e.target.closest && e.target.closest('#pg-bilan');
-  const inPosturo   = e.target.closest && e.target.closest('#pg-bilan-posturo');
-  const inPedicurie = e.target.closest && e.target.closest('#pg-pedicurie');
-  if (!inSport && !inPosturo && !inPedicurie) return;
-  _scheduleBilanAutosave(inSport ? 'sport' : (inPosturo ? 'posturo' : 'pedicurie'));
+  const inSport        = e.target.closest && e.target.closest('#pg-bilan');
+  const inPosturo      = e.target.closest && e.target.closest('#pg-bilan-posturo');
+  const inPedicurie    = e.target.closest && e.target.closest('#pg-pedicurie');
+  // #140 fix — podopédiatrie manquait au routing autosave : seul le hook
+  // capture-avant-navigation sauvait, donc un hard refresh sans changement
+  // de page perdait les dernières saisies. Le flavor 'podopediatrie' est
+  // déjà géré par _scheduleBilanAutosave depuis la Phase 2b1.
+  const inPodopediatrie = e.target.closest && e.target.closest('#pg-podopediatrie');
+  if (!inSport && !inPosturo && !inPedicurie && !inPodopediatrie) return;
+  _scheduleBilanAutosave(
+    inSport ? 'sport'
+    : inPosturo ? 'posturo'
+    : inPedicurie ? 'pedicurie'
+    : 'podopediatrie'
+  );
 });
 
 // ===== STRIPE + MODULES =====
