@@ -1240,7 +1240,7 @@
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(2)" id="pdptab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🚶 Marche</button>
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(3)" id="pdptab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🦴 Morphostatique</button>
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(4)" id="pdptab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">👣 FPI</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(5)" id="pdptab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">⚖️ Charge</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(5)" id="pdptab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">⚖️ Charge / Stabilité</button>
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(6)" id="pdptab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🛌 Décharge</button>
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(7)" id="pdptab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">👟 Chaussure</button>
       <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(8)" id="pdptab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">💊 Traitement</button>
@@ -1917,7 +1917,270 @@
       </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-5" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">⚖️ Examen en charge — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">⚖️ Charge / Stabilité</div>
+
+          <!-- ═══════════════════════════════════════════════════════════════
+               BLOC COMMUN — data-periodes hérité (II III IV)
+               ═══════════════════════════════════════════════════════════════ -->
+
+          <!-- 1. Test de stabilité monopodale -->
+          <div class="podo-block-title">🦶 Test de stabilité monopodale</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:6px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;cursor:pointer;">
+                <input type="checkbox" class="podopediatrie-field" data-field="podo_stab_g_cheville"/>
+                Instabilité de cheville <span style="font-size:11px;color:#9f1239;">(genou tendu)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                <input type="checkbox" class="podopediatrie-field" data-field="podo_stab_g_genou"/>
+                Instabilité de genou <span style="font-size:11px;color:#9f1239;">(genou semi-fléchi)</span>
+              </label>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;cursor:pointer;">
+                <input type="checkbox" class="podopediatrie-field" data-field="podo_stab_d_cheville"/>
+                Instabilité de cheville <span style="font-size:11px;color:#9f1239;">(genou tendu)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                <input type="checkbox" class="podopediatrie-field" data-field="podo_stab_d_genou"/>
+                Instabilité de genou <span style="font-size:11px;color:#9f1239;">(genou semi-fléchi)</span>
+              </label>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--mut);margin-bottom:14px;font-style:italic;">
+            Repère : appui monopodal ≥ 30 s attendu à partir de 8 ans. Genou tendu → dépiste la cheville ; genou semi-fléchi → dépiste le genou.
+          </div>
+
+          <!-- 2. Trendelenburg postural -->
+          <div class="podo-block-title">⛓️ Test des chaînes stabilisatrices (Trendelenburg postural)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:6px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche portant</div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_g" value="1" onchange="_podoTrendelenburgInterpret()">Grade 1</label>
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_g" value="2" onchange="_podoTrendelenburgInterpret()">Grade 2</label>
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_g" value="3" onchange="_podoTrendelenburgInterpret()">Grade 3</label>
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_g" value="4" onchange="_podoTrendelenburgInterpret()">Grade 4</label>
+              </div>
+              <div id="podo-trendelenburg-g-interpret" style="font-size:11px;color:#9f1239;font-weight:500;margin-top:6px;min-height:14px;"></div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit portant</div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_d" value="1" onchange="_podoTrendelenburgInterpret()">Grade 1</label>
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_d" value="2" onchange="_podoTrendelenburgInterpret()">Grade 2</label>
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_d" value="3" onchange="_podoTrendelenburgInterpret()">Grade 3</label>
+                <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_trendelenburg_d" value="4" onchange="_podoTrendelenburgInterpret()">Grade 4</label>
+              </div>
+              <div id="podo-trendelenburg-d-interpret" style="font-size:11px;color:#9f1239;font-weight:500;margin-top:6px;min-height:14px;"></div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#7f1d1d;background:#fff;border:1px solid #fecdd3;border-radius:4px;padding:8px 12px;margin-bottom:14px;line-height:1.7;">
+            <div><strong style="color:#9f1239;">Grade 1</strong> — bassin horizontal, pas d'élévation de l'EIPS du côté opposé à la jambe portante.</div>
+            <div><strong style="color:#9f1239;">Grade 2</strong> — chute de l'EIPS controlatéral, sans modification de l'obliquité scapulaire.</div>
+            <div><strong style="color:#9f1239;">Grade 3</strong> — pas de modification de l'EIPS opposé, mais inclinaison scapulaire du côté de la jambe portante.</div>
+            <div><strong style="color:#9f1239;">Grade 4</strong> — chute de l'EIPS ET de la ceinture scapulaire du côté opposé à la jambe portante.</div>
+          </div>
+
+          <!-- ═══════════════════════════════════════════════════════════════
+               BLOC PÉRIODES III + IV — enveloppe data-periodes restreint
+               ═══════════════════════════════════════════════════════════════ -->
+          <div data-periodes="III IV">
+
+            <!-- 3. Rotation nucale -->
+            <div class="podo-block-title">🌀 Test de rotation nucale</div>
+            <div class="podo-field-lbl" style="margin-top:0;">Limitation de rotation</div>
+            <div class="podo-radio-row">
+              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_limitation" value="aucune">Aucune</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_limitation" value="droite">À droite</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_limitation" value="gauche">À gauche</label>
+            </div>
+
+            <div class="podo-field-lbl">Modification des paramètres</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:8px;font-style:italic;">Ces modificateurs servent à identifier l'entrée sensorielle responsable en observant l'effet de chaque condition.</div>
+            <div style="display:grid;grid-template-columns:1fr;gap:8px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:180px;">Sur tapis mousse</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_mousse" value="amelioration">Amélioration</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_mousse" value="aggravation">Aggravation</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_mousse" value="sans_changement">Sans changement</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:180px;">Yeux fermés</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_yeux" value="amelioration">Amélioration</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_yeux" value="aggravation">Aggravation</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_yeux" value="sans_changement">Sans changement</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:180px;">Dents serrées</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_dents" value="amelioration">Amélioration</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_dents" value="aggravation">Aggravation</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_dents" value="sans_changement">Sans changement</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:180px;">Bouche ouverte</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_bouche" value="amelioration">Amélioration</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_bouche" value="aggravation">Aggravation</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_bouche" value="sans_changement">Sans changement</label>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:180px;">Assis sans contact plantaire</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_assis" value="amelioration">Amélioration</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_assis" value="aggravation">Aggravation</label>
+                  <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_nucale_assis" value="sans_changement">Sans changement</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="podo-field-lbl">Présence d'un parasite</div>
+            <div class="podo-radio-row">
+              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_parasite" value="oui" onchange="_podoNucaleChanged()">Oui</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_parasite" value="non" onchange="_podoNucaleChanged()">Non</label>
+            </div>
+            <div id="podo-nucale-parasite-detail" style="display:none;margin-top:8px;">
+              <input type="text" class="inp podopediatrie-field" data-field="podo_nucale_parasite_origine" placeholder="Origine du parasite…" style="max-width:400px;"/>
+            </div>
+
+            <!-- 4. Romberg (mirror index.html L3089-3121 sport, préfixe podo_) -->
+            <div class="podo-block-title">🧪 Test de Romberg</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;">
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                  <input type="checkbox" class="podopediatrie-field" data-field="podo_romberg_ant"/> Antériorisé
+                </label>
+                <div>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:6px;">
+                    <input type="checkbox" class="podopediatrie-field" data-field="podo_romberg_lat" onchange="_podoRombergApplyState()"/> Latéralisé <span style="font-size:10px;color:#9f1239;">(vestibulaire)</span>
+                  </label>
+                  <div id="podo-romberg-lat-opts" style="display:none;gap:8px;margin-left:20px;">
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_romberg_lat_dir" value="gauche"/> 👈 Gauche</label>
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_romberg_lat_dir" value="droite"/> 👉 Droite</label>
+                  </div>
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                  <input type="checkbox" class="podopediatrie-field" data-field="podo_romberg_post"/> Postériorisé <span style="font-size:10px;color:#9f1239;">(émotionnel)</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                  <input type="checkbox" class="podopediatrie-field" data-field="podo_romberg_oculaire"/> Adaptation oculaire
+                </label>
+                <div>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:6px;">
+                    <input type="checkbox" class="podopediatrie-field" data-field="podo_romberg_rot" onchange="_podoRombergApplyState()"/> Rotation
+                  </label>
+                  <div id="podo-romberg-rot-opts" style="display:none;gap:8px;margin-left:20px;">
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_romberg_rot_dir" value="droite"/> 👉 Droite</label>
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_romberg_rot_dir" value="gauche"/> 👈 Gauche</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Mobilité axe corporel — tableau propre à la fiche podopédiatrie
+                 (4 lignes × 2 colonnes G/D, radio 3 états). Clés podo_mobilite_*.
+                 NOTE : divergent volontairement du sport (Standard/Mousse) — la fiche
+                 podopédiatrie utilise une échelle qualitative « Normale / Raideur (/)
+                 / Absence (X) », plus adaptée à l'observation clinique pédiatrique. -->
+            <div class="podo-block-title">📐 Mobilité de l'axe corporel</div>
+            <div style="overflow-x:auto;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:var(--surf);">
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:left;">Zone</th>
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">👈 Gauche</th>
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">👉 Droite</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Cervical</td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_cervical_g" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_cervical_g" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_cervical_g" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_cervical_d" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_cervical_d" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_cervical_d" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Thoracique</td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_thoracique_g" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_thoracique_g" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_thoracique_g" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_thoracique_d" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_thoracique_d" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_thoracique_d" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Lombaire</td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_lombaire_g" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_lombaire_g" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_lombaire_g" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_lombaire_d" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_lombaire_d" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_lombaire_d" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Arc inférieur</td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_arcinf_g" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_arcinf_g" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_arcinf_g" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_arcinf_d" value="normale">Normale</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_arcinf_d" value="raideur">Raideur (/)</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilite_arcinf_d" value="absence">Absence (X)</label>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style="font-size:11px;color:var(--mut);margin-top:8px;font-style:italic;">Légende : <strong style="color:#9f1239;">/</strong> = raideur · <strong style="color:#9f1239;">X</strong> = absence de mobilité.</div>
+            </div>
+
+          </div><!-- /BLOC PÉRIODES III + IV -->
+
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-6" data-periodes="II III IV" style="display:none;">
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🛌 Examen en décharge — <em>Phase 0 : contenu à venir.</em></div></div>
