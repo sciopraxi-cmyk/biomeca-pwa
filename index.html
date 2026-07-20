@@ -2097,10 +2097,14 @@
             <div style="overflow-x:auto;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;">
               <table style="width:100%;border-collapse:collapse;font-size:12px;">
                 <thead>
-                  <tr style="background:var(--surf);">
-                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:left;">Zone</th>
-                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">👈 Gauche</th>
-                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;">👉 Droite</th>
+                  <!-- Fix contraste : var(--surf) est le bleu foncé du thème, illisible
+                       avec le texte foncé hérité. On aligne l'en-tête sur la palette
+                       rose du tableau (fond rose clair #fecdd3, texte rouge foncé
+                       #7f1d1d) — pattern cohérent avec le bandeau barème FPI. -->
+                  <tr style="background:#fecdd3;">
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:left;color:#7f1d1d;">Zone</th>
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;color:#7f1d1d;">👈 Gauche</th>
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;color:#7f1d1d;">👉 Droite</th>
                   </tr>
                 </thead>
                 <tbody>
