@@ -13699,6 +13699,47 @@ function _podoAchilleInterpret() {
     : '';
 }
 
+// #140 Phase 3b — Trendelenburg postural : grade 1 = physiologique, 2/3/4 = défaut.
+// Rejoue à chaque onchange radio + au chargement d'un bilan (via _podoPostLoadTweaks).
+function _podoTrendelenburgInterpret() {
+  ['g', 'd'].forEach(function (side) {
+    var el = document.getElementById('podo-trendelenburg-' + side + '-interpret');
+    if (!el) return;
+    var checked = document.querySelector('#pg-podopediatrie input[name="podo_trendelenburg_' + side + '"]:checked');
+    if (!checked) { el.textContent = ''; return; }
+    var grade = parseInt(checked.value, 10);
+    el.textContent = (grade === 1)
+      ? 'Stabilité pelvienne physiologique'
+      : 'Défaut de stabilité pelvienne (grade ' + grade + ')';
+  });
+}
+
+// #140 Phase 3b — Rotation nucale : le champ « origine du parasite » n'est
+// affiché que si podo_nucale_parasite === 'oui'.
+function _podoNucaleChanged() {
+  var detail = document.getElementById('podo-nucale-parasite-detail');
+  if (!detail) return;
+  var checked = document.querySelector('#pg-podopediatrie input[name="podo_nucale_parasite"]:checked');
+  detail.style.display = (checked && checked.value === 'oui') ? '' : 'none';
+}
+
+// #140 Phase 3b — Romberg (mirror sport L3089 / posturo psec-1) : les sub-radios
+// D/G de « Latéralisé » et « Rotation » ne sont visibles que si la checkbox
+// mère est cochée. Décochage → sub-radio réinitialisé (évite valeur fantôme).
+// Rejoue au load (via _podoPostLoadTweaks) pour restaurer l'état visible d'un
+// bilan archivé.
+function _podoRombergApplyState() {
+  ['lat', 'rot'].forEach(function (which) {
+    var cb = document.querySelector('#pg-podopediatrie [data-field="podo_romberg_' + which + '"]');
+    var opts = document.getElementById('podo-romberg-' + which + '-opts');
+    if (opts) opts.style.display = (cb && cb.checked) ? 'flex' : 'none';
+    if (cb && !cb.checked) {
+      var radios = document.querySelectorAll('#pg-podopediatrie input[name="podo_romberg_' + which + '_dir"]');
+      radios.forEach(function (r) { r.checked = false; });
+    }
+  });
+}
+
 // #140 Phase 3a — FPI (Foot Posture Index). Somme des 6 items cotés −2..+2
 // par pied. Tant que les 6 ne sont pas renseignés : affiche le total partiel
 // sans classer. Barème (une fois complet) : 0..+5 Normal · +6..+9 En pronation
@@ -13757,6 +13798,9 @@ function _podoPostLoadTweaks() {
   _podoAdamChanged();
   _podoAchilleInterpret();
   _podoFpiInterpret();
+  _podoTrendelenburgInterpret();
+  _podoNucaleChanged();
+  _podoRombergApplyState();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
