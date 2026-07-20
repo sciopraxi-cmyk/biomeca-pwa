@@ -554,9 +554,19 @@ body.printing #rpt-print{display:block!important;}
 
 /* #140 Phase 0 — Palette identitaire rose de la Podopédiatrie (miroir #122 pour ambre/pédicurie).
    Applique les couleurs rose aux sections/cartes de #pg-podopediatrie sans affecter le reste. */
+/* #140 Phase 3a fix systémique — Sans color:… défini, tous les descendants
+   héritent de la teinte du thème (claire en dark mode) → invisible sur rose
+   clair. On force une couleur de texte lisible ET on redéfinit --mut dans ce
+   scope : les propriétés personnalisées CSS cascadent, donc tous les
+   `color:var(--mut)` inline (bandeau barème, intros, mentions muet) se
+   résolvent automatiquement en une teinte lisible sur ce fond, sans avoir à
+   toucher chaque style inline. Remplace les patches ponctuels (« En charge /
+   En décharge » Phase 2a, bandeau barème FPI Phase 3a). */
 #pg-podopediatrie .card {
   border-left:4px solid #e11d48;
   background:linear-gradient(135deg,#fff5f7,#ffe4e9) !important;
+  color:#3f1520;
+  --mut:#8a6672;
 }
 
 /* ============================================================================
