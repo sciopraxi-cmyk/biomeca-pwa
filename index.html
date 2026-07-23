@@ -80,11 +80,11 @@
 
 <div class="lp-nav">
   <div class="lp-nav-logo">
-    <!-- Verticy mark (pictogramme) sur fond sombre → cadre blanc arrondi
-         (règle fond clair). Suppression du bloc texte « sciopraxi / BILANS »
-         (doublon avec le logo). -->
-    <span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:6px;">
-      <img src="assets/verticy-mark.png" alt="Verticy" style="height:40px;display:block;"/>
+    <!-- Lockup Verticy : pictogramme + mot « VERTICY » empilés dans un cadre
+         blanc arrondi (règle fond clair pour surface sombre). -->
+    <span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:6px 12px;">
+      <img src="assets/verticy-mark.png" alt="Verticy" style="height:48px;display:block;"/>
+      <span style="font-size:12px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:3px;">VERTICY</span>
     </span>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
@@ -147,7 +147,7 @@
       🔒 Session verrouillée après 20 minutes d'inactivité, par sécurité. Reconnectez-vous pour reprendre votre travail.
     </div>
     <div style="text-align:center;margin-bottom:22px;">
-      <img src="assets/verticy-logo.png" alt="Verticy" style="height:96px;margin-bottom:12px;"/>
+      <img src="assets/verticy-logo.png" alt="Verticy" style="height:140px;margin-bottom:12px;"/>
       <div style="font-size:16px;font-weight:700;color:#fff;">Connexion</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;">Accédez à votre espace praticien</div>
     </div>
@@ -166,7 +166,7 @@
 
   <div id="pwa-reset-password-form" style="display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:32px;max-width:400px;margin:0 auto 40px;">
     <div style="text-align:center;margin-bottom:22px;">
-      <img src="assets/verticy-logo.png" alt="Verticy" style="height:96px;margin-bottom:12px;"/>
+      <img src="assets/verticy-logo.png" alt="Verticy" style="height:140px;margin-bottom:12px;"/>
       <div style="font-size:16px;font-weight:700;color:#fff;">Réinitialiser le mot de passe</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;">Choisissez un nouveau mot de passe pour votre compte</div>
     </div>
@@ -377,11 +377,14 @@
 </div>
 <div class="topbar">
   <div class="logo-wrap" style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-    <!-- Verticy mark sur topbar sombre (#0d2347) → cadre blanc arrondi. -->
-    <span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:6px;">
-      <img src="assets/verticy-mark.png" alt="Verticy" style="height:36px;object-fit:contain;display:block;"/>
+    <!-- Lockup Verticy : pictogramme + mot « VERTICY » empilés dans un cadre
+         blanc arrondi. Remplace l'ancien texte « BILANS » séparé (doublon
+         avec l'identité de marque). Couleur du mot #23264F = bleu marine du
+         logo Verticy, lisible sur le blanc du conteneur. -->
+    <span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:6px 12px;">
+      <img src="assets/verticy-mark.png" alt="Verticy" style="height:44px;object-fit:contain;display:block;"/>
+      <span style="font-size:11px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:3px;">VERTICY</span>
     </span>
-    <span style="font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.3px;">BILANS</span>
   </div>
   <div class="tnav">
     <button onclick="nav('pg-patients')" id="tn-patients">Patients</button>
@@ -4606,8 +4609,10 @@
 <div id="rpt-print">
   <div class="rp-hdr">
     <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
-      <div style="background:#fff;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
-        <img src="assets/verticy-mark.png" alt="Verticy" style="height:36px;display:block;">
+      <!-- Lockup Verticy vertical : pictogramme + « VERTICY » dans cadre blanc. -->
+      <div style="background:#fff;border-radius:8px;padding:8px 14px;display:flex;flex-direction:column;align-items:center;">
+        <img src="assets/verticy-mark.png" alt="Verticy" style="height:56px;display:block;">
+        <span style="font-size:13px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:4px;">VERTICY</span>
       </div>
       <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
     </div>
