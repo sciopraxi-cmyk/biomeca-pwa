@@ -10928,7 +10928,7 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
   });
 
   // FOOTER
-  bodyHtml += '<div class="footer"><div class="footer-brand">Sciopraxi Bilans</div><div class="footer-info">Bilan Étude de la Posture · '+_escHtml(p.prenom)+' '+_escHtml(p.nom)+' · '+dateStr+'</div></div>';
+  bodyHtml += '<div class="footer"><div class="footer-brand">Verticy</div><div class="footer-info">Bilan Étude de la Posture · '+_escHtml(p.prenom)+' '+_escHtml(p.nom)+' · '+dateStr+'</div></div>';
   // #88-C Annexes fiches d'exercices — markup miroir sport (#88-B,
   // _buildSportRapportContentHTML). page-break-before:always pour démarrer chaque
   // fiche sur une page A4 vierge. object-fit:contain pour respecter le ratio fiche
@@ -14093,7 +14093,7 @@ function buildPedicurieRapportHTML(){
     + '<div class="titre-rapport"><h1>Bilan de Pédicurie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _pedEscapeHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + synth + '</div>'
-    + '<div class="footer"><div class="footer-brand">Sciopraxi</div><div class="footer-info">Bilan de Pédicurie · ' + dateStr + '</div></div>'
+    + '<div class="footer"><div class="footer-brand">Verticy</div><div class="footer-info">Bilan de Pédicurie · ' + dateStr + '</div></div>'
     + '</div></body></html>';
 }
 // #121 Phase 5b — Impression du rapport pédicurie via iframe masquée (pattern
@@ -14198,7 +14198,7 @@ function buildPodopediatrieRapportHTML() {
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + body + '</div>'
-    + '<div class="footer"><div class="footer-brand">Sciopraxi</div><div class="footer-info">Bilan de Podopédiatrie · ' + dateStr + '</div></div>'
+    + '<div class="footer"><div class="footer-brand">Verticy</div><div class="footer-info">Bilan de Podopédiatrie · ' + dateStr + '</div></div>'
     + '</div></body></html>';
 }
 
