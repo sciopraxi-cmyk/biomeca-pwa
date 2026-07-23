@@ -1,7 +1,7 @@
 {
-  "name": "BioMéca",
-  "short_name": "BioMéca",
-  "description": "BioMéca — bilans posturaux et biomécaniques par Verticy",
+  "name": "Verticy",
+  "short_name": "Verticy",
+  "description": "Verticy — bilans posturaux et biomécaniques",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
@@ -22,14 +22,14 @@
       "sizes": "1284x722",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "BioMéca — Liste des patients"
+      "label": "Verticy — Liste des patients"
     },
     {
       "src": "assets/screenshots/mobile.png",
       "sizes": "752x1338",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "BioMéca — Liste des patients (mobile)"
+      "label": "Verticy — Liste des patients (mobile)"
     }
   ]
 }

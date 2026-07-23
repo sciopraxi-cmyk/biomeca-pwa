@@ -1,7 +1,7 @@
 {
   "name": "biomeca-pwa",
   "version": "0.1.0",
-  "description": "BioMéca — bilans cliniques pour podologues, ostéopathes et kinésithérapeutes",
+  "description": "Verticy — bilans cliniques pour podologues, ostéopathes et kinésithérapeutes",
   "private": true,
   "type": "module",
   "scripts": {

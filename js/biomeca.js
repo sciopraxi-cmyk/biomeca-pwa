@@ -3781,7 +3781,11 @@ function renderPatientList() {
 // avec confirmations + bilan préalable des différences.
 function exportAllDataJSON() {
   try {
-    const payload = { exportedAt: new Date().toISOString(), app: 'BioMéca', patients, praticiens };
+    // Rebrand Verticy — `app` est metadata informationnelle, aucun code
+    // d'import ne la consomme actuellement (import volontairement séparé,
+    // cf. L3779-3781). Le futur importateur devra tolérer les deux valeurs
+    // ('BioMéca' pour les sauvegardes pré-rebrand, 'Verticy' pour les nouvelles).
+    const payload = { exportedAt: new Date().toISOString(), app: 'Verticy', patients, praticiens };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
