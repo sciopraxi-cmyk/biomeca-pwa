@@ -10809,7 +10809,8 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
   // HEADER
   bodyHtml += '<div class="rp-page">';
   bodyHtml += '<div class="header">';
-  bodyHtml += '<img class="logo" src="'+logo+'" alt="Sciopraxi"/>';
+  // Verticy logo sur en-tête sombre → cadre blanc arrondi (règle fond clair).
+  bodyHtml += '<span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:6px 10px;"><img class="logo" src="'+logo+'" alt="Verticy"/></span>';
   bodyHtml += '<div class="prat-info"><div class="prat-name">'+_escHtml(prat.nom||'')+' '+_escHtml(prat.prenom||'')+' — '+_escHtml(prat.titre||'')+'</div>';
   if(prat.cabinet) bodyHtml += '<div>'+_escHtml(prat.cabinet)+'</div>';
   if(prat.adresse) bodyHtml += '<div>'+_escHtml(prat.adresse)+'</div>';
@@ -11008,8 +11009,8 @@ async function buildRapport() {
         <div style="background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;border-radius:8px;">
           <div class="rp-hdr">
             <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
-              <div style="background:#0e1f38;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
-                <img src="${logoSrc}" alt="Sciopraxi" style="height:42px;display:block;">
+              <div style="background:#fff;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
+                <img src="${logoSrc}" alt="Verticy" style="height:42px;display:block;">
               </div>
               <div style="font-size:20px;font-weight:700;color:#378ADD;letter-spacing:3px;">BILAN</div>
             </div>
@@ -14077,7 +14078,8 @@ function buildPedicurieRapportHTML(){
     + '</style>';
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bilan de Pédicurie</title>' + css + '</head><body style="margin:0;padding:0;">'
     + '<div class="rp-page">'
-    + '<div class="header"><img class="logo" src="' + logo + '" alt="Sciopraxi"/>' + pratInfo + '</div>'
+    // Verticy logo sur en-tête sombre → cadre blanc arrondi (règle fond clair).
+    + '<div class="header"><span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:6px 10px;"><img class="logo" src="' + logo + '" alt="Verticy"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Pédicurie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _pedEscapeHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + synth + '</div>'
@@ -14178,7 +14180,8 @@ function buildPodopediatrieRapportHTML() {
     + '</style>';
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bilan de Podopédiatrie</title>' + css + '</head><body style="margin:0;padding:0;">'
     + '<div class="rp-page">'
-    + '<div class="header"><img class="logo" src="' + logo + '" alt="Sciopraxi"/>' + pratInfo + '</div>'
+    // Verticy logo sur en-tête sombre → cadre blanc arrondi (règle fond clair).
+    + '<div class="header"><span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:6px 10px;"><img class="logo" src="' + logo + '" alt="Verticy"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + body + '</div>'
