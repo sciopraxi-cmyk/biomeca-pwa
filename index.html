@@ -80,11 +80,11 @@
 
 <div class="lp-nav">
   <div class="lp-nav-logo">
-    <!-- Lockup Verticy : pictogramme + mot « VERTICY » empilés dans un cadre
-         blanc arrondi (règle fond clair pour surface sombre). -->
-    <span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:6px 12px;">
-      <img src="assets/verticy-mark.png" alt="Verticy" style="height:48px;display:block;"/>
-      <span style="font-size:12px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:3px;">VERTICY</span>
+    <!-- Lockup Verticy horizontal : pictogramme + wordmark (image) alignés
+         dans le cadre blanc arrondi (règle fond clair pour surface sombre). -->
+    <span style="display:inline-flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:6px 14px;">
+      <img src="assets/verticy-mark.png" alt="Verticy" style="height:34px;display:block;"/>
+      <img src="assets/verticy-wordmark.png" alt="Verticy" style="height:22px;display:block;"/>
     </span>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
@@ -377,13 +377,12 @@
 </div>
 <div class="topbar">
   <div class="logo-wrap" style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-    <!-- Lockup Verticy : pictogramme + mot « VERTICY » empilés dans un cadre
-         blanc arrondi. Remplace l'ancien texte « BILANS » séparé (doublon
-         avec l'identité de marque). Couleur du mot #23264F = bleu marine du
-         logo Verticy, lisible sur le blanc du conteneur. -->
-    <span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:6px 12px;">
-      <img src="assets/verticy-mark.png" alt="Verticy" style="height:44px;object-fit:contain;display:block;"/>
-      <span style="font-size:11px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:3px;">VERTICY</span>
+    <!-- Lockup Verticy HORIZONTAL et compact — la topbar mesure 56px de haut
+         (css/biomeca.css L33), le lockup empilé dépassait. Pictogramme 28px +
+         wordmark (image) 18px alignés horizontalement, cadre blanc arrondi. -->
+    <span style="display:inline-flex;align-items:center;gap:8px;background:#fff;border-radius:8px;padding:5px 12px;">
+      <img src="assets/verticy-mark.png" alt="Verticy" style="height:28px;object-fit:contain;display:block;"/>
+      <img src="assets/verticy-wordmark.png" alt="Verticy" style="height:18px;object-fit:contain;display:block;"/>
     </span>
   </div>
   <div class="tnav">
@@ -4609,10 +4608,11 @@
 <div id="rpt-print">
   <div class="rp-hdr">
     <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
-      <!-- Lockup Verticy vertical : pictogramme + « VERTICY » dans cadre blanc. -->
-      <div style="background:#fff;border-radius:8px;padding:8px 14px;display:flex;flex-direction:column;align-items:center;">
-        <img src="assets/verticy-mark.png" alt="Verticy" style="height:56px;display:block;">
-        <span style="font-size:13px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:4px;">VERTICY</span>
+      <!-- Lockup Verticy vertical : pictogramme AU-DESSUS du wordmark (image),
+           centrés dans un cadre blanc arrondi. -->
+      <div style="background:#fff;border-radius:8px;padding:10px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <img src="assets/verticy-mark.png" alt="Verticy" style="height:48px;display:block;">
+        <img src="assets/verticy-wordmark.png" alt="Verticy" style="height:18px;display:block;">
       </div>
       <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
     </div>
@@ -4646,6 +4646,10 @@
 <div id="img-store" style="display:none">
   <!-- id="imgjs-logo-sciopraxi" conservé pour compat getElementById dans les 4 générateurs de rapport ; src pointe sur verticy-mark.png (pictogramme compact, lisible à ~64px dans les en-têtes de rapport ; le logo complet serait illisible à cette taille). -->
   <img style="display:none;" id="imgjs-logo-sciopraxi" alt="Verticy" src="assets/verticy-mark.png">
+  <!-- Wordmark Verticy — chargé ici pour que les 4 rapports rendus dans une
+       iframe about:blank (posturo/pédicurie/podopédiatrie) résolvent une URL
+       absolue via .src plutôt qu'une src relative qui échouerait. -->
+  <img style="display:none;" id="imgjs-verticy-wordmark" alt="Verticy" src="assets/verticy-wordmark.png">
   <img style="display:none;" id="imgjs-morpho-face" src="assets/morpho-face-anterieure.png">
   <img style="display:none;" id="imgjs-morpho-face2" src="assets/morpho-face-posterieure.png">
   <img style="display:none;" id="imgjs-morpho-profilG" src="assets/morpho-profil-gauche.png">

@@ -10807,11 +10807,15 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
   bodyHtml = '<style>\n    *{margin:0;padding:0;box-sizing:border-box;}\n    body{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}\n    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}\n    @media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.no-print{display:none !important;}.section,.patient-card,.header,.footer{break-inside:avoid;}.img-container,img{break-inside:avoid;page-break-inside:avoid;}.header,.titre-rapport,.patient-card,.section-title,.section-num,.tag,.tag-navy,.tag-ok,.tag-warn,.tag-alert,.footer{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}}\n    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;}\n    .logo{height:80px;object-fit:contain;}\n    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}\n    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}\n    .titre-rapport{background:#2dd4bf;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}\n    .titre-rapport h1{font-size:9px;font-weight:700;color:#04342C;letter-spacing:2px;text-transform:uppercase;}\n    .titre-rapport .sub{font-size:9px;color:rgba(4,52,44,0.7);letter-spacing:1px;}\n    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;}\n    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}\n    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}\n    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}\n    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}\n    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}\n    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}\n    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}\n    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}\n    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}\n    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}\n    .section{margin:0;break-inside:avoid;padding:0 24px;}\n    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}\n    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}\n    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .section-line{flex:1;height:1px;background:#eaeaea;}\n    .section-body{padding:0;}\n    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}\n    .item:last-child{border-bottom:none;}\n    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;}\n    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}\n    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;}\n    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}\n    .tag-navy{background:#e8edf5;color:#0e1f38;}\n    .tag-ok{background:#ecfdf5;color:#065f46;}\n    .tag-warn{background:#fffbeb;color:#92400e;}\n    .tag-alert{background:#fef2f2;color:#991b1b;}\n    .img-container{position:relative;text-align:center;}\n    .img-base{max-width:100%;border-radius:4px;}\n    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}\n    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}\n    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}\n    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}\n  </style>';
 
   // HEADER
+  // Wordmark absolu — iframe about:blank ne peut pas résoudre une src relative,
+  // #imgjs-verticy-wordmark expose l'URL absolue résolue par le navigateur parent.
+  const wordmarkSrc = document.getElementById('imgjs-verticy-wordmark')?.src || '';
   bodyHtml += '<div class="rp-page">';
   bodyHtml += '<div class="header">';
-  // Lockup Verticy : pictogramme (56px) + « VERTICY » empilés dans un cadre
-  // blanc arrondi. Style inline sur <img> pour surpasser `.logo{height:50px}`.
-  bodyHtml += '<span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:8px 14px;"><img class="logo" src="'+logo+'" alt="Verticy" style="height:56px;display:block;"/><span style="font-size:13px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:4px;">VERTICY</span></span>';
+  // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés
+  // dans un cadre blanc arrondi. Style inline sur <img> pour surpasser
+  // `.logo{height:50px}` local.
+  bodyHtml += '<span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="'+logo+'" alt="Verticy" style="height:48px;display:block;"/><img src="'+wordmarkSrc+'" alt="Verticy" style="height:18px;display:block;"/></span>';
   bodyHtml += '<div class="prat-info"><div class="prat-name">'+_escHtml(prat.nom||'')+' '+_escHtml(prat.prenom||'')+' — '+_escHtml(prat.titre||'')+'</div>';
   if(prat.cabinet) bodyHtml += '<div>'+_escHtml(prat.cabinet)+'</div>';
   if(prat.adresse) bodyHtml += '<div>'+_escHtml(prat.adresse)+'</div>';
@@ -10998,6 +11002,7 @@ async function buildRapport() {
       // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
       // L2688) → URL absolue mise en cache par le navigateur, pas de base64 dupliqué.
       const logoSrc = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
+      const wordmarkSrc = document.getElementById('imgjs-verticy-wordmark')?.src || '';
 
       // Wrapper thème clair (force background:#fff, color:#111) — override LOCAL du
       // thème app navy. Structure HTML clonée de #rpt-print (mêmes classes .rp-hdr/
@@ -11010,9 +11015,9 @@ async function buildRapport() {
         <div style="background:#fff;color:#111;font-family:'DM Sans',sans-serif;font-size:12px;padding:20px 28px;line-height:1.5;border-radius:8px;">
           <div class="rp-hdr">
             <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
-              <div style="background:#fff;border-radius:8px;padding:8px 14px;display:flex;flex-direction:column;align-items:center;">
-                <img src="${logoSrc}" alt="Verticy" style="height:56px;display:block;">
-                <span style="font-size:13px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:4px;">VERTICY</span>
+              <div style="background:#fff;border-radius:8px;padding:10px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <img src="${logoSrc}" alt="Verticy" style="height:48px;display:block;">
+                <img src="${wordmarkSrc}" alt="Verticy" style="height:18px;display:block;">
               </div>
               <div style="font-size:20px;font-weight:700;color:#378ADD;letter-spacing:3px;">BILAN</div>
             </div>
@@ -14029,6 +14034,8 @@ function buildPedicurieRapportHTML(){
     ? (praticiens.find(function(pr){ return pr.id == p.pratId; }) || (praticiens.length === 1 ? praticiens[0] : {}))
     : {};
   var logo = (document.getElementById('imgjs-logo-sciopraxi') || {}).src || '';
+  // Wordmark absolu — iframe about:blank ne peut pas résoudre une src relative.
+  var wordmark = (document.getElementById('imgjs-verticy-wordmark') || {}).src || '';
   var synthEl = document.getElementById('pedicurie-synthese-result');
   var synth = (synthEl && synthEl.innerHTML) ? synthEl.innerHTML : '<p style="font-style:italic;color:#666;">Aucune donnée renseignée.</p>';
   var dateStr = new Date().toLocaleDateString('fr-FR');
@@ -14080,9 +14087,9 @@ function buildPedicurieRapportHTML(){
     + '</style>';
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bilan de Pédicurie</title>' + css + '</head><body style="margin:0;padding:0;">'
     + '<div class="rp-page">'
-    // Lockup Verticy : pictogramme (56px) + « VERTICY » empilés, cadre blanc.
-    // Inline style height:56px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:8px 14px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:56px;display:block;"/><span style="font-size:13px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:4px;">VERTICY</span></span>' + pratInfo + '</div>'
+    // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
+    // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:18px;display:block;"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Pédicurie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _pedEscapeHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + synth + '</div>'
@@ -14121,6 +14128,8 @@ function buildPodopediatrieRapportHTML() {
     ? (praticiens.find(function (pr) { return pr.id == p.pratId; }) || (praticiens.length === 1 ? praticiens[0] : {}))
     : {};
   var logo = (document.getElementById('imgjs-logo-sciopraxi') || {}).src || '';
+  // Wordmark absolu — iframe about:blank ne peut pas résoudre une src relative.
+  var wordmark = (document.getElementById('imgjs-verticy-wordmark') || {}).src || '';
   var d = p.bilanDataPodopediatrie || {};
   var periode = d.periode || '—';
   var ageStr = '';
@@ -14183,9 +14192,9 @@ function buildPodopediatrieRapportHTML() {
     + '</style>';
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bilan de Podopédiatrie</title>' + css + '</head><body style="margin:0;padding:0;">'
     + '<div class="rp-page">'
-    // Lockup Verticy : pictogramme (56px) + « VERTICY » empilés, cadre blanc.
-    // Inline style height:56px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:8px 14px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:56px;display:block;"/><span style="font-size:13px;font-weight:700;letter-spacing:2px;color:#23264F;margin-top:4px;">VERTICY</span></span>' + pratInfo + '</div>'
+    // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
+    // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:18px;display:block;"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + body + '</div>'
