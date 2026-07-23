@@ -80,8 +80,12 @@
 
 <div class="lp-nav">
   <div class="lp-nav-logo">
-    <img src="assets/logo-sciopraxi.png" alt="Sciopraxi"/>
-    <div><small>sciopraxi</small><span>BILANS</span></div>
+    <!-- Verticy mark (pictogramme) sur fond sombre → cadre blanc arrondi
+         (règle fond clair). Suppression du bloc texte « sciopraxi / BILANS »
+         (doublon avec le logo). -->
+    <span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:6px;">
+      <img src="assets/verticy-mark.png" alt="Verticy" style="height:40px;display:block;"/>
+    </span>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
     <button onclick="document.getElementById('pwa-login-form').scrollIntoView({behavior:'smooth'})" style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);padding:9px 20px;border-radius:8px;font-size:13px;cursor:pointer;">Se connecter</button>
@@ -143,7 +147,7 @@
       🔒 Session verrouillée après 20 minutes d'inactivité, par sécurité. Reconnectez-vous pour reprendre votre travail.
     </div>
     <div style="text-align:center;margin-bottom:22px;">
-      <img src="assets/logo-sciopraxi.png" style="height:40px;margin-bottom:12px;"/>
+      <img src="assets/verticy-logo.png" alt="Verticy" style="height:96px;margin-bottom:12px;"/>
       <div style="font-size:16px;font-weight:700;color:#fff;">Connexion</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;">Accédez à votre espace praticien</div>
     </div>
@@ -162,7 +166,7 @@
 
   <div id="pwa-reset-password-form" style="display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:32px;max-width:400px;margin:0 auto 40px;">
     <div style="text-align:center;margin-bottom:22px;">
-      <img src="assets/logo-sciopraxi.png" style="height:40px;margin-bottom:12px;"/>
+      <img src="assets/verticy-logo.png" alt="Verticy" style="height:96px;margin-bottom:12px;"/>
       <div style="font-size:16px;font-weight:700;color:#fff;">Réinitialiser le mot de passe</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;">Choisissez un nouveau mot de passe pour votre compte</div>
     </div>
@@ -373,7 +377,10 @@
 </div>
 <div class="topbar">
   <div class="logo-wrap" style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-    <img src="assets/logo-sciopraxi.png" style="height:40px;object-fit:contain;" alt="Sciopraxi"/>
+    <!-- Verticy mark sur topbar sombre (#0d2347) → cadre blanc arrondi. -->
+    <span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:6px;">
+      <img src="assets/verticy-mark.png" alt="Verticy" style="height:36px;object-fit:contain;display:block;"/>
+    </span>
     <span style="font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.3px;">BILANS</span>
   </div>
   <div class="tnav">
@@ -4599,8 +4606,8 @@
 <div id="rpt-print">
   <div class="rp-hdr">
     <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
-      <div style="background:#0e1f38;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
-        <img src="assets/logo-sciopraxi.png" alt="Sciopraxi" style="height:42px;display:block;">
+      <div style="background:#fff;border-radius:8px;padding:6px 12px;display:flex;align-items:center;">
+        <img src="assets/verticy-mark.png" alt="Verticy" style="height:36px;display:block;">
       </div>
       <div style="font-size:20px;font-weight:700;color:#c8a96e;letter-spacing:3px;">BILAN</div>
     </div>
@@ -4632,7 +4639,8 @@
 
 
 <div id="img-store" style="display:none">
-  <img style="display:none;" id="imgjs-logo-sciopraxi" src="assets/logo-sciopraxi.png">
+  <!-- id="imgjs-logo-sciopraxi" conservé pour compat getElementById dans les 4 générateurs de rapport ; src pointe sur verticy-mark.png (pictogramme compact, lisible à ~64px dans les en-têtes de rapport ; le logo complet serait illisible à cette taille). -->
+  <img style="display:none;" id="imgjs-logo-sciopraxi" alt="Verticy" src="assets/verticy-mark.png">
   <img style="display:none;" id="imgjs-morpho-face" src="assets/morpho-face-anterieure.png">
   <img style="display:none;" id="imgjs-morpho-face2" src="assets/morpho-face-posterieure.png">
   <img style="display:none;" id="imgjs-morpho-profilG" src="assets/morpho-profil-gauche.png">
