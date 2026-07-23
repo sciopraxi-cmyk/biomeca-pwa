@@ -10815,7 +10815,7 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
   // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés
   // dans un cadre blanc arrondi. Style inline sur <img> pour surpasser
   // `.logo{height:50px}` local.
-  bodyHtml += '<span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="'+logo+'" alt="Verticy" style="height:48px;display:block;"/><img src="'+wordmarkSrc+'" alt="Verticy" style="height:18px;display:block;"/></span>';
+  bodyHtml += '<span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="'+logo+'" alt="Verticy" style="height:48px;display:block;"/><img src="'+wordmarkSrc+'" alt="Verticy" style="height:14px;display:block;"/></span>';
   bodyHtml += '<div class="prat-info"><div class="prat-name">'+_escHtml(prat.nom||'')+' '+_escHtml(prat.prenom||'')+' — '+_escHtml(prat.titre||'')+'</div>';
   if(prat.cabinet) bodyHtml += '<div>'+_escHtml(prat.cabinet)+'</div>';
   if(prat.adresse) bodyHtml += '<div>'+_escHtml(prat.adresse)+'</div>';
@@ -11017,7 +11017,7 @@ async function buildRapport() {
             <div class="rp-logo-wrap" style="display:flex;align-items:center;gap:12px;">
               <div style="background:#fff;border-radius:8px;padding:10px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;">
                 <img src="${logoSrc}" alt="Verticy" style="height:48px;display:block;">
-                <img src="${wordmarkSrc}" alt="Verticy" style="height:18px;display:block;">
+                <img src="${wordmarkSrc}" alt="Verticy" style="height:14px;display:block;">
               </div>
               <div style="font-size:20px;font-weight:700;color:#378ADD;letter-spacing:3px;">BILAN</div>
             </div>
@@ -14089,7 +14089,7 @@ function buildPedicurieRapportHTML(){
     + '<div class="rp-page">'
     // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
     // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:18px;display:block;"/></span>' + pratInfo + '</div>'
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Pédicurie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _pedEscapeHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + synth + '</div>'
@@ -14194,7 +14194,7 @@ function buildPodopediatrieRapportHTML() {
     + '<div class="rp-page">'
     // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
     // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:18px;display:block;"/></span>' + pratInfo + '</div>'
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + body + '</div>'
