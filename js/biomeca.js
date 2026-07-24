@@ -13069,11 +13069,12 @@ function _markPodoMorphoTool(activeId) {
 }
 
 // #140 Phase 4a-2 — helper marquage boutons toolbar pieds podo (scope strict
-// pdpsec-8). Miroir _markPodoMorphoTool. Liste fermée des 5 IDs préfixés
-// podo-pieds-tool-* ; toggle .podo-tool-active (rose #e11d48) sur l'actif.
-// Aucun ID morpho podo / sport / posturo dans la liste → additif strict.
+// pdpsec-8). Miroir _markPodoMorphoTool. Liste fermée des 6 IDs préfixés
+// podo-pieds-tool-* (incluant curve-inv) ; toggle .podo-tool-active (rose
+// #e11d48) sur l'actif. Aucun ID morpho podo / sport / posturo dans la liste
+// → additif strict.
 function _markPodoPiedsTool(activeId) {
-  ['podo-pieds-tool-pen','podo-pieds-tool-arrow','podo-pieds-tool-arrow-curve','podo-pieds-tool-circle','podo-pieds-tool-erase'].forEach(id => {
+  ['podo-pieds-tool-pen','podo-pieds-tool-arrow','podo-pieds-tool-arrow-curve','podo-pieds-tool-arrow-curve-inv','podo-pieds-tool-circle','podo-pieds-tool-erase'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.classList.toggle('podo-tool-active', id === activeId);
   });
@@ -13147,6 +13148,8 @@ function setDrawToolCurveInv() {
   _markPosturoFeetTool('btn-curve-inv-posturo-feet');
   // #140 Phase 2b1 — marqueur actif sur ↩ Courbée inv podo-morpho (scope strict #pg-podopediatrie)
   _markPodoMorphoTool('podo-btn-curve-inv-morpho');
+  // #140 Phase 4a-2 fix — marqueur actif sur ↩ Courbée inv podo-pieds (scope strict pdpsec-8)
+  _markPodoPiedsTool('podo-pieds-tool-arrow-curve-inv');
 }
 
 function clearAllMorpho() {

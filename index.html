@@ -2643,6 +2643,7 @@
               <button class="btn" id="podo-pieds-tool-pen" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
               <button class="btn" id="podo-pieds-tool-arrow" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
               <button class="btn" id="podo-pieds-tool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée">↪ Courbée</button>
+              <button class="btn" id="podo-pieds-tool-arrow-curve-inv" onclick="setDrawToolCurveInv()" title="Flèche courbée inversée">↩ Courbée</button>
               <button class="btn" id="podo-pieds-tool-circle" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
               <button class="btn" id="podo-pieds-tool-erase" onclick="setDrawTool('erase')">🧹 Gomme</button>
               <select id="podo-pieds-draw-color-sel" class="inp" style="width:80px;" onchange="drawColor=this.value;">
@@ -2661,9 +2662,13 @@
               <button class="btn" onclick="clearPodoPieds()" style="background:transparent;color:#9f1239;border:1px solid #9f1239;">🗑 Tout effacer</button>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
-              <div>
-                <div class="podo-field-lbl" style="margin-top:0;">Matériaux</div>
+            <!-- Encadrement Matériaux + Recouvrement dans 2 cartes distinctes
+                 (pattern sport #sp-semelles-card L4942-4979). Palette rose podo
+                 (#fff5f7 → #ffe4e9 dégradé, bordure #e11d48, titre #9f1239) au
+                 lieu des couleurs sport (ambre + violet). data-field inchangés. -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+              <div style="background:linear-gradient(135deg,#fff5f7,#ffe4e9);border-left:4px solid #e11d48;border-radius:8px;padding:10px;">
+                <div style="font-size:11px;color:#9f1239;font-weight:700;margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase;">🧱 Matériaux</div>
                 <div class="podo-check-grid">
                   <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_eva"> EVA</label>
                   <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_pe"> PE</label>
@@ -2672,8 +2677,8 @@
                   <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_autre"> Autre</label>
                 </div>
               </div>
-              <div>
-                <div class="podo-field-lbl" style="margin-top:0;">Recouvrement</div>
+              <div style="background:linear-gradient(135deg,#fff5f7,#ffe4e9);border-left:4px solid #e11d48;border-radius:8px;padding:10px;">
+                <div style="font-size:11px;color:#9f1239;font-weight:700;margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase;">🎨 Recouvrement</div>
                 <div class="podo-check-grid">
                   <label><input type="checkbox" class="podopediatrie-field" data-field="podo_recouv_eva"> EVA</label>
                   <label><input type="checkbox" class="podopediatrie-field" data-field="podo_recouv_microfibre"> Microfibre</label>
