@@ -14009,6 +14009,23 @@ function _podoLongApplyState() {
   });
 }
 
+// #140 Phase 3c2b — Examen oculaire (période IV) : sous-bloc « Apparition »
+// visible uniquement si podo_mco = oui. Miroir _podoDowningApplyState :
+// décochage → reset des checkboxes de côté pour éviter les valeurs fantômes.
+function _podoMcoChanged() {
+  var detail = document.getElementById('podo-mco-detail');
+  if (!detail) return;
+  var checked = document.querySelector('#pg-podopediatrie input[name="podo_mco"]:checked');
+  var isOui = (checked && checked.value === 'oui');
+  detail.style.display = isOui ? '' : 'none';
+  if (!isOui) {
+    ['podo_mco_g', 'podo_mco_d'].forEach(function (f) {
+      var cb = document.querySelector('#pg-podopediatrie [data-field="' + f + '"]');
+      if (cb) cb.checked = false;
+    });
+  }
+}
+
 // #140 Phase 1 — Post-load tweaks unifiés (EVA visibility + pré-remplissages).
 // Appelé après loadPodopediatrieBilan dans le nav hook et dans ouvrirBilanPodopediatrie.
 // #140 Phase 2a — Étendu pour reflater les interprétations Morphostatique et
@@ -14031,6 +14048,7 @@ function _podoPostLoadTweaks() {
   _podoDowningApplyState();
   _podoDowningHint();
   _podoLongApplyState();
+  _podoMcoChanged();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
