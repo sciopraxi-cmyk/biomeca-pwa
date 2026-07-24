@@ -13795,9 +13795,39 @@ function _podoPrefillSportDefault() {
   if (input) input.value = patientSport;
 }
 
+// =====================================================================
+// #140 Phase 4c-1 — SEUILS CLINIQUES PODOPÉDIATRIE (source unique)
+// =====================================================================
+// Constantes extraites des helpers d'interprétation. Toute modification
+// d'un seuil se fait ICI et propage aux 5 helpers (_podoAxeCalcInterpret,
+// _podoNavicInterpret, _podoCourburesInterpret, _podoGenuInterpret,
+// _podoCyphoseInterpret) ET au collecteur de synthèse
+// _collectPodopediatrieSyntheseSections. Objectif : éliminer toute
+// divergence entre l'interprétation d'un champ à l'écran et le verdict
+// « hors normes » qui remontera dans la synthèse et le rapport PDF.
+// TTE et AF ont leurs propres tables (_PODO_TTE_REF, _PODO_AF_REF,
+// _PODO_AF_TOL, cf. Spec_Podopediatrie.md §1), également partagées.
+var _PODO_THR_AXECALC_DEG        = 2;       // axe calcanéen ≥ 2° = significatif
+var _PODO_THR_NAVIC_ECART_CM     = 1;       // écart navic ≥ 1 cm = anormal
+var _PODO_THR_GENU_INTERMALL_CM  = 3;       // valgum > 3 cm inter-mall = anormal
+var _PODO_THR_GENU_INTERCOND_CM  = 7;       // varum > 7 cm inter-cond = anormal
+var _PODO_THR_CYPHOSE_MIN_CM     = 10;      // > 10 cm = réductible physiologique
+var _PODO_THR_FLECHE_CERVICALE   = [6, 8];  // [min, max] cm normal
+var _PODO_THR_FLECHE_LOMBAIRE    = [4, 6];
+// FPI (Foot Posture Index, Spec §2) : classe 'Normal' pour somme ∈ [0, 5].
+// Toute autre valeur = hors normes (pronation ou supination).
+function _podoFpiClassify(sum) {
+  if (sum >= 0 && sum <= 5)   return 'Normal';
+  if (sum >= 6 && sum <= 9)   return 'En pronation';
+  if (sum > 9)                return 'Hautement en pronation';
+  if (sum >= -4 && sum <= -1) return 'En supination';
+  return 'Hautement en supination'; // sum ∈ [−12, −5]
+}
+
 // #140 Phase 2a — Interprétation Axe calcanéen (par pied). Seuil physiologique
-// < 2° / significatif ≥ 2°. Ligne affichée sous le select des degrés. Rejoue à
-// chaque onchange direction/degrés + au chargement (via _podoPostLoadTweaks).
+// < _PODO_THR_AXECALC_DEG° / significatif ≥ _PODO_THR_AXECALC_DEG°. Ligne
+// affichée sous le select des degrés. Rejoue à chaque onchange direction/degrés
+// + au chargement (via _podoPostLoadTweaks).
 function _podoAxeCalcInterpret() {
   ['g', 'd'].forEach(function (side) {
     var el = document.getElementById('podo-axecalc-' + side + '-interpret');
@@ -13809,7 +13839,9 @@ function _podoAxeCalcInterpret() {
     if (!dir || dir === 'neutre') { el.textContent = dir === 'neutre' ? 'Axe neutre' : ''; return; }
     if (degRaw === '' || degRaw == null) { el.textContent = 'Tendance ' + dir + ' — précisez les degrés'; return; }
     var deg = parseFloat(degRaw);
-    var qualif = (deg < 2) ? 'physiologique (< 2°)' : 'significatif (≥ 2°)';
+    var qualif = (deg < _PODO_THR_AXECALC_DEG)
+      ? 'physiologique (< ' + _PODO_THR_AXECALC_DEG + '°)'
+      : 'significatif (≥ ' + _PODO_THR_AXECALC_DEG + '°)';
     el.textContent = 'Tendance ' + dir + ' ' + deg + '° — ' + qualif;
   });
 }
@@ -13829,7 +13861,9 @@ function _podoNavicInterpret() {
     var ecart = Math.abs(parseFloat(ch) - parseFloat(de));
     // Formatage FR (virgule décimale) pour cohérence avec les options select.
     var ecartTxt = (Math.round(ecart * 10) / 10).toString().replace('.', ',');
-    var qualif = (ecart < 1) ? 'normal (< 1 cm)' : 'défaut de maintien de l\'arche médiale (≥ 1 cm)';
+    var qualif = (ecart < _PODO_THR_NAVIC_ECART_CM)
+      ? 'normal (< ' + _PODO_THR_NAVIC_ECART_CM + ' cm)'
+      : 'défaut de maintien de l\'arche médiale (≥ ' + _PODO_THR_NAVIC_ECART_CM + ' cm)';
     el.textContent = 'Écart ' + ecartTxt + ' cm — ' + qualif;
   });
 }
@@ -13852,8 +13886,8 @@ function _podoCourburesInterpret() {
       : 'hors normes (norme ' + min + '–' + max + ' cm)';
     el.textContent = vTxt + ' cm — ' + qualif;
   };
-  check('podo_fleche_cervicale', 'podo-fleche-cervicale-interpret', 6, 8);
-  check('podo_fleche_lombaire', 'podo-fleche-lombaire-interpret', 4, 6);
+  check('podo_fleche_cervicale', 'podo-fleche-cervicale-interpret', _PODO_THR_FLECHE_CERVICALE[0], _PODO_THR_FLECHE_CERVICALE[1]);
+  check('podo_fleche_lombaire',  'podo-fleche-lombaire-interpret',  _PODO_THR_FLECHE_LOMBAIRE[0],  _PODO_THR_FLECHE_LOMBAIRE[1]);
 }
 
 // #140 Phase 2a fix — Suspicion d'Achille court : la combinaison marche sur
@@ -13938,13 +13972,9 @@ function _podoFpiInterpret() {
       el.textContent = filled + '/6 items renseignés — total partiel : ' + (sum > 0 ? '+' : '') + sum;
       return;
     }
-    var classe;
-    if (sum >= 0 && sum <= 5) classe = 'Normal';
-    else if (sum >= 6 && sum <= 9) classe = 'En pronation';
-    else if (sum > 9) classe = 'Hautement en pronation';
-    else if (sum >= -4 && sum <= -1) classe = 'En supination';
-    else classe = 'Hautement en supination'; // sum ∈ [−12, −5]
-    el.textContent = 'Total : ' + (sum > 0 ? '+' : '') + sum + ' — ' + classe;
+    // Classification déportée dans _podoFpiClassify (source unique partagée
+    // avec le collecteur de synthèse pour éviter la divergence).
+    el.textContent = 'Total : ' + (sum > 0 ? '+' : '') + sum + ' — ' + _podoFpiClassify(sum);
   });
 }
 
@@ -14089,11 +14119,11 @@ function _podoGenuInterpret() {
   var condInput = document.querySelector('#pg-podopediatrie [data-field="podo_genu_intercond"]');
   var mall = (mallInput && mallInput.value !== '') ? parseFloat(mallInput.value) : null;
   var cond = (condInput && condInput.value !== '') ? parseFloat(condInput.value) : null;
-  if (type === 'valgum' && mall != null && mall > 3) {
-    el.textContent = 'Inter-malléolaire > 3 cm : au-delà de la physiologie';
+  if (type === 'valgum' && mall != null && mall > _PODO_THR_GENU_INTERMALL_CM) {
+    el.textContent = 'Inter-malléolaire > ' + _PODO_THR_GENU_INTERMALL_CM + ' cm : au-delà de la physiologie';
     _podoInterpretStyle(el, 'ko');
-  } else if (type === 'varum' && cond != null && cond > 7) {
-    el.textContent = 'Inter-condylien > 7 cm : au-delà de la physiologie';
+  } else if (type === 'varum' && cond != null && cond > _PODO_THR_GENU_INTERCOND_CM) {
+    el.textContent = 'Inter-condylien > ' + _PODO_THR_GENU_INTERCOND_CM + ' cm : au-delà de la physiologie';
     _podoInterpretStyle(el, 'ko');
   } else if ((type === 'valgum' && mall != null) || (type === 'varum' && cond != null)) {
     el.textContent = 'Dans la physiologie';
@@ -14114,11 +14144,11 @@ function _podoCyphoseInterpret() {
   if (raw === '' || raw == null) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
   var v = parseFloat(raw);
   if (isNaN(v)) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
-  if (v > 10) {
+  if (v > _PODO_THR_CYPHOSE_MIN_CM) {
     el.textContent = 'Cyphose réductible (physiologique)';
     _podoInterpretStyle(el, 'ok');
   } else {
-    el.textContent = 'Cyphose peu réductible (< 10 cm)';
+    el.textContent = 'Cyphose peu réductible (≤ ' + _PODO_THR_CYPHOSE_MIN_CM + ' cm)';
     _podoInterpretStyle(el, 'ko');
   }
 }
@@ -14205,6 +14235,408 @@ function _podoMcoChanged() {
       if (cb) cb.checked = false;
     });
   }
+}
+
+// =====================================================================
+// #140 Phase 4c-1 — SYNTHÈSE PODOPÉDIATRIE (collecteur + renderer)
+// ─────────────────────────────────────────────────────────────────────
+// Architecture : _collectPodopediatrieSyntheseSections() est L'UNIQUE
+// source de la synthèse écran ET du rapport PDF (Phase 4c-2). Ne jamais
+// dupliquer la collecte — la tâche #96 posturo l'a payé.
+//
+// Lecteurs génériques (labelOf/checkedBoxes/radioVal/fieldVal/selectText)
+// inspirés de genererSynthesePedicurie L14431. Filtrage par préfixe
+// data-field : tout champ ajouté plus tard remonte automatiquement, sans
+// maintenance de la synthèse.
+//
+// Section « ⚠️ Éléments à signaler » en tête : consomme les MÊMES
+// constantes de seuils que les helpers d'interprétation (_PODO_THR_*,
+// _PODO_TTE_REF, _PODO_AF_REF, _PODO_AF_TOL). Zéro seuil hardcodé une
+// deuxième fois → impossibilité de divergence entre l'interprétation
+// écran et le verdict alerte.
+// =====================================================================
+function _collectPodopediatrieSyntheseSections() {
+  var root = document.getElementById('pg-podopediatrie');
+  if (!root) return [];
+  var d = (typeof currentPatient !== 'undefined' && currentPatient)
+    ? (currentPatient.bilanDataPodopediatrie || {}) : {};
+
+  // ─── Lecteurs génériques ───────────────────────────────────────
+  function labelOf(el) {
+    var lab = el.closest('label');
+    var txt = lab ? lab.textContent : '';
+    return txt.replace(/\s+/g, ' ').trim();
+  }
+  function checkedBoxes() {
+    var res = [];
+    root.querySelectorAll('input[type="checkbox"].podopediatrie-field').forEach(function (cb) {
+      if (!cb.checked) return;
+      var f = cb.getAttribute('data-field') || '';
+      res.push({ field: f, label: labelOf(cb) });
+    });
+    return res;
+  }
+  function radioVal(name) {
+    var el = root.querySelector('input[name="' + name + '"]:checked');
+    return el ? { value: el.value, label: labelOf(el) } : null;
+  }
+  function fieldVal(f) {
+    var el = root.querySelector('[data-field="' + f + '"]');
+    if (!el) return '';
+    return (el.value || '').trim();
+  }
+  function selectText(f) {
+    var el = root.querySelector('select[data-field="' + f + '"]');
+    if (!el || !el.value) return '';
+    var opt = el.options[el.selectedIndex];
+    return opt ? opt.textContent.trim() : el.value;
+  }
+  function pfx() {
+    var prefixes = Array.prototype.slice.call(arguments);
+    return function (b) {
+      return prefixes.some(function (p) { return b.field.indexOf(p) === 0; });
+    };
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function kv(label, value) { return '<strong>' + esc(label) + '</strong> : ' + esc(value); }
+  function boxItems(predicate, sep) {
+    var arr = checkedBoxes().filter(predicate).map(function (b) { return esc(b.label); });
+    return arr.length ? [arr.join(sep || ', ')] : [];
+  }
+  function radioItem(name, label) {
+    var r = radioVal(name);
+    return r ? kv(label, r.label) : '';
+  }
+  function txtItem(field, label) {
+    var v = fieldVal(field);
+    return v ? kv(label, v) : '';
+  }
+
+  // ─── Section 1 : ⚠️ Éléments à signaler ─────────────────────
+  // Consomme uniquement les constantes _PODO_THR_* / _PODO_TTE_REF /
+  // _PODO_AF_REF / _PODO_AF_TOL — jamais de littéral seuil ici.
+  var alerts = [];
+  function alertItem(txt) { alerts.push('<span style="color:#b91c1c;font-weight:600;">' + esc(txt) + '</span>'); }
+
+  // Axe calcanéen ≥ _PODO_THR_AXECALC_DEG° (par pied)
+  ['g', 'd'].forEach(function (side) {
+    var dir = (root.querySelector('input[name="podo_axecalc_' + side + '_dir"]:checked') || {}).value;
+    var degRaw = fieldVal('podo_axecalc_' + side + '_deg');
+    if (dir && dir !== 'neutre' && degRaw !== '' && parseFloat(degRaw) >= _PODO_THR_AXECALC_DEG) {
+      alertItem('Axe calcanéen pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : tendance ' + dir + ' ' + degRaw + '° (≥ ' + _PODO_THR_AXECALC_DEG + '°)');
+    }
+  });
+  // Navicular drop ≥ _PODO_THR_NAVIC_ECART_CM cm (par pied)
+  ['g', 'd'].forEach(function (side) {
+    var ch = fieldVal('podo_navic_' + side + '_charge');
+    var de = fieldVal('podo_navic_' + side + '_decharge');
+    if (ch !== '' && de !== '') {
+      var ecart = Math.abs(parseFloat(ch) - parseFloat(de));
+      if (ecart >= _PODO_THR_NAVIC_ECART_CM) {
+        var t = (Math.round(ecart * 10) / 10).toString().replace('.', ',');
+        alertItem('Navicular drop pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : écart ' + t + ' cm (≥ ' + _PODO_THR_NAVIC_ECART_CM + ' cm)');
+      }
+    }
+  });
+  // FPI hors [0, 5] (classe non-'Normal')
+  var _FPI_ITEMS = ['talus', 'malleole', 'calcaneus', 'talonav', 'arche', 'avantpied'];
+  ['g', 'd'].forEach(function (side) {
+    var sum = 0, filled = 0;
+    _FPI_ITEMS.forEach(function (it) {
+      var v = (root.querySelector('input[name="podo_fpi_' + side + '_' + it + '"]:checked') || {}).value;
+      if (v != null) { sum += parseInt(v, 10); filled++; }
+    });
+    if (filled === 6) {
+      var classe = _podoFpiClassify(sum);
+      if (classe !== 'Normal') {
+        alertItem('FPI pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : ' + (sum > 0 ? '+' : '') + sum + ' — ' + classe);
+      }
+    }
+  });
+  // TTE hors bande de la tranche d'âge
+  var ageMonths = d.ageMonths;
+  var ageY = (ageMonths != null && !isNaN(ageMonths)) ? Math.round(ageMonths / 12) : null;
+  ['g', 'd'].forEach(function (side) {
+    var raw = fieldVal('podo_tte_' + side);
+    if (raw === '' || ageY == null || ageY < 4) return;
+    var band = null;
+    for (var i = 0; i < _PODO_TTE_REF.length; i++) {
+      if (ageY >= _PODO_TTE_REF[i].minAge && ageY <= _PODO_TTE_REF[i].maxAge) { band = _PODO_TTE_REF[i]; break; }
+    }
+    if (!band) return;
+    var v = parseFloat(raw);
+    if (v < band.lo || v > band.hi) {
+      alertItem('TTE pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : ' + raw + '° hors bande [' + band.lo + '–' + band.hi + '°] pour ' + ageY + ' ans');
+    }
+  });
+  // AF hors moyenne ± _PODO_AF_TOL
+  ['g', 'd'].forEach(function (side) {
+    var raw = fieldVal('podo_af_' + side);
+    if (raw === '' || ageY == null || ageY < 1) return;
+    var lookup = ageY > 16 ? 16 : ageY;
+    var mean = _PODO_AF_REF[lookup];
+    if (mean == null) return;
+    var v = parseFloat(raw);
+    if (Math.abs(v - mean) > _PODO_AF_TOL) {
+      alertItem('AF pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : ' + raw + '° hors norme (attendu ~' + mean + '° à ' + ageY + ' ans, tolérance ±' + _PODO_AF_TOL + '°)');
+    }
+  });
+  // Genou : inter-mall > _PODO_THR_GENU_INTERMALL_CM ou inter-cond > _PODO_THR_GENU_INTERCOND_CM
+  var genuType = (root.querySelector('input[name="podo_genu_type"]:checked') || {}).value;
+  if (genuType === 'valgum') {
+    var mall = fieldVal('podo_genu_intermall');
+    if (mall !== '' && parseFloat(mall) > _PODO_THR_GENU_INTERMALL_CM) {
+      alertItem('Genou valgum : inter-malléolaire ' + mall + ' cm (> ' + _PODO_THR_GENU_INTERMALL_CM + ' cm)');
+    }
+  } else if (genuType === 'varum') {
+    var cond = fieldVal('podo_genu_intercond');
+    if (cond !== '' && parseFloat(cond) > _PODO_THR_GENU_INTERCOND_CM) {
+      alertItem('Genou varum : inter-condylien ' + cond + ' cm (> ' + _PODO_THR_GENU_INTERCOND_CM + ' cm)');
+    }
+  }
+  // Flèches rachidiennes hors bornes
+  function checkFleche(field, bounds, label) {
+    var raw = fieldVal(field);
+    if (raw === '') return;
+    var v = parseFloat(raw);
+    if (v < bounds[0] || v > bounds[1]) {
+      alertItem(label + ' : ' + raw + ' cm hors norme [' + bounds[0] + '–' + bounds[1] + ' cm]');
+    }
+  }
+  checkFleche('podo_fleche_cervicale', _PODO_THR_FLECHE_CERVICALE, 'Flèche cervicale');
+  checkFleche('podo_fleche_lombaire',  _PODO_THR_FLECHE_LOMBAIRE,  'Flèche lombaire');
+  // Test d'Adam avec gibbosité
+  var adam = (root.querySelector('input[name="podo_adam_gibbosite"]:checked') || {}).value;
+  if (adam === 'oui') alertItem('Test d\'Adam : gibbosité présente');
+  // Cyphose : distance ≤ _PODO_THR_CYPHOSE_MIN_CM cm
+  var cyph = fieldVal('podo_cyphose_dist');
+  if (cyph !== '' && parseFloat(cyph) <= _PODO_THR_CYPHOSE_MIN_CM) {
+    alertItem('Cyphose peu réductible : distance ' + cyph + ' cm (≤ ' + _PODO_THR_CYPHOSE_MIN_CM + ' cm)');
+  }
+  // Trendelenburg grade 3 ou 4 (par côté)
+  ['g', 'd'].forEach(function (side) {
+    var g = (root.querySelector('input[name="podo_trendelenburg_' + side + '"]:checked') || {}).value;
+    if (g === '3' || g === '4') {
+      alertItem('Trendelenburg pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : grade ' + g);
+    }
+  });
+  // Instabilité monopodale cochée (cheville ou genou)
+  ['g', 'd'].forEach(function (side) {
+    var sideLbl = side === 'g' ? 'gauche' : 'droit';
+    if (root.querySelector('[data-field="podo_stab_' + side + '_cheville"]:checked')) {
+      alertItem('Instabilité monopodale de cheville pied ' + sideLbl);
+    }
+    if (root.querySelector('[data-field="podo_stab_' + side + '_genou"]:checked')) {
+      alertItem('Instabilité monopodale de genou pied ' + sideLbl);
+    }
+  });
+  // Suspicion d'Achille court (marche talons impossible ET accroupissement impossible)
+  var talons  = (root.querySelector('input[name="podo_marche_talons"]:checked')  || {}).value;
+  var accroup = (root.querySelector('input[name="podo_accroupissement"]:checked') || {}).value;
+  if (talons === 'impossible' && accroup === 'non') {
+    alertItem('Suspicion d\'Achille court (marche sur talons impossible + accroupissement impossible)');
+  }
+  // Chaque suspicion de la Conclusion cochée « oui », avec précision
+  var _SUSP_LABELS = {
+    neuro: 'Pathologie neurologique', boiterie: 'Boiterie d\'esquive',
+    hanche: 'Pathologie de la hanche', posturale: 'Pathologie posturale',
+    genou: 'Pathologie du genou',      pied: 'Pathologie du pied'
+  };
+  Object.keys(_SUSP_LABELS).forEach(function (k) {
+    var r = (root.querySelector('input[name="podo_susp_' + k + '"]:checked') || {}).value;
+    if (r === 'oui') {
+      var prec = fieldVal('podo_susp_' + k + '_precision');
+      alertItem('Suspicion : ' + _SUSP_LABELS[k] + (prec ? ' — ' + prec : ''));
+    }
+  });
+
+  // ─── Sections cliniques (ordre des onglets) ─────────────────────
+  var sections = [];
+  if (alerts.length) sections.push({ titre: '⚠️ Éléments à signaler', items: alerts });
+
+  // Interrogatoire (préfixes larges — tout champ podo_motif_* / podo_atcd_*
+  // / podo_exam_* / podo_doul_* remonte automatiquement via boxItems+pfx).
+  // Corrections audit : txt/pres/loc/type inexistants supprimés, podo_sport
+  // est un data-field text (pas radio), douleur = radio podo_douleur_eva.
+  sections.push({ titre: '📋 Interrogatoire', items: [].concat(
+    boxItems(pfx('podo_motif_')).length ? ['<strong>Motif</strong> : ' + boxItems(pfx('podo_motif_')).join(', ')] : []
+  ).concat(
+    boxItems(pfx('podo_atcd_')).length ? ['<strong>ATCD</strong> : ' + boxItems(pfx('podo_atcd_')).join(', ')] : []
+  ).concat([
+    txtItem('podo_atcd_txt', 'ATCD précisions')
+  ]).concat(
+    boxItems(pfx('podo_exam_')).length ? ['<strong>Examens</strong> : ' + boxItems(pfx('podo_exam_')).join(', ')] : []
+  ).concat(
+    boxItems(pfx('podo_doul_')).length ? ['<strong>Douleur — localisation / horaire</strong> : ' + boxItems(pfx('podo_doul_')).join(', ')] : []
+  ).concat([
+    radioItem('podo_douleur_eva', 'Douleur EVA'),
+    txtItem('podo_sport',         'Sport pratiqué')
+  ]) });
+
+  // Réflexes archaïques (préfixe podo_reflexe_)
+  sections.push({ titre: '🧠 Réflexes archaïques', items: boxItems(pfx('podo_reflexe_')) });
+
+  // Marche — 9 radios réels (audit) + accroupissement + txt course.
+  // Corrections audit : saute/cloche inexistants supprimés.
+  sections.push({ titre: '🚶 Marche', items: [
+    radioItem('podo_marche_talons',       'Marche sur talons'),
+    radioItem('podo_marche_pointes',      'Marche sur pointes'),
+    radioItem('podo_accroupissement',     'Accroupissement'),
+    radioItem('podo_marche_attaque',      'Attaque du pas'),
+    radioItem('podo_marche_plantigrade',  'Plantigrade'),
+    radioItem('podo_marche_digitigrade',  'Digitigrade'),
+    radioItem('podo_marche_valgus',       'Valgus'),
+    radioItem('podo_marche_varus',        'Varus'),
+    radioItem('podo_marche_oscillatoire', 'Marche oscillatoire'),
+    radioItem('podo_marche_course',       'Course'),
+    txtItem('podo_marche_course_txt',     'Course — précisions')
+  ] });
+
+  // Morphostatique
+  sections.push({ titre: '🦴 Morphostatique', items: [
+    radioItem('podo_jack',      'Test de Jack'),
+    radioItem('podo_giration',  'Giration bassin'),
+    radioItem('podo_axecalc_g_dir', 'Axe calcanéen gauche'),
+    txtItem('podo_axecalc_g_deg', 'Axe calc. G (°)'),
+    radioItem('podo_axecalc_d_dir', 'Axe calcanéen droit'),
+    txtItem('podo_axecalc_d_deg', 'Axe calc. D (°)'),
+    txtItem('podo_navic_g_charge', 'Navic G charge (cm)'),
+    txtItem('podo_navic_g_decharge', 'Navic G décharge (cm)'),
+    txtItem('podo_navic_d_charge', 'Navic D charge (cm)'),
+    txtItem('podo_navic_d_decharge', 'Navic D décharge (cm)'),
+    txtItem('podo_fleche_cervicale', 'Flèche cervicale (cm)'),
+    txtItem('podo_fleche_lombaire',  'Flèche lombaire (cm)'),
+    radioItem('podo_adam_gibbosite',    'Test d\'Adam'),
+    radioItem('podo_adam_localisation', 'Adam — localisation')
+  ].concat(boxItems(pfx('podo_morpho_'))) });
+
+  // FPI — total + classe par pied
+  var fpiItems = [];
+  ['g', 'd'].forEach(function (side) {
+    var sum = 0, filled = 0;
+    _FPI_ITEMS.forEach(function (it) {
+      var v = (root.querySelector('input[name="podo_fpi_' + side + '_' + it + '"]:checked') || {}).value;
+      if (v != null) { sum += parseInt(v, 10); filled++; }
+    });
+    if (filled === 6) {
+      fpiItems.push(kv('FPI pied ' + (side === 'g' ? 'gauche' : 'droit'), (sum > 0 ? '+' : '') + sum + ' — ' + _podoFpiClassify(sum)));
+    } else if (filled > 0) {
+      fpiItems.push(kv('FPI pied ' + (side === 'g' ? 'gauche' : 'droit'), filled + '/6 items — partiel'));
+    }
+  });
+  sections.push({ titre: '👣 FPI', items: fpiItems });
+
+  // Charge / Stabilité
+  sections.push({ titre: '⚖️ Charge / Stabilité', items: [
+    radioItem('podo_trendelenburg_g', 'Trendelenburg G'),
+    radioItem('podo_trendelenburg_d', 'Trendelenburg D'),
+    radioItem('podo_nucale_limitation', 'Rotation nucale'),
+    radioItem('podo_nucale_mousse', 'Nucale sur mousse'),
+    radioItem('podo_nucale_yeux',   'Nucale yeux fermés'),
+    radioItem('podo_nucale_dents',  'Nucale dents serrées'),
+    radioItem('podo_nucale_bouche', 'Nucale bouche ouverte'),
+    radioItem('podo_nucale_assis',  'Nucale assis'),
+    radioItem('podo_nucale_parasite', 'Parasite'),
+    txtItem('podo_nucale_parasite_origine', 'Parasite origine'),
+    radioItem('podo_romberg_lat_dir', 'Romberg latéralisé'),
+    radioItem('podo_romberg_rot_dir', 'Romberg rotation'),
+    radioItem('podo_maddox_g', 'Maddox œil gauche'),
+    radioItem('podo_maddox_d', 'Maddox œil droit'),
+    radioItem('podo_lang', 'Test de Lang'),
+    radioItem('podo_mco',  'MCO')
+  ].concat(boxItems(pfx('podo_stab_'))).concat(boxItems(pfx('podo_romberg_'))).concat(boxItems(pfx('podo_mco_'))) });
+
+  // Décharge
+  sections.push({ titre: '🛌 Décharge', items: [
+    radioItem('podo_ortolani', 'Ortolani'),
+    txtItem('podo_tte_g', 'TTE G (°)'),
+    txtItem('podo_tte_d', 'TTE D (°)'),
+    txtItem('podo_af_g',  'AF G (°)'),
+    txtItem('podo_af_d',  'AF D (°)'),
+    radioItem('podo_genu_type', 'Genou'),
+    txtItem('podo_genu_intermall', 'Inter-malléolaire (cm)'),
+    txtItem('podo_genu_intercond', 'Inter-condylien (cm)'),
+    txtItem('podo_cyphose_dist', 'Cyphose distance (cm)'),
+    radioItem('podo_tfd', 'TFD'),
+    radioItem('podo_tfa', 'TFA'),
+    radioItem('podo_rep_eias',  'EIAS'),
+    radioItem('podo_rep_eips',  'EIPS'),
+    radioItem('podo_rep_crete', 'Crête iliaque'),
+    radioItem('podo_long_dd', 'Longueur MI DD'),
+    radioItem('podo_long_dd_side', 'Côté DD'),
+    radioItem('podo_long_pc', 'Longueur MI PC'),
+    radioItem('podo_long_pc_side', 'Côté PC')
+  ].concat(boxItems(pfx('podo_downing_')))
+   // Mobilisation ostéo-articulaire : radios uniquement (0 data-field), boucle
+   // explicite plutôt que pfx (qui ne capte que les checkboxes).
+   .concat((function () {
+     var out = [];
+     [['coxo', 'Coxo-fémorale'], ['genou', 'Genou'], ['cheville', 'Cheville'], ['pied', 'Pied']].forEach(function (art) {
+       ['g', 'd'].forEach(function (side) {
+         var r = radioVal('podo_mobilisation_' + art[0] + '_' + side);
+         if (r) out.push(kv(art[1] + ' ' + (side === 'g' ? 'gauche' : 'droite'), r.label));
+       });
+     });
+     return out;
+   }())) });
+
+  // Chaussure
+  sections.push({ titre: '👟 Chaussure', items: [
+    txtItem('podo_pointure', 'Pointure')
+  ].concat(boxItems(pfx('podo_chauss'))) });
+
+  // Traitement
+  sections.push({ titre: '💊 Traitement', items: [
+    txtItem('podo_semelles_desc', 'Semelles — description')
+  ].concat(boxItems(pfx('podo_mat_')).length ? ['<strong>Matériaux</strong> : ' + boxItems(pfx('podo_mat_')).join(', ')] : [])
+   .concat(boxItems(pfx('podo_recouv_')).length ? ['<strong>Recouvrement</strong> : ' + boxItems(pfx('podo_recouv_')).join(', ')] : [])
+   .concat(boxItems(pfx('podo_conseil_')).length ? ['<strong>Conseils</strong> : ' + boxItems(pfx('podo_conseil_')).join(', ')] : [])
+   .concat([txtItem('podo_conseil_precision', 'Conseils précisions')])
+   .concat(boxItems(pfx('podo_orient_')).length ? ['<strong>Orientation</strong> : ' + boxItems(pfx('podo_orient_')).join(', ')] : [])
+   .concat([
+     txtItem('podo_orient_precision', 'Orientation motif'),
+     radioItem('podo_suivi_delai', 'Délai de contrôle (mois)')
+   ]) });
+
+  // Conclusion
+  sections.push({ titre: '📄 Conclusion', items: [].concat(
+    boxItems(pfx('podo_diag_')).length ? ['<strong>Diagnostic retenu</strong> : ' + boxItems(pfx('podo_diag_')).join(', ')] : []
+  ).concat([
+    txtItem('podo_conclusion_txt', 'Conclusion clinique')
+  ]) });
+
+  // Filtre les sections vides (items tous vides après trim). La section
+  // « ⚠️ Éléments à signaler » est ajoutée en tête et ne subit pas ce filtre
+  // (déjà conditionnée sur alerts.length).
+  return sections.map(function (s) {
+    return { titre: s.titre, items: s.items.filter(function (i) { return i && String(i).trim() !== ''; }) };
+  }).filter(function (s) { return s.items.length > 0; });
+}
+
+// Renderer écran — palette rose podopédiatrie. Lecture seule stricte :
+// aucun élément produit ne porte class="podopediatrie-field" ni data-field,
+// donc savePodopediatrieBilan ne pollue pas bilanDataPodopediatrie
+// (même règle que l'onglet Rapport).
+function _renderPodopediatrieSynthese() {
+  var out = document.getElementById('podopediatrie-synthese-body');
+  if (!out) return;
+  var sections = _collectPodopediatrieSyntheseSections();
+  if (!sections.length) {
+    out.innerHTML = '<div style="font-size:13px;color:var(--mut);font-style:italic;padding:8px 0;">Aucune donnée renseignée pour le moment.</div>';
+    return;
+  }
+  var html = sections.map(function (s) {
+    var lis = s.items.map(function (it) { return '<li style="margin:3px 0;">' + it + '</li>'; }).join('');
+    return '<div style="margin-bottom:14px;">'
+         + '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#9f1239;border-bottom:1px solid rgba(225,29,72,0.25);padding-bottom:3px;margin-bottom:6px;">' + s.titre + '</div>'
+         + '<ul style="margin:0;padding-left:18px;list-style:disc;font-size:13px;line-height:1.5;">' + lis + '</ul>'
+         + '</div>';
+  }).join('');
+  out.innerHTML = '<div style="background:#fff5f7;border:1px solid #fecdd3;border-radius:8px;padding:12px 14px;">' + html + '</div>';
 }
 
 // #140 Phase 1 — Post-load tweaks unifiés (EVA visibility + pré-remplissages).
@@ -14321,6 +14753,12 @@ function showPodopediatrieSection(idx) {
         initPodoPiedsCanvas(currentPatient?.bilanDataPodopediatrie?._podo_pieds);
       }
     }, 50);
+  }
+  // #140 Phase 4c-1 — Onglet Synthèse (idx 9) : régénère la vue en lecture
+  // seule à chaque activation. Source unique de vérité partagée avec le
+  // futur rapport PDF (Phase 4c-2) via _collectPodopediatrieSyntheseSections.
+  if (target === 9) {
+    if (typeof _renderPodopediatrieSynthese === 'function') _renderPodopediatrieSynthese();
   }
   // #140 Phase 0b — Onglet Rapport : régénère l'aperçu à chaque activation.
   // Le body est reflété tel qu'il sortirait à l'impression : toute donnée

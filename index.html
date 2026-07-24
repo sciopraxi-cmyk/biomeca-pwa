@@ -2753,7 +2753,19 @@
       </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-9" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📊 Synthèse — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">📊 Synthèse</div>
+          <div style="font-size:11px;color:var(--mut);font-style:italic;margin-bottom:10px;">
+            Vue en lecture seule alimentée par les saisies des autres onglets. Régénérée à chaque activation.
+          </div>
+          <!-- #140 Phase 4c-1 — Container de rendu de la synthèse. Aucune classe
+               podopediatrie-field ni data-field ici : le contenu est produit par
+               _renderPodopediatrieSynthese à target === 9 dans showPodopediatrieSection.
+               Lecture seule stricte pour ne pas polluer bilanDataPodopediatrie. -->
+          <div id="podopediatrie-synthese-body"></div>
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-10" data-periodes="II III IV" style="display:none;">
       <div class="card">
