@@ -2615,7 +2615,92 @@
       </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-8" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">💊 Traitement — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">💊 Traitement</div>
+
+          <!-- 1. Plan de semelles -->
+          <div class="podo-block-title">🦶 Plan de semelles</div>
+          <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+            <div class="podo-field-lbl" style="margin-top:0;">Description</div>
+            <textarea class="inp podopediatrie-field" data-field="podo_semelles_desc" rows="3" placeholder="Description du plan de semelles…" style="width:100%;"></textarea>
+
+            <!-- Phase 4a-2 : schéma plantaire dessinable à insérer ici -->
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+              <div>
+                <div class="podo-field-lbl" style="margin-top:0;">Matériaux</div>
+                <div class="podo-check-grid">
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_eva"> EVA</label>
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_pe"> PE</label>
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_resine"> Résine</label>
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_mousse"> Mousse</label>
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_mat_autre"> Autre</label>
+                </div>
+              </div>
+              <div>
+                <div class="podo-field-lbl" style="margin-top:0;">Recouvrement</div>
+                <div class="podo-check-grid">
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_recouv_eva"> EVA</label>
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_recouv_microfibre"> Microfibre</label>
+                  <label><input type="checkbox" class="podopediatrie-field" data-field="podo_recouv_peaucerie"> Peaucerie naturelle</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Conseils et mesures associées -->
+          <div class="podo-block-title">💡 Conseils et mesures associées</div>
+          <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+            <div class="podo-check-grid">
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_conseil_chaussage"> Conseils de chaussage</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_conseil_piedsnus"> Marche pieds nus</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_conseil_activite"> Activité physique</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_conseil_proprio"> Exercices proprioceptifs</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_conseil_surveillance"> Abstention et surveillance simple</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_conseil_autre"> Autre</label>
+            </div>
+            <div class="podo-field-lbl">Précisions</div>
+            <textarea class="inp podopediatrie-field" data-field="podo_conseil_precision" rows="2" placeholder="Précisions…" style="width:100%;"></textarea>
+          </div>
+
+          <!-- 3. Orientation -->
+          <div class="podo-block-title">➡️ Orientation vers un autre professionnel</div>
+          <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+            <div class="podo-check-grid">
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_medecin"> Médecin traitant / pédiatre</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_orthopediste"> Orthopédiste</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_neurologue"> Neurologue</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_ophtalmo"> Ophtalmologue / orthoptiste</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_orl"> ORL</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_dentiste"> Dentiste / orthodontiste</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_kine"> Kinésithérapeute</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_ergo"> Ergothérapeute</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_psychomot"> Psychomotricien</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_neuropsy"> Neuropsychologue</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_psychologue"> Psychologue</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_psychiatre"> Psychiatre</label>
+              <label><input type="checkbox" class="podopediatrie-field" data-field="podo_orient_osteo"> Ostéopathe</label>
+            </div>
+            <div class="podo-field-lbl">Motif de l'orientation</div>
+            <textarea class="inp podopediatrie-field" data-field="podo_orient_precision" rows="2" placeholder="Motif de l'orientation…" style="width:100%;"></textarea>
+          </div>
+
+          <!-- 4. Suivi -->
+          <div class="podo-block-title">📅 Suivi</div>
+          <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;">
+            <div class="podo-field-lbl" style="margin-top:0;">Délai de contrôle</div>
+            <div class="podo-radio-row">
+              <label class="podo-radio-btn"><input type="radio" name="podo_suivi_delai" value="1">1 mois</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_suivi_delai" value="2">2 mois</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_suivi_delai" value="3">3 mois</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_suivi_delai" value="6">6 mois</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_suivi_delai" value="12">12 mois</label>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-9" data-periodes="II III IV" style="display:none;">
       <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">📊 Synthèse — <em>Phase 0 : contenu à venir.</em></div></div>
