@@ -2774,6 +2774,87 @@
             <label><input type="checkbox" class="podopediatrie-field" data-field="podo_diag_autre"/> Autre</label>
           </div>
 
+          <!-- #140 Phase 4b — Orientations / suspicions. 6 lignes construites
+               sur le même modèle (radio oui/non + champ de précision conditionnel).
+               Layout compact inspiré de « Modification des paramètres » de la
+               rotation nucale (#pdpsec-5) : libellé à gauche, radios à droite.
+               Champ précision dessous, masqué par défaut, apparaît si oui. -->
+          <div class="podo-block-title">🔎 Orientations / suspicions</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:12px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:200px;">Pathologie neurologique</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_neuro" value="oui" onchange="_podoSuspicionsChanged()">Oui</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_neuro" value="non" onchange="_podoSuspicionsChanged()">Non</label>
+                </div>
+              </div>
+              <div id="podo-susp-neuro-detail" style="display:none;margin-top:6px;">
+                <input type="text" class="inp podopediatrie-field" data-field="podo_susp_neuro_precision" placeholder="Préciser…" style="width:100%;max-width:600px;">
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:200px;">Boiterie d'esquive</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_boiterie" value="oui" onchange="_podoSuspicionsChanged()">Oui</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_boiterie" value="non" onchange="_podoSuspicionsChanged()">Non</label>
+                </div>
+              </div>
+              <div id="podo-susp-boiterie-detail" style="display:none;margin-top:6px;">
+                <input type="text" class="inp podopediatrie-field" data-field="podo_susp_boiterie_precision" placeholder="Préciser…" style="width:100%;max-width:600px;">
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:200px;">Pathologie de la hanche</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_hanche" value="oui" onchange="_podoSuspicionsChanged()">Oui</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_hanche" value="non" onchange="_podoSuspicionsChanged()">Non</label>
+                </div>
+              </div>
+              <div id="podo-susp-hanche-detail" style="display:none;margin-top:6px;">
+                <input type="text" class="inp podopediatrie-field" data-field="podo_susp_hanche_precision" placeholder="Préciser…" style="width:100%;max-width:600px;">
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:200px;">Pathologie posturale</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_posturale" value="oui" onchange="_podoSuspicionsChanged()">Oui</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_posturale" value="non" onchange="_podoSuspicionsChanged()">Non</label>
+                </div>
+              </div>
+              <div id="podo-susp-posturale-detail" style="display:none;margin-top:6px;">
+                <input type="text" class="inp podopediatrie-field" data-field="podo_susp_posturale_precision" placeholder="Préciser…" style="width:100%;max-width:600px;">
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:200px;">Pathologie du genou</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_genou" value="oui" onchange="_podoSuspicionsChanged()">Oui</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_genou" value="non" onchange="_podoSuspicionsChanged()">Non</label>
+                </div>
+              </div>
+              <div id="podo-susp-genou-detail" style="display:none;margin-top:6px;">
+                <input type="text" class="inp podopediatrie-field" data-field="podo_susp_genou_precision" placeholder="Préciser…" style="width:100%;max-width:600px;">
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:12px;flex:1;min-width:200px;">Pathologie du pied</span>
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_pied" value="oui" onchange="_podoSuspicionsChanged()">Oui</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_susp_pied" value="non" onchange="_podoSuspicionsChanged()">Non</label>
+                </div>
+              </div>
+              <div id="podo-susp-pied-detail" style="display:none;margin-top:6px;">
+                <input type="text" class="inp podopediatrie-field" data-field="podo_susp_pied_precision" placeholder="Préciser…" style="width:100%;max-width:600px;">
+              </div>
+            </div>
+          </div>
+
           <div class="podo-field-lbl">Conclusion clinique</div>
           <textarea class="podopediatrie-field podo-inline-input" data-field="podo_conclusion_txt" rows="4" placeholder="Synthèse clinique / recommandations…" style="max-width:800px;"></textarea>
         </div>
