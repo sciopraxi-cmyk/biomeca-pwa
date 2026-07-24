@@ -4666,7 +4666,14 @@ async function migratePosturoPhotos(d, patientId, bilanId) {
 // vers Storage, décision alignée avec sport/posturo (cf. _validatePosturePlacement).
 const PODOPEDIATRIE_PHOTO_KEYS = [
   '_podo_morpho_face', '_podo_morpho_face2', '_podo_morpho_profilG', '_podo_morpho_profilD',
-  '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD'
+  '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD',
+  // #140 Phase 4a-2 — Schéma plantaire dessinable (canvas overlay sur template
+  // plan-semelles-schema-plantaire.png). Format PNG transparent via
+  // _serializeDrawCanvas. Traité comme les 4 silhouettes morpho : upload
+  // Supabase Storage à migratePodopediatriePhotos, stash restauré après
+  // savePatients() par restorePodopediatriePhotosStash (les 3 helpers itèrent
+  // sur PODOPEDIATRIE_PHOTO_KEYS, pas de liste en dur — vérifié).
+  '_podo_pieds'
 ];
 
 async function prefetchPodopediatriePhotos(d) {
@@ -13061,6 +13068,17 @@ function _markPodoMorphoTool(activeId) {
   });
 }
 
+// #140 Phase 4a-2 — helper marquage boutons toolbar pieds podo (scope strict
+// pdpsec-8). Miroir _markPodoMorphoTool. Liste fermée des 5 IDs préfixés
+// podo-pieds-tool-* ; toggle .podo-tool-active (rose #e11d48) sur l'actif.
+// Aucun ID morpho podo / sport / posturo dans la liste → additif strict.
+function _markPodoPiedsTool(activeId) {
+  ['podo-pieds-tool-pen','podo-pieds-tool-arrow','podo-pieds-tool-arrow-curve','podo-pieds-tool-circle','podo-pieds-tool-erase'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('podo-tool-active', id === activeId);
+  });
+}
+
 // Fix #90 — helper marquage état actif boutons posturo body (scope strict psec-*).
 // Symétrique à _markMorphoTool / _markPlantaireTool : liste fermée des 6 IDs body ;
 // reset tous puis marque l'actif. Aucun ID morpho (sans suffixe), plantaire
@@ -13110,6 +13128,10 @@ function setDrawTool(tool) {
   // podo- → additif strict.
   const _podoMorphoMap = {'line':'podo-tool-pen','arrow':'podo-tool-arrow','arrow-curve':'podo-tool-arrow-curve','circle':'podo-tool-circle','erase':'podo-tool-erase'};
   _markPodoMorphoTool(_podoMorphoMap[tool] || '');
+  // #140 Phase 4a-2 — marquage additif pieds podo. Mapping outil interne → ID
+  // préfixé "podo-pieds-tool-". Aucune collision avec les 5 helpers précédents.
+  const _podoPiedsMap = {'line':'podo-pieds-tool-pen','arrow':'podo-pieds-tool-arrow','arrow-curve':'podo-pieds-tool-arrow-curve','circle':'podo-pieds-tool-circle','erase':'podo-pieds-tool-erase'};
+  _markPodoPiedsTool(_podoPiedsMap[tool] || '');
 }
 
 function setDrawToolCurveInv() {
@@ -13247,6 +13269,140 @@ function clearAllPodoMorpho() {
   });
   // Déclenche autosave débouncée — le prochain savePodopediatrieBilan invalidera
   // les 4 clés + leurs Path.
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('podopediatrie');
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// #140 Phase 4a-2 — SCHÉMA PLANTAIRE DESSINABLE (onglet Traitement)
+// ─────────────────────────────────────────────────────────────────────
+// Miroir strict du bloc sport drawPiedsTemplate L13314-13370 : canvas
+// overlay transparent par-dessus l'image DOM #podo-pieds-img. Backing
+// fixe 520×520 (PIEDS_REF_W/H, flag _backingScaled) → coordonnées stables
+// au redimensionnement CSS (fix #119, pas de dérive). Pile undo isolée
+// _podoPiedsUndoOrder (fix #89, aucun mélange avec sport pieds-canvas ni
+// morpho podo). PNG transparent via _serializeDrawCanvas (fix #94, jamais
+// JPEG). _stripBackgroundFromRestore après restore préserve le noir
+// dessiné (fix #115). La gomme de setupDrawCanvas L12898 restaure depuis
+// _baseSnapshot vide → template intact (fix #43).
+// ═════════════════════════════════════════════════════════════════════
+let _podoPiedsUndoOrder = [];
+
+// GARDE D'IDEMPOTENCE (exigence explicite Phase 4a-2) : le hook
+// showPodopediatrieSection(target === 8) peut réappeler initPodoPiedsCanvas
+// à chaque bascule d'onglet. Sans garde, un canvas déjà restauré ou en
+// cours d'édition serait vidé (bug latent tracé en tâche #78 pour
+// showPosturoSection). Politique :
+//   1. Si _initDone && pas de savedData → early return no-op strict.
+//   2. Si _initDone && savedData mais _userDirty → early return (édition en
+//      cours protégée).
+//   3. Si _initDone && savedData && !_userDirty → on peut re-restaurer
+//      (cas prefetch tardif qui apporte enfin la dataURL depuis Storage).
+//   4. Premier appel → init complète (backing, baseSnapshot, restore
+//      éventuel, tag _initDone = true en fin).
+// INIT SUR CONTENEUR MASQUÉ : le backing 520×520 étant FIXE (constantes
+// PIEDS_REF_W/H), l'init ne dépend NI de getBoundingClientRect (qui
+// retournerait 0), NI de la visibilité du parent. _baseSnapshot est
+// capturé via ctx.getImageData(0,0,W,H) sur le canvas backing, indépendant
+// du layout CSS. Le scaling client→backing dans setupDrawCanvas.getPos
+// (L12873) n'est utilisé qu'au moment d'un clic — donc le conteneur DOIT
+// être visible pour dessiner, mais l'init/restore sont OK à froid.
+function initPodoPiedsCanvas(savedData, onReady) {
+  const canvas = document.getElementById('podo-pieds-canvas');
+  if (!canvas) { if (typeof onReady === 'function') onReady(); return; }
+
+  // Garde d'idempotence — cf. politique ci-dessus.
+  if (canvas._initDone) {
+    if (!savedData) { if (typeof onReady === 'function') onReady(); return; }
+    if (canvas._userDirty) { if (typeof onReady === 'function') onReady(); return; }
+    // Cas 3 : re-restore depuis dataURL fraîchement prefetch. Redraw sans
+    // reset du backing ni du baseSnapshot (déjà propres depuis init).
+    const ctx3 = canvas.getContext('2d');
+    ctx3.clearRect(0, 0, canvas.width, canvas.height);
+    const saved3 = new Image();
+    saved3.onload = () => {
+      ctx3.drawImage(saved3, 0, 0, PIEDS_REF_W, PIEDS_REF_H);
+      _stripBackgroundFromRestore(canvas);
+      if (typeof onReady === 'function') onReady();
+    };
+    saved3.onerror = () => { if (typeof onReady === 'function') onReady(); };
+    saved3.src = savedData;
+    return;
+  }
+
+  // Premier appel : init complète (miroir drawPiedsTemplate L13333-L13343).
+  canvas.width  = PIEDS_REF_W;
+  canvas.height = PIEDS_REF_H;
+  canvas._backingScaled = true;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  canvas._history = []; canvas._baseSnapshot = null; canvas._tempSnap = null;
+  setupDrawCanvas(canvas, 'podo-pieds-canvas');
+  canvas._baseSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  // Override pile undo isolée (fix #89 — pattern initPodoMorphoCanvas L13184).
+  canvas._undoOrderStack = _podoPiedsUndoOrder;
+
+  if (savedData) {
+    const saved = new Image();
+    saved.onload = () => {
+      ctx.drawImage(saved, 0, 0, PIEDS_REF_W, PIEDS_REF_H);
+      // Fix #94 auto-réparation (JPEG noir des bilans corrompus pré-fix).
+      _stripBackgroundFromRestore(canvas);
+      canvas._restoreReady = true;
+      canvas._initDone = true;
+      if (typeof onReady === 'function') onReady();
+    };
+    saved.onerror = () => {
+      canvas._restoreReady = true;
+      canvas._initDone = true;
+      if (typeof onReady === 'function') onReady();
+    };
+    saved.src = savedData;
+  } else {
+    canvas._restoreReady = true;
+    canvas._initDone = true;
+    if (typeof onReady === 'function') onReady();
+  }
+}
+
+function undoPodoPieds() {
+  if (_podoPiedsUndoOrder.length === 0) return;
+  const canvasId = _podoPiedsUndoOrder.pop();
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  if (c._history && c._history.length > 0) {
+    c._history.pop();
+    const prev = c._history.length > 0 ? c._history[c._history.length - 1] : c._baseSnapshot;
+    if (prev) ctx.putImageData(prev, 0, 0);
+  } else if (c._baseSnapshot) {
+    ctx.putImageData(c._baseSnapshot, 0, 0);
+  }
+  c._userDirty = true;
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('podopediatrie');
+}
+
+function clearPodoPieds() {
+  if (!confirm('Effacer tout le dessin du schéma plantaire ?')) return;
+  const c = document.getElementById('podo-pieds-canvas');
+  if (!c) return;
+  // Reset MINIMAL — ne PAS rappeler initPodoPiedsCanvas ni setupDrawCanvas
+  // (exigence explicite). Le canvas reste initialisé (backing, handlers, flags
+  // _initDone/_restoreReady/_backingScaled conservés) ; seuls les pixels
+  // utilisateur disparaissent. _baseSnapshot posé à l'init reste valide car
+  // capturé sur canvas transparent (le template est dans #podo-pieds-img côté
+  // DOM, jamais gravé dans le canvas). Le restaurer redonne canvas vide.
+  if (c._baseSnapshot) {
+    c.getContext('2d').putImageData(c._baseSnapshot, 0, 0);
+  } else {
+    // Cas rare : baseSnapshot pas encore capturé (clear déclenché avant init
+    // finalisée). Fallback clearRect — équivalent visuel sur canvas overlay
+    // transparent.
+    c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  }
+  c._history = [];
+  c._tempSnap = null;
+  c._userDirty = true;
+  _podoPiedsUndoOrder.length = 0;
   if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('podopediatrie');
 }
 
@@ -13547,7 +13703,9 @@ async function savePodopediatrieBilan(silent) {
     ['podo-morpho-face',    '_podo_morpho_face'],
     ['podo-morpho-face2',   '_podo_morpho_face2'],
     ['podo-morpho-profilG', '_podo_morpho_profilG'],
-    ['podo-morpho-profilD', '_podo_morpho_profilD']
+    ['podo-morpho-profilD', '_podo_morpho_profilD'],
+    // #140 Phase 4a-2 — schéma plantaire dessinable (Traitement).
+    ['podo-pieds-canvas',   '_podo_pieds']
   ].forEach(([canvasId, key]) => {
     const c = document.getElementById(canvasId);
     if (!c || !c._userDirty) return;
@@ -13557,8 +13715,8 @@ async function savePodopediatrieBilan(silent) {
       delete d[key + 'Path']; // édition confirmée → invalide Path
     }
   });
-  // Reset _userDirty pour les 4 canvas APRÈS sweep, préparer prochain cycle.
-  ['podo-morpho-face','podo-morpho-face2','podo-morpho-profilG','podo-morpho-profilD'].forEach(id => {
+  // Reset _userDirty pour les 5 canvas APRÈS sweep, préparer prochain cycle.
+  ['podo-morpho-face','podo-morpho-face2','podo-morpho-profilG','podo-morpho-profilD','podo-pieds-canvas'].forEach(id => {
     const c = document.getElementById(id);
     if (c) c._userDirty = false;
   });
@@ -14125,6 +14283,18 @@ function showPodopediatrieSection(idx) {
       if (typeof _initPodoMorphoCanvasesIfNeeded === 'function') _initPodoMorphoCanvasesIfNeeded();
       if (typeof _restorePodopediatrieCanvasesFromSource === 'function') {
         _restorePodopediatrieCanvasesFromSource(currentPatient?.bilanDataPodopediatrie, true);
+      }
+    }, 50);
+  }
+  // #140 Phase 4a-2 — Onglet Traitement (idx 8) : init idempotente du canvas
+  // schéma plantaire + restauration depuis _podo_pieds (déjà réhydraté par
+  // prefetchPodopediatriePhotos à ouverture bilan). La garde d'idempotence
+  // dans initPodoPiedsCanvas rend l'appel safe même sur ré-activation
+  // successive de l'onglet ou pendant édition en cours.
+  if (target === 8) {
+    setTimeout(() => {
+      if (typeof initPodoPiedsCanvas === 'function') {
+        initPodoPiedsCanvas(currentPatient?.bilanDataPodopediatrie?._podo_pieds);
       }
     }, 50);
   }

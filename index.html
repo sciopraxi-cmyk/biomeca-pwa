@@ -2625,7 +2625,41 @@
             <div class="podo-field-lbl" style="margin-top:0;">Description</div>
             <textarea class="inp podopediatrie-field" data-field="podo_semelles_desc" rows="3" placeholder="Description du plan de semelles…" style="width:100%;"></textarea>
 
-            <!-- Phase 4a-2 : schéma plantaire dessinable à insérer ici -->
+            <!-- #140 Phase 4a-2 — Schéma plantaire dessinable. Pattern miroir strict
+                 du bloc sport #sp-pieds-wrap (index.html L4881) : IMG DOM template +
+                 CANVAS overlay transparent (backing 520×520 fixe côté JS). Ids
+                 préfixés podo-pieds-* pour zéro collision avec sport (pieds-canvas)
+                 et posturo (posturo-feet-canvas). Toolbar dupliquée avec ids
+                 podo-pieds-tool-* + mapping dans setDrawTool → _markPodoPiedsTool
+                 pour highlighting cohérent. -->
+            <div class="podo-field-lbl">Schéma plantaire</div>
+            <div style="display:flex;justify-content:center;margin:10px 0;">
+              <div id="podo-pieds-wrap" style="position:relative;display:inline-block;width:80%;max-width:400px;margin:0 auto;line-height:0;">
+                <img id="podo-pieds-img" src="assets/plan-semelles-schema-plantaire.png" style="display:block;width:100%;height:auto;" alt="Schéma plantaire"/>
+                <canvas id="podo-pieds-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:8px;"></canvas>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;justify-content:center;">
+              <button class="btn" id="podo-pieds-tool-pen" onclick="setDrawTool('line')" title="Trait droit">╱ Trait</button>
+              <button class="btn" id="podo-pieds-tool-arrow" onclick="setDrawTool('arrow')" title="Flèche droite">→ Flèche</button>
+              <button class="btn" id="podo-pieds-tool-arrow-curve" onclick="setDrawTool('arrow-curve')" title="Flèche courbée">↪ Courbée</button>
+              <button class="btn" id="podo-pieds-tool-circle" onclick="setDrawTool('circle')" title="Cercle/Ovale">○ Cercle</button>
+              <button class="btn" id="podo-pieds-tool-erase" onclick="setDrawTool('erase')">🧹 Gomme</button>
+              <select id="podo-pieds-draw-color-sel" class="inp" style="width:80px;" onchange="drawColor=this.value;">
+                <option value="#e74c3c">Rouge</option>
+                <option value="#2980b9">Bleu</option>
+                <option value="#27ae60">Vert</option>
+                <option value="#f39c12">Orange</option>
+                <option value="#111111">Noir</option>
+              </select>
+              <select id="podo-pieds-draw-size-sel" class="inp" style="width:90px;" onchange="drawSize=+this.value;">
+                <option value="2">Fin</option>
+                <option value="4" selected>Normal</option>
+                <option value="8">Épais</option>
+              </select>
+              <button class="btn" onclick="undoPodoPieds()" style="background:#9f1239;color:#fff;">↩ Annuler</button>
+              <button class="btn" onclick="clearPodoPieds()" style="background:transparent;color:#9f1239;border:1px solid #9f1239;">🗑 Tout effacer</button>
+            </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
               <div>
@@ -5111,6 +5145,10 @@
   <img style="display:none;" id="imgjs-morpho-face2" src="assets/morpho-face-posterieure.png">
   <img style="display:none;" id="imgjs-morpho-profilG" src="assets/morpho-profil-gauche.png">
   <img style="display:none;" id="imgjs-morpho-profilD" src="assets/morpho-profil-droit.png">
+  <!-- #140 Phase 4a-2 — Template schéma plantaire podopédiatrie. Chargé dans
+       #img-store pour que le futur générateur de rapport podo (rendu en iframe
+       about:blank) résolve l'URL absolue via .src (pattern imgjs-verticy-wordmark). -->
+  <img style="display:none;" id="imgjs-plan-semelles" alt="Schéma plantaire" src="assets/plan-semelles-schema-plantaire.png">
 </div>
 </body>
 </html>
