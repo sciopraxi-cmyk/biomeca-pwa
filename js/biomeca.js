@@ -14170,6 +14170,26 @@ function _podoLongApplyState() {
   });
 }
 
+// #140 Phase 4b — Orientations / suspicions (Conclusion). 6 lignes oui/non
+// avec champ de précision conditionnel. Tableau des 6 clés (pas de duplication
+// du code), même logique anti-valeur-fantôme que _podoDowningApplyState et
+// _podoMcoChanged : décochage/non → masque le détail ET vide le champ texte
+// pour éviter qu'une précision fantôme reste persistée dans bilanDataPodopediatrie.
+var _PODO_SUSPICIONS = ['neuro', 'boiterie', 'hanche', 'posturale', 'genou', 'pied'];
+function _podoSuspicionsChanged() {
+  _PODO_SUSPICIONS.forEach(function (key) {
+    var detail = document.getElementById('podo-susp-' + key + '-detail');
+    if (!detail) return;
+    var checked = document.querySelector('#pg-podopediatrie input[name="podo_susp_' + key + '"]:checked');
+    var isOui = (checked && checked.value === 'oui');
+    detail.style.display = isOui ? '' : 'none';
+    if (!isOui) {
+      var input = document.querySelector('#pg-podopediatrie [data-field="podo_susp_' + key + '_precision"]');
+      if (input) input.value = '';
+    }
+  });
+}
+
 // #140 Phase 3c2b — Examen oculaire (période IV) : sous-bloc « Apparition »
 // visible uniquement si podo_mco = oui. Miroir _podoDowningApplyState :
 // décochage → reset des checkboxes de côté pour éviter les valeurs fantômes.
@@ -14210,6 +14230,7 @@ function _podoPostLoadTweaks() {
   _podoDowningHint();
   _podoLongApplyState();
   _podoMcoChanged();
+  _podoSuspicionsChanged();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {
