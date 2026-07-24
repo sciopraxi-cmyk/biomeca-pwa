@@ -2192,6 +2192,71 @@
 
           </div><!-- /BLOC PÉRIODES III + IV -->
 
+          <!-- ═════════════════════════════════════════════════════════════
+               BLOC PÉRIODE IV — enveloppe data-periodes restreint
+               ═════════════════════════════════════════════════════════════ -->
+          <div data-periodes="IV">
+            <div class="podo-block-title">👁️ Examen oculaire</div>
+            <div style="font-size:11px;color:var(--mut);font-style:italic;margin-bottom:8px;">
+              Sujet debout ou assis. Période IV uniquement.
+            </div>
+
+            <!-- 2. Maddox / cover-test -->
+            <div class="podo-field-lbl" style="margin-top:0;">Maddox et test du masquage (cover-test)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div>
+                <div class="podo-field-lbl" style="margin-top:0;">Œil gauche</div>
+                <div class="podo-radio-row">
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_g" value="ortho">Orthophorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_g" value="exo">Exophorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_g" value="eso">Ésophorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_g" value="hyper">Hyperphorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_g" value="hypo">Hypophorie</label>
+                </div>
+              </div>
+              <div>
+                <div class="podo-field-lbl" style="margin-top:0;">Œil droit</div>
+                <div class="podo-radio-row">
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_d" value="ortho">Orthophorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_d" value="exo">Exophorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_d" value="eso">Ésophorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_d" value="hyper">Hyperphorie</label>
+                  <label class="podo-radio-btn"><input type="radio" name="podo_maddox_d" value="hypo">Hypophorie</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Test de Lang -->
+            <div class="podo-field-lbl">Test de Lang</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div style="font-size:12px;margin-bottom:6px;">Vision stéréoscopique</div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn"><input type="radio" name="podo_lang" value="oui">Oui</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_lang" value="non">Non</label>
+              </div>
+            </div>
+
+            <!-- 4. MCO — manœuvre de convergence oculaire -->
+            <div class="podo-field-lbl">MCO — manœuvre de convergence oculaire</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div style="font-size:12px;margin-bottom:6px;">Défaut de convergence</div>
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn"><input type="radio" name="podo_mco" value="oui" onchange="_podoMcoChanged()">Oui</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_mco" value="non" onchange="_podoMcoChanged()">Non</label>
+              </div>
+              <!-- PAS de data-periodes sur ce sous-bloc : _applyPodopediatrieVisibilityForPeriode
+                   remettrait style.display='' et écraserait le masquage conditionnel de _podoMcoChanged. -->
+              <div id="podo-mco-detail" style="display:none;margin-top:10px;">
+                <div class="podo-field-lbl" style="margin-top:0;">Apparition</div>
+                <div class="podo-radio-row">
+                  <label class="podo-radio-btn"><input type="checkbox" class="podopediatrie-field" data-field="podo_mco_g"> 👈 Gauche</label>
+                  <label class="podo-radio-btn"><input type="checkbox" class="podopediatrie-field" data-field="podo_mco_d"> 👉 Droite</label>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /BLOC PÉRIODE IV -->
+
         </div>
       </div>
     </div>

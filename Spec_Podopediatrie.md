@@ -169,6 +169,10 @@ identifiée, et leurs valeurs sont incompatibles avec toutes les séries publié
 - Stabilité monopodale : cases G/D + instabilité **cheville** (genou tendu) et/ou **genou** (semi-fléchi).
 - Test des chaînes stabilisatrices / **Trendelenburg postural** : grade 1–4, G/D.
 - **III/IV** : rotation nucale (bilatéral + modificateurs : tapis mousse, yeux fermés, serrant dents, ouvrant bouche, assis sans contact plantaire), Romberg (reprise posturo/sport), mobilité de l'axe corporel (reprise posturo/sport : cervical/thoracique/lombaire/arc inférieur, X = absence de mobilité, / = raideur).
+- **IV — bloc oculaire** (sujet debout ou assis, donc EN CHARGE) :
+  - **Maddox & test du masquage (cover-test)** : par œil (G/D) → orthophorie / exophorie / ésophorie / hyperphorie / hypophorie.
+  - **Test de Lang** : vision stéréoscopique oui/non.
+  - **MCO** (manœuvre de convergence oculaire) : défaut de convergence oui/non ; si oui → apparition Gauche et/ou Droite.
 
 ### Examen en décharge (Phase 3) — reprise posturo/sport + ajouts
 - **Manœuvre d'Ortolani / ressaut de hanche : oui/non.**
@@ -176,11 +180,11 @@ identifiée, et leurs valeurs sont incompatibles avec toutes les séries publié
 - Antétorsion fémorale (AF) : ° G/D + tendance par âge (§1).
 - Espace inter-malléolaire / inter-condylien (genu valgum/varum, §1).
 - Mobilisation ostéo-articulaire coxo/genou/cheville/pied.
-- **III/IV** : test de réductibilité de la cyphose dorsale (> 10 cm), inégalité de longueur des MI (tableau EIAS/EIPS/TFD/TFA/longueur DD/Downing/longueur PC).
-- **IV** : convergence oculaire + cover-test + Maddox :
-  - Maddox & test du masquage : par œil (G/D) → orthophorie / exophorie / ésophorie / hyperphorie / hypophorie.
-  - **Test de Lang** : vision stéréoscopique oui/non.
-  - **MCO** (manœuvre de convergence oculaire) : défaut de convergence oui/non ; si oui → apparition Gauche et/ou Droite.
+- **III/IV** : test de réductibilité de la cyphose dorsale (> 10 cm), inégalité de longueur des MI (TFD/TFA, repères osseux EIAS/EIPS/crête iliaque, Downing, longueurs DD et PC).
+
+> ⚠️ **Correction du 24/07/2026** : le bloc oculaire (Maddox, cover-test, Lang, MCO) figurait
+> initialement ici, en décharge. Il est **rattaché à l'examen EN CHARGE** — ces tests se
+> pratiquent le sujet debout ou assis, pas allongé. Voir la section « Examen en charge » ci-dessus.
 
 ### Traitement (Phase 4) — plan d'appareillage, SANS les circuits
 ### Synthèse (Phase 4) — auto-générée
