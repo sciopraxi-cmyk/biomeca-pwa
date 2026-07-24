@@ -13943,6 +13943,72 @@ function _podoGenuInterpret() {
   }
 }
 
+// #140 Phase 3c2a — Réductibilité cyphose dorsale : distance manubrium/table
+// en procubitus + hyperextension. Seuil > 10 cm → réductible physiologique.
+function _podoCyphoseInterpret() {
+  var el = document.getElementById('podo-cyphose-interpret');
+  if (!el) return;
+  var input = document.querySelector('#pg-podopediatrie [data-field="podo_cyphose_dist"]');
+  var raw = input ? input.value : '';
+  if (raw === '' || raw == null) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
+  var v = parseFloat(raw);
+  if (isNaN(v)) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
+  if (v > 10) {
+    el.textContent = 'Cyphose réductible (physiologique)';
+    _podoInterpretStyle(el, 'ok');
+  } else {
+    el.textContent = 'Cyphose peu réductible (< 10 cm)';
+    _podoInterpretStyle(el, 'ko');
+  }
+}
+
+// #140 Phase 3c2a — Downing : sub-radios D/G ne s'affichent que si la checkbox
+// correspondante est cochée. Décochage → sub-radio réinitialisé (évite valeur
+// fantôme). Miroir _podoRombergApplyState.
+function _podoDowningApplyState() {
+  ['d', 'g'].forEach(function (side) {
+    var cb = document.querySelector('#pg-podopediatrie [data-field="podo_downing_' + side + '"]');
+    var opts = document.getElementById('podo-downing-' + side + '-opts');
+    if (opts) opts.style.display = (cb && cb.checked) ? 'flex' : 'none';
+    if (cb && !cb.checked) {
+      var radios = document.querySelectorAll('#pg-podopediatrie input[name="podo_downing_' + side + '_res"]');
+      radios.forEach(function (r) { r.checked = false; });
+    }
+  });
+}
+
+// #140 Phase 3c2a — Rappel contextuel : le Downing s'effectue du côté du TFD
+// positif. Cette note n'agit pas sur le formulaire — elle guide seulement.
+function _podoDowningHint() {
+  var el = document.getElementById('podo-downing-hint');
+  if (!el) return;
+  var checked = document.querySelector('#pg-podopediatrie input[name="podo_tfd"]:checked');
+  var v = checked ? checked.value : '';
+  if (!v) { el.textContent = ''; return; }
+  if (v === 'symetrique')      el.textContent = 'TFD symétrique — Downing non indiqué';
+  else if (v === 'droite')     el.textContent = 'TFD positif à droite → réaliser le Downing à droite';
+  else if (v === 'gauche')     el.textContent = 'TFD positif à gauche → réaliser le Downing à gauche';
+  else if (v === 'bilateral')  el.textContent = 'TFD positif à droite et à gauche → réaliser le Downing à droite et à gauche';
+  else el.textContent = '';
+}
+
+// #140 Phase 3c2a — Longueur des MI en DD et PC : sub-radios D/G ne s'affichent
+// que si un radio court|long est coché (pas si egal ni si vide). Réinitialise
+// sub-radio quand on repasse à egal / rien. Un seul helper pour les 2 blocs DD+PC.
+function _podoLongApplyState() {
+  ['dd', 'pc'].forEach(function (kind) {
+    var checked = document.querySelector('#pg-podopediatrie input[name="podo_long_' + kind + '"]:checked');
+    var val = checked ? checked.value : '';
+    var opts = document.getElementById('podo-long-' + kind + '-opts');
+    var showSide = (val === 'court' || val === 'long');
+    if (opts) opts.style.display = showSide ? '' : 'none';
+    if (!showSide) {
+      var radios = document.querySelectorAll('#pg-podopediatrie input[name="podo_long_' + kind + '_side"]');
+      radios.forEach(function (r) { r.checked = false; });
+    }
+  });
+}
+
 // #140 Phase 1 — Post-load tweaks unifiés (EVA visibility + pré-remplissages).
 // Appelé après loadPodopediatrieBilan dans le nav hook et dans ouvrirBilanPodopediatrie.
 // #140 Phase 2a — Étendu pour reflater les interprétations Morphostatique et
@@ -13961,6 +14027,10 @@ function _podoPostLoadTweaks() {
   _podoRombergApplyState();
   _podoTteAfInterpret();
   _podoGenuInterpret();
+  _podoCyphoseInterpret();
+  _podoDowningApplyState();
+  _podoDowningHint();
+  _podoLongApplyState();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {

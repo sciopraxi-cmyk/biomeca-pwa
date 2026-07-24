@@ -2359,6 +2359,149 @@
             </table>
           </div>
 
+          <!-- ═════════════════════════════════════════════════════════════
+               BLOC PÉRIODES III + IV — enveloppe data-periodes restreint
+               ═════════════════════════════════════════════════════════════ -->
+          <div data-periodes="III IV">
+
+            <!-- 1. Réductibilité cyphose dorsale -->
+            <div class="podo-block-title">🌀 Réductibilité de la cyphose dorsale</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:14px;">
+              <div class="podo-field-lbl" style="margin-top:0;">Distance manubrium sternal ↔ table (procubitus, hyperextension) <span style="color:#9f1239;">(cm)</span></div>
+              <input type="number" step="0.1" class="inp podopediatrie-field" data-field="podo_cyphose_dist" onchange="_podoCyphoseInterpret()" placeholder="cm" style="max-width:120px;">
+              <div id="podo-cyphose-interpret" style="font-size:11px;color:#9f1239;font-weight:500;margin-top:8px;min-height:14px;"></div>
+            </div>
+
+            <!-- 2. Inégalité de longueur des MI -->
+            <div class="podo-block-title">📏 Inégalité de longueur des membres inférieurs</div>
+
+            <!-- 2a. TFD -->
+            <div class="podo-field-lbl">Test de Flexion Debout (TFD)</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfd" value="symetrique" onchange="_podoDowningHint()">Symétrique</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfd" value="droite" onchange="_podoDowningHint()">Pouce montant à droite</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfd" value="gauche" onchange="_podoDowningHint()">Pouce montant à gauche</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfd" value="bilateral" onchange="_podoDowningHint()">Pouce montant à droite et à gauche</label>
+              </div>
+            </div>
+
+            <!-- 2b. TFA -->
+            <div class="podo-field-lbl">Test de Flexion Assis (TFA)</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div class="podo-radio-row">
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfa" value="symetrique">Symétrique</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfa" value="droite">Pouce montant à droite</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfa" value="gauche">Pouce montant à gauche</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_tfa" value="bilateral">Pouce montant à droite et à gauche</label>
+              </div>
+            </div>
+
+            <!-- 2c. Repères osseux -->
+            <div class="podo-field-lbl">Repères osseux</div>
+            <div style="overflow-x:auto;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:#fecdd3;">
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:left;color:#7f1d1d;">Repère</th>
+                    <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;color:#7f1d1d;">Constat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">EIAS</td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_eias" value="gauche_haute">Gauche haute</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_eias" value="droite_haute">Droite haute</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_eias" value="symetrique">Symétrique</label>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">EIPS</td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_eips" value="gauche_haute">Gauche haute</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_eips" value="droite_haute">Droite haute</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_eips" value="symetrique">Symétrique</label>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Crête iliaque</td>
+                    <td style="padding:6px 10px;border:1px solid var(--bord);">
+                      <div class="podo-radio-row" style="margin:0;">
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_crete" value="gauche_haute">Gauche haute</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_crete" value="droite_haute">Droite haute</label>
+                        <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_rep_crete" value="symetrique">Symétrique</label>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 2d. Downing — mirror sport L3952-3974, préfixe podo_ -->
+            <div class="podo-field-lbl">Test de Downing</div>
+            <div id="podo-downing-hint" style="font-size:11px;color:var(--mut);font-style:italic;margin-bottom:6px;min-height:14px;"></div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;">
+                    <input type="checkbox" class="podopediatrie-field" data-field="podo_downing_d" onchange="_podoDowningApplyState()"> Droite
+                  </label>
+                  <div id="podo-downing-d-opts" style="display:none;flex-direction:column;gap:4px;margin-left:20px;">
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_downing_d_res" value="post">Pas d'allongement (iliaque POST)</label>
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_downing_d_res" value="ant">Pas de raccourcissement (iliaque ANT)</label>
+                  </div>
+                </div>
+                <div>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;">
+                    <input type="checkbox" class="podopediatrie-field" data-field="podo_downing_g" onchange="_podoDowningApplyState()"> Gauche
+                  </label>
+                  <div id="podo-downing-g-opts" style="display:none;flex-direction:column;gap:4px;margin-left:20px;">
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_downing_g_res" value="post">Pas d'allongement (iliaque POST)</label>
+                    <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_downing_g_res" value="ant">Pas de raccourcissement (iliaque ANT)</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2e. Longueur MI décubitus dorsal — mirror sport L3915-3926 -->
+            <div class="podo-field-lbl">Longueur des MI en décubitus dorsal (DD)</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div class="podo-radio-row" style="margin-bottom:6px;">
+                <label class="podo-radio-btn"><input type="radio" name="podo_long_dd" value="court" onchange="_podoLongApplyState()">Plus court</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_long_dd" value="long" onchange="_podoLongApplyState()">Plus long</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_long_dd" value="egal" onchange="_podoLongApplyState()">Même longueur</label>
+              </div>
+              <div id="podo-long-dd-opts" style="display:none;margin-left:20px;">
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_long_dd_side" value="d">👉 Droite</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_long_dd_side" value="g">👈 Gauche</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2f. Longueur MI procubitus -->
+            <div class="podo-field-lbl">Longueur des MI en procubitus (PC)</div>
+            <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:10px;">
+              <div class="podo-radio-row" style="margin-bottom:6px;">
+                <label class="podo-radio-btn"><input type="radio" name="podo_long_pc" value="court" onchange="_podoLongApplyState()">Plus court</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_long_pc" value="long" onchange="_podoLongApplyState()">Plus long</label>
+                <label class="podo-radio-btn"><input type="radio" name="podo_long_pc" value="egal" onchange="_podoLongApplyState()">Même longueur</label>
+              </div>
+              <div id="podo-long-pc-opts" style="display:none;margin-left:20px;">
+                <div class="podo-radio-row" style="margin:0;">
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_long_pc_side" value="d">👉 Droite</label>
+                  <label class="podo-radio-btn" style="padding:2px 10px;font-size:11px;"><input type="radio" name="podo_long_pc_side" value="g">👈 Gauche</label>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /BLOC PÉRIODES III + IV -->
+
         </div>
       </div>
     </div>
