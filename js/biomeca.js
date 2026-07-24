@@ -13798,54 +13798,118 @@ function _podoAdamChanged() {
 }
 
 // #140 Phase 3c1 — Examen en décharge : TTE et antétorsion fémorale (AF).
-// Table de référence par âge (2–6 ans). Ageless > âge inconnu → « Réf. non
-// disponible pour cet âge ». Champ vide → interpret vide. Rejoue à chaque
-// onchange + au chargement (via _podoPostLoadTweaks).
-var _PODO_TTE_REF = {
-  2: [0.87, 5.65],
-  3: [3.91, 10.86],
-  4: [6.95, 17.39],
-  5: [10.86, 22.6],
-  6: [15.65, 26.08],
-};
+// Références remplacées cf. Spec_Podopediatrie.md §1 (les tables précédentes,
+// dont la source n'a pas pu être retrouvée, étaient incompatibles avec la
+// littérature). Champ vide → interpret vide. Rejoue à chaque onchange + au
+// chargement (via _podoPostLoadTweaks). Formatage FR virgule décimale.
+//
+// TTE — Mudge AJ et al., 2014, J Pediatr Orthop B 23(1):15-25 (n=53, 4–16 ans).
+// Méthode identique à la nôtre : axe bi-malléolaire / axe fémoral, procubitus.
+// Point clinique : PAS d'évolution significative avec l'âge entre 4 et 16 ans
+// → on raisonne par BANDE de tranche d'âge, pas par année. < 4 ans : aucune réf.
+var _PODO_TTE_REF = [
+  { minAge: 4,  maxAge: 7,  mean: 15.8, lo: 3.4, hi: 28.2 },
+  { minAge: 8,  maxAge: 11, mean: 14.3, lo: 4.3, hi: 24.3 },
+  { minAge: 12, maxAge: Infinity, mean: 17.9, lo: 5.7, hi: 30.1 },
+];
+// AF — test de Craig, Shands & Steel 1958 (moyenne par âge, interpolée aux
+// ancres 1/2/10/14/16 ans). Tolérance ± 15° (cf. spec § justification :
+// ± 2 ET Fabry + incertitude Craig). Âge > 16 ans → valeur de 16 ans. < 1 an
+// : aucune réf.
 var _PODO_AF_REF = {
-  2: [39.57, 48.26],
-  3: [37.39, 46.52],
-  4: [28.7, 45.65],
-  5: [32.17, 43.48],
-  6: [28.7, 39.57],
+  1: 39,   2: 31,   3: 30,   4: 29,   5: 28,   6: 27.5,
+  7: 26.5, 8: 26,   9: 25,   10: 24,  11: 23,  12: 22.5,
+  13: 22,  14: 21,  15: 18.5, 16: 16,
 };
+var _PODO_AF_TOL = 15;
+
+// Helper feedback visuel commun : vert sobre pour dans-les-normes, rouge gras
+// pour hors-normes, gris muted pour réf. indisponible. Champ vide → reset
+// propre (styles inline effacés, la CSS de base #9f1239 reprend le relais).
+// Style piloté en JS (pas de classes CSS statiques) pour rester colocalisé
+// avec la logique d'interprétation.
+function _podoInterpretStyle(el, kind) {
+  if (!el) return;
+  if (kind === 'ok') {
+    el.style.color = '#15803d';
+    el.style.fontWeight = '';
+  } else if (kind === 'ko') {
+    el.style.color = '#b91c1c';
+    el.style.fontWeight = '600';
+  } else if (kind === 'na') {
+    el.style.color = 'var(--mut)';
+    el.style.fontWeight = '';
+  } else {
+    // reset (champ vide)
+    el.style.color = '';
+    el.style.fontWeight = '';
+  }
+}
+
 function _podoTteAfInterpret() {
   var d = (typeof currentPatient !== 'undefined' && currentPatient)
     ? (currentPatient.bilanDataPodopediatrie || {}) : {};
   var ageMonths = d.ageMonths;
   var ageY = (ageMonths != null && !isNaN(ageMonths)) ? Math.round(ageMonths / 12) : null;
-  // Formatage FR (virgule décimale) pour cohérence avec _podoNavicInterpret.
-  var fmt = function (n) { return (Math.round(n * 100) / 100).toString().replace('.', ','); };
-  var apply = function (field, elId, refTable) {
+  var fmt = function (n) { return (Math.round(n * 10) / 10).toString().replace('.', ','); };
+
+  var applyTte = function (field, elId) {
     var el = document.getElementById(elId);
     if (!el) return;
     var input = document.querySelector('#pg-podopediatrie [data-field="' + field + '"]');
     var raw = input ? input.value : '';
-    if (raw === '' || raw == null) { el.textContent = ''; return; }
-    if (ageY == null) { el.textContent = 'Réf. non disponible pour cet âge'; return; }
-    var ref = refTable[ageY];
-    if (!ref) { el.textContent = 'Réf. non disponible pour cet âge'; return; }
+    if (raw === '' || raw == null) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
+    if (ageY == null || ageY < 4) { el.textContent = 'Réf. non disponible (< 4 ans)'; _podoInterpretStyle(el, 'na'); return; }
+    var band = null;
+    for (var i = 0; i < _PODO_TTE_REF.length; i++) {
+      if (ageY >= _PODO_TTE_REF[i].minAge && ageY <= _PODO_TTE_REF[i].maxAge) {
+        band = _PODO_TTE_REF[i]; break;
+      }
+    }
+    if (!band) { el.textContent = 'Réf. non disponible (< 4 ans)'; _podoInterpretStyle(el, 'na'); return; }
     var v = parseFloat(raw);
-    var min = ref[0], max = ref[1];
-    var refStr = fmt(min) + '–' + fmt(max) + '°';
-    if (v >= min && v <= max) {
-      el.textContent = 'Dans les normes (' + ageY + ' ans)';
-    } else if (v < min) {
-      el.textContent = 'Sous la norme (attendu ' + refStr + ' à ' + ageY + ' ans)';
+    var bandStr = fmt(band.lo) + '–' + fmt(band.hi) + '°';
+    if (v >= band.lo && v <= band.hi) {
+      el.textContent = 'Dans les normes (moy. attendue ' + fmt(band.mean) + '° pour cette tranche)';
+      _podoInterpretStyle(el, 'ok');
+    } else if (v < band.lo) {
+      el.textContent = 'Sous la bande normale (attendu ' + bandStr + ')';
+      _podoInterpretStyle(el, 'ko');
     } else {
-      el.textContent = 'Au-dessus de la norme (attendu ' + refStr + ' à ' + ageY + ' ans)';
+      el.textContent = 'Au-dessus de la bande normale (attendu ' + bandStr + ')';
+      _podoInterpretStyle(el, 'ko');
     }
   };
-  apply('podo_tte_g', 'podo-tte-g-interpret', _PODO_TTE_REF);
-  apply('podo_tte_d', 'podo-tte-d-interpret', _PODO_TTE_REF);
-  apply('podo_af_g',  'podo-af-g-interpret',  _PODO_AF_REF);
-  apply('podo_af_d',  'podo-af-d-interpret',  _PODO_AF_REF);
+
+  var applyAf = function (field, elId) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var input = document.querySelector('#pg-podopediatrie [data-field="' + field + '"]');
+    var raw = input ? input.value : '';
+    if (raw === '' || raw == null) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
+    if (ageY == null || ageY < 1) { el.textContent = 'Réf. non disponible'; _podoInterpretStyle(el, 'na'); return; }
+    var lookupAge = ageY > 16 ? 16 : ageY;
+    var mean = _PODO_AF_REF[lookupAge];
+    if (mean == null) { el.textContent = 'Réf. non disponible'; _podoInterpretStyle(el, 'na'); return; }
+    var v = parseFloat(raw);
+    var delta = v - mean;
+    var meanStr = 'attendu ~' + fmt(mean) + '° à ' + ageY + ' ans';
+    if (Math.abs(delta) <= _PODO_AF_TOL) {
+      el.textContent = 'Dans les normes (' + meanStr + ')';
+      _podoInterpretStyle(el, 'ok');
+    } else if (delta < 0) {
+      el.textContent = 'Sous la norme (' + meanStr + ')';
+      _podoInterpretStyle(el, 'ko');
+    } else {
+      el.textContent = 'Au-dessus de la norme (' + meanStr + ')';
+      _podoInterpretStyle(el, 'ko');
+    }
+  };
+
+  applyTte('podo_tte_g', 'podo-tte-g-interpret');
+  applyTte('podo_tte_d', 'podo-tte-d-interpret');
+  applyAf('podo_af_g',   'podo-af-g-interpret');
+  applyAf('podo_af_d',   'podo-af-d-interpret');
 }
 
 // #140 Phase 3c1 — Genu : affichage conditionnel de l'input pertinent
@@ -13866,12 +13930,16 @@ function _podoGenuInterpret() {
   var cond = (condInput && condInput.value !== '') ? parseFloat(condInput.value) : null;
   if (type === 'valgum' && mall != null && mall > 3) {
     el.textContent = 'Inter-malléolaire > 3 cm : au-delà de la physiologie';
+    _podoInterpretStyle(el, 'ko');
   } else if (type === 'varum' && cond != null && cond > 7) {
     el.textContent = 'Inter-condylien > 7 cm : au-delà de la physiologie';
+    _podoInterpretStyle(el, 'ko');
   } else if ((type === 'valgum' && mall != null) || (type === 'varum' && cond != null)) {
     el.textContent = 'Dans la physiologie';
+    _podoInterpretStyle(el, 'ok');
   } else {
     el.textContent = '';
+    _podoInterpretStyle(el, '');
   }
 }
 
