@@ -13797,6 +13797,84 @@ function _podoAdamChanged() {
   detail.style.display = (checked && checked.value === 'oui') ? '' : 'none';
 }
 
+// #140 Phase 3c1 — Examen en décharge : TTE et antétorsion fémorale (AF).
+// Table de référence par âge (2–6 ans). Ageless > âge inconnu → « Réf. non
+// disponible pour cet âge ». Champ vide → interpret vide. Rejoue à chaque
+// onchange + au chargement (via _podoPostLoadTweaks).
+var _PODO_TTE_REF = {
+  2: [0.87, 5.65],
+  3: [3.91, 10.86],
+  4: [6.95, 17.39],
+  5: [10.86, 22.6],
+  6: [15.65, 26.08],
+};
+var _PODO_AF_REF = {
+  2: [39.57, 48.26],
+  3: [37.39, 46.52],
+  4: [28.7, 45.65],
+  5: [32.17, 43.48],
+  6: [28.7, 39.57],
+};
+function _podoTteAfInterpret() {
+  var d = (typeof currentPatient !== 'undefined' && currentPatient)
+    ? (currentPatient.bilanDataPodopediatrie || {}) : {};
+  var ageMonths = d.ageMonths;
+  var ageY = (ageMonths != null && !isNaN(ageMonths)) ? Math.round(ageMonths / 12) : null;
+  // Formatage FR (virgule décimale) pour cohérence avec _podoNavicInterpret.
+  var fmt = function (n) { return (Math.round(n * 100) / 100).toString().replace('.', ','); };
+  var apply = function (field, elId, refTable) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var input = document.querySelector('#pg-podopediatrie [data-field="' + field + '"]');
+    var raw = input ? input.value : '';
+    if (raw === '' || raw == null) { el.textContent = ''; return; }
+    if (ageY == null) { el.textContent = 'Réf. non disponible pour cet âge'; return; }
+    var ref = refTable[ageY];
+    if (!ref) { el.textContent = 'Réf. non disponible pour cet âge'; return; }
+    var v = parseFloat(raw);
+    var min = ref[0], max = ref[1];
+    var refStr = fmt(min) + '–' + fmt(max) + '°';
+    if (v >= min && v <= max) {
+      el.textContent = 'Dans les normes (' + ageY + ' ans)';
+    } else if (v < min) {
+      el.textContent = 'Sous la norme (attendu ' + refStr + ' à ' + ageY + ' ans)';
+    } else {
+      el.textContent = 'Au-dessus de la norme (attendu ' + refStr + ' à ' + ageY + ' ans)';
+    }
+  };
+  apply('podo_tte_g', 'podo-tte-g-interpret', _PODO_TTE_REF);
+  apply('podo_tte_d', 'podo-tte-d-interpret', _PODO_TTE_REF);
+  apply('podo_af_g',  'podo-af-g-interpret',  _PODO_AF_REF);
+  apply('podo_af_d',  'podo-af-d-interpret',  _PODO_AF_REF);
+}
+
+// #140 Phase 3c1 — Genu : affichage conditionnel de l'input pertinent
+// (inter-malléolaire pour valgum, inter-condylien pour varum) + interprétation
+// physiologie. Seuils cliniques : valgum > 3 cm inter-mall, varum > 7 cm inter-cond.
+function _podoGenuInterpret() {
+  var typeEl = document.querySelector('#pg-podopediatrie input[name="podo_genu_type"]:checked');
+  var type = typeEl ? typeEl.value : '';
+  var rowMall = document.getElementById('podo-genu-intermall-row');
+  var rowCond = document.getElementById('podo-genu-intercond-row');
+  if (rowMall) rowMall.style.display = (type === 'valgum') ? '' : 'none';
+  if (rowCond) rowCond.style.display = (type === 'varum')  ? '' : 'none';
+  var el = document.getElementById('podo-genu-interpret');
+  if (!el) return;
+  var mallInput = document.querySelector('#pg-podopediatrie [data-field="podo_genu_intermall"]');
+  var condInput = document.querySelector('#pg-podopediatrie [data-field="podo_genu_intercond"]');
+  var mall = (mallInput && mallInput.value !== '') ? parseFloat(mallInput.value) : null;
+  var cond = (condInput && condInput.value !== '') ? parseFloat(condInput.value) : null;
+  if (type === 'valgum' && mall != null && mall > 3) {
+    el.textContent = 'Inter-malléolaire > 3 cm : au-delà de la physiologie';
+  } else if (type === 'varum' && cond != null && cond > 7) {
+    el.textContent = 'Inter-condylien > 7 cm : au-delà de la physiologie';
+  } else if ((type === 'valgum' && mall != null) || (type === 'varum' && cond != null)) {
+    el.textContent = 'Dans la physiologie';
+  } else {
+    el.textContent = '';
+  }
+}
+
 // #140 Phase 1 — Post-load tweaks unifiés (EVA visibility + pré-remplissages).
 // Appelé après loadPodopediatrieBilan dans le nav hook et dans ouvrirBilanPodopediatrie.
 // #140 Phase 2a — Étendu pour reflater les interprétations Morphostatique et
@@ -13813,6 +13891,8 @@ function _podoPostLoadTweaks() {
   _podoTrendelenburgInterpret();
   _podoNucaleChanged();
   _podoRombergApplyState();
+  _podoTteAfInterpret();
+  _podoGenuInterpret();
 }
 
 function _isPodopediatrieSectionVisibleForPeriode(el, periode) {

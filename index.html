@@ -2196,7 +2196,165 @@
       </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-6" data-periodes="II III IV" style="display:none;">
-      <div class="card"><div style="padding:16px;color:var(--mut);font-size:13px;">🛌 Examen en décharge — <em>Phase 0 : contenu à venir.</em></div></div>
+      <div class="card">
+        <div style="padding:16px;">
+          <div class="podo-block-title">🛌 Examen en décharge</div>
+
+          <!-- 1. Ortolani -->
+          <div class="podo-block-title">🍼 Manœuvre d'Ortolani / ressaut de hanche</div>
+          <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:6px;">
+            <div class="podo-radio-row">
+              <label class="podo-radio-btn"><input type="radio" name="podo_ortolani" value="oui">Oui</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_ortolani" value="non">Non</label>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--mut);margin-bottom:14px;font-style:italic;">
+            Un ressaut positif oriente vers une pathologie de hanche.
+          </div>
+
+          <!-- 2. TTE -->
+          <div class="podo-block-title">🦴 Torsion Tibiale Externe (TTE)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:14px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <input type="number" class="inp podopediatrie-field" data-field="podo_tte_g" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
+              <div id="podo-tte-g-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <input type="number" class="inp podopediatrie-field" data-field="podo_tte_d" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
+              <div id="podo-tte-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+          </div>
+
+          <!-- 3. Antétorsion fémorale -->
+          <div class="podo-block-title">🦴 Antétorsion Fémorale (AF)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:14px;">
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <input type="number" class="inp podopediatrie-field" data-field="podo_af_g" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
+              <div id="podo-af-g-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+            <div>
+              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <input type="number" class="inp podopediatrie-field" data-field="podo_af_d" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
+              <div id="podo-af-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
+            </div>
+          </div>
+
+          <!-- 5. Genu -->
+          <div class="podo-block-title">🦵 Genu</div>
+          <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:14px;">
+            <div class="podo-radio-row">
+              <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="aucun" onchange="_podoGenuInterpret()">Aucun / Physiologique</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="valgum" onchange="_podoGenuInterpret()">Genu valgum</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="varum" onchange="_podoGenuInterpret()">Genu varum</label>
+            </div>
+            <div id="podo-genu-intermall-row" style="display:none;margin-top:10px;">
+              <div class="podo-field-lbl" style="margin-top:0;">Espace inter-malléolaire <span style="color:#9f1239;">(cm)</span></div>
+              <input type="number" step="0.1" class="inp podopediatrie-field" data-field="podo_genu_intermall" onchange="_podoGenuInterpret()" placeholder="cm" style="max-width:120px;">
+            </div>
+            <div id="podo-genu-intercond-row" style="display:none;margin-top:10px;">
+              <div class="podo-field-lbl" style="margin-top:0;">Espace inter-condylien <span style="color:#9f1239;">(cm)</span></div>
+              <input type="number" step="0.1" class="inp podopediatrie-field" data-field="podo_genu_intercond" onchange="_podoGenuInterpret()" placeholder="cm" style="max-width:120px;">
+            </div>
+            <div id="podo-genu-interpret" style="font-size:11px;color:#9f1239;font-weight:500;margin-top:8px;min-height:14px;"></div>
+          </div>
+
+          <!-- 7. Mobilisation ostéo-articulaire -->
+          <div class="podo-block-title">🔄 Mobilisation ostéo-articulaire</div>
+          <div style="overflow-x:auto;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:#fecdd3;">
+                  <th style="padding:8px 10px;border:1px solid var(--bord);text-align:left;color:#7f1d1d;">Articulation</th>
+                  <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;color:#7f1d1d;">👈 Gauche</th>
+                  <th style="padding:8px 10px;border:1px solid var(--bord);text-align:center;color:#7f1d1d;">👉 Droite</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Coxo-fémorale</td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_g" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_g" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_g" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_g" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_d" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_d" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_d" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_coxo_d" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Genou</td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_g" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_g" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_g" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_g" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_d" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_d" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_d" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_genou_d" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Cheville</td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_g" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_g" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_g" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_g" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_d" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_d" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_d" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_cheville_d" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 10px;border:1px solid var(--bord);font-weight:600;">Pied</td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_g" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_g" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_g" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_g" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                  <td style="padding:6px 10px;border:1px solid var(--bord);">
+                    <div class="podo-radio-row" style="margin:0;">
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_d" value="normale">Normale</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_d" value="limitee">Limitée</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_d" value="hypermobile">Hypermobile</label>
+                      <label class="podo-radio-btn" style="padding:2px 8px;font-size:11px;"><input type="radio" name="podo_mobilisation_pied_d" value="bloquee">Bloquée</label>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
     </div>
     <div class="sport-section podopediatrie-section" id="pdpsec-7" data-periodes="II III IV" style="display:none;">
       <div class="card">
