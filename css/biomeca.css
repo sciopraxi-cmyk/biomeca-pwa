@@ -66,6 +66,15 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 .g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;}
 .inp{width:100%;padding:7px 10px;border:1px solid var(--bord);border-radius:var(--rs);background:var(--surf);color:var(--txt);font-size:12px;font-family:var(--f);outline:none;transition:border .15s;}
 .inp:focus{border-color:var(--blue);}
+/* Placeholder scopé aux 3 cartes d'authentification (fond blanc) — la classe
+   .inp globale est calibrée thème sombre (fond var(--surf), texte var(--txt)),
+   aucune règle ::placeholder globale n'existe → default browser variable et
+   souvent illisible sur les inputs surchargés en clair inline. Cette règle
+   scopée impose un gris moyen #9ca3af lisible sur fond blanc, sans affecter
+   les milliers d'inputs .inp du reste de l'app. */
+#pwa-login-form .inp::placeholder,
+#pwa-reset-password-form .inp::placeholder,
+#pwa-register-form .inp::placeholder { color:#9ca3af; opacity:1; }
 .btn{padding:6px 14px;border-radius:var(--rs);border:1px solid var(--bord);background:var(--card);cursor:pointer;font-size:12px;font-weight:500;color:var(--txt);font-family:var(--f);transition:all .12s;}
 .btn:hover{background:var(--bord);}
 .btn-blue{background:var(--blue-d);color:var(--blue);border-color:var(--blue);}
