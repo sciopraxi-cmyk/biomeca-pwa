@@ -2214,14 +2214,17 @@
 
           <!-- 2. TTE -->
           <div class="podo-block-title">🦴 Torsion Tibiale Externe (TTE)</div>
+          <div style="font-size:11px;color:var(--mut);font-style:italic;margin-bottom:6px;">
+            Mesure : axe bi-malléolaire par rapport à l'axe fémoral, enfant en procubitus, genou fléchi à 90°.
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:14px;">
             <div>
-              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <div class="podo-field-lbl" style="margin-top:0;">Gauche</div>
               <input type="number" class="inp podopediatrie-field" data-field="podo_tte_g" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
               <div id="podo-tte-g-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
             </div>
             <div>
-              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <div class="podo-field-lbl" style="margin-top:0;">Droite</div>
               <input type="number" class="inp podopediatrie-field" data-field="podo_tte_d" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
               <div id="podo-tte-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
             </div>
@@ -2229,26 +2232,29 @@
 
           <!-- 3. Antétorsion fémorale -->
           <div class="podo-block-title">🦴 Antétorsion Fémorale (AF)</div>
+          <div style="font-size:11px;color:var(--mut);font-style:italic;margin-bottom:6px;">
+            Mesure : test de Craig (procubitus). Tolérance large — à interpréter avec le contexte clinique.
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:14px;">
             <div>
-              <div class="podo-field-lbl" style="margin-top:0;">Pied gauche</div>
+              <div class="podo-field-lbl" style="margin-top:0;">Gauche</div>
               <input type="number" class="inp podopediatrie-field" data-field="podo_af_g" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
               <div id="podo-af-g-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
             </div>
             <div>
-              <div class="podo-field-lbl" style="margin-top:0;">Pied droit</div>
+              <div class="podo-field-lbl" style="margin-top:0;">Droite</div>
               <input type="number" class="inp podopediatrie-field" data-field="podo_af_d" onchange="_podoTteAfInterpret()" placeholder="°" style="max-width:120px;">
               <div id="podo-af-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
             </div>
           </div>
 
-          <!-- 5. Genu -->
-          <div class="podo-block-title">🦵 Genu</div>
+          <!-- 5. Genou (radio value valgum/varum inchangées pour compat data) -->
+          <div class="podo-block-title">🦵 Genou</div>
           <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-bottom:14px;">
             <div class="podo-radio-row">
               <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="aucun" onchange="_podoGenuInterpret()">Aucun / Physiologique</label>
-              <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="valgum" onchange="_podoGenuInterpret()">Genu valgum</label>
-              <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="varum" onchange="_podoGenuInterpret()">Genu varum</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="valgum" onchange="_podoGenuInterpret()">Genou valgum</label>
+              <label class="podo-radio-btn"><input type="radio" name="podo_genu_type" value="varum" onchange="_podoGenuInterpret()">Genou varum</label>
             </div>
             <div id="podo-genu-intermall-row" style="display:none;margin-top:10px;">
               <div class="podo-field-lbl" style="margin-top:0;">Espace inter-malléolaire <span style="color:#9f1239;">(cm)</span></div>
