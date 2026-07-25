@@ -2014,10 +2014,15 @@
             <!-- 3. Rotation nucale -->
             <div class="podo-block-title">🌀 Test de rotation nucale</div>
             <div class="podo-field-lbl" style="margin-top:0;">Limitation de rotation</div>
+            <!-- 3 checkboxes cumulatives (auparavant radios exclusifs) — permettent
+                 de cocher droite ET gauche simultanément. « Aucune » est mutuellement
+                 exclusive avec les deux autres via _podoNucaleLimChanged().
+                 Rupture assumée : les bilans enregistrés avec l'ancien radio
+                 podo_nucale_limitation perdent cette valeur (données de test). -->
             <div class="podo-radio-row">
-              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_limitation" value="aucune">Aucune</label>
-              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_limitation" value="droite">À droite</label>
-              <label class="podo-radio-btn"><input type="radio" name="podo_nucale_limitation" value="gauche">À gauche</label>
+              <label class="podo-radio-btn"><input type="checkbox" class="podopediatrie-field" data-field="podo_nucale_lim_aucune" onchange="_podoNucaleLimChanged('aucune')"> Aucune</label>
+              <label class="podo-radio-btn"><input type="checkbox" class="podopediatrie-field" data-field="podo_nucale_lim_droite" onchange="_podoNucaleLimChanged('droite')"> À droite</label>
+              <label class="podo-radio-btn"><input type="checkbox" class="podopediatrie-field" data-field="podo_nucale_lim_gauche" onchange="_podoNucaleLimChanged('gauche')"> À gauche</label>
             </div>
 
             <div class="podo-field-lbl">Modification des paramètres</div>
@@ -2305,6 +2310,8 @@
               <div id="podo-tte-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
             </div>
           </div>
+          <!-- Interprétation asymétrie D/G TTE (Spec §1, _PODO_THR_ASYM_DEG). -->
+          <div id="podo-tte-asym-interpret" style="font-size:11px;color:#9f1239;margin-top:-8px;margin-bottom:14px;min-height:14px;"></div>
 
           <!-- 3. Antétorsion fémorale -->
           <div class="podo-block-title">🦴 Antétorsion Fémorale (AF)</div>
@@ -2323,6 +2330,8 @@
               <div id="podo-af-d-interpret" style="font-size:11px;color:#9f1239;margin-top:6px;min-height:14px;"></div>
             </div>
           </div>
+          <!-- Interprétation asymétrie D/G AF (Spec §1, _PODO_THR_ASYM_DEG). -->
+          <div id="podo-af-asym-interpret" style="font-size:11px;color:#9f1239;margin-top:-8px;margin-bottom:14px;min-height:14px;"></div>
 
           <!-- 5. Genou (radio value valgum/varum inchangées pour compat data) -->
           <div class="podo-block-title">🦵 Genou</div>

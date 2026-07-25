@@ -90,14 +90,50 @@ Table interpolée linéairement entre ces ancres (les valeurs non grasses sont i
 | 7 ans | 26,5° | | 15 ans | 18,5° |
 | 8 ans | 26° | | 16 ans | **16°** |
 
-**Tolérance retenue : ± 15°.** Justification : ET ≈ 5–7° selon Fabry 1973 (qui situe la
-limite supérieure de normalité, moy + 2 ET, à 38° à 7 ans, 34° à 10 ans, 31° à 16 ans),
-soit ± 2 ET ≈ ± 12° ; à quoi s'ajoute l'incertitude propre du test de Craig (± 10 à 12°
-hors mains très entraînées — Maier 2012, Souza & Powers 2009) et une fiabilité
-test-retest médiocre de l'AF clinique (ICC 0,53 — Wong 2025).
+**Tolérance retenue : ± 12°** (corrigé le 25/07/2026, cf. encadré ci-dessous).
+Justification : ET ≈ 5–7° selon Fabry 1973, qui situe la limite supérieure de normalité
+(moy + 2 ET) à 38° à 7 ans, 34° à 10 ans et 31° à 16 ans → ± 2 ET ≈ ± 12°.
+
+> ⚠️ **Correction du 25/07/2026 — la tolérance était fixée à ± 15°, c'était une erreur
+> méthodologique.** Le ± 15° cumulait l'écart-type de la population (± 2 ET ≈ 12°) ET
+> l'incertitude propre du test de Craig (± 10-12°, Maier 2012, Souza & Powers 2009).
+> Or ces deux quantités ne s'additionnent pas : l'incertitude de mesure élargit la
+> **confiance dans la valeur mesurée**, pas la **plage de normalité de la population**.
+> Les cumuler produisait une bande si large qu'elle ne détectait pratiquement plus rien
+> — un patient à 7° d'un côté et 30° de l'autre était déclaré « dans les normes » des
+> deux côtés. La tolérance revient donc au ± 2 ET réel.
 
 **→ Conséquence d'affichage : privilégier « attendu ~X° à N ans » plutôt qu'un verdict
-binaire normal/anormal.**
+binaire normal/anormal.** La faible fiabilité test-retest de l'AF clinique
+(ICC 0,53 — Wong 2025) impose de traiter le verdict comme une alerte à confirmer
+cliniquement, jamais comme un diagnostic.
+
+---
+
+### Asymétrie droite / gauche — TTE et AF
+
+**Seuil retenu : écart droite/gauche > 8° → à signaler**, pour la TTE comme pour l'AF.
+
+C'est le contrôle **le plus discriminant** des deux paramètres, et il était absent de la
+V1 : comparer chaque côté à la norme sans jamais comparer les deux côtés entre eux laisse
+passer des asymétries majeures dont les deux valeurs restent, prises isolément, dans la
+bande de normalité.
+
+Repères de la littérature : différence côte-à-côte de l'antéversion fémorale ≤ 6°
+(Moulton & Upadhyay 1982, 18 sujets normaux), 4,6° chez l'adulte en IRM (Schneider 1997).
+Le seuil de 8° est volontairement un peu au-dessus de ces valeurs pour absorber
+l'imprécision du test de Craig et limiter les faux positifs.
+
+---
+
+### Bornes d'âge du référentiel
+
+- **1 à 16 ans** : comparaison normale.
+- **17 et 18 ans** : comparaison à la référence de 16 ans, explicitement signalée comme
+  extrapolée.
+- **Au-delà de 18 ans** : **aucun verdict**. Afficher « âge hors du référentiel
+  pédiatrique (table 1–16 ans) ». Rabattre silencieusement sur la valeur de 16 ans tout
+  en affichant l'âge réel du patient est trompeur.
 
 ---
 
