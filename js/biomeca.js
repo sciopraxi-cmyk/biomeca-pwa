@@ -13930,6 +13930,30 @@ function _podoNucaleChanged() {
   detail.style.display = (checked && checked.value === 'oui') ? '' : 'none';
 }
 
+// #140 Phase 4c-1 fix — Rotation nucale : « Limitation » passée de 3 radios
+// exclusifs à 3 checkboxes cumulatives (peut être bilatérale). Règle mutex :
+// « Aucune » exclut droite ET gauche ; cocher droite ou gauche décoche
+// « Aucune ». Appelé au onchange des 3 cases + rejoué au chargement d'un
+// bilan (via _podoPostLoadTweaks) pour normaliser l'état si un ancien
+// bilan avait 2 cases contradictoires.
+function _podoNucaleLimChanged(source) {
+  var aucune = document.querySelector('#pg-podopediatrie [data-field="podo_nucale_lim_aucune"]');
+  var droite = document.querySelector('#pg-podopediatrie [data-field="podo_nucale_lim_droite"]');
+  var gauche = document.querySelector('#pg-podopediatrie [data-field="podo_nucale_lim_gauche"]');
+  if (!aucune || !droite || !gauche) return;
+  if (source === 'aucune' && aucune.checked) {
+    droite.checked = false;
+    gauche.checked = false;
+  } else if ((source === 'droite' && droite.checked) || (source === 'gauche' && gauche.checked)) {
+    aucune.checked = false;
+  } else if (!source) {
+    // Appelé sans argument (post-load) : si aucune ET l'une des deux latérales
+    // sont cochées, aucune l'emporte pas — les latérales sont la donnée
+    // « riche ». Aucune n'est décochée pour cohérence.
+    if (aucune.checked && (droite.checked || gauche.checked)) aucune.checked = false;
+  }
+}
+
 // #140 Phase 3b — Romberg (mirror sport L3089 / posturo psec-1) : les sub-radios
 // D/G de « Latéralisé » et « Rotation » ne sont visibles que si la checkbox
 // mère est cochée. Décochage → sub-radio réinitialisé (évite valeur fantôme).
@@ -13997,22 +14021,36 @@ function _podoAdamChanged() {
 // TTE — Mudge AJ et al., 2014, J Pediatr Orthop B 23(1):15-25 (n=53, 4–16 ans).
 // Méthode identique à la nôtre : axe bi-malléolaire / axe fémoral, procubitus.
 // Point clinique : PAS d'évolution significative avec l'âge entre 4 et 16 ans
-// → on raisonne par BANDE de tranche d'âge, pas par année. < 4 ans : aucune réf.
+// → on raisonne par BANDE de tranche d'âge, pas par année.
+// Bornes d'âge : < 4 ans → aucune réf. 4–16 ans → référentiel direct.
+// 17–18 ans → dernière bande étendue avec mention « extrapolée ». > 18 ans
+// → hors du référentiel pédiatrique, verdict retiré (cf. Spec §1). Dernière
+// bande auparavant maxAge:Infinity — remplacée par 18 pour ne plus donner
+// un verdict pédiatrique à un patient de 39 ans.
 var _PODO_TTE_REF = [
   { minAge: 4,  maxAge: 7,  mean: 15.8, lo: 3.4, hi: 28.2 },
   { minAge: 8,  maxAge: 11, mean: 14.3, lo: 4.3, hi: 24.3 },
-  { minAge: 12, maxAge: Infinity, mean: 17.9, lo: 5.7, hi: 30.1 },
+  { minAge: 12, maxAge: 18, mean: 17.9, lo: 5.7, hi: 30.1 },
 ];
 // AF — test de Craig, Shands & Steel 1958 (moyenne par âge, interpolée aux
-// ancres 1/2/10/14/16 ans). Tolérance ± 15° (cf. spec § justification :
-// ± 2 ET Fabry + incertitude Craig). Âge > 16 ans → valeur de 16 ans. < 1 an
-// : aucune réf.
+// ancres 1/2/10/14/16 ans). Table 1–16 ans. < 1 an : aucune réf.
+// 17–18 ans : comparaison à la réf de 16 ans, marquée « extrapolée ».
+// > 18 ans : hors du référentiel pédiatrique, verdict retiré (cf. Spec §1).
 var _PODO_AF_REF = {
   1: 39,   2: 31,   3: 30,   4: 29,   5: 28,   6: 27.5,
   7: 26.5, 8: 26,   9: 25,   10: 24,  11: 23,  12: 22.5,
   13: 22,  14: 21,  15: 18.5, 16: 16,
 };
-var _PODO_AF_TOL = 15;
+// Tolérance ± 12° = ± 2 ET réel (Fabry 1973 : ET ≈ 5–7°). L'ancienne valeur
+// ± 15° cumulait à tort l'ET de population ET l'incertitude du test de Craig
+// (Maier 2012, ± 10-12° hors mains très entraînées), rendant le contrôle
+// quasi inopérant. La spec §1 tranche : on garde ± 2 ET pur, l'incertitude
+// clinique est déjà signalée par la mention « tolérance large » sous le titre.
+var _PODO_AF_TOL = 12;
+// Seuil d'asymétrie D/G — TTE et AF. Au-dessus, écart inter-membres à
+// signaler dans le bloc alertes de la synthèse ET sous les blocs TTE/AF
+// via une div dédiée. S'applique à tout âge (pas de dépendance à la table).
+var _PODO_THR_ASYM_DEG = 8;
 
 // Helper feedback visuel commun : vert sobre pour dans-les-normes, rouge gras
 // pour hors-normes, gris muted pour réf. indisponible. Champ vide → reset
@@ -14044,30 +14082,34 @@ function _podoTteAfInterpret() {
   var ageY = (ageMonths != null && !isNaN(ageMonths)) ? Math.round(ageMonths / 12) : null;
   var fmt = function (n) { return (Math.round(n * 10) / 10).toString().replace('.', ','); };
 
+  // Bornes d'âge — Spec §1. 17–18 ans → mention extrapolée, > 18 → hors réf.
   var applyTte = function (field, elId) {
     var el = document.getElementById(elId);
     if (!el) return;
     var input = document.querySelector('#pg-podopediatrie [data-field="' + field + '"]');
     var raw = input ? input.value : '';
     if (raw === '' || raw == null) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
-    if (ageY == null || ageY < 4) { el.textContent = 'Réf. non disponible (< 4 ans)'; _podoInterpretStyle(el, 'na'); return; }
+    if (ageY == null || ageY < 4)  { el.textContent = 'Réf. non disponible (< 4 ans)'; _podoInterpretStyle(el, 'na'); return; }
+    if (ageY > 18) { el.textContent = 'Âge hors du référentiel pédiatrique (table 1–16 ans)'; _podoInterpretStyle(el, 'na'); return; }
+    // Ages 17-18 : rabattus sur la dernière bande (12–18) avec suffixe.
     var band = null;
     for (var i = 0; i < _PODO_TTE_REF.length; i++) {
       if (ageY >= _PODO_TTE_REF[i].minAge && ageY <= _PODO_TTE_REF[i].maxAge) {
         band = _PODO_TTE_REF[i]; break;
       }
     }
-    if (!band) { el.textContent = 'Réf. non disponible (< 4 ans)'; _podoInterpretStyle(el, 'na'); return; }
+    if (!band) { el.textContent = 'Âge hors du référentiel pédiatrique (table 1–16 ans)'; _podoInterpretStyle(el, 'na'); return; }
     var v = parseFloat(raw);
     var bandStr = fmt(band.lo) + '–' + fmt(band.hi) + '°';
+    var extra = (ageY >= 17) ? ' (référence 16 ans, extrapolée)' : '';
     if (v >= band.lo && v <= band.hi) {
-      el.textContent = 'Dans les normes (moy. attendue ' + fmt(band.mean) + '° pour cette tranche)';
+      el.textContent = 'Dans les normes (moy. attendue ' + fmt(band.mean) + '° pour cette tranche)' + extra;
       _podoInterpretStyle(el, 'ok');
     } else if (v < band.lo) {
-      el.textContent = 'Sous la bande normale (attendu ' + bandStr + ')';
+      el.textContent = 'Sous la bande normale (attendu ' + bandStr + ')' + extra;
       _podoInterpretStyle(el, 'ko');
     } else {
-      el.textContent = 'Au-dessus de la bande normale (attendu ' + bandStr + ')';
+      el.textContent = 'Au-dessus de la bande normale (attendu ' + bandStr + ')' + extra;
       _podoInterpretStyle(el, 'ko');
     }
   };
@@ -14078,21 +14120,44 @@ function _podoTteAfInterpret() {
     var input = document.querySelector('#pg-podopediatrie [data-field="' + field + '"]');
     var raw = input ? input.value : '';
     if (raw === '' || raw == null) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
-    if (ageY == null || ageY < 1) { el.textContent = 'Réf. non disponible'; _podoInterpretStyle(el, 'na'); return; }
+    if (ageY == null || ageY < 1)  { el.textContent = 'Réf. non disponible (< 1 an)'; _podoInterpretStyle(el, 'na'); return; }
+    if (ageY > 18) { el.textContent = 'Âge hors du référentiel pédiatrique (table 1–16 ans)'; _podoInterpretStyle(el, 'na'); return; }
     var lookupAge = ageY > 16 ? 16 : ageY;
     var mean = _PODO_AF_REF[lookupAge];
-    if (mean == null) { el.textContent = 'Réf. non disponible'; _podoInterpretStyle(el, 'na'); return; }
+    if (mean == null) { el.textContent = 'Âge hors du référentiel pédiatrique (table 1–16 ans)'; _podoInterpretStyle(el, 'na'); return; }
     var v = parseFloat(raw);
     var delta = v - mean;
+    var extra = (ageY >= 17) ? ' (référence 16 ans, extrapolée)' : '';
     var meanStr = 'attendu ~' + fmt(mean) + '° à ' + ageY + ' ans';
     if (Math.abs(delta) <= _PODO_AF_TOL) {
-      el.textContent = 'Dans les normes (' + meanStr + ')';
+      el.textContent = 'Dans les normes (' + meanStr + ')' + extra;
       _podoInterpretStyle(el, 'ok');
     } else if (delta < 0) {
-      el.textContent = 'Sous la norme (' + meanStr + ')';
+      el.textContent = 'Sous la norme (' + meanStr + ')' + extra;
       _podoInterpretStyle(el, 'ko');
     } else {
-      el.textContent = 'Au-dessus de la norme (' + meanStr + ')';
+      el.textContent = 'Au-dessus de la norme (' + meanStr + ')' + extra;
+      _podoInterpretStyle(el, 'ko');
+    }
+  };
+
+  // Asymétrie D/G — active à TOUT âge, ne dépend d'aucune table de référence.
+  // Comparer les 2 côtés d'un même patient reste pertinent au-delà de 18 ans.
+  var applyAsym = function (fieldG, fieldD, elId, label) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var g = document.querySelector('#pg-podopediatrie [data-field="' + fieldG + '"]');
+    var dEl = document.querySelector('#pg-podopediatrie [data-field="' + fieldD + '"]');
+    var vg = g && g.value !== '' ? parseFloat(g.value) : null;
+    var vd = dEl && dEl.value !== '' ? parseFloat(dEl.value) : null;
+    if (vg == null || vd == null) { el.textContent = ''; _podoInterpretStyle(el, ''); return; }
+    var ecart = Math.abs(vg - vd);
+    var etxt = fmt(ecart);
+    if (ecart <= _PODO_THR_ASYM_DEG) {
+      el.textContent = 'Symétrie droite/gauche satisfaisante (écart ' + etxt + '°)';
+      _podoInterpretStyle(el, 'ok');
+    } else {
+      el.textContent = 'Asymétrie ' + label + ' droite/gauche : écart ' + etxt + '° (> ' + _PODO_THR_ASYM_DEG + '°)';
       _podoInterpretStyle(el, 'ko');
     }
   };
@@ -14101,6 +14166,8 @@ function _podoTteAfInterpret() {
   applyTte('podo_tte_d', 'podo-tte-d-interpret');
   applyAf('podo_af_g',   'podo-af-g-interpret');
   applyAf('podo_af_d',   'podo-af-d-interpret');
+  applyAsym('podo_tte_g', 'podo_tte_d', 'podo-tte-asym-interpret', 'TTE');
+  applyAsym('podo_af_g',  'podo_af_d',  'podo-af-asym-interpret',  'AF');
 }
 
 // #140 Phase 3c1 — Genu : affichage conditionnel de l'input pertinent
@@ -14357,12 +14424,14 @@ function _collectPodopediatrieSyntheseSections() {
       }
     }
   });
-  // TTE hors bande de la tranche d'âge
+  // TTE hors bande de la tranche d'âge. Bornes d'âge (Spec §1) : 4–18 ans
+  // seulement, > 18 ans = hors référentiel pédiatrique, pas d'alerte de norme.
   var ageMonths = d.ageMonths;
   var ageY = (ageMonths != null && !isNaN(ageMonths)) ? Math.round(ageMonths / 12) : null;
+  var ageInPediatrique = (ageY != null && ageY <= 18);
   ['g', 'd'].forEach(function (side) {
     var raw = fieldVal('podo_tte_' + side);
-    if (raw === '' || ageY == null || ageY < 4) return;
+    if (raw === '' || ageY == null || ageY < 4 || ageY > 18) return;
     var band = null;
     for (var i = 0; i < _PODO_TTE_REF.length; i++) {
       if (ageY >= _PODO_TTE_REF[i].minAge && ageY <= _PODO_TTE_REF[i].maxAge) { band = _PODO_TTE_REF[i]; break; }
@@ -14373,10 +14442,10 @@ function _collectPodopediatrieSyntheseSections() {
       alertItem('TTE pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : ' + raw + '° hors bande [' + band.lo + '–' + band.hi + '°] pour ' + ageY + ' ans');
     }
   });
-  // AF hors moyenne ± _PODO_AF_TOL
+  // AF hors moyenne ± _PODO_AF_TOL. Bornes d'âge : 1–18 ans seulement.
   ['g', 'd'].forEach(function (side) {
     var raw = fieldVal('podo_af_' + side);
-    if (raw === '' || ageY == null || ageY < 1) return;
+    if (raw === '' || ageY == null || ageY < 1 || ageY > 18) return;
     var lookup = ageY > 16 ? 16 : ageY;
     var mean = _PODO_AF_REF[lookup];
     if (mean == null) return;
@@ -14385,6 +14454,21 @@ function _collectPodopediatrieSyntheseSections() {
       alertItem('AF pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : ' + raw + '° hors norme (attendu ~' + mean + '° à ' + ageY + ' ans, tolérance ±' + _PODO_AF_TOL + '°)');
     }
   });
+  // Asymétrie D/G — active à TOUT âge (indépendante des tables).
+  // Cf. Spec §1 : comparer les 2 côtés d'un même patient reste pertinent
+  // même au-delà de 18 ans.
+  function checkAsym(fieldG, fieldD, label) {
+    var g = fieldVal(fieldG);
+    var dv = fieldVal(fieldD);
+    if (g === '' || dv === '') return;
+    var ecart = Math.abs(parseFloat(g) - parseFloat(dv));
+    if (ecart > _PODO_THR_ASYM_DEG) {
+      var et = (Math.round(ecart * 10) / 10).toString().replace('.', ',');
+      alertItem('Asymétrie de ' + label + ' : ' + g + '° à gauche vs ' + dv + '° à droite (écart ' + et + '°, > ' + _PODO_THR_ASYM_DEG + '°)');
+    }
+  }
+  checkAsym('podo_tte_g', 'podo_tte_d', 'TTE');
+  checkAsym('podo_af_g',  'podo_af_d',  'AF');
   // Genou : inter-mall > _PODO_THR_GENU_INTERMALL_CM ou inter-cond > _PODO_THR_GENU_INTERCOND_CM
   var genuType = (root.querySelector('input[name="podo_genu_type"]:checked') || {}).value;
   if (genuType === 'valgum') {
@@ -14534,7 +14618,19 @@ function _collectPodopediatrieSyntheseSections() {
   sections.push({ titre: '⚖️ Charge / Stabilité', items: [
     radioItem('podo_trendelenburg_g', 'Trendelenburg G'),
     radioItem('podo_trendelenburg_d', 'Trendelenburg D'),
-    radioItem('podo_nucale_limitation', 'Rotation nucale'),
+    // Rotation nucale limitation — 3 checkboxes cumulatives (bilatérale possible).
+    // Lecture manuelle car ce n'est plus un radio simple. Compose l'énumération
+    // « aucune / droite / gauche / droite et gauche ». Vide si aucune n'est cochée.
+    (function () {
+      var a = !!root.querySelector('[data-field="podo_nucale_lim_aucune"]:checked');
+      var dr = !!root.querySelector('[data-field="podo_nucale_lim_droite"]:checked');
+      var g = !!root.querySelector('[data-field="podo_nucale_lim_gauche"]:checked');
+      var parts = [];
+      if (a)  parts.push('Aucune');
+      if (dr) parts.push('À droite');
+      if (g)  parts.push('À gauche');
+      return parts.length ? kv('Rotation nucale — limitation', parts.join(' + ')) : '';
+    }()),
     radioItem('podo_nucale_mousse', 'Nucale sur mousse'),
     radioItem('podo_nucale_yeux',   'Nucale yeux fermés'),
     radioItem('podo_nucale_dents',  'Nucale dents serrées'),
@@ -14654,6 +14750,7 @@ function _podoPostLoadTweaks() {
   _podoFpiInterpret();
   _podoTrendelenburgInterpret();
   _podoNucaleChanged();
+  _podoNucaleLimChanged();
   _podoRombergApplyState();
   _podoTteAfInterpret();
   _podoGenuInterpret();
