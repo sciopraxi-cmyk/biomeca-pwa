@@ -14540,7 +14540,12 @@ function _collectPodopediatrieSyntheseSections() {
 
   // ─── Sections cliniques (ordre des onglets) ─────────────────────
   var sections = [];
-  if (alerts.length) sections.push({ titre: '⚠️ Éléments à signaler', items: alerts });
+  // #140 Phase 4c-2a robustesse — marqueur booléen `isAlerts` porté à la
+  // source. Les consommateurs (rapport, futures vues) doivent tester
+  // `s.isAlerts` plutôt que comparer le libellé, qui contient un émoji et
+  // un sélecteur de variante U+FE0F : changer un seul caractère du titre
+  // ferait basculer silencieusement la section dans le mauvais bloc.
+  if (alerts.length) sections.push({ titre: '⚠️ Éléments à signaler', items: alerts, isAlerts: true });
 
   // Interrogatoire (préfixes larges — tout champ podo_motif_* / podo_atcd_*
   // / podo_exam_* / podo_doul_* remonte automatiquement via boxItems+pfx).
@@ -14580,8 +14585,11 @@ function _collectPodopediatrieSyntheseSections() {
     txtItem('podo_marche_course_txt',     'Course — précisions')
   ] });
 
-  // Morphostatique
-  sections.push({ titre: '🦴 Morphostatique', items: [
+  // Morphostatique — `isMorpho: true` : même principe de robustesse que
+  // `isAlerts` ci-dessus. Le rapport (Phase 4c-2b) insérera les blocs
+  // images (silhouettes / photos posturales / schéma plantaire) juste
+  // après cette section, repéré par ce drapeau et non par le libellé.
+  sections.push({ isMorpho: true, titre: '🦴 Morphostatique', items: [
     radioItem('podo_jack',      'Test de Jack'),
     radioItem('podo_giration',  'Giration bassin'),
     radioItem('podo_axecalc_g_dir', 'Axe calcanéen gauche'),
@@ -14709,7 +14717,15 @@ function _collectPodopediatrieSyntheseSections() {
   // « ⚠️ Éléments à signaler » est ajoutée en tête et ne subit pas ce filtre
   // (déjà conditionnée sur alerts.length).
   return sections.map(function (s) {
-    return { titre: s.titre, items: s.items.filter(function (i) { return i && String(i).trim() !== ''; }) };
+    // Propager `isAlerts` / `isMorpho` (drapeaux d'authorité pour les
+    // consommateurs). Comparer le titre serait fragile (émoji + variation
+    // selector U+FE0F).
+    return {
+      titre: s.titre,
+      isAlerts: !!s.isAlerts,
+      isMorpho: !!s.isMorpho,
+      items: s.items.filter(function (i) { return i && String(i).trim() !== ''; })
+    };
   }).filter(function (s) { return s.items.length > 0; });
 }
 
@@ -15130,13 +15146,71 @@ function buildPodopediatrieRapportHTML() {
   var metrics = '';
   if (p.poids)  metrics += '<div class="metric"><div class="metric-val">' + _escHtml(String(p.poids)) + '</div><div class="metric-lbl">kg</div></div>';
   if (p.taille) metrics += '<div class="metric"><div class="metric-val">' + _escHtml(String(p.taille)) + '</div><div class="metric-lbl">cm</div></div>';
-  // Corps placeholder en Phase 0 — le contenu clinique arrivera avec les sections.
-  var body = '<p style="font-style:italic;color:#666;">Contenu clinique à venir (Phase suivante).</p>';
+  // #140 Phase 4c-2a — Corps du rapport (texte uniquement, sans images).
+  // Source unique de vérité : _collectPodopediatrieSyntheseSections (posée en
+  // 4c-1). Aucune nouvelle collecte de champs — le rapport et la synthèse
+  // écran consomment strictement les mêmes items. C'est ce qui a manqué au
+  // rapport posturo (tâche #96) et qu'on garde blindé ici.
+  // Ordre : sections cliniques du collecteur (Interrogatoire → Conclusion)
+  // dans l'ordre naturel, sauf « ⚠️ Éléments à signaler » qui est remontée
+  // dans le bloc « 📊 Synthèse » en fin de document, avec la conclusion.
+  // Phase 4c-2b (à suivre) : les blocs images (silhouettes, photos posturales,
+  // schéma plantaire) s'insèreront juste après Morphostatique — le marqueur
+  // HTML est déjà posé pour repère.
+  var sectionsAll = (typeof _collectPodopediatrieSyntheseSections === 'function')
+    ? _collectPodopediatrieSyntheseSections() : [];
+  var alertSection = null;
+  var clinical = [];
+  sectionsAll.forEach(function (s) {
+    // #140 Phase 4c-2a robustesse — cf. _collectPodopediatrieSyntheseSections
+    // (L14543). Le drapeau `isAlerts` est la source d'autorité. Comparer le
+    // titre serait fragile (émoji + variation selector U+FE0F).
+    if (s.isAlerts) alertSection = s;
+    else clinical.push(s);
+  });
+  var body = '';
+  clinical.forEach(function (s) {
+    var lis = s.items.map(function (it) { return '<li>' + it + '</li>'; }).join('');
+    body += '<div class="rp-section">'
+         + '<div class="rp-section-title">' + s.titre + '</div>'
+         + '<ul>' + lis + '</ul>'
+         + '</div>';
+    if (s.isMorpho) {
+      body += '<!-- Phase 4c-2b : blocs images (silhouettes morphostatiques, photos posturales, schéma plantaire) à insérer ici -->';
+    }
+  });
+  // Bloc « 📊 Synthèse » : alertes rouges + conclusion clinique rédigée.
+  // Modèle du rapport posturo : bloc de clôture, visuellement distinct
+  // (fond blanc, bordure gauche accentuée). Duplique volontairement
+  // podo_conclusion_txt (déjà présent dans la section Conclusion en amont)
+  // pour clore le rapport sur la conclusion + le résumé des alertes,
+  // comme le fait sport à L12245-12256. Lecture directe du champ (une
+  // seule valeur, pas une re-collecte structurelle).
+  var syn = '';
+  if (alertSection && alertSection.items.length) {
+    syn += '<ul>'
+        + alertSection.items.map(function (it) { return '<li>' + it + '</li>'; }).join('')
+        + '</ul>';
+  } else {
+    syn += '<p class="rp-syn-none">Aucun élément hors normes relevé.</p>';
+  }
+  var conclEl = document.querySelector('#pg-podopediatrie [data-field="podo_conclusion_txt"]');
+  var concl = conclEl ? (conclEl.value || '').trim() : '';
+  if (concl) {
+    syn += '<div class="rp-syn-concl"><strong>Conclusion clinique</strong> : ' + _escHtml(concl) + '</div>';
+  }
+  body += '<div class="rp-section rp-synthese">'
+       + '<div class="rp-section-title">📊 Synthèse</div>'
+       + syn
+       + '</div>';
+  if (!body) {
+    body = '<p style="font-style:italic;color:#666;">Aucune donnée renseignée pour le moment.</p>';
+  }
   var css = '<style>'
     + '*{margin:0;padding:0;box-sizing:border-box;}'
     + 'body{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}'
     + '.rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}'
-    + '@media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.header,.titre-rapport,.patient-card,.footer{break-inside:avoid;}}'
+    + '@media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.header,.titre-rapport,.patient-card,.footer,.rp-section{break-inside:avoid;page-break-inside:avoid;}.rp-section-title{break-after:avoid;page-break-after:avoid;}}'
     + '.header{background:#4c0519;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;}'
     + '.logo{height:64px;object-fit:contain;}'
     + '.prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.55);line-height:1.7;}'
@@ -15155,6 +15229,14 @@ function buildPodopediatrieRapportHTML() {
     + '.metric-val{font-size:18px;font-weight:300;color:#9f1239;line-height:1;}'
     + '.metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}'
     + '.rp-body{padding:16px 24px;} .rp-body ul{margin:0;padding-left:18px;}'
+    + '.rp-section{background:#fff5f7;border:1px solid #fecdd3;border-radius:6px;padding:10px 14px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid;}'
+    + '.rp-section-title{color:#9f1239;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #fecdd3;padding-bottom:4px;margin-bottom:6px;break-after:avoid;page-break-after:avoid;}'
+    + '.rp-section ul{margin:0;padding-left:18px;list-style:disc;font-size:10.5px;line-height:1.5;color:#1f2937;}'
+    + '.rp-section li{margin:2px 0;}'
+    + '.rp-synthese{background:#fff;border:1px solid #fecdd3;border-left:3px solid #9f1239;}'
+    + '.rp-synthese .rp-section-title{color:#4c0519;}'
+    + '.rp-syn-none{font-style:italic;color:#4c0519;font-size:10.5px;margin:0 0 6px;}'
+    + '.rp-syn-concl{margin-top:6px;font-size:10.5px;color:#1f2937;line-height:1.5;white-space:pre-wrap;}'
     + '.footer{background:#fff5f7;border-top:2px solid #9f1239;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;}'
     + '.footer-brand{font-size:8px;font-weight:700;color:#9f1239;letter-spacing:2px;text-transform:uppercase;}'
     + '.footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}'
