@@ -14878,10 +14878,20 @@ function showPodopediatrieSection(idx) {
   // saisie dans les autres onglets sera visible ici.
   // #140 Phase 1b — Rapport est passé de la position 10 à la position 11
   // après insertion de l'onglet « Réflexes » en position 1.
+  // #140 Phase 4c-2b — buildPodopediatrieRapportHTML est asynchrone (résolution
+  // 9 visuels). Placeholder immédiat pour éviter un aperçu vide/figé pendant
+  // le prefetch Storage, puis remplacement au retour de la Promise. Aucun
+  // await sur le hook lui-même (showPodopediatrieSection reste sync).
   if (target === 11) {
     const bodyEl = document.getElementById('podopediatrie-rapport-body');
     if (bodyEl && typeof buildPodopediatrieRapportHTML === 'function') {
-      bodyEl.innerHTML = buildPodopediatrieRapportHTML();
+      bodyEl.innerHTML = '<div style="font-style:italic;color:var(--mut);padding:12px 0;">⏳ Préparation de l\'aperçu…</div>';
+      buildPodopediatrieRapportHTML()
+        .then(function (html) { bodyEl.innerHTML = html; })
+        .catch(function (e) {
+          console.error('[podo rapport preview] build échoué :', e);
+          bodyEl.innerHTML = '<div style="color:#b91c1c;padding:12px 0;">Erreur lors de la préparation de l\'aperçu.</div>';
+        });
     }
   }
 }
@@ -15100,14 +15110,244 @@ function printRapportPedicurie(){
   setTimeout(function(){ try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e){ console.error('Print iframe pédicurie:', e); alert('Erreur lors de l\'impression. Réessayez ou Cmd/Ctrl+P.'); } }, 300);
 }
 
-// #140 Phase 0b — Builder du rapport podopédiatrie. Miroir strict de
-// buildPedicurieRapportHTML : header sciopraxi + cartouche praticien,
-// bandeau titre rose, carte patient (avec période et âge), corps
-// placeholder en Phase 0, footer marque. Réutilise _escHtml (global
-// partagé, cf. #74 durcissement XSS). L'iframe d'impression est réutilisé
-// par printRapportPodopediatrie. Aucune écriture parasite dans le DOM
-// de #pg-podopediatrie (rapport = sortie, pas de saisie).
-function buildPodopediatrieRapportHTML() {
+// #140 Phase 4c-2b — Résolution + compositing des visuels du rapport podopédiatrie.
+// ═══════════════════════════════════════════════════════════════════════════════
+// Trois familles : 4 silhouettes morphostatiques dessinables, 4 photos posturales
+// annotées (déléguées à _collectAnnotatedPostureViews, réutilisé à l'identique
+// du rapport posturo), 1 schéma plantaire (calque sur plan-semelles-schema-plantaire).
+//
+// Sécurité clinique — 3 statuts par visuel :
+//   'ok' → composite complet (gabarit + calque dessin).
+//   'nu' → aucune dataURL ET aucun Path Storage : le clinicien n'a rien dessiné.
+//          Le gabarit nu est affiché, sans mention (comportement légitime).
+//   'ko' → Path Storage présent mais fetch/decode échoué : les annotations
+//          existent mais n'ont pas pu être rechargées. Le gabarit nu est affiché
+//          AVEC une mention rouge visible dans le rapport, pour empêcher le
+//          praticien de conclure à leur absence à l'impression.
+//
+// Bornes de résolution — les 9 composites tirés à la pleine résolution du
+// canvas source (jusqu'à ~1200×1200 sur DPR élevé) donneraient un PDF trop
+// lourd. On borne : silhouettes hauteur max 500 px, plan-semelles largeur
+// max 700 px, photos posturales déjà bornées à 850 px par
+// _collectAnnotatedPostureViews (constante partagée avec posturo/sport).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var _PODO_MAX_MORPHO_H  = 500;
+var _PODO_MAX_PLANTAIRE_W = 700;
+var _PODO_MAX_POSTURE_W = 850; // aligné sur posturo/sport (_collectAnnotatedPostureViews)
+
+// Charge une src (dataURL ou URL absolue) en Image. Réservé au pipeline rapport,
+// où on veut await synchrone avant d'assembler le HTML. Rejette silencieusement
+// si le src est vide (les appelants prévoient un fallback).
+function _podoLoadImage(src) {
+  return new Promise(function (resolve, reject) {
+    if (!src) { reject(new Error('empty src')); return; }
+    var img = new Image();
+    img.onload = function () { resolve(img); };
+    img.onerror = function () { reject(new Error('image load failed')); };
+    img.src = src;
+  });
+}
+
+// Compose une tuile morpho podo : gabarit (imgjs-*) + calque dessin transparent.
+// Retourne { status, dataUrl } où status est 'ok'|'nu'|'ko'. Voir doc ci-dessus.
+// Pattern miroir _resolveSportRapportImages L11294-11354 (scaling `object-fit:
+// contain` équivalent, PNG output, fond blanc rempli avant drawImage).
+async function _composePodoMorphoTile(bd, key, baseId) {
+  var d = bd || {};
+  var baseEl = document.getElementById(baseId);
+  var baseSrc = (baseEl && baseEl.src) || '';
+  var hasPath = !!d[key + 'Path'];
+  var dataUrl = d[key];
+  if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
+    try {
+      var r = await prefetchPhotoToDataUrl(d[key + 'Path']);
+      if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
+    } catch (e) { /* fallthrough → status 'ko' plus bas */ }
+  }
+  if (!dataUrl) {
+    // Distinction clinique : pas de Path = jamais dessiné ; Path présent + KO
+    // = annotations perdues → mention visible côté rapport.
+    return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+  }
+  // Composite : dimensions calque, scale du gabarit centered (object-fit: contain
+  // équivalent). Borne hauteur à _PODO_MAX_MORPHO_H pour limiter le poids PDF.
+  try {
+    var drawing = await _podoLoadImage(dataUrl);
+    var Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
+    if (!Wd || !Hd) return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+    var outH = Math.min(Hd, _PODO_MAX_MORPHO_H);
+    var outW = Math.round(Wd * (outH / Hd));
+    var tmp = document.createElement('canvas');
+    tmp.width = outW; tmp.height = outH;
+    var ctx = tmp.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, outW, outH);
+    if (baseEl && baseEl.complete && baseEl.naturalWidth) {
+      var baseW = baseEl.naturalWidth, baseH = baseEl.naturalHeight;
+      var scale = Math.min((outW - 16) / baseW, outH / baseH);
+      var dispW = baseW * scale, dispH = baseH * scale;
+      ctx.drawImage(baseEl, (outW - dispW) / 2, (outH - dispH) / 2, dispW, dispH);
+    }
+    ctx.drawImage(drawing, 0, 0, outW, outH);
+    return { status: 'ok', dataUrl: tmp.toDataURL('image/png') };
+  } catch (e) {
+    return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+  }
+}
+
+// Compose le schéma plantaire : gabarit plan-semelles (imgjs-plan-semelles)
+// + calque dessin _podo_pieds. Overlay 1:1 (canvas backing 520×520 fixe,
+// pattern miroir sport `_pieds` L11325-11331). Borne largeur à
+// _PODO_MAX_PLANTAIRE_W. Retour { status, dataUrl } identique à morpho.
+async function _composePodoPieds(bd) {
+  var d = bd || {};
+  var baseEl = document.getElementById('imgjs-plan-semelles');
+  var baseSrc = (baseEl && baseEl.src) || '';
+  var hasPath = !!d._podo_piedsPath;
+  var dataUrl = d._podo_pieds;
+  if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
+    try {
+      var r = await prefetchPhotoToDataUrl(d._podo_piedsPath);
+      if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
+    } catch (e) { /* fallthrough */ }
+  }
+  if (!dataUrl) {
+    return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+  }
+  try {
+    var drawing = await _podoLoadImage(dataUrl);
+    var Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
+    if (!Wd || !Hd) return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+    var outW = Math.min(Wd, _PODO_MAX_PLANTAIRE_W);
+    var outH = Math.round(Hd * (outW / Wd));
+    var tmp = document.createElement('canvas');
+    tmp.width = outW; tmp.height = outH;
+    var ctx = tmp.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, outW, outH);
+    if (baseEl && baseEl.complete && baseEl.naturalWidth) {
+      ctx.drawImage(baseEl, 0, 0, outW, outH);
+    }
+    ctx.drawImage(drawing, 0, 0, outW, outH);
+    return { status: 'ok', dataUrl: tmp.toDataURL('image/png') };
+  } catch (e) {
+    return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+  }
+}
+
+// Résolution complète des 3 familles de visuels du rapport podo, en parallèle.
+// Retourne { morpho: [tile,tile,tile,tile], pieds: {status,dataUrl},
+// annotatedViews: [...] }. Chaque tile morpho est enrichi de son label
+// affichable et lu depuis les libellés écran (index.html L1491/L1498/L1513/L1520 —
+// « Profil droit » sous podo-morpho-profilG et « Profil gauche » sous profilD
+// suivent la convention d'assets mal nommés, cf. #140 Phase 2b1). Le rapport
+// doit AFFICHER LES MÊMES LIBELLÉS QUE L'ÉCRAN — sinon double inversion invisible.
+async function _resolvePodoRapportImages(bd) {
+  var d = bd || {};
+  var MORPHO_TILES = [
+    { key: '_podo_morpho_face',    baseId: 'imgjs-morpho-face',    label: 'Face' },
+    { key: '_podo_morpho_face2',   baseId: 'imgjs-morpho-face2',   label: 'Dos' },
+    { key: '_podo_morpho_profilG', baseId: 'imgjs-morpho-profilG', label: 'Profil droit' },
+    { key: '_podo_morpho_profilD', baseId: 'imgjs-morpho-profilD', label: 'Profil gauche' }
+  ];
+  var results = await Promise.all([
+    Promise.all(MORPHO_TILES.map(function (t) {
+      return _composePodoMorphoTile(d, t.key, t.baseId).then(function (r) {
+        return { key: t.key, label: t.label, status: r.status, dataUrl: r.dataUrl };
+      });
+    })),
+    _composePodoPieds(d),
+    (typeof _collectAnnotatedPostureViews === 'function')
+      ? _collectAnnotatedPostureViews(d, _PODO_MAX_POSTURE_W)
+      : Promise.resolve([])
+  ]);
+  return { morpho: results[0], pieds: results[1], annotatedViews: results[2] };
+}
+
+// Rendu HTML du bloc « Silhouettes morphostatiques » (grille 2×2, cadre rose podo).
+// Le bloc n'apparaît QUE si au moins une tuile a un dessin réel ('ok') ou une
+// annotation perdue à signaler ('ko'). Si les 4 tuiles sont 'nu' (jamais
+// dessinées), on retourne '' pour ne pas alourdir le rapport avec 4 gabarits
+// vierges sans valeur clinique. Dès qu'une seule tuile mérite le bloc, on
+// garde les 4 tuiles pour la lecture comparative (une silhouette vierge à
+// côté de 3 annotées reste informative). Mention rouge visible sur les
+// tuiles 'ko' (annotations Storage introuvables).
+function _renderPodoMorphoBlock(morphoTiles) {
+  if (!morphoTiles || !morphoTiles.length) return '';
+  var hasContent = morphoTiles.some(function (t) { return t.status === 'ok' || t.status === 'ko'; });
+  if (!hasContent) return '';
+  var koCount = morphoTiles.filter(function (t) { return t.status === 'ko'; }).length;
+  var html = '<div class="rp-section rp-imgs">'
+           + '<div class="rp-section-title">📸 Silhouettes morphostatiques</div>';
+  if (koCount) {
+    html += '<div class="rp-imgs-warn">⚠️ Annotations non chargées sur ' + koCount
+         + ' silhouette' + (koCount > 1 ? 's' : '')
+         + ' — vérifiez votre connexion avant d\'imprimer.</div>';
+  }
+  html += '<div class="rp-imgs-grid rp-imgs-grid-2">';
+  morphoTiles.forEach(function (t) {
+    html += '<div class="rp-imgs-tile">'
+         + '<div class="rp-imgs-label">' + _escHtml(t.label) + '</div>'
+         + '<img src="' + t.dataUrl + '" alt="' + _escHtml(t.label) + '"/>';
+    if (t.status === 'ko') {
+      html += '<div class="rp-imgs-tile-ko">Annotations non chargées</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+// Rendu HTML du bloc « Photos posturales annotées » — délégation à
+// _buildAnnotatedViewsGridHTML (déjà utilisé par le rapport posturo et le
+// rapport sport, cf. #109-A3 L8121-8131). Wrapper podo pour la palette rose.
+function _renderPodoPostureBlock(annotatedViews) {
+  if (!annotatedViews || !annotatedViews.length) return '';
+  var html = '<div class="rp-section rp-imgs">'
+           + '<div class="rp-section-title">📸 Photos posturales annotées</div>';
+  if (typeof _buildAnnotatedViewsGridHTML === 'function') {
+    html += _buildAnnotatedViewsGridHTML(annotatedViews);
+  }
+  html += '</div>';
+  return html;
+}
+
+// Rendu HTML du bloc « Plan de semelles » — 1 image plein largeur bornée à
+// max-width:70% pour rester lisible sans dominer la page. Mention rouge si 'ko'.
+// Omission stricte si 'nu' (jamais dessiné) : pas de valeur à imprimer un
+// gabarit plantaire vierge, alignement sur la règle des silhouettes.
+function _renderPodoPiedsBlock(piedsResult) {
+  if (!piedsResult || !piedsResult.dataUrl) return '';
+  if (piedsResult.status === 'nu') return '';
+  var html = '<div class="rp-section rp-imgs">'
+           + '<div class="rp-section-title">👣 Plan de semelles</div>';
+  if (piedsResult.status === 'ko') {
+    html += '<div class="rp-imgs-warn">⚠️ Annotations non chargées sur le schéma plantaire — vérifiez votre connexion avant d\'imprimer.</div>';
+  }
+  html += '<div style="text-align:center;">'
+       + '<img src="' + piedsResult.dataUrl + '" alt="Plan de semelles" style="max-width:70%;height:auto;display:inline-block;border-radius:4px;"/>'
+       + '</div></div>';
+  return html;
+}
+
+// #140 Phase 0b (étendu Phase 4c-2a/2b) — Builder du rapport podopédiatrie.
+// Miroir strict de buildPedicurieRapportHTML : header sciopraxi + cartouche
+// praticien, bandeau titre rose, carte patient (avec période et âge), corps
+// clinique alimenté par le collecteur (Phase 4c-2a), puis blocs visuels
+// injectés au repère `isMorpho` (Phase 4c-2b : silhouettes + photos posturales
+// + schéma plantaire, résolus en async). Réutilise _escHtml (global partagé,
+// cf. #74 durcissement XSS). L'iframe d'impression est réutilisé par
+// printRapportPodopediatrie. Aucune écriture parasite dans le DOM de
+// #pg-podopediatrie (rapport = sortie, pas de saisie).
+//
+// #140 Phase 4c-2b — Signature async : le compositing des 9 images (4 silhouettes
+// + 4 photos posturales + 1 plan de semelles) peut nécessiter un prefetch Storage
+// (image absente de la RAM après un save+strip). Les 2 call-sites (aperçu
+// target === 11 dans showPodopediatrieSection L14865-14870, impression
+// printRapportPodopediatrie ci-dessous) attendent la Promise avant d'insérer
+// le HTML — garantie anti-race documentée en Phase 4c-2b.
+async function buildPodopediatrieRapportHTML() {
   var p = (typeof currentPatient !== 'undefined' && currentPatient) ? currentPatient : {};
   var prat = (typeof praticiens !== 'undefined' && praticiens)
     ? (praticiens.find(function (pr) { return pr.id == p.pratId; }) || (praticiens.length === 1 ? praticiens[0] : {}))
@@ -15168,6 +15408,10 @@ function buildPodopediatrieRapportHTML() {
     if (s.isAlerts) alertSection = s;
     else clinical.push(s);
   });
+  // #140 Phase 4c-2b — Résolution asynchrone des visuels AVANT assemblage HTML.
+  // await unique pour la race #110 (impression avant résolution). En parallèle :
+  // 4 silhouettes morpho + schéma plantaire + 4 photos posturales.
+  var visuals = await _resolvePodoRapportImages(d);
   var body = '';
   clinical.forEach(function (s) {
     var lis = s.items.map(function (it) { return '<li>' + it + '</li>'; }).join('');
@@ -15176,7 +15420,13 @@ function buildPodopediatrieRapportHTML() {
          + '<ul>' + lis + '</ul>'
          + '</div>';
     if (s.isMorpho) {
-      body += '<!-- Phase 4c-2b : blocs images (silhouettes morphostatiques, photos posturales, schéma plantaire) à insérer ici -->';
+      // Ordre : silhouettes dessinées (statique 4 vues) → photos annotées
+      // (statique 4 vues avec points/plomb) → schéma plantaire (plan de
+      // traitement). Chaque bloc s'auto-omet s'il n'a rien à montrer
+      // (photos posturales) ou reste en gabarit nu (silhouettes/pieds).
+      body += _renderPodoMorphoBlock(visuals.morpho);
+      body += _renderPodoPostureBlock(visuals.annotatedViews);
+      body += _renderPodoPiedsBlock(visuals.pieds);
     }
   });
   // Bloc « 📊 Synthèse » : alertes rouges + conclusion clinique rédigée.
@@ -15237,6 +15487,14 @@ function buildPodopediatrieRapportHTML() {
     + '.rp-synthese .rp-section-title{color:#4c0519;}'
     + '.rp-syn-none{font-style:italic;color:#4c0519;font-size:10.5px;margin:0 0 6px;}'
     + '.rp-syn-concl{margin-top:6px;font-size:10.5px;color:#1f2937;line-height:1.5;white-space:pre-wrap;}'
+    + '.rp-imgs{background:#fff;}'
+    + '.rp-imgs-grid{display:grid;gap:12px;padding:6px 0;}'
+    + '.rp-imgs-grid-2{grid-template-columns:1fr 1fr;}'
+    + '.rp-imgs-tile{break-inside:avoid;page-break-inside:avoid;text-align:center;position:relative;}'
+    + '.rp-imgs-label{font-size:10px;font-weight:700;color:#9f1239;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}'
+    + '.rp-imgs-tile img{max-width:100%;max-height:220px;object-fit:contain;border:1px solid #fecdd3;border-radius:4px;background:#fff;}'
+    + '.rp-imgs-warn{font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin-bottom:8px;}'
+    + '.rp-imgs-tile-ko{font-size:9px;font-weight:600;color:#b91c1c;margin-top:3px;}'
     + '.footer{background:#fff5f7;border-top:2px solid #9f1239;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;}'
     + '.footer-brand{font-size:8px;font-weight:700;color:#9f1239;letter-spacing:2px;text-transform:uppercase;}'
     + '.footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}'
@@ -15253,23 +15511,44 @@ function buildPodopediatrieRapportHTML() {
     + '</div></body></html>';
 }
 
-// #140 Phase 0b — Impression via iframe masquée. Gate _accessLevel comme
-// les autres export_pdf. Timeout 300 ms pour laisser l'iframe se charger.
-function printRapportPodopediatrie() {
+// #140 Phase 0b (étendu Phase 4c-2b) — Impression via iframe masquée. Gate
+// _accessLevel comme les autres export_pdf. Async car buildPodopediatrieRapportHTML
+// est asynchrone depuis Phase 4c-2b (résolution 9 visuels). Le bouton passe en
+// état désactivé + libellé « ⏳ Préparation… » pendant la résolution — sans
+// ça le clic donne plusieurs secondes de silence apparent (jusqu'à 9 prefetchs
+// Storage). Restauré dans le finally, y compris si une exception remonte.
+async function printRapportPodopediatrie() {
   if (window._accessLevel && window._accessLevel !== 'full') { showAccessRestrictedModal('export_pdf'); return; }
   var wrap = document.getElementById('podopediatrie-rapport-iframe-wrap');
   if (!wrap) { alert('Aperçu du rapport indisponible.'); return; }
-  var html = buildPodopediatrieRapportHTML();
-  wrap.innerHTML = '';
-  var iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:absolute;width:0;height:0;border:none;';
-  wrap.appendChild(iframe);
-  var idoc = iframe.contentDocument || iframe.contentWindow.document;
-  idoc.open(); idoc.write(html); idoc.close();
-  setTimeout(function () {
-    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
-    catch (e) { console.error('Print iframe podopédiatrie:', e); alert('Erreur lors de l\'impression. Réessayez ou Cmd/Ctrl+P.'); }
-  }, 300);
+  var btn = document.getElementById('podo-btn-print');
+  var btnPrev = null;
+  if (btn) {
+    btnPrev = { disabled: btn.disabled, text: btn.textContent };
+    btn.disabled = true;
+    btn.textContent = '⏳ Préparation…';
+  }
+  try {
+    var html = await buildPodopediatrieRapportHTML();
+    wrap.innerHTML = '';
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:absolute;width:0;height:0;border:none;';
+    wrap.appendChild(iframe);
+    var idoc = iframe.contentDocument || iframe.contentWindow.document;
+    idoc.open(); idoc.write(html); idoc.close();
+    setTimeout(function () {
+      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+      catch (e) { console.error('Print iframe podopédiatrie:', e); alert('Erreur lors de l\'impression. Réessayez ou Cmd/Ctrl+P.'); }
+    }, 300);
+  } catch (e) {
+    console.error('[podo rapport] build échoué :', e);
+    alert('Erreur lors de la préparation du rapport. Réessayez.');
+  } finally {
+    if (btn && btnPrev) {
+      btn.disabled = btnPrev.disabled;
+      btn.textContent = btnPrev.text;
+    }
+  }
 }
 
 // #123 — Envoi du rapport par mail (approche mailto : ouvre le client mail du
