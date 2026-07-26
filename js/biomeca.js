@@ -14571,7 +14571,10 @@ function _collectPodopediatrieSyntheseSections() {
 
   // Marche — 9 radios réels (audit) + accroupissement + txt course.
   // Corrections audit : saute/cloche inexistants supprimés.
-  sections.push({ titre: '🚶 Marche', items: [
+  // #140 Phase 4c-2b (fix découplage) — `isMarche: true` marqueur à la source,
+  // consommé par buildPodopediatrieRapportHTML pour la cascade d'insertion du
+  // groupe examen (Morpho → Marche → tête). Pattern miroir isAlerts/isMorpho.
+  sections.push({ isMarche: true, titre: '🚶 Marche', items: [
     radioItem('podo_marche_talons',       'Marche sur talons'),
     radioItem('podo_marche_pointes',      'Marche sur pointes'),
     radioItem('podo_accroupissement',     'Accroupissement'),
@@ -14693,8 +14696,11 @@ function _collectPodopediatrieSyntheseSections() {
     txtItem('podo_pointure', 'Pointure')
   ].concat(boxItems(pfx('podo_chauss'))) });
 
-  // Traitement
-  sections.push({ titre: '💊 Traitement', items: [
+  // Traitement — `isTraitement: true` marqueur à la source, consommé par
+  // buildPodopediatrieRapportHTML pour positionner le schéma plantaire après
+  // cette section (sinon fallback juste avant la Synthèse). Pattern miroir
+  // isAlerts/isMorpho/isMarche.
+  sections.push({ isTraitement: true, titre: '💊 Traitement', items: [
     txtItem('podo_semelles_desc', 'Semelles — description')
   ].concat(boxItems(pfx('podo_mat_')).length ? ['<strong>Matériaux</strong> : ' + boxItems(pfx('podo_mat_')).join(', ')] : [])
    .concat(boxItems(pfx('podo_recouv_')).length ? ['<strong>Recouvrement</strong> : ' + boxItems(pfx('podo_recouv_')).join(', ')] : [])
@@ -14717,13 +14723,15 @@ function _collectPodopediatrieSyntheseSections() {
   // « ⚠️ Éléments à signaler » est ajoutée en tête et ne subit pas ce filtre
   // (déjà conditionnée sur alerts.length).
   return sections.map(function (s) {
-    // Propager `isAlerts` / `isMorpho` (drapeaux d'authorité pour les
-    // consommateurs). Comparer le titre serait fragile (émoji + variation
-    // selector U+FE0F).
+    // Propager `isAlerts` / `isMorpho` / `isMarche` / `isTraitement` (drapeaux
+    // d'authorité pour les consommateurs). Comparer le titre serait fragile
+    // (émoji + variation selector U+FE0F).
     return {
       titre: s.titre,
       isAlerts: !!s.isAlerts,
       isMorpho: !!s.isMorpho,
+      isMarche: !!s.isMarche,
+      isTraitement: !!s.isTraitement,
       items: s.items.filter(function (i) { return i && String(i).trim() !== ''; })
     };
   }).filter(function (s) { return s.items.length > 0; });
@@ -15464,23 +15472,60 @@ async function buildPodopediatrieRapportHTML() {
   // await unique pour la race #110 (impression avant résolution). En parallèle :
   // 4 silhouettes morpho + schéma plantaire + 4 photos posturales.
   var visuals = await _resolvePodoRapportImages(d);
+  // #140 Phase 4c-2b fix découplage — Les blocs images ne dépendent PLUS du
+  // remplissage des sections texte. Avant ce fix, un praticien qui dessinait
+  // sur les silhouettes sans renseigner aucun champ texte de Morphostatique
+  // voyait son bloc images disparaître : la section vide était filtrée par
+  // _collectPodopediatrieSyntheseSections (L14732 .filter items.length > 0),
+  // donc le repère `isMorpho` disparaissait, donc les 3 appels _renderPodo*
+  // n'étaient jamais faits — quel que soit le statut des visuels. Bug prod v45.
+  //
+  // Deux groupes séparés, calculés une seule fois hors boucle :
+  //   1. Groupe examen (silhouettes + photos posturales) : cascade d'insertion
+  //      Morphostatique (priorité) → Marche (fallback) → tête (dernier recours).
+  //   2. Groupe traitement (schéma plantaire) : Traitement (priorité) →
+  //      juste avant la Synthèse (fallback).
+  // Drapeau d'insertion unique par groupe → jamais zéro, jamais deux.
+  var examHtml = _renderPodoMorphoBlock(visuals.morpho) + _renderPodoPostureBlock(visuals.annotatedViews);
+  var treatmentHtml = _renderPodoPiedsBlock(visuals.pieds);
+  var examInserted = false;
+  var treatmentInserted = false;
+  var hasMorphoSection = clinical.some(function (s) { return s.isMorpho; });
+  var hasMarcheSection = clinical.some(function (s) { return s.isMarche; });
   var body = '';
+  // Fallback de tête pour le groupe examen : uniquement si aucune section
+  // ancre n'est présente. Garantit l'insertion même sur un bilan quasi-vide.
+  if (examHtml && !hasMorphoSection && !hasMarcheSection) {
+    body += examHtml;
+    examInserted = true;
+  }
   clinical.forEach(function (s) {
     var lis = s.items.map(function (it) { return '<li>' + it + '</li>'; }).join('');
     body += '<div class="rp-section">'
          + '<div class="rp-section-title">' + s.titre + '</div>'
          + '<ul>' + lis + '</ul>'
          + '</div>';
-    if (s.isMorpho) {
-      // Ordre : silhouettes dessinées (statique 4 vues) → photos annotées
-      // (statique 4 vues avec points/plomb) → schéma plantaire (plan de
-      // traitement). Chaque bloc s'auto-omet s'il n'a rien à montrer
-      // (photos posturales) ou reste en gabarit nu (silhouettes/pieds).
-      body += _renderPodoMorphoBlock(visuals.morpho);
-      body += _renderPodoPostureBlock(visuals.annotatedViews);
-      body += _renderPodoPiedsBlock(visuals.pieds);
+    // Groupe examen — cascade Morphostatique → Marche.
+    if (!examInserted && examHtml) {
+      if (s.isMorpho) {
+        body += examHtml;
+        examInserted = true;
+      } else if (!hasMorphoSection && s.isMarche) {
+        body += examHtml;
+        examInserted = true;
+      }
+    }
+    // Groupe traitement — après Traitement si présente.
+    if (!treatmentInserted && treatmentHtml && s.isTraitement) {
+      body += treatmentHtml;
+      treatmentInserted = true;
     }
   });
+  // Fallback groupe traitement : juste avant la Synthèse si pas encore inséré.
+  if (treatmentHtml && !treatmentInserted) {
+    body += treatmentHtml;
+    treatmentInserted = true;
+  }
   // Bloc « 📊 Synthèse » : alertes rouges + conclusion clinique rédigée.
   // Modèle du rapport posturo : bloc de clôture, visuellement distinct
   // (fond blanc, bordure gauche accentuée). Duplique volontairement
