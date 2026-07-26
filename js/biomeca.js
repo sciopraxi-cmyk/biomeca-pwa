@@ -15136,6 +15136,44 @@ var _PODO_MAX_MORPHO_H  = 500;
 var _PODO_MAX_PLANTAIRE_W = 700;
 var _PODO_MAX_POSTURE_W = 850; // aligné sur posturo/sport (_collectAnnotatedPostureViews)
 
+// Sérialise le canvas vivant si ET SEULEMENT SI l'utilisateur a dessiné dans
+// la session courante (`_userDirty === true`), sans jamais persister. Le
+// rapport est une lecture — provoquer un save ici saturerait le Storage à
+// chaque aperçu. Retourne la dataURL PNG transparente (via _serializeDrawCanvas,
+// jamais JPEG — cf. fix #94) OU null pour dire « pas de dessin frais ici,
+// retombe sur le modèle de données ».
+//
+// Cause exacte du bug corrigé — débounce autosave. Chaque mouseup canvas
+// arme un `_scheduleBilanAutosave('podopediatrie')` (setupDrawCanvas L12980-12985),
+// avec un débounce de 1000 ms (L21289-21294). Séquence typique praticien :
+// finit de dessiner à T=0 → clique l'onglet Rapport à T=300 ms → le save
+// n'a pas encore tourné, `d._podo_*` est encore vide, l'aperçu affiche
+// status 'nu'. Le sweep-avant-quitter L2492 ne joue que pour la nav de
+// PAGE principale, pas pour un changement d'onglet interne à #pg-podopediatrie.
+// La lecture live canvas rend le rapport insensible à ce timing sans écrire
+// sur disque. Le débounce reste inchangé (déclencher un save à chaque coup
+// de crayon serait pire — les 9 uploads Storage peuvent traîner).
+//
+// Cas trompeur explicitement géré : ancien bilan rouvert dont les onglets
+// Morphostatique / Traitement n'ont jamais été affichés → `_userDirty` est
+// falsy (soit `false` posé à l'init, soit `undefined` si le canvas n'a jamais
+// été touché) → on retombe sur `d[key]` / `d[key+'Path']`, jamais on
+// n'écrase le dessin sauvegardé avec un canvas vierge.
+function _readPodoLiveCanvas(canvasId) {
+  if (!canvasId) return null;
+  var c = document.getElementById(canvasId);
+  if (!c) return null;
+  if (!c._userDirty) return null;
+  // _serializeDrawCanvas garde-fou interne : retourne null si _baseSnapshot
+  // absent (canvas jamais initialisé) → on retombe sur le modèle.
+  try {
+    return _serializeDrawCanvas(c);
+  } catch (e) {
+    console.warn('[podo rapport] serialize live canvas failed', canvasId, e);
+    return null;
+  }
+}
+
 // Charge une src (dataURL ou URL absolue) en Image. Réservé au pipeline rapport,
 // où on veut await synchrone avant d'assembler le HTML. Rejette silencieusement
 // si le src est vide (les appelants prévoient un fallback).
@@ -15153,12 +15191,21 @@ function _podoLoadImage(src) {
 // Retourne { status, dataUrl } où status est 'ok'|'nu'|'ko'. Voir doc ci-dessus.
 // Pattern miroir _resolveSportRapportImages L11294-11354 (scaling `object-fit:
 // contain` équivalent, PNG output, fond blanc rempli avant drawImage).
-async function _composePodoMorphoTile(bd, key, baseId) {
+//
+// Fix bug canvas-vivant : ordre de résolution du calque = live canvas
+// (_userDirty) → modèle RAM (d[key]) → Storage (d[key+'Path']). Sinon un
+// dessin fait dans la session juste avant le clic Rapport (débounce
+// autosave 1 s non écoulé, cf. _readPodoLiveCanvas) était invisible.
+async function _composePodoMorphoTile(bd, key, baseId, canvasId) {
   var d = bd || {};
   var baseEl = document.getElementById(baseId);
   var baseSrc = (baseEl && baseEl.src) || '';
   var hasPath = !!d[key + 'Path'];
-  var dataUrl = d[key];
+  // 1) Canvas vivant (session en cours, dessin non sauvegardé) — priorité stricte.
+  var dataUrl = _readPodoLiveCanvas(canvasId);
+  // 2) Modèle RAM (bilan rouvert avec dataURL déjà en mémoire).
+  if (!dataUrl) dataUrl = d[key];
+  // 3) Storage Path (dataURL strippée après save+migration).
   if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
     try {
       var r = await prefetchPhotoToDataUrl(d[key + 'Path']);
@@ -15200,12 +15247,17 @@ async function _composePodoMorphoTile(bd, key, baseId) {
 // + calque dessin _podo_pieds. Overlay 1:1 (canvas backing 520×520 fixe,
 // pattern miroir sport `_pieds` L11325-11331). Borne largeur à
 // _PODO_MAX_PLANTAIRE_W. Retour { status, dataUrl } identique à morpho.
+//
+// Fix bug canvas-vivant : idem morpho — live canvas prioritaire pour rendre
+// visible un dessin d'onglet Traitement fait dans la session juste avant
+// le clic Rapport (débounce autosave 1 s non écoulé).
 async function _composePodoPieds(bd) {
   var d = bd || {};
   var baseEl = document.getElementById('imgjs-plan-semelles');
   var baseSrc = (baseEl && baseEl.src) || '';
   var hasPath = !!d._podo_piedsPath;
-  var dataUrl = d._podo_pieds;
+  var dataUrl = _readPodoLiveCanvas('podo-pieds-canvas');
+  if (!dataUrl) dataUrl = d._podo_pieds;
   if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
     try {
       var r = await prefetchPhotoToDataUrl(d._podo_piedsPath);
@@ -15246,14 +15298,14 @@ async function _composePodoPieds(bd) {
 async function _resolvePodoRapportImages(bd) {
   var d = bd || {};
   var MORPHO_TILES = [
-    { key: '_podo_morpho_face',    baseId: 'imgjs-morpho-face',    label: 'Face' },
-    { key: '_podo_morpho_face2',   baseId: 'imgjs-morpho-face2',   label: 'Dos' },
-    { key: '_podo_morpho_profilG', baseId: 'imgjs-morpho-profilG', label: 'Profil droit' },
-    { key: '_podo_morpho_profilD', baseId: 'imgjs-morpho-profilD', label: 'Profil gauche' }
+    { key: '_podo_morpho_face',    baseId: 'imgjs-morpho-face',    canvasId: 'podo-morpho-face',    label: 'Face' },
+    { key: '_podo_morpho_face2',   baseId: 'imgjs-morpho-face2',   canvasId: 'podo-morpho-face2',   label: 'Dos' },
+    { key: '_podo_morpho_profilG', baseId: 'imgjs-morpho-profilG', canvasId: 'podo-morpho-profilG', label: 'Profil droit' },
+    { key: '_podo_morpho_profilD', baseId: 'imgjs-morpho-profilD', canvasId: 'podo-morpho-profilD', label: 'Profil gauche' }
   ];
   var results = await Promise.all([
     Promise.all(MORPHO_TILES.map(function (t) {
-      return _composePodoMorphoTile(d, t.key, t.baseId).then(function (r) {
+      return _composePodoMorphoTile(d, t.key, t.baseId, t.canvasId).then(function (r) {
         return { key: t.key, label: t.label, status: r.status, dataUrl: r.dataUrl };
       });
     })),
