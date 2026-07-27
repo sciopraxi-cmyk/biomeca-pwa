@@ -19,7 +19,7 @@ test.describe('Authentication', () => {
 
   test("1.3 — mauvais mot de passe affiche un message d'erreur", async ({ page }) => {
     await login(page, {
-      email: TEST_USER_EMAIL || 'podologue@hotmail.com',
+      email: TEST_USER_EMAIL || 'test-user@example.com',
       password: 'mauvais-mot-de-passe-' + Date.now(),
       expectSuccess: false,
     });

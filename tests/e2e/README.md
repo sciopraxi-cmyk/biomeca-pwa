@@ -17,7 +17,7 @@ Tests bout-en-bout pour l'app BioMéca (PWA statique). Cible : `http://localhost
    cp .env.local.example .env.local
    ```
 
-   Puis éditer `.env.local` et mettre le mot de passe du compte test (`podologue@hotmail.com`). `.env.local` est dans `.gitignore` — ne JAMAIS le committer.
+   Puis éditer `.env.local` et mettre le mot de passe du compte test (`test-user@example.com`). `.env.local` est dans `.gitignore` — ne JAMAIS le committer.
 
 3. **Serveur HTTP** : démarré automatiquement par Playwright (`python3 -m http.server 8080`). Si tu as déjà un serveur sur le port 8080 servant la racine du projet, Playwright le réutilise (`reuseExistingServer: true`).
 
@@ -49,7 +49,7 @@ Chaque test patient utilise un nom unique horodaté et un `afterEach` qui suppri
 ## Caveats connus
 
 - **Données prod** : les tests créent de vraies données dans Supabase prod (pas de DB de test pour l'instant). Le cleanup `afterEach` couvre le cas nominal, mais si un test crash brutalement, un patient `E2E Test<timestamp>` peut rester en base.
-- **Compte test `podologue@hotmail.com`** : `licence_payee=FALSE` (résiliation du 2026-05-16). Si l'app finit par bloquer la création de patients sans licence, les tests 2.x échoueront — à diagnostiquer : soit remettre `licence_payee=true` en SQL temporairement, soit créer un compte de test dédié.
+- **Compte test `test-user@example.com`** : `licence_payee=FALSE` (résiliation du 2026-05-16). Si l'app finit par bloquer la création de patients sans licence, les tests 2.x échoueront — à diagnostiquer : soit remettre `licence_payee=true` en SQL temporairement, soit créer un compte de test dédié.
 - **Pas de CI** : tests local-only pour l'instant. Pas de hook GitHub Actions.
 
 ## Structure
