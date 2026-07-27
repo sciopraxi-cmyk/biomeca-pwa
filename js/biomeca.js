@@ -11115,9 +11115,11 @@ async function buildRapport() {
   // #88-B Chaînage : composites #98 + fiches annexes 88-B. Pas de window.print()
   // dans buildRapport (aperçu écran uniquement) — l'utilisateur peut voir les
   // annexes en faisant défiler l'aperçu.
-  _resolveSportRapportImages(p.bilanData || {}, composites => {
+  // Fix #150 — `statuses` propagé depuis _resolveSportRapportImages pour
+  // discriminer 'ok'/'nu'/'ko' côté rendu (mention rouge, auto-omission blocs).
+  _resolveSportRapportImages(p.bilanData || {}, (composites, statuses) => {
     _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses);
 
       // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
       // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
@@ -11378,24 +11380,44 @@ async function _resolveSportRapportImages(bd, callback) {
     { key: '_morpho_profilD', baseId: 'imgjs-morpho-profilD' },
     { key: '_pieds',          baseId: 'sp-pieds-img'         }
   ];
-  // Résolution dataURL (RAM ou Storage) en parallèle. Une entrée sans dataURL
-  // ni Path est simplement absente de drawingUrls (skip propre).
+  // Fix #150 défaut 1 — Résolution avec statuts 'ok'/'nu'/'ko' par clé
+  // (miroir podo/posturo). Ancienne logique : entrée absente de drawingUrls
+  // sur échec, donc fallback silencieux au gabarit nu dans buildBilanPrintSection
+  // → un rapport amputé était indiscernable d'un rapport sans annotation. Enjeu
+  // de sécurité clinique. Statuts :
+  //   'ok' → dataURL disponible (RAM ou Storage prefetch réussi).
+  //   'nu' → aucune dataURL ET aucun Path : jamais dessiné, silencieux.
+  //   'ko' → Path Storage présent mais fetch/decode échoué : le rapport doit
+  //          afficher le bloc AVEC mention rouge (empêche de conclure à l'absence).
+  // Le callback reçoit désormais `(composites, statuses)` — les call-sites
+  // existants qui ignorent le 2e param restent compatibles ; ceux qui l'utilisent
+  // (buildBilanPrintSection via _buildSportRapportContentHTML) affichent la
+  // mention et gèrent l'auto-omission des blocs sans dessin.
   const drawingUrls = {};
+  const statuses = {};
   await Promise.all(TODO.map(async t => {
     if (bd[t.key]) {
       drawingUrls[t.key] = bd[t.key];
+      statuses[t.key] = 'ok';
       return;
     }
     const path = bd[t.key + 'Path'];
     if (path && typeof prefetchPhotoToDataUrl === 'function') {
       const r = await prefetchPhotoToDataUrl(path);
-      if (r.ok) drawingUrls[t.key] = r.dataUrl;
-      else console.warn('[rapport-sport] prefetch fail', t.key + 'Path', '→', r.error);
+      if (r.ok) {
+        drawingUrls[t.key] = r.dataUrl;
+        statuses[t.key] = 'ok';
+      } else {
+        statuses[t.key] = 'ko';
+        console.warn('[rapport-sport] prefetch fail', t.key + 'Path', '→', r.error);
+      }
+    } else {
+      statuses[t.key] = 'nu';
     }
   }));
   const toResolve = TODO.filter(t => drawingUrls[t.key]);
   if(toResolve.length === 0) {
-    callback({});
+    callback({}, statuses);
     return;
   }
   const composites = {};
@@ -11405,7 +11427,7 @@ async function _resolveSportRapportImages(bd, callback) {
     const finalize = (compositeOrFallback) => {
       composites[key] = compositeOrFallback;
       remaining--;
-      if(remaining === 0) callback(composites);
+      if(remaining === 0) callback(composites, statuses);
     };
     drawing.onload = () => {
       const baseEl = document.getElementById(baseId);
@@ -11591,7 +11613,10 @@ function _resolvePosturoFichesImages(d, callback) {
 // #109-A3 — annotatedViews (déjà collectées via _collectAnnotatedPostureViews
 // par les call-sites buildRapport / printReport) propagées en injection sous
 // bilanSection (voisinage de la synthèse clinique posturale).
-function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [], annotatedViews = []) {
+// Fix #150 — 6e param `statuses` : map {key → 'ok'|'nu'|'ko'} par silhouette/pieds,
+// produit par _resolveSportRapportImages. Propagé à buildBilanPrintSection pour
+// afficher la mention rouge sur 'ko' et masquer les blocs entièrement 'nu'.
+function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [], annotatedViews = [], statuses = {}) {
   // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
@@ -11639,7 +11664,7 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // #109-A4 — annotatedViews propagées : injectées DANS la sous-section
   // Bilan Morphostatique de buildBilanPrintSection (cohérent avec posturo).
   const bilanSection = (typeof buildBilanPrintSection === 'function' && p && p.bilanData)
-    ? buildBilanPrintSection(p.bilanData, composites, annotatedViews) : '';
+    ? buildBilanPrintSection(p.bilanData, composites, annotatedViews, statuses) : '';
 
   // #88-B Annexes PDF fiches d'exercices — 1 page imprimable par dataURL retourné
   // par _resolveSportFichesImages (déjà aplaties multi-pages). page-break-before
@@ -11691,11 +11716,12 @@ async function printReport() {
   // build + injection + window.print(). Imbrication intentionnelle (pas Promise.all)
   // pour garder le pattern callback existant + éviter la complexité async/await à
   // ce niveau. Le coût pdf.js est entièrement post-composites — pas de race possible.
-  _resolveSportRapportImages(p.bilanData || {}, composites => {
+  // Fix #150 — statuses propagé (idem buildRapport).
+  _resolveSportRapportImages(p.bilanData || {}, (composites, statuses) => {
     _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
       // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
       // (source unique commune avec buildRapport, parité visuelle garantie).
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses);
       document.getElementById('rp-prat-block').innerHTML = pratHTML;
       document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
       document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
@@ -11715,7 +11741,19 @@ async function printReport() {
 // #109-A4 — annotatedViews (3ᵉ param) : vues posturales annotées injectées
 // DANS la sous-section Bilan Morphostatique, juste après les 4 silhouettes.
 // Cohérent avec le rapport posturo (#109-A4 même placement).
-function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
+// Fix #150 — 4e param `statuses` : map {key → 'ok'|'nu'|'ko'} par silhouette/pieds.
+// Deux règles nouvelles :
+//   1. Le bloc images morpho (4 silhouettes) n'est rendu que si au moins une
+//      tuile a un statut 'ok' ou 'ko'. Sinon on omet — plus de gabarits vierges
+//      alourdissant le PDF quand rien n'a été dessiné.
+//   2. Le bloc images pieds n'est rendu que si le statut _pieds est 'ok' ou 'ko'.
+//   3. Mention rouge visible (palette commune podo/posturo : #b91c1c / #fef2f2 /
+//      #fecaca) sur toute tuile ou bloc 'ko' — un rechargement Storage KO ne
+//      doit JAMAIS produire un rapport indiscernable d'un rapport sans annotation.
+// Les autres champs cliniques (chaine_musculaire, ttt.semellesDesc, etc.) restent
+// des triggers d'affichage de la section elle-même (titre + textes), indépendamment
+// de la présence de visuels.
+function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], statuses = {}) {
   if(!bd||!Object.keys(bd).length) return '';
   const f = (k,def) => (bd[k]!==undefined && bd[k]!=='' && bd[k]!==null) ? bd[k] : (def||'—');
   const yn = (k) => bd[k]==='oui'
@@ -11789,26 +11827,53 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
   const hasAnnotatedViews = annotatedViews && annotatedViews.length > 0;
   if(hasMorpho||bd.chaine_musculaire||hasAnnotatedViews) {
     h += sec('Bilan Morphostatique');
-    // #98 Option B — toujours rendre les 4 silhouettes quand la section est visible.
-    // Source par vue : composites[k] (composite gabarit + dessin user) si pré-résolu,
-    // sinon fallback src du gabarit nu depuis imgjs-* du img-store (garanti chargé
-    // dès le boot HTML index.html L2688). Garantit le rendu MÊME sans dessin sauvegardé.
-    h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-end;">';
+    // Fix #150 défauts 1+2 — Rendu conditionnel + mention rouge.
+    // (2) Le bloc des 4 silhouettes n'est rendu que si au moins une tuile a
+    //     un statut 'ok' ou 'ko'. Sinon on omet totalement — plus de gabarits
+    //     vierges alourdissant le PDF quand le praticien n'a pas dessiné.
+    // (1) Mention rouge visible en tête + par tuile 'ko' (annotations Storage
+    //     introuvables) : palette commune podo/posturo (#b91c1c / #fef2f2 /
+    //     #fecaca). Sécurité clinique : un rapport amputé sans avertissement
+    //     serait indiscernable d'un rapport sans annotation.
     // ⚠️ INVERSION VOLONTAIRE des libellés Profil G/D — les assets sont MAL
     // NOMMÉS (cf. index.html L2290 et js/biomeca.js L15164). La clé
     // _morpho_profilG est associée à la baseId imgjs-morpho-profilG qui pointe
     // sur morpho-profil-gauche.png = profil DROIT réel → label 'Profil D'.
     // Idem symétrique pour _morpho_profilD → label 'Profil G'.
-    [
+    const MORPHO_TILES = [
       ['_morpho_face',   'Face ant.',  'imgjs-morpho-face'],
       ['_morpho_face2',  'Face post.', 'imgjs-morpho-face2'],
       ['_morpho_profilG','Profil D',   'imgjs-morpho-profilG'],
       ['_morpho_profilD','Profil G',   'imgjs-morpho-profilD']
-    ].forEach(([k,lbl,baseId]) => {
-      const src = composites[k] || (document.getElementById(baseId)?.src || '');
-      if(src) h += '<div style="text-align:center;flex:1;"><div style="font-size:8px;color:#888;margin-bottom:2px;">'+lbl+'</div><img src="'+src+'" style="max-width:100%;height:120px;object-fit:contain;border:1px solid #ddd;border-radius:4px;"/></div>';
-    });
-    h += '</div>';
+    ];
+    const morphoHasContent = MORPHO_TILES.some(([k]) => statuses[k] === 'ok' || statuses[k] === 'ko');
+    if (morphoHasContent) {
+      const morphoKoCount = MORPHO_TILES.filter(([k]) => statuses[k] === 'ko').length;
+      if (morphoKoCount) {
+        h += '<div style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin-bottom:6px;">⚠️ Annotations non chargées sur '
+          + morphoKoCount + ' silhouette' + (morphoKoCount > 1 ? 's' : '')
+          + ' — vérifiez votre connexion avant d\'imprimer.</div>';
+      }
+      // Règle validée en podopédiatrie : le bloc s'affiche ou pas (décidé par
+      // morphoHasContent). Une fois affiché, les 4 tuiles sont rendues, y compris
+      // les 'nu' — une silhouette vierge à côté de trois annotées reste une
+      // information de lecture comparative. Pas d'omission individuelle. Mention
+      // « Non chargée » sous chaque tuile en statut 'ko'.
+      h += '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-end;">';
+      MORPHO_TILES.forEach(([k,lbl,baseId]) => {
+        const st = statuses[k];
+        const src = composites[k] || (document.getElementById(baseId)?.src || '');
+        if (!src) return;
+        h += '<div style="text-align:center;flex:1;position:relative;">'
+          + '<div style="font-size:8px;color:#888;margin-bottom:2px;">'+lbl+'</div>'
+          + '<img src="'+src+'" style="max-width:100%;height:120px;object-fit:contain;border:1px solid #ddd;border-radius:4px;"/>';
+        if (st === 'ko') {
+          h += '<div style="font-size:8px;font-weight:600;color:#b91c1c;margin-top:2px;">Non chargée</div>';
+        }
+        h += '</div>';
+      });
+      h += '</div>';
+    }
     if(bd.chaine_musculaire) h += '<p style="font-size:9px;"><strong>Hypothèse chaîne musculaire:</strong> '+_escHtml(bd.chaine_musculaire)+'</p>';
     // #109-A4 — Vues posturales annotées injectées DANS la sous-section
     // Morphostatique, juste après les silhouettes. Sous-titre pour distinguer
@@ -12322,9 +12387,19 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = []) {
   // dont le dessin pieds a été migré paraît « sans pieds » → section masquée.
   if(bd._pieds || bd._piedsPath || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
     h += sec('Plan de Semelles');
-    // #98 Option B — toujours rendre le gabarit pieds quand la section est visible.
-    const piedsSrc = composites._pieds || (document.getElementById('sp-pieds-img')?.src || '');
-    if(piedsSrc) h += '<img src="'+piedsSrc+'" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
+    // Fix #150 défauts 1+2 — Rendu conditionnel + mention rouge pour le
+    // schéma plantaire. Le gabarit n'est rendu que si _pieds a un statut
+    // 'ok' ou 'ko'. Sinon on omet (plus de gabarit vierge alourdissant le
+    // PDF quand le praticien n'a pas dessiné). Mention rouge visible sur 'ko'
+    // (annotations Storage introuvables) — cohérence sécurité clinique.
+    const piedsStatus = statuses._pieds;
+    if (piedsStatus === 'ok' || piedsStatus === 'ko') {
+      if (piedsStatus === 'ko') {
+        h += '<div style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin-bottom:6px;">⚠️ Annotations non chargées sur le schéma plantaire — vérifiez votre connexion avant d\'imprimer.</div>';
+      }
+      const piedsSrc = composites._pieds || (document.getElementById('sp-pieds-img')?.src || '');
+      if(piedsSrc) h += '<img src="'+piedsSrc+'" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
+    }
     if(ttt.semellesDesc) h += '<p style="font-size:9px;"><strong>Description :</strong> '+_escHtml(ttt.semellesDesc)+'</p>';
     if(hasMateriaux) h += '<p style="font-size:9px;"><strong>Matériaux :</strong> '+ttt.materiaux.join(', ')+'</p>';
     if(hasRecouvr) h += '<p style="font-size:9px;"><strong>Recouvrement :</strong> '+ttt.recouvrement.join(', ')+'</p>';
@@ -16181,6 +16256,19 @@ async function saveBilan() {
   // Restaure les dataUrls RAM pour preserve display sans re-fetch Storage
   // (miroir restoreSportPhotosStash L3285 pour le flow mesures).
   restoreSportBilanDataPhotosStash(bilanData, _postureStash);
+  // Fix #150 — Symétrise le restore sur currentPatient.bilanData. Le clone
+  // ci-dessus (post-migrate, pré-savePatients) capture les dataURLs strippées :
+  // sans ce second restore, currentPatient.bilanData conservait uniquement les
+  // Paths et le rapport devait re-fetcher Storage à chaque génération (hors
+  // ligne ou jeton expiré → rapport amputé). Placement strictement APRÈS
+  // savePatients() pour respecter la règle « on persiste la version allégée,
+  // puis on réhydrate en mémoire » (pattern podo/posturo).
+  // Sûr : _stripDataURLsForPersist (L2951, appelé en tête de savePatients avec
+  // try/finally L3069) strippe DÉFINITIVEMENT toute clé où Path ET dataURL
+  // coexistent — donc si un futur savePatients tourne avec ces dataURLs en RAM,
+  // elles sont enlevées AVANT sérialisation et restaurées après. Pas de leak
+  // possible dans localStorage, quel que soit le call-site.
+  restoreSportBilanDataPhotosStash(currentPatient.bilanData, _postureStash);
   alert('✓ Bilan clinique sauvegardé');
 }
 
@@ -16543,6 +16631,12 @@ async function saveBilanSilent() {
   syncOpenedBilanToHistory();
   savePatients();
   restoreSportBilanDataPhotosStash(bilanData, _postureStash);
+  // Fix #150 — cf saveBilan pour la justification complète. En résumé : clone
+  // appauvri capturé par currentPatient.bilanData → rapport doit re-fetcher
+  // Storage. Restore post-savePatients() safe grâce à _stripDataURLsForPersist
+  // (L2951, try/finally L3069) qui strippe toute clé Path+dataURL avant
+  // sérialisation.
+  restoreSportBilanDataPhotosStash(currentPatient.bilanData, _postureStash);
 }
 
 function clearPiedsCanvas() {
