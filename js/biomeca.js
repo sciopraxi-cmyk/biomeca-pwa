@@ -10193,6 +10193,66 @@ function printRapportPosturo() {
   }
 }
 
+// Fix #149 posturo rapport — Résolution des visuels avec chemin path-aware
+// et lecture du canvas vivant. Pattern miroir strict de _resolvePodoRapportImages
+// (podopédiatrie Phase 4c-2b), qui a été validé sur le même triptyque de bugs :
+//   1. Le rapport n'appelait aucun save avant de lire → dessin fait juste avant
+//      le clic Rapport (débounce autosave 1 s non écoulé) invisible.
+//   2. Les conditions if(d._xxx) n'étaient pas path-aware → si le prefetch a
+//      échoué à l'ouverture, les blocs disparaissaient complètement, titre
+//      compris, sans avertissement.
+//   3. Photos posturales annotées prisonnières du bloc silhouettes → un
+//      praticien qui plaçait ses marqueurs sans dessiner sur les silhouettes
+//      ne voyait rien.
+// Sécurité clinique — 3 statuts par visuel :
+//   'ok' → dataURL disponible (live ou RAM ou Storage prefetch).
+//   'nu' → aucune dataURL ET aucun Path : jamais dessiné/capturé, bloc masqué.
+//   'ko' → Path Storage présent mais fetch/decode échoué : bloc affiché avec
+//          mention rouge « Image non chargée — vérifiez votre connexion ».
+//          Empêche le clinicien de conclure à l'absence à l'impression.
+// Aucune écriture : générer un rapport est une lecture (règle rappelée en podo).
+async function _resolvePosturoRapportImages(bd) {
+  var d = bd || {};
+  // Résout une clé RAM → Storage Path uniquement (pas de canvas vivant). Utilisé
+  // pour empreinte (photo capturée) et feetComposite (composite pré-calculé au
+  // save). Retour { status, dataUrl }.
+  async function resolveRamOrPath(ramKey) {
+    var pathKey = ramKey + 'Path';
+    var hasPath = !!d[pathKey];
+    var dataUrl = d[ramKey] || null;
+    if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
+      try {
+        var r = await prefetchPhotoToDataUrl(d[pathKey]);
+        if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
+      } catch (e) { /* fallthrough → 'ko' */ }
+    }
+    if (!dataUrl) return { status: hasPath ? 'ko' : 'nu', dataUrl: null };
+    return { status: 'ok', dataUrl: dataUrl };
+  }
+  // Body canvas : cascade live → RAM → Path. Le canvas posturo-body-canvas est
+  // un canvas overlay dessinable (silhouettes bonhommes 4 vues). Sur `_userDirty`
+  // en cours, on lit le canvas vivant ; sinon on retombe sur le modèle.
+  async function resolveBodyCanvas() {
+    var live = _readLiveDrawCanvas('posturo-body-canvas');
+    if (live) return { status: 'ok', dataUrl: live };
+    return resolveRamOrPath('_bodyCanvas');
+  }
+  var results = await Promise.all([
+    resolveBodyCanvas(),
+    resolveRamOrPath('_empreinte'),
+    resolveRamOrPath('_feetComposite'),
+    (typeof _collectAnnotatedPostureViews === 'function')
+      ? _collectAnnotatedPostureViews(d, _MAX_POSTURE_W)
+      : Promise.resolve([])
+  ]);
+  return {
+    bodyCanvas:     results[0],
+    empreinte:      results[1],
+    feetComposite:  results[2],
+    annotatedViews: results[3]
+  };
+}
+
 // #109-A2 — async pour permettre la pré-génération des photos posturales
 // annotées (4 vues, await Promise.all) avant l'assemblage HTML. Les 2 call-sites
 // HTML (`onclick="buildRapportPosturo()"` dans index.html L477 et js/biomeca.js
@@ -10205,10 +10265,14 @@ async function buildRapportPosturo() {
   const prat = praticiens.find(pr => pr.id == p.pratId) || {};
   const logo = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
 
-  // #109-A2 + A3 — Pré-génération des photos posturales annotées via helper
-  // partagé (extrait pour réutilisation côté rapport sport). 850 px de large
-  // max pour équilibre lisibilité (2 photos/ligne en A4) / poids PDF.
-  const annotatedViews = await _collectAnnotatedPostureViews(d, 850);
+  // Fix #149 — Résolution des visuels avec chemin path-aware + lecture du
+  // canvas vivant. Remplace 3 conditions if(d._xxx) qui perdaient silencieusement
+  // les blocs images quand le prefetch Storage avait échoué, et couvre le
+  // débounce autosave pour un dessin fait juste avant le clic Rapport.
+  // Retour : { bodyCanvas, empreinte, feetComposite, annotatedViews }, chaque
+  // visuel avec un status 'ok' | 'nu' | 'ko'. Voir _resolvePosturoRapportImages.
+  const visuals = await _resolvePosturoRapportImages(d);
+  const annotatedViews = visuals.annotatedViews;
 
     let bodyHtml = `<style>\n    *{margin:0;padding:0;box-sizing:border-box;}\n    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}\n    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}\n    @media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.no-print{display:none !important;}.section,.patient-card,.header,.footer{break-inside:avoid;}.img-container,img{break-inside:avoid;page-break-inside:avoid;}.header,.titre-rapport,.patient-card,.section-title,.section-num,.tag,.tag-navy,.tag-ok,.tag-warn,.tag-alert,.footer{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}}\n\n    /* HEADER */\n    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .logo{height:50px;object-fit:contain;}\n    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}\n    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}\n\n    /* BAND */\n    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}\n    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}\n\n    /* PATIENT */\n    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:0;}\n    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}\n    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}\n    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}\n    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}\n    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}\n    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}\n\n    /* METRICS */\n    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}\n    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}\n    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}\n    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}\n\n    /* SECTIONS */\n    .section{margin:0;break-inside:avoid;padding:0 24px;}\n    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}\n    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0.5px;}\n    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .section-line{flex:1;height:1px;background:#eaeaea;}\n    .section-body{padding:0;}\n\n    /* ROWS */\n    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}\n    .item:last-child{border-bottom:none;}\n    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;padding-top:1px;}\n    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}\n    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;line-height:1.4;}\n\n    /* TAGS */\n    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}\n    .tag-navy{background:#e8edf5;color:#0e1f38;}\n    .tag-ok{background:#ecfdf5;color:#065f46;}\n    .tag-warn{background:#fffbeb;color:#92400e;}\n    .tag-alert{background:#fef2f2;color:#991b1b;}\n\n    /* IMAGES */\n    .img-container{position:relative;text-align:center;}\n    .img-base{max-width:100%;border-radius:4px;}\n    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}\n\n    /* FOOTER */\n    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}\n    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}\n\n    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}\n  </style>`;
 const sections = [];
@@ -10236,11 +10300,20 @@ const sections = [];
   if(d.rombergMorpho) morpho.push(['Romberg', d.rombergMorpho]);
   if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho, color:'#3498db'});
 
-  // Silhouettes bonhommes: capturer chaque vue avec dessins
-  if(d._bodyCanvas) {
+  // Silhouettes bonhommes — condition path-aware (fix #149 défaut 2). Le bloc
+  // apparaît dès que status !== 'nu' : soit dataURL disponible ('ok'), soit
+  // Path Storage présent mais fetch KO ('ko') → gabarits nus affichés avec
+  // mention rouge.
+  // Le code mort d'origine (bcData = canvas.toDataURL non réutilisé, L10242
+  // pré-fix #149) a été supprimé : la lecture live canvas est faite en amont
+  // par _resolvePosturoRapportImages (visuals.bodyCanvas.dataUrl couvre live →
+  // RAM → Path). `bc` local reste utilisé plus bas dans du code mort résiduel
+  // (const W = bc ? bc.width/4 …) → conservé pour ne pas casser cette portée.
+  // Le reste des helpers locaux (makeComposite / sliceDataUrl /
+  // compositeImgCanvas) reste en place, non consommé — nettoyage prévu dans
+  // une tâche séparée (audit code mort).
+  if(visuals.bodyCanvas.status !== 'nu') {
     const bc = document.getElementById('posturo-body-canvas');
-    const bcData = bc ? bc.toDataURL('image/png') : null;
-    
     function makeComposite(imgEl, canvasData, w, h) {
       if(!imgEl) return null;
       try {
@@ -10334,19 +10407,34 @@ const sections = [];
     }
     {
       var bgIds3 = ['imgjs-morpho-profilG','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilD'];
+      // Fix #149 défaut 2 — bodyCanvasData vient désormais de visuals (résolution
+      // live → RAM → Path). Sur status 'ko' la dataURL est null → la branche
+      // async de _buildRapportBody ne recompose pas les slices, les gabarits nus
+      // (profilDImg/…) sont rendus tels quels avec la mention rouge (ko: true).
+      // annotatedViews retirée : section autonome poussée juste après (défaut 3).
       sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-        bodyCanvasData: d._bodyCanvas,
+        bodyCanvasData: visuals.bodyCanvas.dataUrl,
+        ko: visuals.bodyCanvas.status === 'ko',
         bgIds: bgIds3,
         profilDImg: document.getElementById(bgIds3[0]) ? document.getElementById(bgIds3[0]).src : null,
         face2Img:   document.getElementById(bgIds3[1]) ? document.getElementById(bgIds3[1]).src : null,
         faceImg:    document.getElementById(bgIds3[2]) ? document.getElementById(bgIds3[2]).src : null,
         profilGImg: document.getElementById(bgIds3[3]) ? document.getElementById(bgIds3[3]).src : null,
-        // #109-A4 — Vues posturales annotées intégrées DANS la section
-        // Morphostatique (silhouettes), rendues juste après les silhouettes
-        // par la branche `bonhommes` de _doBuildRapport.
-        annotatedViews: annotatedViews,
       });
     }
+  }
+  // Fix #149 défaut 3 — Photos posturales annotées en section autonome, non
+  // plus prisonnière du bloc silhouettes. Un praticien qui place ses marqueurs
+  // sans dessiner sur les silhouettes voit désormais ses photos dans le rapport.
+  // Position : juste après la section bonhommes si présente (immédiatement
+  // au-dessus dans le tableau), sinon à sa place naturelle après « 2. Morphostatique ».
+  // Pas de préfixe « 2. » dans le titre : deux sections « 2. Morphostatique »
+  // et « 2. Morphostatique — Silhouettes » existent déjà, en ajouter une
+  // troisième surchargerait la lecture. La numérotation visible du rapport
+  // (section-num 01/02/03…) est de toute façon générée par _doBuildRapport
+  // à partir de l'index dans le tableau, pas du préfixe du titre.
+  if (annotatedViews && annotatedViews.length > 0) {
+    sections.push({titre:'Analyse posturale — vues annotées', color:'#3498db', type:'annotatedPosture', entries: annotatedViews});
   }
 
   // #106-Final Volet 1 — l'analyse posturale profil n'est plus insérée dans le
@@ -10743,17 +10831,24 @@ const sections = [];
   if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
   if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
 
-  // Empreinte plantaire après section 5
-  if(d._empreinte) {
+  // Empreinte plantaire après section 5 — condition path-aware (fix #149
+  // défaut 2). Section rendue dès que status !== 'nu', avec mention rouge
+  // si Storage KO (ko:true).
+  if (visuals.empreinte.status !== 'nu') {
     const s5idx = sections.findIndex(s => s.titre && s.titre.startsWith('5.'));
     const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
-    sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#f0a500', type:'empreinte', img: d._empreinte});
+    sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#f0a500', type:'empreinte',
+      img: visuals.empreinte.dataUrl,
+      ko: visuals.empreinte.status === 'ko'});
   }
   // Synthèse section 8
   // Plan de semelles (pieds) à la fin dans section 9
   // Plan de semelles section 9 : composite pré-aligné depuis save → alignement parfait.
-  if(d._feetComposite) {
-    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img', img: d._feetComposite});
+  // Condition path-aware (fix #149 défaut 2), même politique 'ko' visible.
+  if (visuals.feetComposite.status !== 'nu') {
+    sections.push({titre:'9. Plan de semelles', color:'#2a7a4e', type:'img',
+      img: visuals.feetComposite.dataUrl,
+      ko: visuals.feetComposite.status === 'ko'});
   }
 
   _buildRapportBody(p, d, prat, logo, sections);
@@ -10866,6 +10961,10 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
     bodyHtml += '<div class="section-title"><div class="section-num">'+num+'</div><div class="section-label">'+s.titre+'</div><div class="section-line"></div></div>';
     bodyHtml += '<div class="section-body">';
     if(s.type === 'bonhommes') {
+      // Fix #149 — mention rouge sur status 'ko' (annotations Storage introuvables).
+      if (s.ko) {
+        bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Annotations non chargées sur les silhouettes — vérifiez votre connexion avant d\'imprimer.</div>';
+      }
       var labels4 = ['Profil D','Dos','Face','Profil G'];
       var imgs4 = [s.profilDImg, s.face2Img, s.faceImg, s.profilGImg];
       bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;">';
@@ -10876,14 +10975,17 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
         bodyHtml += '</div>';
       });
       bodyHtml += '</div>';
-      // #109-A4 — Vues posturales annotées injectées dans la MÊME section
-      // Morphostatique (silhouettes), juste après les 4 bonhommes. Sous-titre
-      // pour distinguer visuellement du bloc silhouettes. Skip total si pas
-      // de vues placées (helper retourne '').
-      if (s.annotatedViews && s.annotatedViews.length > 0) {
-        bodyHtml += '<div style="margin-top:10px;break-inside:avoid;">';
-        bodyHtml += '<div style="font-size:11px;font-weight:700;color:#0e1f38;margin-bottom:6px;">📐 Analyse posturale — vues annotées</div>';
-        bodyHtml += _buildAnnotatedViewsGridHTML(s.annotatedViews);
+      // Fix #149 défaut 3 — Vues posturales annotées ne sont PLUS injectées
+      // dans le bloc bonhommes. Section 'annotatedPosture' autonome, cf.
+      // buildRapportPosturo (poussée juste après bonhommes si présente).
+    } else if(s.type === 'annotatedPosture') {
+      // Fix #149 défaut 3 — Section autonome pour les 4 photos posturales
+      // annotées. Rendue dès qu'au moins un marqueur est placé, indépendamment
+      // du bloc silhouettes. Skip inline si entries vides (garde défensive :
+      // la section n'est déjà poussée que si length > 0).
+      if (s.entries && s.entries.length > 0) {
+        bodyHtml += '<div style="padding:10px 0;">';
+        bodyHtml += _buildAnnotatedViewsGridHTML(s.entries);
         bodyHtml += '</div>';
       }
     } else if(s.type === 'pieds') {
@@ -10893,8 +10995,16 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
         bodyHtml += '</div>';
       }
     } else if(s.type === 'img') {
+      // Fix #149 — mention rouge 'ko' (plan de semelles Storage KO).
+      if (s.ko) {
+        bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Image non chargée — vérifiez votre connexion avant d\'imprimer.</div>';
+      }
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-width:70%;border-radius:4px;display:block;margin:0 auto;"/></div>';
     } else if(s.type === 'empreinte') {
+      // Fix #149 — mention rouge 'ko' (empreinte plantaire Storage KO).
+      if (s.ko) {
+        bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Empreinte non chargée — vérifiez votre connexion avant d\'imprimer.</div>';
+      }
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-width:70%;border-radius:4px;display:block;margin:0 auto;"/></div>';
     } else if(s.type === 'image') {
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-height:200px;border-radius:4px;"/></div>';
@@ -15142,32 +15252,36 @@ function printRapportPedicurie(){
 
 var _PODO_MAX_MORPHO_H  = 500;
 var _PODO_MAX_PLANTAIRE_W = 700;
-var _PODO_MAX_POSTURE_W = 850; // aligné sur posturo/sport (_collectAnnotatedPostureViews)
+// Constante partagée par les rapports podo + posturo (potentiellement sport
+// plus tard). Nom neutre — le pipeline photos posturales est commun via
+// _collectAnnotatedPostureViews.
+var _MAX_POSTURE_W = 850;
 
-// Sérialise le canvas vivant si ET SEULEMENT SI l'utilisateur a dessiné dans
-// la session courante (`_userDirty === true`), sans jamais persister. Le
-// rapport est une lecture — provoquer un save ici saturerait le Storage à
-// chaque aperçu. Retourne la dataURL PNG transparente (via _serializeDrawCanvas,
-// jamais JPEG — cf. fix #94) OU null pour dire « pas de dessin frais ici,
-// retombe sur le modèle de données ».
+// Helper partagé rapports (podo + posturo, éventuellement sport). Sérialise
+// le canvas vivant si ET SEULEMENT SI l'utilisateur a dessiné dans la session
+// courante (`_userDirty === true`), sans jamais persister. Le rapport est
+// une lecture — provoquer un save ici saturerait le Storage à chaque aperçu.
+// Retourne la dataURL PNG transparente (via _serializeDrawCanvas, jamais JPEG —
+// cf. fix #94) OU null pour dire « pas de dessin frais ici, retombe sur le
+// modèle de données ».
 //
-// Cause exacte du bug corrigé — débounce autosave. Chaque mouseup canvas
-// arme un `_scheduleBilanAutosave('podopediatrie')` (setupDrawCanvas L12980-12985),
+// Cause exacte du bug d'origine — débounce autosave. Chaque mouseup canvas
+// arme un `_scheduleBilanAutosave(<flavor>)` (setupDrawCanvas L12980-12985),
 // avec un débounce de 1000 ms (L21289-21294). Séquence typique praticien :
 // finit de dessiner à T=0 → clique l'onglet Rapport à T=300 ms → le save
-// n'a pas encore tourné, `d._podo_*` est encore vide, l'aperçu affiche
-// status 'nu'. Le sweep-avant-quitter L2492 ne joue que pour la nav de
-// PAGE principale, pas pour un changement d'onglet interne à #pg-podopediatrie.
-// La lecture live canvas rend le rapport insensible à ce timing sans écrire
-// sur disque. Le débounce reste inchangé (déclencher un save à chaque coup
-// de crayon serait pire — les 9 uploads Storage peuvent traîner).
+// n'a pas encore tourné, `d[key]` est encore vide, l'aperçu affiche status
+// 'nu'. Le sweep-avant-quitter ne joue que pour la nav de PAGE principale,
+// pas pour un changement d'onglet interne au bilan. La lecture live canvas
+// rend le rapport insensible à ce timing sans écrire sur disque. Le débounce
+// reste inchangé (déclencher un save à chaque coup de crayon serait pire —
+// les uploads Storage peuvent traîner).
 //
 // Cas trompeur explicitement géré : ancien bilan rouvert dont les onglets
-// Morphostatique / Traitement n'ont jamais été affichés → `_userDirty` est
-// falsy (soit `false` posé à l'init, soit `undefined` si le canvas n'a jamais
-// été touché) → on retombe sur `d[key]` / `d[key+'Path']`, jamais on
-// n'écrase le dessin sauvegardé avec un canvas vierge.
-function _readPodoLiveCanvas(canvasId) {
+// dessinables n'ont jamais été affichés → `_userDirty` est falsy (soit `false`
+// posé à l'init, soit `undefined` si le canvas n'a jamais été touché) → on
+// retombe sur `d[key]` / `d[key+'Path']`, jamais on n'écrase le dessin
+// sauvegardé avec un canvas vierge.
+function _readLiveDrawCanvas(canvasId) {
   if (!canvasId) return null;
   var c = document.getElementById(canvasId);
   if (!c) return null;
@@ -15177,7 +15291,7 @@ function _readPodoLiveCanvas(canvasId) {
   try {
     return _serializeDrawCanvas(c);
   } catch (e) {
-    console.warn('[podo rapport] serialize live canvas failed', canvasId, e);
+    console.warn('[rapport] serialize live canvas failed', canvasId, e);
     return null;
   }
 }
@@ -15203,14 +15317,14 @@ function _podoLoadImage(src) {
 // Fix bug canvas-vivant : ordre de résolution du calque = live canvas
 // (_userDirty) → modèle RAM (d[key]) → Storage (d[key+'Path']). Sinon un
 // dessin fait dans la session juste avant le clic Rapport (débounce
-// autosave 1 s non écoulé, cf. _readPodoLiveCanvas) était invisible.
+// autosave 1 s non écoulé, cf. _readLiveDrawCanvas) était invisible.
 async function _composePodoMorphoTile(bd, key, baseId, canvasId) {
   var d = bd || {};
   var baseEl = document.getElementById(baseId);
   var baseSrc = (baseEl && baseEl.src) || '';
   var hasPath = !!d[key + 'Path'];
   // 1) Canvas vivant (session en cours, dessin non sauvegardé) — priorité stricte.
-  var dataUrl = _readPodoLiveCanvas(canvasId);
+  var dataUrl = _readLiveDrawCanvas(canvasId);
   // 2) Modèle RAM (bilan rouvert avec dataURL déjà en mémoire).
   if (!dataUrl) dataUrl = d[key];
   // 3) Storage Path (dataURL strippée après save+migration).
@@ -15264,7 +15378,7 @@ async function _composePodoPieds(bd) {
   var baseEl = document.getElementById('imgjs-plan-semelles');
   var baseSrc = (baseEl && baseEl.src) || '';
   var hasPath = !!d._podo_piedsPath;
-  var dataUrl = _readPodoLiveCanvas('podo-pieds-canvas');
+  var dataUrl = _readLiveDrawCanvas('podo-pieds-canvas');
   if (!dataUrl) dataUrl = d._podo_pieds;
   if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
     try {
@@ -15319,7 +15433,7 @@ async function _resolvePodoRapportImages(bd) {
     })),
     _composePodoPieds(d),
     (typeof _collectAnnotatedPostureViews === 'function')
-      ? _collectAnnotatedPostureViews(d, _PODO_MAX_POSTURE_W)
+      ? _collectAnnotatedPostureViews(d, _MAX_POSTURE_W)
       : Promise.resolve([])
   ]);
   return { morpho: results[0], pieds: results[1], annotatedViews: results[2] };
