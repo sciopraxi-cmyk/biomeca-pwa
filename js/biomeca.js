@@ -15296,6 +15296,29 @@ function _readLiveDrawCanvas(canvasId) {
   }
 }
 
+// Fix #153 posturo — Test de vacuité d'un canvas overlay dessinable. Retourne
+// true si aucun pixel n'a un alpha > 3 (tolérance anti-aliasing minimal). Sûr
+// pour tous les canvas où le baseSnapshot est transparent (posturo-feet-canvas,
+// posturo-body-canvas, podo-morpho-*, podo-pieds-canvas — tous des overlays
+// transparents par-dessus une image DOM). Un trait blanc user donne alpha 255
+// sur ses pixels → détecté comme contenu ; un canvas jamais dessiné ou
+// entièrement effacé par la gomme donne alpha 0 partout → vide.
+//
+// Ne pas confondre avec _serializeDrawCanvas(canvas), qui renvoie TOUJOURS un
+// PNG string non-null (sauf si _baseSnapshot absent) : sur canvas vierge le
+// PNG est entièrement transparent mais existe comme string. Comparer à null
+// ne discrimine pas vide/tracé — il faut inspecter les pixels, ce que fait
+// ce helper.
+function _isDrawCanvasBlank(canvas) {
+  if (!canvas || !canvas._baseSnapshot) return true;
+  var ctx = canvas.getContext('2d');
+  var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (var i = 3; i < data.length; i += 4) {
+    if (data[i] > 3) return false;
+  }
+  return true;
+}
+
 // Charge une src (dataURL ou URL absolue) en Image. Réservé au pipeline rapport,
 // où on veut await synchrone avant d'assembler le HTML. Rejette silencieusement
 // si le src est vide (les appelants prévoient un fallback).
@@ -20955,21 +20978,43 @@ async function savePosturoBilan(silent = false) {
     delete d._bodyCanvasPath;
   }
   const fc=document.getElementById('posturo-feet-canvas');
-  if(fc) {
-    // #99 + Bug édition perdue (option iii) — check _userDirty (insensible aux
-    // ré-init initPosturoFeetCanvas par navigation idx === 8). Le cas
-    // `!d._feetDrawings` (1er dessin sans Path préexistant) reste couvert : un
-    // 1er mouseup met _userDirty=true, donc writeNew=true.
-    const writeNew = fc._userDirty || !d._feetDrawings;
-    if(writeNew) {
-      // 1. Sauvegarder les dessins seuls (PNG transparent) pour restauration sur canvas
-      //    à la prochaine ouverture du bilan (édition + gomme propre).
+  // Fix #153 — Point de vérité unique : `_userDirty`. Toute autre condition
+  // de déclenchement est dangereuse. La rétractation par rapport à l'ancien
+  // code :
+  //   - L'ancienne garde `writeNew = fc._userDirty || !d._feetDrawings`
+  //     tombait sur un piège cross-migration. Sur un bilan ancien migré vers
+  //     Storage, `_feetDrawings` est strippé après upload (POSTURO_PHOTO_KEYS
+  //     L4600-4603 → migratePhotoEntry L4633-4653). Seul `_feetDrawingsPath`
+  //     subsiste. Sur rouverture sans que l'onglet Pieds ait été visité,
+  //     `d._feetDrawings === undefined` et le canvas est vide → `!_feetDrawings`
+  //     valait vrai → écriture d'un composite vide (bug d'origine visible en
+  //     prod : bloc « Plan de semelles » vierge dans le rapport) et effet
+  //     collatéral pire encore possible si on cascade sur la suppression.
+  //   - Le commentaire d'origine (`!d._feetDrawings` comme filet pour le
+  //     « 1er dessin sans Path préexistant ») était redondant : le 1er trait
+  //     pose `_userDirty=true` via mouseup (setupDrawCanvas L12974), donc
+  //     `_userDirty` suffit.
+  //
+  // Nouvelle règle stricte : on ne touche aux clés `_feet*` QUE si l'utilisateur
+  // a interagi avec le canvas dans la session courante. Un canvas vide non
+  // édité n'apporte AUCUNE information sur le contenu persisté — ne rien
+  // écrire, ne rien supprimer.
+  if (fc && fc._userDirty) {
+    if (_isDrawCanvasBlank(fc)) {
+      // Canvas dirty puis vidé (undo total OU gomme complète) — l'intention
+      // utilisateur est claire : plus d'annotation. On nettoie les 4 clés
+      // (RAM + Path Storage) pour que le bloc « Plan de semelles » disparaisse
+      // du rapport. Seul cas où la suppression est légitime.
+      delete d._feetDrawings;
+      delete d._feetDrawingsPath;
+      delete d._feetComposite;
+      delete d._feetCompositePath;
+    } else {
+      // Contenu réel détecté — écriture normale, comportement historique préservé.
+      // 1. Calque seul (PNG transparent) pour restauration édition + gomme.
       d._feetDrawings = fc.toDataURL('image/png');
       delete d._feetDrawingsPath;
-
-      // 2. Composer template + dessins avec positionnement correct (mesuré DOM-live).
-      //    Ce composite est utilisé tel quel dans le rapport — alignement parfait garanti
-      //    car on mesure ici la position visuelle réelle de l'image dans le canvas.
+      // 2. Composite template + dessins mesuré DOM-live pour alignement parfait.
       const piedsImg = document.getElementById('posturo-feet-img');
       if(piedsImg && piedsImg.naturalWidth > 0) {
         const parent = fc.parentElement;
@@ -20993,12 +21038,12 @@ async function savePosturoBilan(silent = false) {
             0, 0, compC.width, compC.height
           );
           d._feetComposite = compC.toDataURL('image/jpeg', 0.85);
-          // #99 + Bug RAM-leak — invalide aussi le Path du composite (corrélé au _feetDrawings).
           delete d._feetCompositePath;
         }
       }
     }
   }
+  // Sinon (fc absent OU _userDirty=false) : aucune écriture, aucune suppression.
   // #99 + Bug édition perdue — reset _userDirty pour body/feet posturo APRÈS sweep.
   // Prépare le prochain cycle d'édition (un nouveau mouseup re-marquera dirty).
   ['posturo-body-canvas','posturo-feet-canvas'].forEach(id => {
