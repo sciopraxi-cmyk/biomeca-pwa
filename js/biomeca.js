@@ -16179,10 +16179,24 @@ async function saveBilan() {
   if(!currentPatient) { alert('Aucun patient sélectionné.'); return; }
   if(!bilanData) bilanData = {};
 
-  // 1. Capturer tous les champs texte/textarea (.bilan-field)
+  // INVARIANT (fix #154) : les sweeps ci-dessous 1/2/3/4/5 sont le miroir strict
+  // de loadBilan. Tout champ LU ici DOIT être remis à zéro par loadBilan, sinon
+  // les valeurs par défaut HTML du DOM (SELECT 1re option, range mi-course post
+  // `.value=''`) contaminent le nouveau bilan et le rapport affiche des mesures
+  // fantômes. Ajouter un data-field, un radio ou une checkbox : mettre à jour
+  // loadBilan en même temps.
+  //
+  // 1. Capturer tous les champs .bilan-field (portée globale).
+  //    Fix #154 — Range : skip si `!el._userDirty` (drapeau posé au 1er input
+  //    isTrusted, cf. loadBilan). Distingue non renseigné (clé absente de
+  //    bilanData) de renseigné à 0 (valeur délibérée). Sans ce skip, le range
+  //    EVA revient à sa valeur mi-course après reset et le sweep écrit "5"
+  //    dans un bilan neuf sans que le praticien ait touché au curseur.
   document.querySelectorAll('.bilan-field').forEach(el => {
     const field = el.dataset.field;
-    if(field) bilanData[field] = el.value || '';
+    if (!field) return;
+    if (el.type === 'range' && !el._userDirty) return;
+    bilanData[field] = el.value || '';
   });
 
   // 2. Capturer tous les boutons radio du bilan (groupés par name)
@@ -16339,6 +16353,30 @@ const B2_SCHEMAS_MOTEURS = {
   ]
 };
 
+// INVARIANT (fix #154) : loadBilan est le miroir strict des sweeps de sauvegarde
+// (saveBilan L16183-16227 + saveBilanSilent L16578-16610). Tout champ que ces
+// sweeps LISENT doit être remis à zéro ici, MÊME si bilanData est vide. Sans
+// cette symétrie, les valeurs par défaut HTML (SELECT 1re option, range
+// mi-course après `.value=''`) sont ré-aspirées par le prochain autosave et
+// contaminent le nouveau bilan — le rapport affiche alors des mesures fantômes
+// (EVA 5/10, distance doigt-sol 16 cm, schémas moteurs, chaînes musculaires,
+// plans) sans que le praticien les ait saisies. Bug prod v49 (#154).
+//
+// Périmètre à couvrir en miroir :
+//   A' — document.querySelectorAll('.bilan-field') portée globale
+//   B' — document.querySelectorAll('#pg-bilan input[type=radio]')
+//   C' — document.querySelectorAll('#pg-bilan input[type=checkbox]')
+//   D' — bloc traitements sport via clearSportTtt + restoreSportTtt
+//
+// Ranges (input[type=range].bilan-field) : cas particulier — `el.value = ''`
+// est normalisé par le navigateur à la valeur médiane, indiscernable d'une
+// saisie. Distinction non renseigné / renseigné à 0 via un drapeau `_userDirty`
+// posé au 1er event `input` isTrusted (user réel, filtre les dispatchs
+// programmatiques). Sweep skippe si `!_userDirty` → clé absente de bilanData.
+// Miroir strict du pattern `_userDirty` déjà utilisé pour les canvas dessin.
+//
+// Ajouter un data-field, radio ou checkbox : mettre à jour ce loader ET le
+// sweep en même temps, sinon la contamination cross-bilan revient.
 function loadBilan() {
   if(!currentPatient) return;
   bilanData = currentPatient.bilanData ? JSON.parse(JSON.stringify(currentPatient.bilanData)) : {};
@@ -16368,46 +16406,76 @@ function loadBilan() {
       }
     });
   }, 3000);
+  // Fix #154 — bilan vide : ouvrir le gate canvas immédiatement (comme avant),
+  // MAIS continuer vers la partie autoritaire (A' à D') au lieu de early-return.
+  // Sans quoi les SELECT et range résiduels du bilan précédent restent affichés
+  // et sont ré-écrits par le prochain autosave → contamination.
   if(!Object.keys(bilanData).length) {
-    // Bilan vide (jamais sauvé) → rien à restaurer, ouvre le gate immédiatement.
     ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
       const c = document.getElementById(id);
       if (c) { c._restoreReady = true; _hideRestoreOverlay(c); }
     });
-    return;
   }
 
-  // Remplir les champs texte/textarea
+  // A' — Champs .bilan-field (portée globale, miroir sweep A). Écriture
+  // systématique : `d[f] !== undefined ? d[f] : ''` — jamais laisser le DOM
+  // garder sa valeur précédente ni sa valeur par défaut HTML. Cas SELECT :
+  // `el.value = ''` sélectionne l'option de valeur "" si présente (les selects
+  // du formulaire ont typiquement `<option value="">—</option>` en tête).
+  // Cas range : traitement spécial (drapeau d'interaction _userDirty).
   document.querySelectorAll('.bilan-field').forEach(el => {
     const field = el.dataset.field;
-    if(field && bilanData[field] !== undefined) el.value = bilanData[field];
+    if (!field) return;
+    if (el.type === 'range') {
+      // Handler idempotent — pose _userDirty=true UNIQUEMENT sur event isTrusted
+      // (user réel). Filtre le dispatchEvent('input') synth juste en dessous et
+      // tout autre dispatch programmatique.
+      if (!el._userDirtyBound) {
+        el.addEventListener('input', (e) => { if (e.isTrusted) el._userDirty = true; });
+        el._userDirtyBound = true;
+      }
+      if (bilanData[field] !== undefined && bilanData[field] !== '') {
+        el.value = bilanData[field];
+        el._userDirty = true;   // Données restaurées = considérées renseignées.
+      } else {
+        el.value = el.min || 0;
+        el._userDirty = false;  // Skippé par le sweep tant qu'aucune interaction.
+      }
+    } else {
+      el.value = bilanData[field] !== undefined ? bilanData[field] : '';
+    }
   });
 
-  // A1 — Rafraîchit l'affichage du span associé aux input range (ex: EVA score)
-  // après restauration de la value : dispatch 'input' déclenche le oninput inline
-  // qui met à jour le span dynamique (sp-an-eva-val).
+  // A1 — Rafraîchit l'affichage du span associé aux input range (ex: EVA score).
+  // Dispatch synth Event('input') → isTrusted=false → n'écrase pas _userDirty
+  // via le handler ci-dessus. Toujours nécessaire pour mettre à jour le span
+  // dynamique #sp-an-eva-val même sur bilan vide (curseur à min).
   document.querySelectorAll('#pg-bilan input[type=range].bilan-field').forEach(r => r.dispatchEvent(new Event('input')));
 
-  // Restaurer les boutons radio
+  // B' — Radios #pg-bilan (miroir sweep B). Écriture systématique — force
+  // uncheck si data absente. Sans cette symétrie, les radios cochés du bilan
+  // précédent restaient cochés (sweep écrit `bilanData[name] = value`).
   document.querySelectorAll('#pg-bilan input[type=radio]').forEach(el => {
-    if(el.name && bilanData[el.name] !== undefined) {
-      el.checked = (el.value === bilanData[el.name]);
-    }
+    el.checked = !!(el.name && bilanData[el.name] !== undefined && el.value === bilanData[el.name]);
   });
 
-  // Restaurer les checkboxes
+  // C' — Checkboxes #pg-bilan (miroir sweep C). Field extrait via regex sur
+  // onchange="setBilanField('xxx', this.checked)". Écriture systématique —
+  // force uncheck si data absente ou non-true.
   document.querySelectorAll('#pg-bilan input[type=checkbox]').forEach(el => {
-    if(el.getAttribute('onchange')) {
-      // Extraire le field depuis onchange="setBilanField('xxx', this.checked)"
-      const match = el.getAttribute('onchange').match(/setBilanField\('([^']+)'/);
-      if(match) {
-        const field = match[1];
-        el.checked = bilanData[field] === true;
-      }
+    const onch = el.getAttribute('onchange') || '';
+    const match = onch.match(/setBilanField\(['"]([^'"]+)['"]/);
+    if(match) {
+      el.checked = bilanData[match[1]] === true;
     }
   });
 
-  // Restaurer le bloc traitements sport (Sprint A4) — stack exo hors regex auto
+  // D' — Bloc traitements sport. clearSportTtt idempotent (reset selects
+  // sys/sub, materiaux, recouvrement, semellesDesc, prochainRdv) puis
+  // restoreSportTtt no-op si !bilanData.ttt. Miroir strict du sweep D
+  // (collectSportTtt). Sans clearSportTtt inconditionnel, restoreSportTtt
+  // early-return sur bilan vide laissait les selects ttt du bilan précédent.
+  clearSportTtt();
   restoreSportTtt(bilanData);
 
   // B1 #73 — Restauration UX des wrappers conditionnels sport ssec-2.
@@ -16575,9 +16643,14 @@ async function saveBilanSilent() {
   // mais l'ordre interne sweep → migrate → savePatients → restore est strict.
   if(!currentPatient) return;
   if(!bilanData) bilanData = {};
+  // INVARIANT (fix #154) — cf. saveBilan pour la justification complète. En
+  // résumé : miroir strict de loadBilan ; range skippé si !_userDirty ; ajouter
+  // un champ nécessite de mettre à jour loadBilan en même temps.
   document.querySelectorAll('.bilan-field').forEach(el => {
     const field = el.dataset.field;
-    if(field) bilanData[field] = el.value || '';
+    if (!field) return;
+    if (el.type === 'range' && !el._userDirty) return;
+    bilanData[field] = el.value || '';
   });
   document.querySelectorAll('#pg-bilan input[type=radio]').forEach(el => {
     if(el.checked && el.name) bilanData[el.name] = el.value;
