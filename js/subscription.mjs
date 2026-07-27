@@ -22,12 +22,6 @@
 //   landing `{fixed:[X], choose:1, pool:[A,B]}` ≡ PR58 `{required:[X], choose:{from:[A,B], count:1}}`
 //   landing `{fixed:[X,Y,Z], choose:0, pool:[]}` ≡ PR58 `{required:[X,Y,Z], choose:null}`
 
-// ⚠️  Avertissement task #58 : le module 'podopedia' apparaît dans PLAN_MODULES
-// pour cohérence avec le futur, MAIS son UI consommatrice n'est PAS encore
-// implémentée (badge "Prochainement" dans index.html ligne ~2095). Le wizard
-// C2 doit RESTREINDRE les choix utilisateur pour ne pas proposer 'podopedia'
-// dans les "choose.from" tant que le module n'est pas fonctionnel.
-// À retirer ce commentaire quand le module Podopédiatrie sera développé.
 export const PLAN_MODULES = [
   {
     planIdx: 0,
