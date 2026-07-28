@@ -15241,6 +15241,13 @@ var _PODO_MAX_PLANTAIRE_W = 700;
 // plus tard). Nom neutre — le pipeline photos posturales est commun via
 // _collectAnnotatedPostureViews.
 var _MAX_POSTURE_W = 850;
+// Fix #151 — Borne largeur pour l'empreinte plantaire posturo. L'empreinte
+// est affichée à max-width:70% de la largeur d'une page A4 dans le rapport
+// (soit ≈ 147 mm). 1400 px couvre largement 200 dpi à l'impression et évite
+// de persister en localStorage / Supabase Storage des JPEG de 3000-4000 px
+// venus d'un téléphone récent. Voir _downscaleDataUrl + captureEmpreinte +
+// previewEmpreinte.
+var _MAX_EMPREINTE_W = 1400;
 
 // Helper partagé rapports (podo + posturo, éventuellement sport). Sérialise
 // le canvas vivant si ET SEULEMENT SI l'utilisateur a dessiné dans la session
@@ -15315,6 +15322,72 @@ function _podoLoadImage(src) {
     img.onerror = function () { reject(new Error('image load failed')); };
     img.src = src;
   });
+}
+
+// Fix #151 — Borne la résolution d'une dataURL image. Charge via
+// createImageBitmap avec `imageOrientation: 'from-image'` pour appliquer
+// l'orientation EXIF au moment du redimensionnement (photos iPhone portrait
+// et autres). Fallback Image standard si createImageBitmap indisponible ou
+// échoue (Safari ancien, environnements atypiques).
+//
+// Comportement :
+//   - naturalWidth <= maxW → retourne la dataURL D'ORIGINE inchangée
+//     (aucun ré-encodage, aucune perte de qualité).
+//   - naturalWidth >  maxW → redessine sur canvas borné (largeur = maxW,
+//     hauteur = ratio préservé), sortie JPEG à `quality`.
+//
+// Impératif de sûreté : en cas d'échec (chargement KO, decode KO, exception
+// à n'importe quelle étape), retourne la dataURL D'ORIGINE — jamais null,
+// jamais undefined. Une photo trop lourde vaut infiniment mieux qu'une
+// photo perdue.
+async function _downscaleDataUrl(dataUrl, maxW, quality) {
+  if (!dataUrl) return dataUrl;
+  try {
+    var w, h, drawable;
+    // Pipeline privilégié : createImageBitmap + option EXIF explicite.
+    // Chrome 79+, FF 90+, Safari 15+ supportent `imageOrientation`. Sur les
+    // versions plus anciennes, l'option est ignorée mais l'appel réussit
+    // (l'orientation EXIF peut alors être perdue au redimensionnement).
+    if (typeof createImageBitmap === 'function' && typeof fetch === 'function') {
+      try {
+        var blob = await (await fetch(dataUrl)).blob();
+        drawable = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+        w = drawable.width;
+        h = drawable.height;
+      } catch (_bmpErr) {
+        // Erreur délibérément ignorée : createImageBitmap peut échouer sur
+        // Safari ancien, blob mal formé ou variantes exotiques. On bascule
+        // silencieusement sur le pipeline Image ci-dessous. Préfixe `_` =
+        // convention projet pour var de catch intentionnellement inutilisée
+        // (pattern autorisé /^_/u de la règle no-unused-vars).
+        drawable = null;
+      }
+    }
+    if (!drawable) {
+      var img = await _podoLoadImage(dataUrl);
+      drawable = img;
+      w = img.naturalWidth;
+      h = img.naturalHeight;
+    }
+    if (!w || !h) return dataUrl;
+    if (w <= maxW) {
+      if (drawable.close) drawable.close();
+      return dataUrl;
+    }
+    var scale = maxW / w;
+    var outW = maxW;
+    var outH = Math.round(h * scale);
+    var canvas = document.createElement('canvas');
+    canvas.width = outW;
+    canvas.height = outH;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(drawable, 0, 0, outW, outH);
+    if (drawable.close) drawable.close();
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch (e) {
+    console.warn('[downscale] fallback to original dataURL:', e && e.message);
+    return dataUrl;
+  }
 }
 
 // Compose une tuile morpho podo : gabarit (imgjs-*) + calque dessin transparent.
@@ -18636,13 +18709,19 @@ function stopEmpreinteCamera() {
   if(video?.srcObject) { video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
   if(wrap) wrap.style.display = 'none';
 }
-function captureEmpreinte() {
+async function captureEmpreinte() {
   const video = document.getElementById('po-empreinte-video');
   if(!video) return;
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+  const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+  // Fix #151 — Borne la résolution AVANT toute assignation. La version bornée
+  // alimente à la fois img.src et bilanDataPosturo._empreinte, sinon le sweep
+  // L~20970 relit img.src et la version pleine résolution reviendrait par la
+  // porte du DOM. _downscaleDataUrl garantit le fallback dataURL originale sur
+  // erreur (jamais null).
+  const dataUrl = await _downscaleDataUrl(rawDataUrl, _MAX_EMPREINTE_W, 0.85);
   const img = document.getElementById('po-empreinte-img');
   if(img) { img.src = dataUrl; img.style.display = 'block'; }
   const del = document.getElementById('po-empreinte-del');
@@ -18670,11 +18749,19 @@ function deleteEmpreinte() {
 function previewEmpreinte(input) {
   if(!input.files || !input.files[0]) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  // Fix #151 — Double async (FileReader.onload puis _downscaleDataUrl).
+  // Reste correct : le handler devient async, aucun caller n'attend son retour
+  // (fire-and-forget). Race théorique si l'user clique save AVANT que le
+  // downscale se termine → le sweep L~20970 lit img.src qui vaut encore la
+  // valeur pré-onload (aucun _empreinte assigné à ce stade) OU la valeur
+  // bornée post-onload. Aucun cas où une version pleine résolution serait
+  // persistée en aval — img.src ne reçoit que la version bornée.
+  reader.onload = async (e) => {
+    const bounded = await _downscaleDataUrl(e.target.result, _MAX_EMPREINTE_W, 0.85);
     const img = document.getElementById('po-empreinte-img');
-    if(img) { img.src = e.target.result; img.style.display = 'block'; }
+    if(img) { img.src = bounded; img.style.display = 'block'; }
     if(currentPatient?.bilanDataPosturo) {
-      currentPatient.bilanDataPosturo._empreinte = e.target.result;
+      currentPatient.bilanDataPosturo._empreinte = bounded;
       // #99 + Bug RAM-leak — invalide le Path à l'upload d'un nouveau fichier.
       delete currentPatient.bilanDataPosturo._empreintePath;
     }
