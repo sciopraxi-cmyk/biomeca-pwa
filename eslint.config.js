@@ -19,11 +19,20 @@ export default [
   // Base : règles recommandées
   js.configs.recommended,
 
-  // Règle globale — autorise les paramètres et variables préfixés par _
-  // à rester unused (convention standard JS pour signaler "volontairement ignoré").
+  // Règle globale — autorise les paramètres, variables et variables de catch
+  // préfixés par _ à rester unused (convention standard JS pour signaler
+  // "volontairement ignoré"). Les trois motifs partagent le même préfixe
+  // volontairement — une convention unique, appliquée uniformément.
   {
     rules: {
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
     },
   },
 
