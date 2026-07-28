@@ -10303,108 +10303,18 @@ const sections = [];
   // Silhouettes bonhommes — condition path-aware (fix #149 défaut 2). Le bloc
   // apparaît dès que status !== 'nu' : soit dataURL disponible ('ok'), soit
   // Path Storage présent mais fetch KO ('ko') → gabarits nus affichés avec
-  // mention rouge.
-  // Le code mort d'origine (bcData = canvas.toDataURL non réutilisé, L10242
-  // pré-fix #149) a été supprimé : la lecture live canvas est faite en amont
-  // par _resolvePosturoRapportImages (visuals.bodyCanvas.dataUrl couvre live →
-  // RAM → Path). `bc` local reste utilisé plus bas dans du code mort résiduel
-  // (const W = bc ? bc.width/4 …) → conservé pour ne pas casser cette portée.
-  // Le reste des helpers locaux (makeComposite / sliceDataUrl /
-  // compositeImgCanvas) reste en place, non consommé — nettoyage prévu dans
-  // une tâche séparée (audit code mort).
+  // mention rouge. L'assemblage réel des 4 slices est fait en async par
+  // _buildRapportBody (branche `bonhommes`) via makeSliceComposite L10868.
+  // Fix #152 — Purge du code mort résiduel qui traînait dans ce bloc depuis
+  // le refactor #149 : helpers locaux makeComposite / getCanvasSlice /
+  // composite / sliceDataUrl / compositeImgCanvas et leurs variables (bc,
+  // faceEl/face2El/profilGEl/profilDEl, W/H, slice0-3, imgIds) — jamais
+  // consommés dans ce bloc, sans call-site externe. Bénéfice concret :
+  // suppression de 4 appels toDataURL par génération de rapport (slice0-3).
+  // Bonus : 2 des fonctions supprimées faisaient `new Image(); img.src=…;
+  // drawImage` sans attendre onload — bug latent si un futur lecteur les
+  // avait réactivées.
   if(visuals.bodyCanvas.status !== 'nu') {
-    const bc = document.getElementById('posturo-body-canvas');
-    function makeComposite(imgEl, canvasData, w, h) {
-      if(!imgEl) return null;
-      try {
-        const tmpC = document.createElement('canvas');
-        tmpC.width = w || 300; tmpC.height = h || 500;
-        const ctx = tmpC.getContext('2d');
-        ctx.drawImage(imgEl, 0, 0, tmpC.width, tmpC.height);
-        if(canvasData) {
-          const img2 = new Image();
-          img2.src = canvasData;
-          ctx.drawImage(img2, 0, 0, tmpC.width, tmpC.height);
-        }
-        return tmpC.toDataURL('image/png');
-      } catch(e) { return imgEl.src; }
-    }
-    
-    const faceEl = document.getElementById('imgjs-morpho-face');
-    const face2El = document.getElementById('imgjs-morpho-face2');
-    const profilGEl = document.getElementById('imgjs-morpho-profilG');
-    const profilDEl = document.getElementById('imgjs-morpho-profilD');
-    const W = bc ? bc.width/4 : 300;
-    const H = bc ? bc.height : 500;
-    
-    // Créer canvas partiel pour chaque vue (le canvas global est divisé en 4)
-    function getCanvasSlice(canvasEl, sliceIdx, totalSlices) {
-      if(!canvasEl) return null;
-      try {
-        const sliceW = canvasEl.width / totalSlices;
-        const tmpC = document.createElement('canvas');
-        tmpC.width = sliceW; tmpC.height = canvasEl.height;
-        const ctx = tmpC.getContext('2d');
-        ctx.drawImage(canvasEl, sliceIdx*sliceW, 0, sliceW, canvasEl.height, 0, 0, sliceW, canvasEl.height);
-        return tmpC.toDataURL('image/png');
-      } catch(e) { return null; }
-    }
-    
-    const slice0 = getCanvasSlice(bc, 0, 4);
-    const slice1 = getCanvasSlice(bc, 1, 4);
-    const slice2 = getCanvasSlice(bc, 2, 4);
-    const slice3 = getCanvasSlice(bc, 3, 4);
-    
-    function composite(imgEl, sliceData) {
-      if(!imgEl) return null;
-      try {
-        const tmpC = document.createElement('canvas');
-        tmpC.width = 300; tmpC.height = 500;
-        const ctx = tmpC.getContext('2d');
-        ctx.drawImage(imgEl, 0, 0, 300, 500);
-        if(sliceData) {
-          const img2 = new Image(); img2.src = sliceData;
-          ctx.drawImage(img2, 0, 0, 300, 500);
-        }
-        return tmpC.toDataURL('image/png');
-      } catch(e) { return imgEl?.src || null; }
-    }
-    
-    // Utiliser d._bodyCanvas (données sauvegardées) pour découper en 4 vues
-    function sliceDataUrl(dataUrl, sliceIdx, totalSlices) {
-      if(!dataUrl) return null;
-      try {
-        const img = new Image();
-        img.src = dataUrl;
-        const tmp = document.createElement('canvas');
-        const sw = Math.floor(img.naturalWidth / totalSlices) || 300;
-        const sh = img.naturalHeight || 500;
-        tmp.width = sw; tmp.height = sh;
-        tmp.getContext('2d').drawImage(img, sliceIdx*sw, 0, sw, sh, 0, 0, sw, sh);
-        return tmp.toDataURL('image/png');
-      } catch(e) { return null; }
-    }
-    // Combiner image de fond + canvas dessins
-    const imgIds = ['imgjs-morpho-profilD','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilG'];
-    function compositeImgCanvas(imgId, canvasData, sliceIdx) {
-      const imgEl = document.getElementById(imgId);
-      if(!imgEl) return canvasData ? sliceDataUrl(canvasData, sliceIdx, 4) : null;
-      try {
-        const tmp = document.createElement('canvas');
-        tmp.width = 300; tmp.height = 500;
-        const ctx = tmp.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0,0,300,500);
-        ctx.drawImage(imgEl, 0, 0, 300, 500);
-        if(canvasData) {
-          const cv2 = new Image(); cv2.src = canvasData;
-          const sw = Math.floor((cv2.naturalWidth||1200)/4);
-          const sh = cv2.naturalHeight||500;
-          ctx.drawImage(cv2, sliceIdx*sw, 0, sw, sh, 0, 0, 300, 500);
-        }
-        return tmp.toDataURL('image/png');
-      } catch(e) { return imgEl.src; }
-    }
     {
       var bgIds3 = ['imgjs-morpho-profilG','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilD'];
       // Fix #149 défaut 2 — bodyCanvasData vient désormais de visuals (résolution
