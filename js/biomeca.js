@@ -10933,6 +10933,8 @@ function _buildRapportBody(p, d, prat, logo, sections) {
             ? (i + ':' + g.dx.toFixed(0) + ',' + g.dy.toFixed(0) + ' ' + g.w.toFixed(0) + 'x' + g.h.toFixed(0))
             : (i + ':null');
         }).join(' | '));
+      // #151 volet 2 — Accumulateur de bornage pour log unique après les 4 slices.
+      var bornageLog = [];
       function makeSliceComposite(i) {
         var tmp = document.createElement('canvas');
         tmp.width = sw; tmp.height = sh;
@@ -10945,12 +10947,29 @@ function _buildRapportBody(p, d, prat, logo, sections) {
         }
         // Superposer les dessins - le canvas global a exactement la même taille
         ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
-        return tmp.toDataURL('image/png');
+        // #151 volet 2 — Bornage homothétique du composite terminé, jamais
+        // par recalcul de coordonnées. Voir _boundCompositeHeight pour le
+        // raisonnement (préservation géométrique par construction).
+        var b = _boundCompositeHeight(tmp, _MAX_MORPHO_COMPOSITE_H);
+        var url = b.canvas.toDataURL('image/png');
+        bornageLog.push({
+          i: i,
+          srcW: b.srcW, srcH: b.srcH,
+          outW: b.outW, outH: b.outH,
+          kb: Math.round(url.length / 1024),
+        });
+        return url;
       }
       bonhommesSection.profilDImg = makeSliceComposite(0);
       bonhommesSection.face2Img   = makeSliceComposite(1);
       bonhommesSection.faceImg    = makeSliceComposite(2);
       bonhommesSection.profilGImg = makeSliceComposite(3);
+      console.info(
+        '[posturo report] silhouettes bornage max=' + _MAX_MORPHO_COMPOSITE_H + 'px | ' +
+        bornageLog.map(function(l) {
+          return 'slice' + l.i + ':' + l.srcW + 'x' + l.srcH + '→' + l.outW + 'x' + l.outH + '=' + l.kb + 'KB';
+        }).join(' | ')
+      );
       bonhommesSection.bodyCanvasData = null;
       // #88-C Annexes PDF — résolution async APRÈS bonhommes, AVANT injection iframe.
       _resolvePosturoFichesImages(d, function(fichesPages) {
@@ -11487,13 +11506,28 @@ async function _resolveSportRapportImages(bd, callback) {
     return;
   }
   const composites = {};
+  // #151 volet 2 — Accumulateur de bornage pour log unique par rapport (au
+  // lieu d'une ligne par composite). _pieds SPORT exclu : son canvas source
+  // a un backing FIXE 520×520 depuis la refonte #119, déjà borné par
+  // construction — pas de bornage à appliquer, pas de log à produire.
+  const bornageLog = [];
   let remaining = toResolve.length;
   toResolve.forEach(({ key, baseId }) => {
     const drawing = new Image();
     const finalize = (compositeOrFallback) => {
       composites[key] = compositeOrFallback;
       remaining--;
-      if(remaining === 0) callback(composites, statuses);
+      if(remaining === 0) {
+        if (bornageLog.length) {
+          console.info(
+            '[sport report] morpho bornage max=' + _MAX_MORPHO_COMPOSITE_H + 'px | ' +
+            bornageLog.map(function(l) {
+              return l.key + ':' + l.srcW + 'x' + l.srcH + '→' + l.outW + 'x' + l.outH + '=' + l.kb + 'KB';
+            }).join(' | ')
+          );
+        }
+        callback(composites, statuses);
+      }
     };
     drawing.onload = () => {
       const baseEl = document.getElementById(baseId);
@@ -11540,7 +11574,22 @@ async function _resolveSportRapportImages(bd, callback) {
         }
         ctx.drawImage(baseEl, dx, dy, dispW, dispH);
         ctx.drawImage(drawing, 0, 0, Wd, Hd);
-        finalize(tmp.toDataURL('image/png'));
+        // #151 volet 2 — Bornage homothétique sur la branche MORPHO uniquement.
+        // _pieds skip : backing fixe 520×520 déjà borné (#119).
+        let outUrl;
+        if (key === '_pieds') {
+          outUrl = tmp.toDataURL('image/png');
+        } else {
+          const b = _boundCompositeHeight(tmp, _MAX_MORPHO_COMPOSITE_H);
+          outUrl = b.canvas.toDataURL('image/png');
+          bornageLog.push({
+            key: key,
+            srcW: b.srcW, srcH: b.srcH,
+            outW: b.outW, outH: b.outH,
+            kb: Math.round(outUrl.length / 1024),
+          });
+        }
+        finalize(outUrl);
       } catch(e) {
         finalize(drawingUrls[key]);
       }
@@ -15424,8 +15473,45 @@ function printRapportPedicurie(){
 // _collectAnnotatedPostureViews (constante partagée avec posturo/sport).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var _PODO_MAX_MORPHO_H  = 500;
+// #151 volet 2 — Renommage : ancienne _PODO_MAX_MORPHO_H (spécifique podo)
+// devient _MAX_MORPHO_COMPOSITE_H, partagée par les trois rapports (podo,
+// sport, posturo) puisqu'elles bornent le MÊME type de composite : gabarit
+// morphostatique + calque dessin transparent, output PNG. 500 px = seuil
+// esthétique éprouvé côté podo, appliqué aux deux autres pour uniformité.
+var _MAX_MORPHO_COMPOSITE_H = 500;
 var _PODO_MAX_PLANTAIRE_W = 700;
+
+// #151 volet 2 — Bornage HOMOTHÉTIQUE d'un composite TERMINÉ.
+// Choix délibéré vs. l'approche plus efficace qui consisterait à multiplier
+// chaque coordonnée par le facteur d'échelle en amont : un facteur uniforme
+// appliqué à un canvas fini préserve toute la géométrie relative PAR
+// CONSTRUCTION — impossible d'introduire un décalage.
+// Coût : un canvas temporaire + un drawImage, largement amorti par la
+// réduction de poids de la dataURL (et du PDF final). Le confort de ne pas
+// rouvrir la porte des décalages géométriques (cf. la journée passée sur
+// le calage des silhouettes posturo) l'emporte sur l'économie.
+//
+// Contrat : source canvas + hauteur max → { canvas, srcW, srcH, outW, outH,
+// scaled }. Retourne le canvas source lui-même si aucun bornage requis
+// (hauteur déjà sous le seuil), sinon un nouveau canvas plus petit.
+function _boundCompositeHeight(srcCanvas, maxH) {
+  var srcW = srcCanvas.width;
+  var srcH = srcCanvas.height;
+  if (srcH <= maxH) {
+    return { canvas: srcCanvas, srcW: srcW, srcH: srcH, outW: srcW, outH: srcH, scaled: false };
+  }
+  var outH = maxH;
+  var outW = Math.round(srcW * (outH / srcH));
+  var out = document.createElement('canvas');
+  out.width = outW;
+  out.height = outH;
+  var octx = out.getContext('2d');
+  // Smoothing par défaut du navigateur (high sur Chrome/Safari). Pas de tweak :
+  // les traits fins doivent rester nets, on garde PNG output pour éviter les
+  // artefacts JPEG autour des lignes (inverse du cas photographique).
+  octx.drawImage(srcCanvas, 0, 0, outW, outH);
+  return { canvas: out, srcW: srcW, srcH: srcH, outW: outW, outH: outH, scaled: true };
+}
 // Constante partagée par les rapports podo + posturo (potentiellement sport
 // plus tard). Nom neutre — le pipeline photos posturales est commun via
 // _collectAnnotatedPostureViews.
@@ -15610,12 +15696,12 @@ async function _composePodoMorphoTile(bd, key, baseId, canvasId) {
     return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
   }
   // Composite : dimensions calque, scale du gabarit centered (object-fit: contain
-  // équivalent). Borne hauteur à _PODO_MAX_MORPHO_H pour limiter le poids PDF.
+  // équivalent). Borne hauteur à _MAX_MORPHO_COMPOSITE_H pour limiter le poids PDF.
   try {
     var drawing = await _podoLoadImage(dataUrl);
     var Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
     if (!Wd || !Hd) return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
-    var outH = Math.min(Hd, _PODO_MAX_MORPHO_H);
+    var outH = Math.min(Hd, _MAX_MORPHO_COMPOSITE_H);
     var outW = Math.round(Wd * (outH / Hd));
     var tmp = document.createElement('canvas');
     tmp.width = outW; tmp.height = outH;
