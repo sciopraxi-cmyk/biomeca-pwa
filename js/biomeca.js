@@ -20952,7 +20952,18 @@ function showPosturoSection(idx) {
     // observé : rapport lancé depuis Traitements après avoir visité tab 2
     // puis navigué → memoized perdue → fallback).
     // Timer > init (150 ms) pour laisser le navigateur poser la layout.
+    //
+    // CAPTURE UNIQUE — la mémoire fige DÉLIBÉRÉMENT l'état initial propre,
+    // celui du PREMIER affichage de la page. Sans cette garde, tout retour
+    // sur la section après une génération de rapport recapturait un layout
+    // déjà dérivé (iframe expansive, styles rémanents), écrasant la
+    // référence propre par une valeur déjà polluée — décalage résiduel
+    // observé en test. Seul l'écouteur resize (voir plus bas) peut
+    // renouveler la mémoire, parce qu'un redimensionnement est un
+    // changement légitime de mise en page ; une génération de rapport
+    // ne l'est pas.
     setTimeout(() => {
+      if (_posturoBodyBgGeometry) return;
       const c = document.getElementById('posturo-body-canvas');
       const g = _capturePosturoBodyBgGeometry(c);
       if (g) _posturoBodyBgGeometry = g;
