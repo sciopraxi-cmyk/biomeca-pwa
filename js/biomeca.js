@@ -13353,17 +13353,50 @@ function undoPodoMorpho() {
   }
 }
 
+// #147 — Reset MINIMAL sur les 4 canvases morpho podo (motif clearPodoPieds).
+// Correct ici parce que les canvases sont des OVERLAYS transparents par-dessus
+// des <img> DOM : le gabarit visible reste dans le DOM, jamais gravé dans le
+// canvas. Le baseSnapshot capturé à l'init représente donc l'état vide
+// (transparent) et le restaurer redonne un canvas propre. Rappeler
+// initPodoMorphoCanvas (ancien comportement) ré-exécutait pour rien la
+// mesure DPR, la re-capture du snapshot et le setupDrawCanvas, alors que
+// tous ces états sont conservés à travers le clear.
+//
+// Garde d'initialisation conservée : si `!Array.isArray(c._history)`, c'est
+// que le canvas n'a jamais été initialisé (clearAllPodoMorpho fait alors
+// office d'initialiseur, cas historique). Dans ce cas seulement on tombe
+// sur initPodoMorphoCanvas.
 function clearAllPodoMorpho() {
   _podoMorphoUndoOrder.length = 0;
   _PODO_MORPHO_CANVAS_IDS.forEach(id => {
     const c = document.getElementById(id);
-    if (c) {
-      c._history = [];
-      c._baseSnapshot = null;
-      c._tempSnap = null;
-      c._userDirty = true; // force invalidation au prochain save
+    if (!c) return;
+    if (!Array.isArray(c._history)) {
+      // Canvas jamais initialisé — filet d'initialisation historique.
+      initPodoMorphoCanvas(id);
+      return;
     }
-    initPodoMorphoCanvas(id);
+    // Reset minimal : restaure baseSnapshot (transparent post-init), vide
+    // history + tempSnap, marque dirty pour invalidation au prochain save.
+    // Ne PAS mettre _baseSnapshot à null — c'est lui qu'on restaure.
+    if (c._baseSnapshot) {
+      c.getContext('2d').putImageData(c._baseSnapshot, 0, 0);
+    } else {
+      // Cas rare : baseSnapshot pas encore capturé mais _history existe
+      // (fenêtre transitoire). Fallback clearRect — équivalent visuel sur
+      // canvas overlay transparent.
+      c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    }
+    c._history = [];
+    c._tempSnap = null;
+    c._userDirty = true;
+    // Réaffirme l'override du correctif #89 : la pile undo dédiée doit être
+    // (ré)attachée explicitement. L'ancien code l'obtenait gratuitement en
+    // rappelant initPodoMorphoCanvas ; le reset minimal saute cet appel, donc
+    // sans cette ligne un canvas initialisé par un autre chemin retomberait
+    // sur _morphoUndoOrder (sport) et un futur undo pop-erait dans la mauvaise
+    // pile — exactement la dérive que #89 a corrigée.
+    c._undoOrderStack = _podoMorphoUndoOrder;
   });
   // Déclenche autosave débouncée — le prochain savePodopediatrieBilan invalidera
   // les 4 clés + leurs Path.
@@ -16695,18 +16728,50 @@ async function saveBilanSilent() {
   restoreSportBilanDataPhotosStash(currentPatient.bilanData, _postureStash);
 }
 
+// #147 — Reset MINIMAL sur le canvas pieds sport (motif clearPodoPieds).
+// Correct ici parce que le canvas est un OVERLAY transparent par-dessus
+// #sp-pieds-img (gabarit visible directement dans le DOM, jamais gravé dans
+// le canvas). Le baseSnapshot capturé à l'init représente donc l'état vide
+// (transparent) et le restaurer redonne un canvas propre. Rappeler
+// drawPiedsTemplate (ancien comportement) ré-affectait width/height sur le
+// backing 520×520 fixe, re-posait _backingScaled, re-capturait le snapshot et
+// rappelait setupDrawCanvas — tout ça alors que ces états sont préservés à
+// travers le clear. Note : pieds-canvas n'a PAS de pile undo dédiée
+// (confirmé par le commentaire de initMorphoCanvas L12866-12867 et par la
+// lecture d'undoPieds L13540 qui n'utilise que c._history) → aucune pile à
+// purger, contrairement à clearPodoPieds qui purge _podoPiedsUndoOrder.
+//
+// Garde d'initialisation conservée : si `!Array.isArray(c._history)`, c'est
+// que le canvas n'a jamais été initialisé (drawPiedsTemplate faisait office
+// d'initialiseur historiquement). Dans ce cas seulement on tombe sur
+// drawPiedsTemplate — sinon reset minimal.
 function clearPiedsCanvas() {
   const c = document.getElementById('pieds-canvas');
   if(!c) return;
-  c.getContext('2d').clearRect(0,0,c.width,c.height);
+  if (!Array.isArray(c._history)) {
+    // Canvas jamais initialisé — filet d'initialisation historique.
+    drawPiedsTemplate();
+    return;
+  }
+  // Reset minimal : restaure baseSnapshot (transparent post-init), vide
+  // history + tempSnap, marque dirty. Ne PAS mettre _baseSnapshot à null
+  // ni retoucher canvas.width/height (backing 520×520 fixe préservé).
+  if (c._baseSnapshot) {
+    c.getContext('2d').putImageData(c._baseSnapshot, 0, 0);
+  } else {
+    // Cas rare : _history existe mais baseSnapshot pas encore capturé
+    // (fenêtre transitoire). Fallback clearRect sur overlay transparent.
+    c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  }
+  c._history = [];
+  c._tempSnap = null;
   // #99 + Bug édition perdue — clear user-triggered = édition (cf clearAllMorpho).
   c._userDirty = true;
-  drawPiedsTemplate();
   // #119 — Auto-save (parité dessin). Sans ça, effacer tout puis quitter sans
   // toucher au clavier laisserait l'ancien dessin persisté tant que la capture-
   // avant-quitter #116 ne tire pas (nav directe vers une page hors-bilan OK,
   // mais un refresh dur perdrait le clear). _userDirty=true reste valide jusqu'au
-  // sweep (drawPiedsTemplate ne reset que _history/_baseSnapshot/_tempSnap).
+  // sweep — le reset minimal ne touche pas au flag.
   if (typeof _scheduleBilanAutosave === 'function') {
     _scheduleBilanAutosave(true);
   }
