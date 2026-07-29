@@ -10764,6 +10764,20 @@ const sections = [];
   _buildRapportBody(p, d, prat, logo, sections);
 }
 
+// Mémoire module-scope de la géométrie des gabarits silhouettes posturo.
+// STOCKAGE MODULE (pas sur l'élément canvas) car le canvas est remplacé à
+// chaque nav('pg-bilan-posturo') : injectBilanPosturoPage L17107 fait
+// `existing.remove()` puis recrée toute la page, emportant l'ancien élément
+// et toute propriété attachée. Un stockage DOM-attribute survivait donc à
+// un switch d'onglet dans la même page mais était vidé dès que l'utilisateur
+// naviguait vers le rapport puis revenait au bilan — cas nominal observé.
+// Une variable module survit à tous les remplacements DOM.
+//
+// Écriture unique par showPosturoSection(1) (via _capturePosturoBodyBgGeometry
+// ci-dessous, timer 300 ms après affichage). Lecture par _buildRapportBody
+// bloc bonhommes en priorité.
+let _posturoBodyBgGeometry = null;
+
 // Mesure la géométrie des 4 gabarits silhouettes visibles dans la rangée
 // éditeur (js/biomeca.js L17121 sq.), convertie en coordonnées backing du
 // canvas #posturo-body-canvas. Retourne un tableau [{dx,dy,w,h}, …] pour les
@@ -10771,9 +10785,10 @@ const sections = [];
 // rangée absente, rect nul sur un des enfants).
 //
 // Consommé par (a) le hook d'affichage showPosturoSection(1) pour mémoriser
-// la géométrie sur `canvas._bgGeometry` avant que la section ne soit à
-// nouveau masquée, et (b) la génération de rapport dans _buildRapportBody
-// (bloc bonhommes) qui essaie la mesure directe puis retombe sur la mémoisée.
+// la géométrie dans _posturoBodyBgGeometry (module-scope) avant que la
+// section ne soit à nouveau masquée, et (b) la génération de rapport dans
+// _buildRapportBody (bloc bonhommes) qui consulte d'abord la mémoire puis
+// tente la mesure directe.
 function _capturePosturoBodyBgGeometry(canvas) {
   if (!canvas || !canvas.parentElement) return null;
   var cRect = canvas.getBoundingClientRect();
@@ -10801,6 +10816,30 @@ function _capturePosturoBodyBgGeometry(canvas) {
   return geoms;
 }
 
+// Rattrapage du seul angle mort de l'inversion de priorité mémoire >
+// mesure directe : si l'utilisateur redimensionne la fenêtre ou branche
+// un écran externe pendant qu'il dessine, la mémoire capturée au moment
+// de showPosturoSection(1) devient périmée. Or c'est elle qui l'emporte
+// au rapport (pour échapper à la contamination cumulative documentée dans
+// _buildRapportBody) → sans ce rattrapage, un rapport lancé après resize
+// serait mal calé.
+//
+// Un écouteur `resize` module-scope débouncé (~100 ms après le dernier
+// événement, pour ne pas mesurer pendant un resize continu type
+// drag-de-bordure) relance la capture. _capturePosturoBodyBgGeometry
+// renvoie null si la section est masquée (rects nuls) — on n'écrase
+// _posturoBodyBgGeometry QUE sur retour non nul, jamais avec un échec :
+// une mémoire valide ne doit jamais être remplacée par une capture ratée.
+let _posturoBodyBgGeometryResizeTimer = null;
+window.addEventListener('resize', function() {
+  clearTimeout(_posturoBodyBgGeometryResizeTimer);
+  _posturoBodyBgGeometryResizeTimer = setTimeout(function() {
+    var c = document.getElementById('posturo-body-canvas');
+    var g = _capturePosturoBodyBgGeometry(c);
+    if (g) _posturoBodyBgGeometry = g;
+  }, 100);
+});
+
 function _buildRapportBody(p, d, prat, logo, sections) {
   // Résoudre les images bonhommes si nécessaire
   var bonhommesSection = sections.find(function(s){ return s.type === 'bonhommes' && s.bodyCanvasData; });
@@ -10821,62 +10860,72 @@ function _buildRapportBody(p, d, prat, logo, sections) {
       // DPR=2 → gabarit du rapport 10 % plus petit que celui sur lequel le
       // praticien a dessiné, écart croissant vers le bas.
       //
-      // Résolution en trois paliers (chemin unique journalisé sur une ligne
-      // pour les 4 tuiles) :
-      //   1. mesure directe (section actuellement visible) — le plus précis ;
-      //   2. mesure mémorisée sur `canvas._bgGeometry`, capturée par
-      //      showPosturoSection(1) → _capturePosturoBodyBgGeometry (L20xxx).
-      //      Couvre le cas nominal : le praticien a forcément affiché la
-      //      section pour dessiner, la capture est donc disponible même si
-      //      le rapport est déclenché depuis un autre onglet posturo ;
-      //   3. fallback layout : reconstruction à partir des contraintes CSS
+      // Résolution en trois paliers, avec un ordre de priorité CONTRE-INTUITIF
+      // (chemin unique journalisé sur une ligne pour les 4 tuiles) :
+      //
+      //   1. MÉMOIRE d'abord — _posturoBodyBgGeometry (module-scope), capturée
+      //      par showPosturoSection(1) au moment où la section était affichée
+      //      dans un contexte de mise en page PROPRE. On préfère
+      //      DÉLIBÉRÉMENT cette mesure ancienne à la mesure fraîche parce que
+      //      la fraîche est contaminée : ouvrir le rapport (iframe expansive
+      //      → toggle scrollbar body → shift de largeur viewport, styles
+      //      cumulatifs sur pg-bilan-posturo, etc.) modifie la géométrie
+      //      sous-jacente et l'effet s'accumule à chaque génération.
+      //      Symptôme observé : dx dérivant de 96 → 85 → 81 sur 3 générations
+      //      successives. La capture propre reste la référence.
+      //   2. Mesure directe — utile UNIQUEMENT si la mémoire est vide (ex :
+      //      bilan restauré depuis stockage, utilisateur clique Rapport sans
+      //      avoir visité tab 2 — mais alors il n'a rien dessiné). Contexte
+      //      potentiellement contaminé mais mieux que le fallback.
+      //   3. Fallback layout : reconstruction depuis les contraintes CSS
       //      connues (hauteur = 200 × devicePixelRatio, aspect préservé,
-      //      offset haut mesuré). Ne sert que pour un bilan restauré depuis
-      //      le stockage dont on n'a jamais ouvert l'onglet — cas sans
-      //      dessin à caler.
+      //      offset haut mesuré). Ne sert que quand ni mémoire ni mesure
+      //      directe ne sont disponibles.
       //
       // Piège : bgIds pointe vers les preloads en display:none (index.html
       // L5262 sq.). La mesure directe et la mémorisée regardent les <img>
       // VISIBLES de la rangée éditeur, dans l'ordre du DOM (qui coïncide avec
       // l'ordre des slices : profil-gauche/face-post/face-ant/profil-droit).
       var liveCanvas = document.getElementById('posturo-body-canvas');
-      var directGeoms = _capturePosturoBodyBgGeometry(liveCanvas);
-      var memoGeoms = liveCanvas ? liveCanvas._bgGeometry : null;
+      var memoGeoms = _posturoBodyBgGeometry;
       var geoms, geoSource;
-      if (directGeoms) {
-        geoms = directGeoms;
-        geoSource = 'measured';
-      } else if (memoGeoms) {
+      if (memoGeoms) {
         geoms = memoGeoms;
         geoSource = 'memoized';
       } else {
-        // Fallback layout. Offset haut : 45 CSS px sous le haut du canvas
-        // (mesure relevée le 29/07/2026, canvasRect.y 223,5 vs imgRect.y
-        // 268,5). Décomposition : padding rangée flex 16 px + libellé ~21 px
-        // + padding encadré 8 px. Centrage horizontal préservé — il est
-        // correct : l'image est centrée dans sa colonne, qui est alignée
-        // avec la tuile à ~centrage près.
-        var dpr = window.devicePixelRatio || 1;
-        var POSTURO_BG_TOP_OFFSET_CSS = 45;
-        var dyBacking = POSTURO_BG_TOP_OFFSET_CSS * dpr;
-        geoms = bgIds.map(function(id) {
-          var bgEl = document.getElementById(id);
-          if (!bgEl || bgEl.naturalWidth <= 0) return null;
-          var aspect = bgEl.naturalWidth / bgEl.naturalHeight;
-          var hFb = 200 * dpr;
-          var wFb = hFb * aspect;
-          // Défensif : si le fallback dépasse la tuile (DPR extrême), on
-          // contraint en préservant l'aspect plutôt que de déborder.
-          if (hFb > sh) { wFb *= sh / hFb; hFb = sh; }
-          if (wFb > sw) { hFb *= sw / wFb; wFb = sw; }
-          return {
-            dx: (sw - wFb) / 2,
-            dy: dyBacking,
-            w:  wFb,
-            h:  hFb,
-          };
-        });
-        geoSource = 'fallback-layout';
+        var directGeoms = _capturePosturoBodyBgGeometry(liveCanvas);
+        if (directGeoms) {
+          geoms = directGeoms;
+          geoSource = 'measured';
+        } else {
+          // Fallback layout. Offset haut : 45 CSS px sous le haut du canvas
+          // (mesure relevée le 29/07/2026, canvasRect.y 223,5 vs imgRect.y
+          // 268,5). Décomposition : padding rangée flex 16 px + libellé ~21 px
+          // + padding encadré 8 px. Centrage horizontal préservé — il est
+          // correct : l'image est centrée dans sa colonne, qui est alignée
+          // avec la tuile à ~centrage près.
+          var dpr = window.devicePixelRatio || 1;
+          var POSTURO_BG_TOP_OFFSET_CSS = 45;
+          var dyBacking = POSTURO_BG_TOP_OFFSET_CSS * dpr;
+          geoms = bgIds.map(function(id) {
+            var bgEl = document.getElementById(id);
+            if (!bgEl || bgEl.naturalWidth <= 0) return null;
+            var aspect = bgEl.naturalWidth / bgEl.naturalHeight;
+            var hFb = 200 * dpr;
+            var wFb = hFb * aspect;
+            // Défensif : si le fallback dépasse la tuile (DPR extrême), on
+            // contraint en préservant l'aspect plutôt que de déborder.
+            if (hFb > sh) { wFb *= sh / hFb; hFb = sh; }
+            if (wFb > sw) { hFb *= sw / wFb; wFb = sw; }
+            return {
+              dx: (sw - wFb) / 2,
+              dy: dyBacking,
+              w:  wFb,
+              h:  hFb,
+            };
+          });
+          geoSource = 'fallback-layout';
+        }
       }
       console.info('[posturo report] silhouettes geom=' + geoSource,
         geoms.map(function(g, i) {
@@ -20808,16 +20857,19 @@ function showPosturoSection(idx) {
     if(psec1) psec1.style.display = '';
     setTimeout(initPosturoBodyCanvas, 150);
     // Mémorisation de la géométrie des gabarits pour le rapport posturo.
-    // Le praticien qui a dessiné a forcément affiché la section → cette
-    // capture couvre le cas nominal où le rapport est ensuite déclenché
-    // depuis un autre onglet, avec psec-1 masqué et la mesure directe
-    // impossible. Consommée par _buildRapportBody (bloc bonhommes) via
-    // canvas._bgGeometry. Timer > init (150 ms) pour laisser le navigateur
-    // poser la layout.
+    // Capture prise dans un contexte de mise en page PROPRE (avant toute
+    // génération de rapport qui pourrait perturber le layout — voir défaut 1
+    // documenté dans _buildRapportBody). Stockée dans la variable
+    // module-scope _posturoBodyBgGeometry, PAS sur canvas._bgGeometry :
+    // le canvas est remplacé par injectBilanPosturoPage à chaque re-nav
+    // vers le bilan, ce qui viderait toute propriété DOM-attribute (défaut 2
+    // observé : rapport lancé depuis Traitements après avoir visité tab 2
+    // puis navigué → memoized perdue → fallback).
+    // Timer > init (150 ms) pour laisser le navigateur poser la layout.
     setTimeout(() => {
       const c = document.getElementById('posturo-body-canvas');
       const g = _capturePosturoBodyBgGeometry(c);
-      if (c && g) c._bgGeometry = g;
+      if (g) _posturoBodyBgGeometry = g;
     }, 300);
   }
   if(idx === 3) {
