@@ -20941,7 +20941,22 @@ function showPosturoSection(idx) {
     // Attendre que psec-1 soit visible avant d'initialiser le canvas
     const psec1 = document.getElementById('psec-1');
     if(psec1) psec1.style.display = '';
-    setTimeout(initPosturoBodyCanvas, 150);
+    // Fix #78 — garde idempotente, motif !_baseSnapshot déjà en place côté
+    // sport (showSportBilanSection ssec-1 L21053, ssec-9 L21101). Sans elle,
+    // initPosturoBodyCanvas est DESTRUCTIVE (canvas.width=... efface les
+    // pixels, vide _history et _baseSnapshot) et était rappelée à CHAQUE
+    // retour sur cette section, écrasant tout trait dessiné depuis le
+    // dernier autosave par le contenu de bilanDataPosturo._bodyCanvas — perte
+    // silencieuse déjà contournée côté save via _userDirty (cf. commentaire
+    // savePosturoBilan) mais jamais corrigée à la source. Le canvas persiste
+    // tant qu'on ne quitte pas pg-bilan-posturo (injectBilanPosturoPage
+    // recrée la page — donc un _baseSnapshot neuf — à chaque nav() vers
+    // cette page ; seul le va-et-vient ENTRE onglets DE la même page doit
+    // être rendu idempotent ici).
+    const bodyCanvas = document.getElementById('posturo-body-canvas');
+    if(bodyCanvas && !bodyCanvas._baseSnapshot) {
+      setTimeout(initPosturoBodyCanvas, 150);
+    }
     // Mémorisation de la géométrie des gabarits pour le rapport posturo.
     // Capture prise dans un contexte de mise en page PROPRE (avant toute
     // génération de rapport qui pourrait perturber le layout — voir défaut 1
@@ -20991,7 +21006,14 @@ function showPosturoSection(idx) {
       updateNeuroTotals();
     }, 400);
   }
-  if(idx === 8) setTimeout(initPosturoFeetCanvas, 100);
+  if(idx === 8) {
+    // Fix #78 — même garde, initPosturoFeetCanvas est tout aussi destructive
+    // (voir commentaire ci-dessus pour idx===1).
+    const feetCanvas = document.getElementById('posturo-feet-canvas');
+    if(feetCanvas && !feetCanvas._baseSnapshot) {
+      setTimeout(initPosturoFeetCanvas, 100);
+    }
+  }
 }
 
 // ───────────────────────────────────────────
