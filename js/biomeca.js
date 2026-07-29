@@ -10764,6 +10764,43 @@ const sections = [];
   _buildRapportBody(p, d, prat, logo, sections);
 }
 
+// Mesure la géométrie des 4 gabarits silhouettes visibles dans la rangée
+// éditeur (js/biomeca.js L17121 sq.), convertie en coordonnées backing du
+// canvas #posturo-body-canvas. Retourne un tableau [{dx,dy,w,h}, …] pour les
+// 4 slices, ou null si la mesure échoue (section masquée, canvas absent,
+// rangée absente, rect nul sur un des enfants).
+//
+// Consommé par (a) le hook d'affichage showPosturoSection(1) pour mémoriser
+// la géométrie sur `canvas._bgGeometry` avant que la section ne soit à
+// nouveau masquée, et (b) la génération de rapport dans _buildRapportBody
+// (bloc bonhommes) qui essaie la mesure directe puis retombe sur la mémoisée.
+function _capturePosturoBodyBgGeometry(canvas) {
+  if (!canvas || !canvas.parentElement) return null;
+  var cRect = canvas.getBoundingClientRect();
+  if (cRect.width === 0) return null;
+  var flexRow = canvas.parentElement.querySelector(':scope > div');
+  if (!flexRow) return null;
+  var cols = Array.from(flexRow.children);
+  var scale = canvas.width / cRect.width;
+  var geoms = cols.map(function(col, i) {
+    var vImg = col ? col.querySelector('img') : null;
+    if (!vImg) return null;
+    var r = vImg.getBoundingClientRect();
+    if (r.width === 0) return null;
+    return {
+      dx: (r.x - cRect.x - i * (cRect.width / 4)) * scale,
+      dy: (r.y - cRect.y) * scale,
+      w:  r.width * scale,
+      h:  r.height * scale,
+    };
+  });
+  // Refus tout-ou-rien : si une seule tuile est manquante, on renvoie null
+  // pour laisser jouer le palier suivant (mémoisée ou fallback) plutôt que
+  // de mélanger deux sources.
+  if (geoms.length !== 4 || geoms.some(function(g) { return g === null; })) return null;
+  return geoms;
+}
+
 function _buildRapportBody(p, d, prat, logo, sections) {
   // Résoudre les images bonhommes si nécessaire
   var bonhommesSection = sections.find(function(s){ return s.type === 'bonhommes' && s.bodyCanvasData; });
@@ -10775,17 +10812,87 @@ function _buildRapportBody(p, d, prat, logo, sections) {
       var sw = Math.floor(bcImg.width/4);
       var sh = bcImg.height;
       var bgIds = bonhommesSection.bgIds || [];
+      // Correctif calage silhouettes rapport posturo (pré-requis #151 volet 2).
+      // Bug : gabarit rendu à sa taille NATURELLE (naturalWidth/naturalHeight)
+      // et centré dans la tuile. Or dans l'éditeur, les <img> subissent
+      // max-height:200px CSS + object-fit:contain (js/biomeca.js L17126 sq.),
+      // ce qui les rescale à 200 CSS px = 200 × devicePixelRatio px backing.
+      // Diagnostic chiffré : naturalHeight 360, hauteur réelle mesurée 400 sur
+      // DPR=2 → gabarit du rapport 10 % plus petit que celui sur lequel le
+      // praticien a dessiné, écart croissant vers le bas.
+      //
+      // Résolution en trois paliers (chemin unique journalisé sur une ligne
+      // pour les 4 tuiles) :
+      //   1. mesure directe (section actuellement visible) — le plus précis ;
+      //   2. mesure mémorisée sur `canvas._bgGeometry`, capturée par
+      //      showPosturoSection(1) → _capturePosturoBodyBgGeometry (L20xxx).
+      //      Couvre le cas nominal : le praticien a forcément affiché la
+      //      section pour dessiner, la capture est donc disponible même si
+      //      le rapport est déclenché depuis un autre onglet posturo ;
+      //   3. fallback layout : reconstruction à partir des contraintes CSS
+      //      connues (hauteur = 200 × devicePixelRatio, aspect préservé,
+      //      offset haut mesuré). Ne sert que pour un bilan restauré depuis
+      //      le stockage dont on n'a jamais ouvert l'onglet — cas sans
+      //      dessin à caler.
+      //
+      // Piège : bgIds pointe vers les preloads en display:none (index.html
+      // L5262 sq.). La mesure directe et la mémorisée regardent les <img>
+      // VISIBLES de la rangée éditeur, dans l'ordre du DOM (qui coïncide avec
+      // l'ordre des slices : profil-gauche/face-post/face-ant/profil-droit).
+      var liveCanvas = document.getElementById('posturo-body-canvas');
+      var directGeoms = _capturePosturoBodyBgGeometry(liveCanvas);
+      var memoGeoms = liveCanvas ? liveCanvas._bgGeometry : null;
+      var geoms, geoSource;
+      if (directGeoms) {
+        geoms = directGeoms;
+        geoSource = 'measured';
+      } else if (memoGeoms) {
+        geoms = memoGeoms;
+        geoSource = 'memoized';
+      } else {
+        // Fallback layout. Offset haut : 45 CSS px sous le haut du canvas
+        // (mesure relevée le 29/07/2026, canvasRect.y 223,5 vs imgRect.y
+        // 268,5). Décomposition : padding rangée flex 16 px + libellé ~21 px
+        // + padding encadré 8 px. Centrage horizontal préservé — il est
+        // correct : l'image est centrée dans sa colonne, qui est alignée
+        // avec la tuile à ~centrage près.
+        var dpr = window.devicePixelRatio || 1;
+        var POSTURO_BG_TOP_OFFSET_CSS = 45;
+        var dyBacking = POSTURO_BG_TOP_OFFSET_CSS * dpr;
+        geoms = bgIds.map(function(id) {
+          var bgEl = document.getElementById(id);
+          if (!bgEl || bgEl.naturalWidth <= 0) return null;
+          var aspect = bgEl.naturalWidth / bgEl.naturalHeight;
+          var hFb = 200 * dpr;
+          var wFb = hFb * aspect;
+          // Défensif : si le fallback dépasse la tuile (DPR extrême), on
+          // contraint en préservant l'aspect plutôt que de déborder.
+          if (hFb > sh) { wFb *= sh / hFb; hFb = sh; }
+          if (wFb > sw) { hFb *= sw / wFb; wFb = sw; }
+          return {
+            dx: (sw - wFb) / 2,
+            dy: dyBacking,
+            w:  wFb,
+            h:  hFb,
+          };
+        });
+        geoSource = 'fallback-layout';
+      }
+      console.info('[posturo report] silhouettes geom=' + geoSource,
+        geoms.map(function(g, i) {
+          return g
+            ? (i + ':' + g.dx.toFixed(0) + ',' + g.dy.toFixed(0) + ' ' + g.w.toFixed(0) + 'x' + g.h.toFixed(0))
+            : (i + ':null');
+        }).join(' | '));
       function makeSliceComposite(i) {
         var tmp = document.createElement('canvas');
         tmp.width = sw; tmp.height = sh;
         var ctx = tmp.getContext('2d');
         ctx.fillStyle='#fff'; ctx.fillRect(0,0,sw,sh);
         var bgEl = document.getElementById(bgIds[i]);
-        if(bgEl && bgEl.naturalWidth>0) {
-          // Image petite centrée dans le slice - même position que dans l'app
-          var bgW = bgEl.naturalWidth; var bgH = bgEl.naturalHeight;
-          var dx = (sw - bgW)/2; var dy = (sh - bgH)/2;
-          ctx.drawImage(bgEl, dx, dy, bgW, bgH);
+        var g = geoms[i];
+        if(bgEl && bgEl.naturalWidth>0 && g) {
+          ctx.drawImage(bgEl, g.dx, g.dy, g.w, g.h);
         }
         // Superposer les dessins - le canvas global a exactement la même taille
         ctx.drawImage(bcImg, i*sw, 0, sw, sh, 0, 0, sw, sh);
@@ -20700,6 +20807,18 @@ function showPosturoSection(idx) {
     const psec1 = document.getElementById('psec-1');
     if(psec1) psec1.style.display = '';
     setTimeout(initPosturoBodyCanvas, 150);
+    // Mémorisation de la géométrie des gabarits pour le rapport posturo.
+    // Le praticien qui a dessiné a forcément affiché la section → cette
+    // capture couvre le cas nominal où le rapport est ensuite déclenché
+    // depuis un autre onglet, avec psec-1 masqué et la mesure directe
+    // impossible. Consommée par _buildRapportBody (bloc bonhommes) via
+    // canvas._bgGeometry. Timer > init (150 ms) pour laisser le navigateur
+    // poser la layout.
+    setTimeout(() => {
+      const c = document.getElementById('posturo-body-canvas');
+      const g = _capturePosturoBodyBgGeometry(c);
+      if (c && g) c._bgGeometry = g;
+    }, 300);
   }
   if(idx === 3) {
     setTimeout(updateNeuroTotals, 100);
