@@ -4037,9 +4037,19 @@ function creerBilanSport(patIdx, type) {
     if(!p.bilansSport) p.bilansSport = [];
     // Task [#71] — voir finalizeBilanSport L2812 pour la justification détaillée.
     const num = p.bilansSport.filter((b) => b.type === 'controle').length + 1;
+    // Fix #75 — bug d'identité : l'archive de l'ANCIEN bilan doit être labellisée
+    // avec le type RÉEL de cet ancien bilan (p.currentBilanSportSousType), pas
+    // avec `type`, qui est le paramètre de la fonction et désigne le NOUVEAU
+    // bilan que l'utilisateur vient de demander. Avant ce fix : un Initial en
+    // cours + clic "Contrôle" archivait l'Initial sous label="Sportif Contrôle N"
+    // et type='controle' — l'utilisateur perdait la trace que l'ancien bilan
+    // était un Initial. Mirroir de finalizeBilanSport L3932, qui dérive déjà
+    // correctement `type` de p.currentBilanSportSousType (elle n'a pas ce
+    // paramètre `type` du tout, donc n'a jamais été exposée au bug).
+    const oldType = p.currentBilanSportSousType;
     p.bilansSport.push({
-      label: type === 'initial' ? 'Sportif Initial' : 'Sportif Contrôle ' + num,
-      type: type,
+      label: oldType === 'initial' ? 'Sportif Initial' : 'Sportif Contrôle ' + num,
+      type: oldType,
       date: new Date().toLocaleDateString('fr-FR'),
       mesures: JSON.parse(JSON.stringify(p.mesures||{})),
       bilanData: JSON.parse(JSON.stringify(p.bilanData||{}))
