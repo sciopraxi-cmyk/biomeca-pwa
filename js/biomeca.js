@@ -788,6 +788,146 @@ async function saveToSupabase() {
   }
 }
 
+// ─── #102 Phase 2a — synchronisation best-effort vers le schéma normalisé ───
+// Sort du modèle "un blob JSON par praticien" (user_data) sans y toucher :
+// écrit EN PARALLÈLE dans public.patients / public.bilans (migration SQL
+// patients-bilans-schema.sql), pour peupler les nouvelles tables au fil de
+// l'usage réel AVANT de faire dépendre le chargement de l'app de ces tables
+// (Phase 2b, pas encore faite). Le blob user_data reste l'unique source de
+// vérité pour l'instant — si cette fonction échoue, ça n'affecte RIEN
+// d'autre : appelée en fire-and-forget après le localStorage write réussi
+// de savePatients(), jamais avant, jamais bloquant.
+//
+// Périmètre actuel : patient courant uniquement (currentPatient), modules
+// sport + posturo uniquement. Podopédiatrie/pédicurie hors scope pour cette
+// itération — à étendre une fois ce premier flux validé sur des cas réels.
+//
+// Stabilité des id cloud : patient.id (Date.now()) n'est pas un uuid → un
+// id cloud séparé (_cloudId) est généré une fois et mis en cache sur l'objet
+// patient (donc persisté par le prochain localStorage write, aucune plomberie
+// supplémentaire requise). Les bilans ont déjà un _bilanId (crypto.randomUUID(),
+// motif #89/#99 existant) — réutilisé tel quel comme id de ligne bilans,
+// aucun champ supplémentaire nécessaire.
+function _parseFrDateToISO(frDate) {
+  // 'DD/MM/YYYY' (toLocaleDateString('fr-FR')) → 'YYYY-MM-DD' (colonne date
+  // Postgres). Retourne null si format inattendu plutôt que d'envoyer une
+  // valeur ambiguë à la base.
+  if (!frDate || typeof frDate !== 'string') return null;
+  const m = frDate.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
+async function _syncCurrentPatientToNormalizedTables() {
+  if (!pwaUser?.id || !currentPatient) return;
+  try {
+    const p = currentPatient;
+    if (!p._cloudId) p._cloudId = crypto.randomUUID();
+
+    const patientRow = {
+      id: p._cloudId,
+      user_id: pwaUser.id,
+      nom: p.nom || '',
+      prenom: p.prenom || null,
+      ddn: p.ddn || null, // déjà au format ISO (input type=date)
+      sport: p.sport || null,
+      metier: p.metier || null,
+      type_bilan: p.typeBilan || null,
+      lat: p.lat || null,
+      poids: p.poids != null && p.poids !== '' ? p.poids : null,
+      taille: p.taille != null && p.taille !== '' ? p.taille : null,
+      email: p.email || null,
+      tel: p.tel || null,
+      current_bilan_sport_sous_type: p.currentBilanSportSousType || null,
+      current_bilan_posturo_sous_type: p.currentBilanPosturoSousType || null,
+    };
+    await authFetch(SUPA_URL + '/rest/v1/patients?on_conflict=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify(patientRow),
+    });
+
+    const bilanRows = [];
+
+    // Bilan sport en cours (non archivé) — clé de contenu = mesures OU bilanData.
+    if ((p.mesures && Object.keys(p.mesures).length > 0) || hasBilanDataContent(p.bilanData)) {
+      if (!p.mesures) p.mesures = {};
+      if (!p.mesures._bilanId) p.mesures._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: p.mesures._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'sport',
+        status: 'in_progress',
+        sous_type: p.currentBilanSportSousType || null,
+        label: null,
+        bilan_date: _parseFrDateToISO(p.bilanInitialDate),
+        payload: { mesures: p.mesures, bilanData: p.bilanData || {} },
+      });
+    }
+
+    // Bilan posturo en cours (non archivé).
+    if (hasBilanDataContent(p.bilanDataPosturo)) {
+      if (!p.bilanDataPosturo._bilanId) p.bilanDataPosturo._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: p.bilanDataPosturo._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'posturo',
+        status: 'in_progress',
+        sous_type: p.currentBilanPosturoSousType || null,
+        label: null,
+        bilan_date: null,
+        payload: p.bilanDataPosturo,
+      });
+    }
+
+    // Archives sport.
+    (p.bilansSport || []).forEach((b) => {
+      if (!b._bilanId) b._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: b._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'sport',
+        status: 'archived',
+        sous_type: b.type || null,
+        label: b.label || null,
+        bilan_date: _parseFrDateToISO(b.date),
+        payload: { mesures: b.mesures || {}, bilanData: b.bilanData || {} },
+      });
+    });
+
+    // Archives posturo.
+    (p.bilansPosturo || []).forEach((b) => {
+      if (!b.bilanDataPosturo) return;
+      if (!b.bilanDataPosturo._bilanId) b.bilanDataPosturo._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: b.bilanDataPosturo._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'posturo',
+        status: 'archived',
+        sous_type: b.type || null,
+        label: b.label || null,
+        bilan_date: _parseFrDateToISO(b.date),
+        payload: b.bilanDataPosturo,
+      });
+    });
+
+    if (bilanRows.length) {
+      await authFetch(SUPA_URL + '/rest/v1/bilans?on_conflict=id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+        body: JSON.stringify(bilanRows),
+      });
+    }
+  } catch (e) {
+    // Best-effort strict : jamais de banner, jamais de blocage. Le blob
+    // user_data reste la source de vérité tant que Phase 2b n'est pas faite.
+    console.warn('[#102 Phase 2a] sync normalisée échouée (sans impact) :', e instanceof Error ? e.message : String(e));
+  }
+}
+
 // ─── Déconnexion ───
 // ─── Admin: gestion utilisateurs ───
 async function adminCreateUser() {
@@ -3184,6 +3324,10 @@ function savePatients() {
   }
 
   saveToSupabase();
+  // #102 Phase 2a — best-effort, ne bloque jamais le retour de savePatients()
+  // ni n'affecte son résultat. Voir commentaire de la fonction pour le détail
+  // du périmètre (currentPatient, modules sport+posturo, écriture seule).
+  _syncCurrentPatientToNormalizedTables();
   return true;
   } finally {
     // #81 + Bug RAM-leak — restauration RAM garantie sur TOUS les chemins de
