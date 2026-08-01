@@ -870,8 +870,29 @@ async function _syncPatientToNormalizedTables(p) {
 
     const bilanRows = [];
 
+    // ⚠️ Miroir de test : js/bilan-sync-guard.mjs — répercuter toute
+    // modification de ce garde-fou dans le module miroir (sinon les tests
+    // Vitest passent en vert alors que la sync dérive en prod).
+    //
+    // #102 Phase 2b hotfix 2 — un bilan « en cours » n'existe que si son
+    // sous-type est posé (currentBilan<Module>SousType != null). La seule
+    // présence de contenu ne suffit PAS : ouvrirBilan<Module>() charge une
+    // COPIE d'un bilan archivé (même _bilanId d'origine) dans le slot « en
+    // cours » pour de la consultation en lecture seule, en supprimant
+    // volontairement le sousType (delete p.currentBilan<Module>SousType,
+    // motif #69/#70 déjà présent ailleurs). Sans ce garde-fou, consulter une
+    // archive fait pousser une ligne status=in_progress avec le MÊME id que
+    // la ligne status=archived déjà en base → Postgres 21000 « ON CONFLICT
+    // DO UPDATE command cannot affect row a second time » sur tout le batch.
+    // Découvert en usage réel via le shadow-read #167 + la vérification .ok
+    // ajoutée au hotfix précédent.
+    const sportEnCours = p.currentBilanSportSousType != null;
+    const posturoEnCours = p.currentBilanPosturoSousType != null;
+    const podopediatrieEnCours = p.currentBilanPodopediatrieSousType != null;
+    const pedicurieEnCours = p.currentBilanPedicurieSousType != null;
+
     // Bilan sport en cours (non archivé) — clé de contenu = mesures OU bilanData.
-    if ((p.mesures && Object.keys(p.mesures).length > 0) || hasBilanDataContent(p.bilanData)) {
+    if (sportEnCours && ((p.mesures && Object.keys(p.mesures).length > 0) || hasBilanDataContent(p.bilanData))) {
       if (!p.mesures) p.mesures = {};
       if (!p.mesures._bilanId) p.mesures._bilanId = crypto.randomUUID();
       bilanRows.push({
@@ -893,7 +914,7 @@ async function _syncPatientToNormalizedTables(p) {
     }
 
     // Bilan posturo en cours (non archivé).
-    if (hasBilanDataContent(p.bilanDataPosturo)) {
+    if (posturoEnCours && hasBilanDataContent(p.bilanDataPosturo)) {
       if (!p.bilanDataPosturo._bilanId) p.bilanDataPosturo._bilanId = crypto.randomUUID();
       bilanRows.push({
         id: p.bilanDataPosturo._bilanId,
@@ -917,7 +938,7 @@ async function _syncPatientToNormalizedTables(p) {
     }
 
     // Bilan podopédiatrie en cours (non archivé).
-    if (hasBilanDataContent(p.bilanDataPodopediatrie)) {
+    if (podopediatrieEnCours && hasBilanDataContent(p.bilanDataPodopediatrie)) {
       if (!p.bilanDataPodopediatrie._bilanId) p.bilanDataPodopediatrie._bilanId = crypto.randomUUID();
       bilanRows.push({
         id: p.bilanDataPodopediatrie._bilanId,
@@ -934,7 +955,7 @@ async function _syncPatientToNormalizedTables(p) {
     }
 
     // Bilan pédicurie en cours (non archivé).
-    if (hasBilanDataContent(p.bilanDataPedicurie)) {
+    if (pedicurieEnCours && hasBilanDataContent(p.bilanDataPedicurie)) {
       if (!p.bilanDataPedicurie._bilanId) p.bilanDataPedicurie._bilanId = crypto.randomUUID();
       bilanRows.push({
         id: p.bilanDataPedicurie._bilanId,
