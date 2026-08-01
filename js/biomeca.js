@@ -870,6 +870,10 @@ async function _syncPatientToNormalizedTables(p) {
 
     const bilanRows = [];
 
+    // ⚠️ Miroir de test : js/bilan-sync-guard.mjs — répercuter toute
+    // modification de ce garde-fou dans le module miroir (sinon les tests
+    // Vitest passent en vert alors que la sync dérive en prod).
+    //
     // #102 Phase 2b hotfix 2 — un bilan « en cours » n'existe que si son
     // sous-type est posé (currentBilan<Module>SousType != null). La seule
     // présence de contenu ne suffit PAS : ouvrirBilan<Module>() charge une
