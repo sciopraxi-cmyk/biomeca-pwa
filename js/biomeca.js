@@ -788,19 +788,29 @@ async function saveToSupabase() {
   }
 }
 
-// ─── #102 Phase 2a — synchronisation best-effort vers le schéma normalisé ───
+// ─── #102 Phase 2a/3 — synchronisation best-effort vers le schéma normalisé ───
 // Sort du modèle "un blob JSON par praticien" (user_data) sans y toucher :
 // écrit EN PARALLÈLE dans public.patients / public.bilans (migration SQL
 // patients-bilans-schema.sql), pour peupler les nouvelles tables au fil de
 // l'usage réel AVANT de faire dépendre le chargement de l'app de ces tables
-// (Phase 2b, pas encore faite). Le blob user_data reste l'unique source de
-// vérité pour l'instant — si cette fonction échoue, ça n'affecte RIEN
-// d'autre : appelée en fire-and-forget après le localStorage write réussi
-// de savePatients(), jamais avant, jamais bloquant.
+// (Phase 2b lecture, pas encore faite). Le blob user_data reste l'unique
+// source de vérité pour l'instant — si cette fonction échoue, ça n'affecte
+// RIEN d'autre : appelée en fire-and-forget après le localStorage write
+// réussi de savePatients(), jamais avant, jamais bloquant.
 //
-// Périmètre actuel : patient courant uniquement (currentPatient), modules
-// sport + posturo uniquement. Podopédiatrie/pédicurie hors scope pour cette
-// itération — à étendre une fois ce premier flux validé sur des cas réels.
+// Phase 3 — paramétrée par patient (p) plutôt que figée sur currentPatient :
+// plusieurs handlers (abandonner/finalize/supprimerBilanSport) agissent sur
+// patients[patIdx] SANS passer par selectPatient() au préalable (le patient
+// visé peut être différent de currentPatient, ex. action depuis la liste).
+// Un appel qui ne syncerait que currentPatient laisserait ces écritures hors
+// des tables normalisées. Chaque call-site doit donc appeler explicitement
+// _syncPatientToNormalizedTables(p) avec le patient RÉELLEMENT modifié, en
+// plus (pas à la place) de l'appel générique dans savePatients() qui couvre
+// currentPatient.
+//
+// Périmètre actuel : modules sport + posturo uniquement. Podopédiatrie/
+// pédicurie hors scope pour cette itération — à étendre une fois ce premier
+// flux validé sur des cas réels.
 //
 // Stabilité des id cloud : patient.id (Date.now()) n'est pas un uuid → un
 // id cloud séparé (_cloudId) est généré une fois et mis en cache sur l'objet
@@ -817,10 +827,9 @@ function _parseFrDateToISO(frDate) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
-async function _syncCurrentPatientToNormalizedTables() {
-  if (!pwaUser?.id || !currentPatient) return;
+async function _syncPatientToNormalizedTables(p) {
+  if (!pwaUser?.id || !p) return;
   try {
-    const p = currentPatient;
     if (!p._cloudId) p._cloudId = crypto.randomUUID();
 
     const patientRow = {
@@ -3324,10 +3333,13 @@ function savePatients() {
   }
 
   saveToSupabase();
-  // #102 Phase 2a — best-effort, ne bloque jamais le retour de savePatients()
-  // ni n'affecte son résultat. Voir commentaire de la fonction pour le détail
-  // du périmètre (currentPatient, modules sport+posturo, écriture seule).
-  _syncCurrentPatientToNormalizedTables();
+  // #102 Phase 2a/3 — best-effort, ne bloque jamais le retour de savePatients()
+  // ni n'affecte son résultat. Couvre currentPatient ; les handlers qui
+  // modifient un AUTRE patient (abandonner/finalize/supprimerBilanSport,
+  // cf. #102 Phase 3) appellent en plus _syncPatientToNormalizedTables(p)
+  // explicitement pour ce patient-là. Voir commentaire de la fonction pour
+  // le détail du périmètre (modules sport+posturo, écriture seule).
+  _syncPatientToNormalizedTables(currentPatient);
   return true;
   } finally {
     // #81 + Bug RAM-leak — restauration RAM garantie sur TOUS les chemins de
@@ -4054,6 +4066,11 @@ function abandonnerBilanSport(patIdx) {
   // #117-incident — Abandon VOLONTAIRE d'un bilan en cours → suppress la garde.
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — p peut différer de currentPatient (action lancée depuis la
+  // liste patients sans ouvrir la fiche). savePatients() ne sync que
+  // currentPatient vers les tables normalisées ; sans cet appel explicite,
+  // l'abandon resterait invisible pour public.bilans/public.patients.
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
 }
 
@@ -4094,6 +4111,9 @@ function finalizeBilanSport(patIdx) {
     if(c) c._userDirty = false;
   });
   savePatients();
+  // #102 Phase 3 — cf. commentaire équivalent dans abandonnerBilanSport : p
+  // peut être un patient autre que currentPatient.
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
 }
@@ -4210,6 +4230,12 @@ function creerBilanSport(patIdx, type) {
   // (sousType undefined → l'original est dans les archives, on n'a rien perdu).
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — savePatients() ci-dessus sync currentPatient, qui est
+  // encore l'ANCIEN patient sélectionné à cet instant (selectPatient(p) n'a
+  // pas encore tourné, cf. plus bas). Sans cet appel explicite sur p, la
+  // nouvelle valeur de currentBilanSportSousType et l'éventuelle archive
+  // créée ci-dessus resteraient invisibles pour les tables normalisées.
+  _syncPatientToNormalizedTables(p);
   currentOpenedBilanIdx = null;
   selectPatient(p);
   nav('pg-sport');
@@ -4330,6 +4356,18 @@ async function supprimerBilanSport(patIdx, bilanIdx) {
   // #117-incident — Suppression VOLONTAIRE d'une archive sport → suppress la garde.
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — cf. commentaire équivalent dans abandonnerBilanSport : p
+  // peut être un patient autre que currentPatient.
+  _syncPatientToNormalizedTables(p);
+  // _syncPatientToNormalizedTables ne fait que des upserts : une ligne
+  // public.bilans dont l'archive correspondante vient d'être supprimée en
+  // RAM resterait fantôme en base sans ce DELETE explicite. Best-effort,
+  // même discipline que le reste de la sync (jamais de blocage/alerte).
+  if (bilanId) {
+    authFetch(SUPA_URL + '/rest/v1/bilans?id=eq.' + bilanId, { method: 'DELETE' }).catch((e) =>
+      console.warn('[#102 Phase 3] delete bilan normalisé échoué (sans impact) :', e instanceof Error ? e.message : String(e))
+    );
+  }
   renderPatientList();
 }
 
