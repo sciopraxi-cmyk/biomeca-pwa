@@ -1091,12 +1091,21 @@ function _reconstructPatientBilansFromRows(rows) {
 // fetchPatientBilans(cloudId) — GET réseau (colonnes légères + payload) puis
 // reconstruction. best-effort : ne throw jamais, renvoie une reconstruction
 // vide en cas d'échec réseau (cohérent avec le reste de la sync #102).
-// Pas encore appelée depuis le flux applicatif.
+// order=created_at.asc : created_at n'est fixé qu'à la première écriture
+// d'une ligne (upsert on_conflict=id ne le retouche pas) — l'ordre suit donc
+// l'ordre chronologique de première synchronisation de chaque bilan/archive,
+// qui correspond à l'ordre d'apparition dans les tableaux bilansX[] côté RAM
+// pour un usage normal (archivage append-only). Important pour #166-shadow
+// (étape 3) : sans cet ordre, une comparaison RAM vs reconstruction sur les
+// tableaux d'archives produirait des faux écarts liés au seul ordre.
 async function fetchPatientBilans(cloudId) {
   if (!cloudId) return _reconstructPatientBilansFromRows([]);
   try {
     const res = await authFetch(
-      SUPA_URL + '/rest/v1/bilans?patient_id=eq.' + cloudId + '&select=module,status,sous_type,label,bilan_date,payload'
+      SUPA_URL +
+        '/rest/v1/bilans?patient_id=eq.' +
+        cloudId +
+        '&select=module,status,sous_type,label,bilan_date,payload&order=created_at.asc'
     );
     if (!res.ok) {
       console.warn('[#102 Phase 2b] fetchPatientBilans : réponse non OK (' + res.status + ')');
@@ -1107,6 +1116,50 @@ async function fetchPatientBilans(cloudId) {
   } catch (e) {
     console.warn('[#102 Phase 2b] fetchPatientBilans échoué :', e instanceof Error ? e.message : String(e));
     return _reconstructPatientBilansFromRows([]);
+  }
+}
+
+// ─── #102 Phase 2b étape 3 — vérification silencieuse (shadow-read) ───
+// Compare, pour information seulement, la reconstruction depuis les tables
+// normalisées à l'état RAM actuel (issu du blob user_data) au moment de
+// l'ouverture d'un patient (selectPatient). AUCUN effet sur l'affichage :
+// ne fait que logguer un écart en console. Objectif : accumuler des preuves
+// réelles, sur l'usage réel de l'app, avant de faire dépendre l'affichage
+// de fetchPatientBilans (prochaine étape — la bascule effective).
+//
+// Des écarts sont ATTENDUS et non alarmants dans deux cas : un patient dont
+// la dernière modification n'a pas fini de se synchroniser (fire-and-forget,
+// cf. _syncPatientToNormalizedTables), ou une sync qui a échoué silencieusement
+// pour ce patient (son propre try/catch best-effort). Un écart qui persiste
+// après un save fraîchement réussi serait en revanche le signe d'un vrai bug
+// de reconstruction à corriger avant la bascule — c'est ce que cette
+// vérification sert à détecter.
+async function _shadowVerifyBilanReconstruction(p) {
+  if (!p || !p._cloudId) return; // jamais synchronisé, rien à comparer
+  try {
+    const reconstructed = await fetchPatientBilans(p._cloudId);
+    const diffs = [];
+    const cmp = (label, a, b) => {
+      const sa = JSON.stringify(a === undefined ? null : a);
+      const sb = JSON.stringify(b === undefined ? null : b);
+      if (sa !== sb) diffs.push(label);
+    };
+    cmp('mesures', p.mesures, reconstructed.mesures);
+    cmp('bilanData', p.bilanData, reconstructed.bilanData);
+    cmp('bilanDataPosturo', p.bilanDataPosturo, reconstructed.bilanDataPosturo);
+    cmp('bilanDataPodopediatrie', p.bilanDataPodopediatrie, reconstructed.bilanDataPodopediatrie);
+    cmp('bilanDataPedicurie', p.bilanDataPedicurie, reconstructed.bilanDataPedicurie);
+    cmp('bilansSport', p.bilansSport || [], reconstructed.bilansSport);
+    cmp('bilansPosturo', p.bilansPosturo || [], reconstructed.bilansPosturo);
+    cmp('bilansPodopediatrie', p.bilansPodopediatrie || [], reconstructed.bilansPodopediatrie);
+    cmp('bilansPedicurie', p.bilansPedicurie || [], reconstructed.bilansPedicurie);
+    if (diffs.length) {
+      console.warn(
+        '[#102 Phase 2b étape 3] écart blob vs normalisé pour ' + (p.prenom || '') + ' ' + (p.nom || '') + ' : ' + diffs.join(', ')
+      );
+    }
+  } catch (e) {
+    console.warn('[#102 Phase 2b étape 3] vérification échouée (sans impact) :', e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -3715,6 +3768,9 @@ function selectPatient(p) {
   bilanData = p.bilanData ? JSON.parse(JSON.stringify(p.bilanData)) : {};
   clearBilanFields();
   loadBilan();
+  // #102 Phase 2b étape 3 — vérification silencieuse, fire-and-forget,
+  // aucun effet sur l'affichage (cf. commentaire de la fonction).
+  _shadowVerifyBilanReconstruction(p);
 }
 
 function clearBilanFields() {
