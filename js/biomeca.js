@@ -1010,6 +1010,106 @@ async function _syncPatientToNormalizedTables(p) {
   }
 }
 
+// ─── #102 Phase 2b étape 2 — lecture depuis le schéma normalisé (préparation) ───
+// Reconstruit les champs bilan (mesures/bilanData*/bilansX[]) d'un patient à
+// partir des lignes public.bilans, dans EXACTEMENT la forme attendue par le
+// reste de l'app (selectPatient, renderPatientList, buildRapport*...). Miroir
+// STRICT, en sens inverse, de _syncPatientToNormalizedTables ci-dessus —
+// toute évolution de l'un doit être répercutée dans l'autre :
+//   - bilan en cours sport   : payload {mesures, bilanData} → p.mesures / p.bilanData
+//   - bilan en cours posturo/podopédiatrie/pédicurie : payload → p.bilanData<Module>
+//     (le payload EST l'objet bilanData<Module>, _bilanId compris — écrit tel
+//     quel côté sync, donc relu tel quel ici, aucune reconstruction de clé).
+//   - archives sport         : payload {mesures, bilanData} → entrée {label, type, date, mesures, bilanData}
+//   - archives autres modules: payload → entrée {label, type, date, bilanData<Module>}
+//     (_bilanId déjà inclus dans le payload, comme pour le bilan en cours).
+//
+// Pas encore branchée : ni loadSupabaseData() ni selectPatient() n'appellent
+// cette fonction à ce jour. Le blob user_data reste l'unique source lue par
+// l'app. Cette étape ne fait qu'exister et être vérifiable en isolation,
+// avant le basculement effectif (prochaine étape de Phase 2b).
+//
+// _reconstructPatientBilansFromRows est une fonction PURE (aucun fetch,
+// aucun effet de bord) — c'est elle qui porte la logique de reconstruction,
+// testable indépendamment du réseau. fetchPatientBilans() n'est que le GET
+// + l'appel à cette fonction.
+function _isoDateToFr(iso) {
+  // Inverse de _parseFrDateToISO : 'YYYY-MM-DD' → 'DD/MM/YYYY'. Retourne
+  // null si iso est absent ou mal formé (jamais de chaîne trompeuse).
+  if (!iso || typeof iso !== 'string') return null;
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
+}
+
+function _reconstructPatientBilansFromRows(rows) {
+  const out = {
+    mesures: undefined,
+    bilanData: undefined,
+    bilanDataPosturo: undefined,
+    bilanDataPodopediatrie: undefined,
+    bilanDataPedicurie: undefined,
+    bilansSport: [],
+    bilansPosturo: [],
+    bilansPodopediatrie: [],
+    bilansPedicurie: [],
+  };
+  (rows || []).forEach((row) => {
+    const payload = row.payload || {};
+    if (row.status === 'in_progress') {
+      if (row.module === 'sport') {
+        out.mesures = payload.mesures || {};
+        out.bilanData = payload.bilanData || {};
+      } else if (row.module === 'posturo') {
+        out.bilanDataPosturo = payload;
+      } else if (row.module === 'podopediatrie') {
+        out.bilanDataPodopediatrie = payload;
+      } else if (row.module === 'pedicurie') {
+        out.bilanDataPedicurie = payload;
+      }
+    } else if (row.status === 'archived') {
+      const date = _isoDateToFr(row.bilan_date);
+      if (row.module === 'sport') {
+        out.bilansSport.push({
+          label: row.label || null,
+          type: row.sous_type || null,
+          date,
+          mesures: payload.mesures || {},
+          bilanData: payload.bilanData || {},
+        });
+      } else if (row.module === 'posturo') {
+        out.bilansPosturo.push({ label: row.label || null, type: row.sous_type || null, date, bilanDataPosturo: payload });
+      } else if (row.module === 'podopediatrie') {
+        out.bilansPodopediatrie.push({ label: row.label || null, type: row.sous_type || null, date, bilanDataPodopediatrie: payload });
+      } else if (row.module === 'pedicurie') {
+        out.bilansPedicurie.push({ label: row.label || null, type: row.sous_type || null, date, bilanDataPedicurie: payload });
+      }
+    }
+  });
+  return out;
+}
+
+// fetchPatientBilans(cloudId) — GET réseau (colonnes légères + payload) puis
+// reconstruction. best-effort : ne throw jamais, renvoie une reconstruction
+// vide en cas d'échec réseau (cohérent avec le reste de la sync #102).
+// Pas encore appelée depuis le flux applicatif.
+async function fetchPatientBilans(cloudId) {
+  if (!cloudId) return _reconstructPatientBilansFromRows([]);
+  try {
+    const res = await authFetch(
+      SUPA_URL + '/rest/v1/bilans?patient_id=eq.' + cloudId + '&select=module,status,sous_type,label,bilan_date,payload'
+    );
+    if (!res.ok) {
+      console.warn('[#102 Phase 2b] fetchPatientBilans : réponse non OK (' + res.status + ')');
+      return _reconstructPatientBilansFromRows([]);
+    }
+    const rows = await res.json();
+    return _reconstructPatientBilansFromRows(rows);
+  } catch (e) {
+    console.warn('[#102 Phase 2b] fetchPatientBilans échoué :', e instanceof Error ? e.message : String(e));
+    return _reconstructPatientBilansFromRows([]);
+  }
+}
+
 // ─── Déconnexion ───
 // ─── Admin: gestion utilisateurs ───
 async function adminCreateUser() {
