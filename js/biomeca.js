@@ -808,9 +808,9 @@ async function saveToSupabase() {
 // plus (pas à la place) de l'appel générique dans savePatients() qui couvre
 // currentPatient.
 //
-// Périmètre actuel : modules sport + posturo uniquement. Podopédiatrie/
-// pédicurie hors scope pour cette itération — à étendre une fois ce premier
-// flux validé sur des cas réels.
+// Périmètre : les 4 modules (sport, posturo, podopédiatrie, pédicurie).
+// Podopédiatrie/pédicurie ajoutées après validation du flux sport+posturo
+// sur des cas réels (miroir strict du pattern sport/posturo existant).
 //
 // Stabilité des id cloud : patient.id (Date.now()) n'est pas un uuid → un
 // id cloud séparé (_cloudId) est généré une fois et mis en cache sur l'objet
@@ -848,6 +848,8 @@ async function _syncPatientToNormalizedTables(p) {
       tel: p.tel || null,
       current_bilan_sport_sous_type: p.currentBilanSportSousType || null,
       current_bilan_posturo_sous_type: p.currentBilanPosturoSousType || null,
+      current_bilan_podopediatrie_sous_type: p.currentBilanPodopediatrieSousType || null,
+      current_bilan_pedicurie_sous_type: p.currentBilanPedicurieSousType || null,
     };
     await authFetch(SUPA_URL + '/rest/v1/patients?on_conflict=id', {
       method: 'POST',
@@ -890,6 +892,38 @@ async function _syncPatientToNormalizedTables(p) {
       });
     }
 
+    // Bilan podopédiatrie en cours (non archivé).
+    if (hasBilanDataContent(p.bilanDataPodopediatrie)) {
+      if (!p.bilanDataPodopediatrie._bilanId) p.bilanDataPodopediatrie._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: p.bilanDataPodopediatrie._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'podopediatrie',
+        status: 'in_progress',
+        sous_type: p.currentBilanPodopediatrieSousType || null,
+        label: null,
+        bilan_date: null,
+        payload: p.bilanDataPodopediatrie,
+      });
+    }
+
+    // Bilan pédicurie en cours (non archivé).
+    if (hasBilanDataContent(p.bilanDataPedicurie)) {
+      if (!p.bilanDataPedicurie._bilanId) p.bilanDataPedicurie._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: p.bilanDataPedicurie._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'pedicurie',
+        status: 'in_progress',
+        sous_type: p.currentBilanPedicurieSousType || null,
+        label: null,
+        bilan_date: null,
+        payload: p.bilanDataPedicurie,
+      });
+    }
+
     // Archives sport.
     (p.bilansSport || []).forEach((b) => {
       if (!b._bilanId) b._bilanId = crypto.randomUUID();
@@ -920,6 +954,40 @@ async function _syncPatientToNormalizedTables(p) {
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
         payload: b.bilanDataPosturo,
+      });
+    });
+
+    // Archives podopédiatrie.
+    (p.bilansPodopediatrie || []).forEach((b) => {
+      if (!b.bilanDataPodopediatrie) return;
+      if (!b.bilanDataPodopediatrie._bilanId) b.bilanDataPodopediatrie._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: b.bilanDataPodopediatrie._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'podopediatrie',
+        status: 'archived',
+        sous_type: b.type || null,
+        label: b.label || null,
+        bilan_date: _parseFrDateToISO(b.date),
+        payload: b.bilanDataPodopediatrie,
+      });
+    });
+
+    // Archives pédicurie.
+    (p.bilansPedicurie || []).forEach((b) => {
+      if (!b.bilanDataPedicurie) return;
+      if (!b.bilanDataPedicurie._bilanId) b.bilanDataPedicurie._bilanId = crypto.randomUUID();
+      bilanRows.push({
+        id: b.bilanDataPedicurie._bilanId,
+        patient_id: p._cloudId,
+        user_id: pwaUser.id,
+        module: 'pedicurie',
+        status: 'archived',
+        sous_type: b.type || null,
+        label: b.label || null,
+        bilan_date: _parseFrDateToISO(b.date),
+        payload: b.bilanDataPedicurie,
       });
     });
 
@@ -4429,6 +4497,8 @@ function abandonnerBilanPedicurie(patIdx) {
   currentOpenedBilanPedicurieIdx = null;
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — p peut différer de currentPatient. Cf. abandonnerBilanSport (PR #156).
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
 }
 
@@ -4455,6 +4525,8 @@ function finalizeBilanPedicurie(patIdx) {
   delete p.currentBilanPedicurieSousType;
   currentOpenedBilanPedicurieIdx = null;
   savePatients();
+  // #102 Phase 3 — cf. commentaire équivalent dans abandonnerBilanPedicurie.
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
 }
@@ -4495,6 +4567,10 @@ function creerBilanPedicurie(patIdx, type) {
   // #118 v2 — Création VOLONTAIRE → suppress la garde de richesse.
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — savePatients() ci-dessus sync currentPatient (l'ANCIEN
+  // patient sélectionné, selectPatient(p) n'a pas encore tourné). Sync
+  // explicite sur p, cf. creerBilanSport.
+  _syncPatientToNormalizedTables(p);
   currentOpenedBilanPedicurieIdx = null;
   selectPatient(p);
   nav('pg-pedicurie');
@@ -4528,10 +4604,19 @@ function supprimerBilanPedicurie(patIdx, bilanIdx) {
   const bilan = p.bilansPedicurie?.[bilanIdx];
   if(!bilan) return;
   if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
+  // #102 Phase 3 — capturé AVANT le splice, cf. supprimerBilanPosturo.
+  const bilanId = bilan.bilanDataPedicurie?._bilanId;
   p.bilansPedicurie.splice(bilanIdx, 1);
   // Phase 0 — pas de cleanup Storage (pas de photos).
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — cf. supprimerBilanSport.
+  _syncPatientToNormalizedTables(p);
+  if (bilanId) {
+    authFetch(SUPA_URL + '/rest/v1/bilans?id=eq.' + bilanId, { method: 'DELETE' }).catch((e) =>
+      console.warn('[#102 Phase 3] delete bilan normalisé échoué (sans impact) :', e instanceof Error ? e.message : String(e))
+    );
+  }
   renderPatientList();
 }
 
@@ -4714,6 +4799,10 @@ function _confirmPodopediatrieOuvrir() {
   p.currentBilanPodopediatrieSousType = type;
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — savePatients() ci-dessus sync currentPatient (l'ANCIEN
+  // patient sélectionné, selectPatient(p) n'a pas encore tourné). Sync
+  // explicite sur p, cf. creerBilanSport.
+  _syncPatientToNormalizedTables(p);
   currentOpenedBilanPodopediatrieIdx = null;
   selectPatient(p);
   _closePodopediatrieAgeModal();
@@ -4761,6 +4850,8 @@ function abandonnerBilanPodopediatrie(patIdx) {
   currentOpenedBilanPodopediatrieIdx = null;
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — p peut différer de currentPatient. Cf. abandonnerBilanSport (PR #156).
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
 }
 
@@ -4788,6 +4879,8 @@ function finalizeBilanPodopediatrie(patIdx) {
   delete p.currentBilanPodopediatrieSousType;
   currentOpenedBilanPodopediatrieIdx = null;
   savePatients();
+  // #102 Phase 3 — cf. commentaire équivalent dans abandonnerBilanPodopediatrie.
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
 }
@@ -4798,9 +4891,18 @@ function supprimerBilanPodopediatrie(patIdx, bilanIdx) {
   const bilan = p.bilansPodopediatrie?.[bilanIdx];
   if (!bilan) return;
   if (!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
+  // #102 Phase 3 — capturé AVANT le splice, cf. supprimerBilanPosturo.
+  const bilanId = bilan.bilanDataPodopediatrie?._bilanId;
   p.bilansPodopediatrie.splice(bilanIdx, 1);
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — cf. supprimerBilanSport.
+  _syncPatientToNormalizedTables(p);
+  if (bilanId) {
+    authFetch(SUPA_URL + '/rest/v1/bilans?id=eq.' + bilanId, { method: 'DELETE' }).catch((e) =>
+      console.warn('[#102 Phase 3] delete bilan normalisé échoué (sans impact) :', e instanceof Error ? e.message : String(e))
+    );
+  }
   renderPatientList();
 }
 
