@@ -851,11 +851,22 @@ async function _syncPatientToNormalizedTables(p) {
       current_bilan_podopediatrie_sous_type: p.currentBilanPodopediatrieSousType || null,
       current_bilan_pedicurie_sous_type: p.currentBilanPedicurieSousType || null,
     };
-    await authFetch(SUPA_URL + '/rest/v1/patients?on_conflict=id', {
+    // #102 Phase 2b hotfix — authFetch ne throw/alerte que sur 401/403 (JWT),
+    // jamais sur un 400/409/etc générique (cf. js/biomeca.js authFetch). Sans
+    // cette vérification explicite, un échec PostgREST (ex. PGRST102 « All
+    // object keys must match », découvert via le shadow-read #167) reste
+    // invisible : silencieux dans notre code, visible uniquement dans
+    // l'onglet Network des devtools. On vérifie donc .ok nous-mêmes ici.
+    const patientRes = await authFetch(SUPA_URL + '/rest/v1/patients?on_conflict=id', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
       body: JSON.stringify(patientRow),
     });
+    if (!patientRes.ok) {
+      const body = await patientRes.text().catch(() => '');
+      console.warn('[#102 Phase 2a] sync patients échouée (' + patientRes.status + ') : ' + body);
+      return; // bilans.patient_id référence patients.id — inutile de continuer
+    }
 
     const bilanRows = [];
 
@@ -893,6 +904,14 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: p.currentBilanPosturoSousType || null,
         label: null,
         bilan_date: null,
+        // #102 Phase 2b hotfix — PostgREST (PGRST102 « All object keys must
+        // match ») refuse un batch POST array dont les objets n'ont pas
+        // exactement les mêmes clés. nb_tests n'a de sens que pour le sport
+        // (cf. plus haut) mais doit être présent, à null, sur CHAQUE ligne
+        // du batch — sinon toute sync mêlant un bilan sport à un autre
+        // module échoue silencieusement (authFetch ne relance/n'alerte pas
+        // sur un 400 générique). Découvert via le shadow-read #167.
+        nb_tests: null,
         payload: p.bilanDataPosturo,
       });
     }
@@ -909,6 +928,7 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: p.currentBilanPodopediatrieSousType || null,
         label: null,
         bilan_date: null,
+        nb_tests: null, // cf. commentaire sur la ligne posturo ci-dessus
         payload: p.bilanDataPodopediatrie,
       });
     }
@@ -925,6 +945,7 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: p.currentBilanPedicurieSousType || null,
         label: null,
         bilan_date: null,
+        nb_tests: null, // cf. commentaire sur la ligne posturo ci-dessus
         payload: p.bilanDataPedicurie,
       });
     }
@@ -941,6 +962,7 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: b.type || null,
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
+        nb_tests: null, // archive, pas de sous-libellé "en cours" — cf. commentaire ci-dessus
         payload: { mesures: b.mesures || {}, bilanData: b.bilanData || {} },
       });
     });
@@ -958,6 +980,7 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: b.type || null,
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
+        nb_tests: null, // cf. commentaire sur la ligne posturo en cours ci-dessus
         payload: b.bilanDataPosturo,
       });
     });
@@ -975,6 +998,7 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: b.type || null,
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
+        nb_tests: null, // cf. commentaire sur la ligne posturo en cours ci-dessus
         payload: b.bilanDataPodopediatrie,
       });
     });
@@ -992,16 +1016,21 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: b.type || null,
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
+        nb_tests: null, // cf. commentaire sur la ligne posturo en cours ci-dessus
         payload: b.bilanDataPedicurie,
       });
     });
 
     if (bilanRows.length) {
-      await authFetch(SUPA_URL + '/rest/v1/bilans?on_conflict=id', {
+      const bilansRes = await authFetch(SUPA_URL + '/rest/v1/bilans?on_conflict=id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
         body: JSON.stringify(bilanRows),
       });
+      if (!bilansRes.ok) {
+        const body = await bilansRes.text().catch(() => '');
+        console.warn('[#102 Phase 2a] sync bilans échouée (' + bilansRes.status + ') : ' + body);
+      }
     }
   } catch (e) {
     // Best-effort strict : jamais de banner, jamais de blocage. Le blob
