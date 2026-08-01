@@ -4136,6 +4136,9 @@ function abandonnerBilanPosturo(patIdx) {
   // #117-incident — Abandon VOLONTAIRE d'un bilan posturo en cours → suppress la garde.
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — p peut différer de currentPatient (action lancée depuis la
+  // liste patients sans ouvrir la fiche). Cf. abandonnerBilanSport (PR #156).
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
 }
 
@@ -4164,6 +4167,8 @@ function finalizeBilanPosturo(patIdx) {
   delete p.currentBilanPosturoSousType;
   currentOpenedBilanPosturoIdx = null;
   savePatients();
+  // #102 Phase 3 — cf. commentaire équivalent dans abandonnerBilanPosturo.
+  _syncPatientToNormalizedTables(p);
   renderPatientList();
   alert('✓ Bilan "' + label + '" archivé avec succès.');
 }
@@ -4329,6 +4334,10 @@ function creerBilanPosturo(patIdx, type) {
   // consultation (l'original est dans les archives, on n'a rien perdu).
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — cf. commentaire équivalent dans creerBilanSport : savePatients()
+  // ci-dessus sync currentPatient, encore l'ANCIEN patient sélectionné à cet
+  // instant (selectPatient(p) n'a pas encore tourné). Sync explicite sur p.
+  _syncPatientToNormalizedTables(p);
   currentOpenedBilanPosturoIdx = null;
   selectPatient(p);
   nav('pg-bilan-posturo');
@@ -4377,10 +4386,21 @@ function supprimerBilanPosturo(patIdx, bilanIdx) {
   const bilan = p.bilansPosturo?.[bilanIdx];
   if(!bilan) return;
   if(!confirm('Supprimer le bilan "' + bilan.label + '" du ' + bilan.date + ' ? Cette action est irréversible.')) return;
+  // #102 Phase 3 — capturé AVANT le splice, même motif que supprimerBilanSport :
+  // id stocké sous bilan.bilanDataPosturo._bilanId (cf. _syncPatientToNormalizedTables,
+  // archives posturo). Absent sur les bilans très anciens (pré-sync) → DELETE skippé.
+  const bilanId = bilan.bilanDataPosturo?._bilanId;
   p.bilansPosturo.splice(bilanIdx, 1);
   // #117-incident — Suppression VOLONTAIRE d'une archive posturo → suppress la garde.
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
+  // #102 Phase 3 — cf. commentaire équivalent dans supprimerBilanSport.
+  _syncPatientToNormalizedTables(p);
+  if (bilanId) {
+    authFetch(SUPA_URL + '/rest/v1/bilans?id=eq.' + bilanId, { method: 'DELETE' }).catch((e) =>
+      console.warn('[#102 Phase 3] delete bilan normalisé échoué (sans impact) :', e instanceof Error ? e.message : String(e))
+    );
+  }
   renderPatientList();
 }
 
