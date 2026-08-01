@@ -872,6 +872,11 @@ async function _syncPatientToNormalizedTables(p) {
         sous_type: p.currentBilanSportSousType || null,
         label: null,
         bilan_date: _parseFrDateToISO(p.bilanInitialDate),
+        // #102 Phase 2b étape 1 — compte léger, lisible sans le payload complet
+        // (cf. migrations/bilans-nb-tests.sql). Miroir exact de nbTestsEnCours
+        // dans renderPatientList() (js/biomeca.js), pour rester la même valeur
+        // le jour où la liste passera à une lecture légère.
+        nb_tests: Object.keys(p.mesures).length,
         payload: { mesures: p.mesures, bilanData: p.bilanData || {} },
       });
     }
