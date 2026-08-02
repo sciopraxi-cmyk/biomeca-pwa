@@ -18460,10 +18460,10 @@ function getBilanPosturoHTML() {
         <div style="background:#555;color:#fff;text-align:center;font-style:italic;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">⚡ CONFLUENCE DES DONNÉES</div>
         <table style="width:100%;border-collapse:collapse;font-size:10px;">
           <tr>
-            <td style="font-weight:700;padding:3px 4px;border:1px solid #ccc;">VESTIBULAIRE</td>
-            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
-            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">D</td>
-            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
+            <td style="font-weight:700;padding:3px 4px;border:1px solid #ccc;color:#222;">VESTIBULAIRE</td>
+            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">G</td>
+            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">D</td>
+            <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">N</td>
           </tr>
           ${[['ROMBERG + CSC ANT','vest-ant'],['ROMBERG + CSC LAT','vest-lat'],['ROMBERG + CSC POST','vest-post']].map(([label,id]) => `<tr>
             <td style="padding:2px 4px;border:1px solid #ccc;color:#222;">${label}</td>
@@ -18517,7 +18517,7 @@ function getBilanPosturoHTML() {
           </tr>`).join('')}
           <tr>
             <td style="padding:2px 4px;border:1px solid #d6eaf8;background:#d6eaf8;color:#222;">PROPRIO AXE <span style="font-size:9px;">X sur les parties du corps affectées</span></td>
-            <td colspan="3" style="text-align:center;border:1px solid #d6eaf8;padding:2px;">
+            <td colspan="3" style="text-align:center;border:1px solid #d6eaf8;padding:2px;color:#222;">
               <input type="checkbox" id="proprio-axe-tete" onchange="setPosturoNeuro('proprio-axe-tete',this.checked)" title="Tête"/> Tête
               <input type="checkbox" id="proprio-axe-corps" onchange="setPosturoNeuro('proprio-axe-corps',this.checked)" title="Corps"/> Corps
               <input type="checkbox" id="proprio-axe-bassin" onchange="setPosturoNeuro('proprio-axe-bassin',this.checked)" title="Bassin"/> Bassin
@@ -18582,7 +18582,7 @@ function getBilanPosturoHTML() {
             <td style="padding:2px 4px;border:1px solid #ccc;background:${bg};color:#222;">${label}</td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-o" onchange="setPosturoNeuro('ref-${id}-o',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${id}-n" onchange="setPosturoNeuro('ref-${id}-n',this.checked)"/></td>
-            <td style="padding:2px 4px;border:1px solid #ccc;">${reflex}</td>
+            <td style="padding:2px 4px;border:1px solid #ccc;color:#222;">${reflex}</td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-g" onchange="setPosturoNeuro('ref-${rid}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-d" onchange="setPosturoNeuro('ref-${rid}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="ref-${rid}-n" onchange="setPosturoNeuro('ref-${rid}-n',this.checked)"/></td>
