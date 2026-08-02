@@ -18311,7 +18311,7 @@ function getBilanPosturoHTML() {
         <td style="background:#ff0;color:#222;font-weight:700;text-align:center;padding:4px;border:1px solid #999;">N</td>
       </tr>
       <tr>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Épaule + basse</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Épaule + basse</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-g" onchange="setPosturoNeuro('aps-epaule-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-d" onchange="setPosturoNeuro('aps-epaule-d',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-epaule-n" onchange="setPosturoNeuro('aps-epaule-n',this.checked)"/></td>
@@ -18321,7 +18321,7 @@ function getBilanPosturoHTML() {
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tronc-n" onchange="setPosturoNeuro('apd-tronc-n',this.checked)"/></td>
       </tr>
       <tr>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Rotation interne épaule</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Rotation interne épaule</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-g" onchange="setPosturoNeuro('aps-rot-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-d" onchange="setPosturoNeuro('aps-rot-d',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-rot-n" onchange="setPosturoNeuro('aps-rot-n',this.checked)"/></td>
@@ -18331,7 +18331,7 @@ function getBilanPosturoHTML() {
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-cervelet-n" onchange="setPosturoNeuro('apd-cervelet-n',this.checked)"/></td>
       </tr>
       <tr>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion du coude</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Flexion du coude</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-g" onchange="setPosturoNeuro('aps-coude-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-d" onchange="setPosturoNeuro('aps-coude-d',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-coude-n" onchange="setPosturoNeuro('aps-coude-n',this.checked)"/></td>
@@ -18341,7 +18341,7 @@ function getBilanPosturoHTML() {
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="apd-tete-n" onchange="setPosturoNeuro('apd-tete-n',this.checked)"/></td>
       </tr>
       <tr>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Pronation du poignet</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Pronation du poignet</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-g" onchange="setPosturoNeuro('aps-pron-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-d" onchange="setPosturoNeuro('aps-pron-d',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="aps-pron-n" onchange="setPosturoNeuro('aps-pron-n',this.checked)"/></td>
@@ -18362,21 +18362,21 @@ function getBilanPosturoHTML() {
         <td style="border:1px solid #999;"></td>
       </tr>
       <tr>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles extenseurs poignet</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Faiblesse muscles extenseurs poignet</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-g" onchange="setPosturoNeuro('cf-ext-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-ext-d" onchange="setPosturoNeuro('cf-ext-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Flexion poignet et doigts</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Flexion poignet et doigts</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-g" onchange="setPosturoNeuro('acd-flex-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-flex-d" onchange="setPosturoNeuro('acd-flex-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
       </tr>
       <tr>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Faiblesse muscles Fléchisseurs de hanche</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Faiblesse muscles Fléchisseurs de hanche</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-g" onchange="setPosturoNeuro('cf-flex-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="cf-flex-d" onchange="setPosturoNeuro('cf-flex-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
-        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;">Hyperextension genou</td>
+        <td colspan="4" style="padding:3px 6px;border:1px solid #ccc;color:#222;">Hyperextension genou</td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-g" onchange="setPosturoNeuro('acd-hyper-g',this.checked)"/></td>
         <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="acd-hyper-d" onchange="setPosturoNeuro('acd-hyper-d',this.checked)"/></td>
         <td style="border:1px solid #ccc;"></td>
@@ -18413,35 +18413,35 @@ function getBilanPosturoHTML() {
             <td style="background:#f8d7da;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #e74c3c;">N</td>
           </tr>
           <tr>
-            <td colspan="2" style="padding:2px 4px;border:1px solid #f8d7da;">Recapillarisation</td>
+            <td colspan="2" style="padding:2px 4px;border:1px solid #f8d7da;color:#222;">Recapillarisation</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-g" onchange="setPosturoNeuro('nc-recap-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-d" onchange="setPosturoNeuro('nc-recap-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-recap-n" onchange="setPosturoNeuro('nc-recap-n',this.checked)"/></td>
           </tr>
           ${['NC1','NC2'].map(nc => `<tr>
             <td style="padding:2px 4px;border:1px solid #f8d7da;"></td>
-            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;color:#222;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${['NC3','NC4'].map(nc => `<tr>
             <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Mésencéphale</td>
-            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;color:#222;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${['NC5','NC6','NC7','NC8'].map(nc => `<tr>
             <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Pont de Varole</td>
-            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;color:#222;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${['NC9','NC10','NC11','NC12'].map(nc => `<tr>
             <td style="background:#f4a261;padding:2px 4px;border:1px solid #f8d7da;font-size:9px;color:#222;">Bulbe rachidien</td>
-            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;">${nc}</td>
+            <td style="padding:2px 4px;border:1px solid #f8d7da;font-weight:600;color:#222;">${nc}</td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-g" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-d" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #f8d7da;"><input type="checkbox" id="nc-${nc.toLowerCase()}-n" onchange="setPosturoNeuro('nc-${nc.toLowerCase()}-n',this.checked)"/></td>
@@ -18466,7 +18466,7 @@ function getBilanPosturoHTML() {
             <td style="font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">N</td>
           </tr>
           ${[['ROMBERG + CSC ANT','vest-ant'],['ROMBERG + CSC LAT','vest-lat'],['ROMBERG + CSC POST','vest-post']].map(([label,id]) => `<tr>
-            <td style="padding:2px 4px;border:1px solid #ccc;">${label}</td>
+            <td style="padding:2px 4px;border:1px solid #ccc;color:#222;">${label}</td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
@@ -18485,7 +18485,7 @@ function getBilanPosturoHTML() {
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
           ${[['GOLGI (M) force iso','prop-golgi'],['PACCINI (A) mvt précis','prop-paccini'],['RUFFINI (A) Décompression','prop-ruffini-d'],['RUFFINI (A) Compression','prop-ruffini-c'],['GOLGI (A) mvt forcé','prop-golgi-a']].map(([label,id]) => `<tr>
-            <td style="padding:2px 4px;border:1px solid #ccc;">${label}</td>
+            <td style="padding:2px 4px;border:1px solid #ccc;color:#222;">${label}</td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
@@ -18530,7 +18530,7 @@ function getBilanPosturoHTML() {
             <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">N</td>
           </tr>
           ${[['Précision (doigt-nez)','inter-prec'],['Coordination (mvt alternatif)','inter-coord']].map(([label,id]) => `<tr>
-            <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;color:#222;">${label}</td>
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
@@ -18542,7 +18542,7 @@ function getBilanPosturoHTML() {
             <td style="background:#f0a500;font-weight:700;text-align:center;padding:3px;border:1px solid #3498db;color:#222;">N</td>
           </tr>
           ${[['Précision (piano)','lat-prec'],['Coordination (Go-No Go)','lat-coord']].map(([label,id]) => `<tr>
-            <td style="padding:2px 4px;border:1px solid #d6eaf8;">${label}</td>
+            <td style="padding:2px 4px;border:1px solid #d6eaf8;color:#222;">${label}</td>
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-g" onchange="setPosturoNeuro('${id}-g',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #d6eaf8;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
