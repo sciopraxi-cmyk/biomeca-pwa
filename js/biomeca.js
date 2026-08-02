@@ -1212,68 +1212,19 @@ async function fetchPatientBilans(cloudId) {
   }
 }
 
-// ─── #102 Phase 2b étape 3 — vérification silencieuse (shadow-read) ───
-// Compare, pour information seulement, la reconstruction depuis les tables
-// normalisées à l'état RAM actuel (issu du blob user_data) au moment de
-// l'ouverture d'un patient (selectPatient). AUCUN effet sur l'affichage :
-// ne fait que logguer un écart en console. Objectif : accumuler des preuves
-// réelles, sur l'usage réel de l'app, avant de faire dépendre l'affichage
-// de fetchPatientBilans (prochaine étape — la bascule effective).
-//
-// Des écarts sont ATTENDUS et non alarmants dans deux cas : un patient dont
-// la dernière modification n'a pas fini de se synchroniser (fire-and-forget,
-// cf. _syncPatientToNormalizedTables), ou une sync qui a échoué silencieusement
-// pour ce patient (son propre try/catch best-effort). Un écart qui persiste
-// après un save fraîchement réussi serait en revanche le signe d'un vrai bug
-// de reconstruction à corriger avant la bascule — c'est ce que cette
-// vérification sert à détecter.
-async function _shadowVerifyBilanReconstruction(p) {
-  if (!p || !p._cloudId) return; // jamais synchronisé, rien à comparer
-  try {
-    const reconstructed = await fetchPatientBilans(p._cloudId);
-    const diffs = [];
-    const cmp = (label, a, b) => {
-      const sa = JSON.stringify(a === undefined ? null : a);
-      const sb = JSON.stringify(b === undefined ? null : b);
-      if (sa !== sb) diffs.push(label);
-    };
-    // #102 Phase 2b étape 4a-bis — même garde que le hotfix #163 côté écriture
-    // (isEnCoursPourSync, cf. js/bilan-sync-guard.mjs) : le slot "en cours" ne
-    // compare QUE si le bilan est génuinement en cours (sousType posé). Sans
-    // cette garde, consulter une archive (ouvrirBilan<Module>() charge une
-    // COPIE de l'archive dans le slot "en cours" pour affichage, sousType
-    // supprimé, motif #69/#70) fait remonter un écart en boucle — le blob
-    // affiche la copie, la reconstruction n'a à raison aucune ligne
-    // in_progress correspondante (#163 l'empêche désormais). Ce n'est pas une
-    // dérive de données, c'est un résidu d'affichage attendu. Les 4 listes
-    // d'archives (bilans<Module>) restent comparées sans condition : un écart
-    // là reste un vrai signal (ligne manquante ou périmée en base).
-    if (p.currentBilanSportSousType != null) {
-      cmp('mesures', p.mesures, reconstructed.mesures);
-      cmp('bilanData', p.bilanData, reconstructed.bilanData);
-    }
-    if (p.currentBilanPosturoSousType != null) {
-      cmp('bilanDataPosturo', p.bilanDataPosturo, reconstructed.bilanDataPosturo);
-    }
-    if (p.currentBilanPodopediatrieSousType != null) {
-      cmp('bilanDataPodopediatrie', p.bilanDataPodopediatrie, reconstructed.bilanDataPodopediatrie);
-    }
-    if (p.currentBilanPedicurieSousType != null) {
-      cmp('bilanDataPedicurie', p.bilanDataPedicurie, reconstructed.bilanDataPedicurie);
-    }
-    cmp('bilansSport', p.bilansSport || [], reconstructed.bilansSport);
-    cmp('bilansPosturo', p.bilansPosturo || [], reconstructed.bilansPosturo);
-    cmp('bilansPodopediatrie', p.bilansPodopediatrie || [], reconstructed.bilansPodopediatrie);
-    cmp('bilansPedicurie', p.bilansPedicurie || [], reconstructed.bilansPedicurie);
-    if (diffs.length) {
-      console.warn(
-        '[#102 Phase 2b étape 3] écart blob vs normalisé pour ' + (p.prenom || '') + ' ' + (p.nom || '') + ' : ' + diffs.join(', ')
-      );
-    }
-  } catch (e) {
-    console.warn('[#102 Phase 2b étape 3] vérification échouée (sans impact) :', e instanceof Error ? e.message : String(e));
-  }
-}
+// #102 Phase 2b étape 3 — le shadow-read (_shadowVerifyBilanReconstruction)
+// a été retiré ici (cf. selectPatient) après avoir rempli son rôle de
+// diagnostic pré-bascule : parité blob/reconstruction validée sans écart
+// réel sur plusieurs patients au fil des étapes 4a/4a-bis/4a-ter/4a-quater.
+// fetchPatientBilans() et _reconstructPatientBilansFromRows() restent en
+// place, testés (js/bilan-reconstruct.mjs), prêts pour l'étape 4b (bascule
+// effective de la lecture) — un chantier séparé et délibéré, pas improvisé :
+// plus de 400 lectures directes de p.bilansSport/p.mesures/etc. dans
+// js/biomeca.js dépendent aujourd'hui du blob localStorage comme source de
+// vérité, et fetchPatientBilans() renvoie une reconstruction VIDE en cas
+// d'échec réseau (best-effort) — un branchement naïf sur le fetch ferait
+// disparaître l'affichage hors-ligne, contraire à l'interdit CLAUDE.md sur
+// un rapport amputé qui aurait l'air normal.
 
 // ─── Déconnexion ───
 // ─── Admin: gestion utilisateurs ───
@@ -3900,14 +3851,14 @@ function selectPatient(p) {
   // _cloudId, cf. commentaire de la fonction) se verrait provisionner un
   // _cloudId à CHAQUE sélection tant qu'aucun savePatients() n'intervient —
   // une ligne patients orpheline en base à chaque rechargement entretemps.
-  // La vérification #167 s'enchaîne SEULEMENT une fois la resync terminée —
-  // sinon la course sync/lecture ferait remonter un faux écart transitoire
-  // dès la première ouverture post-déploiement. Fire-and-forget : ne bloque
-  // jamais l'affichage (comme #167 déjà).
+  // #102 Phase 2b — retrait du shadow-read (#167) à ce point : il a rempli
+  // son rôle de diagnostic pré-bascule (accumuler la preuve de parité blob vs
+  // reconstruction avant l'étape 4b). Validé sans écart réel sur plusieurs
+  // patients au fil des étapes 4a/4a-bis/4a-ter/4a-quater — cf. historique
+  // _reconstructPatientBilansFromRows. Fire-and-forget conservé pour la
+  // resync elle-même (écriture seule, source de vérité inchangée).
   if (p._cloudId) {
-    _syncPatientToNormalizedTables(p).then(() => _shadowVerifyBilanReconstruction(p));
-  } else {
-    _shadowVerifyBilanReconstruction(p);
+    _syncPatientToNormalizedTables(p);
   }
 }
 
