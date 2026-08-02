@@ -1122,7 +1122,7 @@ function _reconstructPatientBilansFromRows(rows) {
     } else if (row.status === 'archived') {
       const date = _isoDateToFr(row.bilan_date);
       // #102 Phase 2b étape 4a-ter — row.id doit être réinjecté comme _bilanId
-      // sur chaque entrée reconstruite. Découvert via le shadow-read (#167) :
+      // UNIQUEMENT pour le sport. Découvert via le shadow-read (#167) :
       // deepEqual(ordre ignoré) renvoyait false sur bilansSport alors que
       // mesures/bilanData/label/type/date concordaient tous — la seule
       // différence était l'absence totale de _bilanId côté reconstruction.
@@ -1130,6 +1130,21 @@ function _reconstructPatientBilansFromRows(rows) {
       // (étape 4b) perdrait la capacité de rouvrir un bilan archivé par index
       // fiable, de détecter les doublons, et casserait le garde-fou anti-
       // collision (#163) et l'édition en place d'une archive (#118).
+      //
+      // #102 Phase 2b étape 4a-quater — correctif du correctif ci-dessus :
+      // pour sport, _bilanId vit HORS payload (b._bilanId au niveau racine de
+      // l'entrée d'archive, cf. _syncPatientToNormalizedTables L975-976), donc
+      // le payload envoyé à Supabase ({mesures, bilanData}) ne le contient
+      // jamais — la réinjection depuis row.id est indispensable.
+      // Pour posturo/podopediatrie/pedicurie en revanche, _bilanId vit DANS le
+      // payload (b.bilanData<Module>._bilanId, cf. L918-920/942-944/959-961) :
+      // le payload envoyé EST bilanData<Module> tel quel, _bilanId compris. Le
+      // dupliquer au niveau racine de l'entrée reconstruite ajoutait une clé
+      // que le blob n'a jamais eue à cet endroit, cassant deepEqual pour ces
+      // 3 modules alors qu'ils étaient déjà corrects avant ce fix. Confirmé en
+      // console sur une patiente réelle : blob keys ['date','type','label',
+      // 'bilanDataPosturo'] vs recon keys avec un '_bilanId' racine en trop,
+      // alors que bilanDataPosturo._bilanId concordait déjà des deux côtés.
       if (row.module === 'sport') {
         out.bilansSport.push({
           _bilanId: row.id,
@@ -1141,7 +1156,6 @@ function _reconstructPatientBilansFromRows(rows) {
         });
       } else if (row.module === 'posturo') {
         out.bilansPosturo.push({
-          _bilanId: row.id,
           label: row.label || null,
           type: row.sous_type || null,
           date,
@@ -1149,7 +1163,6 @@ function _reconstructPatientBilansFromRows(rows) {
         });
       } else if (row.module === 'podopediatrie') {
         out.bilansPodopediatrie.push({
-          _bilanId: row.id,
           label: row.label || null,
           type: row.sous_type || null,
           date,
@@ -1157,7 +1170,6 @@ function _reconstructPatientBilansFromRows(rows) {
         });
       } else if (row.module === 'pedicurie') {
         out.bilansPedicurie.push({
-          _bilanId: row.id,
           label: row.label || null,
           type: row.sous_type || null,
           date,

@@ -10,11 +10,18 @@
 // Régression couverte (étape 4a-ter, découverte via le shadow-read #167 avec
 // une comparaison deepEqual insensible à l'ordre des clés) : la sélection
 // PostgREST omettait la colonne `id`, et la reconstruction n'exposait jamais
-// `_bilanId` sur les entrées archivées — mesures/bilanData/label/type/date
-// concordaient parfaitement, seul l'identifiant manquait. Sans lui, basculer
-// la lecture sur fetchPatientBilans() (étape 4b) casserait la réouverture
-// fiable d'un bilan archivé, la détection de doublons, le garde-fou anti-
-// collision (#163) et l'édition en place d'une archive (#118).
+// `_bilanId` sur les entrées archivées sport — mesures/bilanData/label/type/
+// date concordaient parfaitement, seul l'identifiant manquait. Sans lui,
+// basculer la lecture sur fetchPatientBilans() (étape 4b) casserait la
+// réouverture fiable d'un bilan archivé, la détection de doublons, le
+// garde-fou anti-collision (#163) et l'édition en place d'une archive (#118).
+//
+// Correctif du correctif (étape 4a-quater) : cette réinjection de _bilanId
+// au niveau racine de l'entrée ne s'applique QU'AU SPORT. Pour posturo/
+// podopediatrie/pedicurie, _bilanId vit DANS le payload (bilanData<Module>.
+// _bilanId côté écriture), donc row.payload le contient déjà — l'ajouter
+// aussi au niveau racine créait une clé absente du blob réel et cassait
+// deepEqual pour ces 3 modules, qui n'avaient jamais eu de problème.
 
 // 'YYYY-MM-DD' → 'DD/MM/YYYY'. Retourne null si iso est absent ou mal formé.
 export function isoDateToFr(iso) {
@@ -64,7 +71,6 @@ export function reconstructPatientBilansFromRows(rows) {
         });
       } else if (row.module === 'posturo') {
         out.bilansPosturo.push({
-          _bilanId: row.id,
           label: row.label || null,
           type: row.sous_type || null,
           date,
@@ -72,7 +78,6 @@ export function reconstructPatientBilansFromRows(rows) {
         });
       } else if (row.module === 'podopediatrie') {
         out.bilansPodopediatrie.push({
-          _bilanId: row.id,
           label: row.label || null,
           type: row.sous_type || null,
           date,
@@ -80,7 +85,6 @@ export function reconstructPatientBilansFromRows(rows) {
         });
       } else if (row.module === 'pedicurie') {
         out.bilansPedicurie.push({
-          _bilanId: row.id,
           label: row.label || null,
           type: row.sous_type || null,
           date,
