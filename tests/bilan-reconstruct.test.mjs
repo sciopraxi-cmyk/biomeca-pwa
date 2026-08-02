@@ -56,16 +56,46 @@ describe('reconstructPatientBilansFromRows', () => {
     expect(out.bilansSport[0].bilanData).toEqual({ motif: 'test' });
   });
 
-  it('applique la même garantie _bilanId aux 3 autres modules archivés', () => {
+  it("#102 étape 4a-quater régression — posturo/podopediatrie/pedicurie n'ont PAS de _bilanId racine (il vit dans le payload, contrairement au sport)", () => {
+    // Contrairement au sport, _bilanId est stocké par _syncPatientToNormalizedTables
+    // À L'INTÉRIEUR de bilanData<Module> (cf. js/biomeca.js L918-920), donc le
+    // payload transmis à Supabase le contient déjà. Dupliquer row.id au niveau
+    // racine de l'entrée reconstruite ajoutait une clé absente du blob réel
+    // (['date','type','label','bilanDataPosturo'] côté blob) et cassait
+    // deepEqual pour ces 3 modules — confirmé en console sur une patiente réelle.
     const rows = [
-      { id: 'id-posturo', module: 'posturo', status: 'archived', payload: { x: 1 } },
-      { id: 'id-podo', module: 'podopediatrie', status: 'archived', payload: { y: 2 } },
-      { id: 'id-pedi', module: 'pedicurie', status: 'archived', payload: { z: 3 } },
+      {
+        id: 'id-posturo',
+        module: 'posturo',
+        status: 'archived',
+        payload: { x: 1, _bilanId: 'id-posturo' },
+      },
+      {
+        id: 'id-podo',
+        module: 'podopediatrie',
+        status: 'archived',
+        payload: { y: 2, _bilanId: 'id-podo' },
+      },
+      {
+        id: 'id-pedi',
+        module: 'pedicurie',
+        status: 'archived',
+        payload: { z: 3, _bilanId: 'id-pedi' },
+      },
     ];
     const out = reconstructPatientBilansFromRows(rows);
-    expect(out.bilansPosturo[0]._bilanId).toBe('id-posturo');
-    expect(out.bilansPodopediatrie[0]._bilanId).toBe('id-podo');
-    expect(out.bilansPedicurie[0]._bilanId).toBe('id-pedi');
+    expect(out.bilansPosturo[0]._bilanId).toBeUndefined();
+    expect(out.bilansPosturo[0].bilanDataPosturo._bilanId).toBe('id-posturo');
+    expect(out.bilansPodopediatrie[0]._bilanId).toBeUndefined();
+    expect(out.bilansPodopediatrie[0].bilanDataPodopediatrie._bilanId).toBe('id-podo');
+    expect(out.bilansPedicurie[0]._bilanId).toBeUndefined();
+    expect(out.bilansPedicurie[0].bilanDataPedicurie._bilanId).toBe('id-pedi');
+    expect(Object.keys(out.bilansPosturo[0]).sort()).toEqual([
+      'bilanDataPosturo',
+      'date',
+      'label',
+      'type',
+    ]);
   });
 
   it('conserve plusieurs archives du même module dans leur ordre', () => {
