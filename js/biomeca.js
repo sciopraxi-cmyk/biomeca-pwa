@@ -2373,9 +2373,19 @@ async function pwaLogout() {
 // ─── Init PWA ───
 async function initPWA() {
   // Vérifier session existante
-  const session = loadPwaSession();
+  let session = loadPwaSession();
   if(session.token && session.user) {
     try {
+      // #102 Phase 2b hotfix 3 — refresh préventif AVANT le premier appel réseau
+      // (supa.getUser()). Sans ça, un token expiré pendant l'absence (onglet
+      // rouvert après un moment) produit un 403 sur /auth/v1/user QUE authFetch
+      // récupère ensuite avec succès (refresh + retry, #100) — mais le navigateur
+      // logge quand même la requête ratée initiale dans la Console (comportement
+      // DevTools indépendant de notre gestion applicative, cf. incident #85/#100).
+      // ensureSession() ne fait AUCUN appel réseau si le token est encore valide
+      // >60s (décodage JWT local uniquement) : coût nul dans le cas normal.
+      await ensureSession();
+      session = loadPwaSession(); // re-lire : ensureSession a pu rafraîchir le token
       const userData = await supa.getUser();
       if(userData.id) {
         const isAdmin = session.user.email?.toLowerCase() === 'sciopraxi@gmail.com';
