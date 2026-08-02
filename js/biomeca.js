@@ -1091,6 +1091,9 @@ function _isoDateToFr(iso) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
 }
 
+// ⚠️ Miroir de test : js/bilan-reconstruct.mjs — répercuter toute
+// modification de cette fonction dans le module miroir (sinon les tests
+// Vitest passent en vert alors que la reconstruction dérive en prod).
 function _reconstructPatientBilansFromRows(rows) {
   const out = {
     mesures: undefined,
@@ -1118,8 +1121,18 @@ function _reconstructPatientBilansFromRows(rows) {
       }
     } else if (row.status === 'archived') {
       const date = _isoDateToFr(row.bilan_date);
+      // #102 Phase 2b étape 4a-ter — row.id doit être réinjecté comme _bilanId
+      // sur chaque entrée reconstruite. Découvert via le shadow-read (#167) :
+      // deepEqual(ordre ignoré) renvoyait false sur bilansSport alors que
+      // mesures/bilanData/label/type/date concordaient tous — la seule
+      // différence était l'absence totale de _bilanId côté reconstruction.
+      // Sans lui, un patient dont la lecture bascule sur fetchPatientBilans()
+      // (étape 4b) perdrait la capacité de rouvrir un bilan archivé par index
+      // fiable, de détecter les doublons, et casserait le garde-fou anti-
+      // collision (#163) et l'édition en place d'une archive (#118).
       if (row.module === 'sport') {
         out.bilansSport.push({
+          _bilanId: row.id,
           label: row.label || null,
           type: row.sous_type || null,
           date,
@@ -1127,11 +1140,29 @@ function _reconstructPatientBilansFromRows(rows) {
           bilanData: payload.bilanData || {},
         });
       } else if (row.module === 'posturo') {
-        out.bilansPosturo.push({ label: row.label || null, type: row.sous_type || null, date, bilanDataPosturo: payload });
+        out.bilansPosturo.push({
+          _bilanId: row.id,
+          label: row.label || null,
+          type: row.sous_type || null,
+          date,
+          bilanDataPosturo: payload,
+        });
       } else if (row.module === 'podopediatrie') {
-        out.bilansPodopediatrie.push({ label: row.label || null, type: row.sous_type || null, date, bilanDataPodopediatrie: payload });
+        out.bilansPodopediatrie.push({
+          _bilanId: row.id,
+          label: row.label || null,
+          type: row.sous_type || null,
+          date,
+          bilanDataPodopediatrie: payload,
+        });
       } else if (row.module === 'pedicurie') {
-        out.bilansPedicurie.push({ label: row.label || null, type: row.sous_type || null, date, bilanDataPedicurie: payload });
+        out.bilansPedicurie.push({
+          _bilanId: row.id,
+          label: row.label || null,
+          type: row.sous_type || null,
+          date,
+          bilanDataPedicurie: payload,
+        });
       }
     }
   });
@@ -1155,7 +1186,7 @@ async function fetchPatientBilans(cloudId) {
       SUPA_URL +
         '/rest/v1/bilans?patient_id=eq.' +
         cloudId +
-        '&select=module,status,sous_type,label,bilan_date,payload&order=created_at.asc'
+        '&select=id,module,status,sous_type,label,bilan_date,payload&order=created_at.asc'
     );
     if (!res.ok) {
       console.warn('[#102 Phase 2b] fetchPatientBilans : réponse non OK (' + res.status + ')');
