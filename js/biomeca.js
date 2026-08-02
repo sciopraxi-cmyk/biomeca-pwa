@@ -3828,9 +3828,25 @@ function selectPatient(p) {
   bilanData = p.bilanData ? JSON.parse(JSON.stringify(p.bilanData)) : {};
   clearBilanFields();
   loadBilan();
-  // #102 Phase 2b étape 3 — vérification silencieuse, fire-and-forget,
-  // aucun effet sur l'affichage (cf. commentaire de la fonction).
-  _shadowVerifyBilanReconstruction(p);
+  // #102 Phase 2b étape 4a — resync opportuniste à chaque ouverture patient,
+  // SEULEMENT si déjà connu du cloud (_cloudId présent). Referme la dérive
+  // laissée par les bugs #159→#162 (silencieux à l'époque, cf. commentaire de
+  // _syncPatientToNormalizedTables) pour tout patient déjà synchronisé au
+  // moins une fois : écriture seule (upsert du blob actuel), aucun impact sur
+  // le blob lui-même (reste la source de vérité). Garde sur _cloudId : sans
+  // elle, un patient jamais encore sauvegardé (donc jamais persisté avec son
+  // _cloudId, cf. commentaire de la fonction) se verrait provisionner un
+  // _cloudId à CHAQUE sélection tant qu'aucun savePatients() n'intervient —
+  // une ligne patients orpheline en base à chaque rechargement entretemps.
+  // La vérification #167 s'enchaîne SEULEMENT une fois la resync terminée —
+  // sinon la course sync/lecture ferait remonter un faux écart transitoire
+  // dès la première ouverture post-déploiement. Fire-and-forget : ne bloque
+  // jamais l'affichage (comme #167 déjà).
+  if (p._cloudId) {
+    _syncPatientToNormalizedTables(p).then(() => _shadowVerifyBilanReconstruction(p));
+  } else {
+    _shadowVerifyBilanReconstruction(p);
+  }
 }
 
 function clearBilanFields() {
