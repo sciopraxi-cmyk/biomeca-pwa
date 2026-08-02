@@ -1194,11 +1194,30 @@ async function _shadowVerifyBilanReconstruction(p) {
       const sb = JSON.stringify(b === undefined ? null : b);
       if (sa !== sb) diffs.push(label);
     };
-    cmp('mesures', p.mesures, reconstructed.mesures);
-    cmp('bilanData', p.bilanData, reconstructed.bilanData);
-    cmp('bilanDataPosturo', p.bilanDataPosturo, reconstructed.bilanDataPosturo);
-    cmp('bilanDataPodopediatrie', p.bilanDataPodopediatrie, reconstructed.bilanDataPodopediatrie);
-    cmp('bilanDataPedicurie', p.bilanDataPedicurie, reconstructed.bilanDataPedicurie);
+    // #102 Phase 2b étape 4a-bis — même garde que le hotfix #163 côté écriture
+    // (isEnCoursPourSync, cf. js/bilan-sync-guard.mjs) : le slot "en cours" ne
+    // compare QUE si le bilan est génuinement en cours (sousType posé). Sans
+    // cette garde, consulter une archive (ouvrirBilan<Module>() charge une
+    // COPIE de l'archive dans le slot "en cours" pour affichage, sousType
+    // supprimé, motif #69/#70) fait remonter un écart en boucle — le blob
+    // affiche la copie, la reconstruction n'a à raison aucune ligne
+    // in_progress correspondante (#163 l'empêche désormais). Ce n'est pas une
+    // dérive de données, c'est un résidu d'affichage attendu. Les 4 listes
+    // d'archives (bilans<Module>) restent comparées sans condition : un écart
+    // là reste un vrai signal (ligne manquante ou périmée en base).
+    if (p.currentBilanSportSousType != null) {
+      cmp('mesures', p.mesures, reconstructed.mesures);
+      cmp('bilanData', p.bilanData, reconstructed.bilanData);
+    }
+    if (p.currentBilanPosturoSousType != null) {
+      cmp('bilanDataPosturo', p.bilanDataPosturo, reconstructed.bilanDataPosturo);
+    }
+    if (p.currentBilanPodopediatrieSousType != null) {
+      cmp('bilanDataPodopediatrie', p.bilanDataPodopediatrie, reconstructed.bilanDataPodopediatrie);
+    }
+    if (p.currentBilanPedicurieSousType != null) {
+      cmp('bilanDataPedicurie', p.bilanDataPedicurie, reconstructed.bilanDataPedicurie);
+    }
     cmp('bilansSport', p.bilansSport || [], reconstructed.bilansSport);
     cmp('bilansPosturo', p.bilansPosturo || [], reconstructed.bilansPosturo);
     cmp('bilansPodopediatrie', p.bilansPodopediatrie || [], reconstructed.bilansPodopediatrie);
