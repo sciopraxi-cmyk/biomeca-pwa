@@ -1433,6 +1433,12 @@ async function refreshGoogleCalendarStatus() {
     if (!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
     renderGoogleCalendarStatus(data.connected, data.google_email);
+    if (data.connected) {
+      await loadGoogleCalendarEvents();
+    } else {
+      const evBox = document.getElementById('agenda-google-events');
+      if (evBox) evBox.innerHTML = '';
+    }
   } catch (e) {
     console.error('[agenda] google-calendar-status failed:', e);
     box.textContent = 'Impossible de vérifier la connexion à Google Calendar.';
@@ -1452,6 +1458,109 @@ function renderGoogleCalendarStatus(connected, email) {
     box.innerHTML =
       '<div style="color:var(--mut);">Non connecté</div>' +
       '<button class="btn" onclick="connectGoogleCalendar()" style="margin-top:8px;background:#4285F4;color:#fff;">Connecter Google Calendar</button>';
+  }
+}
+
+// Charge les événements à venir (30 prochains jours, 20 max) du calendrier
+// "primary" du praticien connecté, via l'Edge Function google-calendar-events
+// (le refresh token ne quitte jamais le serveur — cf. commentaire d'en-tête
+// de cette fonction côté Edge).
+async function loadGoogleCalendarEvents() {
+  const box = document.getElementById('agenda-google-events');
+  if (!box) return;
+  box.innerHTML = '<div style="font-size:12px;color:var(--mut);">Chargement des événements…</div>';
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events', { method: 'GET' });
+    if (!res.ok) throw new Error('events ' + res.status);
+    const data = await res.json();
+    renderGoogleCalendarEvents(data.events || []);
+  } catch (e) {
+    console.error('[agenda] loadGoogleCalendarEvents failed:', e);
+    box.innerHTML = '<div style="font-size:12px;color:var(--mut);">Impossible de charger les événements.</div>';
+  }
+}
+
+function renderGoogleCalendarEvents(events) {
+  const box = document.getElementById('agenda-google-events');
+  if (!box) return;
+  const fmt = function (iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso; // date seule (événement journée entière)
+    return d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+  };
+  let html = '<div class="stitle" style="margin-top:14px;">Événements à venir</div>';
+  if (!events.length) {
+    html +=
+      '<div style="font-size:12px;color:var(--mut);margin-bottom:10px;">Aucun événement à venir.</div>';
+  } else {
+    html +=
+      '<div style="margin-bottom:10px;">' +
+      events
+        .map(function (e) {
+          return (
+            '<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:13px;">' +
+            '<strong>' +
+            _escHtml(e.summary) +
+            '</strong>' +
+            '<div style="font-size:11px;color:var(--mut);">' +
+            _escHtml(fmt(e.start)) +
+            (e.end ? ' → ' + _escHtml(fmt(e.end)) : '') +
+            '</div>' +
+            '</div>'
+          );
+        })
+        .join('') +
+      '</div>';
+  }
+  html +=
+    '<button class="btn" onclick="toggleGoogleCalendarEventForm()" style="background:#666;color:#fff;font-size:12px;padding:6px 14px;">+ Nouvel événement</button>' +
+    '<div id="agenda-google-event-form" style="display:none;margin-top:10px;">' +
+    '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div><input class="inp" id="agenda-ev-title" placeholder="Consultation..."/>' +
+    '<div class="g2" style="margin-top:6px;">' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local"/></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Fin *</div><input class="inp" id="agenda-ev-end" type="datetime-local"/></div>' +
+    '</div>' +
+    '<div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Description</div><textarea class="inp" id="agenda-ev-desc" rows="2"></textarea></div>' +
+    '<button class="btn btn-blue" onclick="createGoogleCalendarEvent()" style="margin-top:8px;">✓ Créer l\'événement</button>' +
+    '</div>';
+  box.innerHTML = html;
+}
+
+function toggleGoogleCalendarEventForm() {
+  const f = document.getElementById('agenda-google-event-form');
+  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function createGoogleCalendarEvent() {
+  const titleEl = document.getElementById('agenda-ev-title');
+  const startEl = document.getElementById('agenda-ev-start');
+  const endEl = document.getElementById('agenda-ev-end');
+  const descEl = document.getElementById('agenda-ev-desc');
+  const title = titleEl ? titleEl.value.trim() : '';
+  const start = startEl ? startEl.value : '';
+  const end = endEl ? endEl.value : '';
+  const desc = descEl ? descEl.value : '';
+  if (!title || !start || !end) {
+    alert('Titre, début et fin sont requis.');
+    return;
+  }
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: title,
+        start: new Date(start).toISOString(),
+        end: new Date(end).toISOString(),
+        description: desc || undefined,
+      }),
+    });
+    if (!res.ok) throw new Error('create ' + res.status);
+    await loadGoogleCalendarEvents();
+  } catch (e) {
+    console.error('[agenda] createGoogleCalendarEvent failed:', e);
+    alert("La création de l'événement a échoué. Réessaie plus tard.");
   }
 }
 
