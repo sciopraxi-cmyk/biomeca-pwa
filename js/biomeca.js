@@ -524,6 +524,10 @@ async function onPwaLoginSuccess() {
   document.getElementById('biomeca-app').style.display = '';
   showAdminPanelIfNeeded();
   nav('pg-patients');
+  // #177/#179 — si on revient d'une redirection Google Calendar OAuth, bascule
+  // sur l'onglet Agenda plutôt que de rester sur Patients (et affiche le
+  // résultat connecté/erreur). No-op si aucun paramètre agenda_google.
+  handleAgendaGoogleRedirect();
 
   // Afficher onglet Paramètres si admin
   const paramsBtn = document.getElementById('tn-params');
@@ -1406,6 +1410,107 @@ async function tryStartTrial() {
     console.error('[access] start-trial network error:', e);
     return { ok: false };
   }
+}
+
+// ===== AGENDA — Google Calendar (Task #177/#179) =====
+//
+// Trois Edge Functions : google-calendar-init (démarre l'OAuth, retourne
+// l'URL d'autorisation Google), google-calendar-status (connected +
+// google_email, jamais le token), google-calendar-disconnect (révoque +
+// supprime). Le refresh token ne transite JAMAIS côté client — authFetch
+// porte uniquement le JWT Supabase du praticien.
+
+async function initAgendaPage() {
+  await refreshGoogleCalendarStatus();
+}
+
+async function refreshGoogleCalendarStatus() {
+  const box = document.getElementById('agenda-google-status');
+  if (!box) return;
+  box.textContent = 'Chargement…';
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-status', { method: 'GET' });
+    if (!res.ok) throw new Error('status ' + res.status);
+    const data = await res.json();
+    renderGoogleCalendarStatus(data.connected, data.google_email);
+  } catch (e) {
+    console.error('[agenda] google-calendar-status failed:', e);
+    box.textContent = 'Impossible de vérifier la connexion à Google Calendar.';
+  }
+}
+
+function renderGoogleCalendarStatus(connected, email) {
+  const box = document.getElementById('agenda-google-status');
+  if (!box) return;
+  if (connected) {
+    box.innerHTML =
+      '<div style="color:#27ae60;font-weight:600;">✓ Connecté' +
+      (email ? ' — ' + _escHtml(email) : '') +
+      '</div>' +
+      '<button class="btn" onclick="disconnectGoogleCalendar()" style="margin-top:8px;background:#c0392b;color:#fff;">Déconnecter</button>';
+  } else {
+    box.innerHTML =
+      '<div style="color:var(--mut);">Non connecté</div>' +
+      '<button class="btn" onclick="connectGoogleCalendar()" style="margin-top:8px;background:#4285F4;color:#fff;">Connecter Google Calendar</button>';
+  }
+}
+
+async function connectGoogleCalendar() {
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error('init ' + res.status);
+    const data = await res.json();
+    if (!data || !data.url) throw new Error('no url in response');
+    // Redirection pleine page (pas un fetch) : Google exige une navigation réelle.
+    window.location.href = data.url;
+  } catch (e) {
+    console.error('[agenda] connectGoogleCalendar failed:', e);
+    alert('Impossible de démarrer la connexion à Google Calendar. Réessaie plus tard.');
+  }
+}
+
+async function disconnectGoogleCalendar() {
+  if (!confirm('Déconnecter Google Calendar ?')) return;
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-disconnect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error('disconnect ' + res.status);
+    await refreshGoogleCalendarStatus();
+  } catch (e) {
+    console.error('[agenda] disconnectGoogleCalendar failed:', e);
+    alert('La déconnexion a échoué. Réessaie plus tard.');
+  }
+}
+
+// Gère le retour de redirection après google-calendar-callback
+// (?agenda_google=connected|error&agenda_google_detail=...). Appelé une fois
+// juste après le login (onPwaLoginSuccess) — la session Supabase persiste
+// côté client (localStorage) pendant l'aller-retour vers Google, donc le
+// praticien est toujours authentifié à son retour. Nettoie l'URL ensuite
+// (history.replaceState) pour ne pas re-déclencher le message à chaque refresh.
+function handleAgendaGoogleRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('agenda_google');
+  if (!status) return;
+  const detail = params.get('agenda_google_detail');
+  nav('pg-agenda');
+  if (status === 'connected') {
+    alert('Google Calendar connecté avec succès.');
+  } else if (status === 'error') {
+    alert('La connexion à Google Calendar a échoué' + (detail ? ' (' + detail + ')' : '') + '.');
+  }
+  params.delete('agenda_google');
+  params.delete('agenda_google_detail');
+  const qs = params.toString();
+  const newUrl = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+  window.history.replaceState({}, '', newUrl);
 }
 
 // #74 E2 — Source des champs d'abonnement : app_metadata (infalsifiable,
@@ -2962,12 +3067,14 @@ function nav(id) {
   const map = {
     'pg-patients':'tn-patients',
     'pg-praticiens':'tn-praticiens','pg-params':'tn-params',
-    'pg-sport':'tn-patients','pg-posturo':'tn-patients'
+    'pg-sport':'tn-patients','pg-posturo':'tn-patients',
+    'pg-agenda':'tn-agenda'
   };
   if (map[id]) { const b=document.getElementById(map[id]); if(b) b.classList.add('act'); }
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
+  if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
     // #81 — rafraîchit le compteur Maintenance à l'ouverture de Paramètres

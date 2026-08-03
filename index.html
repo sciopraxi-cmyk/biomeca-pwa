@@ -400,6 +400,7 @@
     <button onclick="nav('pg-patients')" id="tn-patients">Patients</button>
     <button onclick="nav('pg-praticiens')" id="tn-praticiens">Praticiens</button>
     <button onclick="nav('pg-params')" id="tn-params">Paramètres</button>
+    <button onclick="nav('pg-agenda')" id="tn-agenda">📅 Agenda</button>
   </div>
   <div style="flex:1;"></div>
   <a href="https://www.doctolib.fr" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:6px;background:#fff;border-radius:6px;padding:4px 12px;text-decoration:none;margin-right:8px;font-size:11px;font-weight:700;color:#0e4d91;white-space:nowrap;">
@@ -3097,6 +3098,39 @@
       <div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Adresse complète</div><textarea class="inp" id="pr-adresse" rows="2" placeholder="1 rue de la Santé, 75000 Paris"></textarea></div>
       <div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Email</div><input class="inp" id="pr-email" placeholder="contact@cabinet.fr"/></div>
       <button class="btn btn-blue btn-full" onclick="createPraticien()">✓ Enregistrer le praticien</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ AGENDA (#177/#179) ══ -->
+
+<div class="page" id="pg-agenda">
+  <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
+    <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">📅 Agenda</h2>
+
+    <!-- Doctolib — lien externe (déjà en place dans le header) -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle">Doctolib</div>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
+        Aucune intégration directe possible (API réservée aux partenaires Doctolib). Utilisez le bouton « Doctolib » du header pour ouvrir votre agenda dans un nouvel onglet.
+      </p>
+    </div>
+
+    <!-- Google Calendar — OAuth lecture/écriture -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle">Google Calendar</div>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
+        Connexion directe en lecture/écriture depuis Verticy.
+      </p>
+      <div id="agenda-google-status" style="font-size:13px;color:var(--mut);">Chargement…</div>
+    </div>
+
+    <!-- Apple Calendar — reporté #178 -->
+    <div class="card">
+      <div class="stitle">Apple Calendar</div>
+      <p style="font-size:13px;color:var(--mut);">
+        Lecture seule via flux ICS public — bientôt disponible.
+      </p>
     </div>
   </div>
 </div>
