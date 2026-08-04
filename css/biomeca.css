@@ -726,13 +726,21 @@ body.printing #rpt-print{display:block!important;}
 .cal-evchip:hover { background:var(--blue); color:#04231c; }
 .cal-more { font-size:9px; color:var(--mut); margin-top:2px; cursor:pointer; }
 
-.cal-grid-week {
-  display:grid; grid-template-columns:44px repeat(7,1fr);
+/* Structure flex à 2 lignes (header + body), chacune avec une case fixe de
+   44px (coin / colonne d'heures) puis 7 cases égales (jours). Volontairement
+   pas de CSS Grid ici : une grille demanderait un placement explicite
+   (grid-row/grid-column) pour que la colonne d'heures (14 cellules hautes de
+   1 ligne) cohabite avec les colonnes de jour (1 cellule haute de 14 lignes)
+   — sans ça l'auto-placement répartit les items n'importe où. */
+.cal-week-wrap {
   border:1px solid var(--bord); border-radius:var(--rs); overflow:hidden;
   background:var(--card);
 }
+.cal-week-headerrow, .cal-week-bodyrow { display:flex; }
+.cal-week-corner, .cal-week-hourcol { flex:0 0 44px; }
+.cal-week-corner { background:var(--surf); border-bottom:1px solid var(--bord); }
 .cal-week-head {
-  background:var(--surf); color:var(--mut); font-size:10px; font-weight:600;
+  flex:1; background:var(--surf); color:var(--mut); font-size:10px; font-weight:600;
   text-align:center; padding:6px 2px; text-transform:uppercase;
   border-bottom:1px solid var(--bord); border-left:1px solid var(--bord);
 }
@@ -742,7 +750,7 @@ body.printing #rpt-print{display:block!important;}
   border-top:1px solid var(--bord); box-sizing:border-box;
 }
 .cal-week-col {
-  position:relative; border-left:1px solid var(--bord); cursor:pointer;
+  flex:1; position:relative; border-left:1px solid var(--bord); cursor:pointer;
   box-sizing:border-box;
 }
 .cal-week-hourline {
