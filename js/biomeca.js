@@ -1670,18 +1670,27 @@ function _agRenderMonthGrid() {
   return html;
 }
 
+// Structure flex à 2 lignes (headerrow + bodyrow), chacune avec 8 cases
+// (1 colonne d'heures/coin + 7 jours). Un vrai CSS Grid ici demanderait un
+// placement explicite (grid-row/grid-column) pour que la colonne d'heures
+// (14 lignes de 1 cellule) cohabite avec les colonnes de jour (1 cellule
+// haute de 14 lignes) — sans ça, l'auto-placement de la grille les répartit
+// n'importe où (bug constaté : heures et événements décalés/mélangés).
+// Le flex évite le problème : chaque case est un simple item de rang 1.
 function _agRenderWeekGrid() {
   const start = _agStartOfWeek(agCal.refDate);
   const todayKey = _agDateKey(new Date());
   const DOW = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
   const totalHours = AG_CAL_HOUR_END - AG_CAL_HOUR_START;
+  const gridHeight = totalHours * AG_CAL_ROW_H;
 
-  let head = '<div class="cal-week-head"></div>';
   const days = [];
   for (let i = 0; i < 7; i++) days.push(_agAddDays(start, i));
+
+  let headerRow = '<div class="cal-week-corner"></div>';
   days.forEach(function (d, idx) {
     const key = _agDateKey(d);
-    head +=
+    headerRow +=
       '<div class="cal-week-head' +
       (key === todayKey ? ' cal-week-head-today' : '') +
       '">' +
@@ -1691,12 +1700,12 @@ function _agRenderWeekGrid() {
       '</b></div>';
   });
 
-  let hourLabels = '';
-  let cols = '';
+  let hourCol = '';
   for (let h = AG_CAL_HOUR_START; h < AG_CAL_HOUR_END; h++) {
-    hourLabels += '<div class="cal-week-hourlabel" style="height:' + AG_CAL_ROW_H + 'px;">' + h + 'h</div>';
+    hourCol += '<div class="cal-week-hourlabel" style="height:' + AG_CAL_ROW_H + 'px;">' + h + 'h</div>';
   }
 
+  let dayCols = '';
   days.forEach(function (d) {
     const key = _agDateKey(d);
     const dayEvents = _agEventsOnDay(key).filter(function (e) {
@@ -1740,9 +1749,9 @@ function _agRenderWeekGrid() {
         '</div>';
     });
 
-    cols +=
+    dayCols +=
       '<div class="cal-week-col" style="height:' +
-      totalHours * AG_CAL_ROW_H +
+      gridHeight +
       'px;" onclick="openAgendaEventModal(null,\'' +
       key +
       'T' +
@@ -1752,7 +1761,19 @@ function _agRenderWeekGrid() {
       '</div>';
   });
 
-  return '<div class="cal-grid-week">' + head + hourLabels + cols + '</div>';
+  return (
+    '<div class="cal-week-wrap">' +
+    '<div class="cal-week-headerrow">' +
+    headerRow +
+    '</div>' +
+    '<div class="cal-week-bodyrow">' +
+    '<div class="cal-week-hourcol">' +
+    hourCol +
+    '</div>' +
+    dayCols +
+    '</div>' +
+    '</div>'
+  );
 }
 
 // ─── Modale création / édition ──────────────────────────────────────────
