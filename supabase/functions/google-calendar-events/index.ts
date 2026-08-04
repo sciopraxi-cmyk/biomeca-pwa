@@ -1,14 +1,25 @@
 // Edge Function google-calendar-events — lecture/écriture des événements
-// Google Calendar depuis Verticy (Task #181/#182, suite de #177/#179).
+// Google Calendar depuis Verticy (Task #181/#182, suite de #177/#179,
+// multi-comptes #187).
 //
 // GET    : liste les événements sur une plage [timeMin, timeMax] (query
-//          params ISO) du calendrier "primary" du praticien connecté —
-//          la plage est fournie par le client (grille semaine/mois affichée
-//          dans l'onglet Agenda). Sans paramètres, retombe sur les 30
-//          prochains jours par défaut.
-// POST   : crée un événement sur ce même calendrier.
-// PATCH  : modifie un événement existant (id dans le corps JSON).
-// DELETE : supprime un événement existant (id en query param ?id=...).
+//          params ISO), agrégés depuis TOUS les comptes Google connectés du
+//          praticien (#187 : plus un seul compte possible). Chaque événement
+//          est tagué connectionId + accountEmail pour que le client puisse
+//          le colorer par compte et savoir où agir dessus. Un compte dont le
+//          rafraîchissement échoue (token révoqué côté Google, etc.) est
+//          exclu du résultat SANS faire échouer les autres — mais signalé
+//          via failedAccounts pour que l'UI l'affiche visiblement plutôt que
+//          de laisser croire à une simple absence de rendez-vous (principe
+//          CLAUDE.md : un manque ne doit jamais ressembler à une normalité).
+// POST   : crée un événement — connectionId requis dans le corps JSON
+//          (compte cible, choisi côté client s'il y en a plusieurs).
+// PATCH  : modifie un événement existant — id + connectionId requis dans le
+//          corps JSON (connectionId = compte propriétaire de l'événement,
+//          inchangé depuis sa création : on ne déplace pas un événement
+//          d'un compte à l'autre).
+// DELETE : supprime un événement existant — id + connectionId en query
+//          params (?id=...&connectionId=...).
 //
 // Le refresh token stocké (agenda_connections.refresh_token_encrypted,
 // AES-GCM) n'est jamais renvoyé au client : cette fonction le déchiffre
@@ -77,7 +88,7 @@ async function getAccessToken(refreshToken: string): Promise<string> {
   return data.access_token as string;
 }
 
-function toClientEvent(e: any) {
+function toClientEvent(e: any, connectionId: string, accountEmail: string | null) {
   return {
     id: e.id,
     summary: e.summary || '(sans titre)',
@@ -85,7 +96,35 @@ function toClientEvent(e: any) {
     start: e.start?.dateTime || e.start?.date || null,
     end: e.end?.dateTime || e.end?.date || null,
     htmlLink: e.htmlLink || null,
+    source: 'google',
+    connectionId,
+    accountEmail,
   };
+}
+
+type ConnectionRow = { id: string; refresh_token_encrypted: string; google_email: string | null };
+
+// Charge UNE connexion Google précise, vérifiée appartenir à userId — un
+// connectionId d'un autre praticien (ou inexistant) renvoie null plutôt que
+// de lever une exception opaque.
+async function getConnectionRow(
+  userId: string,
+  connectionId: string
+): Promise<ConnectionRow | null> {
+  const { data, error } = await supaAdmin
+    .from('agenda_connections')
+    .select('id, refresh_token_encrypted, google_email')
+    .eq('id', connectionId)
+    .eq('user_id', userId)
+    .eq('provider', 'google')
+    .maybeSingle();
+  if (error) throw new Error('select connection: ' + error.message);
+  return (data as ConnectionRow) || null;
+}
+
+async function accessTokenFor(row: ConnectionRow): Promise<string> {
+  const refreshToken = await decrypt(row.refresh_token_encrypted);
+  return getAccessToken(refreshToken);
 }
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PATCH', 'DELETE'];
@@ -102,61 +141,85 @@ Deno.serve(async (req) => {
   if (authError || !userData?.user) return json({ error: 'Invalid token' }, 401);
   const userId = userData.user.id;
 
-  const { data: row, error: selectErr } = await supaAdmin
-    .from('agenda_connections')
-    .select('refresh_token_encrypted')
-    .eq('user_id', userId)
-    .eq('provider', 'google')
-    .maybeSingle();
-  if (selectErr) return json({ error: 'select: ' + selectErr.message }, 500);
-  if (!row) return json({ error: 'Google Calendar non connecté' }, 409);
-
-  let accessToken: string;
-  try {
-    const refreshToken = await decrypt(row.refresh_token_encrypted as string);
-    accessToken = await getAccessToken(refreshToken);
-  } catch (e) {
-    console.error('[google-calendar-events] token refresh failed', e);
-    return json(
-      { error: "Impossible de rafraîchir l'accès Google. Reconnecte Google Calendar." },
-      502
-    );
-  }
-
   const reqUrl = new URL(req.url);
   const eventsBase = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 
-  // ─── GET — liste sur une plage [timeMin, timeMax] ─────────────────────
+  // ─── GET — agrège TOUS les comptes Google connectés (#187) ─────────────
   if (req.method === 'GET') {
+    const { data: rows, error: selErr } = await supaAdmin
+      .from('agenda_connections')
+      .select('id, refresh_token_encrypted, google_email')
+      .eq('user_id', userId)
+      .eq('provider', 'google')
+      .order('created_at', { ascending: true });
+    if (selErr) return json({ error: 'select: ' + selErr.message }, 500);
+    if (!rows || rows.length === 0) return json({ events: [], failedAccounts: [] });
+
     const now = new Date();
     const defaultMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const timeMin = reqUrl.searchParams.get('timeMin') || now.toISOString();
     const timeMax = reqUrl.searchParams.get('timeMax') || defaultMax.toISOString();
 
-    const url = new URL(eventsBase);
-    url.searchParams.set('timeMin', timeMin);
-    url.searchParams.set('timeMax', timeMax);
-    // 250 = maximum accepté par l'API Calendar par page ; largement suffisant
-    // pour une grille semaine/mois d'un cabinet — pas de pagination gérée
-    // au-delà (limitation connue, à revoir si un praticien sature ce plafond).
-    url.searchParams.set('maxResults', '250');
-    url.searchParams.set('singleEvents', 'true');
-    url.searchParams.set('orderBy', 'startTime');
+    const settled = await Promise.allSettled(
+      (rows as ConnectionRow[]).map(async (row) => {
+        const accessToken = await accessTokenFor(row);
+        const url = new URL(eventsBase);
+        url.searchParams.set('timeMin', timeMin);
+        url.searchParams.set('timeMax', timeMax);
+        // 250 = maximum accepté par l'API Calendar par page ; largement
+        // suffisant pour une grille semaine/mois d'un cabinet, par compte —
+        // pas de pagination gérée au-delà (limitation connue).
+        url.searchParams.set('maxResults', '250');
+        url.searchParams.set('singleEvents', 'true');
+        url.searchParams.set('orderBy', 'startTime');
+        const res = await fetch(url.toString(), {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || String(res.status));
+        return (data.items || []).map((e: any) => toClientEvent(e, row.id, row.google_email));
+      })
+    );
 
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
+    const events: any[] = [];
+    const failedAccounts: { connectionId: string; google_email: string | null; error: string }[] =
+      [];
+    settled.forEach((r, i) => {
+      const row = (rows as ConnectionRow[])[i];
+      if (r.status === 'fulfilled') {
+        events.push(...r.value);
+      } else {
+        console.error('[google-calendar-events] compte', row.google_email, 'échoué:', r.reason);
+        failedAccounts.push({
+          connectionId: row.id,
+          google_email: row.google_email,
+          error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+        });
+      }
     });
-    const data = await res.json();
-    if (!res.ok)
-      return json({ error: 'calendar list: ' + (data.error?.message || res.status) }, 502);
 
-    return json({ events: (data.items || []).map(toClientEvent) });
+    return json({ events, failedAccounts });
   }
 
-  // ─── DELETE — suppression, id en query param ───────────────────────────
+  // ─── DELETE — suppression, id + connectionId en query params ───────────
   if (req.method === 'DELETE') {
     const id = reqUrl.searchParams.get('id');
-    if (!id) return json({ error: 'id requis' }, 400);
+    const connectionId = reqUrl.searchParams.get('connectionId');
+    if (!id || !connectionId) return json({ error: 'id et connectionId requis' }, 400);
+
+    const row = await getConnectionRow(userId, connectionId);
+    if (!row) return json({ error: 'Compte Google introuvable ou non autorisé' }, 404);
+
+    let accessToken: string;
+    try {
+      accessToken = await accessTokenFor(row);
+    } catch (e) {
+      console.error('[google-calendar-events] token refresh failed', e);
+      return json(
+        { error: "Impossible de rafraîchir l'accès Google pour ce compte. Reconnecte-le." },
+        502
+      );
+    }
 
     const res = await fetch(`${eventsBase}/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -185,10 +248,24 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === 'PATCH') {
-    const { id, summary, start, end, description } = body || {};
-    if (!id || !summary || !start || !end) {
-      return json({ error: 'id, summary, start et end sont requis' }, 400);
+    const { id, summary, start, end, description, connectionId } = body || {};
+    if (!id || !summary || !start || !end || !connectionId) {
+      return json({ error: 'id, summary, start, end et connectionId sont requis' }, 400);
     }
+    const row = await getConnectionRow(userId, connectionId);
+    if (!row) return json({ error: 'Compte Google introuvable ou non autorisé' }, 404);
+
+    let accessToken: string;
+    try {
+      accessToken = await accessTokenFor(row);
+    } catch (e) {
+      console.error('[google-calendar-events] token refresh failed', e);
+      return json(
+        { error: "Impossible de rafraîchir l'accès Google pour ce compte. Reconnecte-le." },
+        502
+      );
+    }
+
     const res = await fetch(`${eventsBase}/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -202,13 +279,26 @@ Deno.serve(async (req) => {
     const data = await res.json();
     if (!res.ok)
       return json({ error: 'calendar update: ' + (data.error?.message || res.status) }, 502);
-    return json({ ok: true, event: toClientEvent(data) });
+    return json({ ok: true, event: toClientEvent(data, row.id, row.google_email) });
   }
 
   // POST — création d'un événement
-  const { summary, start, end, description } = body || {};
-  if (!summary || !start || !end) {
-    return json({ error: 'summary, start et end sont requis' }, 400);
+  const { summary, start, end, description, connectionId } = body || {};
+  if (!summary || !start || !end || !connectionId) {
+    return json({ error: 'summary, start, end et connectionId sont requis' }, 400);
+  }
+  const row = await getConnectionRow(userId, connectionId);
+  if (!row) return json({ error: 'Compte Google introuvable ou non autorisé' }, 404);
+
+  let accessToken: string;
+  try {
+    accessToken = await accessTokenFor(row);
+  } catch (e) {
+    console.error('[google-calendar-events] token refresh failed', e);
+    return json(
+      { error: "Impossible de rafraîchir l'accès Google pour ce compte. Reconnecte-le." },
+      502
+    );
   }
 
   const res = await fetch(eventsBase, {
@@ -225,5 +315,5 @@ Deno.serve(async (req) => {
   if (!res.ok)
     return json({ error: 'calendar create: ' + (data.error?.message || res.status) }, 502);
 
-  return json({ ok: true, event: toClientEvent(data) });
+  return json({ ok: true, event: toClientEvent(data, row.id, row.google_email) });
 });

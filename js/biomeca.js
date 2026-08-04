@@ -1412,13 +1412,23 @@ async function tryStartTrial() {
   }
 }
 
-// ===== AGENDA — Google Calendar + Apple Calendar (Task #177/#179/#178) =====
+// ===== AGENDA — Google Calendar + Apple Calendar (Task #177/#179/#178/#187) =====
 //
 // Google : quatre Edge Functions — google-calendar-init (démarre l'OAuth,
-// retourne l'URL d'autorisation Google), google-calendar-status (connected +
-// google_email, jamais le token), google-calendar-disconnect (révoque +
-// supprime), google-calendar-events (lecture/écriture). Le refresh token ne
-// transite JAMAIS côté client.
+// retourne l'URL d'autorisation Google), google-calendar-status (liste des
+// comptes connectés, jamais le token), google-calendar-disconnect (révoque +
+// supprime UN compte), google-calendar-events (lecture/écriture, agrège tous
+// les comptes). Le refresh token ne transite JAMAIS côté client.
+//
+// #187 — multi-comptes Google illimité (comme l'app Calendar native de
+// Scio, qui affiche plusieurs comptes simultanément) : agCal.googleConnections
+// est un TABLEAU (0..N), chaque connexion identifiée par son connectionId
+// (= id de la ligne agenda_connections). Apple reste volontairement
+// single-compte (un seul lien ICS). Chaque événement Google porte désormais
+// connectionId + accountEmail (tagués côté google-calendar-events) : la
+// grille les colore par compte (1er compte = bleu historique inchangé,
+// suivants = palette AG_GOOGLE_ACCENTS) et saveAgendaEvent()/deleteAgendaEvent()
+// les renvoient pour cibler le bon compte côté serveur.
 //
 // Apple (#178) : pas d'OAuth, le praticien colle l'URL d'un flux ICS public
 // iCloud. Quatre Edge Functions symétriques — apple-calendar-connect (teste
@@ -1449,31 +1459,49 @@ async function refreshGoogleCalendarStatus() {
     const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-status', { method: 'GET' });
     if (!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
-    agCal.googleConnected = !!data.connected;
-    renderGoogleCalendarStatus(data.connected, data.google_email);
+    agCal.googleConnections = data.connections || [];
+    agCal.googleConnected = agCal.googleConnections.length > 0;
+    renderGoogleCalendarStatus(agCal.googleConnections);
     return agCal.googleConnected;
   } catch (e) {
     console.error('[agenda] google-calendar-status failed:', e);
     box.textContent = 'Impossible de vérifier la connexion à Google Calendar.';
+    agCal.googleConnections = [];
     agCal.googleConnected = false;
     return false;
   }
 }
 
-function renderGoogleCalendarStatus(connected, email) {
+// #187 — une ligne par compte connecté (pastille couleur + email +
+// déconnexion individuelle), puis toujours un bouton "Ajouter un compte
+// Google" (illimité, contrairement à Apple qui reste single-compte).
+function renderGoogleCalendarStatus(connections) {
   const box = document.getElementById('agenda-google-status');
   if (!box) return;
-  if (connected) {
-    box.innerHTML =
-      '<div style="color:#27ae60;font-weight:600;">✓ Connecté' +
-      (email ? ' — ' + _escHtml(email) : '') +
-      '</div>' +
-      '<button class="btn" onclick="disconnectGoogleCalendar()" style="margin-top:8px;background:#c0392b;color:#fff;">Déconnecter</button>';
-  } else {
-    box.innerHTML =
-      '<div style="color:var(--mut);">Non connecté</div>' +
-      '<button class="btn" onclick="connectGoogleCalendar()" style="margin-top:8px;background:#4285F4;color:#fff;">Connecter Google Calendar</button>';
-  }
+  const rows = connections
+    .map(function (c, i) {
+      const accent = AG_GOOGLE_ACCENTS[i % AG_GOOGLE_ACCENTS.length];
+      const dotColor = accent ? accent.fg : '#4285F4';
+      return (
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' +
+        dotColor +
+        ';flex:0 0 auto;"></span>' +
+        '<span style="flex:1;font-weight:600;color:#27ae60;">' +
+        (c.google_email ? _escHtml(c.google_email) : 'Compte connecté') +
+        '</span>' +
+        '<button class="btn" onclick="disconnectGoogleCalendar(\'' +
+        c.id +
+        '\')" style="background:#c0392b;color:#fff;font-size:11px;padding:4px 10px;">Déconnecter</button>' +
+        '</div>'
+      );
+    })
+    .join('');
+  box.innerHTML =
+    (connections.length === 0 ? '<div style="color:var(--mut);margin-bottom:8px;">Non connecté</div>' : rows) +
+    '<button class="btn" onclick="connectGoogleCalendar()" style="margin-top:8px;background:#4285F4;color:#fff;">' +
+    (connections.length === 0 ? 'Connecter Google Calendar' : '+ Ajouter un compte Google') +
+    '</button>';
 }
 
 async function refreshAppleCalendarStatus() {
@@ -1565,9 +1593,45 @@ const agCal = {
   refDate: new Date(),
   events: [],
   editingId: null,
+  // #187 — plusieurs comptes Google possibles : [{id, google_email, updated_at}, ...].
+  // googleConnected reste dérivé (googleConnections.length > 0) pour tout le
+  // code existant qui ne fait qu'un simple test booléen (bouton "+ Événement",
+  // click-to-create sur cellule vide, etc.).
+  googleConnections: [],
   googleConnected: false,
+  googleFailedAccounts: [],
   appleConnected: false,
 };
+
+// #187 — accent visuel par compte Google au-delà du 1er (qui garde le bleu
+// historique var(--blue)/var(--blue-d), aucun style inline, zéro régression
+// visuelle pour l'usage à un seul compte). Évite le violet (réservé à
+// Apple, #178) et le rouge (déjà sémantique : suppression/erreur).
+const AG_GOOGLE_ACCENTS = [
+  null, // compte #1 : style CSS par défaut, inchangé
+  { bg: 'rgba(52,168,83,0.15)', fg: '#34a853' }, // compte #2 : vert
+  { bg: 'rgba(0,172,193,0.15)', fg: '#00acc1' }, // compte #3 : cyan
+  { bg: 'rgba(92,107,192,0.15)', fg: '#5c6bc0' }, // compte #4 : indigo
+  { bg: 'rgba(255,112,67,0.15)', fg: '#ff7043' }, // compte #5 : corail
+];
+// Au-delà de 5 comptes, la couleur recommence à tourner (#187 accepte une
+// dégradation gracieuse ici : l'email dans la modale reste la source fiable
+// de distinction, la couleur n'est qu'un repère visuel rapide).
+function _agGoogleAccentIndex(connectionId) {
+  const idx = agCal.googleConnections.findIndex(function (c) {
+    return c.id === connectionId;
+  });
+  return idx >= 0 ? idx % AG_GOOGLE_ACCENTS.length : 0;
+}
+// Style inline pour un événement Google d'un compte autre que le 1er —
+// chaîne vide pour Apple (garde sa classe CSS dédiée) et pour le 1er compte
+// Google (garde le style par défaut inchangé).
+function _agEventAccentStyle(e) {
+  if (e.source !== 'google') return '';
+  const accent = AG_GOOGLE_ACCENTS[_agGoogleAccentIndex(e.connectionId)];
+  if (!accent) return '';
+  return 'background:' + accent.bg + ';color:' + accent.fg + ';border-left-color:' + accent.fg + ';';
+}
 
 const AG_CAL_HOUR_START = 7; // fenêtre visible par défaut : 07h→21h (horaires cabinet usuels)
 const AG_CAL_HOUR_END = 21;
@@ -1632,17 +1696,29 @@ function _agDedupeKey(e) {
   return title + '|' + startMinute;
 }
 
-// Retire les événements Apple (lecture seule) qui doublonnent un événement
-// Google déjà présent — Google reste la source de vérité en cas de conflit,
-// puisque c'est le seul des deux modifiable depuis Verticy.
+// Retire les doublons entre sources — Google reste prioritaire sur Apple en
+// cas de conflit (seul modifiable depuis Verticy). #187 : généralisé aussi
+// aux collisions ENTRE comptes Google (même dédoublonnage déjà en place,
+// étendu — cf. décision Scio du 04/08/2026 : un événement partagé entre
+// deux comptes Google du même praticien ne doit apparaître qu'une fois).
+// Tri stable par priorité (Google avant Apple) puis 1ère occurrence de
+// chaque clé titre+minute gagne, quel que soit le compte/la source.
 function _agDedupeEvents(events) {
-  const googleKeys = {};
-  events.forEach(function (e) {
-    if (e.source === 'google') googleKeys[_agDedupeKey(e)] = true;
+  const priority = function (e) {
+    return e.source === 'google' ? 0 : 1;
+  };
+  const ordered = events.slice().sort(function (a, b) {
+    return priority(a) - priority(b);
   });
-  return events.filter(function (e) {
-    return e.source !== 'apple' || !googleKeys[_agDedupeKey(e)];
+  const seen = {};
+  const kept = [];
+  ordered.forEach(function (e) {
+    const k = _agDedupeKey(e);
+    if (seen[k]) return;
+    seen[k] = true;
+    kept.push(e);
   });
+  return kept;
 }
 
 async function loadAgendaCalendarEvents() {
@@ -1653,6 +1729,7 @@ async function loadAgendaCalendarEvents() {
   const timeMin = encodeURIComponent(start.toISOString());
   const timeMax = encodeURIComponent(end.toISOString());
 
+  agCal.googleFailedAccounts = [];
   const fetches = [];
   if (agCal.googleConnected) {
     fetches.push(
@@ -1662,9 +1739,12 @@ async function loadAgendaCalendarEvents() {
           return res.json();
         })
         .then(function (data) {
-          return (data.events || []).map(function (e) {
-            return Object.assign({ source: 'google' }, e);
-          });
+          // #187 — un compte Google en échec (token révoqué, etc.) ne doit
+          // pas faire disparaître silencieusement ses rendez-vous : signalé
+          // via googleFailedAccounts pour un bandeau visible (cf. rendu du
+          // toolbar), pas juste un console.error invisible au praticien.
+          agCal.googleFailedAccounts = data.failedAccounts || [];
+          return data.events || []; // déjà taggés source:'google'/connectionId côté Edge Function
         })
         .catch(function (e) {
           console.error('[agenda] google events failed:', e);
@@ -1769,6 +1849,21 @@ function renderAgendaCalendar() {
     '</div>' +
     '</div>';
 
+  // #187 — un compte Google en échec de rafraîchissement ne doit pas juste
+  // disparaître (ses rendez-vous manqueraient sans que ça ne se voie) :
+  // bandeau visible, même logique que la distinction clinique CLAUDE.md
+  // "jamais dessiné" vs "existe mais rechargement échoué".
+  const failedBanner =
+    agCal.googleFailedAccounts && agCal.googleFailedAccounts.length > 0
+      ? '<div style="background:#c0392b22;color:#c0392b;border:1px solid #c0392b55;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:8px;">⚠ ' +
+        agCal.googleFailedAccounts
+          .map(function (a) {
+            return _escHtml(a.google_email || 'compte Google');
+          })
+          .join(', ') +
+        ' — rechargement impossible, ces rendez-vous peuvent manquer. Reconnecte ce compte si besoin.</div>'
+      : '';
+
   const grid = agCal.view === 'week' ? _agRenderWeekGrid() : _agRenderMonthGrid();
   // #182-ter — préserve la position de défilement de la grille semaine (0h-24h,
   // fenêtre visible par défaut 7h-21h) d'un re-render à l'autre (ex : après
@@ -1776,7 +1871,7 @@ function renderAgendaCalendar() {
   // l'utilisateur à 7h même s'il avait scrollé vers un rendez-vous matinal/tardif.
   const prevBody = box.querySelector('.cal-week-bodyrow');
   const prevScrollTop = prevBody ? prevBody.scrollTop : null;
-  box.innerHTML = toolbar + grid;
+  box.innerHTML = failedBanner + toolbar + grid;
   if (agCal.view === 'week') {
     const newBody = box.querySelector('.cal-week-bodyrow');
     if (newBody) {
@@ -1864,6 +1959,8 @@ function _agRenderMonthGrid() {
           return (
             '<div class="cal-evchip' +
             (e.source === 'apple' ? ' cal-evchip-apple' : '') +
+            '" style="' +
+            _agEventAccentStyle(e) +
             '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
             e.id +
             '\')" title="' +
@@ -1941,6 +2038,8 @@ function _agRenderWeekGrid() {
       colInner +=
         '<div class="cal-week-allday' +
         (e.source === 'apple' ? ' cal-week-allday-apple' : '') +
+        '" style="' +
+        _agEventAccentStyle(e) +
         '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
         e.id +
         '\')">' +
@@ -1972,7 +2071,9 @@ function _agRenderWeekGrid() {
         top +
         'px;height:' +
         height +
-        'px;" onclick="event.stopPropagation();openAgendaEventModal(\'' +
+        'px;' +
+        _agEventAccentStyle(e) +
+        '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
         e.id +
         '\')" title="' +
         _escHtml(e.summary) +
@@ -2108,6 +2209,20 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '<input class="inp" id="agenda-ev-title" placeholder="Consultation..." value="' +
     (existing ? _escHtml(existing.summary) : '') +
     '"/>' +
+    // #187 — sélecteur de compte Google cible, uniquement à la création et
+    // seulement s'il y a un vrai choix à faire (>1 compte connecté). En
+    // édition, l'événement reste sur son compte d'origine (existing.connectionId,
+    // repris tel quel dans saveAgendaEvent — pas de "déplacer vers un autre
+    // compte" dans ce périmètre).
+    (!existing && agCal.googleConnections.length > 1
+      ? '<div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Compte Google</div><select class="inp" id="agenda-ev-account">' +
+        agCal.googleConnections
+          .map(function (c, i) {
+            return '<option value="' + _escHtml(c.id) + '">' + _escHtml(c.google_email || 'Compte ' + (i + 1)) + '</option>';
+          })
+          .join('') +
+        '</select></div>'
+      : '') +
     '<div class="g2" style="margin-top:6px;">' +
     '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local" value="' +
     startVal +
@@ -2147,11 +2262,32 @@ async function saveAgendaEvent() {
     alert('Titre, début et fin sont requis.');
     return;
   }
+
+  // #187 — compte Google cible : en édition, celui de l'événement d'origine
+  // (on ne déplace pas un événement entre comptes) ; en création, celui
+  // choisi dans le sélecteur s'il y en avait un, sinon le seul compte
+  // connecté.
+  let connectionId;
+  if (agCal.editingId) {
+    const existing = agCal.events.find(function (e) {
+      return e.id === agCal.editingId;
+    });
+    connectionId = existing ? existing.connectionId : null;
+  } else {
+    const accEl = document.getElementById('agenda-ev-account');
+    connectionId = accEl ? accEl.value : agCal.googleConnections[0] && agCal.googleConnections[0].id;
+  }
+  if (!connectionId) {
+    alert('Aucun compte Google connecté.');
+    return;
+  }
+
   const payload = {
     summary: title,
     start: new Date(start).toISOString(),
     end: new Date(end).toISOString(),
     description: desc || undefined,
+    connectionId: connectionId,
   };
   try {
     let res;
@@ -2180,10 +2316,18 @@ async function saveAgendaEvent() {
 async function deleteAgendaEvent() {
   if (!agCal.editingId) return;
   if (!confirm('Supprimer cet événement ?')) return;
+  // #187 — connectionId requis côté serveur pour savoir quel compte Google
+  // interroger (l'id d'événement seul ne suffit plus, il y a potentiellement
+  // plusieurs comptes).
+  const existing = agCal.events.find(function (e) {
+    return e.id === agCal.editingId;
+  });
+  const connectionId = existing ? existing.connectionId : '';
   try {
-    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events?id=' + encodeURIComponent(agCal.editingId), {
-      method: 'DELETE',
-    });
+    const res = await authFetch(
+      SUPA_URL + '/functions/v1/google-calendar-events?id=' + encodeURIComponent(agCal.editingId) + '&connectionId=' + encodeURIComponent(connectionId),
+      { method: 'DELETE' }
+    );
     if (!res.ok) throw new Error('delete ' + res.status);
     closeAgendaEventModal();
     await loadAgendaCalendarEvents();
@@ -2193,6 +2337,10 @@ async function deleteAgendaEvent() {
   }
 }
 
+// #187 — un seul point d'entrée pour "connecter un compte Google", que ce
+// soit le premier ou un supplémentaire : prompt=consent (google-calendar-init)
+// force à chaque fois l'écran de sélection de compte Google, donc rien de
+// spécial à faire ici pour ajouter un 2e/3e compte plutôt que le tout premier.
 async function connectGoogleCalendar() {
   try {
     const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-init', {
@@ -2211,16 +2359,24 @@ async function connectGoogleCalendar() {
   }
 }
 
-async function disconnectGoogleCalendar() {
-  if (!confirm('Déconnecter Google Calendar ?')) return;
+// #187 — déconnecte UN compte précis (connectionId, bouton dédié par ligne
+// dans renderGoogleCalendarStatus), pas "tout Google" comme avant. Repasse
+// par initAgendaPage() (pas juste refreshGoogleCalendarStatus comme avant
+// #187) pour que les événements de ce compte disparaissent aussitôt de la
+// grille, et que la carte calendrier se masque si plus aucun provider n'est
+// connecté — corrige au passage un angle mort pré-existant (Apple le
+// faisait déjà via disconnectAppleCalendar, pas Google).
+async function disconnectGoogleCalendar(connectionId) {
+  if (!connectionId) return;
+  if (!confirm('Déconnecter ce compte Google ?')) return;
   try {
     const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-disconnect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: '{}',
+      body: JSON.stringify({ connectionId: connectionId }),
     });
     if (!res.ok) throw new Error('disconnect ' + res.status);
-    await refreshGoogleCalendarStatus();
+    await initAgendaPage();
   } catch (e) {
     console.error('[agenda] disconnectGoogleCalendar failed:', e);
     alert('La déconnexion a échoué. Réessaie plus tard.');
