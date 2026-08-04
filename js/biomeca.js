@@ -1569,9 +1569,15 @@ const agCal = {
   appleConnected: false,
 };
 
-const AG_CAL_HOUR_START = 7; // grille semaine : 07h→21h (horaires cabinet usuels)
+const AG_CAL_HOUR_START = 7; // fenêtre visible par défaut : 07h→21h (horaires cabinet usuels)
 const AG_CAL_HOUR_END = 21;
 const AG_CAL_ROW_H = 40; // px par heure dans la grille semaine
+// #182-ter — la grille couvre les 24h (défilable) pour qu'un rendez-vous
+// avant 7h ou après 21h reste consultable, sans changer l'apparence par
+// défaut : seule la fenêtre AG_CAL_HOUR_START→AG_CAL_HOUR_END est visible
+// au chargement, le reste s'atteint en scrollant dans la colonne.
+const AG_CAL_GRID_START = 0;
+const AG_CAL_GRID_END = 24;
 
 function _agStartOfWeek(d) {
   // Semaine FR : lundi → dimanche.
@@ -1764,13 +1770,59 @@ function renderAgendaCalendar() {
     '</div>';
 
   const grid = agCal.view === 'week' ? _agRenderWeekGrid() : _agRenderMonthGrid();
+  // #182-ter — préserve la position de défilement de la grille semaine (0h-24h,
+  // fenêtre visible par défaut 7h-21h) d'un re-render à l'autre (ex : après
+  // création/édition d'un événement) ; sinon chaque rafraîchissement ramènerait
+  // l'utilisateur à 7h même s'il avait scrollé vers un rendez-vous matinal/tardif.
+  const prevBody = box.querySelector('.cal-week-bodyrow');
+  const prevScrollTop = prevBody ? prevBody.scrollTop : null;
   box.innerHTML = toolbar + grid;
+  if (agCal.view === 'week') {
+    const newBody = box.querySelector('.cal-week-bodyrow');
+    if (newBody) {
+      newBody.scrollTop = prevScrollTop !== null ? prevScrollTop : AG_CAL_HOUR_START * AG_CAL_ROW_H;
+    }
+  }
 }
 
 function _agEventsOnDay(dateKey) {
   return agCal.events
     .filter(function (e) {
       return _agIsoDateKey(e.start) === dateKey;
+    })
+    .sort(function (a, b) {
+      return (a.start || '').localeCompare(b.start || '');
+    });
+}
+
+// #182-bis — un événement horodaté (Apple ou Google) qui traverse minuit
+// (ex : 19h→17h le lendemain) n'est PAS rattaché au seul jour de départ dans
+// la grille semaine : sans ça, la portion après minuit disparaît purement et
+// simplement (aucune trace sur la colonne du lendemain), ce qui est le genre
+// de rapport amputé silencieux que ce projet s'interdit (cf. CLAUDE.md,
+// distinction clinique). Cette fonction calcule le segment de l'événement `e`
+// visible dans la journée civile locale `dayDate`, borné à [00:00, 24:00[.
+// Retourne null si `e` n'a pas d'heure (all-day, traité séparément) ou ne
+// recoupe pas ce jour.
+function _agEventSegmentOnDay(e, dayDate) {
+  if (!e.start || !e.start.includes('T')) return null;
+  const s = new Date(e.start);
+  const en = e.end && e.end.includes('T') ? new Date(e.end) : new Date(s.getTime() + 30 * 60000);
+  const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate());
+  const dayEnd = _agAddDays(dayStart, 1);
+  const segStart = s < dayStart ? dayStart : s;
+  const segEnd = en > dayEnd ? dayEnd : en;
+  if (segEnd <= segStart) return null; // pas de recouvrement avec ce jour
+  return { segStart: segStart, segEnd: segEnd };
+}
+
+// Événements horodatés dont un segment recoupe `dayDate` — à la différence
+// de _agEventsOnDay, inclut les événements démarrés la veille (ou avant) qui
+// se prolongent sur ce jour.
+function _agTimedEventsOverlappingDay(dayDate) {
+  return agCal.events
+    .filter(function (e) {
+      return _agEventSegmentOnDay(e, dayDate) !== null;
     })
     .sort(function (a, b) {
       return (a.start || '').localeCompare(b.start || '');
@@ -1832,16 +1884,23 @@ function _agRenderMonthGrid() {
 // Structure flex à 2 lignes (headerrow + bodyrow), chacune avec 8 cases
 // (1 colonne d'heures/coin + 7 jours). Un vrai CSS Grid ici demanderait un
 // placement explicite (grid-row/grid-column) pour que la colonne d'heures
-// (14 lignes de 1 cellule) cohabite avec les colonnes de jour (1 cellule
-// haute de 14 lignes) — sans ça, l'auto-placement de la grille les répartit
+// (24 lignes de 1 cellule) cohabite avec les colonnes de jour (1 cellule
+// haute de 24 lignes) — sans ça, l'auto-placement de la grille les répartit
 // n'importe où (bug constaté : heures et événements décalés/mélangés).
 // Le flex évite le problème : chaque case est un simple item de rang 1.
+// La bodyrow a une hauteur figée (fenêtre 7h-21h) avec overflow-y:auto : le
+// contenu réel couvre 0h-24h, défilable pour les rendez-vous hors cabinet
+// usuel (#182-ter).
 function _agRenderWeekGrid() {
   const start = _agStartOfWeek(agCal.refDate);
   const todayKey = _agDateKey(new Date());
   const DOW = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-  const totalHours = AG_CAL_HOUR_END - AG_CAL_HOUR_START;
+  // Grille réelle (défilable) : 24h. Fenêtre visible par défaut au chargement
+  // (hauteur figée du conteneur de scroll) : AG_CAL_HOUR_START→AG_CAL_HOUR_END,
+  // inchangée visuellement pour qui ne scrolle pas.
+  const totalHours = AG_CAL_GRID_END - AG_CAL_GRID_START;
   const gridHeight = totalHours * AG_CAL_ROW_H;
+  const viewportHeight = (AG_CAL_HOUR_END - AG_CAL_HOUR_START) * AG_CAL_ROW_H;
 
   const days = [];
   for (let i = 0; i < 7; i++) days.push(_agAddDays(start, i));
@@ -1860,22 +1919,22 @@ function _agRenderWeekGrid() {
   });
 
   let hourCol = '';
-  for (let h = AG_CAL_HOUR_START; h < AG_CAL_HOUR_END; h++) {
+  for (let h = AG_CAL_GRID_START; h < AG_CAL_GRID_END; h++) {
     hourCol += '<div class="cal-week-hourlabel" style="height:' + AG_CAL_ROW_H + 'px;">' + h + 'h</div>';
   }
 
   let dayCols = '';
   days.forEach(function (d) {
     const key = _agDateKey(d);
-    const dayEvents = _agEventsOnDay(key).filter(function (e) {
-      return e.start && e.start.includes('T'); // exclut les all-day de la grille horaire
-    });
+    // #182-bis — recoupement du jour (pas seulement jour de départ), pour
+    // que la portion après-minuit d'un événement horodaté reste visible.
+    const dayEvents = _agTimedEventsOverlappingDay(d);
     const allDay = _agEventsOnDay(key).filter(function (e) {
       return !e.start || !e.start.includes('T');
     });
 
     let colInner = '';
-    for (let h = AG_CAL_HOUR_START; h < AG_CAL_HOUR_END; h++) {
+    for (let h = AG_CAL_GRID_START; h < AG_CAL_GRID_END; h++) {
       colInner += '<div class="cal-week-hourline" style="height:' + AG_CAL_ROW_H + 'px;"></div>';
     }
     allDay.forEach(function (e) {
@@ -1889,13 +1948,23 @@ function _agRenderWeekGrid() {
         '</div>';
     });
     dayEvents.forEach(function (e) {
-      const s = new Date(e.start);
-      const en = e.end ? new Date(e.end) : new Date(s.getTime() + 30 * 60000);
-      const startMin = Math.max(0, (s.getHours() - AG_CAL_HOUR_START) * 60 + s.getMinutes());
-      const durMin = Math.max(15, (en.getTime() - s.getTime()) / 60000);
+      // Segment de CET événement borné à CE jour — un événement qui
+      // traverse minuit produit un segment distinct par jour traversé
+      // (ex : 19h→24h le jeudi, 00h→17h le vendredi), chacun cliquable et
+      // ouvrant la même modale avec la plage complète d'origine.
+      const seg = _agEventSegmentOnDay(e, d);
+      if (!seg) return;
+      const s = seg.segStart;
+      const en = seg.segEnd;
+      // Grille = 24h entières (AG_CAL_GRID_START=0) : plus de clamp/rejet
+      // ici, un rendez-vous avant 7h ou après 21h reste positionné à sa
+      // vraie heure, simplement hors de la fenêtre visible par défaut —
+      // atteignable en scrollant (#182-ter).
+      const startMin = (s.getHours() - AG_CAL_GRID_START) * 60 + s.getMinutes();
+      const rawDurMin = Math.max(15, (en.getTime() - s.getTime()) / 60000);
+      const durMin = Math.min(rawDurMin, totalHours * 60 - startMin); // ne déborde pas la grille
       const top = (startMin / 60) * AG_CAL_ROW_H;
       const height = Math.max(18, (durMin / 60) * AG_CAL_ROW_H);
-      if (startMin >= totalHours * 60) return; // hors plage affichée
       colInner +=
         '<div class="cal-week-event' +
         (e.source === 'apple' ? ' cal-week-event-apple' : '') +
@@ -1927,7 +1996,12 @@ function _agRenderWeekGrid() {
     '<div class="cal-week-headerrow">' +
     headerRow +
     '</div>' +
-    '<div class="cal-week-bodyrow">' +
+    // Hauteur figée = fenêtre 7h-21h par défaut ; le contenu réel (24h) déborde
+    // et devient consultable au scroll (overflow-y:auto), cf. renderAgendaCalendar()
+    // pour le scrollTop initial/préservé.
+    '<div class="cal-week-bodyrow" style="max-height:' +
+    viewportHeight +
+    'px;overflow-y:auto;">' +
     '<div class="cal-week-hourcol">' +
     hourCol +
     '</div>' +
@@ -1957,10 +2031,20 @@ function _agFormatRangeReadable(startIso, endIso) {
     return String(n).padStart(2, '0');
   };
   const s = new Date(startIso);
-  const label = pad(s.getDate()) + '/' + pad(s.getMonth() + 1) + '/' + s.getFullYear() + ' à ' + pad(s.getHours()) + ':' + pad(s.getMinutes());
+  const dateLabel = function (d) {
+    return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+  };
+  const timeLabel = function (d) {
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  };
+  const label = dateLabel(s) + ' à ' + timeLabel(s);
   if (!endIso || !endIso.includes('T')) return label;
   const e = new Date(endIso);
-  return label + ' – ' + pad(e.getHours()) + ':' + pad(e.getMinutes());
+  // #182-bis — si la fin tombe un autre jour que le départ (ex : 19h→17h le
+  // lendemain), afficher sa date évite qu'un "– 17:00" nu laisse croire à
+  // une fin le même jour (rapport trompeur, pas seulement amputé).
+  const sameDay = dateLabel(e) === dateLabel(s);
+  return label + ' – ' + (sameDay ? timeLabel(e) : dateLabel(e) + ' à ' + timeLabel(e));
 }
 
 function openAgendaEventModal(eventId, prefillLocal) {
