@@ -3123,15 +3123,21 @@
         Connexion directe en lecture/écriture depuis Verticy.
       </p>
       <div id="agenda-google-status" style="font-size:13px;color:var(--mut);">Chargement…</div>
-      <div id="agenda-google-events"></div>
     </div>
 
-    <!-- Apple Calendar — reporté #178 -->
-    <div class="card">
+    <!-- Apple Calendar — ICS lecture seule (#178) -->
+    <div class="card" style="margin-bottom:16px;">
       <div class="stitle">Apple Calendar</div>
-      <p style="font-size:13px;color:var(--mut);">
-        Lecture seule via flux ICS public — bientôt disponible.
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
+        Lecture seule via flux ICS public. Dans l'app Calendrier : clic droit sur UN calendrier iCloud natif (pas un compte externe déjà visible dans la même app) → Partager le calendrier → Calendrier public → colle le lien ci-dessous.
       </p>
+      <div id="agenda-apple-status" style="font-size:13px;color:var(--mut);">Chargement…</div>
+    </div>
+
+    <!-- Grille calendrier unifiée — fusion Google + Apple (#182/#178) -->
+    <div class="card" id="agenda-calendar-card" style="display:none;">
+      <div class="stitle">Calendrier</div>
+      <div id="agenda-calendar-grid"></div>
     </div>
   </div>
 </div>

@@ -1412,36 +1412,51 @@ async function tryStartTrial() {
   }
 }
 
-// ===== AGENDA — Google Calendar (Task #177/#179) =====
+// ===== AGENDA — Google Calendar + Apple Calendar (Task #177/#179/#178) =====
 //
-// Trois Edge Functions : google-calendar-init (démarre l'OAuth, retourne
-// l'URL d'autorisation Google), google-calendar-status (connected +
+// Google : quatre Edge Functions — google-calendar-init (démarre l'OAuth,
+// retourne l'URL d'autorisation Google), google-calendar-status (connected +
 // google_email, jamais le token), google-calendar-disconnect (révoque +
-// supprime). Le refresh token ne transite JAMAIS côté client — authFetch
-// porte uniquement le JWT Supabase du praticien.
+// supprime), google-calendar-events (lecture/écriture). Le refresh token ne
+// transite JAMAIS côté client.
+//
+// Apple (#178) : pas d'OAuth, le praticien colle l'URL d'un flux ICS public
+// iCloud. Quatre Edge Functions symétriques — apple-calendar-connect (teste
+// le lien + stocke), apple-calendar-status, apple-calendar-disconnect,
+// apple-calendar-events (lecture seule, parse le ICS côté serveur). L'URL
+// ICS ne transite JAMAIS côté client une fois enregistrée.
+//
+// authFetch porte uniquement le JWT Supabase du praticien dans les deux cas.
 
 async function initAgendaPage() {
-  await refreshGoogleCalendarStatus();
+  const results = await Promise.all([refreshGoogleCalendarStatus(), refreshAppleCalendarStatus()]);
+  const anyConnected = results[0] || results[1];
+  const card = document.getElementById('agenda-calendar-card');
+  if (anyConnected) {
+    if (card) card.style.display = '';
+    initAgendaCalendar();
+  } else {
+    if (card) card.style.display = 'none';
+    agCal.events = [];
+  }
 }
 
 async function refreshGoogleCalendarStatus() {
   const box = document.getElementById('agenda-google-status');
-  if (!box) return;
+  if (!box) return false;
   box.textContent = 'Chargement…';
   try {
     const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-status', { method: 'GET' });
     if (!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
+    agCal.googleConnected = !!data.connected;
     renderGoogleCalendarStatus(data.connected, data.google_email);
-    if (data.connected) {
-      initAgendaCalendar();
-    } else {
-      const evBox = document.getElementById('agenda-google-events');
-      if (evBox) evBox.innerHTML = '';
-    }
+    return agCal.googleConnected;
   } catch (e) {
     console.error('[agenda] google-calendar-status failed:', e);
     box.textContent = 'Impossible de vérifier la connexion à Google Calendar.';
+    agCal.googleConnected = false;
+    return false;
   }
 }
 
@@ -1461,6 +1476,83 @@ function renderGoogleCalendarStatus(connected, email) {
   }
 }
 
+async function refreshAppleCalendarStatus() {
+  const box = document.getElementById('agenda-apple-status');
+  if (!box) return false;
+  box.textContent = 'Chargement…';
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/apple-calendar-status', { method: 'GET' });
+    if (!res.ok) throw new Error('status ' + res.status);
+    const data = await res.json();
+    agCal.appleConnected = !!data.connected;
+    renderAppleCalendarStatus(data.connected, data.calendar_name);
+    return agCal.appleConnected;
+  } catch (e) {
+    console.error('[agenda] apple-calendar-status failed:', e);
+    box.textContent = 'Impossible de vérifier la connexion à Apple Calendar.';
+    agCal.appleConnected = false;
+    return false;
+  }
+}
+
+function renderAppleCalendarStatus(connected, calendarName) {
+  const box = document.getElementById('agenda-apple-status');
+  if (!box) return;
+  if (connected) {
+    box.innerHTML =
+      '<div style="color:#27ae60;font-weight:600;">✓ Connecté' +
+      (calendarName ? ' — ' + _escHtml(calendarName) : '') +
+      '</div>' +
+      '<button class="btn" onclick="disconnectAppleCalendar()" style="margin-top:8px;background:#c0392b;color:#fff;">Déconnecter</button>';
+  } else {
+    box.innerHTML =
+      '<div style="color:var(--mut);margin-bottom:8px;">Non connecté</div>' +
+      '<input class="inp" id="agenda-apple-url" placeholder="webcal://p12-caldav.icloud.com/published/2/..." style="margin-bottom:8px;"/>' +
+      '<button class="btn" onclick="connectAppleCalendar()" style="background:#555;color:#fff;">Connecter Apple Calendar</button>';
+  }
+}
+
+async function connectAppleCalendar() {
+  const input = document.getElementById('agenda-apple-url');
+  const icsUrl = input ? input.value.trim() : '';
+  if (!icsUrl) {
+    alert("Colle d'abord le lien du flux ICS.");
+    return;
+  }
+  const box = document.getElementById('agenda-apple-status');
+  if (box) box.innerHTML = '<div style="color:var(--mut);">Connexion…</div>';
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/apple-calendar-connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ icsUrl: icsUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data && data.error) || 'connect ' + res.status);
+    await initAgendaPage();
+  } catch (e) {
+    console.error('[agenda] connectAppleCalendar failed:', e);
+    alert('Connexion impossible : ' + (e && e.message ? e.message : 'réessaie plus tard.'));
+    renderAppleCalendarStatus(false, null);
+  }
+}
+
+async function disconnectAppleCalendar() {
+  if (!confirm('Déconnecter Apple Calendar ?')) return;
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/apple-calendar-disconnect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error('disconnect ' + res.status);
+    await initAgendaPage();
+  } catch (e) {
+    console.error('[agenda] disconnectAppleCalendar failed:', e);
+    alert('La déconnexion a échoué. Réessaie plus tard.');
+  }
+}
+
 // ===== Agenda — grille calendrier semaine/mois (Task #182) =====
 //
 // État module (une seule page Agenda affichée à la fois — pas besoin
@@ -1473,6 +1565,8 @@ const agCal = {
   refDate: new Date(),
   events: [],
   editingId: null,
+  googleConnected: false,
+  appleConnected: false,
 };
 
 const AG_CAL_HOUR_START = 7; // grille semaine : 07h→21h (horaires cabinet usuels)
@@ -1521,22 +1615,80 @@ function _agRange() {
   return { start: gridStart, end: _agAddDays(gridStart, 42) };
 }
 
+// Clé de dédoublonnage : titre normalisé + horaire de début à la minute.
+// Sert de filet si un praticien partage un calendrier iCloud qui recoupe
+// son compte Google déjà connecté (cf. échange avec Scio le 04/08/2026) —
+// le lien de partage étant censé être scoped à un seul calendrier iCloud
+// natif, ce cas ne devrait normalement pas se produire.
+function _agDedupeKey(e) {
+  const title = (e.summary || '').trim().toLowerCase();
+  const startMinute = e.start ? e.start.slice(0, 16) : '';
+  return title + '|' + startMinute;
+}
+
+// Retire les événements Apple (lecture seule) qui doublonnent un événement
+// Google déjà présent — Google reste la source de vérité en cas de conflit,
+// puisque c'est le seul des deux modifiable depuis Verticy.
+function _agDedupeEvents(events) {
+  const googleKeys = {};
+  events.forEach(function (e) {
+    if (e.source === 'google') googleKeys[_agDedupeKey(e)] = true;
+  });
+  return events.filter(function (e) {
+    return e.source !== 'apple' || !googleKeys[_agDedupeKey(e)];
+  });
+}
+
 async function loadAgendaCalendarEvents() {
-  const box = document.getElementById('agenda-google-events');
+  const box = document.getElementById('agenda-calendar-grid');
   if (!box) return;
   box.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Chargement du calendrier…</div>';
   const { start, end } = _agRange();
+  const timeMin = encodeURIComponent(start.toISOString());
+  const timeMax = encodeURIComponent(end.toISOString());
+
+  const fetches = [];
+  if (agCal.googleConnected) {
+    fetches.push(
+      authFetch(SUPA_URL + '/functions/v1/google-calendar-events?timeMin=' + timeMin + '&timeMax=' + timeMax, { method: 'GET' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('google events ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          return (data.events || []).map(function (e) {
+            return Object.assign({ source: 'google' }, e);
+          });
+        })
+        .catch(function (e) {
+          console.error('[agenda] google events failed:', e);
+          return [];
+        })
+    );
+  }
+  if (agCal.appleConnected) {
+    fetches.push(
+      authFetch(SUPA_URL + '/functions/v1/apple-calendar-events?timeMin=' + timeMin + '&timeMax=' + timeMax, { method: 'GET' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('apple events ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          return data.events || []; // déjà taggés source:'apple' côté Edge Function
+        })
+        .catch(function (e) {
+          console.error('[agenda] apple events failed:', e);
+          return [];
+        })
+    );
+  }
+
   try {
-    const url =
-      SUPA_URL +
-      '/functions/v1/google-calendar-events?timeMin=' +
-      encodeURIComponent(start.toISOString()) +
-      '&timeMax=' +
-      encodeURIComponent(end.toISOString());
-    const res = await authFetch(url, { method: 'GET' });
-    if (!res.ok) throw new Error('events ' + res.status);
-    const data = await res.json();
-    agCal.events = data.events || [];
+    const results = await Promise.all(fetches);
+    const merged = results.reduce(function (acc, list) {
+      return acc.concat(list);
+    }, []);
+    agCal.events = _agDedupeEvents(merged);
     renderAgendaCalendar();
   } catch (e) {
     console.error('[agenda] loadAgendaCalendarEvents failed:', e);
@@ -1563,7 +1715,7 @@ function agCalSetView(view) {
 }
 
 function renderAgendaCalendar() {
-  const box = document.getElementById('agenda-google-events');
+  const box = document.getElementById('agenda-calendar-grid');
   if (!box) return;
   const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   let title;
@@ -1602,7 +1754,12 @@ function renderAgendaCalendar() {
     (agCal.view === 'month' ? 'cal-view-active' : '') +
     '" onclick="agCalSetView(\'month\')">Mois</button>' +
     '</div>' +
-    '<button class="btn btn-blue" onclick="openAgendaEventModal(null)" style="font-size:11px;padding:5px 12px;">+ Événement</button>' +
+    // Créer un événement écrit toujours dans Google (seul agenda modifiable
+    // depuis Verticy) — masqué si Google n'est pas connecté, même si Apple
+    // (lecture seule) l'est.
+    (agCal.googleConnected
+      ? '<button class="btn btn-blue" onclick="openAgendaEventModal(null)" style="font-size:11px;padding:5px 12px;">+ Événement</button>'
+      : '') +
     '</div>' +
     '</div>';
 
@@ -1644,16 +1801,18 @@ function _agRenderMonthGrid() {
       '<div class="cal-day' +
       (isOther ? ' cal-day-other' : '') +
       (isToday ? ' cal-day-today' : '') +
-      '" onclick="openAgendaEventModal(null,\'' +
-      key +
-      '\')">' +
+      '" onclick="' +
+      (agCal.googleConnected ? "openAgendaEventModal(null,'" + key + "')" : '') +
+      '">' +
       '<div class="cal-daynum">' +
       day.getDate() +
       '</div>' +
       shown
         .map(function (e) {
           return (
-            '<div class="cal-evchip" onclick="event.stopPropagation();openAgendaEventModal(\'' +
+            '<div class="cal-evchip' +
+            (e.source === 'apple' ? ' cal-evchip-apple' : '') +
+            '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
             e.id +
             '\')" title="' +
             _escHtml(e.summary) +
@@ -1721,7 +1880,9 @@ function _agRenderWeekGrid() {
     }
     allDay.forEach(function (e) {
       colInner +=
-        '<div class="cal-week-allday" onclick="event.stopPropagation();openAgendaEventModal(\'' +
+        '<div class="cal-week-allday' +
+        (e.source === 'apple' ? ' cal-week-allday-apple' : '') +
+        '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
         e.id +
         '\')">' +
         _escHtml(e.summary) +
@@ -1736,7 +1897,9 @@ function _agRenderWeekGrid() {
       const height = Math.max(18, (durMin / 60) * AG_CAL_ROW_H);
       if (startMin >= totalHours * 60) return; // hors plage affichée
       colInner +=
-        '<div class="cal-week-event" style="top:' +
+        '<div class="cal-week-event' +
+        (e.source === 'apple' ? ' cal-week-event-apple' : '') +
+        '" style="top:' +
         top +
         'px;height:' +
         height +
@@ -1752,11 +1915,9 @@ function _agRenderWeekGrid() {
     dayCols +=
       '<div class="cal-week-col" style="height:' +
       gridHeight +
-      'px;" onclick="openAgendaEventModal(null,\'' +
-      key +
-      'T' +
-      String(AG_CAL_HOUR_START).padStart(2, '0') +
-      ':00\')">' +
+      'px;" onclick="' +
+      (agCal.googleConnected ? "openAgendaEventModal(null,'" + key + 'T' + String(AG_CAL_HOUR_START).padStart(2, '0') + ":00')" : '') +
+      '">' +
       colInner +
       '</div>';
   });
@@ -1787,9 +1948,53 @@ function _agToLocalInputValue(iso) {
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
+// Formatte une plage start/end (ISO dateTime ou date pure all-day) en texte
+// lisible pour la modale en lecture seule des événements Apple.
+function _agFormatRangeReadable(startIso, endIso) {
+  if (!startIso) return '';
+  if (!startIso.includes('T')) return 'Toute la journée — ' + startIso;
+  const pad = function (n) {
+    return String(n).padStart(2, '0');
+  };
+  const s = new Date(startIso);
+  const label = pad(s.getDate()) + '/' + pad(s.getMonth() + 1) + '/' + s.getFullYear() + ' à ' + pad(s.getHours()) + ':' + pad(s.getMinutes());
+  if (!endIso || !endIso.includes('T')) return label;
+  const e = new Date(endIso);
+  return label + ' – ' + pad(e.getHours()) + ':' + pad(e.getMinutes());
+}
+
 function openAgendaEventModal(eventId, prefillLocal) {
-  agCal.editingId = eventId || null;
   const existing = eventId ? agCal.events.find((e) => e.id === eventId) : null;
+
+  // Apple Calendar est lecture seule (#178) : pas de formulaire d'édition,
+  // juste un rappel des infos et un bouton Fermer.
+  if (existing && existing.source === 'apple') {
+    agCal.editingId = null;
+    const overlay = document.createElement('div');
+    overlay.className = 'cal-event-modal-backdrop';
+    overlay.id = 'agenda-event-modal-backdrop';
+    overlay.onclick = function (ev) {
+      if (ev.target === overlay) closeAgendaEventModal();
+    };
+    overlay.innerHTML =
+      '<div class="cal-event-modal">' +
+      '<div class="stitle">' +
+      _escHtml(existing.summary) +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--mut);margin-bottom:4px;">📅 Apple Calendar — lecture seule</div>' +
+      '<div style="font-size:13px;margin-bottom:8px;">' +
+      _escHtml(_agFormatRangeReadable(existing.start, existing.end)) +
+      '</div>' +
+      (existing.description
+        ? '<div style="font-size:12px;color:var(--mut);white-space:pre-wrap;margin-bottom:8px;">' + _escHtml(existing.description) + '</div>'
+        : '') +
+      '<button class="btn" onclick="closeAgendaEventModal()" style="width:100%;">Fermer</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    return;
+  }
+
+  agCal.editingId = eventId || null;
 
   let startVal = '';
   let endVal = '';
