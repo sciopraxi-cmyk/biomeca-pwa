@@ -674,3 +674,97 @@ body.printing #rpt-print{display:block!important;}
   color:#fff !important;
   border-color:#e11d48 !important;
 }
+
+/* #182 — Onglet Agenda : grille calendrier semaine/mois façon Google Calendar. */
+.cal-toolbar {
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:10px; margin:14px 0 10px;
+}
+.cal-title {
+  font-size:14px; font-weight:600; color:var(--txt); margin-left:4px;
+}
+.cal-nav-btn {
+  padding:4px 10px; font-weight:700; line-height:1;
+}
+.cal-view-toggle {
+  display:inline-flex; border:1px solid var(--bord); border-radius:var(--rs); overflow:hidden;
+}
+.cal-view-toggle button {
+  background:var(--surf); color:var(--mut); border:none; cursor:pointer;
+  font-size:11px; font-family:var(--f); padding:5px 12px;
+}
+.cal-view-toggle button.cal-view-active {
+  background:var(--blue); color:#04231c; font-weight:700;
+}
+
+.cal-grid-month {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  gap:1px; background:var(--bord); border:1px solid var(--bord);
+  border-radius:var(--rs); overflow:hidden;
+}
+.cal-dow {
+  background:var(--surf); color:var(--mut); font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em; text-align:center; padding:6px 2px;
+}
+.cal-day {
+  background:var(--card); min-height:82px; padding:4px; cursor:pointer;
+  position:relative; transition:background .12s;
+}
+.cal-day:hover { background:var(--surf); }
+.cal-day-other { opacity:.35; }
+.cal-daynum {
+  display:inline-block; min-width:20px; height:20px; line-height:20px;
+  text-align:center; font-size:11px; font-weight:600; color:var(--txt);
+  border-radius:50%; margin-bottom:2px;
+}
+.cal-day-today .cal-daynum { background:var(--blue); color:#04231c; }
+.cal-evchip {
+  background:var(--blue-d); color:var(--blue); border-left:3px solid var(--blue);
+  border-radius:3px; padding:1px 4px; font-size:10px; margin-top:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
+}
+.cal-evchip:hover { background:var(--blue); color:#04231c; }
+.cal-more { font-size:9px; color:var(--mut); margin-top:2px; cursor:pointer; }
+
+.cal-grid-week {
+  display:grid; grid-template-columns:44px repeat(7,1fr);
+  border:1px solid var(--bord); border-radius:var(--rs); overflow:hidden;
+  background:var(--card);
+}
+.cal-week-head {
+  background:var(--surf); color:var(--mut); font-size:10px; font-weight:600;
+  text-align:center; padding:6px 2px; text-transform:uppercase;
+  border-bottom:1px solid var(--bord); border-left:1px solid var(--bord);
+}
+.cal-week-head-today { color:var(--blue); }
+.cal-week-hourlabel {
+  font-size:9px; color:var(--mut); text-align:right; padding-right:4px;
+  border-top:1px solid var(--bord); box-sizing:border-box;
+}
+.cal-week-col {
+  position:relative; border-left:1px solid var(--bord); cursor:pointer;
+  box-sizing:border-box;
+}
+.cal-week-hourline {
+  border-top:1px solid var(--bord); box-sizing:border-box;
+}
+.cal-week-event {
+  position:absolute; left:2px; right:2px; background:var(--blue-d); color:var(--blue);
+  border-left:3px solid var(--blue); border-radius:4px; padding:2px 4px;
+  font-size:10px; overflow:hidden; cursor:pointer; box-sizing:border-box;
+}
+.cal-week-event:hover { background:var(--blue); color:#04231c; }
+.cal-week-allday {
+  background:var(--orange-d); color:var(--orange); border-left:3px solid var(--orange);
+  border-radius:3px; padding:1px 4px; font-size:10px; margin:2px; cursor:pointer;
+}
+
+.cal-event-modal-backdrop {
+  position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  display:flex; align-items:center; justify-content:center; z-index:1000;
+  padding:16px;
+}
+.cal-event-modal {
+  background:var(--card); border:1px solid var(--bord); border-radius:var(--r);
+  padding:16px; width:340px; max-width:100%;
+}

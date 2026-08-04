@@ -1,9 +1,14 @@
 // Edge Function google-calendar-events — lecture/écriture des événements
-// Google Calendar depuis Verticy (Task #181, suite de #177/#179).
+// Google Calendar depuis Verticy (Task #181/#182, suite de #177/#179).
 //
-// GET  : liste les événements à venir (30 prochains jours, 20 max) du
-//        calendrier "primary" du praticien connecté.
-// POST : crée un événement sur ce même calendrier.
+// GET    : liste les événements sur une plage [timeMin, timeMax] (query
+//          params ISO) du calendrier "primary" du praticien connecté —
+//          la plage est fournie par le client (grille semaine/mois affichée
+//          dans l'onglet Agenda). Sans paramètres, retombe sur les 30
+//          prochains jours par défaut.
+// POST   : crée un événement sur ce même calendrier.
+// PATCH  : modifie un événement existant (id dans le corps JSON).
+// DELETE : supprime un événement existant (id en query param ?id=...).
 //
 // Le refresh token stocké (agenda_connections.refresh_token_encrypted,
 // AES-GCM) n'est jamais renvoyé au client : cette fonction le déchiffre
@@ -29,7 +34,7 @@ const ENCRYPTION_KEY_B64 = Deno.env.get('ENCRYPTION_KEY')!;
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
 };
 
 function json(body: unknown, status = 200): Response {
@@ -72,10 +77,22 @@ async function getAccessToken(refreshToken: string): Promise<string> {
   return data.access_token as string;
 }
 
+function toClientEvent(e: any) {
+  return {
+    id: e.id,
+    summary: e.summary || '(sans titre)',
+    description: e.description || '',
+    start: e.start?.dateTime || e.start?.date || null,
+    end: e.end?.dateTime || e.end?.date || null,
+    htmlLink: e.htmlLink || null,
+  };
+}
+
+const ALLOWED_METHODS = ['GET', 'POST', 'PATCH', 'DELETE'];
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  if (req.method !== 'GET' && req.method !== 'POST')
-    return json({ error: 'Method not allowed' }, 405);
+  if (!ALLOWED_METHODS.includes(req.method)) return json({ error: 'Method not allowed' }, 405);
 
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
@@ -106,11 +123,23 @@ Deno.serve(async (req) => {
     );
   }
 
+  const reqUrl = new URL(req.url);
+  const eventsBase = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+
+  // ─── GET — liste sur une plage [timeMin, timeMax] ─────────────────────
   if (req.method === 'GET') {
-    const timeMin = new Date().toISOString();
-    const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+    const now = new Date();
+    const defaultMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const timeMin = reqUrl.searchParams.get('timeMin') || now.toISOString();
+    const timeMax = reqUrl.searchParams.get('timeMax') || defaultMax.toISOString();
+
+    const url = new URL(eventsBase);
     url.searchParams.set('timeMin', timeMin);
-    url.searchParams.set('maxResults', '20');
+    url.searchParams.set('timeMax', timeMax);
+    // 250 = maximum accepté par l'API Calendar par page ; largement suffisant
+    // pour une grille semaine/mois d'un cabinet — pas de pagination gérée
+    // au-delà (limitation connue, à revoir si un praticien sature ce plafond).
+    url.searchParams.set('maxResults', '250');
     url.searchParams.set('singleEvents', 'true');
     url.searchParams.set('orderBy', 'startTime');
 
@@ -121,29 +150,68 @@ Deno.serve(async (req) => {
     if (!res.ok)
       return json({ error: 'calendar list: ' + (data.error?.message || res.status) }, 502);
 
-    const events = (data.items || []).map((e: any) => ({
-      id: e.id,
-      summary: e.summary || '(sans titre)',
-      start: e.start?.dateTime || e.start?.date || null,
-      end: e.end?.dateTime || e.end?.date || null,
-      htmlLink: e.htmlLink || null,
-    }));
-    return json({ events });
+    return json({ events: (data.items || []).map(toClientEvent) });
   }
 
-  // POST — création d'un événement
+  // ─── DELETE — suppression, id en query param ───────────────────────────
+  if (req.method === 'DELETE') {
+    const id = reqUrl.searchParams.get('id');
+    if (!id) return json({ error: 'id requis' }, 400);
+
+    const res = await fetch(`${eventsBase}/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    // Google renvoie 204 No Content sans corps JSON en cas de succès.
+    if (!res.ok && res.status !== 410) {
+      let detail = String(res.status);
+      try {
+        const data = await res.json();
+        detail = data.error?.message || detail;
+      } catch {
+        /* pas de corps JSON — on garde le status */
+      }
+      return json({ error: 'calendar delete: ' + detail }, 502);
+    }
+    return json({ ok: true });
+  }
+
+  // ─── POST / PATCH — corps JSON commun ──────────────────────────────────
   let body: any;
   try {
     body = await req.json();
   } catch {
     return json({ error: 'JSON invalide' }, 400);
   }
+
+  if (req.method === 'PATCH') {
+    const { id, summary, start, end, description } = body || {};
+    if (!id || !summary || !start || !end) {
+      return json({ error: 'id, summary, start et end sont requis' }, 400);
+    }
+    const res = await fetch(`${eventsBase}/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary,
+        description: description || '',
+        start: { dateTime: start },
+        end: { dateTime: end },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok)
+      return json({ error: 'calendar update: ' + (data.error?.message || res.status) }, 502);
+    return json({ ok: true, event: toClientEvent(data) });
+  }
+
+  // POST — création d'un événement
   const { summary, start, end, description } = body || {};
   if (!summary || !start || !end) {
     return json({ error: 'summary, start et end sont requis' }, 400);
   }
 
-  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+  const res = await fetch(eventsBase, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -157,14 +225,5 @@ Deno.serve(async (req) => {
   if (!res.ok)
     return json({ error: 'calendar create: ' + (data.error?.message || res.status) }, 502);
 
-  return json({
-    ok: true,
-    event: {
-      id: data.id,
-      summary: data.summary,
-      start: data.start?.dateTime,
-      end: data.end?.dateTime,
-      htmlLink: data.htmlLink,
-    },
-  });
+  return json({ ok: true, event: toClientEvent(data) });
 });

@@ -1434,7 +1434,7 @@ async function refreshGoogleCalendarStatus() {
     const data = await res.json();
     renderGoogleCalendarStatus(data.connected, data.google_email);
     if (data.connected) {
-      await loadGoogleCalendarEvents();
+      initAgendaCalendar();
     } else {
       const evBox = document.getElementById('agenda-google-events');
       if (evBox) evBox.innerHTML = '';
@@ -1461,78 +1461,370 @@ function renderGoogleCalendarStatus(connected, email) {
   }
 }
 
-// Charge les événements à venir (30 prochains jours, 20 max) du calendrier
-// "primary" du praticien connecté, via l'Edge Function google-calendar-events
-// (le refresh token ne quitte jamais le serveur — cf. commentaire d'en-tête
-// de cette fonction côté Edge).
-async function loadGoogleCalendarEvents() {
+// ===== Agenda — grille calendrier semaine/mois (Task #182) =====
+//
+// État module (une seule page Agenda affichée à la fois — pas besoin
+// d'isoler par instance). agCal.events est la liste brute renvoyée par
+// l'Edge Function pour la plage actuellement affichée (agCal.rangeStart →
+// agCal.rangeEnd) ; agCal.editingId non-null = la modale édite un
+// événement existant plutôt que d'en créer un.
+const agCal = {
+  view: 'month', // 'month' | 'week'
+  refDate: new Date(),
+  events: [],
+  editingId: null,
+};
+
+const AG_CAL_HOUR_START = 7; // grille semaine : 07h→21h (horaires cabinet usuels)
+const AG_CAL_HOUR_END = 21;
+const AG_CAL_ROW_H = 40; // px par heure dans la grille semaine
+
+function _agStartOfWeek(d) {
+  // Semaine FR : lundi → dimanche.
+  const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = (r.getDay() + 6) % 7; // 0=lundi ... 6=dimanche
+  r.setDate(r.getDate() - day);
+  return r;
+}
+function _agAddDays(d, n) {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+function _agDateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function _agIsoDateKey(iso) {
+  // 'YYYY-MM-DD...' (dateTime) ou 'YYYY-MM-DD' (date journée entière) → clé locale.
+  if (!iso) return '';
+  if (!iso.includes('T')) return iso; // déjà une date pure (all-day)
+  const d = new Date(iso);
+  return _agDateKey(d);
+}
+
+// Charge/rafraîchit la vue courante (mois ou semaine) après connexion,
+// navigation, ou modification d'un événement.
+function initAgendaCalendar() {
+  agCal.refDate = new Date();
+  agCal.view = 'month';
+  loadAgendaCalendarEvents();
+}
+
+function _agRange() {
+  if (agCal.view === 'week') {
+    const start = _agStartOfWeek(agCal.refDate);
+    return { start, end: _agAddDays(start, 7) };
+  }
+  // month : grille de 6 semaines complètes couvrant le mois affiché.
+  const firstOfMonth = new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth(), 1);
+  const gridStart = _agStartOfWeek(firstOfMonth);
+  return { start: gridStart, end: _agAddDays(gridStart, 42) };
+}
+
+async function loadAgendaCalendarEvents() {
   const box = document.getElementById('agenda-google-events');
   if (!box) return;
-  box.innerHTML = '<div style="font-size:12px;color:var(--mut);">Chargement des événements…</div>';
+  box.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Chargement du calendrier…</div>';
+  const { start, end } = _agRange();
   try {
-    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events', { method: 'GET' });
+    const url =
+      SUPA_URL +
+      '/functions/v1/google-calendar-events?timeMin=' +
+      encodeURIComponent(start.toISOString()) +
+      '&timeMax=' +
+      encodeURIComponent(end.toISOString());
+    const res = await authFetch(url, { method: 'GET' });
     if (!res.ok) throw new Error('events ' + res.status);
     const data = await res.json();
-    renderGoogleCalendarEvents(data.events || []);
+    agCal.events = data.events || [];
+    renderAgendaCalendar();
   } catch (e) {
-    console.error('[agenda] loadGoogleCalendarEvents failed:', e);
-    box.innerHTML = '<div style="font-size:12px;color:var(--mut);">Impossible de charger les événements.</div>';
+    console.error('[agenda] loadAgendaCalendarEvents failed:', e);
+    box.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Impossible de charger le calendrier.</div>';
   }
 }
 
-function renderGoogleCalendarEvents(events) {
+function agCalPrev() {
+  agCal.refDate = agCal.view === 'week' ? _agAddDays(agCal.refDate, -7) : new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth() - 1, 1);
+  loadAgendaCalendarEvents();
+}
+function agCalNext() {
+  agCal.refDate = agCal.view === 'week' ? _agAddDays(agCal.refDate, 7) : new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth() + 1, 1);
+  loadAgendaCalendarEvents();
+}
+function agCalToday() {
+  agCal.refDate = new Date();
+  loadAgendaCalendarEvents();
+}
+function agCalSetView(view) {
+  if (agCal.view === view) return;
+  agCal.view = view;
+  loadAgendaCalendarEvents();
+}
+
+function renderAgendaCalendar() {
   const box = document.getElementById('agenda-google-events');
   if (!box) return;
-  const fmt = function (iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso; // date seule (événement journée entière)
-    return d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-  };
-  let html = '<div class="stitle" style="margin-top:14px;">Événements à venir</div>';
-  if (!events.length) {
-    html +=
-      '<div style="font-size:12px;color:var(--mut);margin-bottom:10px;">Aucun événement à venir.</div>';
+  const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  let title;
+  if (agCal.view === 'week') {
+    const start = _agStartOfWeek(agCal.refDate);
+    const end = _agAddDays(start, 6);
+    title =
+      start.getDate() +
+      (start.getMonth() !== end.getMonth() ? ' ' + MOIS[start.getMonth()] : '') +
+      ' – ' +
+      end.getDate() +
+      ' ' +
+      MOIS[end.getMonth()] +
+      ' ' +
+      end.getFullYear();
   } else {
+    title = MOIS[agCal.refDate.getMonth()] + ' ' + agCal.refDate.getFullYear();
+  }
+
+  const toolbar =
+    '<div class="cal-toolbar">' +
+    '<div style="display:flex;align-items:center;gap:6px;">' +
+    '<button class="btn" onclick="agCalToday()" style="font-size:11px;padding:5px 10px;">Aujourd\'hui</button>' +
+    '<button class="btn cal-nav-btn" onclick="agCalPrev()" title="Précédent">‹</button>' +
+    '<button class="btn cal-nav-btn" onclick="agCalNext()" title="Suivant">›</button>' +
+    '<span class="cal-title">' +
+    _escHtml(title.charAt(0).toUpperCase() + title.slice(1)) +
+    '</span>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:6px;">' +
+    '<div class="cal-view-toggle">' +
+    '<button class="' +
+    (agCal.view === 'week' ? 'cal-view-active' : '') +
+    '" onclick="agCalSetView(\'week\')">Semaine</button>' +
+    '<button class="' +
+    (agCal.view === 'month' ? 'cal-view-active' : '') +
+    '" onclick="agCalSetView(\'month\')">Mois</button>' +
+    '</div>' +
+    '<button class="btn btn-blue" onclick="openAgendaEventModal(null)" style="font-size:11px;padding:5px 12px;">+ Événement</button>' +
+    '</div>' +
+    '</div>';
+
+  const grid = agCal.view === 'week' ? _agRenderWeekGrid() : _agRenderMonthGrid();
+  box.innerHTML = toolbar + grid;
+}
+
+function _agEventsOnDay(dateKey) {
+  return agCal.events
+    .filter(function (e) {
+      return _agIsoDateKey(e.start) === dateKey;
+    })
+    .sort(function (a, b) {
+      return (a.start || '').localeCompare(b.start || '');
+    });
+}
+
+function _agRenderMonthGrid() {
+  const { start } = _agRange();
+  const todayKey = _agDateKey(new Date());
+  const curMonth = agCal.refDate.getMonth();
+  const DOW = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+  let html = '<div class="cal-grid-month">';
+  DOW.forEach(function (d) {
+    html += '<div class="cal-dow">' + d + '</div>';
+  });
+
+  for (let i = 0; i < 42; i++) {
+    const day = _agAddDays(start, i);
+    const key = _agDateKey(day);
+    const isOther = day.getMonth() !== curMonth;
+    const isToday = key === todayKey;
+    const dayEvents = _agEventsOnDay(key);
+    const shown = dayEvents.slice(0, 3);
+    const extra = dayEvents.length - shown.length;
+
     html +=
-      '<div style="margin-bottom:10px;">' +
-      events
+      '<div class="cal-day' +
+      (isOther ? ' cal-day-other' : '') +
+      (isToday ? ' cal-day-today' : '') +
+      '" onclick="openAgendaEventModal(null,\'' +
+      key +
+      '\')">' +
+      '<div class="cal-daynum">' +
+      day.getDate() +
+      '</div>' +
+      shown
         .map(function (e) {
           return (
-            '<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:13px;">' +
-            '<strong>' +
+            '<div class="cal-evchip" onclick="event.stopPropagation();openAgendaEventModal(\'' +
+            e.id +
+            '\')" title="' +
             _escHtml(e.summary) +
-            '</strong>' +
-            '<div style="font-size:11px;color:var(--mut);">' +
-            _escHtml(fmt(e.start)) +
-            (e.end ? ' → ' + _escHtml(fmt(e.end)) : '') +
-            '</div>' +
+            '">' +
+            _escHtml(e.summary) +
             '</div>'
           );
         })
         .join('') +
+      (extra > 0 ? '<div class="cal-more">+' + extra + ' de plus</div>' : '') +
       '</div>';
   }
-  html +=
-    '<button class="btn" onclick="toggleGoogleCalendarEventForm()" style="background:#666;color:#fff;font-size:12px;padding:6px 14px;">+ Nouvel événement</button>' +
-    '<div id="agenda-google-event-form" style="display:none;margin-top:10px;">' +
-    '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div><input class="inp" id="agenda-ev-title" placeholder="Consultation..."/>' +
-    '<div class="g2" style="margin-top:6px;">' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local"/></div>' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Fin *</div><input class="inp" id="agenda-ev-end" type="datetime-local"/></div>' +
+  html += '</div>';
+  return html;
+}
+
+function _agRenderWeekGrid() {
+  const start = _agStartOfWeek(agCal.refDate);
+  const todayKey = _agDateKey(new Date());
+  const DOW = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+  const totalHours = AG_CAL_HOUR_END - AG_CAL_HOUR_START;
+
+  let head = '<div class="cal-week-head"></div>';
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(_agAddDays(start, i));
+  days.forEach(function (d, idx) {
+    const key = _agDateKey(d);
+    head +=
+      '<div class="cal-week-head' +
+      (key === todayKey ? ' cal-week-head-today' : '') +
+      '">' +
+      DOW[idx] +
+      ' <b>' +
+      d.getDate() +
+      '</b></div>';
+  });
+
+  let hourLabels = '';
+  let cols = '';
+  for (let h = AG_CAL_HOUR_START; h < AG_CAL_HOUR_END; h++) {
+    hourLabels += '<div class="cal-week-hourlabel" style="height:' + AG_CAL_ROW_H + 'px;">' + h + 'h</div>';
+  }
+
+  days.forEach(function (d) {
+    const key = _agDateKey(d);
+    const dayEvents = _agEventsOnDay(key).filter(function (e) {
+      return e.start && e.start.includes('T'); // exclut les all-day de la grille horaire
+    });
+    const allDay = _agEventsOnDay(key).filter(function (e) {
+      return !e.start || !e.start.includes('T');
+    });
+
+    let colInner = '';
+    for (let h = AG_CAL_HOUR_START; h < AG_CAL_HOUR_END; h++) {
+      colInner += '<div class="cal-week-hourline" style="height:' + AG_CAL_ROW_H + 'px;"></div>';
+    }
+    allDay.forEach(function (e) {
+      colInner +=
+        '<div class="cal-week-allday" onclick="event.stopPropagation();openAgendaEventModal(\'' +
+        e.id +
+        '\')">' +
+        _escHtml(e.summary) +
+        '</div>';
+    });
+    dayEvents.forEach(function (e) {
+      const s = new Date(e.start);
+      const en = e.end ? new Date(e.end) : new Date(s.getTime() + 30 * 60000);
+      const startMin = Math.max(0, (s.getHours() - AG_CAL_HOUR_START) * 60 + s.getMinutes());
+      const durMin = Math.max(15, (en.getTime() - s.getTime()) / 60000);
+      const top = (startMin / 60) * AG_CAL_ROW_H;
+      const height = Math.max(18, (durMin / 60) * AG_CAL_ROW_H);
+      if (startMin >= totalHours * 60) return; // hors plage affichée
+      colInner +=
+        '<div class="cal-week-event" style="top:' +
+        top +
+        'px;height:' +
+        height +
+        'px;" onclick="event.stopPropagation();openAgendaEventModal(\'' +
+        e.id +
+        '\')" title="' +
+        _escHtml(e.summary) +
+        '">' +
+        _escHtml(e.summary) +
+        '</div>';
+    });
+
+    cols +=
+      '<div class="cal-week-col" style="height:' +
+      totalHours * AG_CAL_ROW_H +
+      'px;" onclick="openAgendaEventModal(null,\'' +
+      key +
+      'T' +
+      String(AG_CAL_HOUR_START).padStart(2, '0') +
+      ':00\')">' +
+      colInner +
+      '</div>';
+  });
+
+  return '<div class="cal-grid-week">' + head + hourLabels + cols + '</div>';
+}
+
+// ─── Modale création / édition ──────────────────────────────────────────
+
+function _agToLocalInputValue(iso) {
+  if (!iso) return '';
+  const d = iso.includes('T') ? new Date(iso) : new Date(iso + 'T09:00');
+  const pad = function (n) {
+    return String(n).padStart(2, '0');
+  };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function openAgendaEventModal(eventId, prefillLocal) {
+  agCal.editingId = eventId || null;
+  const existing = eventId ? agCal.events.find((e) => e.id === eventId) : null;
+
+  let startVal = '';
+  let endVal = '';
+  if (existing) {
+    startVal = _agToLocalInputValue(existing.start);
+    endVal = _agToLocalInputValue(existing.end);
+  } else if (prefillLocal) {
+    const base = prefillLocal.includes('T') ? prefillLocal : prefillLocal + 'T09:00';
+    startVal = base;
+    const endDate = new Date(base);
+    endDate.setMinutes(endDate.getMinutes() + 30);
+    endVal = _agToLocalInputValue(endDate.toISOString());
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'cal-event-modal-backdrop';
+  overlay.id = 'agenda-event-modal-backdrop';
+  overlay.onclick = function (ev) {
+    if (ev.target === overlay) closeAgendaEventModal();
+  };
+  overlay.innerHTML =
+    '<div class="cal-event-modal">' +
+    '<div class="stitle">' +
+    (existing ? 'Modifier l\'événement' : 'Nouvel événement') +
     '</div>' +
-    '<div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Description</div><textarea class="inp" id="agenda-ev-desc" rows="2"></textarea></div>' +
-    '<button class="btn btn-blue" onclick="createGoogleCalendarEvent()" style="margin-top:8px;">✓ Créer l\'événement</button>' +
+    '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div>' +
+    '<input class="inp" id="agenda-ev-title" placeholder="Consultation..." value="' +
+    (existing ? _escHtml(existing.summary) : '') +
+    '"/>' +
+    '<div class="g2" style="margin-top:6px;">' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local" value="' +
+    startVal +
+    '"/></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Fin *</div><input class="inp" id="agenda-ev-end" type="datetime-local" value="' +
+    endVal +
+    '"/></div>' +
+    '</div>' +
+    '<div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Description</div><textarea class="inp" id="agenda-ev-desc" rows="2">' +
+    (existing ? _escHtml(existing.description || '') : '') +
+    '</textarea></div>' +
+    '<div style="display:flex;gap:8px;margin-top:12px;">' +
+    '<button class="btn btn-blue" onclick="saveAgendaEvent()" style="flex:1;">✓ Enregistrer</button>' +
+    (existing ? '<button class="btn btn-red" onclick="deleteAgendaEvent()">🗑</button>' : '') +
+    '<button class="btn" onclick="closeAgendaEventModal()">Annuler</button>' +
+    '</div>' +
     '</div>';
-  box.innerHTML = html;
+  document.body.appendChild(overlay);
 }
 
-function toggleGoogleCalendarEventForm() {
-  const f = document.getElementById('agenda-google-event-form');
-  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+function closeAgendaEventModal() {
+  const el = document.getElementById('agenda-event-modal-backdrop');
+  if (el) el.remove();
+  agCal.editingId = null;
 }
 
-async function createGoogleCalendarEvent() {
+async function saveAgendaEvent() {
   const titleEl = document.getElementById('agenda-ev-title');
   const startEl = document.getElementById('agenda-ev-start');
   const endEl = document.getElementById('agenda-ev-end');
@@ -1545,22 +1837,49 @@ async function createGoogleCalendarEvent() {
     alert('Titre, début et fin sont requis.');
     return;
   }
+  const payload = {
+    summary: title,
+    start: new Date(start).toISOString(),
+    end: new Date(end).toISOString(),
+    description: desc || undefined,
+  };
   try {
-    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        summary: title,
-        start: new Date(start).toISOString(),
-        end: new Date(end).toISOString(),
-        description: desc || undefined,
-      }),
-    });
-    if (!res.ok) throw new Error('create ' + res.status);
-    await loadGoogleCalendarEvents();
+    let res;
+    if (agCal.editingId) {
+      res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ id: agCal.editingId }, payload)),
+      });
+    } else {
+      res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    }
+    if (!res.ok) throw new Error('save ' + res.status);
+    closeAgendaEventModal();
+    await loadAgendaCalendarEvents();
   } catch (e) {
-    console.error('[agenda] createGoogleCalendarEvent failed:', e);
-    alert("La création de l'événement a échoué. Réessaie plus tard.");
+    console.error('[agenda] saveAgendaEvent failed:', e);
+    alert("L'enregistrement de l'événement a échoué. Réessaie plus tard.");
+  }
+}
+
+async function deleteAgendaEvent() {
+  if (!agCal.editingId) return;
+  if (!confirm('Supprimer cet événement ?')) return;
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/google-calendar-events?id=' + encodeURIComponent(agCal.editingId), {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('delete ' + res.status);
+    closeAgendaEventModal();
+    await loadAgendaCalendarEvents();
+  } catch (e) {
+    console.error('[agenda] deleteAgendaEvent failed:', e);
+    alert("La suppression de l'événement a échoué. Réessaie plus tard.");
   }
 }
 
