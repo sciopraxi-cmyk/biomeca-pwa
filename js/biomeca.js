@@ -1481,7 +1481,13 @@ function renderGoogleCalendarStatus(connections) {
   const rows = connections
     .map(function (c, i) {
       const accent = AG_GOOGLE_ACCENTS[i % AG_GOOGLE_ACCENTS.length];
-      const dotColor = accent ? accent.fg : '#4285F4';
+      // #187-fix — le 1er compte n'a pas d'accent (AG_GOOGLE_ACCENTS[0] = null,
+      // cf. plus bas) et ses événements gardent donc la couleur PAR DÉFAUT de
+      // la grille : var(--blue), qui malgré son nom vaut #2dd4bf (un
+      // sarcelle/vert, pas un bleu — piège de nommage, cf. CLAUDE.md). La
+      // pastille utilisait à tort le bleu Google #4285F4, d'où l'incohérence
+      // pastille bleue / événements verts signalée par Scio le 05/08/2026.
+      const dotColor = accent ? accent.fg : 'var(--blue)';
       return (
         '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">' +
         '<span style="width:10px;height:10px;border-radius:50%;background:' +
