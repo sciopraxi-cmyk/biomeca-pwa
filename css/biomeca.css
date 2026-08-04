@@ -724,6 +724,13 @@ body.printing #rpt-print{display:block!important;}
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
 }
 .cal-evchip:hover { background:var(--blue); color:#04231c; }
+/* Apple Calendar (#178, lecture seule) : couleur distincte du bleu Google
+   pour que le praticien distingue au coup d'œil ce qui est modifiable
+   (Google) de ce qui ne l'est pas (Apple). */
+.cal-evchip-apple {
+  background:rgba(167,139,250,0.15); color:var(--purple); border-left-color:var(--purple);
+}
+.cal-evchip-apple:hover { background:var(--purple); color:#1a1030; }
 .cal-more { font-size:9px; color:var(--mut); margin-top:2px; cursor:pointer; }
 
 /* Structure flex à 2 lignes (header + body), chacune avec une case fixe de
@@ -762,9 +769,16 @@ body.printing #rpt-print{display:block!important;}
   font-size:10px; overflow:hidden; cursor:pointer; box-sizing:border-box;
 }
 .cal-week-event:hover { background:var(--blue); color:#04231c; }
+.cal-week-event-apple {
+  background:rgba(167,139,250,0.15); color:var(--purple); border-left-color:var(--purple);
+}
+.cal-week-event-apple:hover { background:var(--purple); color:#1a1030; }
 .cal-week-allday {
   background:var(--orange-d); color:var(--orange); border-left:3px solid var(--orange);
   border-radius:3px; padding:1px 4px; font-size:10px; margin:2px; cursor:pointer;
+}
+.cal-week-allday-apple {
+  background:rgba(167,139,250,0.15); color:var(--purple); border-left-color:var(--purple);
 }
 
 .cal-event-modal-backdrop {
