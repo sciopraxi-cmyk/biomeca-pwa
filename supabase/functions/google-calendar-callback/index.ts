@@ -126,9 +126,13 @@ Deno.serve(async (req) => {
     return redirectToApp('error', 'token_exchange_failed');
   }
 
-  // ─── Email du compte Google connecté (best-effort, purement informatif) ───
-  // Nécessite les scopes openid/email en plus de calendar.events pour être
-  // rempli — sinon reste null et l'UI affichera juste "Connecté" sans email.
+  // ─── Email du compte Google connecté (#187 : requis, plus best-effort) ───
+  // Depuis #187, google-calendar-init demande explicitement le scope
+  // userinfo.email — sans email fiable, impossible de distinguer plusieurs
+  // comptes Google entre eux (account_key = google_email, cf. migration
+  // agenda-google-multi.sql). Un échec ici stockerait une ligne ambiguë :
+  // fail-fast plutôt qu'une connexion "réussie" mais silencieusement
+  // inexploitable (même principe que le test-fetch de apple-calendar-connect).
   let googleEmail: string | null = null;
   try {
     const userinfoResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -138,22 +142,31 @@ Deno.serve(async (req) => {
       const userinfo = await userinfoResp.json();
       googleEmail = userinfo.email ?? null;
     }
-  } catch (_e) {
-    // best-effort — une erreur ici ne doit pas faire échouer la connexion
+  } catch (e) {
+    console.error('google userinfo fetch failed', e);
+  }
+  if (!googleEmail) {
+    console.error('google userinfo: email manquant, connexion refusée');
+    return redirectToApp('error', 'email_missing');
   }
 
   // ─── Chiffre et stocke ───────────────────────────────────────────────
+  // onConflict sur (user_id, provider, account_key) : reconnecter le MÊME
+  // compte Google (même email) met à jour sa ligne existante (rotation du
+  // refresh token) ; connecter un compte DIFFÉRENT insère une ligne de plus
+  // — #187, multi-comptes illimité.
   const encryptedRefreshToken = await encrypt(tokenData.refresh_token as string);
 
   const { error: upsertErr } = await supaAdmin.from('agenda_connections').upsert(
     {
       user_id: userId,
       provider: 'google',
+      account_key: googleEmail,
       refresh_token_encrypted: encryptedRefreshToken,
       google_email: googleEmail,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: 'user_id,provider' }
+    { onConflict: 'user_id,provider,account_key' }
   );
   if (upsertErr) {
     console.error('agenda_connections upsert failed', upsertErr);

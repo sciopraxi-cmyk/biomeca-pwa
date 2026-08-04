@@ -113,16 +113,22 @@ Deno.serve(async (req) => {
   }
   const calendarName = extractCalName(icsText);
 
+  // account_key fixe 'apple' (#187) : Apple reste volontairement
+  // single-compte, contrairement à Google qui autorise désormais plusieurs
+  // lignes par praticien (account_key = email du compte, cf. migration
+  // agenda-google-multi.sql). onConflict porte donc sur les 3 colonnes de
+  // la nouvelle contrainte, pas seulement (user_id, provider).
   const encryptedUrl = await encrypt(icsUrl);
   const { error: upsertErr } = await supaAdmin.from('agenda_connections').upsert(
     {
       user_id: userId,
       provider: 'apple',
+      account_key: 'apple',
       ics_url_encrypted: encryptedUrl,
       calendar_name: calendarName,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: 'user_id,provider' }
+    { onConflict: 'user_id,provider,account_key' }
   );
   if (upsertErr) {
     console.error('[apple-calendar-connect] upsert failed', upsertErr);

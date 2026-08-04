@@ -9,11 +9,16 @@
 // pas un fetch : Google doit voir une navigation réelle).
 //
 // scope=calendar.events (lecture/écriture des événements, pas la gestion des
-// agendas eux-mêmes — cf. décision #177 : scope le plus restreint suffisant).
+// agendas eux-mêmes — cf. décision #177 : scope le plus restreint suffisant)
+// + userinfo.email (#187) : nécessaire pour identifier QUEL compte Google a
+// été connecté quand plusieurs comptes coexistent — sans ça google_email
+// resterait null et deux comptes seraient indiscernables dans l'UI comme en
+// base (account_key en dépend, cf. migration agenda-google-multi.sql).
 // access_type=offline + prompt=consent : force Google à renvoyer un refresh
 // token à CHAQUE connexion (par défaut, Google ne le renvoie qu'au tout
 // premier consentement — inutile ici, on veut pouvoir reconnecter proprement
-// après une révocation ou un changement de compte Google).
+// après une révocation, ou connecter un compte Google supplémentaire : le
+// prompt=consent force aussi l'écran de sélection de compte Google).
 //
 // oauth_states : RLS activée sans policy (cf. migration agenda-google-oauth.sql)
 // — accessible uniquement via ce service_role client, jamais par le praticien
@@ -32,7 +37,8 @@ const supaAdmin = createClient(
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!;
 const REDIRECT_URI = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-callback`;
-const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const SCOPE =
+  'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

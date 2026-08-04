@@ -1,10 +1,18 @@
-// Edge Function google-calendar-disconnect — déconnecte Google Calendar
-// (Task #177/#179).
+// Edge Function google-calendar-disconnect — déconnecte UN compte Google
+// Calendar (Task #177/#179, multi-comptes #187).
 //
 // Révoque le refresh token côté Google (best-effort — une révocation échouée
 // ne doit pas bloquer la suppression locale, sinon un praticien resterait
 // bloqué "connecté" dans Verticy alors qu'il veut s'en aller) puis supprime
-// la ligne agenda_connections.
+// la ligne agenda_connections correspondante.
+//
+// #187 : un praticien pouvant désormais connecter plusieurs comptes Google,
+// cette fonction exige un connectionId (id de la ligne agenda_connections,
+// renvoyé par google-calendar-status) précisant LEQUEL déconnecter — un
+// appel sans connectionId est refusé plutôt que de couper tous les comptes
+// à la fois par défaut. La ligne ciblée doit appartenir à l'utilisateur
+// authentifié (vérifié via .eq('user_id', ...)) : un connectionId d'un
+// autre praticien est ignoré (0 ligne supprimée), jamais exécuté à l'aveugle.
 //
 // Déploiement : supabase functions deploy google-calendar-disconnect --no-verify-jwt
 
@@ -54,31 +62,41 @@ Deno.serve(async (req) => {
   if (authError || !userData?.user) return json({ error: 'Invalid token' }, 401);
   const userId = userData.user.id;
 
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    // corps vide toléré uniquement si connectionId absent → erreur explicite ci-dessous
+  }
+  const connectionId = (body?.connectionId || '').toString();
+  if (!connectionId) return json({ error: 'connectionId requis (#187)' }, 400);
+
   const { data: row, error: selectErr } = await supaAdmin
     .from('agenda_connections')
     .select('refresh_token_encrypted')
+    .eq('id', connectionId)
     .eq('user_id', userId)
     .eq('provider', 'google')
     .maybeSingle();
   if (selectErr) return json({ error: 'select: ' + selectErr.message }, 500);
+  if (!row) return json({ error: 'Compte Google introuvable ou déjà déconnecté' }, 404);
 
-  if (row) {
-    // Révocation best-effort côté Google — cf. commentaire d'en-tête.
-    try {
-      const refreshToken = await decrypt(row.refresh_token_encrypted as string);
-      await fetch('https://oauth2.googleapis.com/revoke', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ token: refreshToken }),
-      });
-    } catch (e) {
-      console.error('google token revoke failed (non-bloquant)', e);
-    }
+  // Révocation best-effort côté Google — cf. commentaire d'en-tête.
+  try {
+    const refreshToken = await decrypt(row.refresh_token_encrypted as string);
+    await fetch('https://oauth2.googleapis.com/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token: refreshToken }),
+    });
+  } catch (e) {
+    console.error('google token revoke failed (non-bloquant)', e);
   }
 
   const { error: deleteErr } = await supaAdmin
     .from('agenda_connections')
     .delete()
+    .eq('id', connectionId)
     .eq('user_id', userId)
     .eq('provider', 'google');
   if (deleteErr) return json({ error: 'delete: ' + deleteErr.message }, 500);

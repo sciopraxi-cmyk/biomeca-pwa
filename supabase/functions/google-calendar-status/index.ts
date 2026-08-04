@@ -1,11 +1,17 @@
 // Edge Function google-calendar-status — état de connexion Google Calendar
-// pour l'onglet Agenda (Task #177/#179).
+// pour l'onglet Agenda (Task #177/#179, multi-comptes #187).
 //
 // agenda_connections est RLS-verrouillée (service_role uniquement, cf.
 // migration agenda-google-oauth.sql) : le client ne peut pas lire directement
-// s'il est connecté ni avec quel email. Cette fonction expose UNIQUEMENT les
-// deux informations non sensibles (connected, google_email) — jamais
-// refresh_token_encrypted.
+// combien de comptes sont connectés ni avec quels emails. Cette fonction
+// expose UNIQUEMENT les informations non sensibles par connexion (id,
+// google_email, updated_at) — jamais refresh_token_encrypted.
+//
+// #187 : renvoie désormais un TABLEAU de connexions (0, 1 ou N comptes
+// Google), plus le booléen connected dérivé (compat rétro pour tout code
+// qui ne lirait que ce champ). L'id de chaque connexion sert de
+// connectionId côté client — passé à google-calendar-events (création) et
+// google-calendar-disconnect (déconnexion d'un compte précis).
 //
 // Déploiement : supabase functions deploy google-calendar-status --no-verify-jwt
 
@@ -41,14 +47,21 @@ Deno.serve(async (req) => {
   const { data: userData, error: authError } = await supaAdmin.auth.getUser(token);
   if (authError || !userData?.user) return json({ error: 'Invalid token' }, 401);
 
-  const { data: row, error: selectErr } = await supaAdmin
+  const { data: rows, error: selectErr } = await supaAdmin
     .from('agenda_connections')
-    .select('google_email')
+    .select('id, google_email, updated_at')
     .eq('user_id', userData.user.id)
     .eq('provider', 'google')
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
   if (selectErr) return json({ error: 'select: ' + selectErr.message }, 500);
 
-  return json({ connected: !!row, google_email: row?.google_email ?? null });
+  const connections = rows || [];
+  return json({
+    connected: connections.length > 0,
+    connections,
+    // Compat rétro : ancien champ google_email (1er compte), au cas où un
+    // client pas encore rechargé lirait encore ce format.
+    google_email: connections[0]?.google_email ?? null,
+  });
 });
