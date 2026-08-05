@@ -719,11 +719,11 @@ body.printing #rpt-print{display:block!important;}
 }
 .cal-day-today .cal-daynum { background:var(--blue); color:#04231c; }
 .cal-evchip {
-  background:var(--blue-d); color:var(--blue); border-left:3px solid var(--blue);
+  background:var(--ev-bg, var(--blue-d)); color:var(--ev-fg, var(--blue)); border-left:3px solid var(--ev-fg, var(--blue));
   border-radius:3px; padding:1px 4px; font-size:10px; margin-top:2px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
 }
-.cal-evchip:hover { background:var(--blue); color:#04231c; }
+.cal-evchip:hover { background:var(--ev-fg, var(--blue)); color:var(--ev-fg-hover, #04231c); }
 /* Apple Calendar (#178, lecture seule) : couleur distincte du bleu Google
    pour que le praticien distingue au coup d'œil ce qui est modifiable
    (Google) de ce qui ne l'est pas (Apple). */
@@ -763,18 +763,26 @@ body.printing #rpt-print{display:block!important;}
 .cal-week-hourline {
   border-top:1px solid var(--bord); box-sizing:border-box;
 }
+/* #193 — les comptes Google accentués (#187/#191) posaient background/color
+   en style INLINE (spécificité imbattable par n'importe quelle règle CSS,
+   y compris :hover) : l'effet de survol restait figé sur ces événements,
+   contrairement aux événements par défaut (Apple + 1er compte Google, sans
+   accent) dont le survol fonctionnait. Fix : l'accent passe désormais par
+   des variables CSS (--ev-bg/--ev-fg/--ev-fg-hover, posées en inline par
+   _agEventAccentStyle) avec repli sur les couleurs par défaut — :hover peut
+   à nouveau lire/écraser via ces variables quel que soit le compte. */
 .cal-week-event {
-  position:absolute; left:2px; right:2px; background:var(--blue-d); color:var(--blue);
-  border-left:3px solid var(--blue); border-radius:4px; padding:2px 4px;
+  position:absolute; left:2px; right:2px; background:var(--ev-bg, var(--blue-d)); color:var(--ev-fg, var(--blue));
+  border-left:3px solid var(--ev-fg, var(--blue)); border-radius:4px; padding:2px 4px;
   font-size:10px; overflow:hidden; cursor:pointer; box-sizing:border-box;
 }
-.cal-week-event:hover { background:var(--blue); color:#04231c; }
+.cal-week-event:hover { background:var(--ev-fg, var(--blue)); color:var(--ev-fg-hover, #04231c); }
 .cal-week-event-apple {
   background:rgba(167,139,250,0.15); color:var(--purple); border-left-color:var(--purple);
 }
 .cal-week-event-apple:hover { background:var(--purple); color:#1a1030; }
 .cal-week-allday {
-  background:var(--orange-d); color:var(--orange); border-left:3px solid var(--orange);
+  background:var(--ev-bg, var(--orange-d)); color:var(--ev-fg, var(--orange)); border-left:3px solid var(--ev-fg, var(--orange));
   border-radius:3px; padding:1px 4px; font-size:10px; margin:2px; cursor:pointer;
 }
 .cal-week-allday-apple {

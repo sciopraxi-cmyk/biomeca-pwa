@@ -1645,11 +1645,17 @@ function _agGoogleAccentIndex(connectionId) {
 // Style inline pour un événement Google d'un compte autre que le 1er —
 // chaîne vide pour Apple (garde sa classe CSS dédiée) et pour le 1er compte
 // Google (garde le style par défaut inchangé).
+// #193 — pose des VARIABLES CSS (--ev-bg/--ev-fg/--ev-fg-hover) plutôt que
+// des propriétés directes (background/color) : ces dernières, en inline,
+// ont une spécificité imbattable par les règles :hover de css/biomeca.css,
+// ce qui gelait le survol sur les événements accentués (Scio, 05/08/2026).
+// Les classes .cal-week-event/.cal-evchip/.cal-week-allday lisent ces
+// variables via var(--ev-fg, repli-par-défaut), donc :hover reprend la main.
 function _agEventAccentStyle(e) {
   if (e.source !== 'google') return '';
   const accent = AG_GOOGLE_ACCENTS[_agGoogleAccentIndex(e.connectionId)];
   if (!accent) return '';
-  return 'background:' + accent.bg + ';color:' + accent.fg + ';border-left-color:' + accent.fg + ';';
+  return '--ev-bg:' + accent.bg + ';--ev-fg:' + accent.fg + ';--ev-fg-hover:#fff;';
 }
 
 const AG_CAL_HOUR_START = 7; // fenêtre visible par défaut : 07h→21h (horaires cabinet usuels)
