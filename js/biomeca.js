@@ -1943,6 +1943,61 @@ function _agTimedEventsOverlappingDay(dayDate) {
     });
 }
 
+// #192 — deux rendez-vous à la même heure se recouvraient entièrement dans
+// la grille semaine (chacun en pleine largeur de colonne), le second cachant
+// le premier sans indice visuel qu'il y en avait deux. Algorithme classique
+// de calage calendrier : regroupe les items dont les segments se chevauchent
+// (directement ou en chaîne) en « clusters », puis assigne à chaque item la
+// première colonne libre du cluster (glouton, trié par heure de début).
+// Chaque item repart avec _col (index 0-based) et _cols (nb de colonnes du
+// cluster) — le rendu s'en sert pour se partager la largeur de la colonne
+// jour au lieu de se superposer.
+function _agLayoutOverlaps(items) {
+  const sorted = items.slice().sort(function (a, b) {
+    return a.segStart - b.segStart || a.segEnd - b.segEnd;
+  });
+
+  const clusters = [];
+  let current = [];
+  let currentEnd = null;
+  sorted.forEach(function (it) {
+    if (current.length === 0 || it.segStart < currentEnd) {
+      current.push(it);
+      currentEnd = currentEnd === null || it.segEnd > currentEnd ? it.segEnd : currentEnd;
+    } else {
+      clusters.push(current);
+      current = [it];
+      currentEnd = it.segEnd;
+    }
+  });
+  if (current.length) clusters.push(current);
+
+  clusters.forEach(function (cluster) {
+    const colEnds = []; // colEnds[i] = fin du dernier item placé dans la colonne i
+    cluster.forEach(function (it) {
+      let placed = false;
+      for (let c = 0; c < colEnds.length; c++) {
+        if (colEnds[c] <= it.segStart) {
+          it._col = c;
+          colEnds[c] = it.segEnd;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        it._col = colEnds.length;
+        colEnds.push(it.segEnd);
+      }
+    });
+    const totalCols = colEnds.length;
+    cluster.forEach(function (it) {
+      it._cols = totalCols;
+    });
+  });
+
+  return sorted;
+}
+
 function _agRenderMonthGrid() {
   const { start } = _agRange();
   const todayKey = _agDateKey(new Date());
@@ -2065,15 +2120,20 @@ function _agRenderWeekGrid() {
         _escHtml(e.summary) +
         '</div>';
     });
-    dayEvents.forEach(function (e) {
-      // Segment de CET événement borné à CE jour — un événement qui
-      // traverse minuit produit un segment distinct par jour traversé
-      // (ex : 19h→24h le jeudi, 00h→17h le vendredi), chacun cliquable et
-      // ouvrant la même modale avec la plage complète d'origine.
-      const seg = _agEventSegmentOnDay(e, d);
-      if (!seg) return;
-      const s = seg.segStart;
-      const en = seg.segEnd;
+    // #192 — segments du jour + calage anti-recouvrement (côte à côte plutôt
+    // que superposés) avant rendu.
+    const daySegs = dayEvents
+      .map(function (e) {
+        const seg = _agEventSegmentOnDay(e, d);
+        return seg ? { e: e, segStart: seg.segStart, segEnd: seg.segEnd } : null;
+      })
+      .filter(function (x) {
+        return x !== null;
+      });
+    _agLayoutOverlaps(daySegs).forEach(function (it) {
+      const e = it.e;
+      const s = it.segStart;
+      const en = it.segEnd;
       // Grille = 24h entières (AG_CAL_GRID_START=0) : plus de clamp/rejet
       // ici, un rendez-vous avant 7h ou après 21h reste positionné à sa
       // vraie heure, simplement hors de la fenêtre visible par défaut —
@@ -2083,6 +2143,14 @@ function _agRenderWeekGrid() {
       const durMin = Math.min(rawDurMin, totalHours * 60 - startMin); // ne déborde pas la grille
       const top = (startMin / 60) * AG_CAL_ROW_H;
       const height = Math.max(18, (durMin / 60) * AG_CAL_ROW_H);
+      // it._cols = nb de rendez-vous simultanés dans ce créneau (1 si seul) ;
+      // it._col = sa position parmi eux — se partagent la largeur de colonne
+      // au lieu de se recouvrir. right:auto nécessaire pour que width prenne
+      // le dessus sur le left:2px;right:2px par défaut de .cal-week-event.
+      const cols = it._cols || 1;
+      const col = it._col || 0;
+      const leftPct = (col / cols) * 100;
+      const widthPct = 100 / cols;
       colInner +=
         '<div class="cal-week-event' +
         (e.source === 'apple' ? ' cal-week-event-apple' : '') +
@@ -2090,7 +2158,11 @@ function _agRenderWeekGrid() {
         top +
         'px;height:' +
         height +
-        'px;' +
+        'px;left:calc(' +
+        leftPct +
+        '% + 2px);right:auto;width:calc(' +
+        widthPct +
+        '% - 4px);' +
         _agEventAccentStyle(e) +
         '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
         e.id +
