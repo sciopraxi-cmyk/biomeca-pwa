@@ -1609,16 +1609,29 @@ const agCal = {
   appleConnected: false,
 };
 
-// #187 — accent visuel par compte Google au-delà du 1er (qui garde le bleu
-// historique var(--blue)/var(--blue-d), aucun style inline, zéro régression
-// visuelle pour l'usage à un seul compte). Évite le violet (réservé à
-// Apple, #178) et le rouge (déjà sémantique : suppression/erreur).
+// #187 — accent visuel par compte Google au-delà du 1er (qui garde le bleu/
+// vert historique var(--blue)/var(--green) — les deux valent #2dd4bf,
+// teinte ~174°, cf. css/biomeca.css — aucun style inline, zéro régression
+// visuelle pour l'usage à un seul compte).
+// #187-UX — Scio a trouvé les teintes #2/#3/#4 d'origine (vert/cyan/indigo)
+// trop proches les unes des autres ET du teal #1 (toutes dans la bande
+// ~150-210°). Palette refaite en reprenant les 4 couleurs d'identité des
+// bilans (#122/#140) pour rester cohérent avec le reste de l'app : le
+// compte #1 (teal, sans accent) tombe déjà sur la couleur Posturo #2dd4bf —
+// les comptes #2-#4 reprennent donc les 3 autres (Sport bleu, Podopédiatrie
+// rose, Pédicurie ambre). Pas de violet : réservé à Apple Calendar dans
+// cette même grille (var(--purple) #a78bfa, ~255°) — un compte Google
+// violet serait indiscernable d'un événement Apple. Le compte #5 (au-delà
+// des 4 bilans) reçoit un magenta ~300°, seule teinte encore libre entre
+// le violet Apple (~255°) et le rouge suppression/erreur (var(--red)
+// #f04060, ~350°, dont le rose Podopédiatrie ~347° est déjà voisin — accepté
+// ici puisque c'est la couleur identitaire existante du module) :
 const AG_GOOGLE_ACCENTS = [
-  null, // compte #1 : style CSS par défaut, inchangé
-  { bg: 'rgba(52,168,83,0.15)', fg: '#34a853' }, // compte #2 : vert
-  { bg: 'rgba(0,172,193,0.15)', fg: '#00acc1' }, // compte #3 : cyan
-  { bg: 'rgba(92,107,192,0.15)', fg: '#5c6bc0' }, // compte #4 : indigo
-  { bg: 'rgba(255,112,67,0.15)', fg: '#ff7043' }, // compte #5 : corail
+  null, // compte #1 : style CSS par défaut, inchangé (teal ~174°, = Posturo)
+  { bg: 'rgba(55,138,221,0.15)', fg: '#378ADD' }, // compte #2 : bleu (Sport)
+  { bg: 'rgba(225,29,72,0.15)', fg: '#e11d48' }, // compte #3 : rose (Podopédiatrie)
+  { bg: 'rgba(217,119,6,0.15)', fg: '#d97706' }, // compte #4 : ambre (Pédicurie)
+  { bg: 'rgba(192,38,211,0.15)', fg: '#c026d3' }, // compte #5 : magenta ~300° (pas de 5e bilan)
 ];
 // Au-delà de 5 comptes, la couleur recommence à tourner (#187 accepte une
 // dégradation gracieuse ici : l'email dans la modale reste la source fiable
