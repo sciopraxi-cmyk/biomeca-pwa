@@ -22449,11 +22449,17 @@ function renderCompare() {
   };
   const displayValue = (v) => v == null ? '—' : (v === '' ? '✓' : v);
   let html = '<div style="font-size:11px;color:#888;margin-bottom:10px;font-style:italic;">Lignes surlignées = différences entre les deux bilans.</div>';
-  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  // #199 — table-layout:fixed + largeurs explicites 30/35/35 : sans ça, les
+  // colonnes A/B s'auto-dimensionnent sur leur contenu le plus large toutes
+  // lignes confondues, et la colonne B (souvent des « — » courts) se retrouve
+  // écrasée tout à droite (cf. capture Scio, bilan Contrôle quasi invisible).
+  // border-left sur la colonne B = séparation visuelle réelle gauche/droite,
+  // pas juste l'espacement des cellules (sport ET posturo, moteur commun).
+  html += '<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;">';
   html += '<thead><tr style="background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);text-align:left;">';
   html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);width:30%;">Champ</th>';
-  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);">' + a.label + '</th>';
-  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);">' + b.label + '</th>';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);width:35%;word-wrap:break-word;">' + a.label + '</th>';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);border-left:2px solid rgba(255,255,255,0.18);width:35%;word-wrap:break-word;">' + b.label + '</th>';
   html += '</tr></thead><tbody>';
   allTitles.forEach(titre => {
     html += '<tr><td colspan="3" style="padding:10px 10px 6px;font-weight:700;color:#2a7a4e;background:rgba(45,212,191,0.06);border-top:1px solid rgba(255,255,255,0.08);">' + titre + '</td></tr>';
@@ -22484,10 +22490,14 @@ function renderCompare() {
       const rowStyle = different
         ? 'background:#fff7ed;color:#1f2937;'
         : 'color:rgba(255,255,255,0.85);';
+      // Séparateur A/B teinté selon le fond de la ligne (blanc translucide sur
+      // fond sombre par défaut, ambre foncé sur fond clair #fff7ed des lignes
+      // différentes) — sinon invisible sur l'un des deux fonds.
+      const sepColor = different ? 'rgba(154,52,18,0.35)' : 'rgba(255,255,255,0.18)';
       html += '<tr style="' + rowStyle + '">';
-      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);">' + label + '</td>';
-      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);">' + displayValue(valA) + '</td>';
-      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);">' + displayValue(valB) + deltaHtml + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);word-wrap:break-word;">' + label + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);word-wrap:break-word;">' + displayValue(valA) + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);border-left:2px solid ' + sepColor + ';word-wrap:break-word;">' + displayValue(valB) + deltaHtml + '</td>';
       html += '</tr>';
     });
   });
