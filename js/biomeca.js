@@ -5204,6 +5204,15 @@ function renderPatientList() {
         </div>`).join('')}
       </div>` : '';
 
+    // #196 — Bouton « Comparer les bilans » posturo, miroir exact de #117 sport
+    // (≥ 2 bilans posturo, archives + bilan en cours). Lecture seule, ouvre
+    // pg-compare via le moteur générique openComparePosturo/renderCompare.
+    const nbPosturoComparables = bilansPosturo.length + (hasBilanPosturoEnCours ? 1 : 0);
+    const comparePosturoHtml = nbPosturoComparables >= 2 ? `
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+        <button onclick="openComparePosturo(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(45,212,191,0.18);color:#7fe0d1;border:1px solid rgba(45,212,191,0.3);">🔄 Comparer les bilans</button>
+      </div>` : '';
+
     // #121 Phase 0 — Liste des archives pédicurie (miroir posturo, palette ambre).
     const bilansPedicurieHtml = bilansPedicurie.length ? `
       <div style="margin-top:10px;">
@@ -5330,7 +5339,7 @@ function renderPatientList() {
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:${_hasAnyExpandedBilan?'4px':'0'};">
           ${modPosturo}${modSport}${modPedicurie}${modPodo}
         </div>
-        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilanPodopediatrieEnCoursHtml}${bilansPosturoHtml}${bilansPedicurieHtml}${bilansPodopediatrieHtml}${bilansSportHtml}${compareSportHtml}
+        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilanPodopediatrieEnCoursHtml}${bilansPosturoHtml}${comparePosturoHtml}${bilansPedicurieHtml}${bilansPodopediatrieHtml}${bilansSportHtml}${compareSportHtml}
       </div>
     </div>`;
   }).join('');
@@ -11915,29 +11924,22 @@ async function _resolvePosturoRapportImages(bd) {
   };
 }
 
-// #109-A2 — async pour permettre la pré-génération des photos posturales
-// annotées (4 vues, await Promise.all) avant l'assemblage HTML. Les 2 call-sites
-// HTML (`onclick="buildRapportPosturo()"` dans index.html L477 et js/biomeca.js
-// L12691) acceptent l'async fire-and-forget : la Promise retournée est ignorée
-// par onclick (aucune modification d'appelant nécessaire).
-async function buildRapportPosturo() {
-  const p = currentPatient;
-  if(!p) return;
-  const d = p.bilanDataPosturo || {};
-  const prat = praticiens.find(pr => pr.id == p.pratId) || {};
-  const logo = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
-
-  // Fix #149 — Résolution des visuels avec chemin path-aware + lecture du
-  // canvas vivant. Remplace 3 conditions if(d._xxx) qui perdaient silencieusement
-  // les blocs images quand le prefetch Storage avait échoué, et couvre le
-  // débounce autosave pour un dessin fait juste avant le clic Rapport.
-  // Retour : { bodyCanvas, empreinte, feetComposite, annotatedViews }, chaque
-  // visuel avec un status 'ok' | 'nu' | 'ko'. Voir _resolvePosturoRapportImages.
-  const visuals = await _resolvePosturoRapportImages(d);
-  const annotatedViews = visuals.annotatedViews;
-
-    let bodyHtml = `<style>\n    *{margin:0;padding:0;box-sizing:border-box;}\n    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}\n    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}\n    @media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.no-print{display:none !important;}.section,.patient-card,.header,.footer{break-inside:avoid;}.img-container,img{break-inside:avoid;page-break-inside:avoid;}.header,.titre-rapport,.patient-card,.section-title,.section-num,.tag,.tag-navy,.tag-ok,.tag-warn,.tag-alert,.footer{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}}\n\n    /* HEADER */\n    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .logo{height:50px;object-fit:contain;}\n    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}\n    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}\n\n    /* BAND */\n    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}\n    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}\n\n    /* PATIENT */\n    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:0;}\n    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}\n    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}\n    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}\n    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}\n    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}\n    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}\n\n    /* METRICS */\n    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}\n    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}\n    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}\n    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}\n\n    /* SECTIONS */\n    .section{margin:0;break-inside:avoid;padding:0 24px;}\n    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}\n    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0.5px;}\n    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .section-line{flex:1;height:1px;background:#eaeaea;}\n    .section-body{padding:0;}\n\n    /* ROWS */\n    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}\n    .item:last-child{border-bottom:none;}\n    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;padding-top:1px;}\n    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}\n    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;line-height:1.4;}\n\n    /* TAGS */\n    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}\n    .tag-navy{background:#e8edf5;color:#0e1f38;}\n    .tag-ok{background:#ecfdf5;color:#065f46;}\n    .tag-warn{background:#fffbeb;color:#92400e;}\n    .tag-alert{background:#fef2f2;color:#991b1b;}\n\n    /* IMAGES */\n    .img-container{position:relative;text-align:center;}\n    .img-base{max-width:100%;border-radius:4px;}\n    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}\n\n    /* FOOTER */\n    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}\n    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}\n\n    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}\n  </style>`;
-const sections = [];
+// #117-posturo — Extraction pure des sections TEXTE du rapport postural (hors
+// visuels : silhouettes, vues annotées, empreinte, plan de semelles — gérés à
+// part par buildRapportPosturo car dépendants du DOM/async, cf. plus bas).
+// Aucune lecture DOM, aucune lecture currentPatient : ne consomme que l'objet
+// bilanDataPosturo (d) passé en paramètre — utilisable aussi bien sur le
+// bilan en cours (p.bilanDataPosturo) que sur une archive
+// (bilansPosturo[i].bilanDataPosturo). Miroir exact de _extractSportSections
+// (#117 sport, L22232) : une seule source de vérité pour le rapport PDF
+// (buildRapportPosturo, appelant ci-dessous) ET la comparaison de bilans
+// (renderCompare) — élimine tout risque de divergence entre les deux vues.
+// items en paires [label, valeur] (format déjà natif de ce bloc, contrairement
+// à _extractSportSections qui utilise des chaînes 'Label: valeur' — hérité du
+// format sport) ; renderCompare() normalise les deux formats à l'affichage.
+function _extractPosturoSections(d) {
+  d = d || {};
+  const sections = [];
 
   // 1. Anamnèse
   const anam = [];
@@ -11952,7 +11954,9 @@ const sections = [];
   if(d.douleur) anam.push(['Douleur', d.douleur]);
   if(anam.length) sections.push({titre:'1. Anamnèse', items:anam, color:'#2a7a4e'});
 
-  // 2. Morphostatique
+  // 2. Morphostatique (texte — les silhouettes sont gérées séparément par
+  // buildRapportPosturo, DOM/async, insérées après coup par recherche de
+  // préfixe de titre)
   const morpho = [];
   if(d.comp1) morpho.push(['Compensation 1', d.comp1]);
   if(d.comp2) morpho.push(['Compensation 2', d.comp2]);
@@ -11961,53 +11965,6 @@ const sections = [];
   if(d.prefMot) morpho.push(['Préférences motrices', d.prefMot]);
   if(d.rombergMorpho) morpho.push(['Romberg', d.rombergMorpho]);
   if(morpho.length) sections.push({titre:'2. Morphostatique', items:morpho, color:'#3498db'});
-
-  // Silhouettes bonhommes — condition path-aware (fix #149 défaut 2). Le bloc
-  // apparaît dès que status !== 'nu' : soit dataURL disponible ('ok'), soit
-  // Path Storage présent mais fetch KO ('ko') → gabarits nus affichés avec
-  // mention rouge. L'assemblage réel des 4 slices est fait en async par
-  // _buildRapportBody (branche `bonhommes`) via makeSliceComposite L10868.
-  // Fix #152 — Purge du code mort résiduel qui traînait dans ce bloc depuis
-  // le refactor #149 : helpers locaux makeComposite / getCanvasSlice /
-  // composite / sliceDataUrl / compositeImgCanvas et leurs variables (bc,
-  // faceEl/face2El/profilGEl/profilDEl, W/H, slice0-3, imgIds) — jamais
-  // consommés dans ce bloc, sans call-site externe. Bénéfice concret :
-  // suppression de 4 appels toDataURL par génération de rapport (slice0-3).
-  // Bonus : 2 des fonctions supprimées faisaient `new Image(); img.src=…;
-  // drawImage` sans attendre onload — bug latent si un futur lecteur les
-  // avait réactivées.
-  if(visuals.bodyCanvas.status !== 'nu') {
-    {
-      var bgIds3 = ['imgjs-morpho-profilG','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilD'];
-      // Fix #149 défaut 2 — bodyCanvasData vient désormais de visuals (résolution
-      // live → RAM → Path). Sur status 'ko' la dataURL est null → la branche
-      // async de _buildRapportBody ne recompose pas les slices, les gabarits nus
-      // (profilDImg/…) sont rendus tels quels avec la mention rouge (ko: true).
-      // annotatedViews retirée : section autonome poussée juste après (défaut 3).
-      sections.push({titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
-        bodyCanvasData: visuals.bodyCanvas.dataUrl,
-        ko: visuals.bodyCanvas.status === 'ko',
-        bgIds: bgIds3,
-        profilDImg: document.getElementById(bgIds3[0]) ? document.getElementById(bgIds3[0]).src : null,
-        face2Img:   document.getElementById(bgIds3[1]) ? document.getElementById(bgIds3[1]).src : null,
-        faceImg:    document.getElementById(bgIds3[2]) ? document.getElementById(bgIds3[2]).src : null,
-        profilGImg: document.getElementById(bgIds3[3]) ? document.getElementById(bgIds3[3]).src : null,
-      });
-    }
-  }
-  // Fix #149 défaut 3 — Photos posturales annotées en section autonome, non
-  // plus prisonnière du bloc silhouettes. Un praticien qui place ses marqueurs
-  // sans dessiner sur les silhouettes voit désormais ses photos dans le rapport.
-  // Position : juste après la section bonhommes si présente (immédiatement
-  // au-dessus dans le tableau), sinon à sa place naturelle après « 2. Morphostatique ».
-  // Pas de préfixe « 2. » dans le titre : deux sections « 2. Morphostatique »
-  // et « 2. Morphostatique — Silhouettes » existent déjà, en ajouter une
-  // troisième surchargerait la lecture. La numérotation visible du rapport
-  // (section-num 01/02/03…) est de toute façon générée par _doBuildRapport
-  // à partir de l'index dans le tableau, pas du préfixe du titre.
-  if (annotatedViews && annotatedViews.length > 0) {
-    sections.push({titre:'Analyse posturale — vues annotées', color:'#3498db', type:'annotatedPosture', entries: annotatedViews});
-  }
 
   // #106-Final Volet 1 — l'analyse posturale profil n'est plus insérée dans le
   // corps Morphostatique. Elle apparaît UNE fois dans le rapport, via la section
@@ -12097,9 +12054,7 @@ const sections = [];
   if(d.scoliose) dyn.push(['Scoliose', d.scoliose]);
   if(dyn.length) sections.push({titre:'3. Bilan dynamique', items:dyn, color:'#e74c3c'});
 
-  // Images bonhommes
-
-    // 4. Neuro-fonctionnel
+  // 4. Neuro-fonctionnel
   const neuro = [];
   if(d.neuro4) {
     const n = d.neuro4;
@@ -12352,12 +12307,12 @@ const sections = [];
   if(d.biomecArticulaire) terr.push(['Biomécanique/Articulaire', d.biomecArticulaire]);
   if(terr.length) sections.push({titre:'8. Terrain du patient', items:terr, color:'#2a7a4e'});
 
-  // Synthèse clinique (entre Terrain et Circuits)
-  // 9. Traitements
+  // 9. Traitements — trait[] accumulé en 2 temps (avant puis après le bloc
+  // Synthèse/Circuits ci-dessous), comme dans le code d'origine.
   const trait = [];
   if(d.semellesDesc) trait.push(['Plan de semelles', d.semellesDesc]);
-  // Circuits express — encadrés séparés par circuit
-  const circLabels = ['Exercice 1','Exercice 2','Exercice 3','Exercice 4'];
+
+  // Synthèse clinique (entre Terrain et Circuits)
   if(d._synthese && d._synthese.length > 0) {
     const synItems = [];
     d._synthese.forEach(function(s) {
@@ -12367,6 +12322,8 @@ const sections = [];
     if(synItems.length) sections.push({titre:'8. Synthèse clinique', items:synItems, color:'#2a7a4e'});
   }
 
+  // Circuits express — encadrés séparés par circuit
+  const circLabels = ['Exercice 1','Exercice 2','Exercice 3','Exercice 4'];
   ['c1','c2'].forEach(function(cx, ci) {
     const circItems = [];
     circLabels.forEach(function(lbl, i) {
@@ -12385,6 +12342,7 @@ const sections = [];
       sections.push({titre:'9. Circuit '+(ci+1), items:circItems, color:'#16a085'});
     }
   });
+
   if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
   if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
   const tests = [];
@@ -12402,6 +12360,82 @@ const sections = [];
   if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
   if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
   if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
+
+  return sections;
+}
+
+// #109-A2 — async pour permettre la pré-génération des photos posturales
+// annotées (4 vues, await Promise.all) avant l'assemblage HTML. Les 2 call-sites
+// HTML (`onclick="buildRapportPosturo()"` dans index.html L477 et js/biomeca.js
+// L12691) acceptent l'async fire-and-forget : la Promise retournée est ignorée
+// par onclick (aucune modification d'appelant nécessaire).
+async function buildRapportPosturo() {
+  const p = currentPatient;
+  if(!p) return;
+  const d = p.bilanDataPosturo || {};
+  const prat = praticiens.find(pr => pr.id == p.pratId) || {};
+  const logo = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
+
+  // Fix #149 — Résolution des visuels avec chemin path-aware + lecture du
+  // canvas vivant. Remplace 3 conditions if(d._xxx) qui perdaient silencieusement
+  // les blocs images quand le prefetch Storage avait échoué, et couvre le
+  // débounce autosave pour un dessin fait juste avant le clic Rapport.
+  // Retour : { bodyCanvas, empreinte, feetComposite, annotatedViews }, chaque
+  // visuel avec un status 'ok' | 'nu' | 'ko'. Voir _resolvePosturoRapportImages.
+  const visuals = await _resolvePosturoRapportImages(d);
+  const annotatedViews = visuals.annotatedViews;
+
+    let bodyHtml = `<style>\n    *{margin:0;padding:0;box-sizing:border-box;}\n    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff;}\n    .rp-page{width:210mm;min-height:297mm;padding:0 0 15mm;margin:0 auto;}\n    @media print{*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}@page{size:A4;margin:0;}html,body{margin:0;padding:0;width:210mm;}.rp-page{padding:0;width:210mm;margin:0;}.no-print{display:none !important;}.section,.patient-card,.header,.footer{break-inside:avoid;}.img-container,img{break-inside:avoid;page-break-inside:avoid;}.header,.titre-rapport,.patient-card,.section-title,.section-num,.tag,.tag-navy,.tag-ok,.tag-warn,.tag-alert,.footer{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}}\n\n    /* HEADER */\n    .header{background:#0e1f38;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .logo{height:50px;object-fit:contain;}\n    .prat-info{text-align:right;font-size:9px;color:rgba(255,255,255,0.5);line-height:1.7;}\n    .prat-name{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}\n\n    /* BAND */\n    .titre-rapport{background:#1a3a6e;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}\n    .titre-rapport h1{font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;}\n    .titre-rapport .sub{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1px;}\n\n    /* PATIENT */\n    .patient-card{background:#f7f8fa;border-bottom:1px solid #eaeaea;padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:0;}\n    .patient-avatar{width:44px;height:44px;border-radius:50%;background:#0e1f38;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0;}\n    .patient-name{font-size:16px;font-weight:300;color:#0e1f38;letter-spacing:0.5px;}\n    .patient-details{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.6;}\n    .patient-right{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}\n    .pt-chip{font-size:9px;padding:2px 8px;border-radius:20px;background:#fff;border:1px solid #d1d5db;color:#374151;font-weight:500;}\n    .pt-chip-alert{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}\n\n    /* METRICS */\n    .patient-metrics{display:flex;gap:8px;flex-shrink:0;}\n    .metric{background:#fff;border:1px solid #eaeaea;border-radius:6px;padding:8px 12px;text-align:center;min-width:52px;}\n    .metric-val{font-size:18px;font-weight:300;color:#0e1f38;line-height:1;}\n    .metric-lbl{font-size:8px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}\n\n    /* SECTIONS */\n    .section{margin:0;break-inside:avoid;padding:0 24px;}\n    .section-title{display:flex;align-items:center;gap:8px;padding:12px 0 8px;margin-top:16px;border-bottom:2px solid #0e1f38;}\n    .section-num{font-size:8px;font-weight:700;color:#fff;background:#0e1f38;width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0.5px;}\n    .section-label{font-size:10px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .section-line{flex:1;height:1px;background:#eaeaea;}\n    .section-body{padding:0;}\n\n    /* ROWS */\n    .item{display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f3f3f0;}\n    .item:last-child{border-bottom:none;}\n    .item-label{font-size:9px;font-weight:700;color:#9ca3af;min-width:180px;letter-spacing:0.5px;text-transform:uppercase;padding-top:1px;}\n    .item-value{flex:1;font-size:11px;color:#1f2937;line-height:1.4;}\n    .item-value-hl{flex:1;font-size:11px;color:#0e1f38;font-weight:600;line-height:1.4;}\n\n    /* TAGS */\n    .tag{display:inline-block;font-size:8px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-right:3px;}\n    .tag-navy{background:#e8edf5;color:#0e1f38;}\n    .tag-ok{background:#ecfdf5;color:#065f46;}\n    .tag-warn{background:#fffbeb;color:#92400e;}\n    .tag-alert{background:#fef2f2;color:#991b1b;}\n\n    /* IMAGES */\n    .img-container{position:relative;text-align:center;}\n    .img-base{max-width:100%;border-radius:4px;}\n    .img-overlay{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;}\n\n    /* FOOTER */\n    .footer{background:#f7f8fa;border-top:2px solid #0e1f38;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;}\n    .footer-brand{font-size:8px;font-weight:700;color:#0e1f38;letter-spacing:2px;text-transform:uppercase;}\n    .footer-info{font-size:8px;color:#9ca3af;letter-spacing:0.5px;}\n\n    .btn-print{position:fixed;bottom:20px;right:20px;background:#0e1f38;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;}\n  </style>`;
+// #117-posturo — sections texte extraites via la fonction pure partagée avec
+  // la comparaison de bilans (cf. _extractPosturoSections plus haut, L11923).
+  // Remplace ~350 lignes de logique inline dupliquée par un seul appel : une
+  // seule source de vérité pour le rapport PDF et la comparaison, plus aucun
+  // risque de divergence future entre les deux.
+  const sections = _extractPosturoSections(d);
+
+  // Silhouettes bonhommes + vues annotées — insérées juste avant « 3. Bilan
+  // dynamique » (recherche par préfixe de titre, robuste même si Anamnèse
+  // et/ou Morphostatique sont vides et donc absentes du tableau — reproduit
+  // la position historique : ces 2 sections visuelles étaient poussées juste
+  // après Morphostatique, avant Bilan dynamique, cf. ordre du code d'origine).
+  // Condition path-aware (fix #149 défaut 2). Le bloc silhouettes apparaît dès
+  // que status !== 'nu' : soit dataURL disponible ('ok'), soit Path Storage
+  // présent mais fetch KO ('ko') → gabarits nus affichés avec mention rouge.
+  // L'assemblage réel des 4 slices est fait en async par _buildRapportBody
+  // (branche `bonhommes`) via makeSliceComposite L10868.
+  const beforeDynIdx = sections.findIndex(s => s.titre && s.titre.startsWith('3.'));
+  let visualAnchor = beforeDynIdx >= 0 ? beforeDynIdx : sections.length;
+  if(visuals.bodyCanvas.status !== 'nu') {
+    var bgIds3 = ['imgjs-morpho-profilG','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilD'];
+    // Fix #149 défaut 2 — bodyCanvasData vient désormais de visuals (résolution
+    // live → RAM → Path). Sur status 'ko' la dataURL est null → la branche
+    // async de _buildRapportBody ne recompose pas les slices, les gabarits nus
+    // (profilDImg/…) sont rendus tels quels avec la mention rouge (ko: true).
+    // annotatedViews retirée : section autonome poussée juste après (défaut 3).
+    sections.splice(visualAnchor, 0, {titre:'2. Morphostatique — Silhouettes', color:'#3498db', type:'bonhommes',
+      bodyCanvasData: visuals.bodyCanvas.dataUrl,
+      ko: visuals.bodyCanvas.status === 'ko',
+      bgIds: bgIds3,
+      profilDImg: document.getElementById(bgIds3[0]) ? document.getElementById(bgIds3[0]).src : null,
+      face2Img:   document.getElementById(bgIds3[1]) ? document.getElementById(bgIds3[1]).src : null,
+      faceImg:    document.getElementById(bgIds3[2]) ? document.getElementById(bgIds3[2]).src : null,
+      profilGImg: document.getElementById(bgIds3[3]) ? document.getElementById(bgIds3[3]).src : null,
+    });
+    visualAnchor++;
+  }
+  // Fix #149 défaut 3 — Photos posturales annotées en section autonome, non
+  // plus prisonnière du bloc silhouettes. Un praticien qui place ses marqueurs
+  // sans dessiner sur les silhouettes voit désormais ses photos dans le rapport.
+  // Position : juste après la section bonhommes si présente, sinon à sa place
+  // naturelle après « 2. Morphostatique ». Pas de préfixe « 2. » dans le titre :
+  // deux sections « 2. Morphostatique » et « 2. Morphostatique — Silhouettes »
+  // existent déjà, en ajouter une troisième surchargerait la lecture. La
+  // numérotation visible du rapport (section-num 01/02/03…) est de toute façon
+  // générée par _doBuildRapport à partir de l'index dans le tableau, pas du
+  // préfixe du titre.
+  if (annotatedViews && annotatedViews.length > 0) {
+    sections.splice(visualAnchor, 0, {titre:'Analyse posturale — vues annotées', color:'#3498db', type:'annotatedPosture', entries: annotatedViews});
+  }
 
   // Empreinte plantaire après section 5 — condition path-aware (fix #149
   // défaut 2). Section rendue dès que status !== 'nu', avec mention rouge
@@ -22227,7 +22261,7 @@ function _buildSportSyntheseHTMLForRapport(bd) {
 // (bilanData, mesures) explicite. Inclut « ⚠️ Mesures à signaler » (mode
 // condensé) en tête si des alertes existent. Aucune lecture DOM, aucune
 // lecture currentPatient — pure. Utilisé par _buildSportSyntheseHTMLForRapport
-// (rapport, où mesures = currentPatient.mesures) ET par renderCompareSport
+// (rapport, où mesures = currentPatient.mesures) ET par renderCompare
 // (comparaison côte-à-côte, où mesures = bilan.mesures d'une archive).
 function _extractSportSections(bilanData, mesures) {
   const bd = bilanData || {};
@@ -22246,9 +22280,16 @@ function _extractSportSections(bilanData, mesures) {
   return sections;
 }
 
+// #117/#196 — Type actif de la comparaison en cours ('sport' | 'posturo').
+// La page pg-compare et ses 2 <select> sont génériques et partagés entre les
+// deux flux (un seul type actif à la fois) ; ce module-scope mémorise lequel
+// entre l'ouverture (openCompareSport/openComparePosturo) et le rendu
+// (renderCompare), plutôt que de dupliquer la page ou le moteur de rendu.
+let _compareType = 'sport';
+
 // #117 Étape A — Ouvre la page de comparaison côte-à-côte de 2 bilans sport.
 // Peuple les 2 <select> avec les options (bilan en cours s'il existe + chaque
-// archive bilansSport), branche onchange → renderCompareSport. Lecture seule :
+// archive bilansSport), branche onchange → renderCompare. Lecture seule :
 // pas d'écriture sur le store patient, juste un selectPatient pour activer le
 // contexte global currentPatient (header + scope mesures pour le rendu).
 function openCompareSport(patIdx) {
@@ -22278,45 +22319,84 @@ function openCompareSport(patIdx) {
     selA.value = options[0].value;
     selB.value = options[options.length - 1].value;
   }
-  selA.onchange = renderCompareSport;
-  selB.onchange = renderCompareSport;
+  _compareType = 'sport';
+  selA.onchange = renderCompare;
+  selB.onchange = renderCompare;
   const nameEl = document.getElementById('compare-patient-name');
   if (nameEl) nameEl.textContent = (p.prenom || '') + ' ' + (p.nom || '');
   nav('pg-compare');
-  renderCompareSport();
+  renderCompare();
 }
 
-// #117 Étape A — Résout une valeur de <select> ('current' ou 'archive:N') vers
-// { label, bilanData, mesures }. Le label inclut la date pour les archives ;
-// « Bilan en cours » n'a pas de date affichée. Renvoie null si la value est
-// invalide ou l'archive disparue (cas edge : suppression entre 2 selects).
-function _resolveCompareBilan(p, value) {
+// #196 — Ouvre la comparaison de 2 bilans posturo. Miroir exact de
+// openCompareSport : mêmes règles d'ordre d'options (archives puis « Bilan en
+// cours »), même sélection par défaut (A=plus ancien, B=plus récent). Seule la
+// source de données change (bilansPosturo / currentBilanPosturoSousType).
+function openComparePosturo(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  selectPatient(p);
+  const selA = document.getElementById('compare-sel-a');
+  const selB = document.getElementById('compare-sel-b');
+  if (!selA || !selB) return;
+  const options = [];
+  (p.bilansPosturo || []).forEach((b, idx) => {
+    options.push({ value: 'archive:' + idx, label: (b.label || 'Bilan'), date: b.date || '' });
+  });
+  if (p.currentBilanPosturoSousType) {
+    options.push({ value: 'current', label: 'Bilan en cours', date: '' });
+  }
+  const optionsHtml = options.map(o =>
+    '<option value="' + o.value + '">' + o.label + (o.date ? ' — ' + o.date : '') + '</option>'
+  ).join('');
+  selA.innerHTML = optionsHtml;
+  selB.innerHTML = optionsHtml;
+  if (options.length >= 2) {
+    selA.value = options[0].value;
+    selB.value = options[options.length - 1].value;
+  }
+  _compareType = 'posturo';
+  selA.onchange = renderCompare;
+  selB.onchange = renderCompare;
+  const nameEl = document.getElementById('compare-patient-name');
+  if (nameEl) nameEl.textContent = (p.prenom || '') + ' ' + (p.nom || '');
+  nav('pg-compare');
+  renderCompare();
+}
+
+// #117 Étape A / #196 — Résout une valeur de <select> ('current' ou
+// 'archive:N') vers { label, bilanData, mesures }. Le label inclut la date
+// pour les archives ; « Bilan en cours » n'a pas de date affichée. Renvoie
+// null si la value est invalide ou l'archive disparue (cas edge : suppression
+// entre 2 selects). type='posturo' lit bilansPosturo/bilanDataPosturo — les
+// archives posturo n'ont pas de champ mesures séparé (contrairement au sport,
+// tout est dans bilanDataPosturo) → mesures reste null dans ce cas.
+function _resolveCompareBilan(p, value, type) {
   if (!p || !value) return null;
+  const isPosturo = type === 'posturo';
   if (value === 'current') {
-    return {
-      label:     'Bilan en cours',
-      bilanData: p.bilanData || {},
-      mesures:   p.mesures   || {},
-    };
+    return isPosturo
+      ? { label: 'Bilan en cours', bilanData: p.bilanDataPosturo || {}, mesures: null }
+      : { label: 'Bilan en cours', bilanData: p.bilanData || {}, mesures: p.mesures || {} };
   }
   const m = value.match(/^archive:(\d+)$/);
   if (!m) return null;
-  const b = (p.bilansSport || [])[parseInt(m[1], 10)];
+  const b = (isPosturo ? p.bilansPosturo : p.bilansSport || [])[parseInt(m[1], 10)];
   if (!b) return null;
-  return {
-    label:     (b.label || 'Bilan') + (b.date ? ' — ' + b.date : ''),
-    bilanData: b.bilanData || {},
-    mesures:   b.mesures   || {},
-  };
+  return isPosturo
+    ? { label: (b.label || 'Bilan') + (b.date ? ' — ' + b.date : ''), bilanData: b.bilanDataPosturo || {}, mesures: null }
+    : { label: (b.label || 'Bilan') + (b.date ? ' — ' + b.date : ''), bilanData: b.bilanData || {}, mesures: b.mesures || {} };
 }
 
-// #117 Étape A — Rendu du tableau de comparaison 3 colonnes (Champ | A | B).
-// Aligne les sections par titre (union, ordre = A puis B-only), puis aligne
-// les lignes par label (parse « Label : valeur » sur le 1er « : »). Lignes
+// #117 Étape A / #196 — Rendu générique du tableau de comparaison 3 colonnes
+// (Champ | A | B), pour les 2 flux sport ET posturo (cf. _compareType) — une
+// seule logique de rendu, pas de duplication (#196 : « tous les bilans
+// fonctionnent de la même façon »). Aligne les sections par titre (union,
+// ordre = A puis B-only), puis aligne les lignes par label. Lignes
 // différentes : fond orange clair #fff7ed + texte sombre pour contraste, delta
 // signé si les 2 valeurs portent un nombre. Valeurs manquantes (champ absent
 // dans un seul bilan) : « — » + ligne surlignée.
-function renderCompareSport() {
+function renderCompare() {
   const content = document.getElementById('compare-content');
   if (!content) return;
   if (!currentPatient) {
@@ -22326,24 +22406,39 @@ function renderCompareSport() {
   const selA = document.getElementById('compare-sel-a');
   const selB = document.getElementById('compare-sel-b');
   if (!selA || !selB) return;
-  const a = _resolveCompareBilan(currentPatient, selA.value);
-  const b = _resolveCompareBilan(currentPatient, selB.value);
+  const a = _resolveCompareBilan(currentPatient, selA.value, _compareType);
+  const b = _resolveCompareBilan(currentPatient, selB.value, _compareType);
   if (!a || !b) {
     content.innerHTML = '<div style="color:#888;font-style:italic;padding:8px 0;">Sélectionnez 2 bilans à comparer.</div>';
     return;
   }
-  const sectionsA = _extractSportSections(a.bilanData, a.mesures);
-  const sectionsB = _extractSportSections(b.bilanData, b.mesures);
-  const byTitleA = Object.fromEntries(sectionsA.map(s => [s.titre, s.items]));
-  const byTitleB = Object.fromEntries(sectionsB.map(s => [s.titre, s.items]));
+  const sectionsA = _compareType === 'posturo' ? _extractPosturoSections(a.bilanData) : _extractSportSections(a.bilanData, a.mesures);
+  const sectionsB = _compareType === 'posturo' ? _extractPosturoSections(b.bilanData) : _extractSportSections(b.bilanData, b.mesures);
+  // Filtre défensif : ne garder que les sections texte (items). posturo comme
+  // sport n'en produisent aujourd'hui que de ce type (les sections visuelles
+  // — silhouettes, photos annotées, empreinte, plan de semelles — sont
+  // ajoutées après coup par buildRapportPosturo, jamais par
+  // _extractPosturoSections), mais le filtre protège la comparaison d'une
+  // future section image sans y toucher.
+  const textSectionsA = sectionsA.filter(s => Array.isArray(s.items));
+  const textSectionsB = sectionsB.filter(s => Array.isArray(s.items));
+  const byTitleA = Object.fromEntries(textSectionsA.map(s => [s.titre, s.items]));
+  const byTitleB = Object.fromEntries(textSectionsB.map(s => [s.titre, s.items]));
   // Union des titres, ordre = A puis ajouts de B.
   const allTitles = [];
-  sectionsA.forEach(s => allTitles.push(s.titre));
-  sectionsB.forEach(s => { if (!allTitles.includes(s.titre)) allTitles.push(s.titre); });
-  // Parse « Label : valeur » sur le 1er « : ». Pas de « : » → item entier =
-  // label, value = '' (booléen affiché « ✓ »). Multiples « : » → la 1ʳᵉ seule
-  // sépare (le reste fait partie de la valeur).
-  const parseItem = (s) => {
+  textSectionsA.forEach(s => allTitles.push(s.titre));
+  textSectionsB.forEach(s => { if (!allTitles.includes(s.titre)) allTitles.push(s.titre); });
+  // Normalise un item vers { label, value }, quel que soit son format natif :
+  // - sport : string « Label: valeur » → parse sur le 1er « : ». Pas de
+  //   « : » → item entier = label, value = '' (booléen affiché « ✓ »).
+  //   Multiples « : » → la 1ʳᵉ seule sépare (le reste fait partie de la valeur).
+  // - posturo : paire [label, value] déjà séparée (format natif préservé par
+  //   _extractPosturoSections, cf. #194) → aucun parsing à faire.
+  const parseItem = (it) => {
+    if (Array.isArray(it)) {
+      return { label: String(it[0]).trim(), value: it[1] == null ? '' : String(it[1]).trim() };
+    }
+    const s = String(it);
     const idx = s.indexOf(':');
     if (idx < 0) return { label: s.trim(), value: '' };
     return { label: s.slice(0, idx).trim(), value: s.slice(idx + 1).trim() };
