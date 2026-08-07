@@ -7433,8 +7433,20 @@ function redetectMarkers() {
 
 async function enumerateCameras(selectId) {
   try {
-    // Demander permission d'abord pour avoir les labels
-    await navigator.mediaDevices.getUserMedia({video:true}).then(s=>s.getTracks().forEach(t=>t.stop())).catch(()=>{});
+    // Demander permission d'abord pour avoir les labels — MAIS jamais quand un
+    // stream est déjà actif : sur iPadOS, ouvrir ce flux-sonde pendant qu'une
+    // caméra tourne coupe (mute) le flux actif → écran noir sans erreur
+    // (#202-iPad, constaté sur la capture posturale : seule la caméra par
+    // défaut survivait, les autres viraient au noir).
+    const hasActiveStream =
+      (typeof vidStream !== 'undefined' && vidStream) ||
+      (typeof camStream !== 'undefined' && camStream) ||
+      (typeof _postureStreams !== 'undefined' &&
+        _postureStreams &&
+        Object.values(_postureStreams).some(Boolean));
+    if (!hasActiveStream) {
+      await navigator.mediaDevices.getUserMedia({video:true}).then(s=>s.getTracks().forEach(t=>t.stop())).catch(()=>{});
+    }
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cameras = devices.filter(d => d.kind === 'videoinput');
     const sel = document.getElementById(selectId);
@@ -10557,14 +10569,48 @@ async function _togglePostureCam(prefix) {
   if (_postureStreams[prefix]) { _stopPostureCam(prefix); return; }
   const sel = document.getElementById(`${prefix}-pc-camera-select`);
   const selVal = sel?.value;
+  // #202-iPad — facingMode déduit du libellé pour le repli : iPadOS peut
+  // livrer une piste MUTED (image noire, aucune erreur) sur un deviceId
+  // exact, notamment caméras virtuelles ou caméra pas encore libérée.
+  const selLabel = sel?.selectedOptions?.[0]?.textContent || '';
+  const wantEnv = /arri|back|rear|environment/i.test(selLabel);
   const constraints = {
     audio: false,
     video: selVal
       ? { deviceId: { exact: selVal }, width: { ideal: 1920 }, height: { ideal: 1080 } }
       : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
   };
+  const fallback = { audio: false, video: { facingMode: wantEnv ? 'environment' : 'user' } };
   try {
-    _postureStreams[prefix] = await navigator.mediaDevices.getUserMedia(constraints);
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e1) {
+      console.warn('[#202] getUserMedia deviceId exact a échoué, repli facingMode :', e1.name, e1.message);
+      stream = await navigator.mediaDevices.getUserMedia(fallback);
+    }
+    // Piste muted → on attend l'unmute un court instant, sinon on relâche et
+    // on retente en facingMode simple (sans deviceId ni résolution imposée).
+    let track = stream.getVideoTracks()[0];
+    if (track && track.muted) {
+      const unmuted = await new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(false), 1500);
+        track.onunmute = () => { clearTimeout(timer); resolve(true); };
+      });
+      if (!unmuted) {
+        console.warn('[#202] Piste restée muted, repli facingMode', fallback.video.facingMode);
+        stream.getTracks().forEach((t) => t.stop());
+        await new Promise((r) => setTimeout(r, 300));
+        stream = await navigator.mediaDevices.getUserMedia(fallback);
+        track = stream.getVideoTracks()[0];
+      }
+    }
+    _postureStreams[prefix] = stream;
+    console.info(
+      '[#202] Caméra posture :', track?.label,
+      '· muted=', track?.muted,
+      '·', JSON.stringify(track?.getSettings?.() || {})
+    );
     const video = document.getElementById(`${prefix}-pc-video`);
     if (video) {
       video.srcObject = _postureStreams[prefix];
@@ -10593,6 +10639,9 @@ async function _togglePostureCam(prefix) {
 async function _switchPostureCam(prefix) {
   if (!_postureStreams[prefix]) return; // pas de stream → l'utilisateur clique « Activer » d'abord
   _stopPostureCam(prefix);
+  // #202-iPad — laisser iPadOS libérer la caméra avant d'en rouvrir une autre,
+  // sinon la nouvelle piste arrive muted (écran noir sans erreur).
+  await new Promise((r) => setTimeout(r, 300));
   await _togglePostureCam(prefix);
 }
 
