@@ -10881,22 +10881,18 @@ function togglePlay(){const p=document.getElementById('vid-el');if(p.paused){p.p
 function stepFrame(dir){const p=document.getElementById('vid-el');p.pause();p.currentTime=Math.max(0,Math.min(p.duration||0,p.currentTime+dir/30));document.getElementById('btn-play').textContent='▶';}
 function seekVid(val){const p=document.getElementById('vid-el');if(p.duration)p.currentTime=(val/1000)*p.duration;}
 
-// #200 — Types MIME candidats par ordre de préférence, testés via
-// isTypeSupported avant de construire le MediaRecorder. Sans ça, le navigateur
-// choisissait un défaut qui pouvait échouer à la négociation avec certains flux
-// caméra (constaté avec une caméra haute vitesse) : MediaRecorder levait alors
-// une exception synchrone, jamais interceptée, qui interrompait toggleRec()
-// avant même mediaRec.start() — le bouton « Rec » restait inerte, sans un seul
-// message, aucun indice que l'enregistrement n'avait jamais démarré.
-const REC_MIME_CANDIDATES = [
-  'video/webm;codecs=vp9',
-  'video/webm;codecs=vp8',
-  'video/webm',
-  'video/mp4',
-];
-function _pickRecMimeType() {
+// #200-2 — Codecs de secours, essayés SEULEMENT si le constructeur par défaut
+// (sans mimeType) échoue. Ordre : laisser le navigateur choisir en premier,
+// car forcer un codec explicite (vp9/vp8) peut réussir à la construction tout
+// en produisant un flux que le <video> du même navigateur refuse ensuite de
+// décoder (constaté avec une caméra haute vitesse : aucune exception, aucun
+// onerror pendant l'enregistrement, mais échec silencieux à la relecture —
+// cf. player.onerror ci-dessous). Le défaut du navigateur reste la valeur la
+// plus fiable puisque c'est ce qu'il sait décoder nativement.
+const REC_MIME_FALLBACKS = ['video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+function _pickRecFallbackMimeType() {
   if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
-  return REC_MIME_CANDIDATES.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  return REC_MIME_FALLBACKS.find(t => MediaRecorder.isTypeSupported(t)) || '';
 }
 
 function toggleRec() {
@@ -10905,15 +10901,26 @@ function toggleRec() {
     mediaRec.stop();isRecording=false;document.getElementById('btn-vrec').textContent='⏺ Rec';
   } else {
     recChunks=[];
-    const mimeType = _pickRecMimeType();
     try {
-      mediaRec = mimeType ? new MediaRecorder(vidStream, { mimeType }) : new MediaRecorder(vidStream);
+      mediaRec = new MediaRecorder(vidStream);
     } catch (err) {
-      // #200 — échec de négociation MediaRecorder/flux caméra : signalé au lieu
-      // de laisser toggleRec() s'arrêter en silence (cf. commentaire ci-dessus).
-      console.error('MediaRecorder init failed', err);
-      alert("Impossible de démarrer l'enregistrement avec cette caméra (format vidéo non supporté par le navigateur).");
-      return;
+      console.warn('MediaRecorder() par défaut a échoué, tentative avec mimeType explicite', err);
+      const fallback = _pickRecFallbackMimeType();
+      if (!fallback) {
+        // #200 — échec de négociation MediaRecorder/flux caméra, aucun codec de
+        // secours disponible : signalé au lieu de laisser toggleRec() s'arrêter
+        // en silence (le bouton « Rec » restait inerte, sans un seul message).
+        console.error('MediaRecorder init failed, no fallback mimeType supported', err);
+        alert("Impossible de démarrer l'enregistrement avec cette caméra (format vidéo non supporté par le navigateur).");
+        return;
+      }
+      try {
+        mediaRec = new MediaRecorder(vidStream, { mimeType: fallback });
+      } catch (err2) {
+        console.error('MediaRecorder init failed even with fallback mimeType', fallback, err2);
+        alert("Impossible de démarrer l'enregistrement avec cette caméra (format vidéo non supporté par le navigateur).");
+        return;
+      }
     }
     mediaRec.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
     mediaRec.onerror=(e)=>{
@@ -10932,11 +10939,18 @@ function toggleRec() {
         alert("Aucune donnée vidéo capturée — l'enregistrement n'a pas pu être lu.");
         return;
       }
-      const blob=new Blob(recChunks,{type: mimeType || 'video/webm'});
+      // #200-2 — mediaRec.mimeType = ce que le navigateur a RÉELLEMENT utilisé
+      // pour encoder (peut différer d'un mimeType demandé si le navigateur a dû
+      // ajuster). L'utiliser pour étiqueter le Blob évite un mismatch entre le
+      // conteneur déclaré et les octets réels, qui fait échouer la relecture
+      // sans toucher à l'enregistrement lui-même.
+      const actualType = mediaRec.mimeType || 'video/webm';
+      console.info('Enregistrement KFPPA : mimeType=', actualType, '· chunks=', recChunks.length, '· taille totale=', recChunks.reduce((s,c)=>s+c.size,0), 'octets');
+      const blob=new Blob(recChunks,{type: actualType});
       const player=document.getElementById('vid-el'); const vcanvas=document.getElementById('vid-canvas');
       player.srcObject=null; player.src=URL.createObjectURL(blob);
       player.onerror=()=>{
-        console.error('Lecture du clip enregistré impossible', player.error);
+        console.error('Lecture du clip enregistré impossible — mimeType=', actualType, 'error=', player.error);
         alert("Le clip enregistré n'a pas pu être lu (format non supporté après capture).");
       };
       player.onloadedmetadata=()=>{
