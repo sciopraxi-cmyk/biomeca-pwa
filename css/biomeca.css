@@ -273,7 +273,9 @@ body.printing #rpt-print{display:block!important;}
 @media (max-width: 768px) {
   .cap-layout { grid-template-columns: 1fr !important; }
   .cap-side { max-width: 100% !important; }
-  #vid-canvas, #photo-canvas { max-width: 100% !important; width: 100% !important; }
+  /* #200 — #photo-canvas ne correspond à aucun id réel (le vrai id est
+     #ph-canvas) : cette règle ne matchait jamais côté photo, corrigé. */
+  #vid-canvas, #ph-canvas { max-width: 100% !important; width: 100% !important; }
   .morpho-canvas { width: 80px !important; height: 200px !important; }
 }
 

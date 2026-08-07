@@ -3200,13 +3200,19 @@
           <button class="btn btn-green" id="btn-vcam" onclick="toggleVCam()">▶ Activer caméra</button>
           <button class="btn btn-red" id="btn-vrec" onclick="toggleRec()" style="display:none;">⏺ Rec</button>
           <button class="btn" id="btn-vauto" onclick="toggleVAutoDetect()" style="display:none;">Auto : OFF</button>
+          <button class="btn" id="btn-vsnap" onclick="snapMarkersToReflectiveBlobs()" style="display:none;">🎯 Caler les capteurs</button>
           <button class="btn" onclick="document.getElementById('vid-file-in').click()">Importer</button>
           <input type="file" id="vid-file-in" accept="video/*" style="display:none;" onchange="loadVidFile(this)"/>
           <span class="badge bd" id="vcam-st">Inactive</span>
         </div>
         <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);">
           <video id="vid-el" style="width:100%;display:block;opacity:.9;" playsinline></video>
-          <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;"></canvas>
+          <!-- #200 — height:100% forcé cassait le ratio intrinsèque du canvas (qui suit
+               videoWidth/videoHeight, cf. toggleVCam/loadVidFile/toggleRec) dès que la
+               caméra ne rendait pas exactement la hauteur du parent (caméra haute
+               vitesse à ratio différent → image étirée). width seul laisse le canvas
+               suivre son propre ratio, comme #ph-canvas en mode photo. -->
+          <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;cursor:crosshair;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
           <div class="angle-overlay" id="vid-angles"></div>
         </div>
