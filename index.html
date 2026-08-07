@@ -3201,6 +3201,7 @@
           <button class="btn btn-red" id="btn-vrec" onclick="toggleRec()" style="display:none;">⏺ Rec</button>
           <button class="btn" id="btn-vauto" onclick="toggleVAutoDetect()" style="display:none;">Auto : OFF</button>
           <button class="btn" id="btn-vsnap" onclick="snapMarkersToReflectiveBlobs()" style="display:none;">🎯 Caler les capteurs</button>
+          <button class="btn" id="btn-vzone" onclick="toggleVidZone()" style="display:none;" title="Tracez un rectangle englobant toutes les pastilles (sans chaussures ni sol) : le seuil de détection devient relatif à la zone">◱ Zone</button>
           <button class="btn" onclick="document.getElementById('vid-file-in').click()">Importer</button>
           <input type="file" id="vid-file-in" accept="video/*" style="display:none;" onchange="loadVidFile(this)"/>
           <span class="badge bd" id="vcam-st">Inactive</span>

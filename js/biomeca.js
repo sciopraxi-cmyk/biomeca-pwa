@@ -3606,6 +3606,15 @@ let camStream = null, animId = null;
 let autoLive = false;
 let sensThr = 200;
 
+// #111 — Zone de calage des capteurs (tests vidéo). Rectangle tracé par le
+// praticien englobant toutes les pastilles (jambes, sans chaussures ni sol) :
+// la détection s'y restreint avec un seuil de luminance RELATIF à la zone
+// (percentiles locaux) au lieu du seuil global fixe — fait ressortir les
+// pastilles peu contrastées. vidSnapZone = {x,y,w,h} en coords canvas vidéo.
+let vidSnapZone = null;
+let vidZoneMode = false; // bouton ◱ Zone actif : le prochain drag trace la zone
+let _vidZoneDrag = null; // rectangle en cours de tracé {x0,y0,x1,y1}
+
 // feat-biomec-capteurs (A) — facteur de taille des marqueurs dessinés (point,
 // halo, label) appliqué à drawOverlay + findMarkerAt. Persisté en localStorage
 // clé bm4-marker-size pour rester appliqué entre sessions / PWA reloads.
@@ -7473,6 +7482,7 @@ async function toggleVCam() {
       document.getElementById('btn-vrec').style.display='';
       document.getElementById('btn-vauto').style.display='';
       document.getElementById('btn-vsnap').style.display='';
+      document.getElementById('btn-vzone').style.display='';
       document.getElementById('vcam-st').textContent='Live'; document.getElementById('vcam-st').className='badge bg';
       document.getElementById('btn-vcam').textContent='⏹ Arrêter'; document.getElementById('btn-vcam').className='btn btn-red';
       vAutoDetect=true; document.getElementById('btn-vauto').textContent='Auto : ON'; document.getElementById('btn-vauto').className='btn btn-green';
@@ -7488,6 +7498,7 @@ function stopVCam() {
   document.getElementById('btn-vcam').textContent='Activer caméra'; document.getElementById('btn-vcam').className='btn btn-green';
   document.getElementById('btn-vrec').style.display='none'; document.getElementById('btn-vauto').style.display='none';
   document.getElementById('btn-vsnap').style.display='none';
+  document.getElementById('btn-vzone').style.display='none';
   document.getElementById('vcam-st').textContent='Inactive'; document.getElementById('vcam-st').className='badge bd';
 }
 
@@ -7501,6 +7512,7 @@ function loadVidFile(input) {
     document.getElementById('vid-info').textContent=`${player.videoWidth}×${player.videoHeight} · ${player.duration.toFixed(1)}s`;
     document.getElementById('btn-vauto').style.display='';
     document.getElementById('btn-vsnap').style.display='';
+    document.getElementById('btn-vzone').style.display='';
     vAutoDetect=true; document.getElementById('btn-vauto').textContent='Auto : ON'; document.getElementById('btn-vauto').className='btn btn-green';
     document.getElementById('vcam-st').textContent='Vidéo'; document.getElementById('vcam-st').className='badge bb';
     setupVidCanvas(player,vcanvas);
@@ -10832,6 +10844,8 @@ function setupVidCanvas(player, vcanvas) {
   const view = TESTS[currentTestId]?.view || 'face';
   vcanvas.onmousedown = e => {
     const {x,y}=canvasXY(e,vcanvas);
+    // #111 — mode Zone : le drag trace le rectangle de calage, pas un marqueur.
+    if(vidZoneMode){_vidZoneDrag={x0:x,y0:y,x1:x,y1:y};return;}
     const hit=findMarkerAt(x,y,vidMarkers,vcanvas.width);
     if(hit>=0){
       selectedVidMkrIdx=hit;isVidDragging=true;
@@ -10849,6 +10863,21 @@ function setupVidCanvas(player, vcanvas) {
     }
   };
   vcanvas.onmousemove=e=>{
+    // #111 — tracé de la zone en direct (frame + overlay + rectangle).
+    if(_vidZoneDrag){
+      const{x:zx,y:zy}=canvasXY(e,vcanvas);
+      _vidZoneDrag.x1=zx;_vidZoneDrag.y1=zy;
+      const zctx=vcanvas.getContext('2d');
+      zctx.drawImage(player,0,0,vcanvas.width,vcanvas.height);
+      drawOverlay(zctx,vcanvas,vidMarkers,selectedVidMkrIdx,view);
+      _drawSnapZoneRect(zctx,{
+        x:Math.min(_vidZoneDrag.x0,_vidZoneDrag.x1),
+        y:Math.min(_vidZoneDrag.y0,_vidZoneDrag.y1),
+        w:Math.abs(_vidZoneDrag.x1-_vidZoneDrag.x0),
+        h:Math.abs(_vidZoneDrag.y1-_vidZoneDrag.y0),
+      });
+      return;
+    }
     if(!isVidDragging||selectedVidMkrIdx<0)return;
     const{x,y}=canvasXY(e,vcanvas);
     vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
@@ -10859,7 +10888,30 @@ function setupVidCanvas(player, vcanvas) {
     drawOverlay(ctx2,vcanvas,vidMarkers,selectedVidMkrIdx,TESTS[currentTestId]?.view||'face');
     updateAngleOverlay('vid-angles',vidMarkers,TESTS[currentTestId]?.view||'face');
   };
-  vcanvas.onmouseup=()=>isVidDragging=false;
+  vcanvas.onmouseup=()=>{
+    // #111 — fin du tracé de zone : validation puis calage immédiat.
+    if(_vidZoneDrag){
+      const z=_vidZoneDrag;_vidZoneDrag=null;
+      const W2=vcanvas.width,H2=vcanvas.height;
+      const zx=Math.max(0,Math.round(Math.min(z.x0,z.x1)));
+      const zy=Math.max(0,Math.round(Math.min(z.y0,z.y1)));
+      const zw=Math.min(W2-zx,Math.round(Math.abs(z.x1-z.x0)));
+      const zh=Math.min(H2-zy,Math.round(Math.abs(z.y1-z.y0)));
+      _setVidZoneMode(false);
+      if(zw<20||zh<20){
+        vidSnapZone=null;
+        const c0=vcanvas.getContext('2d');
+        c0.drawImage(player,0,0,W2,H2);
+        drawOverlay(c0,vcanvas,vidMarkers,selectedVidMkrIdx,view);
+        alert('Zone trop petite — tracez un rectangle englobant toutes les pastilles.');
+      } else {
+        vidSnapZone={x:zx,y:zy,w:zw,h:zh};
+        snapMarkersToReflectiveBlobs();
+      }
+      return;
+    }
+    isVidDragging=false;
+  };
   vcanvas.ontouchstart=e=>{e.preventDefault();const t=e.touches[0];vcanvas.onmousedown({clientX:t.clientX,clientY:t.clientY});};
   vcanvas.ontouchmove=e=>{e.preventDefault();const t=e.touches[0];vcanvas.onmousemove({clientX:t.clientX,clientY:t.clientY});};
   vcanvas.ontouchend=()=>vcanvas.onmouseup();
@@ -11250,6 +11302,48 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
 // marqueur ne peut se caler que sur la pastille la plus proche de sa position
 // anatomique attendue, pas juste la première trouvée. Pas de blob à portée →
 // marqueur conservé tel quel. Le drag manuel reste possible ensuite.
+// #111 — Mode Zone : active/désactive le tracé du rectangle de calage.
+// Re-cliquer pendant le mode annule ; re-cliquer avec une zone posée l'efface
+// (retour au calage plein cadre).
+function toggleVidZone() {
+  if (vidZoneMode) {
+    _setVidZoneMode(false);
+    return;
+  }
+  if (!vidZoneMode && vidSnapZone) {
+    vidSnapZone = null;
+    const vEl = document.getElementById('vid-el');
+    const vC = document.getElementById('vid-canvas');
+    if (vEl && vC && vC.width > 0 && vEl.readyState >= 2) {
+      const ctx = vC.getContext('2d');
+      ctx.drawImage(vEl, 0, 0, vC.width, vC.height);
+      drawOverlay(ctx, vC, vidMarkers, selectedVidMkrIdx, TESTS[currentTestId]?.view || 'face');
+    }
+    return;
+  }
+  _setVidZoneMode(true);
+}
+
+function _setVidZoneMode(on) {
+  vidZoneMode = on;
+  if (!on) _vidZoneDrag = null;
+  const b = document.getElementById('btn-vzone');
+  if (b) {
+    b.textContent = on ? '◱ Tracez la zone…' : '◱ Zone';
+    b.className = on ? 'btn btn-green' : 'btn';
+  }
+}
+
+// #111 — Rectangle de zone (tracé en cours ou zone posée) sur le canvas vidéo.
+function _drawSnapZoneRect(ctx, z) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(z.x, z.y, z.w, z.h);
+  ctx.restore();
+}
+
 function snapMarkersToReflectiveBlobs() {
   const vEl = document.getElementById('vid-el');
   const vC  = document.getElementById('vid-canvas');
@@ -11266,29 +11360,132 @@ function snapMarkersToReflectiveBlobs() {
   tmp.width = W; tmp.height = H;
   const tctx = tmp.getContext('2d');
   tctx.drawImage(vEl, 0, 0, W, H);
-  const data = tctx.getImageData(0, 0, W, H).data;
 
-  // 2) Blobs réfléchissants — seuil adaptatif. Les pastilles réelles sont
-  //    rarement saturées à 255 (distance, tissu, éclairage cabinet) : on part
-  //    du seuil nominal puis on relâche par paliers jusqu'à première
-  //    détection. #111 — retour terrain : pastilles visibles à l'image mais
-  //    0 blob au seuil fixe de 200.
-  let blobs = [];
-  let usedLum = sensThr;
-  for (const lm of [sensThr, 170, 145]) {
-    blobs = _detectReflectiveBlobs(data, W, H, { lumMin: lm });
-    usedLum = lm;
-    if (blobs.length > 0) break;
+  // #111-Zone — si une zone est posée, la détection s'y restreint : les
+  // coordonnées des blobs sont ensuite ré-exprimées en coords canvas.
+  const zone = vidSnapZone;
+  const offX = zone ? zone.x : 0;
+  const offY = zone ? zone.y : 0;
+  const dW = zone ? zone.w : W;
+  const dH = zone ? zone.h : H;
+  const data = tctx.getImageData(offX, offY, dW, dH).data;
+
+  // Seuils de luminance : global fixe par paliers, ou RELATIF à la zone
+  // (percentiles hauts de l'histogramme local) — une pastille peu contrastée
+  // dans l'absolu reste le pic de brillance de sa zone.
+  let lumSteps = [sensThr, 170, 145];
+  if (zone) {
+    const lums = [];
+    for (let li = 0; li < data.length; li += 8) {
+      lums.push((data[li] + data[li + 1] + data[li + 2]) / 3);
+    }
+    lums.sort((l1, l2) => l1 - l2);
+    const pct = (p) =>
+      Math.max(110, Math.round(lums[Math.min(lums.length - 1, Math.floor(lums.length * p))]) - 6);
+    lumSteps = [...new Set([pct(0.998), pct(0.995), pct(0.985)])];
   }
-  console.info(
-    'Calage capteurs : lumMin=',
-    usedLum,
-    '· blobs=',
-    blobs.length,
-    '·',
-    blobs.map((b) => Math.round(b.x) + ',' + Math.round(b.y) + ' (s' + b.size + ')').join(' · ')
-  );
-  if (blobs.length === 0) {
+
+  // 2) Détection multi-seuils + filtres anti-parasites, calibrés sur les logs
+  //    du retour terrain #111 : au seuil fixe le détecteur capte bien les
+  //    pastilles MAIS aussi des reflets (bords d'image, prises au sol de
+  //    taille s34/s44 vs s7-s19 pour les pastilles), et il en manque parfois
+  //    (chaussures claires sans contraste). On cherche le seuil qui donne un
+  //    compte exact et une géométrie plausible par côté après filtrage ;
+  //    sinon on garde le meilleur essai et on rend un bilan chiffré.
+  const expected = { D: 0, G: 0, '': 0 };
+  vidMarkers.forEach((m) => {
+    if (expected[m.side] !== undefined) expected[m.side]++;
+  });
+  // Séparation D/G : centre de la zone si posée (le praticien y cadre les
+  // deux jambes), sinon centre de l'image.
+  const midX = zone ? zone.x + zone.w / 2 : W / 2;
+  const sideOf = (b) => {
+    const left = b.x < midX;
+    if (view === 'dos') return left ? 'G' : 'D';
+    return left ? 'D' : 'G'; // vue face : côté D du patient = moitié gauche image
+  };
+  const filterBlobs = (raw) => {
+    // a) Bords d'image : reflets de murs / membres coupés, jamais des
+    //    pastilles. Sans objet si une zone est posée : le cadrage du
+    //    praticien fait office de filtre.
+    let fb = zone
+      ? raw.slice()
+      : raw.filter((b) => b.x > W * 0.03 && b.x < W * 0.97 && b.y > H * 0.05 && b.y < H * 0.95);
+    // b) Tailles aberrantes vs médiane (prises au sol, gros reflets) — les
+    //    pastilles d'une même session ont des tailles homogènes.
+    if (fb.length >= 3) {
+      const sizes = fb.map((b) => b.size).sort((s1, s2) => s1 - s2);
+      const med = sizes[Math.floor(sizes.length / 2)];
+      fb = fb.filter((b) => b.size <= med * 2.5 && b.size >= med / 2.5);
+    }
+    // c) Cohérence de colonne par côté : les pastilles d'un côté sont sur la
+    //    jambe (colonne x serrée) — on écarte ce qui s'en éloigne trop.
+    const bySide = { D: [], G: [], '': [] };
+    fb.forEach((b) => bySide[sideOf(b)].push(b));
+    ['D', 'G'].forEach((s) => {
+      const arr = bySide[s];
+      if (arr.length < 2) return;
+      const xs = arr.map((b) => b.x).sort((x1, x2) => x1 - x2);
+      const medX = xs[Math.floor(xs.length / 2)];
+      bySide[s] = arr.filter((b) => Math.abs(b.x - medX) <= W * 0.08);
+    });
+    bySide.D.sort((b1, b2) => b1.y - b2.y);
+    bySide.G.sort((b1, b2) => b1.y - b2.y);
+    bySide[''] = fb;
+    return bySide;
+  };
+  // Répartition verticale plausible : écarts homogènes (facteur ≤ 2,5).
+  // Rejette le cas réel « hanche + cheville + chaussure » (écarts 454/59 px)
+  // dont le compte est exact mais l'identité fausse — un calage silencieux
+  // et faux serait pire qu'un refus expliqué (outil clinique).
+  const spacingOk = (arr) => {
+    if (arr.length < 3) return true;
+    const gaps = [];
+    for (let gi = 1; gi < arr.length; gi++) gaps.push(arr[gi].y - arr[gi - 1].y);
+    const mn = Math.min(...gaps);
+    const mx = Math.max(...gaps);
+    return mn > 0 && mx / mn <= 2.5;
+  };
+  let best = null;
+  let bestScore = -1;
+  for (const lm of lumSteps) {
+    // Zone : saturation relâchée (le cadrage exclut déjà les parasites
+    // colorés), coordonnées ré-exprimées en coords canvas via l'offset.
+    const rawLocal = _detectReflectiveBlobs(
+      data,
+      dW,
+      dH,
+      zone ? { lumMin: lm, satMax: 45 } : { lumMin: lm }
+    );
+    const raw = zone
+      ? rawLocal.map((b) => ({ x: b.x + offX, y: b.y + offY, size: b.size }))
+      : rawLocal;
+    const bySide = filterBlobs(raw);
+    let score = 0;
+    ['D', 'G'].forEach((s) => {
+      if (expected[s] > 0 && bySide[s].length === expected[s] && spacingOk(bySide[s])) score++;
+    });
+    console.info(
+      'Calage capteurs :',
+      zone ? 'zone ' + zone.x + ',' + zone.y + ' ' + zone.w + '×' + zone.h : 'plein cadre',
+      '· lumMin=',
+      lm,
+      '· bruts=',
+      raw.length,
+      '· D=',
+      bySide.D.map((b) => Math.round(b.x) + ',' + Math.round(b.y) + ' (s' + b.size + ')').join(' · '),
+      '· G=',
+      bySide.G.map((b) => Math.round(b.x) + ',' + Math.round(b.y) + ' (s' + b.size + ')').join(' · '),
+      '· côtés exacts=',
+      score
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      best = bySide;
+    }
+    if (score === 2) break;
+  }
+  if (best.D.length === 0 && best.G.length === 0 && best[''].length === 0) {
     alert(
       "Aucune pastille détectée, même en abaissant le seuil de luminosité. Vérifiez l'éclairage et la visibilité des pastilles."
     );
@@ -11297,20 +11494,10 @@ function snapMarkersToReflectiveBlobs() {
 
   // 3) Assignation par côté et par ORDRE VERTICAL haut→bas — l'identité des
   //    capteurs (EIAS→Rotule→Tarse par côté) est portée par l'ordre
-  //    d'apparition des pastilles, pas par la distance au gabarit : le patient
-  //    n'est jamais exactement là où le prior layout le suppose (retour
-  //    terrain #111 : pastilles au centre de l'image, colonnes gabarit aux
-  //    bords → aucune paire dans l'ancienne tolérance de distance).
-  //    Si le compte détecté diffère du compte attendu sur un côté, on refuse
-  //    de deviner (outil clinique : un capteur calé sur un reflet parasite
-  //    fausserait un angle du rapport) — repli : affinage par proximité de la
-  //    position actuelle, puis bilan chiffré affiché à l'écran.
-  const midX = W / 2;
-  const sideOf = (b) => {
-    const left = b.x < midX;
-    if (view === 'dos') return left ? 'G' : 'D';
-    return left ? 'D' : 'G'; // vue face : côté D du patient = moitié gauche image
-  };
+  //    d'apparition des pastilles, pas par la distance au gabarit. Calage
+  //    complet UNIQUEMENT si compte exact + géométrie plausible ; sinon
+  //    affinage prudent par proximité de la position actuelle et bilan
+  //    chiffré — jamais de devinette sur un outil clinique.
   const priorFn = _getMarkerPriorPositions(currentTestId, W, H);
   let assigned = 0;
   const bilanCotes = [];
@@ -11320,21 +11507,18 @@ function snapMarkersToReflectiveBlobs() {
       if (m.side === side) mkrIdx.push(i);
     });
     if (mkrIdx.length === 0) return;
-    const sideBlobs = blobs
-      .filter((b) => (side === '' ? true : sideOf(b) === side))
-      .sort((a, b) => a.y - b.y);
-    if (side !== '' && sideBlobs.length === mkrIdx.length) {
-      // Compte exact : calage direct dans l'ordre vertical (identité sûre).
+    const sideBlobs = best[side];
+    if (side !== '' && sideBlobs.length === mkrIdx.length && spacingOk(sideBlobs)) {
+      // Compte exact + répartition plausible : calage direct dans l'ordre.
       sideBlobs.forEach((b, k) => {
         vidMarkers[mkrIdx[k]].x = b.x;
         vidMarkers[mkrIdx[k]].y = b.y;
         assigned++;
       });
     } else {
-      // Compte différent (ou marqueurs sans côté, ex. MLA profil dont l'ordre
-      // n'est pas vertical) : affinage prudent par proximité de la position
-      // actuelle (sinon prior), assignation greedy unique, tolérance large.
-      const tol = Math.max(80, W / 10);
+      // Détection non concluante (ou marqueurs sans côté, ex. MLA profil dont
+      // l'ordre n'est pas vertical) : affinage par proximité uniquement.
+      const tol = Math.max(60, W / 16);
       const pairs = [];
       mkrIdx.forEach((mi, k) => {
         const m = vidMarkers[mi];
@@ -11345,7 +11529,7 @@ function snapMarkersToReflectiveBlobs() {
           if (d <= tol) pairs.push({ mi, bi, d });
         });
       });
-      pairs.sort((a, b) => a.d - b.d);
+      pairs.sort((p1, p2) => p1.d - p2.d);
       const usedM = new Set();
       const usedB = new Set();
       pairs.forEach((p) => {
@@ -11358,12 +11542,14 @@ function snapMarkersToReflectiveBlobs() {
       });
       if (side !== '') {
         bilanCotes.push(
-          sideBlobs.length +
-            ' pastille(s) détectée(s) côté ' +
+          'Côté ' +
             side +
-            ' pour ' +
+            ' : ' +
+            sideBlobs.length +
+            ' pastille(s) fiable(s) pour ' +
             mkrIdx.length +
-            ' capteur(s)'
+            ' capteur(s)' +
+            (sideBlobs.length === mkrIdx.length ? ' (répartition verticale incohérente)' : '')
         );
       }
     }
@@ -11383,7 +11569,7 @@ function snapMarkersToReflectiveBlobs() {
         assigned +
         ' capteur(s) calé(s).\n' +
         bilanCotes.join('\n') +
-        "\nMasquez les reflets parasites (chaussures claires, sol brillant) ou ajustez l'éclairage, puis recommencez — ou déplacez les capteurs à la main."
+        "\nPastilles peu contrastées (chaussures claires ?) ou reflets parasites : ajustez l'éclairage, choisissez une frame stable, ou déplacez les capteurs à la main."
     );
   } else if (assigned === 0) {
     alert("Aucun capteur n'a pu être calé. Ajustez l'éclairage ou déplacez les capteurs à la main.");
@@ -11394,6 +11580,10 @@ function snapMarkersToReflectiveBlobs() {
 function drawOverlay(ctx, canvas, markers, selIdx, view) {
   const W=canvas.width;
   const segW=Math.max(8,W/55); // largeur du rectangle segment
+
+  // #111-Zone — la zone de calage posée reste visible sur le canvas vidéo
+  // (et seulement lui : drawOverlay sert aussi aux canvas photo).
+  if (vidSnapZone && canvas.id === 'vid-canvas') _drawSnapZoneRect(ctx, vidSnapZone);
 
   // Dessiner segments par groupe (D et G)
   ['D','G',''].forEach(side=>{
