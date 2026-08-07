@@ -13185,16 +13185,16 @@ function _buildRapportBody(p, d, prat, logo, sections) {
       );
       bonhommesSection.bodyCanvasData = null;
       // #88-C Annexes PDF — résolution async APRÈS bonhommes, AVANT injection iframe.
-      _resolvePosturoFichesImages(d, function(fichesPages) {
-        _doBuildRapport(p, d, prat, logo, sections, fichesPages);
+      _resolvePosturoFichesImages(d, function(fichesPages, fichesFailed) {
+        _doBuildRapport(p, d, prat, logo, sections, fichesPages, fichesFailed);
       });
     };
     bcImg.src = bonhommesSection.bodyCanvasData;
     return;
   }
   // #88-C Annexes PDF — fast-path sans bonhommes, résolution annexes seule.
-  _resolvePosturoFichesImages(d, function(fichesPages) {
-    _doBuildRapport(p, d, prat, logo, sections, fichesPages);
+  _resolvePosturoFichesImages(d, function(fichesPages, fichesFailed) {
+    _doBuildRapport(p, d, prat, logo, sections, fichesPages, fichesFailed);
   });
 }
 
@@ -13202,7 +13202,7 @@ function _buildRapportBody(p, d, prat, logo, sections) {
 // _resolvePosturoFichesImages (déjà aplaties multi-pages). Defaut [] = aucun
 // changement pour les call-sites legacy (compat). annexesHTML construit avant
 // le </div> final de .rp-page → 1 page A4 par fiche, page-break-before strict.
-function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
+function _doBuildRapport(p, d, prat, logo, sections, fichesPages = [], fichesFailed = []) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR');
   const initiales = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
@@ -13352,6 +13352,8 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = []) {
   // _buildSportRapportContentHTML). page-break-before:always pour démarrer chaque
   // fiche sur une page A4 vierge. object-fit:contain pour respecter le ratio fiche
   // source. Si fichesPages = [], la map produit '' → bodyHtml inchangé.
+  // #112 — mention rouge AVANT les pages d'annexes si des fiches manquent.
+  bodyHtml += _buildFichesFailHTML(fichesFailed);
   bodyHtml += (fichesPages || []).map(function(dataURL) {
     return '<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="'+dataURL+'" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>';
   }).join('');
@@ -13416,8 +13418,8 @@ async function buildRapport() {
   // Fix #150 — `statuses` propagé depuis _resolveSportRapportImages pour
   // discriminer 'ok'/'nu'/'ko' côté rendu (mention rouge, auto-omission blocs).
   _resolveSportRapportImages(p.bilanData || {}, (composites, statuses) => {
-    _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses);
+    _resolveSportFichesImages(p.bilanData || {}, (fichesPages, fichesFailed) => {
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses, fichesFailed);
 
       // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
       // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
@@ -13821,18 +13823,37 @@ async function _resolveSportRapportImages(bd, callback) {
 // validation FICHES_SYSTEMES, l'encodage URL, le rendu pdf.js scale 2.0, et la
 // gestion d'erreurs par fiche. Tout changement (échelle, cache LRU, switch pdf.js
 // version) se fait UNIQUEMENT ici. callback toujours appelée — jamais bloquante.
+// #112 — La callback reçoit désormais (pages, failedLabels) : failedLabels =
+// libellés des fiches attendues mais NON rendues (pdf.js indisponible, fiche
+// hors manifeste, fetch/rendu échoué). Les call-sites injectent une mention
+// rouge visible dans le rapport — un rapport amputé ne doit pas avoir l'air
+// normal (même règle maison que #150 pour les images).
 function _resolveFichesImagesFromPairs(pairs, callback) {
-  // Fast-path : 0 fiche OU pdf.js indisponible (CDN bloqué, mode offline strict).
-  // Le rapport reste fonctionnel sans annexes — dégradation gracieuse.
-  if(pairs.size === 0 || typeof pdfjsLib === 'undefined') {
-    callback([]);
+  const labelOf = key => {
+    const idx = key.indexOf('|');
+    return key.slice(0, idx) + ' — ' + key.slice(idx + 1);
+  };
+  // Fast-path : 0 fiche attendue → rien à rendre, rien à signaler.
+  if(pairs.size === 0) {
+    callback([], []);
+    return;
+  }
+  // pdf.js indisponible (script vendor non chargé, mode dégradé) : AUCUNE des
+  // fiches attendues ne peut être rendue — toutes signalées (#112, fin de
+  // l'échec silencieux).
+  if(typeof pdfjsLib === 'undefined') {
+    const allLabels = [];
+    pairs.forEach(key => allLabels.push(labelOf(key)));
+    console.warn('[#112] pdf.js indisponible — aucune fiche rendue :', allLabels.join(' · '));
+    callback([], allLabels);
     return;
   }
   // Validation manifeste + construction des chemins NFC encodés.
   // assets/fiches/<slug>/<sub>.pdf — slug = ASCII pur, sub = NFC avec accents/espaces/
   // apostrophes droites. encodeURI laisse intacts /, (, ), ', . — tous valides RFC 3986
   // sub-delims/unreserved. Encode espaces → %20 et accents UTF-8 (é → %C3%A9).
-  const urls = [];
+  const jobs = [];
+  const failed = [];
   pairs.forEach(key => {
     const idx = key.indexOf('|');
     const slug = key.slice(0, idx);
@@ -13840,22 +13861,23 @@ function _resolveFichesImagesFromPairs(pairs, callback) {
     const cfg = FICHES_SYSTEMES[slug];
     if(!cfg || !cfg.subs.includes(sub)) {
       console.warn('[#88] Fiche introuvable dans FICHES_SYSTEMES :', slug, '/', sub);
+      failed.push(labelOf(key));
       return;
     }
-    urls.push(encodeURI('assets/fiches/' + slug + '/' + sub + '.pdf'));
+    jobs.push({ url: encodeURI('assets/fiches/' + slug + '/' + sub + '.pdf'), label: labelOf(key) });
   });
-  if(urls.length === 0) {
-    callback([]);
+  if(jobs.length === 0) {
+    callback([], failed);
     return;
   }
   // Rendu page à page : pdf.numPages → render canvas (scale 2.0 = QR nets) → dataURL.
-  // try/catch par fiche → skip + warn ; jamais de rejet global, callback toujours
-  // appelée. Le .flat() à la fin aplatit la liste de listes en une séquence ordonnée
-  // de pages (toutes les pages de la fiche 1, puis fiche 2, …) — l'ordre des fiches
-  // suit l'ordre d'insertion du Set (déterminé par le collecteur).
-  Promise.all(urls.map(async url => {
+  // try/catch par fiche → skip + warn + AJOUT à failed (#112) ; jamais de rejet
+  // global, callback toujours appelée. Le .flat() à la fin aplatit la liste de
+  // listes en une séquence ordonnée de pages (toutes les pages de la fiche 1,
+  // puis fiche 2, …) — l'ordre des fiches suit l'ordre d'insertion du Set.
+  Promise.all(jobs.map(async job => {
     try {
-      const pdf = await pdfjsLib.getDocument(url).promise;
+      const pdf = await pdfjsLib.getDocument(job.url).promise;
       const pages = [];
       for(let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -13869,11 +13891,28 @@ function _resolveFichesImagesFromPairs(pairs, callback) {
       }
       return pages;
     } catch(e) {
-      console.warn('[#88] Échec rendu fiche :', url, e);
+      console.warn('[#88] Échec rendu fiche :', job.url, e);
+      failed.push(job.label);
       return [];
     }
-  })).then(results => callback(results.flat()))
-    .catch(e => { console.warn('[#88] Erreur globale annexes :', e); callback([]); });
+  })).then(results => callback(results.flat(), failed))
+    .catch(e => {
+      console.warn('[#88] Erreur globale annexes :', e);
+      callback([], jobs.map(j => j.label).concat(failed));
+    });
+}
+
+// #112 — Bloc rouge visible dans le rapport quand des fiches prescrites n'ont
+// pas pu être jointes en annexe. Partagé sport + posturo.
+function _buildFichesFailHTML(failed) {
+  if(!failed || failed.length === 0) return '';
+  return (
+    '<div style="page-break-inside:avoid;border:2px solid #c0392b;background:#fdecea;color:#7f1d1d;padding:10px 14px;margin:14px 24px;font-size:11px;border-radius:4px;">' +
+    '<b style="color:#c0392b;">⚠ Annexes incomplètes</b> — ' + failed.length +
+    " fiche(s) d'exercice prescrite(s) n'ont pas pu être jointe(s) à ce rapport :<br>" +
+    failed.map(l => '· ' + _escHtml(l)).join('<br>') +
+    '<br><span style="font-weight:600;">Régénérez le rapport (connexion réseau requise) avant remise au patient.</span></div>'
+  );
 }
 
 // #88-C Collecteur sport — lit la structure nested bd.ttt.{c1,c2,ch}. Filtre via
@@ -13944,7 +13983,7 @@ function _resolvePosturoFichesImages(d, callback) {
 // Fix #150 — 6e param `statuses` : map {key → 'ok'|'nu'|'ko'} par silhouette/pieds,
 // produit par _resolveSportRapportImages. Propagé à buildBilanPrintSection pour
 // afficher la mention rouge sur 'ko' et masquer les blocs entièrement 'nu'.
-function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [], annotatedViews = [], statuses = {}) {
+function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [], annotatedViews = [], statuses = {}, fichesFailed = []) {
   // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
@@ -13999,7 +14038,8 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // garantit que chaque fiche commence sur une nouvelle page. object-fit:contain
   // pour respecter le ratio de la fiche A4 source. Si fichesPages = [] (fast-path
   // 0 fiche ou pdf.js indispo), annexesHTML = '' → bodyHTML inchangé.
-  const annexesHTML = (fichesPages || []).map(dataURL =>
+  // #112 — mention rouge en tête d'annexes si des fiches prescrites manquent.
+  const annexesHTML = _buildFichesFailHTML(fichesFailed) + (fichesPages || []).map(dataURL =>
     `<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="${dataURL}" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>`
   ).join('');
 
@@ -14046,10 +14086,10 @@ async function printReport() {
   // ce niveau. Le coût pdf.js est entièrement post-composites — pas de race possible.
   // Fix #150 — statuses propagé (idem buildRapport).
   _resolveSportRapportImages(p.bilanData || {}, (composites, statuses) => {
-    _resolveSportFichesImages(p.bilanData || {}, fichesPages => {
+    _resolveSportFichesImages(p.bilanData || {}, (fichesPages, fichesFailed) => {
       // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
       // (source unique commune avec buildRapport, parité visuelle garantie).
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses, fichesFailed);
       document.getElementById('rp-prat-block').innerHTML = pratHTML;
       document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
       document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
