@@ -94,11 +94,26 @@ const supa = {
     return res.json();
   },
 
-  async signOut(token) {
-    await fetch(SUPA_URL + '/auth/v1/logout', {
+  // #203 — Un logout envoyé avec un access_token expiré répond 403 (bruit
+  // console) et surtout NE révoque PAS la session côté serveur : le
+  // refresh_token restait utilisable. Si le jeton est expiré, on le
+  // rafraîchit d'abord pour révoquer réellement la session ; si le refresh
+  // échoue, la session est déjà invalide côté serveur — rien à révoquer,
+  // aucun appel réseau voué à l'échec.
+  async signOut(token, refreshToken) {
+    let bearer = token;
+    if (_isJwtExpired(token)) {
+      const r = refreshToken ? await this.refreshAccessToken(refreshToken).catch(() => null) : null;
+      if (r && r.access_token) bearer = r.access_token;
+      else return; // session déjà invalide côté serveur
+    }
+    const res = await fetch(SUPA_URL + '/auth/v1/logout', {
       method: 'POST',
-      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token }
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + bearer }
     });
+    if (!res.ok) {
+      console.info('Logout serveur refusé (' + res.status + ') — session déjà invalidée, déconnexion locale seule.');
+    }
   },
 
   async refreshAccessToken(refreshToken) {
@@ -221,6 +236,23 @@ async function authFetch(url, options = {}, _retry = 0) {
     }
   }
   return res;
+}
+
+// #203 — Décodage JWT minimal pour savoir si l'access_token est déjà expiré
+// (même logique de décodage Base64URL que ensureSession ci-dessous). Indécidable
+// (décodage raté, pas de claim exp) → false : on laisse le serveur trancher.
+function _isJwtExpired(token) {
+  if (!token) return true;
+  try {
+    const seg = token.split('.')[1] || '';
+    const b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    if (!payload || typeof payload.exp !== 'number') return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch (_e) {
+    return false;
+  }
 }
 
 // #85 Phase 1 — refresh préventif de session avant les appels Storage.
@@ -3446,7 +3478,10 @@ async function pwaLogout() {
   sessionStorage.removeItem('skip_logout_confirm');
   _stopIdleLock();
   if(pwaUser?.token) {
-    try { await supa.signOut(pwaUser.token); } catch(e) {}
+    // #203 — le refresh_token permet à signOut de rafraîchir un jeton expiré
+    // pour révoquer réellement la session serveur (sinon logout 403 = session
+    // serveur jamais révoquée).
+    try { await supa.signOut(pwaUser.token, loadPwaSession().refreshToken); } catch(e) {}
   }
   clearPwaSession();
   pwaUser = null;
