@@ -11268,50 +11268,105 @@ function snapMarkersToReflectiveBlobs() {
   tctx.drawImage(vEl, 0, 0, W, H);
   const data = tctx.getImageData(0, 0, W, H).data;
 
-  // 2) Blobs réfléchissants (filtres tight par défaut — pastilles argent/blanc).
-  const blobs = _detectReflectiveBlobs(data, W, H);
+  // 2) Blobs réfléchissants — seuil adaptatif. Les pastilles réelles sont
+  //    rarement saturées à 255 (distance, tissu, éclairage cabinet) : on part
+  //    du seuil nominal puis on relâche par paliers jusqu'à première
+  //    détection. #111 — retour terrain : pastilles visibles à l'image mais
+  //    0 blob au seuil fixe de 200.
+  let blobs = [];
+  let usedLum = sensThr;
+  for (const lm of [sensThr, 170, 145]) {
+    blobs = _detectReflectiveBlobs(data, W, H, { lumMin: lm });
+    usedLum = lm;
+    if (blobs.length > 0) break;
+  }
+  console.info(
+    'Calage capteurs : lumMin=',
+    usedLum,
+    '· blobs=',
+    blobs.length,
+    '·',
+    blobs.map((b) => Math.round(b.x) + ',' + Math.round(b.y) + ' (s' + b.size + ')').join(' · ')
+  );
   if (blobs.length === 0) {
-    alert("Aucune pastille détectée. Vérifiez l'éclairage ou ajustez le seuil de sensibilité.");
+    alert(
+      "Aucune pastille détectée, même en abaissant le seuil de luminosité. Vérifiez l'éclairage et la visibilité des pastilles."
+    );
     return;
   }
 
-  // 3) Référence par marqueur : sa position actuelle (déjà placé) ou le prior
-  //    layout du test. idxInSide compte l'ordre dans la liste filtrée par côté
-  //    pour résoudre EIAS/Rotule/Tarse (genou-bi) ou points 1-4 (ap-bi).
+  // 3) Assignation par côté et par ORDRE VERTICAL haut→bas — l'identité des
+  //    capteurs (EIAS→Rotule→Tarse par côté) est portée par l'ordre
+  //    d'apparition des pastilles, pas par la distance au gabarit : le patient
+  //    n'est jamais exactement là où le prior layout le suppose (retour
+  //    terrain #111 : pastilles au centre de l'image, colonnes gabarit aux
+  //    bords → aucune paire dans l'ancienne tolérance de distance).
+  //    Si le compte détecté diffère du compte attendu sur un côté, on refuse
+  //    de deviner (outil clinique : un capteur calé sur un reflet parasite
+  //    fausserait un angle du rapport) — repli : affinage par proximité de la
+  //    position actuelle, puis bilan chiffré affiché à l'écran.
+  const midX = W / 2;
+  const sideOf = (b) => {
+    const left = b.x < midX;
+    if (view === 'dos') return left ? 'G' : 'D';
+    return left ? 'D' : 'G'; // vue face : côté D du patient = moitié gauche image
+  };
   const priorFn = _getMarkerPriorPositions(currentTestId, W, H);
-  const idxBySide = { D: 0, G: 0, '': 0 };
-  const refs = [];
-  vidMarkers.forEach((m, i) => {
-    const j = idxBySide[m.side] !== undefined ? idxBySide[m.side]++ : 0;
-    let ref = null;
-    if (m.x !== null && m.y !== null) ref = { x: m.x, y: m.y };
-    else ref = priorFn(m, j);
-    if (ref) refs.push({ markerIdx: i, refX: ref.x, refY: ref.y });
-  });
-
-  // 4) Assignation greedy : on construit toutes les paires (marqueur, blob)
-  //    dans la tolérance, on trie par distance ASC, on consomme en gardant un
-  //    Set d'usage côté marqueurs ET côté blobs (assignation unique).
-  const tol = Math.max(40, W / 15);
-  const pairs = [];
-  refs.forEach((r) => {
-    blobs.forEach((b, bi) => {
-      const d = Math.hypot(b.x - r.refX, b.y - r.refY);
-      if (d <= tol) pairs.push({ markerIdx: r.markerIdx, blobIdx: bi, d });
-    });
-  });
-  pairs.sort((a, b) => a.d - b.d);
-  const usedMkr = new Set();
-  const usedBlob = new Set();
   let assigned = 0;
-  pairs.forEach((p) => {
-    if (usedMkr.has(p.markerIdx) || usedBlob.has(p.blobIdx)) return;
-    const b = blobs[p.blobIdx];
-    vidMarkers[p.markerIdx].x = b.x;
-    vidMarkers[p.markerIdx].y = b.y;
-    usedMkr.add(p.markerIdx);
-    usedBlob.add(p.blobIdx);
-    assigned++;
+  const bilanCotes = [];
+  ['D', 'G', ''].forEach((side) => {
+    const mkrIdx = [];
+    vidMarkers.forEach((m, i) => {
+      if (m.side === side) mkrIdx.push(i);
+    });
+    if (mkrIdx.length === 0) return;
+    const sideBlobs = blobs
+      .filter((b) => (side === '' ? true : sideOf(b) === side))
+      .sort((a, b) => a.y - b.y);
+    if (side !== '' && sideBlobs.length === mkrIdx.length) {
+      // Compte exact : calage direct dans l'ordre vertical (identité sûre).
+      sideBlobs.forEach((b, k) => {
+        vidMarkers[mkrIdx[k]].x = b.x;
+        vidMarkers[mkrIdx[k]].y = b.y;
+        assigned++;
+      });
+    } else {
+      // Compte différent (ou marqueurs sans côté, ex. MLA profil dont l'ordre
+      // n'est pas vertical) : affinage prudent par proximité de la position
+      // actuelle (sinon prior), assignation greedy unique, tolérance large.
+      const tol = Math.max(80, W / 10);
+      const pairs = [];
+      mkrIdx.forEach((mi, k) => {
+        const m = vidMarkers[mi];
+        const ref = m.x !== null && m.y !== null ? { x: m.x, y: m.y } : priorFn(m, k);
+        if (!ref) return;
+        sideBlobs.forEach((b, bi) => {
+          const d = Math.hypot(b.x - ref.x, b.y - ref.y);
+          if (d <= tol) pairs.push({ mi, bi, d });
+        });
+      });
+      pairs.sort((a, b) => a.d - b.d);
+      const usedM = new Set();
+      const usedB = new Set();
+      pairs.forEach((p) => {
+        if (usedM.has(p.mi) || usedB.has(p.bi)) return;
+        vidMarkers[p.mi].x = sideBlobs[p.bi].x;
+        vidMarkers[p.mi].y = sideBlobs[p.bi].y;
+        usedM.add(p.mi);
+        usedB.add(p.bi);
+        assigned++;
+      });
+      if (side !== '') {
+        bilanCotes.push(
+          sideBlobs.length +
+            ' pastille(s) détectée(s) côté ' +
+            side +
+            ' pour ' +
+            mkrIdx.length +
+            ' capteur(s)'
+        );
+      }
+    }
   });
 
   // 5) Redessine overlay + rafraîchit la liste / résultats. Frame de fond
@@ -11322,8 +11377,16 @@ function snapMarkersToReflectiveBlobs() {
   updateAngleOverlay('vid-angles', vidMarkers, view);
   renderMkrList();
   updateResults();
-  if (assigned === 0) {
-    alert("Aucun marqueur n'a pu être calé dans la tolérance (" + Math.round(tol) + ' px). Rapprochez les capteurs de leur position attendue ou ajustez le seuil.');
+  if (bilanCotes.length > 0) {
+    alert(
+      'Calage partiel : ' +
+        assigned +
+        ' capteur(s) calé(s).\n' +
+        bilanCotes.join('\n') +
+        "\nMasquez les reflets parasites (chaussures claires, sol brillant) ou ajustez l'éclairage, puis recommencez — ou déplacez les capteurs à la main."
+    );
+  } else if (assigned === 0) {
+    alert("Aucun capteur n'a pu être calé. Ajustez l'éclairage ou déplacez les capteurs à la main.");
   }
 }
 
