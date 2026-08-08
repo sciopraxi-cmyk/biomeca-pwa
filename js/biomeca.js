@@ -18105,6 +18105,22 @@ function showPedicurieSection(idx) {
   // refléter immédiatement les saisies des autres sections (no-op si le
   // conteneur #pedicurie-synthese-result n'existe pas).
   if (typeof genererSynthesePedicurie === 'function') genererSynthesePedicurie();
+  // #206-suite — Onglet Rapport (idx 9, pdsec-10) : aperçu régénéré à chaque
+  // activation, miroir du hook podopédiatrie (target === 11). La synthèse
+  // vient d'être régénérée ci-dessus → buildPedicurieRapportHTML (sync) lit
+  // un état à jour, photos galeries incluses via _pedInjectGalleryBlocks.
+  if (idx === 9) {
+    const bodyEl = document.getElementById('pedicurie-rapport-body');
+    if (bodyEl && typeof buildPedicurieRapportHTML === 'function') {
+      try {
+        bodyEl.innerHTML = buildPedicurieRapportHTML();
+      } catch (e) {
+        console.error('[pedicurie rapport preview] build échoué :', e);
+        bodyEl.innerHTML =
+          '<div style="color:#b91c1c;padding:12px 0;">Erreur lors de la préparation de l\'aperçu.</div>';
+      }
+    }
+  }
 }
 
 // #121 Phase 2b — Calcule le grade HAS suggéré à partir des saisies neuro,
