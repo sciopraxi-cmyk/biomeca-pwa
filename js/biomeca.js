@@ -631,6 +631,25 @@ async function loadSupabaseData() {
       praticiens = [];
       _dataLoaded = true;  // Task #64 — nouvel user légitimement vide, saves autorisés
       _loadedFromFallback = false; // #114-1a — pas de cloud row mais Supabase atteint.
+      // #102-B (règle 3, détection) — cloud atteint mais AUCUN blob user_data :
+      // si les tables normalisées contiennent pourtant des patients (blob
+      // supprimé/corrompu), on le SIGNALE explicitement au lieu d'afficher une
+      // liste vide l'air normal. Reconstruction automatique = B-v2 (roadmap),
+      // jamais improvisée ici.
+      try {
+        const pr = await authFetch(SUPA_URL + '/rest/v1/patients?select=id');
+        if (pr.ok) {
+          const prows = await pr.json();
+          if (Array.isArray(prows) && prows.length > 0) {
+            _showSyncErrorBanner(
+              '⚠️ ' + prows.length + ' patient(s) présents dans le cloud mais aucun dossier principal chargé. ' +
+              'Ne créez pas de nouveaux dossiers sur cet appareil et signalez ce message.'
+            );
+          }
+        }
+      } catch (_e) {
+        // Détection best-effort : son échec ne doit pas bloquer le boot.
+      }
     }
     // Migration : anciens bilans (p.bilans[]) → p.bilansSport[]
     let migrated = false;
@@ -701,6 +720,17 @@ async function loadSupabaseData() {
     }
     _dataLoaded = true;  // Task #64 — fallback considéré comme valide, saves autorisés
     _loadedFromFallback = true; // #114-1a — mémoire issue du cache local non confirmée.
+    // #102-B — nouvel appareil hors-ligne : cloud injoignable ET aucune donnée
+    // locale sur cet appareil. Jamais de liste vide silencieuse : signal
+    // explicite + instruction de reprise (recharger = réessayer le boot cloud).
+    // L'écrasement du cloud par cet état vide est déjà bloqué par le
+    // reconcile #114-1a (_loadedFromFallback).
+    if (patients.length === 0) {
+      _showSyncErrorBanner(
+        '⚠️ Impossible de joindre le cloud au démarrage et aucune donnée locale sur cet appareil. ' +
+        'Vérifiez la connexion puis rechargez la page pour récupérer vos patients.'
+      );
+    }
   }
 
   currentPatient = null; bilanData = {};
