@@ -546,6 +546,7 @@
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(6)" id="pdtab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🦴 Morpho/Chaussage</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(7)" id="pdtab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">💊 Soins</button>
       <button class="btn pedicurie-tab" onclick="showPedicurieSection(8)" id="pdtab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📄 Synthèse</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(9)" id="pdtab-9" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📄 Rapport</button>
     </div>
 
     <!-- Section 1 — Anamnèse -->
@@ -1277,6 +1278,22 @@
         <div style="font-size:11px;color:#666;margin-bottom:10px;font-style:italic;">Compte-rendu généré à partir des champs renseignés. Seuls les éléments saisis sont repris.</div>
         <div style="margin-bottom:12px;"><button onclick="genererSynthesePedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔄 Générer la synthèse</button><button onclick="printRapportPedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;margin-left:6px;">🖨️ Imprimer / PDF</button><button onclick="envoyerRapportMail()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;margin-left:6px;">✉️ Envoyer par mail</button></div>
         <div id="pedicurie-synthese-result"></div>
+      </div>
+    </div>
+
+    <!-- #206-suite — Onglet Rapport dédié (sortie, pas de saisie). Miroir de
+         l'onglet Rapport podopédiatrie (pdpsec-11) : aperçu régénéré à chaque
+         activation + boutons imprimer/mail. Aucun .pedicurie-field ici — le
+         balayage savePedicurieBilan ne polluera pas bilanDataPedicurie. -->
+    <div class="sport-section pedicurie-section" id="pdsec-10">
+      <div class="card">
+        <div style="padding:12px 16px;border-bottom:1px solid rgba(217,119,6,0.18);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button onclick="envoyerRapportMail()" class="btn" style="background:#b7740a;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">✉️ Envoyer par mail</button>
+          <button id="ped-btn-print" onclick="printRapportPedicurie()" class="btn" style="background:#d97706;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
+        </div>
+        <div id="pedicurie-rapport-body" style="padding:16px;font-size:13px;color:#333;">
+          <em style="color:var(--mut);">Aperçu du rapport disponible à l'ouverture de cet onglet.</em>
+        </div>
       </div>
     </div>
 
