@@ -6832,22 +6832,40 @@ function renderPodoscopeGallery() {
 // l'input file n'y propose pas les caméras branchées). Miroir du flux
 // empreinte posturo (startEmpreinteCamera). « Capturer » peut enchaîner
 // plusieurs prises sans fermer le flux.
-function startPodoscopeCamera() {
+// #203-fix — retours Scio : facingMode environment sur Mac peut resolver vers
+// une caméra qui n'affiche rien (écran noir), et le choix de caméra manquait.
+// Stratégie : deviceId explicite si le sélecteur a une valeur, sinon caméra
+// PAR DÉFAUT (video:true — la plus fiable sur desktop). Le sélecteur est
+// peuplé par enumerateCameras (labels disponibles une fois le flux actif ;
+// la garde #202 empêche la sonde de couper le flux).
+async function startPodoscopeCamera() {
   const wrap = document.getElementById('sp-podoscope-video-wrap');
   const video = document.getElementById('sp-podoscope-video');
   if (!wrap || !video) return;
-  navigator.mediaDevices
-    .getUserMedia({ video: { facingMode: 'environment' } })
-    .then((stream) => {
-      video.srcObject = stream;
-      wrap.style.display = 'block';
-    })
-    .catch(() =>
-      navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-        video.srcObject = stream;
-        wrap.style.display = 'block';
-      })
-    );
+  // Libérer un flux précédent avant d'en ouvrir un autre (délai #202-iPad).
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  const selVal = document.getElementById('sp-podoscope-cam-select')?.value;
+  const constraints = selVal ? { video: { deviceId: { exact: selVal } } } : { video: true };
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    video.play().catch(() => {});
+    wrap.style.display = 'block';
+    enumerateCameras('sp-podoscope-cam-select');
+  } catch (e) {
+    console.warn('[#203] Caméra podoscope inaccessible :', e?.name, e?.message);
+    alert("Impossible d'ouvrir cette caméra. Choisissez-en une autre dans le sélecteur.");
+    wrap.style.display = 'block';
+    enumerateCameras('sp-podoscope-cam-select');
+  }
+}
+
+function switchPodoscopeCamera() {
+  startPodoscopeCamera();
 }
 
 function stopPodoscopeCamera() {
