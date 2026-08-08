@@ -4650,17 +4650,25 @@ function _stripDataURLsForPersist(patientsArr) {
       delete obj.neuro4[k + 'Path'];
     }
   };
+  // #203 — clés dynamiques des galeries (podoscope sport / plantaire posturo) :
+  // même paire _xxx/_xxxPath que les clés fixes, donc même strip conditionnel
+  // (Path set + dataURL présente). Sans elles, chaque savePatients re-persisterait
+  // en localStorage les dataURLs restaurées en RAM par les restore-stash (#35).
+  const sportKeysOf = (bd) =>
+    SPORT_BILAN_PHOTO_KEYS.concat(_galleryDynKeys(bd, '_podoscopePhotos', '_podo_ph_'));
+  const posturoKeysOf = (d) =>
+    POSTURO_PHOTO_KEYS.concat(_galleryDynKeys(d, '_plantairePhotos', '_plant_ph_'));
   for (const p of patientsArr) {
-    stripObjFlat(p.bilanData, SPORT_BILAN_PHOTO_KEYS);
-    stripObjFlat(p.bilanDataPosturo, POSTURO_PHOTO_KEYS);
+    stripObjFlat(p.bilanData, sportKeysOf(p.bilanData));
+    stripObjFlat(p.bilanDataPosturo, posturoKeysOf(p.bilanDataPosturo));
     purgeImagesFromNeuro4(p.bilanDataPosturo);
     stripMesures(p.mesures);
     if (Array.isArray(p.bilansSport)) for (const arch of p.bilansSport) {
-      stripObjFlat(arch.bilanData, SPORT_BILAN_PHOTO_KEYS);
+      stripObjFlat(arch.bilanData, sportKeysOf(arch.bilanData));
       stripMesures(arch.mesures);
     }
     if (Array.isArray(p.bilansPosturo)) for (const arch of p.bilansPosturo) {
-      stripObjFlat(arch.bilanDataPosturo, POSTURO_PHOTO_KEYS);
+      stripObjFlat(arch.bilanDataPosturo, posturoKeysOf(arch.bilanDataPosturo));
       purgeImagesFromNeuro4(arch.bilanDataPosturo);
     }
   }
@@ -6414,7 +6422,10 @@ async function prefetchPosturoPhotos(d) {
   if (!d) return;
   // #85 Fix race boot — refresh préventif si JWT proche de l'expiration.
   await ensureSession();
-  await Promise.all(POSTURO_PHOTO_KEYS.map(async k => {
+  // #203 (2/3) — inclut les clés dynamiques de la galerie plantaire (paires
+  // par id, même format scalaire _xxx/_xxxPath que le reste du pipeline).
+  const allKeys = POSTURO_PHOTO_KEYS.concat(_galleryDynKeys(d, '_plantairePhotos', '_plant_ph_'));
+  await Promise.all(allKeys.map(async k => {
     const pathKey = k + 'Path';
     if (!d[pathKey] || d[k]) return;
     const r = await prefetchPhotoToDataUrl(d[pathKey]);
@@ -6432,8 +6443,11 @@ async function prefetchPosturoPhotos(d) {
 async function migratePosturoPhotos(d, patientId, bilanId) {
   // #85 Fix race boot — refresh préventif avant les uploads Storage.
   await ensureSession();
+  // #203 (2/3) — clés dynamiques galerie plantaire incluses dans tout le
+  // cycle (stash, upload, cleanup), même contrat scalaire que les clés fixes.
+  const allKeys = POSTURO_PHOTO_KEYS.concat(_galleryDynKeys(d, '_plantairePhotos', '_plant_ph_'));
   const stash = {};
-  for (const k of POSTURO_PHOTO_KEYS) {
+  for (const k of allKeys) {
     if (d[k] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
       stash[k] = d[k];
     }
@@ -6441,17 +6455,17 @@ async function migratePosturoPhotos(d, patientId, bilanId) {
   if (Object.keys(stash).length === 0) return stash;
   const pathArgs = { userId: pwaUser?.id, patientId, type: 'posturo', bilanId };
   const results = await Promise.all(
-    POSTURO_PHOTO_KEYS.map(k => migratePhotoEntry(d, k, pathArgs))
+    allKeys.map(k => migratePhotoEntry(d, k, pathArgs))
   );
   results.forEach((r, i) => {
-    if (!r.ok) console.warn('[posturo] migrate fail', POSTURO_PHOTO_KEYS[i], '→', r.error);
+    if (!r.ok) console.warn('[posturo] migrate fail', allKeys[i], '→', r.error);
   });
   // Cleanup explicite — couvre le cas "double save sans reload" : à la 2e save,
   // d[k+'Path'] est déjà set (de la save #1) ET d[k] contient encore la dataUrl
   // restaurée du stash post-save #1. migratePhotoEntry retourne migrated:false
   // (no-op, path déjà set), mais sans ce delete la dataUrl serait re-persistée.
   // Le stash capturé en début de fonction garantit la restauration RAM par le caller.
-  for (const k of POSTURO_PHOTO_KEYS) {
+  for (const k of allKeys) {
     if (d[k + 'Path'] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
       delete d[k];
     }
@@ -6773,6 +6787,18 @@ const PHOTO_GALLERIES = {
         ? savePodopediatrieBilan(true)
         : Promise.resolve(),
   },
+  // #203 (2/3) — posturo, système plantaire. legacy = l'empreinte historique
+  // (_empreinte/_empreintePath) affichée comme première entrée de la galerie,
+  // sans migration : le rapport posturo continue de la lire à son emplacement.
+  'po-plantaire': {
+    arrKey: '_plantairePhotos',
+    prefix: '_plant_ph_',
+    legacy: { dataKey: '_empreinte', pathKey: '_empreintePath' },
+    getTargets: () =>
+      currentPatient && currentPatient.bilanDataPosturo ? [currentPatient.bilanDataPosturo] : [],
+    save: () =>
+      typeof savePosturoBilan === 'function' ? savePosturoBilan(true) : Promise.resolve(),
+  },
 };
 
 // Clés dynamiques d'un conteneur pour une collection donnée (consommé par les
@@ -6837,6 +6863,15 @@ async function addGalleryPhotos(galId, input) {
   try { await cfg.save(); } catch (e) { console.warn('[#203] save post-ajout', galId, ':', e?.message); }
 }
 
+// #203 (2/3) — lecture d'une entrée de galerie, y compris l'entrée legacy
+// (id réservé '__legacy' → paire cfg.legacy.dataKey/pathKey au lieu du préfixe).
+function _galleryEntryData(cfg, t, id) {
+  if (id === '__legacy' && cfg.legacy) {
+    return { data: t[cfg.legacy.dataKey], hasPath: !!t[cfg.legacy.pathKey] };
+  }
+  return { data: t[cfg.prefix + id], hasPath: !!t[cfg.prefix + id + 'Path'] };
+}
+
 function deleteGalleryPhoto(galId, id) {
   const cfg = PHOTO_GALLERIES[galId];
   if (!cfg) return;
@@ -6846,6 +6881,11 @@ function deleteGalleryPhoto(galId, id) {
   // Suppression VOLONTAIRE : dataURL ET Path retirés des deux exemplaires
   // (≠ interdit CLAUDE.md qui vise les purges sur heuristique).
   targets.forEach((t) => {
+    if (id === '__legacy' && cfg.legacy) {
+      delete t[cfg.legacy.dataKey];
+      delete t[cfg.legacy.pathKey];
+      return;
+    }
     if (Array.isArray(t[cfg.arrKey])) t[cfg.arrKey] = t[cfg.arrKey].filter((x) => x !== id);
     delete t[cfg.prefix + id];
     delete t[cfg.prefix + id + 'Path'];
@@ -6861,11 +6901,15 @@ function renderGallery(galId) {
   const wrap = document.getElementById(galId + '-gallery');
   if (!cfg || !wrap) return;
   const t = cfg.getTargets()[0];
-  const ids = t && Array.isArray(t[cfg.arrKey]) ? t[cfg.arrKey] : [];
+  let ids = t && Array.isArray(t[cfg.arrKey]) ? t[cfg.arrKey].slice() : [];
+  // Entrée legacy (posturo : empreinte historique) affichée en tête, sans
+  // migration — les clés d'origine restent la source de vérité.
+  if (t && cfg.legacy && (t[cfg.legacy.dataKey] || t[cfg.legacy.pathKey])) {
+    ids = ['__legacy'].concat(ids);
+  }
   wrap.innerHTML = ids
     .map((id) => {
-      const data = t[cfg.prefix + id];
-      const hasPath = !!t[cfg.prefix + id + 'Path'];
+      const { data, hasPath } = _galleryEntryData(cfg, t, id);
       const inner = data
         ? '<img src="' + data + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;cursor:zoom-in;" onclick="openGalleryLightbox(\'' + galId + "','" + id + '\')"/>'
         : '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:10px;color:#888;text-align:center;padding:4px;">' + (hasPath ? 'chargement…' : 'photo indisponible') + '</div>';
@@ -6883,7 +6927,7 @@ function renderGallery(galId) {
 function openGalleryLightbox(galId, id) {
   const cfg = PHOTO_GALLERIES[galId];
   const t = cfg && cfg.getTargets()[0];
-  const data = t && t[cfg.prefix + id];
+  const data = t && _galleryEntryData(cfg, t, id).data;
   if (!data) return;
   const ov = document.createElement('div');
   ov.style.cssText =
@@ -12809,19 +12853,29 @@ async function _resolvePosturoRapportImages(bd) {
     if (live) return { status: 'ok', dataUrl: live };
     return resolveRamOrPath('_bodyCanvas');
   }
+  // #203 (2/3) — photos de la galerie plantaire (clés dynamiques _plant_ph_<id>).
+  // Même résolution RAM → Path que l'empreinte, un statut par photo : une photo
+  // non rechargée depuis Storage produit une mention rouge, jamais un rapport
+  // amputé d'aspect normal (règles #148/#150).
+  function resolvePlantGallery() {
+    var ids = Array.isArray(d._plantairePhotos) ? d._plantairePhotos : [];
+    return Promise.all(ids.map(function (id) { return resolveRamOrPath('_plant_ph_' + id); }));
+  }
   var results = await Promise.all([
     resolveBodyCanvas(),
     resolveRamOrPath('_empreinte'),
     resolveRamOrPath('_feetComposite'),
     (typeof _collectAnnotatedPostureViews === 'function')
       ? _collectAnnotatedPostureViews(d, _MAX_POSTURE_W)
-      : Promise.resolve([])
+      : Promise.resolve([]),
+    resolvePlantGallery()
   ]);
   return {
     bodyCanvas:     results[0],
     empreinte:      results[1],
     feetComposite:  results[2],
-    annotatedViews: results[3]
+    annotatedViews: results[3],
+    plantGallery:   results[4]
   };
 }
 
@@ -13341,12 +13395,19 @@ async function buildRapportPosturo() {
   // Empreinte plantaire après section 5 — condition path-aware (fix #149
   // défaut 2). Section rendue dès que status !== 'nu', avec mention rouge
   // si Storage KO (ko:true).
-  if (visuals.empreinte.status !== 'nu') {
+  // #203 (2/3) — la section porte aussi les photos de la galerie plantaire
+  // (visuals.plantGallery) : elle est donc rendue même sans empreinte legacy
+  // dès qu'au moins une photo existe (dataURL ou Path).
+  const plantGal = visuals.plantGallery || [];
+  const galHasAny = plantGal.some(g => g.status !== 'nu');
+  if (visuals.empreinte.status !== 'nu' || galHasAny) {
     const s5idx = sections.findIndex(s => s.titre && s.titre.startsWith('5.'));
     const insertAt5 = s5idx >= 0 ? s5idx+1 : sections.length;
     sections.splice(insertAt5, 0, {titre:'5. Empreinte plantaire', color:'#f0a500', type:'empreinte',
       img: visuals.empreinte.dataUrl,
-      ko: visuals.empreinte.status === 'ko'});
+      ko: visuals.empreinte.status === 'ko',
+      photos: plantGal.filter(g => g.status === 'ok').map(g => g.dataUrl),
+      photosKo: plantGal.filter(g => g.status === 'ko').length});
   }
   // Synthèse section 8
   // Plan de semelles (pieds) à la fin dans section 9
@@ -13688,6 +13749,16 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = [], fichesFai
         bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Empreinte non chargée — vérifiez votre connexion avant d\'imprimer.</div>';
       }
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-width:70%;border-radius:4px;display:block;margin:0 auto;"/></div>';
+      // #203 (2/3) — photos galerie plantaire, grille 2 colonnes + mention
+      // rouge par photo non rechargée (règles #148/#150).
+      if (s.photosKo > 0) {
+        bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ ' + s.photosKo + ' photo(s) plantaire(s) non rechargée(s) depuis le stockage — régénérez le rapport (connexion requise) avant remise au patient.</div>';
+      }
+      if (s.photos && s.photos.length > 0) {
+        bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0;">' +
+          s.photos.map(function(ph){ return '<div style="break-inside:avoid;"><img src="'+ph+'" style="width:100%;border-radius:6px;border:1px solid #eaeaea;"/></div>'; }).join('') +
+          '</div>';
+      }
     } else if(s.type === 'image') {
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-height:200px;border-radius:4px;"/></div>';
     } else if(s.items) {
@@ -20761,31 +20832,24 @@ function getBilanPosturoHTML() {
     <!-- Examen empreinte -->
     <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
       <div style="font-weight:600;margin-bottom:10px;color:#2a7a4e;">👣 Examen empreinte et morpho plantaire</div>
-      <input type="file" id="po-empreinte-file" accept="image/*" style="display:none;" onchange="previewEmpreinte(this)"/>
-      <input type="file" id="po-empreinte-cam" accept="image/*" capture="environment" style="display:none;" onchange="previewEmpreinte(this)"/>
-      <div id="po-empreinte-preview" style="text-align:center;margin-bottom:10px;">
-        <img id="po-empreinte-img" style="max-width:100%;max-height:220px;display:none;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);"/>
+      <!-- #203 (2/3) — galerie générique multi-photos, uniforme avec sport et
+           podopédiatrie. L'empreinte legacy (_empreinte/_empreintePath) est
+           affichée comme entrée spéciale de la galerie — aucune migration
+           destructive, le rapport continue de la lire. -->
+      <div id="po-plantaire-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+        <label class="btn" style="display:inline-block;cursor:pointer;">➕ Ajouter des photos
+          <input type="file" accept="image/*" multiple style="display:none;" onchange="addGalleryPhotos('po-plantaire', this)"/>
+        </label>
+        <button class="btn" onclick="startGalleryCamera('po-plantaire')">📸 Caméra</button>
       </div>
-      <div id="po-empreinte-video-wrap" style="display:none;margin-bottom:10px;">
-        <video id="po-empreinte-video" autoplay playsinline style="width:100%;max-height:220px;border-radius:10px;background:#000;color:#222;"></video>
-        <div style="display:flex;gap:8px;margin-top:8px;justify-content:center;">
-          <button class="btn" onclick="captureEmpreinte()" style="padding:10px 20px;font-size:13px;border-radius:8px;">📸 Capturer</button>
-          <button class="btn" onclick="stopEmpreinteCamera()" style="padding:10px 20px;font-size:13px;border-radius:8px;background:#888;color:#222;">✕ Annuler</button>
+      <div id="po-plantaire-video-wrap" style="display:none;margin-bottom:10px;">
+        <video id="po-plantaire-video" autoplay playsinline muted style="width:100%;max-width:480px;border-radius:8px;display:block;background:#000;"></video>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+          <select class="inp" id="po-plantaire-cam-select" style="max-width:220px;" onchange="startGalleryCamera('po-plantaire')"></select>
+          <button class="btn btn-green" onclick="captureGalleryPhoto('po-plantaire')">📷 Capturer</button>
+          <button class="btn btn-red" onclick="stopGalleryCamera('po-plantaire')">✕ Fermer</button>
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-        <button onclick="startEmpreinteCamera()" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:#fff;border:2px solid #2a7a4e;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;color:#2a7a4e;">
-          <span style="font-size:24px;">📷</span>Caméra ordi
-        </button>
-        <button onclick="document.getElementById('po-empreinte-cam').click()" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:#fff;border:2px solid #3498db;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;color:#3498db;">
-          <span style="font-size:24px;">📱</span>Caméra mobile
-        </button>
-        <button onclick="document.getElementById('po-empreinte-file').click()" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:#fff;border:2px solid #8e44ad;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;color:#8e44ad;">
-          <span style="font-size:24px;">🖼️</span>Depuis l'ordi
-        </button>
-      </div>
-      <div style="text-align:center;margin-top:8px;">
-        <button id="po-empreinte-del" onclick="deleteEmpreinte()" style="display:none;padding:8px 16px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;">🗑 Supprimer la photo</button>
       </div>
     </div>
 
@@ -24153,7 +24217,10 @@ async function savePosturoBilan(silent = false) {
   });
   // Section 5
   d.epines=getRad('po-epines'); d.epinesLoc=getPoVal('po-epines-loc');
-  // Photo empreinte
+  // Photo empreinte — #203 (2/3) : po-empreinte-img n'existe plus dans le DOM
+  // (remplacé par la galerie po-plantaire), emprImg est donc null et ce sweep
+  // est un no-op. CONSERVÉ tel quel : il n'assigne que si présent et ne doit
+  // JAMAIS supprimer d._empreinte (source de vérité legacy, lue par le rapport).
   const emprImg = document.getElementById('po-empreinte-img');
   if(emprImg && emprImg.src && emprImg.src.startsWith('data:')) d._empreinte = emprImg.src;
   d.chaussureType=getPoVal('po-chaussure-type');
@@ -24469,13 +24536,20 @@ function loadPosturoBilan() {
     });
   }
   setPosturoRadio('po-epines',d.epines); setPoVal('po-epines-loc',d.epinesLoc);
-  // Restaurer photo empreinte
+  // Restaurer photo empreinte — #203 (2/3) : po-empreinte-img/del retirés du
+  // DOM, bloc conservé en no-op défensif ; l'empreinte legacy est désormais
+  // affichée par la galerie plantaire (entrée '__legacy').
   if(d._empreinte) {
     const img = document.getElementById('po-empreinte-img');
     const del = document.getElementById('po-empreinte-del');
     if(img) { img.src = d._empreinte; img.style.display = 'block'; }
     if(del) del.style.display = 'inline-block';
   }
+  // #203 (2/3) — galerie plantaire (photos multi + empreinte legacy). Les deux
+  // chemins d'ouverture (ouvrirBilanPosturo L7436/L7460) font `await
+  // prefetchPosturoPhotos` AVANT nav → les dataURLs sous Paths sont déjà
+  // réhydratées quand ce render s'exécute.
+  renderGallery('po-plantaire');
   setPoVal('po-chaussure-type',d.chaussureType);
   setChk('po-usure-interne',d.usureInterne); setChk('po-usure-externe',d.usureExterne); setChk('po-usure-contrefort',d.usureContrefort);
   setChk('po-test-pouces',d.testPouces); setChk('po-test-convergence',d.testConvergence);
