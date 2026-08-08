@@ -18624,12 +18624,6 @@ async function buildPodopediatrieRapportHTML() {
   var hasMorphoSection = clinical.some(function (s) { return s.isMorpho; });
   var hasMarcheSection = clinical.some(function (s) { return s.isMarche; });
   var body = '';
-  // Fallback de tête pour le groupe examen : uniquement si aucune section
-  // ancre n'est présente. Garantit l'insertion même sur un bilan quasi-vide.
-  if (examHtml && !hasMorphoSection && !hasMarcheSection) {
-    body += examHtml;
-    examInserted = true;
-  }
   clinical.forEach(function (s) {
     var lis = s.items.map(function (it) { return '<li>' + it + '</li>'; }).join('');
     body += '<div class="rp-section">'
@@ -18652,6 +18646,15 @@ async function buildPodopediatrieRapportHTML() {
       treatmentInserted = true;
     }
   });
+  // #203-fix — Fallback du groupe examen déplacé de la TÊTE vers la FIN des
+  // sections cliniques (retour Scio : les photos sortaient avant
+  // l'Interrogatoire quand aucune section Morphostatique/Marche texte n'était
+  // remplie). Position clinique correcte : après les sections saisies, avant
+  // Traitement/Synthèse.
+  if (examHtml && !examInserted) {
+    body += examHtml;
+    examInserted = true;
+  }
   // Fallback groupe traitement : juste avant la Synthèse si pas encore inséré.
   if (treatmentHtml && !treatmentInserted) {
     body += treatmentHtml;
