@@ -14422,38 +14422,6 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // garantit que chaque fiche commence sur une nouvelle page. object-fit:contain
   // pour respecter le ratio de la fiche A4 source. Si fichesPages = [] (fast-path
   // 0 fiche ou pdf.js indispo), annexesHTML = '' → bodyHTML inchangé.
-  // #203 — Photos podoscope dans le rapport. Règles #148/#150 : bloc absent si
-  // aucune photo ; image par dataURL présente ; Path sans dataURL (rechargement
-  // Storage échoué) → mention ROUGE visible, jamais un rapport amputé d'aspect
-  // normal.
-  let podoscopeHTML = '';
-  {
-    const bdP = (p && p.bilanData) || {};
-    const ids = Array.isArray(bdP._podoscopePhotos) ? bdP._podoscopePhotos : [];
-    if (ids.length > 0) {
-      let missing = 0;
-      const imgs = ids
-        .map((id) => {
-          const data = bdP['_podo_ph_' + id];
-          if (data) {
-            return '<div style="break-inside:avoid;"><img src="' + data + '" style="width:100%;border-radius:6px;border:1px solid #eaeaea;"/></div>';
-          }
-          if (bdP['_podo_ph_' + id + 'Path']) missing++;
-          return '';
-        })
-        .join('');
-      const missHTML = missing > 0
-        ? '<div style="border:2px solid #c0392b;background:#fdecea;color:#7f1d1d;padding:8px 12px;margin:8px 0;font-size:11px;border-radius:4px;"><b style="color:#c0392b;">⚠</b> ' + missing + ' photo(s) podoscope n\'ont pas pu être rechargées depuis le stockage — régénérez le rapport (connexion requise) avant remise au patient.</div>'
-        : '';
-      if (imgs || missHTML) {
-        podoscopeHTML =
-          '<div class="section" style="break-inside:avoid;"><div class="section-title"><div class="section-num">📷</div><div class="section-label">Photos podoscope</div><div class="section-line"></div></div>' +
-          missHTML +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0;">' + imgs + '</div></div>';
-      }
-    }
-  }
-
   // #112 — mention rouge en tête d'annexes si des fiches prescrites manquent.
   const annexesHTML = _buildFichesFailHTML(fichesFailed) + (fichesPages || []).map(dataURL =>
     `<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="${dataURL}" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>`
@@ -14462,7 +14430,7 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // #109-A4 — Les vues posturales annotées sont désormais injectées DANS la
   // sous-section Bilan Morphostatique (cf. buildBilanPrintSection ci-dessus),
   // juste après les silhouettes. Plus de bloc séparé entre bilanSection et annexes.
-  const bodyHTML = sectionsHTML + concluHTML + bilanSection + podoscopeHTML + annexesHTML;
+  const bodyHTML = sectionsHTML + concluHTML + bilanSection + annexesHTML;
   return { pratHTML, patientHTML, bodyHTML };
 }
 
@@ -14609,8 +14577,12 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
   const hasMorpho = bd._morpho_face||bd._morpho_face2||bd._morpho_profilG||bd._morpho_profilD
     ||bd._morpho_facePath||bd._morpho_face2Path||bd._morpho_profilGPath||bd._morpho_profilDPath;
   const hasAnnotatedViews = annotatedViews && annotatedViews.length > 0;
-  if(hasMorpho||bd.chaine_musculaire||hasAnnotatedViews) {
+  // #203-fix placement — photos podoscope EN TÊTE de la section Morphostatique
+  // (miroir de l'UI, retour Scio : elles sortaient après la synthèse).
+  const hasPodoscope = Array.isArray(bd._podoscopePhotos) && bd._podoscopePhotos.length > 0;
+  if(hasMorpho||bd.chaine_musculaire||hasAnnotatedViews||hasPodoscope) {
     h += sec('Bilan Morphostatique');
+    h += _buildGalleryReportHTML(bd, '_podoscopePhotos', '_podo_ph_', 'Photos podoscope / morphologie plantaire');
     // Fix #150 défauts 1+2 — Rendu conditionnel + mention rouge.
     // (2) Le bloc des 4 silhouettes n'est rendu que si au moins une tuile a
     //     un statut 'ok' ou 'ko'. Sinon on omet totalement — plus de gabarits
@@ -18640,7 +18612,12 @@ async function buildPodopediatrieRapportHTML() {
   //   2. Groupe traitement (schéma plantaire) : Traitement (priorité) →
   //      juste avant la Synthèse (fallback).
   // Drapeau d'insertion unique par groupe → jamais zéro, jamais deux.
-  var examHtml = _renderPodoMorphoBlock(visuals.morpho) + _renderPodoPostureBlock(visuals.annotatedViews);
+  // #203-fix placement — la galerie photos rejoint le groupe examen (cascade
+  // d'insertion Morphostatique prioritaire), en tête, miroir de l'UI.
+  var examHtml =
+    _buildGalleryReportHTML(d, '_morphoPhotos', '_pdp_ph_', 'Photos podoscope / morphologie') +
+    _renderPodoMorphoBlock(visuals.morpho) +
+    _renderPodoPostureBlock(visuals.annotatedViews);
   var treatmentHtml = _renderPodoPiedsBlock(visuals.pieds);
   var examInserted = false;
   var treatmentInserted = false;
@@ -18757,7 +18734,7 @@ async function buildPodopediatrieRapportHTML() {
     + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
-    + '<div class="rp-body">' + body + _buildGalleryReportHTML(d, '_morphoPhotos', '_pdp_ph_', 'Photos podoscope / morphologie') + '</div>'
+    + '<div class="rp-body">' + body + '</div>'
     + '<div class="footer"><div class="footer-brand">Verticy</div><div class="footer-info">Bilan de Podopédiatrie · ' + dateStr + '</div></div>'
     + '</div></body></html>';
 }
