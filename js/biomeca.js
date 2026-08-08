@@ -6739,11 +6739,25 @@ function _podoscopePhotoKeys(bd) {
   return bd._podoscopePhotos.map((id) => '_podo_ph_' + id);
 }
 
+// #203-fix persistance — le save sport lit le GLOBAL bilanData (balayage DOM,
+// cf. #118) tandis que la migration Storage lit currentPatient.bilanData :
+// toute écriture photo doit toucher LES DEUX exemplaires, sinon le save qui
+// suit écrase les clés fraîchement posées (bug constaté par Scio : photo
+// disparue en sortant/revenant du bilan).
+function _podoscopeTargets() {
+  const t = [];
+  if (currentPatient && currentPatient.bilanData) t.push(currentPatient.bilanData);
+  if (typeof bilanData !== 'undefined' && bilanData && bilanData !== currentPatient?.bilanData) {
+    t.push(bilanData);
+  }
+  return t;
+}
+
 async function addPodoscopePhotos(input) {
   if (!input.files || input.files.length === 0) return;
-  const bd = currentPatient && currentPatient.bilanData;
-  if (!bd) { alert('Aucun patient sélectionné.'); input.value = ''; return; }
-  if (!Array.isArray(bd._podoscopePhotos)) bd._podoscopePhotos = [];
+  const targets = _podoscopeTargets();
+  if (targets.length === 0) { alert('Aucun patient sélectionné.'); input.value = ''; return; }
+  targets.forEach((t) => { if (!Array.isArray(t._podoscopePhotos)) t._podoscopePhotos = []; });
   const files = Array.from(input.files);
   input.value = ''; // reset pour pouvoir re-sélectionner les mêmes fichiers
   for (let i = 0; i < files.length; i++) {
@@ -6758,8 +6772,10 @@ async function addPodoscopePhotos(input) {
     // que l'empreinte posturo, fallback dataURL originale sur erreur).
     const bounded = await _downscaleDataUrl(dataUrl, _MAX_EMPREINTE_W, 0.85);
     const id = Date.now().toString(36) + '_' + i;
-    bd._podoscopePhotos.push(id);
-    bd['_podo_ph_' + id] = bounded;
+    targets.forEach((t) => {
+      if (!t._podoscopePhotos.includes(id)) t._podoscopePhotos.push(id);
+      t['_podo_ph_' + id] = bounded;
+    });
   }
   renderPodoscopeGallery();
   // Persistance + upload Storage via le flux de save standard.
@@ -6769,14 +6785,19 @@ async function addPodoscopePhotos(input) {
 }
 
 function deletePodoscopePhoto(id) {
-  const bd = currentPatient && currentPatient.bilanData;
-  if (!bd || !Array.isArray(bd._podoscopePhotos)) return;
+  const targets = _podoscopeTargets();
+  if (targets.length === 0) return;
   if (!confirm('Supprimer cette photo ?')) return;
-  bd._podoscopePhotos = bd._podoscopePhotos.filter((x) => x !== id);
   // Suppression VOLONTAIRE de l'utilisateur : retirer dataURL ET Path est
   // légitime ici (≠ interdit CLAUDE.md qui vise les purges sur heuristique).
-  delete bd['_podo_ph_' + id];
-  delete bd['_podo_ph_' + id + 'Path'];
+  // #203-fix — appliquée aux DEUX exemplaires (global + currentPatient).
+  targets.forEach((t) => {
+    if (Array.isArray(t._podoscopePhotos)) {
+      t._podoscopePhotos = t._podoscopePhotos.filter((x) => x !== id);
+    }
+    delete t['_podo_ph_' + id];
+    delete t['_podo_ph_' + id + 'Path'];
+  });
   renderPodoscopeGallery();
   if (typeof saveBilanSilent === 'function') {
     saveBilanSilent().catch((e) => console.warn('[#203] save post-suppression :', e?.message));
@@ -19316,6 +19337,15 @@ function loadBilan() {
     if (typeof bilanData !== 'undefined' && bilanData && currentPatient?.bilanData) {
       SPORT_BILAN_PHOTO_KEYS.forEach(k => {
         if (currentPatient.bilanData[k]) bilanData[k] = currentPatient.bilanData[k];
+      });
+      // #203-fix — même report pour les clés podoscope dynamiques + le tableau
+      // d'ids : le save (global) doit les connaître, sinon il les écrase.
+      if (Array.isArray(currentPatient.bilanData._podoscopePhotos)) {
+        bilanData._podoscopePhotos = currentPatient.bilanData._podoscopePhotos.slice();
+      }
+      _podoscopePhotoKeys(currentPatient.bilanData).forEach(k => {
+        if (currentPatient.bilanData[k]) bilanData[k] = currentPatient.bilanData[k];
+        if (currentPatient.bilanData[k + 'Path']) bilanData[k + 'Path'] = currentPatient.bilanData[k + 'Path'];
       });
     }
     _renderAllPostureSlots('sp');
