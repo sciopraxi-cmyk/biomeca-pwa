@@ -6306,6 +6306,7 @@ async function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
     selectPatient(p);
     if (p.bilanDataPodopediatrie) {
       try { await prefetchPodopediatriePhotos(p.bilanDataPodopediatrie); } catch (e) {}
+      renderGallery('podo-morpho'); // #203
     }
     nav('pg-podopediatrie');
     return;
@@ -6318,6 +6319,7 @@ async function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
   // en RAM pour que _restorePodopediatrieCanvasesFromSource (dans le hook
   // showPodopediatrieSection target===3) trouve les dataURLs.
   try { await prefetchPodopediatriePhotos(currentPatient.bilanDataPodopediatrie); } catch (e) {}
+  renderGallery('podo-morpho'); // #203
   nav('pg-podopediatrie');
   setTimeout(loadPodopediatrieBilan, 50);
   setTimeout(_applyPodopediatrieVisibilityForPeriode, 50);
@@ -6480,7 +6482,9 @@ const PODOPEDIATRIE_PHOTO_KEYS = [
 async function prefetchPodopediatriePhotos(d) {
   if (!d) return;
   await ensureSession();
-  await Promise.all(PODOPEDIATRIE_PHOTO_KEYS.map(async k => {
+  // #203 — clés dynamiques de la galerie Morphostatique (pattern sport v103).
+  const allKeys = PODOPEDIATRIE_PHOTO_KEYS.concat(_galleryDynKeys(d, '_morphoPhotos', '_pdp_ph_'));
+  await Promise.all(allKeys.map(async k => {
     const pathKey = k + 'Path';
     if (!d[pathKey] || d[k]) return;
     const r = await prefetchPhotoToDataUrl(d[pathKey]);
@@ -6491,8 +6495,10 @@ async function prefetchPodopediatriePhotos(d) {
 
 async function migratePodopediatriePhotos(d, patientId, bilanId) {
   await ensureSession();
+  // #203 — clés dynamiques de la galerie incluses dans tout le cycle.
+  const allKeys = PODOPEDIATRIE_PHOTO_KEYS.concat(_galleryDynKeys(d, '_morphoPhotos', '_pdp_ph_'));
   const stash = {};
-  for (const k of PODOPEDIATRIE_PHOTO_KEYS) {
+  for (const k of allKeys) {
     if (d[k] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
       stash[k] = d[k];
     }
@@ -6500,13 +6506,13 @@ async function migratePodopediatriePhotos(d, patientId, bilanId) {
   if (Object.keys(stash).length === 0) return stash;
   const pathArgs = { userId: pwaUser?.id, patientId, type: 'podopediatrie', bilanId };
   const results = await Promise.all(
-    PODOPEDIATRIE_PHOTO_KEYS.map(k => migratePhotoEntry(d, k, pathArgs))
+    allKeys.map(k => migratePhotoEntry(d, k, pathArgs))
   );
   results.forEach((r, i) => {
-    if (!r.ok) console.warn('[podopediatrie] migrate fail', PODOPEDIATRIE_PHOTO_KEYS[i], '→', r.error);
+    if (!r.ok) console.warn('[podopediatrie] migrate fail', allKeys[i], '→', r.error);
   });
   // Cleanup double-save (miroir posturo).
-  for (const k of PODOPEDIATRIE_PHOTO_KEYS) {
+  for (const k of allKeys) {
     if (d[k + 'Path'] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
       delete d[k];
     }
@@ -6739,6 +6745,213 @@ function _podoscopePhotoKeys(bd) {
   return bd._podoscopePhotos.map((id) => '_podo_ph_' + id);
 }
 
+// ══════════════════════════════════════════════════════
+// #203 — MOTEUR GÉNÉRIQUE de galeries photos (multi-instances)
+// ══════════════════════════════════════════════════════
+// Une galerie = une config : conteneur(s) de données (les DEUX exemplaires
+// pour sport, cf. fix #118 ; objet unique pour les autres modules), clé de
+// collection, préfixe des paires _xxx/_xxxPath, base des ids DOM
+// (<base>-gallery, <base>-video-wrap, <base>-video, <base>-cam-select),
+// et hook de save du module. Le HTML appelle les fonctions génériques avec
+// l'id de galerie.
+const PHOTO_GALLERIES = {
+  'sp-podoscope': {
+    arrKey: '_podoscopePhotos',
+    prefix: '_podo_ph_',
+    getTargets: () => _podoscopeTargets(),
+    save: () => (typeof saveBilanSilent === 'function' ? saveBilanSilent() : Promise.resolve()),
+  },
+  'podo-morpho': {
+    arrKey: '_morphoPhotos',
+    prefix: '_pdp_ph_',
+    getTargets: () =>
+      currentPatient && currentPatient.bilanDataPodopediatrie
+        ? [currentPatient.bilanDataPodopediatrie]
+        : [],
+    save: () =>
+      typeof savePodopediatrieBilan === 'function'
+        ? savePodopediatrieBilan(true)
+        : Promise.resolve(),
+  },
+};
+
+// Clés dynamiques d'un conteneur pour une collection donnée (consommé par les
+// prefetch/migrate de chaque module, pattern sport v103).
+function _galleryDynKeys(container, arrKey, prefix) {
+  if (!container || !Array.isArray(container[arrKey])) return [];
+  return container[arrKey].map((id) => prefix + id);
+}
+
+// #203 — Bloc rapport générique d'une galerie (règles #148/#150) : rien si
+// aucune photo, grille 2 colonnes, mention ROUGE si des Paths n'ont pas pu
+// être rechargés depuis Storage — jamais un rapport amputé d'aspect normal.
+function _buildGalleryReportHTML(container, arrKey, prefix, title) {
+  const ids = container && Array.isArray(container[arrKey]) ? container[arrKey] : [];
+  if (ids.length === 0) return '';
+  let missing = 0;
+  const imgs = ids
+    .map((id) => {
+      const data = container[prefix + id];
+      if (data) {
+        return '<div style="break-inside:avoid;"><img src="' + data + '" style="width:100%;border-radius:6px;border:1px solid #eaeaea;"/></div>';
+      }
+      if (container[prefix + id + 'Path']) missing++;
+      return '';
+    })
+    .join('');
+  const missHTML = missing > 0
+    ? '<div style="border:2px solid #c0392b;background:#fdecea;color:#7f1d1d;padding:8px 12px;margin:8px 0;font-size:11px;border-radius:4px;"><b style="color:#c0392b;">⚠</b> ' + missing + " photo(s) n'ont pas pu être rechargées depuis le stockage — régénérez le rapport (connexion requise) avant remise au patient.</div>"
+    : '';
+  if (!imgs && !missHTML) return '';
+  return (
+    '<div style="break-inside:avoid;padding:0 24px;"><div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-bottom:2px solid #333;padding:12px 0 8px;margin-top:16px;">📷 ' + title + '</div>' +
+    missHTML +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0;">' + imgs + '</div></div>'
+  );
+}
+
+async function addGalleryPhotos(galId, input) {
+  const cfg = PHOTO_GALLERIES[galId];
+  if (!cfg || !input.files || input.files.length === 0) return;
+  const targets = cfg.getTargets();
+  if (targets.length === 0) { alert('Aucun patient sélectionné.'); input.value = ''; return; }
+  targets.forEach((t) => { if (!Array.isArray(t[cfg.arrKey])) t[cfg.arrKey] = []; });
+  const files = Array.from(input.files);
+  input.value = '';
+  for (let i = 0; i < files.length; i++) {
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(files[i]);
+    });
+    if (!dataUrl) continue;
+    const bounded = await _downscaleDataUrl(dataUrl, _MAX_EMPREINTE_W, 0.85);
+    const id = Date.now().toString(36) + '_' + i;
+    targets.forEach((t) => {
+      if (!t[cfg.arrKey].includes(id)) t[cfg.arrKey].push(id);
+      t[cfg.prefix + id] = bounded;
+    });
+  }
+  renderGallery(galId);
+  try { await cfg.save(); } catch (e) { console.warn('[#203] save post-ajout', galId, ':', e?.message); }
+}
+
+function deleteGalleryPhoto(galId, id) {
+  const cfg = PHOTO_GALLERIES[galId];
+  if (!cfg) return;
+  const targets = cfg.getTargets();
+  if (targets.length === 0) return;
+  if (!confirm('Supprimer cette photo ?')) return;
+  // Suppression VOLONTAIRE : dataURL ET Path retirés des deux exemplaires
+  // (≠ interdit CLAUDE.md qui vise les purges sur heuristique).
+  targets.forEach((t) => {
+    if (Array.isArray(t[cfg.arrKey])) t[cfg.arrKey] = t[cfg.arrKey].filter((x) => x !== id);
+    delete t[cfg.prefix + id];
+    delete t[cfg.prefix + id + 'Path'];
+  });
+  renderGallery(galId);
+  Promise.resolve(cfg.save()).catch((e) =>
+    console.warn('[#203] save post-suppression', galId, ':', e?.message)
+  );
+}
+
+function renderGallery(galId) {
+  const cfg = PHOTO_GALLERIES[galId];
+  const wrap = document.getElementById(galId + '-gallery');
+  if (!cfg || !wrap) return;
+  const t = cfg.getTargets()[0];
+  const ids = t && Array.isArray(t[cfg.arrKey]) ? t[cfg.arrKey] : [];
+  wrap.innerHTML = ids
+    .map((id) => {
+      const data = t[cfg.prefix + id];
+      const hasPath = !!t[cfg.prefix + id + 'Path'];
+      const inner = data
+        ? '<img src="' + data + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;cursor:zoom-in;" onclick="openGalleryLightbox(\'' + galId + "','" + id + '\')"/>'
+        : '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:10px;color:#888;text-align:center;padding:4px;">' + (hasPath ? 'chargement…' : 'photo indisponible') + '</div>';
+      return (
+        '<div style="position:relative;width:110px;height:110px;background:#f3f4f6;border:1px solid var(--bord);border-radius:8px;">' +
+        inner +
+        '<button onclick="deleteGalleryPhoto(\'' + galId + "','" + id + '\')" title="Supprimer" ' +
+        'style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;background:#c0392b;color:#fff;cursor:pointer;font-size:12px;line-height:1;">✕</button>' +
+        '</div>'
+      );
+    })
+    .join('');
+}
+
+function openGalleryLightbox(galId, id) {
+  const cfg = PHOTO_GALLERIES[galId];
+  const t = cfg && cfg.getTargets()[0];
+  const data = t && t[cfg.prefix + id];
+  if (!data) return;
+  const ov = document.createElement('div');
+  ov.style.cssText =
+    'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+  ov.innerHTML = '<img src="' + data + '" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;"/>';
+  ov.onclick = () => ov.remove();
+  document.body.appendChild(ov);
+}
+
+async function startGalleryCamera(galId) {
+  const wrap = document.getElementById(galId + '-video-wrap');
+  const video = document.getElementById(galId + '-video');
+  if (!wrap || !video) return;
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  const selVal = document.getElementById(galId + '-cam-select')?.value;
+  const constraints = selVal ? { video: { deviceId: { exact: selVal } } } : { video: true };
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    video.play().catch(() => {});
+    wrap.style.display = 'block';
+    enumerateCameras(galId + '-cam-select');
+  } catch (e) {
+    console.warn('[#203] Caméra galerie inaccessible :', galId, e?.name, e?.message);
+    alert("Impossible d'ouvrir cette caméra. Choisissez-en une autre dans le sélecteur.");
+    wrap.style.display = 'block';
+    enumerateCameras(galId + '-cam-select');
+  }
+}
+
+function stopGalleryCamera(galId) {
+  const video = document.getElementById(galId + '-video');
+  const wrap = document.getElementById(galId + '-video-wrap');
+  if (video?.srcObject) {
+    video.srcObject.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+  }
+  if (wrap) wrap.style.display = 'none';
+}
+
+async function captureGalleryPhoto(galId) {
+  const cfg = PHOTO_GALLERIES[galId];
+  const video = document.getElementById(galId + '-video');
+  if (!cfg || !video || !video.videoWidth) return;
+  const targets = cfg.getTargets();
+  if (targets.length === 0) { alert('Aucun patient sélectionné.'); return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const raw = canvas.toDataURL('image/jpeg', 0.9);
+  const bounded = await _downscaleDataUrl(raw, _MAX_EMPREINTE_W, 0.85);
+  const id = Date.now().toString(36) + '_c';
+  targets.forEach((t) => {
+    if (!Array.isArray(t[cfg.arrKey])) t[cfg.arrKey] = [];
+    if (!t[cfg.arrKey].includes(id)) t[cfg.arrKey].push(id);
+    t[cfg.prefix + id] = bounded;
+  });
+  renderGallery(galId);
+  Promise.resolve(cfg.save()).catch((e) =>
+    console.warn('[#203] save post-capture', galId, ':', e?.message)
+  );
+}
+
 // #203-fix persistance — le save sport lit le GLOBAL bilanData (balayage DOM,
 // cf. #118) tandis que la migration Storage lit currentPatient.bilanData :
 // toute écriture photo doit toucher LES DEUX exemplaires, sinon le save qui
@@ -6754,78 +6967,18 @@ function _podoscopeTargets() {
 }
 
 async function addPodoscopePhotos(input) {
-  if (!input.files || input.files.length === 0) return;
-  const targets = _podoscopeTargets();
-  if (targets.length === 0) { alert('Aucun patient sélectionné.'); input.value = ''; return; }
-  targets.forEach((t) => { if (!Array.isArray(t._podoscopePhotos)) t._podoscopePhotos = []; });
-  const files = Array.from(input.files);
-  input.value = ''; // reset pour pouvoir re-sélectionner les mêmes fichiers
-  for (let i = 0; i < files.length; i++) {
-    const dataUrl = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(files[i]);
-    });
-    if (!dataUrl) continue;
-    // Fix #151 — borne la résolution AVANT toute assignation (même pipeline
-    // que l'empreinte posturo, fallback dataURL originale sur erreur).
-    const bounded = await _downscaleDataUrl(dataUrl, _MAX_EMPREINTE_W, 0.85);
-    const id = Date.now().toString(36) + '_' + i;
-    targets.forEach((t) => {
-      if (!t._podoscopePhotos.includes(id)) t._podoscopePhotos.push(id);
-      t['_podo_ph_' + id] = bounded;
-    });
-  }
-  renderPodoscopeGallery();
-  // Persistance + upload Storage via le flux de save standard.
-  if (typeof saveBilanSilent === 'function') {
-    try { await saveBilanSilent(); } catch (e) { console.warn('[#203] save post-ajout :', e?.message); }
-  }
+  return addGalleryPhotos('sp-podoscope', input);
 }
 
 function deletePodoscopePhoto(id) {
-  const targets = _podoscopeTargets();
-  if (targets.length === 0) return;
-  if (!confirm('Supprimer cette photo ?')) return;
-  // Suppression VOLONTAIRE de l'utilisateur : retirer dataURL ET Path est
-  // légitime ici (≠ interdit CLAUDE.md qui vise les purges sur heuristique).
-  // #203-fix — appliquée aux DEUX exemplaires (global + currentPatient).
-  targets.forEach((t) => {
-    if (Array.isArray(t._podoscopePhotos)) {
-      t._podoscopePhotos = t._podoscopePhotos.filter((x) => x !== id);
-    }
-    delete t['_podo_ph_' + id];
-    delete t['_podo_ph_' + id + 'Path'];
-  });
-  renderPodoscopeGallery();
-  if (typeof saveBilanSilent === 'function') {
-    saveBilanSilent().catch((e) => console.warn('[#203] save post-suppression :', e?.message));
-  }
+  return deleteGalleryPhoto('sp-podoscope', id);
 }
 
 // Vignettes : dataURL présente → image cliquable (plein écran overlay) ;
 // Path présent sans dataURL (prefetch encore en vol ou échoué) → case grise
 // « chargement… » — jamais un trou silencieux.
 function renderPodoscopeGallery() {
-  const wrap = document.getElementById('sp-podoscope-gallery');
-  if (!wrap) return;
-  const bd = currentPatient && currentPatient.bilanData;
-  const ids = (bd && Array.isArray(bd._podoscopePhotos)) ? bd._podoscopePhotos : [];
-  wrap.innerHTML = ids.map((id) => {
-    const data = bd['_podo_ph_' + id];
-    const hasPath = !!bd['_podo_ph_' + id + 'Path'];
-    const inner = data
-      ? '<img src="' + data + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;cursor:zoom-in;" onclick="_openPodoscopeLightbox(\'' + id + '\')"/>'
-      : '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:10px;color:#888;text-align:center;padding:4px;">' + (hasPath ? 'chargement…' : 'photo indisponible') + '</div>';
-    return (
-      '<div style="position:relative;width:110px;height:110px;background:#f3f4f6;border:1px solid var(--bord);border-radius:8px;">' +
-      inner +
-      '<button onclick="deletePodoscopePhoto(\'' + id + '\')" title="Supprimer" ' +
-      'style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;background:#c0392b;color:#fff;cursor:pointer;font-size:12px;line-height:1;">✕</button>' +
-      '</div>'
-    );
-  }).join('');
+  return renderGallery('sp-podoscope');
 }
 
 // #203 — Flux caméra live pour la galerie (webcam/caméra USB sur desktop —
@@ -6839,78 +6992,23 @@ function renderPodoscopeGallery() {
 // peuplé par enumerateCameras (labels disponibles une fois le flux actif ;
 // la garde #202 empêche la sonde de couper le flux).
 async function startPodoscopeCamera() {
-  const wrap = document.getElementById('sp-podoscope-video-wrap');
-  const video = document.getElementById('sp-podoscope-video');
-  if (!wrap || !video) return;
-  // Libérer un flux précédent avant d'en ouvrir un autre (délai #202-iPad).
-  if (video.srcObject) {
-    video.srcObject.getTracks().forEach((t) => t.stop());
-    video.srcObject = null;
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  const selVal = document.getElementById('sp-podoscope-cam-select')?.value;
-  const constraints = selVal ? { video: { deviceId: { exact: selVal } } } : { video: true };
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = stream;
-    video.play().catch(() => {});
-    wrap.style.display = 'block';
-    enumerateCameras('sp-podoscope-cam-select');
-  } catch (e) {
-    console.warn('[#203] Caméra podoscope inaccessible :', e?.name, e?.message);
-    alert("Impossible d'ouvrir cette caméra. Choisissez-en une autre dans le sélecteur.");
-    wrap.style.display = 'block';
-    enumerateCameras('sp-podoscope-cam-select');
-  }
+  return startGalleryCamera('sp-podoscope');
 }
 
 function switchPodoscopeCamera() {
-  startPodoscopeCamera();
+  return startGalleryCamera('sp-podoscope');
 }
 
 function stopPodoscopeCamera() {
-  const video = document.getElementById('sp-podoscope-video');
-  const wrap = document.getElementById('sp-podoscope-video-wrap');
-  if (video?.srcObject) {
-    video.srcObject.getTracks().forEach((t) => t.stop());
-    video.srcObject = null;
-  }
-  if (wrap) wrap.style.display = 'none';
+  return stopGalleryCamera('sp-podoscope');
 }
 
 async function capturePodoscopePhoto() {
-  const video = document.getElementById('sp-podoscope-video');
-  if (!video || !video.videoWidth) return;
-  const targets = _podoscopeTargets();
-  if (targets.length === 0) { alert('Aucun patient sélectionné.'); return; }
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  const raw = canvas.toDataURL('image/jpeg', 0.9);
-  // Même pipeline que l'ajout par fichier : bornage #151 + deux exemplaires.
-  const bounded = await _downscaleDataUrl(raw, _MAX_EMPREINTE_W, 0.85);
-  const id = Date.now().toString(36) + '_c';
-  targets.forEach((t) => {
-    if (!Array.isArray(t._podoscopePhotos)) t._podoscopePhotos = [];
-    if (!t._podoscopePhotos.includes(id)) t._podoscopePhotos.push(id);
-    t['_podo_ph_' + id] = bounded;
-  });
-  renderPodoscopeGallery();
-  if (typeof saveBilanSilent === 'function') {
-    saveBilanSilent().catch((e) => console.warn('[#203] save post-capture :', e?.message));
-  }
+  return captureGalleryPhoto('sp-podoscope');
 }
 
 function _openPodoscopeLightbox(id) {
-  const bd = currentPatient && currentPatient.bilanData;
-  const data = bd && bd['_podo_ph_' + id];
-  if (!data) return;
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
-  ov.innerHTML = '<img src="' + data + '" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;"/>';
-  ov.onclick = () => ov.remove();
-  document.body.appendChild(ov);
+  return openGalleryLightbox('sp-podoscope', id);
 }
 
 // ══════════════════════════════════════════════════════
@@ -18659,7 +18757,7 @@ async function buildPodopediatrieRapportHTML() {
     + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
-    + '<div class="rp-body">' + body + '</div>'
+    + '<div class="rp-body">' + body + _buildGalleryReportHTML(d, '_morphoPhotos', '_pdp_ph_', 'Photos podoscope / morphologie') + '</div>'
     + '<div class="footer"><div class="footer-brand">Verticy</div><div class="footer-info">Bilan de Podopédiatrie · ' + dateStr + '</div></div>'
     + '</div></body></html>';
 }
