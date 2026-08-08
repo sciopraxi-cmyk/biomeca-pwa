@@ -687,6 +687,23 @@
       <div class="card sport-card-orange">
         <div class="sport-block-title c-orange">🔬 Examen dermatologique</div>
 
+        <!-- #203 (3/3) — galerie photos générique (moteur PHOTO_GALLERIES) -->
+        <div id="ped-dermato-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+          <label class="btn" style="display:inline-block;cursor:pointer;">➕ Ajouter des photos
+            <input type="file" accept="image/*" multiple style="display:none;" onchange="addGalleryPhotos('ped-dermato', this)"/>
+          </label>
+          <button class="btn" onclick="startGalleryCamera('ped-dermato')">📸 Caméra</button>
+        </div>
+        <div id="ped-dermato-video-wrap" style="display:none;margin-bottom:10px;">
+          <video id="ped-dermato-video" autoplay playsinline muted style="width:100%;max-width:480px;border-radius:8px;display:block;background:#000;"></video>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+            <select class="inp" id="ped-dermato-cam-select" style="max-width:220px;" onchange="startGalleryCamera('ped-dermato')"></select>
+            <button class="btn btn-green" onclick="captureGalleryPhoto('ped-dermato')">📷 Capturer</button>
+            <button class="btn btn-red" onclick="stopGalleryCamera('ped-dermato')">✕ Fermer</button>
+          </div>
+        </div>
+
         <!-- Sous-section : Hyperkératoses -->
         <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Hyperkératoses</div>
 <div style="margin-bottom:8px;">
@@ -781,6 +798,24 @@
     <div class="sport-section pedicurie-section" id="pdsec-3">
       <div class="card sport-card-orange">
         <div class="sport-block-title c-orange">🦶 Examen unguéal (par orteil)</div>
+
+        <!-- #203 (3/3) — galerie photos générique (moteur PHOTO_GALLERIES) -->
+        <div id="ped-ongles-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+          <label class="btn" style="display:inline-block;cursor:pointer;">➕ Ajouter des photos
+            <input type="file" accept="image/*" multiple style="display:none;" onchange="addGalleryPhotos('ped-ongles', this)"/>
+          </label>
+          <button class="btn" onclick="startGalleryCamera('ped-ongles')">📸 Caméra</button>
+        </div>
+        <div id="ped-ongles-video-wrap" style="display:none;margin-bottom:10px;">
+          <video id="ped-ongles-video" autoplay playsinline muted style="width:100%;max-width:480px;border-radius:8px;display:block;background:#000;"></video>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+            <select class="inp" id="ped-ongles-cam-select" style="max-width:220px;" onchange="startGalleryCamera('ped-ongles')"></select>
+            <button class="btn btn-green" onclick="captureGalleryPhoto('ped-ongles')">📷 Capturer</button>
+            <button class="btn btn-red" onclick="stopGalleryCamera('ped-ongles')">✕ Fermer</button>
+          </div>
+        </div>
+
         <div style="font-size:11px;color:#666;margin-bottom:6px;font-style:italic;">Une case par anomalie observée.</div>
 
         <!-- #121 Phase 1c — Légende visible des abréviations. Référence principale ;
@@ -1098,6 +1133,23 @@
     <div class="sport-section pedicurie-section" id="pdsec-7">
       <div class="card sport-card-orange">
         <div class="sport-block-title c-orange">🦴 Morphostatique &amp; chaussage</div>
+
+        <!-- #203 (3/3) — galerie photos générique (moteur PHOTO_GALLERIES) -->
+        <div id="ped-chaussage-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+          <label class="btn" style="display:inline-block;cursor:pointer;">➕ Ajouter des photos
+            <input type="file" accept="image/*" multiple style="display:none;" onchange="addGalleryPhotos('ped-chaussage', this)"/>
+          </label>
+          <button class="btn" onclick="startGalleryCamera('ped-chaussage')">📸 Caméra</button>
+        </div>
+        <div id="ped-chaussage-video-wrap" style="display:none;margin-bottom:10px;">
+          <video id="ped-chaussage-video" autoplay playsinline muted style="width:100%;max-width:480px;border-radius:8px;display:block;background:#000;"></video>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+            <select class="inp" id="ped-chaussage-cam-select" style="max-width:220px;" onchange="startGalleryCamera('ped-chaussage')"></select>
+            <button class="btn btn-green" onclick="captureGalleryPhoto('ped-chaussage')">📷 Capturer</button>
+            <button class="btn btn-red" onclick="stopGalleryCamera('ped-chaussage')">✕ Fermer</button>
+          </div>
+        </div>
 
         <!-- Sous-section : Déformations -->
         <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Déformations</div>

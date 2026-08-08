@@ -4658,9 +4658,17 @@ function _stripDataURLsForPersist(patientsArr) {
     SPORT_BILAN_PHOTO_KEYS.concat(_galleryDynKeys(bd, '_podoscopePhotos', '_podo_ph_'));
   const posturoKeysOf = (d) =>
     POSTURO_PHOTO_KEYS.concat(_galleryDynKeys(d, '_plantairePhotos', '_plant_ph_'));
+  // #203 (3/3) — couverture podopédiatrie et pédicurie, absentes du strip
+  // jusqu'ici (trou latent #35 : leurs dataURLs migrées re-persistaient en
+  // localStorage à chaque savePatients via le restore-stash).
+  const podopedKeysOf = (d) =>
+    PODOPEDIATRIE_PHOTO_KEYS.concat(_galleryDynKeys(d, '_morphoPhotos', '_pdp_ph_'));
+  const pedicurieKeysOf = (d) => _pedicurieDynKeys(d);
   for (const p of patientsArr) {
     stripObjFlat(p.bilanData, sportKeysOf(p.bilanData));
     stripObjFlat(p.bilanDataPosturo, posturoKeysOf(p.bilanDataPosturo));
+    stripObjFlat(p.bilanDataPodopediatrie, podopedKeysOf(p.bilanDataPodopediatrie));
+    stripObjFlat(p.bilanDataPedicurie, pedicurieKeysOf(p.bilanDataPedicurie));
     purgeImagesFromNeuro4(p.bilanDataPosturo);
     stripMesures(p.mesures);
     if (Array.isArray(p.bilansSport)) for (const arch of p.bilansSport) {
@@ -4670,6 +4678,12 @@ function _stripDataURLsForPersist(patientsArr) {
     if (Array.isArray(p.bilansPosturo)) for (const arch of p.bilansPosturo) {
       stripObjFlat(arch.bilanDataPosturo, posturoKeysOf(arch.bilanDataPosturo));
       purgeImagesFromNeuro4(arch.bilanDataPosturo);
+    }
+    if (Array.isArray(p.bilansPodopediatrie)) for (const arch of p.bilansPodopediatrie) {
+      stripObjFlat(arch.bilanDataPodopediatrie, podopedKeysOf(arch.bilanDataPodopediatrie));
+    }
+    if (Array.isArray(p.bilansPedicurie)) for (const arch of p.bilansPedicurie) {
+      stripObjFlat(arch.bilanDataPedicurie, pedicurieKeysOf(arch.bilanDataPedicurie));
     }
   }
   return stash;
@@ -6071,9 +6085,10 @@ function creerBilanPedicurie(patIdx, type) {
   nav('pg-pedicurie');
 }
 
-// Phase 0 — SIMPLIFIÉ vs ouvrirBilanPosturo : pas de prefetch photos, pas de
-// restauration neuro4. Synchrone (aucun await nécessaire).
-function ouvrirBilanPedicurie(patIdx, bilanIdx) {
+// Phase 0 — SIMPLIFIÉ vs ouvrirBilanPosturo : pas de restauration neuro4.
+// #203 (3/3) — devenue async : prefetch des photos galeries AVANT nav
+// (miroir posturo), pour que renderGallery trouve les dataURLs réhydratées.
+async function ouvrirBilanPedicurie(patIdx, bilanIdx) {
   const p = patients[patIdx];
   if(!p) return;
   const bilan = p.bilansPedicurie?.[bilanIdx];
@@ -6081,6 +6096,7 @@ function ouvrirBilanPedicurie(patIdx, bilanIdx) {
     // Bilan courant
     currentOpenedBilanPedicurieIdx = null;
     selectPatient(p);
+    try { await prefetchPedicuriePhotos(currentPatient?.bilanDataPedicurie); } catch (_e) {}
     nav('pg-pedicurie');
     return;
   }
@@ -6089,6 +6105,7 @@ function ouvrirBilanPedicurie(patIdx, bilanIdx) {
   currentOpenedBilanPedicurieIdx = bilanIdx;
   // Reset flag bilan en cours (mirror sport/posturo).
   delete p.currentBilanPedicurieSousType;
+  try { await prefetchPedicuriePhotos(currentPatient.bilanDataPedicurie); } catch (_e) {}
   nav('pg-pedicurie');
   setTimeout(loadPedicurieBilan, 50);
 }
@@ -6549,6 +6566,76 @@ function restorePodopediatriePhotosStash(d, stash) {
 }
 
 // ───────────────────────────────────────────────────────────────────
+// Helpers Storage — bilan pédicurie (#203 3/3)
+// ───────────────────────────────────────────────────────────────────
+// La pédicurie n'a AUCUNE clé photo fixe : uniquement les clés dynamiques des
+// 3 galeries (examen dermatologique, examen unguéal, morpho/chaussage), même
+// contrat scalaire _xxx/_xxxPath que partout ailleurs.
+const PEDICURIE_GALLERY_DEFS = [
+  { arrKey: '_dermatoPhotos', prefix: '_ped_derm_ph_' },
+  { arrKey: '_onglesPhotos', prefix: '_ped_ong_ph_' },
+  { arrKey: '_chaussagePhotos', prefix: '_ped_chau_ph_' },
+];
+
+function _pedicurieDynKeys(d) {
+  return PEDICURIE_GALLERY_DEFS.reduce(
+    (acc, g) => acc.concat(_galleryDynKeys(d, g.arrKey, g.prefix)),
+    []
+  );
+}
+
+// Miroir prefetchPodopediatriePhotos — restaure dataUrl RAM depuis path Storage.
+async function prefetchPedicuriePhotos(d) {
+  if (!d) return;
+  if (typeof prefetchPhotoToDataUrl !== 'function') return;
+  await ensureSession();
+  const allKeys = _pedicurieDynKeys(d);
+  await Promise.all(allKeys.map(async k => {
+    const pathKey = k + 'Path';
+    if (!d[pathKey] || d[k]) return;
+    const r = await prefetchPhotoToDataUrl(d[pathKey]);
+    if (r.ok) d[k] = r.dataUrl;
+    else console.warn('[pedicurie] prefetch fail', pathKey, '→', r.error);
+  }));
+}
+
+// Miroir migratePodopediatriePhotos — upload dataUrl → Storage, set Path,
+// delete dataUrl. Stash retourné pour restauration RAM post-savePatients.
+async function migratePedicuriePhotos(d, patientId, bilanId) {
+  if (typeof migratePhotoEntry !== 'function') return {};
+  await ensureSession();
+  const allKeys = _pedicurieDynKeys(d);
+  const stash = {};
+  for (const k of allKeys) {
+    if (d[k] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
+      stash[k] = d[k];
+    }
+  }
+  if (Object.keys(stash).length === 0) return stash;
+  const pathArgs = { userId: pwaUser?.id, patientId, type: 'pedicurie', bilanId };
+  const results = await Promise.all(
+    allKeys.map(k => migratePhotoEntry(d, k, pathArgs))
+  );
+  results.forEach((r, i) => {
+    if (!r.ok) console.warn('[pedicurie] migrate fail', allKeys[i], '→', r.error);
+  });
+  // Cleanup double-save (miroir posturo).
+  for (const k of allKeys) {
+    if (d[k + 'Path'] && typeof d[k] === 'string' && d[k].startsWith('data:')) {
+      delete d[k];
+    }
+  }
+  return stash;
+}
+
+// Miroir restorePodopediatriePhotosStash — même garde anti-stomp.
+function restorePedicuriePhotosStash(d, stash) {
+  for (const k in stash) {
+    if (!d[k]) d[k] = stash[k];
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────
 // Helpers Storage — bilan sport (Task #53 PR B2)
 // ───────────────────────────────────────────────────────────────────
 // Les photos sport sont stockées dans des arrays d'objets :
@@ -6799,7 +6886,37 @@ const PHOTO_GALLERIES = {
     save: () =>
       typeof savePosturoBilan === 'function' ? savePosturoBilan(true) : Promise.resolve(),
   },
+  // #203 (3/3) — pédicurie : 3 galeries (examen dermatologique, examen unguéal,
+  // morpho/chaussage), même conteneur bilanDataPedicurie, même save.
+  'ped-dermato': {
+    arrKey: '_dermatoPhotos',
+    prefix: '_ped_derm_ph_',
+    getTargets: () => _pedicurieGalleryTargets(),
+    save: () => _pedicurieGallerySave(),
+  },
+  'ped-ongles': {
+    arrKey: '_onglesPhotos',
+    prefix: '_ped_ong_ph_',
+    getTargets: () => _pedicurieGalleryTargets(),
+    save: () => _pedicurieGallerySave(),
+  },
+  'ped-chaussage': {
+    arrKey: '_chaussagePhotos',
+    prefix: '_ped_chau_ph_',
+    getTargets: () => _pedicurieGalleryTargets(),
+    save: () => _pedicurieGallerySave(),
+  },
 };
+
+// #203 (3/3) — helpers partagés des 3 galeries pédicurie.
+function _pedicurieGalleryTargets() {
+  return currentPatient && currentPatient.bilanDataPedicurie
+    ? [currentPatient.bilanDataPedicurie]
+    : [];
+}
+function _pedicurieGallerySave() {
+  return typeof savePedicurieBilan === 'function' ? savePedicurieBilan(true) : Promise.resolve();
+}
 
 // Clés dynamiques d'un conteneur pour une collection donnée (consommé par les
 // prefetch/migrate de chaque module, pattern sport v103).
@@ -16664,13 +16781,15 @@ function syncOpenedBilanPedicurieToHistory() {
   target.bilanDataPedicurie = JSON.parse(JSON.stringify(currentPatient.bilanDataPedicurie || {}));
 }
 
-// #121 Phase 0/1a — Sauvegarde du bilan pédicurie. NON async (pas de photos
-// donc pas de migration Storage). Balayage générique : tous les champs
-// `.pedicurie-field` (text/textarea/select/checkbox avec `data-field`) +
-// tous les radios `name="ped_*"` dans `#pg-pedicurie`. Pas besoin de toucher
-// à cette fonction quand on ajoute des sections — il suffit d'ajouter les
-// champs avec la classe et l'attribut idoines.
-function savePedicurieBilan(silent) {
+// #121 Phase 0/1a — Sauvegarde du bilan pédicurie. Balayage générique : tous
+// les champs `.pedicurie-field` (text/textarea/select/checkbox avec
+// `data-field`) + tous les radios `name="ped_*"` dans `#pg-pedicurie`. Pas
+// besoin de toucher à cette fonction quand on ajoute des sections — il suffit
+// d'ajouter les champs avec la classe et l'attribut idoines.
+// #203 (3/3) — devenue async : migration Storage des photos des 3 galeries
+// (miroir strict savePodopediatrieBilan). Les callers existants n'attendent
+// pas le retour (fire-and-forget), signature compatible.
+async function savePedicurieBilan(silent) {
   if (!currentPatient) { if (!silent) alert('Sélectionnez un patient'); return; }
   if (!currentPatient.bilanDataPedicurie) currentPatient.bilanDataPedicurie = {};
   const d = currentPatient.bilanDataPedicurie;
@@ -16684,8 +16803,18 @@ function savePedicurieBilan(silent) {
   document.querySelectorAll('#pg-pedicurie input[type=radio]').forEach(el => {
     if (el.checked && el.name) d[el.name] = el.value;
   });
+  // #203 (3/3) — migration Storage des photos galeries. Try/catch : un échec
+  // ne bloque pas la sauvegarde clinique (dataURLs restent en RAM, retry au
+  // prochain save). Stash capturé pour restauration RAM post-savePatients.
+  let photoStash = {};
+  try {
+    photoStash = await migratePedicuriePhotos(d, currentPatient.id, d.id) || {};
+  } catch (e) {
+    console.warn('[pedicurie] migrate error', e);
+  }
   syncOpenedBilanPedicurieToHistory();
   savePatients();
+  restorePedicuriePhotosStash(d, photoStash);
   if (!silent) alert('✓ Bilan pédicurie sauvegardé');
 }
 
@@ -16708,6 +16837,12 @@ function loadPedicurieBilan() {
     if (!el.name) return;
     el.checked = (d[el.name] !== undefined && el.value === d[el.name]);
   });
+  // #203 (3/3) — les 3 galeries photos. Les dataURLs sous Paths sont déjà
+  // réhydratées : ouvrirBilanPedicurie fait `await prefetchPedicuriePhotos`
+  // avant nav (miroir posturo).
+  renderGallery('ped-dermato');
+  renderGallery('ped-ongles');
+  renderGallery('ped-chaussage');
 }
 
 // #121 Phase 1b — Bascule de section pédicurie. Affiche la idx-ième
@@ -17953,6 +18088,9 @@ function showPedicurieSection(idx) {
   const sections = document.querySelectorAll('#pg-pedicurie .pedicurie-section');
   if (!sections.length || idx < 0 || idx >= sections.length) return;
   sections.forEach((s, i) => { s.style.display = i === idx ? '' : 'none'; });
+  // #203 (3/3) — coupe les caméras des galeries au changement d'onglet (une
+  // vidéo masquée laisserait le flux — et la LED caméra — actifs).
+  ['ped-dermato', 'ped-ongles', 'ped-chaussage'].forEach((g) => stopGalleryCamera(g));
   document.querySelectorAll('#pg-pedicurie .pedicurie-tab').forEach((t, i) => {
     const active = (i === idx);
     t.style.background  = active ? '#d97706' : 'transparent';
@@ -18072,6 +18210,57 @@ function genererSynthesePedicurie(){
   out.innerHTML='<div style="background:rgba(217,119,6,0.04);border:1px solid rgba(217,119,6,0.18);border-radius:8px;padding:12px 14px;">'+html+'</div>';
 }
 
+// #203 (3/3) — Injecte les blocs photos des 3 galeries dans la synthèse HTML,
+// chacun APRÈS la section clinique correspondante (placement demandé : près
+// des sections, jamais en tête — leçon rapport podo v109). La synthèse est
+// une suite de <div> sections dont le 1er enfant porte le titre : on matche
+// par textContent. Repli si la section texte est vide/absente : fin de la
+// synthèse. Blocs construits par _buildGalleryReportHTML (règles #148/#150 :
+// rien si vide, mention rouge si Paths non rechargés).
+function _pedInjectGalleryBlocks(synthHtml, d) {
+  var defs = [
+    ['🔬 Examen dermatologique', '_dermatoPhotos', '_ped_derm_ph_', 'Photos — Examen dermatologique'],
+    ['🦶 Examen unguéal', '_onglesPhotos', '_ped_ong_ph_', 'Photos — Examen unguéal'],
+    ['🦴 Morphostatique & chaussage', '_chaussagePhotos', '_ped_chau_ph_', 'Photos — Morphostatique & chaussage'],
+  ];
+  var host = document.createElement('div');
+  host.innerHTML = synthHtml;
+  // La synthèse écran est enveloppée dans un div cadre (genererSynthesePedicurie
+  // L~18190) : les sections sont les enfants de ce wrapper. Repli d'append :
+  // l'intérieur du wrapper si présent, sinon host.
+  var fallbackParent = host.firstElementChild && host.children.length === 1
+    ? host.firstElementChild
+    : host;
+  defs.forEach(function (def) {
+    var block = _buildGalleryReportHTML(d || {}, def[1], def[2], def[3]);
+    if (!block) return;
+    var wrap = document.createElement('div');
+    wrap.innerHTML = block;
+    var node = wrap.firstElementChild;
+    if (!node) return;
+    // Le div TITRE d'une section a pour textContent le titre seul et est le
+    // 1er enfant de son wrapper de section.
+    var sectionWrap = null;
+    var divs = host.querySelectorAll('div');
+    for (var i = 0; i < divs.length; i++) {
+      if (
+        divs[i].textContent.trim() === def[0] &&
+        divs[i].parentElement &&
+        divs[i] === divs[i].parentElement.firstElementChild
+      ) {
+        sectionWrap = divs[i].parentElement;
+        break;
+      }
+    }
+    if (sectionWrap && sectionWrap.parentNode) {
+      sectionWrap.parentNode.insertBefore(node, sectionWrap.nextSibling);
+    } else {
+      fallbackParent.appendChild(node);
+    }
+  });
+  return host.innerHTML;
+}
+
 // #121 Phase 5b — Builder du rapport pédicurie. Compose un document HTML
 // autonome avec header sciopraxi (logo + cartouche praticien), bandeau titre
 // ambre, carte patient (initiales + chips + métriques), corps = synthèse
@@ -18086,6 +18275,8 @@ function buildPedicurieRapportHTML(){
   var wordmark = (document.getElementById('imgjs-verticy-wordmark') || {}).src || '';
   var synthEl = document.getElementById('pedicurie-synthese-result');
   var synth = (synthEl && synthEl.innerHTML) ? synthEl.innerHTML : '<p style="font-style:italic;color:#666;">Aucune donnée renseignée.</p>';
+  // #203 (3/3) — photos des 3 galeries injectées près de leurs sections.
+  synth = _pedInjectGalleryBlocks(synth, p.bilanDataPedicurie);
   var dateStr = new Date().toLocaleDateString('fr-FR');
   var initiales = (((p.prenom || '?')[0]) + ((p.nom || '?')[0])).toUpperCase();
   var age = p.ddn ? Math.floor((Date.now() - new Date(p.ddn)) / 31557600000) : '';
