@@ -6828,6 +6828,62 @@ function renderPodoscopeGallery() {
   }).join('');
 }
 
+// #203 — Flux caméra live pour la galerie (webcam/caméra USB sur desktop —
+// l'input file n'y propose pas les caméras branchées). Miroir du flux
+// empreinte posturo (startEmpreinteCamera). « Capturer » peut enchaîner
+// plusieurs prises sans fermer le flux.
+function startPodoscopeCamera() {
+  const wrap = document.getElementById('sp-podoscope-video-wrap');
+  const video = document.getElementById('sp-podoscope-video');
+  if (!wrap || !video) return;
+  navigator.mediaDevices
+    .getUserMedia({ video: { facingMode: 'environment' } })
+    .then((stream) => {
+      video.srcObject = stream;
+      wrap.style.display = 'block';
+    })
+    .catch(() =>
+      navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+        video.srcObject = stream;
+        wrap.style.display = 'block';
+      })
+    );
+}
+
+function stopPodoscopeCamera() {
+  const video = document.getElementById('sp-podoscope-video');
+  const wrap = document.getElementById('sp-podoscope-video-wrap');
+  if (video?.srcObject) {
+    video.srcObject.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+  }
+  if (wrap) wrap.style.display = 'none';
+}
+
+async function capturePodoscopePhoto() {
+  const video = document.getElementById('sp-podoscope-video');
+  if (!video || !video.videoWidth) return;
+  const targets = _podoscopeTargets();
+  if (targets.length === 0) { alert('Aucun patient sélectionné.'); return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const raw = canvas.toDataURL('image/jpeg', 0.9);
+  // Même pipeline que l'ajout par fichier : bornage #151 + deux exemplaires.
+  const bounded = await _downscaleDataUrl(raw, _MAX_EMPREINTE_W, 0.85);
+  const id = Date.now().toString(36) + '_c';
+  targets.forEach((t) => {
+    if (!Array.isArray(t._podoscopePhotos)) t._podoscopePhotos = [];
+    if (!t._podoscopePhotos.includes(id)) t._podoscopePhotos.push(id);
+    t['_podo_ph_' + id] = bounded;
+  });
+  renderPodoscopeGallery();
+  if (typeof saveBilanSilent === 'function') {
+    saveBilanSilent().catch((e) => console.warn('[#203] save post-capture :', e?.message));
+  }
+}
+
 function _openPodoscopeLightbox(id) {
   const bd = currentPatient && currentPatient.bilanData;
   const data = bd && bd['_podo_ph_' + id];
