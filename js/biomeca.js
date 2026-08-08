@@ -7529,12 +7529,20 @@ async function enumerateCameras(selectId) {
     // caméra tourne coupe (mute) le flux actif → écran noir sans erreur
     // (#202-iPad, constaté sur la capture posturale : seule la caméra par
     // défaut survivait, les autres viraient au noir).
-    const hasActiveStream =
-      (typeof vidStream !== 'undefined' && vidStream) ||
-      (typeof camStream !== 'undefined' && camStream) ||
-      (typeof _postureStreams !== 'undefined' &&
-        _postureStreams &&
-        Object.values(_postureStreams).some(Boolean));
+    // #202-fix TDZ — au boot, initPWA appelle enumerateCameras AVANT que les
+    // déclarations let vidStream/camStream (plus bas dans le fichier) soient
+    // exécutées ; typeof ne protège PAS de la temporal dead zone (ReferenceError
+    // quand même). Or en TDZ aucune caméra ne peut être active → false correct.
+    let hasActiveStream = false;
+    try {
+      hasActiveStream = !!(
+        vidStream ||
+        camStream ||
+        (_postureStreams && Object.values(_postureStreams).some(Boolean))
+      );
+    } catch (_e) {
+      hasActiveStream = false;
+    }
     if (!hasActiveStream) {
       await navigator.mediaDevices.getUserMedia({video:true}).then(s=>s.getTracks().forEach(t=>t.stop())).catch(()=>{});
     }
