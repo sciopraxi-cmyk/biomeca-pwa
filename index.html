@@ -5105,6 +5105,13 @@
         </select>
         <button class="btn btn-red" onclick="undoPieds()">↩ Annuler</button>
       </div>
+      <!-- #203 — Galerie photos podoscope (multi). L'input file natif donne
+           l'appareil photo sur iPad et la Continuity Camera sur Mac. -->
+      <div class="field-lbl" style="margin-top:12px;">📷 Photos podoscope / morphologie plantaire</div>
+      <div id="sp-podoscope-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"></div>
+      <label class="btn" style="display:inline-block;cursor:pointer;">➕ Ajouter des photos
+        <input type="file" accept="image/*" multiple style="display:none;" onchange="addPodoscopePhotos(this)"/>
+      </label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
         <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:10px;">
           <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🧱 Matériaux</div>

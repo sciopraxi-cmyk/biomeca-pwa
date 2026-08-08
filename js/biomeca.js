@@ -6671,7 +6671,10 @@ async function prefetchSportBilanDataPhotos(bd) {
   if (typeof prefetchPhotoToDataUrl !== 'function') return;
   // #85 Fix race boot — refresh préventif si JWT proche de l'expiration.
   await ensureSession();
-  await Promise.all(SPORT_BILAN_PHOTO_KEYS.map(async k => {
+  // #203 — inclut les clés dynamiques des photos podoscope (paires par id,
+  // même format scalaire _xxx/_xxxPath que le reste du pipeline).
+  const allKeys = SPORT_BILAN_PHOTO_KEYS.concat(_podoscopePhotoKeys(bd));
+  await Promise.all(allKeys.map(async k => {
     const pathKey = k + 'Path';
     if (!bd[pathKey] || bd[k]) return;
     const r = await prefetchPhotoToDataUrl(bd[pathKey]);
@@ -6690,8 +6693,11 @@ async function migrateSportBilanDataPhotos(bd, patientId, bilanId) {
   if (typeof migratePhotoEntry !== 'function') return {};
   // #85 Fix race boot — refresh préventif avant les uploads Storage.
   await ensureSession();
+  // #203 — clés dynamiques podoscope incluses dans tout le cycle (stash,
+  // upload, cleanup) : elles suivent exactement le contrat scalaire existant.
+  const allKeys = SPORT_BILAN_PHOTO_KEYS.concat(_podoscopePhotoKeys(bd));
   const stash = {};
-  for (const k of SPORT_BILAN_PHOTO_KEYS) {
+  for (const k of allKeys) {
     if (bd[k] && typeof bd[k] === 'string' && bd[k].startsWith('data:')) {
       stash[k] = bd[k];
     }
@@ -6699,13 +6705,13 @@ async function migrateSportBilanDataPhotos(bd, patientId, bilanId) {
   if (Object.keys(stash).length === 0) return stash;
   const pathArgs = { userId: pwaUser?.id, patientId, type: 'sport', bilanId };
   const results = await Promise.all(
-    SPORT_BILAN_PHOTO_KEYS.map(k => migratePhotoEntry(bd, k, pathArgs))
+    allKeys.map(k => migratePhotoEntry(bd, k, pathArgs))
   );
   results.forEach((r, i) => {
-    if (!r.ok) console.warn('[sport-bd] migrate fail', SPORT_BILAN_PHOTO_KEYS[i], '→', r.error);
+    if (!r.ok) console.warn('[sport-bd] migrate fail', allKeys[i], '→', r.error);
   });
   // Cleanup miroir migratePosturoPhotos L3180-3184 (cas "double save sans reload").
-  for (const k of SPORT_BILAN_PHOTO_KEYS) {
+  for (const k of allKeys) {
     if (bd[k + 'Path'] && typeof bd[k] === 'string' && bd[k].startsWith('data:')) {
       delete bd[k];
     }
@@ -6719,6 +6725,97 @@ function restoreSportBilanDataPhotosStash(bd, stash) {
   for (const k in stash) {
     if (!bd[k]) bd[k] = stash[k];
   }
+}
+
+// ══════════════════════════════════════════════════════
+// #203 — Galerie photos podoscope (bilan sport, multi-photos)
+// ══════════════════════════════════════════════════════
+// Modèle : bd._podoscopePhotos = [id, id, ...] (ordre d'ajout), et pour chaque
+// id une paire scalaire bd['_podo_ph_'+id] (dataURL) / bd['_podo_ph_'+id+'Path']
+// (Storage) — exactement le contrat des autres clés photo, donc migration,
+// prefetch, stash et backfill traitent ces clés sans code spécial.
+function _podoscopePhotoKeys(bd) {
+  if (!bd || !Array.isArray(bd._podoscopePhotos)) return [];
+  return bd._podoscopePhotos.map((id) => '_podo_ph_' + id);
+}
+
+async function addPodoscopePhotos(input) {
+  if (!input.files || input.files.length === 0) return;
+  const bd = currentPatient && currentPatient.bilanData;
+  if (!bd) { alert('Aucun patient sélectionné.'); input.value = ''; return; }
+  if (!Array.isArray(bd._podoscopePhotos)) bd._podoscopePhotos = [];
+  const files = Array.from(input.files);
+  input.value = ''; // reset pour pouvoir re-sélectionner les mêmes fichiers
+  for (let i = 0; i < files.length; i++) {
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(files[i]);
+    });
+    if (!dataUrl) continue;
+    // Fix #151 — borne la résolution AVANT toute assignation (même pipeline
+    // que l'empreinte posturo, fallback dataURL originale sur erreur).
+    const bounded = await _downscaleDataUrl(dataUrl, _MAX_EMPREINTE_W, 0.85);
+    const id = Date.now().toString(36) + '_' + i;
+    bd._podoscopePhotos.push(id);
+    bd['_podo_ph_' + id] = bounded;
+  }
+  renderPodoscopeGallery();
+  // Persistance + upload Storage via le flux de save standard.
+  if (typeof saveBilanSilent === 'function') {
+    try { await saveBilanSilent(); } catch (e) { console.warn('[#203] save post-ajout :', e?.message); }
+  }
+}
+
+function deletePodoscopePhoto(id) {
+  const bd = currentPatient && currentPatient.bilanData;
+  if (!bd || !Array.isArray(bd._podoscopePhotos)) return;
+  if (!confirm('Supprimer cette photo ?')) return;
+  bd._podoscopePhotos = bd._podoscopePhotos.filter((x) => x !== id);
+  // Suppression VOLONTAIRE de l'utilisateur : retirer dataURL ET Path est
+  // légitime ici (≠ interdit CLAUDE.md qui vise les purges sur heuristique).
+  delete bd['_podo_ph_' + id];
+  delete bd['_podo_ph_' + id + 'Path'];
+  renderPodoscopeGallery();
+  if (typeof saveBilanSilent === 'function') {
+    saveBilanSilent().catch((e) => console.warn('[#203] save post-suppression :', e?.message));
+  }
+}
+
+// Vignettes : dataURL présente → image cliquable (plein écran overlay) ;
+// Path présent sans dataURL (prefetch encore en vol ou échoué) → case grise
+// « chargement… » — jamais un trou silencieux.
+function renderPodoscopeGallery() {
+  const wrap = document.getElementById('sp-podoscope-gallery');
+  if (!wrap) return;
+  const bd = currentPatient && currentPatient.bilanData;
+  const ids = (bd && Array.isArray(bd._podoscopePhotos)) ? bd._podoscopePhotos : [];
+  wrap.innerHTML = ids.map((id) => {
+    const data = bd['_podo_ph_' + id];
+    const hasPath = !!bd['_podo_ph_' + id + 'Path'];
+    const inner = data
+      ? '<img src="' + data + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;cursor:zoom-in;" onclick="_openPodoscopeLightbox(\'' + id + '\')"/>'
+      : '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:10px;color:#888;text-align:center;padding:4px;">' + (hasPath ? 'chargement…' : 'photo indisponible') + '</div>';
+    return (
+      '<div style="position:relative;width:110px;height:110px;background:#f3f4f6;border:1px solid var(--bord);border-radius:8px;">' +
+      inner +
+      '<button onclick="deletePodoscopePhoto(\'' + id + '\')" title="Supprimer" ' +
+      'style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;background:#c0392b;color:#fff;cursor:pointer;font-size:12px;line-height:1;">✕</button>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+function _openPodoscopeLightbox(id) {
+  const bd = currentPatient && currentPatient.bilanData;
+  const data = bd && bd['_podo_ph_' + id];
+  if (!data) return;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+  ov.innerHTML = '<img src="' + data + '" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;"/>';
+  ov.onclick = () => ov.remove();
+  document.body.appendChild(ov);
 }
 
 // ══════════════════════════════════════════════════════
@@ -14132,6 +14229,38 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // garantit que chaque fiche commence sur une nouvelle page. object-fit:contain
   // pour respecter le ratio de la fiche A4 source. Si fichesPages = [] (fast-path
   // 0 fiche ou pdf.js indispo), annexesHTML = '' → bodyHTML inchangé.
+  // #203 — Photos podoscope dans le rapport. Règles #148/#150 : bloc absent si
+  // aucune photo ; image par dataURL présente ; Path sans dataURL (rechargement
+  // Storage échoué) → mention ROUGE visible, jamais un rapport amputé d'aspect
+  // normal.
+  let podoscopeHTML = '';
+  {
+    const bdP = (p && p.bilanData) || {};
+    const ids = Array.isArray(bdP._podoscopePhotos) ? bdP._podoscopePhotos : [];
+    if (ids.length > 0) {
+      let missing = 0;
+      const imgs = ids
+        .map((id) => {
+          const data = bdP['_podo_ph_' + id];
+          if (data) {
+            return '<div style="break-inside:avoid;"><img src="' + data + '" style="width:100%;border-radius:6px;border:1px solid #eaeaea;"/></div>';
+          }
+          if (bdP['_podo_ph_' + id + 'Path']) missing++;
+          return '';
+        })
+        .join('');
+      const missHTML = missing > 0
+        ? '<div style="border:2px solid #c0392b;background:#fdecea;color:#7f1d1d;padding:8px 12px;margin:8px 0;font-size:11px;border-radius:4px;"><b style="color:#c0392b;">⚠</b> ' + missing + ' photo(s) podoscope n\'ont pas pu être rechargées depuis le stockage — régénérez le rapport (connexion requise) avant remise au patient.</div>'
+        : '';
+      if (imgs || missHTML) {
+        podoscopeHTML =
+          '<div class="section" style="break-inside:avoid;"><div class="section-title"><div class="section-num">📷</div><div class="section-label">Photos podoscope</div><div class="section-line"></div></div>' +
+          missHTML +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0;">' + imgs + '</div></div>';
+      }
+    }
+  }
+
   // #112 — mention rouge en tête d'annexes si des fiches prescrites manquent.
   const annexesHTML = _buildFichesFailHTML(fichesFailed) + (fichesPages || []).map(dataURL =>
     `<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="${dataURL}" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>`
@@ -14140,7 +14269,7 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // #109-A4 — Les vues posturales annotées sont désormais injectées DANS la
   // sous-section Bilan Morphostatique (cf. buildBilanPrintSection ci-dessus),
   // juste après les silhouettes. Plus de bloc séparé entre bilanSection et annexes.
-  const bodyHTML = sectionsHTML + concluHTML + bilanSection + annexesHTML;
+  const bodyHTML = sectionsHTML + concluHTML + bilanSection + podoscopeHTML + annexesHTML;
   return { pratHTML, patientHTML, bodyHTML };
 }
 
@@ -19191,7 +19320,12 @@ function loadBilan() {
     }
     _renderAllPostureSlots('sp');
     _restoreSportMorphoPiedsFromBilanData();
+    // #203 — re-rendu de la galerie podoscope avec les dataURLs réhydratées.
+    renderPodoscopeGallery();
   });
+  // #203 — rendu immédiat (vignettes « chargement… » si Paths pas encore
+  // réhydratés) : l'utilisateur voit tout de suite l'état de la galerie.
+  renderPodoscopeGallery();
 }
 
 function toggleDictaphone() {
