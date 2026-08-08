@@ -1291,8 +1291,11 @@
           <button onclick="envoyerRapportMail()" class="btn" style="background:#b7740a;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">✉️ Envoyer par mail</button>
           <button id="ped-btn-print" onclick="printRapportPedicurie()" class="btn" style="background:#d97706;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
         </div>
-        <div id="pedicurie-rapport-body" style="padding:16px;font-size:13px;color:#333;">
-          <em style="color:var(--mut);">Aperçu du rapport disponible à l'ouverture de cet onglet.</em>
+        <!-- Fond BLANC : l'aperçu doit refléter le rendu PDF (le document
+             rapport suppose body blanc, ses textes sombres seraient illisibles
+             sur le fond nuit de l'app). -->
+        <div id="pedicurie-rapport-body" style="padding:16px;font-size:13px;color:#333;background:#fff;border-radius:0 0 10px 10px;">
+          <em style="color:#666;">Aperçu du rapport disponible à l'ouverture de cet onglet.</em>
         </div>
       </div>
     </div>
@@ -2982,8 +2985,9 @@
           <button onclick="envoyerRapportMail()" class="btn" style="background:#9f1239;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">✉️ Envoyer par mail</button>
           <button id="podo-btn-print" onclick="printRapportPodopediatrie()" class="btn" style="background:#e11d48;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
         </div>
-        <div id="podopediatrie-rapport-body" style="padding:16px;font-size:13px;color:#333;">
-          <em style="color:var(--mut);">Aperçu du rapport disponible à l'ouverture de cet onglet.</em>
+        <!-- Fond BLANC : aperçu fidèle au rendu PDF (miroir fix pédicurie). -->
+        <div id="podopediatrie-rapport-body" style="padding:16px;font-size:13px;color:#333;background:#fff;border-radius:0 0 10px 10px;">
+          <em style="color:#666;">Aperçu du rapport disponible à l'ouverture de cet onglet.</em>
         </div>
       </div>
     </div>
