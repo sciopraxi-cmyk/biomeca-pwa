@@ -3409,7 +3409,8 @@
            flux empreinte posturo). Capturer peut enchaîner plusieurs prises. -->
       <div id="sp-podoscope-video-wrap" style="display:none;margin-bottom:10px;">
         <video id="sp-podoscope-video" autoplay playsinline muted style="width:100%;max-width:480px;border-radius:8px;display:block;background:#000;"></video>
-        <div style="display:flex;gap:8px;margin-top:6px;">
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+          <select class="inp" id="sp-podoscope-cam-select" style="max-width:220px;" onchange="switchPodoscopeCamera()"></select>
           <button class="btn btn-green" onclick="capturePodoscopePhoto()">📷 Capturer</button>
           <button class="btn btn-red" onclick="stopPodoscopeCamera()">✕ Fermer</button>
         </div>
