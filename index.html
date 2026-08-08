@@ -1481,6 +1481,25 @@
         <div style="padding:16px;">
           <div class="podo-block-title">🦴 Morphostatique</div>
 
+          <!-- #203 — Galerie photos (podoscope/morphologie), moteur générique
+               multi-instances. Ids dérivés de la base podo-morpho. -->
+          <div class="field-lbl" style="margin-top:6px;">📷 Photos podoscope / morphologie plantaire</div>
+          <div id="podo-morpho-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+            <label class="btn" style="display:inline-block;cursor:pointer;">➕ Ajouter des photos
+              <input type="file" accept="image/*" multiple style="display:none;" onchange="addGalleryPhotos('podo-morpho', this)"/>
+            </label>
+            <button class="btn" onclick="startGalleryCamera('podo-morpho')">📸 Caméra</button>
+          </div>
+          <div id="podo-morpho-video-wrap" style="display:none;margin-bottom:10px;">
+            <video id="podo-morpho-video" autoplay playsinline muted style="width:100%;max-width:480px;border-radius:8px;display:block;background:#000;"></video>
+            <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+              <select class="inp" id="podo-morpho-cam-select" style="max-width:220px;" onchange="startGalleryCamera('podo-morpho')"></select>
+              <button class="btn btn-green" onclick="captureGalleryPhoto('podo-morpho')">📷 Capturer</button>
+              <button class="btn btn-red" onclick="stopGalleryCamera('podo-morpho')">✕ Fermer</button>
+            </div>
+          </div>
+
           <!-- #140 Phase 2b1 — 4 silhouettes dessinables (Face, Dos, Profil G, Profil D).
                ATTENTION : le libellé Face ↔ Dos ne correspond pas 1:1 aux clés de la
                morpho sport (où « face2 » = Face postérieure = Dos). Ici on mappe
