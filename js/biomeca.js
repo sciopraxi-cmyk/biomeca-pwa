@@ -18120,9 +18120,24 @@ async function _downscaleDataUrl(dataUrl, maxW, quality) {
     // Chrome 79+, FF 90+, Safari 15+ supportent `imageOrientation`. Sur les
     // versions plus anciennes, l'option est ignorée mais l'appel réussit
     // (l'orientation EXIF peut alors être perdue au redimensionnement).
-    if (typeof createImageBitmap === 'function' && typeof fetch === 'function') {
+    if (typeof createImageBitmap === 'function') {
       try {
-        var blob = await (await fetch(dataUrl)).blob();
+        // #203-CSP — fetch(dataUrl) est bloqué par connect-src (la CSP #74
+        // n'autorise pas data:) : l'essai échouait TOUJOURS avec une erreur
+        // console avant la bascule Image. Décodage local base64 → Blob à la
+        // place (dataUrlToBlob de storage.js, repli inline si pas chargé) —
+        // zéro réseau, zéro CSP, pipeline EXIF préservé.
+        var blob;
+        if (typeof dataUrlToBlob === 'function') {
+          blob = dataUrlToBlob(dataUrl);
+        } else {
+          var parts = dataUrl.split(',');
+          var mime = (parts[0].match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+          var bin = atob(parts[1]);
+          var arr = new Uint8Array(bin.length);
+          for (var bi = 0; bi < bin.length; bi++) arr[bi] = bin.charCodeAt(bi);
+          blob = new Blob([arr], { type: mime });
+        }
         drawable = await createImageBitmap(blob, { imageOrientation: 'from-image' });
         w = drawable.width;
         h = drawable.height;
