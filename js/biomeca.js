@@ -1217,6 +1217,44 @@ function _reconstructPatientBilansFromRows(rows) {
   return out;
 }
 
+// #102-A — Fusion ADDITIVE des archives cloud dans le blob patient.
+// ⚠️ Miroir de test : js/bilan-merge.mjs — répercuter toute modification.
+// Règles STRICTES (découpage #102 validé 08/08/2026, roadmap locale) :
+// 1. Archive au cloud, absente en local (id fiable) → AJOUT (copie profonde).
+// 2. Archive présente des deux côtés (même id) → AUCUNE modification locale.
+// 3. Archive locale absente du cloud → AUCUNE suppression.
+// 4. Entrée cloud sans id fiable → PAS d'ajout (doublon indétectable > manque
+//    visible). In_progress HORS périmètre : l'état de travail courant ne doit
+//    jamais être écrasé depuis le cloud.
+const _ARCHIVE_ID_READERS = {
+  bilansSport: (b) => (b && b._bilanId) || null,
+  bilansPosturo: (b) => (b && b.bilanDataPosturo && b.bilanDataPosturo._bilanId) || null,
+  bilansPodopediatrie: (b) =>
+    (b && b.bilanDataPodopediatrie && b.bilanDataPodopediatrie._bilanId) || null,
+  bilansPedicurie: (b) => (b && b.bilanDataPedicurie && b.bilanDataPedicurie._bilanId) || null,
+};
+
+function _mergeCloudArchivesIntoPatient(p, recon) {
+  const added = [];
+  if (!p || !recon) return added;
+  Object.keys(_ARCHIVE_ID_READERS).forEach((col) => {
+    const idOf = _ARCHIVE_ID_READERS[col];
+    const cloudArr = Array.isArray(recon[col]) ? recon[col] : [];
+    if (cloudArr.length === 0) return;
+    if (!Array.isArray(p[col])) p[col] = [];
+    const localArr = p[col];
+    const localIds = new Set(localArr.map(idOf).filter(Boolean));
+    cloudArr.forEach((b) => {
+      const id = idOf(b);
+      if (!id || localIds.has(id)) return; // règles 2 et 4
+      localArr.push(JSON.parse(JSON.stringify(b))); // règle 1 — copie profonde
+      localIds.add(id);
+      added.push(col + ':' + id);
+    });
+  });
+  return added;
+}
+
 // fetchPatientBilans(cloudId) — GET réseau (colonnes légères + payload) puis
 // reconstruction. best-effort : ne throw jamais, renvoie une reconstruction
 // vide en cas d'échec réseau (cohérent avec le reste de la sync #102).
@@ -5000,7 +5038,25 @@ function selectPatient(p) {
   // _reconstructPatientBilansFromRows. Fire-and-forget conservé pour la
   // resync elle-même (écriture seule, source de vérité inchangée).
   if (p._cloudId) {
-    _syncPatientToNormalizedTables(p);
+    // #102-A — séquence écrire PUIS lire : la resync opportuniste (upsert du
+    // blob local) part d'abord, la lecture cloud ne démarre qu'après, sinon
+    // on lirait un état antérieur à notre propre écriture. Fusion ADDITIVE
+    // (cf. _mergeCloudArchivesIntoPatient) : seuls des ajouts d'archives
+    // créées sur un autre appareil, jamais de modification ni de suppression.
+    // L'UI est déjà ouverte sur le blob local — zéro régression hors-ligne,
+    // les listes d'archives se rendent à la demande et liront le tableau
+    // enrichi au prochain affichage.
+    _syncPatientToNormalizedTables(p)
+      .then(() => fetchPatientBilans(p._cloudId))
+      .then((recon) => {
+        const added = _mergeCloudArchivesIntoPatient(p, recon);
+        if (added.length === 0) return;
+        console.info('[#102-A] Archives cloud fusionnées (autre appareil) :', added.join(' · '));
+        savePatients();
+      })
+      .catch((e) =>
+        console.warn('[#102-A] Fusion archives cloud échouée (sans impact local) :', e?.message)
+      );
   }
 }
 
