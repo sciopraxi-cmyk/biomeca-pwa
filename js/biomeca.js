@@ -5691,6 +5691,70 @@ function savePraticiens() {
   saveToSupabase();
 }
 
+// ===== #229-B — Logo praticien (upload + redimensionnement borné) =====
+// État transitoire du formulaire (chargé par editPraticien, consommé par
+// create/saveEdit). La dataURL est TOUJOURS issue de _resizePratLogo (max
+// 300 px, recompression JPEG si le PNG dépasse ~120 Ko) : taille bornée,
+// pas de risque de saturation localStorage (leçon #35).
+let _pratLogoDataUrl = '';
+
+function _setPratLogoPreview(url) {
+  const img = document.getElementById('pr-logo-preview');
+  const rm = document.getElementById('pr-logo-remove');
+  if (img) { img.src = url || ''; img.style.display = url ? '' : 'none'; }
+  if (rm) rm.style.display = url ? '' : 'none';
+}
+
+function removePraticienLogo() {
+  _pratLogoDataUrl = '';
+  _setPratLogoPreview('');
+  const input = document.getElementById('pr-logo-input');
+  if (input) input.value = '';
+}
+
+function loadPraticienLogo(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 300;
+      const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * ratio));
+      const h = Math.max(1, Math.round(img.height * ratio));
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      let url = cv.toDataURL('image/png');
+      if (url.length > 160000) {
+        // PNG trop lourd (photo, dégradés) → JPEG sur fond blanc.
+        const cv2 = document.createElement('canvas');
+        cv2.width = w; cv2.height = h;
+        const ctx2 = cv2.getContext('2d');
+        ctx2.fillStyle = '#fff'; ctx2.fillRect(0, 0, w, h);
+        ctx2.drawImage(cv, 0, 0);
+        url = cv2.toDataURL('image/jpeg', 0.85);
+      }
+      _pratLogoDataUrl = url;
+      _setPratLogoPreview(url);
+    };
+    img.onerror = () => alert("Image illisible — utilisez un PNG, JPEG ou WebP.");
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+// Bloc HTML du logo praticien pour les headers de rapport ('' si absent).
+// Cadre blanc arrondi aligné sur le lockup Verticy ; dataURL autonome, donc
+// compatible iframes srcdoc (rapports podo/pédicurie, #222).
+function _pratLogoBlockHTML(prat, height) {
+  if (!prat || !prat.logo) return '';
+  const hpx = height || 48;
+  return '<span style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:8px 12px;"><img src="' + prat.logo + '" alt="" style="height:' + hpx + 'px;display:block;max-width:180px;object-fit:contain;"/></span>';
+}
+
 function createPraticien() {
   const nom = document.getElementById('pr-nom').value.trim();
   if (!nom) { alert('Nom obligatoire.'); return; }
@@ -5701,9 +5765,11 @@ function createPraticien() {
     tel:document.getElementById('pr-tel').value,
     adresse:document.getElementById('pr-adresse').value,
     email:document.getElementById('pr-email').value,
+    logo:_pratLogoDataUrl, // #229-B
   };
   praticiens.push(pr); savePraticiens();
   ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id=>{document.getElementById(id).value='';});
+  removePraticienLogo(); // #229-B — reset du formulaire
   renderPratList(); populatePratSelect();
   alert(`✓ Praticien enregistré : ${pr.nom}`);
 }
@@ -7804,6 +7870,9 @@ function editPraticien(i) {
   document.getElementById('pr-tel').value = pr.tel || '';
   document.getElementById('pr-adresse').value = pr.adresse || '';
   document.getElementById('pr-email').value = pr.email || '';
+  // #229-B — charger le logo existant dans l'état + l'aperçu du formulaire.
+  _pratLogoDataUrl = pr.logo || '';
+  _setPratLogoPreview(_pratLogoDataUrl);
   // Changer le bouton en mode édition
   const btn = document.querySelector('#pg-praticiens button[onclick*="createPraticien"]');
   if(btn) {
@@ -7825,6 +7894,7 @@ function saveEditPraticien(i) {
   pr.tel = document.getElementById('pr-tel').value.trim();
   pr.adresse = document.getElementById('pr-adresse').value.trim();
   pr.email = document.getElementById('pr-email').value.trim();
+  pr.logo = _pratLogoDataUrl; // #229-B — '' si retiré via le bouton ✕
   savePatients();
   renderPratList();
   // Remettre le bouton en mode création
@@ -7833,6 +7903,7 @@ function saveEditPraticien(i) {
   ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
+  removePraticienLogo(); // #229-B — reset du formulaire
 }
 
 function populatePratSelect() {
@@ -13973,6 +14044,9 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = [], fichesFai
   // dans un cadre blanc arrondi. Style inline sur <img> pour surpasser
   // `.logo{height:50px}` local.
   bodyHtml += '<span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="'+logo+'" alt="Verticy" style="height:48px;display:block;"/><img src="'+wordmarkSrc+'" alt="Verticy" style="height:14px;display:block;"/></span>';
+  // #229-B — logo du cabinet au centre du header ('' si absent, le
+  // space-between du .header centre naturellement le 3e enfant).
+  bodyHtml += _pratLogoBlockHTML(prat);
   bodyHtml += '<div class="prat-info"><div class="prat-name">'+_escHtml(prat.nom||'')+' '+_escHtml(prat.prenom||'')+' — '+_escHtml(prat.titre||'')+'</div>';
   if(prat.cabinet) bodyHtml += '<div>'+_escHtml(prat.cabinet)+'</div>';
   if(prat.adresse) bodyHtml += '<div>'+_escHtml(prat.adresse)+'</div>';
@@ -14207,6 +14281,7 @@ async function buildRapport() {
               </div>
               <div style="font-size:20px;font-weight:700;color:#378ADD;letter-spacing:3px;">BILAN</div>
             </div>
+            ${_pratLogoBlockHTML(prat)}
             <div class="rp-prat">${pratHTML}</div>
           </div>
           <div class="rp-pt-info">${patientHTML}</div>
@@ -14858,6 +14933,12 @@ async function printReport() {
       // (source unique commune avec buildRapport, parité visuelle garantie).
       const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses, fichesFailed);
       document.getElementById('rp-prat-block').innerHTML = pratHTML;
+      // #229-B — logo du cabinet au centre du header print.
+      const rpLogo = document.getElementById('rp-prat-logo');
+      if (rpLogo) {
+        rpLogo.src = prat.logo || '';
+        rpLogo.style.display = prat.logo ? '' : 'none';
+      }
       document.getElementById('rp-pt-info-block').innerHTML = patientHTML;
       document.getElementById('rp-sections').innerHTML = bodyHTML.trim()
         ? bodyHTML
@@ -18750,7 +18831,7 @@ function buildPedicurieRapportHTML(){
     + '<div class="rp-page">'
     // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
     // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + pratInfo + '</div>'
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + _pratLogoBlockHTML(prat) + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Pédicurie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _pedEscapeHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + synth + '</div>'
@@ -19471,7 +19552,7 @@ async function buildPodopediatrieRapportHTML() {
     + '<div class="rp-page">'
     // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
     // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + pratInfo + '</div>'
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + _pratLogoBlockHTML(prat) + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + body + '</div>'
