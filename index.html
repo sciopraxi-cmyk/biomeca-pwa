@@ -554,6 +554,13 @@
       <div class="card sport-card-orange">
         <div class="sport-block-title c-orange">📋 Anamnèse</div>
 
+        <!-- #226-B — date de consultation (auto-remplie à la date du jour
+             par _fichePrefillApply, modifiable). -->
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Date de consultation</div>
+        <div style="margin-bottom:12px;">
+          <input type="date" class="inp pedicurie-field" data-field="ped_date_consult" style="max-width:220px;"/>
+        </div>
+
         <!-- Sous-section : Motif de consultation -->
         <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Motif de consultation</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 12px;margin-bottom:8px;">
@@ -679,6 +686,12 @@
         </div>
         <div>
           <input class="inp pedicurie-field" data-field="ped_ttt_autre_txt" placeholder="Autre — préciser..."/>
+        </div>
+        <!-- #226-B — allergies : donnée de sécurité avant tout soin
+             (latex, iode/antiseptiques, pansements...). -->
+        <div class="field-lbl" style="margin-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Allergies</div>
+        <div>
+          <input class="inp pedicurie-field" data-field="ped_allergies_txt" placeholder="Latex, iode, pansements, antiseptiques... (ou « aucune connue »)"/>
         </div>
       </div>
     </div>
@@ -1350,6 +1363,11 @@
         <div style="padding:16px;">
           <div class="podo-block-title">📋 Interrogatoire</div>
 
+          <!-- #226-B — date de consultation (auto-remplie à la date du jour
+               par _fichePrefillApply, modifiable). -->
+          <div class="podo-field-lbl">Date de consultation</div>
+          <input type="date" class="podopediatrie-field podo-inline-input" data-field="podo_date_consult" style="max-width:220px;"/>
+
           <!-- Motif de consultation -->
           <div class="podo-field-lbl">Motif de consultation</div>
           <div class="podo-check-grid">
@@ -1409,6 +1427,14 @@
             <label><input type="checkbox" class="podopediatrie-field" data-field="podo_atcd_prematurite"/> Prématurité</label>
           </div>
           <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_atcd_txt" placeholder="Précisions antécédents…" style="max-width:520px;"/>
+
+          <!-- #226-B — développement : âge d'acquisition de la marche (donnée
+               n°1 de l'interrogatoire pédiatrique) + terme de naissance. -->
+          <div class="podo-field-lbl">Développement</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_age_marche" placeholder="Âge de la marche (ex: 14 mois)" style="max-width:250px;"/>
+            <input type="text" class="podopediatrie-field podo-inline-input" data-field="podo_terme" placeholder="Terme de naissance (ex: 39 SA)" style="max-width:250px;"/>
+          </div>
 
           <!-- Examens déjà réalisés -->
           <div class="podo-block-title">🔬 Examens déjà réalisés</div>
@@ -3412,6 +3438,10 @@
       <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#2471a3;">Sport & mode de vie</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
         <div style="grid-column:1/-1;"><div class="field-lbl">Sport(s) pratiqué(s) — type, fréquence, intensité, niveau</div><textarea class="inp bilan-field" rows="2" data-field="sport_detail" placeholder="Ex: Trail 3×/sem, compétition régionale..."></textarea></div>
+        <!-- #226-B — objectif/échéance (structure le plan de traitement) et
+             chaussage sportif (donnée clé en course à pied). -->
+        <div><div class="field-lbl">Objectif sportif / échéance</div><input class="inp bilan-field" data-field="objectif_sportif" placeholder="Ex: marathon en octobre..."/></div>
+        <div><div class="field-lbl">Chaussage sportif</div><input class="inp bilan-field" data-field="chaussage_sportif" placeholder="Modèle, drop, km, usure..."/></div>
         <div><div class="field-lbl">Travail / Profession</div><input class="inp bilan-field" data-field="travail" placeholder="Profession..."/></div>
         <div><div class="field-lbl">Activité quotidienne</div><input class="inp bilan-field" data-field="activite_quot" placeholder="Sédentaire, actif..."/></div>
       </div>
