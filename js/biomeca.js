@@ -4214,6 +4214,8 @@ function nav(id) {
     // #140 Phase 1 — Post-load tweaks : reflète l'état conditionnel EVA + pré-remplit
     // podo_sport avec currentPatient.sport si absent. Timing 60 ms > load.
     setTimeout(_podoPostLoadTweaks, 60);
+    // #204 — injection 🎤 sur les champs libres (miroir pédicurie, idempotent).
+    if(typeof _injectPodopediatrieMicButtons === 'function') setTimeout(_injectPodopediatrieMicButtons, 50);
   }
   // Bandeau d'en-tête uniformisé sur les 3 bilans + landing pg-sport.
   // setTimeout pour laisser le markup du posturo (injecté dynamiquement) se
@@ -24950,6 +24952,38 @@ function _injectPedicurieMicButtons() {
     btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:50%;opacity:0.6;vertical-align:middle;';
     btn.onclick = (function(fieldId, b) {
       return function() { startDictation(fieldId, b); };
+    })(el.id, btn);
+    el.parentNode.insertBefore(btn, el.nextSibling);
+  });
+}
+
+// #204 — Miroir strict _injectPedicurieMicButtons pour la podopédiatrie.
+// Injection idempotente (garde _micInjected) d'un bouton 🎤 après chaque champ
+// libre : textarea + input texte. Exclusions : checkbox/date/range comme en
+// pédicurie, PLUS number (dicter « trois » dans un champ degrés produirait une
+// valeur invalide — TTE/AF/flèches sont des number). Les radios podo n'ont pas
+// la classe .podopediatrie-field, donc jamais matchés.
+function _injectPodopediatrieMicButtons() {
+  var fields = document.querySelectorAll(
+    '#pg-podopediatrie textarea.podopediatrie-field, ' +
+      '#pg-podopediatrie input.podopediatrie-field:not([type="checkbox"]):not([type="date"]):not([type="range"]):not([type="number"])'
+  );
+  fields.forEach(function (el) {
+    if (el._micInjected) return;
+    if (!el.id) {
+      var df = el.dataset.field;
+      if (!df) return;
+      el.id = 'pdpf-' + df;
+    }
+    el._micInjected = true;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = 'Dicter dans ce champ';
+    btn.innerHTML = '&#127908;';
+    btn.style.cssText =
+      'background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:50%;opacity:0.6;vertical-align:middle;';
+    btn.onclick = (function (fieldId, b) {
+      return function () { startDictation(fieldId, b); };
     })(el.id, btn);
     el.parentNode.insertBefore(btn, el.nextSibling);
   });
