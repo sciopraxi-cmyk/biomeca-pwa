@@ -26307,6 +26307,44 @@ function _runPatientsCSVImport(text) {
   alert(msg);
 }
 
+// ===== #229-A — EXPORT CSV DU RÉPERTOIRE PATIENTS =====
+// Miroir du format d'import (ordre Doctolib puis champs propres à Verticy),
+// séparateur ';', BOM UTF-8 (Excel), échappement RFC 4180. Le NIR n'existe
+// pas dans Verticy (cf. #223-A) donc n'apparaît pas. Sert aussi de
+// sauvegarde du répertoire (droit d'export RGPD, complément #135).
+function _csvEscape(v) {
+  const s = String(v == null ? '' : v);
+  return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function exportPatientsCSV() {
+  if (!Array.isArray(patients) || !patients.length) {
+    alert('Aucun patient à exporter.');
+    return;
+  }
+  const header = ['Civilité', 'Nom', 'Prénom', 'Date de naissance', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', "Type d'assurance", 'Profession', 'Nom du médecin traitant', 'Provenance', 'Antécédents', 'Examens réalisés', 'Sport', 'Latéralité', 'Poids (kg)', 'Taille (cm)'];
+  // Date de naissance au format JJ/MM/AAAA (symétrie avec l'import, Excel-friendly).
+  const frDate = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    return isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString('fr-FR');
+  };
+  const rows = patients.map((p) => [
+    p.civilite, p.nom, p.prenom, frDate(p.ddn), p.email, p.tel,
+    p.adresse, p.cp, p.ville, p.assurance, p.metier, p.medecinTraitant,
+    p.provenance, p.antecedents, p.examens, p.sport, p.lat, p.poids, p.taille,
+  ]);
+  const csv = '\uFEFF' + [header, ...rows].map((r) => r.map(_csvEscape).join(';')).join('\r\n') + '\r\n';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'verticy-patients-' + _todayISO() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
 function importPatientsCSV(input) {
   const file = input.files[0];
   if (!file) return;
