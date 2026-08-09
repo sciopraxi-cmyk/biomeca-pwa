@@ -15928,7 +15928,7 @@ function initMorphoCanvas(canvasId) {
   canvas.height = Math.round(r.height * window.devicePixelRatio);
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
   canvas._history = []; canvas._baseSnapshot = null; canvas._tempSnap = null;
   // Fix #89 — tag morpho pour la pile chronologique d'ordre. Pieds/posturo
@@ -16009,7 +16009,7 @@ function setupDrawCanvas(canvas, canvasId) {
   // Snapshot de base après le rendu initial (pour la gomme)
   setTimeout(() => {
     if(!canvas._baseSnapshot) {
-      canvas._baseSnapshot = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+      canvas._baseSnapshot = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0,0,canvas.width,canvas.height);
     }
   }, 200);
 
@@ -16039,12 +16039,12 @@ function setupDrawCanvas(canvas, canvasId) {
     const p = getPos(e);
     startX = p.x; startY = p.y;
     // Sauvegarder snapshot temp pour preview pendant le dessin
-    canvas._tempSnap = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+    canvas._tempSnap = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0,0,canvas.width,canvas.height);
   };
 
   canvas.onmousemove = e => {
     if(!drawing) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const p = getPos(e);
 
     if(drawTool === 'erase') {
@@ -16100,7 +16100,7 @@ function setupDrawCanvas(canvas, canvasId) {
   canvas.onmouseup = () => {
     if(drawing) {
       // Sauvegarder dans l'historique UNIQUEMENT à la fin du trait
-      const snapshot = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+      const snapshot = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0,0,canvas.width,canvas.height);
       canvas._history.push(snapshot);
       if(canvas._history.length > 30) canvas._history.shift();
       // Fix #89 — push additif chronologique morpho uniquement. _undoOrderStack
@@ -16327,7 +16327,7 @@ function undoMorpho() {
   const canvasId = _morphoUndoOrder.pop();
   const c = document.getElementById(canvasId);
   if(!c) return;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   if(c._history && c._history.length > 0) {
     c._history.pop();
     const prev = c._history.length > 0 ? c._history[c._history.length-1] : c._baseSnapshot;
@@ -16393,7 +16393,7 @@ function undoPodoMorpho() {
   const canvasId = _podoMorphoUndoOrder.pop();
   const c = document.getElementById(canvasId);
   if (!c) return;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   if (c._history && c._history.length > 0) {
     c._history.pop();
     const prev = c._history.length > 0 ? c._history[c._history.length - 1] : c._baseSnapshot;
@@ -16430,12 +16430,12 @@ function clearAllPodoMorpho() {
     // history + tempSnap, marque dirty pour invalidation au prochain save.
     // Ne PAS mettre _baseSnapshot à null — c'est lui qu'on restaure.
     if (c._baseSnapshot) {
-      c.getContext('2d').putImageData(c._baseSnapshot, 0, 0);
+      c.getContext('2d', { willReadFrequently: true }).putImageData(c._baseSnapshot, 0, 0);
     } else {
       // Cas rare : baseSnapshot pas encore capturé mais _history existe
       // (fenêtre transitoire). Fallback clearRect — équivalent visuel sur
       // canvas overlay transparent.
-      c.getContext('2d').clearRect(0, 0, c.width, c.height);
+      c.getContext('2d', { willReadFrequently: true }).clearRect(0, 0, c.width, c.height);
     }
     c._history = [];
     c._tempSnap = null;
@@ -16497,7 +16497,7 @@ function initPodoPiedsCanvas(savedData, onReady) {
     if (canvas._userDirty) { if (typeof onReady === 'function') onReady(); return; }
     // Cas 3 : re-restore depuis dataURL fraîchement prefetch. Redraw sans
     // reset du backing ni du baseSnapshot (déjà propres depuis init).
-    const ctx3 = canvas.getContext('2d');
+    const ctx3 = canvas.getContext('2d', { willReadFrequently: true });
     ctx3.clearRect(0, 0, canvas.width, canvas.height);
     const saved3 = new Image();
     saved3.onload = () => {
@@ -16514,7 +16514,7 @@ function initPodoPiedsCanvas(savedData, onReady) {
   canvas.width  = PIEDS_REF_W;
   canvas.height = PIEDS_REF_H;
   canvas._backingScaled = true;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   canvas._history = []; canvas._baseSnapshot = null; canvas._tempSnap = null;
   setupDrawCanvas(canvas, 'podo-pieds-canvas');
@@ -16550,7 +16550,7 @@ function undoPodoPieds() {
   const canvasId = _podoPiedsUndoOrder.pop();
   const c = document.getElementById(canvasId);
   if (!c) return;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   if (c._history && c._history.length > 0) {
     c._history.pop();
     const prev = c._history.length > 0 ? c._history[c._history.length - 1] : c._baseSnapshot;
@@ -16573,12 +16573,12 @@ function clearPodoPieds() {
   // capturé sur canvas transparent (le template est dans #podo-pieds-img côté
   // DOM, jamais gravé dans le canvas). Le restaurer redonne canvas vide.
   if (c._baseSnapshot) {
-    c.getContext('2d').putImageData(c._baseSnapshot, 0, 0);
+    c.getContext('2d', { willReadFrequently: true }).putImageData(c._baseSnapshot, 0, 0);
   } else {
     // Cas rare : baseSnapshot pas encore capturé (clear déclenché avant init
     // finalisée). Fallback clearRect — équivalent visuel sur canvas overlay
     // transparent.
-    c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    c.getContext('2d', { willReadFrequently: true }).clearRect(0, 0, c.width, c.height);
   }
   c._history = [];
   c._tempSnap = null;
@@ -16628,7 +16628,7 @@ function undoPieds() {
   // sémantique (pop+put = no-op) que undoMorpho.
   const c = document.getElementById('pieds-canvas');
   if(!c) return;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   if(c._history && c._history.length > 0) {
     c._history.pop();
     const prev = c._history.length > 0 ? c._history[c._history.length-1] : c._baseSnapshot;
@@ -16670,7 +16670,7 @@ function drawPiedsTemplate(savedData, onReady) {
   canvas.width  = PIEDS_REF_W;
   canvas.height = PIEDS_REF_H;
   canvas._backingScaled = true;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   canvas._history = []; canvas._baseSnapshot = null; canvas._tempSnap = null;
   setupDrawCanvas(canvas, 'pieds-canvas');
@@ -19433,7 +19433,7 @@ function _serializeDrawCanvas(canvas) {
 function _stripBackgroundFromRestore(canvas) {
   if(!canvas || !canvas._baseSnapshot) return;
   const W = canvas.width, H = canvas.height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const current = ctx.getImageData(0, 0, W, H);
   _subtractBaseSnapshot(current, canvas._baseSnapshot);
   ctx.putImageData(current, 0, 0);
@@ -24213,7 +24213,7 @@ function setPosturoDrawColor(col) { posturoDrawColor = col; }
 
 function clearPosturoCanvas(id) {
   const c = document.getElementById(id);
-  if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+  if(c) c.getContext('2d', { willReadFrequently: true }).clearRect(0,0,c.width,c.height);
 }
 
 // Historique undo pour bilan posturo
@@ -24223,7 +24223,7 @@ let _posturoFeetHistory = [];
 function undoPosturoBody() {
   const canvas = document.getElementById('posturo-body-canvas');
   if(!canvas) return;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if(canvas._history && canvas._history.length > 0) {
     canvas._history.pop();
     const prev = canvas._history.length > 0
@@ -24246,7 +24246,7 @@ function undoPosturoBody() {
 function undoPosturoFeet() {
   const canvas = document.getElementById('posturo-feet-canvas');
   if(!canvas) return;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const prev = canvas._history && canvas._history.length > 0
     ? (canvas._history.pop(), canvas._history.length > 0 ? canvas._history[canvas._history.length-1] : canvas._baseSnapshot)
     : canvas._baseSnapshot;
@@ -24265,7 +24265,7 @@ function initPosturoBodyCanvas() {
   canvas.height = Math.round(r.height * dpr);
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
   canvas._history = [];
   canvas._baseSnapshot = null;
@@ -24319,7 +24319,7 @@ function initPosturoFeetCanvas() {
   canvas.height = Math.round(r.height * dpr);
   canvas.style.width = r.width + 'px';
   canvas.style.height = r.height + 'px';
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.scale(dpr, dpr);
   canvas._history = [];
   canvas._baseSnapshot = null;
