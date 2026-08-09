@@ -912,6 +912,17 @@ async function _syncPatientToNormalizedTables(p) {
       taille: p.taille != null && p.taille !== '' ? p.taille : null,
       email: p.email || null,
       tel: p.tel || null,
+      // #223-A — fiche étendue (migration supabase/migrations/
+      // patients-fiche-etendue.sql, à exécuter AVANT le déploiement de ce
+      // code : PostgREST rejette toute colonne inconnue et l'échec couperait
+      // aussi la sync des bilans via le return early ci-dessous).
+      civilite: p.civilite || null,
+      adresse: p.adresse || null,
+      cp: p.cp || null,
+      ville: p.ville || null,
+      medecin_traitant: p.medecinTraitant || null,
+      assurance: p.assurance || null,
+      provenance: p.provenance || null,
       current_bilan_sport_sous_type: p.currentBilanSportSousType || null,
       current_bilan_posturo_sous_type: p.currentBilanPosturoSousType || null,
       current_bilan_podopediatrie_sous_type: p.currentBilanPodopediatrieSousType || null,
@@ -4955,6 +4966,18 @@ function editPatient(idx) {
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${_escHtml(p.metier||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${_escHtml(p.email||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${_escHtml(p.tel||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Civilité</div>
+          <select class="inp" id="ep-civilite">
+            <option value="" ${!p.civilite?'selected':''}></option>
+            <option ${p.civilite==='M.'?'selected':''}>M.</option>
+            <option ${p.civilite==='Mme'?'selected':''}>Mme</option>
+          </select></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Médecin traitant</div><input class="inp" id="ep-medtraitant" value="${_escHtml(p.medecinTraitant||'')}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Adresse</div><input class="inp" id="ep-adresse" value="${_escHtml(p.adresse||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Code postal</div><input class="inp" id="ep-cp" value="${_escHtml(p.cp||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Ville</div><input class="inp" id="ep-ville" value="${_escHtml(p.ville||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Type d'assurance</div><input class="inp" id="ep-assurance" value="${_escHtml(p.assurance||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Provenance</div><input class="inp" id="ep-provenance" value="${_escHtml(p.provenance||'')}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${_escHtml(p.motif||'')}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
           <select class="inp" id="ep-prat">
@@ -4985,6 +5008,14 @@ function saveEditPatient(idx) {
   p.lat = document.getElementById('ep-lat').value;
   p.email = document.getElementById('ep-email')?.value||'';
   p.tel = document.getElementById('ep-tel')?.value||'';
+  // #223-A — coordonnées et contexte administratif (facultatifs, pas de NIR).
+  p.civilite = document.getElementById('ep-civilite')?.value||'';
+  p.medecinTraitant = document.getElementById('ep-medtraitant')?.value.trim()||'';
+  p.adresse = document.getElementById('ep-adresse')?.value.trim()||'';
+  p.cp = document.getElementById('ep-cp')?.value.trim()||'';
+  p.ville = document.getElementById('ep-ville')?.value.trim()||'';
+  p.assurance = document.getElementById('ep-assurance')?.value.trim()||'';
+  p.provenance = document.getElementById('ep-provenance')?.value.trim()||'';
   p.pratId = document.getElementById('ep-prat').value;
   savePatients();
   document.getElementById('edit-patient-modal')?.remove();
@@ -5014,6 +5045,15 @@ function openNewPatientModal() {
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Poids (kg)</div><input class="inp" id="np-poids" type="number" placeholder="70"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Taille (cm)</div><input class="inp" id="np-taille" type="number" placeholder="175"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Métier / Profession</div><input class="inp" id="np-metier" placeholder="Kiné, coureur amateur..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Civilité</div><select class="inp" id="np-civilite"><option value=""></option><option>M.</option><option>Mme</option></select></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Email</div><input class="inp" id="np-email" type="email" placeholder="patient@mail.fr"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Téléphone</div><input class="inp" id="np-tel" type="tel" placeholder="06..."/></div>
+          <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Adresse</div><input class="inp" id="np-adresse" placeholder="12 rue..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Code postal</div><input class="inp" id="np-cp" placeholder="33000"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Ville</div><input class="inp" id="np-ville" placeholder="Bordeaux"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin traitant</div><input class="inp" id="np-medtraitant" placeholder="Dr ..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Type d'assurance</div><input class="inp" id="np-assurance" placeholder="Sécurité sociale, mutuelle..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Provenance</div><input class="inp" id="np-provenance" placeholder="Doctolib, bouche à oreille..."/></div>
           <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien</div><select class="inp" id="np-prat"><option value="">— Choisir —</option></select></div>
         </div>
         <div style="margin-top:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Motif / antécédents</div><textarea class="inp" id="np-motif" rows="2" placeholder="Douleur genou, entorses..."></textarea></div>
@@ -5055,11 +5095,25 @@ function createPatient() {
     poids:document.getElementById('np-poids').value,
     taille:document.getElementById('np-taille').value,
     pratId, motif:document.getElementById('np-motif').value,
+    // #223-A — coordonnées et contexte administratif (facultatifs). Le NIR
+    // est volontairement ABSENT de la fiche : aucun besoin fonctionnel côté
+    // Verticy (pas de FSE) et donnée trop sensible hors hébergement HDS.
+    civilite:document.getElementById('np-civilite')?.value||'',
+    email:document.getElementById('np-email')?.value.trim()||'',
+    tel:document.getElementById('np-tel')?.value.trim()||'',
+    adresse:document.getElementById('np-adresse')?.value.trim()||'',
+    cp:document.getElementById('np-cp')?.value.trim()||'',
+    ville:document.getElementById('np-ville')?.value.trim()||'',
+    medecinTraitant:document.getElementById('np-medtraitant')?.value.trim()||'',
+    assurance:document.getElementById('np-assurance')?.value.trim()||'',
+    provenance:document.getElementById('np-provenance')?.value.trim()||'',
     date:new Date().toLocaleDateString('fr-FR'), mesures:{}
   };
   patients.push(p); savePatients();
   selectPatient(p);
-  ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille','np-motif'].forEach(id=>{document.getElementById(id).value='';});
+  ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille','np-motif',
+   'np-civilite','np-email','np-tel','np-adresse','np-cp','np-ville',
+   'np-medtraitant','np-assurance','np-provenance'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   closeNewPatientModal();
   nav('pg-patients');
 }
