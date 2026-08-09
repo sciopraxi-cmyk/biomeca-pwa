@@ -4951,9 +4951,28 @@ function editPatient(idx) {
     <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
       <div style="font-weight:700;font-size:16px;color:#2a7a4e;margin-bottom:16px;">✏️ Modifier le patient</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <!-- #223-C — ordre calé sur l'export Doctolib, champs propres à
+             Verticy à la fin. Le motif a été retiré : il vit dans chaque
+             bilan (p.motif existant conservé, plus éditable ici). -->
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Civilité</div>
+          <select class="inp" id="ep-civilite">
+            <option value="" ${!p.civilite?'selected':''}></option>
+            <option ${p.civilite==='M.'?'selected':''}>M.</option>
+            <option ${p.civilite==='Mme'?'selected':''}>Mme</option>
+          </select></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Nom *</div><input class="inp" id="ep-nom" value="${_escHtml(p.nom||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Prénom *</div><input class="inp" id="ep-prenom" value="${_escHtml(p.prenom||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Date de naissance</div><input class="inp" type="date" id="ep-ddn" value="${_escHtml(p.ddn||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${_escHtml(p.email||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${_escHtml(p.tel||'')}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Adresse</div><input class="inp" id="ep-adresse" value="${_escHtml(p.adresse||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Code postal</div><input class="inp" id="ep-cp" value="${_escHtml(p.cp||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Ville</div><input class="inp" id="ep-ville" value="${_escHtml(p.ville||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Type d'assurance</div><input class="inp" id="ep-assurance" value="${_escHtml(p.assurance||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${_escHtml(p.metier||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Médecin traitant</div><input class="inp" id="ep-medtraitant" value="${_escHtml(p.medecinTraitant||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Provenance</div><input class="inp" id="ep-provenance" value="${_escHtml(p.provenance||'')}"/></div>
+        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${_escHtml(p.sport||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Latéralité</div>
           <select class="inp" id="ep-lat">
             <option ${(p.lat||'Droitier')==='Droitier'?'selected':''}>Droitier</option>
@@ -4962,23 +4981,6 @@ function editPatient(idx) {
           </select></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Poids (kg)</div><input class="inp" id="ep-poids" value="${_escHtml(p.poids||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Taille (cm)</div><input class="inp" id="ep-taille" value="${_escHtml(p.taille||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${_escHtml(p.sport||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${_escHtml(p.metier||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${_escHtml(p.email||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${_escHtml(p.tel||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Civilité</div>
-          <select class="inp" id="ep-civilite">
-            <option value="" ${!p.civilite?'selected':''}></option>
-            <option ${p.civilite==='M.'?'selected':''}>M.</option>
-            <option ${p.civilite==='Mme'?'selected':''}>Mme</option>
-          </select></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Médecin traitant</div><input class="inp" id="ep-medtraitant" value="${_escHtml(p.medecinTraitant||'')}"/></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Adresse</div><input class="inp" id="ep-adresse" value="${_escHtml(p.adresse||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Code postal</div><input class="inp" id="ep-cp" value="${_escHtml(p.cp||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Ville</div><input class="inp" id="ep-ville" value="${_escHtml(p.ville||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Type d'assurance</div><input class="inp" id="ep-assurance" value="${_escHtml(p.assurance||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Provenance</div><input class="inp" id="ep-provenance" value="${_escHtml(p.provenance||'')}"/></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Motif</div><input class="inp" id="ep-motif" value="${_escHtml(p.motif||'')}"/></div>
         <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
           <select class="inp" id="ep-prat">
             ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${_escHtml(pr.nom||'')} ${_escHtml(pr.prenom||'')} — ${_escHtml(pr.titre||'')}</option>`).join('')}
@@ -5003,7 +5005,8 @@ function saveEditPatient(idx) {
   p.sport = document.getElementById('ep-sport').value;
   p.poids = document.getElementById('ep-poids').value;
   p.taille = document.getElementById('ep-taille').value;
-  p.motif = document.getElementById('ep-motif').value;
+  // #223-C — motif retiré de la fiche (il vit dans chaque bilan) ; p.motif
+  // existant conservé tel quel, simplement plus éditable ici.
   p.metier = document.getElementById('ep-metier').value;
   p.lat = document.getElementById('ep-lat').value;
   p.email = document.getElementById('ep-email')?.value||'';
@@ -5037,26 +5040,28 @@ function openNewPatientModal() {
           <button onclick="closeNewPatientModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">✕</button>
         </div>
         <div class="g2">
+          <!-- #223-C — ordre calé sur l'export Doctolib (identité, contact,
+               adresse, contexte administratif), champs propres à Verticy à
+               la fin. Le motif a été retiré : il vit dans chaque bilan. -->
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Civilité</div><select class="inp" id="np-civilite"><option value=""></option><option>M.</option><option>Mme</option></select></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom *</div><input class="inp" id="np-nom" placeholder="Nom"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prénom *</div><input class="inp" id="np-prenom" placeholder="Prénom"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance</div><input class="inp" id="np-ddn" type="date"/></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Sport et/ou activité</div><input class="inp" id="np-sport" placeholder="Trail, running..."/></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Latéralité</div><select class="inp" id="np-lat"><option>Droitier</option><option>Gaucher</option></select></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Poids (kg)</div><input class="inp" id="np-poids" type="number" placeholder="70"/></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Taille (cm)</div><input class="inp" id="np-taille" type="number" placeholder="175"/></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Métier / Profession</div><input class="inp" id="np-metier" placeholder="Kiné, coureur amateur..."/></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Civilité</div><select class="inp" id="np-civilite"><option value=""></option><option>M.</option><option>Mme</option></select></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Email</div><input class="inp" id="np-email" type="email" placeholder="patient@mail.fr"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Téléphone</div><input class="inp" id="np-tel" type="tel" placeholder="06..."/></div>
           <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Adresse</div><input class="inp" id="np-adresse" placeholder="12 rue..."/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Code postal</div><input class="inp" id="np-cp" placeholder="33000"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Ville</div><input class="inp" id="np-ville" placeholder="Bordeaux"/></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin traitant</div><input class="inp" id="np-medtraitant" placeholder="Dr ..."/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Type d'assurance</div><input class="inp" id="np-assurance" placeholder="Sécurité sociale, mutuelle..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Métier / Profession</div><input class="inp" id="np-metier" placeholder="Kiné, coureur amateur..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin traitant</div><input class="inp" id="np-medtraitant" placeholder="Dr ..."/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Provenance</div><input class="inp" id="np-provenance" placeholder="Doctolib, bouche à oreille..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Sport et/ou activité</div><input class="inp" id="np-sport" placeholder="Trail, running..."/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Latéralité</div><select class="inp" id="np-lat"><option>Droitier</option><option>Gaucher</option></select></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Poids (kg)</div><input class="inp" id="np-poids" type="number" placeholder="70"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Taille (cm)</div><input class="inp" id="np-taille" type="number" placeholder="175"/></div>
           <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien</div><select class="inp" id="np-prat"><option value="">— Choisir —</option></select></div>
         </div>
-        <div style="margin-top:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Motif / antécédents</div><textarea class="inp" id="np-motif" rows="2" placeholder="Douleur genou, entorses..."></textarea></div>
         <div id="np-err" style="display:none;color:var(--red);font-size:11px;margin-top:5px;padding:5px 8px;background:var(--red-d);border-radius:var(--rs);"></div>
         <button class="btn btn-blue btn-full" style="margin-top:12px;" onclick="createPatient()">✓ Créer le dossier</button>
       </div>`;
@@ -5094,7 +5099,9 @@ function createPatient() {
     lat:document.getElementById('np-lat').value,
     poids:document.getElementById('np-poids').value,
     taille:document.getElementById('np-taille').value,
-    pratId, motif:document.getElementById('np-motif').value,
+    pratId,
+    // #223-C — le motif n'est plus saisi sur la fiche (il vit dans chaque
+    // bilan) ; les fiches existantes conservent leur p.motif tel quel.
     // #223-A — coordonnées et contexte administratif (facultatifs). Le NIR
     // est volontairement ABSENT de la fiche : aucun besoin fonctionnel côté
     // Verticy (pas de FSE) et donnée trop sensible hors hébergement HDS.
@@ -5111,7 +5118,7 @@ function createPatient() {
   };
   patients.push(p); savePatients();
   selectPatient(p);
-  ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille','np-motif',
+  ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille',
    'np-civilite','np-email','np-tel','np-adresse','np-cp','np-ville',
    'np-medtraitant','np-assurance','np-provenance'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   closeNewPatientModal();
@@ -14730,7 +14737,7 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
     <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${_escHtml(p.lat||'—')}</div>
     <div class="rp-pt-item"><strong>Sport</strong>${_escHtml(p.sport||'—')}</div>
     <div class="rp-pt-item"><strong>Poids · Taille</strong>${_escHtml(p.poids||'—')} kg · ${_escHtml(p.taille||'—')} cm</div>
-    <div class="rp-pt-item"><strong>Motif</strong>${_escHtml(p.motif||'—')}</div>
+    ${p.motif ? `<div class="rp-pt-item"><strong>Motif</strong>${_escHtml(p.motif)}</div>` : ''}
     <div class="rp-pt-item"><strong>Date</strong>${p.date}</div>`;
 
   // 3. Corps : sectionsHTML (tests bioméca) + concluHTML + bilanSection
@@ -26013,7 +26020,8 @@ function _importMapHeaders(rawHeaders) {
     assurance: find((h) => h.includes('assurance')),
     provenance: find((h) => h.includes('provenance')),
     metier: find((h) => h.includes('profession') || h === 'metier'),
-    motif: find((h) => h === 'motif' || h.startsWith('motif ')),
+    // #223-C — pas de mapping 'motif' : le motif vit dans chaque bilan,
+    // plus sur la fiche patient.
   };
   // Repli nom : premier en-tête commençant par 'nom' qui n'est ni le médecin
   // traitant, ni le nom de naissance, ni un 'nom prénom' agrégé ambigu.
@@ -26051,7 +26059,8 @@ function _importMatchDecision(candidates, rowDdn) {
 }
 
 // Champs texte importables → clés de la fiche patient (#223-A incluse).
-const _IMPORT_FIELDS = ['civilite', 'email', 'tel', 'adresse', 'cp', 'ville', 'medecinTraitant', 'assurance', 'provenance', 'metier', 'motif'];
+// #223-C — 'motif' retiré (il vit dans chaque bilan).
+const _IMPORT_FIELDS = ['civilite', 'email', 'tel', 'adresse', 'cp', 'ville', 'medecinTraitant', 'assurance', 'provenance', 'metier'];
 
 // Cœur de l'import, séparé du FileReader pour rester lisible.
 function _runPatientsCSVImport(text) {
