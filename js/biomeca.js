@@ -23914,11 +23914,28 @@ function renderCompare() {
   //   Multiples « : » → la 1ʳᵉ seule sépare (le reste fait partie de la valeur).
   // - posturo : paire [label, value] déjà séparée (format natif préservé par
   //   _extractPosturoSections, cf. #194) → aucun parsing à faire.
-  const parseItem = (it) => {
+  // #117-fix parse HTML — les items podo/pédicurie sont du HTML (kv() avec
+  // <strong>, alertes en <span style="color:#b91c1c;…">) : le split sur le
+  // 1er « : » tombait DANS l'attribut style (« color:#b91c1c ») → labels
+  // identiques tronqués pour toutes les alertes → la 1ʳᵉ répétée N fois
+  // (capture Scio). Dépouille du HTML vers texte AVANT parsing ; no-op sur
+  // les items déjà texte (sport) et les paires (posturo).
+  const stripHtml = (s) => {
+    if (s.indexOf('<') === -1) return s;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = s;
+    return (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+  };
+  const parseItem = (it, noSplit) => {
     if (Array.isArray(it)) {
       return { label: String(it[0]).trim(), value: it[1] == null ? '' : String(it[1]).trim() };
     }
-    const s = String(it);
+    const s = stripHtml(String(it));
+    // noSplit (sections ⚠️) : l'item entier est une ALERTE, présente ou non
+    // dans chaque bilan — pas une paire clé-valeur. Sans ça, « Suspicion :
+    // Pathologie X » et « Suspicion : Pathologie Y » partageraient le label
+    // « Suspicion » et s'écraseraient mutuellement.
+    if (noSplit) return { label: s.trim(), value: '' };
     const idx = s.indexOf(':');
     if (idx < 0) return { label: s.trim(), value: '' };
     return { label: s.slice(0, idx).trim(), value: s.slice(idx + 1).trim() };
@@ -23943,10 +23960,15 @@ function renderCompare() {
   html += '</tr></thead><tbody>';
   allTitles.forEach(titre => {
     html += '<tr><td colspan="3" style="padding:10px 10px 6px;font-weight:700;color:#2a7a4e;background:rgba(45,212,191,0.06);border-top:1px solid rgba(255,255,255,0.08);">' + titre + '</td></tr>';
-    const parsedA = (byTitleA[titre] || []).map(parseItem);
-    const parsedB = (byTitleB[titre] || []).map(parseItem);
+    // Sections « ⚠️ … » : items = alertes complètes (noSplit), comparées en
+    // présence/absence (✓ / —) plutôt qu'en clé-valeur.
+    const noSplit = titre.indexOf('⚠') !== -1;
+    const parsedA = (byTitleA[titre] || []).map((it) => parseItem(it, noSplit));
+    const parsedB = (byTitleB[titre] || []).map((it) => parseItem(it, noSplit));
+    // Dédoublonnage des labels de A AUSSI (deux items au même label après
+    // parsing produiraient des lignes dupliquées du premier match).
     const labels = [];
-    parsedA.forEach(p => labels.push(p.label));
+    parsedA.forEach(p => { if (!labels.includes(p.label)) labels.push(p.label); });
     parsedB.forEach(p => { if (!labels.includes(p.label)) labels.push(p.label); });
     labels.forEach(label => {
       const aEntry = parsedA.find(p => p.label === label);
