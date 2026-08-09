@@ -923,6 +923,10 @@ async function _syncPatientToNormalizedTables(p) {
       medecin_traitant: p.medecinTraitant || null,
       assurance: p.assurance || null,
       provenance: p.provenance || null,
+      // #226-A — données stables (migration patients-antecedents-examens.sql,
+      // à exécuter AVANT le déploiement — même contrainte PostgREST que #223-A).
+      antecedents: p.antecedents || null,
+      examens: p.examens || null,
       current_bilan_sport_sous_type: p.currentBilanSportSousType || null,
       current_bilan_posturo_sous_type: p.currentBilanPosturoSousType || null,
       current_bilan_podopediatrie_sous_type: p.currentBilanPodopediatrieSousType || null,
@@ -4259,6 +4263,8 @@ function nav(id) {
     setTimeout(loadPedicurieBilan, 50);
     if(typeof _injectPedicurieMicButtons === 'function') setTimeout(_injectPedicurieMicButtons, 50);
     setTimeout(() => showPedicurieSection(0), 50);
+    // #226-A — pré-remplissage fiche → anamnèse (après restauration).
+    setTimeout(() => _fichePrefillApply('pedicurie'), 70);
   }
   if(id === 'pg-podopediatrie') {
     // #140 Phase 0 — Restauration depuis bilanDataPodopediatrie + masquage
@@ -4269,6 +4275,8 @@ function nav(id) {
     // #140 Phase 1 — Post-load tweaks : reflète l'état conditionnel EVA + pré-remplit
     // podo_sport avec currentPatient.sport si absent. Timing 60 ms > load.
     setTimeout(_podoPostLoadTweaks, 60);
+    // #226-A — pré-remplissage fiche → anamnèse (après tweaks, 70 > 60).
+    setTimeout(() => _fichePrefillApply('podopediatrie'), 70);
     // #204 — injection 🎤 sur les champs libres (miroir pédicurie, idempotent).
     if(typeof _injectPodopediatrieMicButtons === 'function') setTimeout(_injectPodopediatrieMicButtons, 50);
   }
@@ -4290,6 +4298,8 @@ function nav(id) {
     }
     showPosturoSection(0);
     setTimeout(loadPosturoBilan, 50);
+    // #226-A — pré-remplissage fiche → anamnèse (après restauration, 80 > 50).
+    setTimeout(() => _fichePrefillApply('posturo'), 80);
   }
   if(id === 'pg-bilan') {
     setTimeout(() => {
@@ -4302,6 +4312,8 @@ function nav(id) {
         // 3. Initialiser canvas pieds APRÈS loadBilan (bilanData disponible)
         const pc = document.getElementById('pieds-canvas');
         if(pc) { drawPiedsTemplate(currentPatient?.bilanData?._pieds); }
+        // #226-A — pré-remplissage fiche → anamnèse (après loadBilan).
+        _fichePrefillApply('sport');
       }, 200);
       // Injection micros de dictée par champ texte (Q-mic-1 b, #73 A1)
       if(typeof _injectSportMicButtons === 'function') setTimeout(_injectSportMicButtons, 250);
@@ -4972,6 +4984,8 @@ function editPatient(idx) {
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${_escHtml(p.metier||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Médecin traitant</div><input class="inp" id="ep-medtraitant" value="${_escHtml(p.medecinTraitant||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Provenance</div><input class="inp" id="ep-provenance" value="${_escHtml(p.provenance||'')}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Antécédents (traumatiques, médicaux, familiaux)</div><textarea class="inp" id="ep-antecedents" rows="2">${_escHtml(p.antecedents||'')}</textarea></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Examens réalisés</div><textarea class="inp" id="ep-examens" rows="2">${_escHtml(p.examens||'')}</textarea></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${_escHtml(p.sport||'')}"/></div>
         <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Latéralité</div>
           <select class="inp" id="ep-lat">
@@ -5019,6 +5033,8 @@ function saveEditPatient(idx) {
   p.ville = document.getElementById('ep-ville')?.value.trim()||'';
   p.assurance = document.getElementById('ep-assurance')?.value.trim()||'';
   p.provenance = document.getElementById('ep-provenance')?.value.trim()||'';
+  p.antecedents = document.getElementById('ep-antecedents')?.value.trim()||'';
+  p.examens = document.getElementById('ep-examens')?.value.trim()||'';
   p.pratId = document.getElementById('ep-prat').value;
   savePatients();
   document.getElementById('edit-patient-modal')?.remove();
@@ -5056,6 +5072,10 @@ function openNewPatientModal() {
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Métier / Profession</div><input class="inp" id="np-metier" placeholder="Kiné, coureur amateur..."/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin traitant</div><input class="inp" id="np-medtraitant" placeholder="Dr ..."/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Provenance</div><input class="inp" id="np-provenance" placeholder="Doctolib, bouche à oreille..."/></div>
+          <!-- #226-A — données stables du patient, redescendues dans les
+               anamnèses des bilans et complétables depuis un bilan en cours. -->
+          <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Antécédents (traumatiques, médicaux, familiaux)</div><textarea class="inp" id="np-antecedents" rows="2" placeholder="Fractures, entorses, chirurgies..."></textarea></div>
+          <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Examens réalisés</div><textarea class="inp" id="np-examens" rows="2" placeholder="Radio, IRM, scanner, bilan sanguin..."></textarea></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Sport et/ou activité</div><input class="inp" id="np-sport" placeholder="Trail, running..."/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Latéralité</div><select class="inp" id="np-lat"><option>Droitier</option><option>Gaucher</option></select></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Poids (kg)</div><input class="inp" id="np-poids" type="number" placeholder="70"/></div>
@@ -5114,13 +5134,15 @@ function createPatient() {
     medecinTraitant:document.getElementById('np-medtraitant')?.value.trim()||'',
     assurance:document.getElementById('np-assurance')?.value.trim()||'',
     provenance:document.getElementById('np-provenance')?.value.trim()||'',
+    antecedents:document.getElementById('np-antecedents')?.value.trim()||'',
+    examens:document.getElementById('np-examens')?.value.trim()||'',
     date:new Date().toLocaleDateString('fr-FR'), mesures:{}
   };
   patients.push(p); savePatients();
   selectPatient(p);
   ['np-nom','np-prenom','np-ddn','np-sport','np-poids','np-taille',
    'np-civilite','np-email','np-tel','np-adresse','np-cp','np-ville',
-   'np-medtraitant','np-assurance','np-provenance'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+   'np-medtraitant','np-assurance','np-provenance','np-antecedents','np-examens'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   closeNewPatientModal();
   nav('pg-patients');
 }
@@ -17141,6 +17163,92 @@ function _podoPrefillSportDefault() {
   if (!patientSport) return;
   const input = document.querySelector('#pg-podopediatrie [data-field="podo_sport"]');
   if (input) input.value = patientSport;
+}
+
+// ===== #226-A — Pré-remplissage fiche → anamnèses + remontée contrôlée =====
+// Descend les données stables de la fiche patient (profession, sport, médecin
+// traitant, antécédents, examens) dans les champs texte des anamnèses,
+// UNIQUEMENT si le champ n'a jamais été saisi pour ce bilan (clé undefined —
+// généralisation du pattern _podoPrefillSportDefault : une saisie effacée
+// volontairement est respectée, pas de re-remplissage à chaque nav).
+// Remontée : antécédents/examens saisis dans un bilan EN COURS (critère
+// canonique currentBilan<Module>SousType posé, cf. garde sync #172) mettent à
+// jour la fiche ; une archive consultée/rouverte ne remonte JAMAIS (#217
+// supprime le sousType à l'ouverture d'archive). Les archives conservent leur
+// instantané : la fiche est la donnée vivante, chaque bilan archivé fige la
+// sienne.
+const _FICHE_PREFILL = {
+  sport: {
+    enCours: () => currentPatient?.currentBilanSportSousType != null,
+    data: () => currentPatient?.bilanData || {},
+    el: (f) => document.querySelector('#pg-bilan [data-field="' + f.sel + '"]'),
+    fields: [
+      { sel: 'travail', key: 'travail', from: (p) => p.metier },
+      { sel: 'sport_detail', key: 'sport_detail', from: (p) => p.sport },
+      { sel: 'medecin', key: 'medecin', from: (p) => p.medecinTraitant },
+      { sel: 'antecedents', key: 'antecedents', from: (p) => p.antecedents, up: 'antecedents' },
+      { sel: 'examens', key: 'examens', from: (p) => p.examens, up: 'examens' },
+    ],
+  },
+  posturo: {
+    enCours: () => currentPatient?.currentBilanPosturoSousType != null,
+    data: () => currentPatient?.bilanDataPosturo || {},
+    el: (f) => document.getElementById(f.sel),
+    fields: [
+      { sel: 'po-travail', key: 'travail', from: (p) => p.metier },
+      { sel: 'po-activite', key: 'activite', from: (p) => p.sport },
+      { sel: 'po-medecin', key: 'medecin', from: (p) => p.medecinTraitant },
+      { sel: 'po-atcd', key: 'atcd', from: (p) => p.antecedents, up: 'antecedents' },
+      { sel: 'po-examens', key: 'examens', from: (p) => p.examens, up: 'examens' },
+    ],
+  },
+  podopediatrie: {
+    enCours: () => currentPatient?.currentBilanPodopediatrieSousType != null,
+    data: () => currentPatient?.bilanDataPodopediatrie || {},
+    el: (f) => document.querySelector('#pg-podopediatrie [data-field="' + f.sel + '"]'),
+    // podo_sport reste géré par _podoPrefillSportDefault (#140 Phase 1).
+    fields: [{ sel: 'podo_atcd_txt', key: 'podo_atcd_txt', from: (p) => p.antecedents, up: 'antecedents' }],
+  },
+  pedicurie: {
+    enCours: () => currentPatient?.currentBilanPedicurieSousType != null,
+    data: () => currentPatient?.bilanDataPedicurie || {},
+    el: (f) => document.querySelector('#pg-pedicurie [data-field="' + f.sel + '"]'),
+    fields: [{ sel: 'ped_profession', key: 'ped_profession', from: (p) => p.metier }],
+  },
+};
+
+const _fichePrefillTimers = {};
+function _fichePrefillApply(module) {
+  const cfg = _FICHE_PREFILL[module];
+  if (!cfg || !currentPatient) return;
+  const d = cfg.data();
+  cfg.fields.forEach((f) => {
+    const el = cfg.el(f);
+    if (!el) return;
+    // Descente : champ jamais saisi pour CE bilan + valeur fiche disponible.
+    if (d[f.key] === undefined && !el.value) {
+      const v = String(f.from(currentPatient) || '').trim();
+      if (v) el.value = v; // persisté par le sweep habituel du bilan
+    }
+    // Remontée contrôlée — listener idempotent (le markup posturo est
+    // réinjecté à chaque nav : le flag vit sur l'élément, donc rebind ok).
+    if (f.up && !el._ficheUpBound) {
+      el._ficheUpBound = true;
+      el.addEventListener('input', () => {
+        if (!cfg.enCours() || !currentPatient) return;
+        clearTimeout(_fichePrefillTimers[module + f.up]);
+        _fichePrefillTimers[module + f.up] = setTimeout(() => {
+          if (!cfg.enCours() || !currentPatient) return;
+          currentPatient[f.up] = el.value.trim();
+          try {
+            savePatients();
+          } catch (_e) {
+            /* best-effort — persistera au prochain save */
+          }
+        }, 800);
+      });
+    }
+  });
 }
 
 // =====================================================================
