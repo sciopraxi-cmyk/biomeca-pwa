@@ -5884,6 +5884,17 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   // via le confirm() ci-dessus. Cohérent avec le pattern delete sousType utilisé
   // par abandonner/finalize/creer.
   delete p.currentBilanSportSousType;
+  // #217 — Persiste IMMÉDIATEMENT le remplacement du slot courant par la copie
+  // d'archive, sous _intentionalReduction : l'ouverture d'archive est une
+  // action volontaire (bouton Ouvrir, + confirm si bilan en cours), et le
+  // contenu écrasé sans sousType est par construction un duplicata déjà en
+  // sécurité dans sa propre archive. Sans ce save, la version persistée
+  // gardait l'ancien courant riche et TOUTE sauvegarde ultérieure de
+  // l'archive rouverte déclenchait la garde #35-D (retour terrain : pop-up
+  // récurrente 523→449 sur Contrôle 1 rouvert, écart = mesures de l'Initial
+  // restées dans le slot courant après archivage).
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   nav('pg-sport');
 }
 
@@ -6132,6 +6143,9 @@ async function ouvrirBilanPedicurie(patIdx, bilanIdx) {
   currentOpenedBilanPedicurieIdx = bilanIdx;
   // Reset flag bilan en cours (mirror sport/posturo).
   delete p.currentBilanPedicurieSousType;
+  // #217 — persist immédiat du remplacement volontaire (miroir sport).
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   try { await prefetchPedicuriePhotos(currentPatient.bilanDataPedicurie); } catch (_e) {}
   nav('pg-pedicurie');
   setTimeout(loadPedicurieBilan, 50);
@@ -6367,6 +6381,9 @@ async function ouvrirBilanPodopediatrie(patIdx, bilanIdx) {
   currentPatient.bilanDataPodopediatrie = JSON.parse(JSON.stringify(bilan.bilanDataPodopediatrie || {}));
   currentOpenedBilanPodopediatrieIdx = bilanIdx;
   delete p.currentBilanPodopediatrieSousType;
+  // #217 — persist immédiat du remplacement volontaire (miroir sport).
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   // #140 Phase 2b1 — Prefetch AVANT nav : rehydrate les Path Storage en dataURLs
   // en RAM pour que _restorePodopediatrieCanvasesFromSource (dans le hook
   // showPodopediatrieSection target===3) trouve les dataURLs.
@@ -7606,6 +7623,11 @@ async function ouvrirBilanPosturo(patIdx, bilanIdx) {
   // Task #69.3 — Reset flag "bilan en cours" posturo (mirror sport). Cohérent
   // avec le pattern delete sousType utilisé par abandonner/finalize/creer.
   delete p.currentBilanPosturoSousType;
+  // #217 — persist immédiat du remplacement volontaire (miroir sport, cf.
+  // ouvrirBilanSport) : évite la garde #35-D récurrente au save d'une
+  // archive rouverte quand le slot courant contenait un duplicata plus riche.
+  _intentionalReduction = true;
+  try { savePatients(); } finally { _intentionalReduction = false; }
   // Réinitialiser le canvas pour forcer recalcul taille
   const oldCanvas = document.getElementById('posturo-body-canvas');
   if(oldCanvas) { oldCanvas.width = 0; oldCanvas.height = 0; oldCanvas._baseSnapshot = null; oldCanvas._history = []; }
