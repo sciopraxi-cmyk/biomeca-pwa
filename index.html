@@ -3140,8 +3140,8 @@
     <input style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:10px;" id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..." 
       style="flex:1;font-size:13px;" oninput="renderPatientList()">
     <button class="btn" onclick="openNewPatientModal()" style="background:#2dd4bf;color:#04342C;font-size:13px;white-space:nowrap;">+ Nouveau patient</button>
-    <button class="btn" onclick="document.getElementById('doctolib-csv-input').click()" style="background:#0e4d91;color:#fff;font-size:13px;white-space:nowrap;">📥 Import Doctolib</button>
-    <input type="file" id="doctolib-csv-input" accept=".csv" style="display:none;" onchange="importDoctolibCSV(this)">
+    <button class="btn" onclick="document.getElementById('doctolib-csv-input').click()" title="Import CSV : base patients / export RDV Doctolib, export DrSanté" style="background:#0e4d91;color:#fff;font-size:13px;white-space:nowrap;">📥 Import CSV</button>
+    <input type="file" id="doctolib-csv-input" accept=".csv" style="display:none;" onchange="importPatientsCSV(this)">
   </div>
   <div id="pt-list-el"></div>
 </div>
