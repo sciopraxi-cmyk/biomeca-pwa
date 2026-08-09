@@ -14460,7 +14460,12 @@ function _resolveFichesImagesFromPairs(pairs, callback) {
   // puis fiche 2, …) — l'ordre des fiches suit l'ordre d'insertion du Set.
   Promise.all(jobs.map(async job => {
     try {
-      const pdf = await pdfjsLib.getDocument(job.url).promise;
+      // verbosity 0 (ERRORS seulement) — les polices embarquées de certaines
+      // fiches PDF ont des programmes de hinting TrueType invalides ; PDF.js
+      // les ignore sans conséquence sur le rendu mais spamme la console de
+      // « Warning: TT: undefined function » (retour terrain). Les vraies
+      // erreurs restent loguées, et le try/catch par fiche (#112) inchangé.
+      const pdf = await pdfjsLib.getDocument({ url: job.url, verbosity: 0 }).promise;
       const pages = [];
       for(let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
