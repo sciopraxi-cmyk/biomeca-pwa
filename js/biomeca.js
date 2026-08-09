@@ -18788,13 +18788,17 @@ async function _overlayDataUrlIsEmpty(dataUrl) {
   }
 }
 
-async function _composePodoMorphoTile(bd, key, baseId, canvasId) {
+// #117-B — Param noLive : la COMPARAISON compose les visuels de 2 ARCHIVES ;
+// le canvas vivant reflète le bilan actuellement ouvert, pas l'archive → il
+// doit être ignoré (sinon le dessin de la session s'afficherait dans les 2
+// colonnes). Le rapport (appels sans noLive) garde la priorité live intacte.
+async function _composePodoMorphoTile(bd, key, baseId, canvasId, noLive) {
   var d = bd || {};
   var baseEl = document.getElementById(baseId);
   var baseSrc = (baseEl && baseEl.src) || '';
   var hasPath = !!d[key + 'Path'];
   // 1) Canvas vivant (session en cours, dessin non sauvegardé) — priorité stricte.
-  var dataUrl = _readLiveDrawCanvas(canvasId);
+  var dataUrl = noLive ? null : _readLiveDrawCanvas(canvasId);
   // 2) Modèle RAM (bilan rouvert avec dataURL déjà en mémoire).
   if (!dataUrl) dataUrl = d[key];
   // 3) Storage Path (dataURL strippée après save+migration).
@@ -18847,12 +18851,13 @@ async function _composePodoMorphoTile(bd, key, baseId, canvasId) {
 // Fix bug canvas-vivant : idem morpho — live canvas prioritaire pour rendre
 // visible un dessin d'onglet Traitement fait dans la session juste avant
 // le clic Rapport (débounce autosave 1 s non écoulé).
-async function _composePodoPieds(bd) {
+// #117-B — noLive : cf. _composePodoMorphoTile (comparaison d'archives).
+async function _composePodoPieds(bd, noLive) {
   var d = bd || {};
   var baseEl = document.getElementById('imgjs-plan-semelles');
   var baseSrc = (baseEl && baseEl.src) || '';
   var hasPath = !!d._podo_piedsPath;
-  var dataUrl = _readLiveDrawCanvas('podo-pieds-canvas');
+  var dataUrl = noLive ? null : _readLiveDrawCanvas('podo-pieds-canvas');
   if (!dataUrl) dataUrl = d._podo_pieds;
   if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
     try {
@@ -24044,7 +24049,135 @@ function renderCompare() {
     });
   });
   html += '</tbody></table>';
+  // #117-B — Section visuels (async : prefetch Storage + compositing). Rendu
+  // différé sous le tableau, jeton anti-race sur changement de sélection.
+  html += '<div id="compare-visuals"><div style="color:rgba(255,255,255,0.4);font-style:italic;padding:12px 10px;">⏳ Chargement des visuels…</div></div>';
   content.innerHTML = html;
+  const token = ++_compareVisualsToken;
+  _renderCompareVisuals(a, b, _compareType, token).catch((e) => {
+    console.warn('[#117-B] visuels comparaison échoués :', e?.message);
+    const host = document.getElementById('compare-visuals');
+    if (host && token === _compareVisualsToken) host.innerHTML = '';
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// #117-B — VISUELS côte à côte dans la comparaison de bilans
+// ══════════════════════════════════════════════════════
+// Collecte les visuels d'UN bilan (courant OU archive) en catégories
+// [{ title, imgs: [dataUrl…], ko: n }]. Tout est résolu depuis l'objet de
+// données (jamais le canvas vivant — flag noLive des composeurs podo) :
+// - prefetch du module d'abord (réhydrate les Paths Storage en dataURLs ;
+//   le re-bloat localStorage est neutralisé par le strip #35, étendu aux
+//   4 modules courant + archives)
+// - règles #148/#150 : catégorie absente si rien, compteur ko (rouge) pour
+//   les Paths non rechargés, calques vides déjà filtrés par les composeurs.
+async function _collectCompareVisuals(type, d) {
+  if (!d) return [];
+  const out = [];
+  const galToImgs = (arrKey, prefix, title) => {
+    const ids = Array.isArray(d[arrKey]) ? d[arrKey] : [];
+    if (!ids.length) return;
+    const imgs = [];
+    let ko = 0;
+    ids.forEach((id) => {
+      if (d[prefix + id]) imgs.push(d[prefix + id]);
+      else if (d[prefix + id + 'Path']) ko++;
+    });
+    if (imgs.length || ko) out.push({ title, imgs, ko });
+  };
+  const ramOrPath = (key, title) => {
+    if (d[key]) out.push({ title, imgs: [d[key]], ko: 0 });
+    else if (d[key + 'Path']) out.push({ title, imgs: [], ko: 1 });
+  };
+  const annotated = async () => {
+    const av = await _collectAnnotatedPostureViews(d, _MAX_POSTURE_W);
+    if (av.length) out.push({ title: 'Photos posturales annotées', imgs: av.map((v) => v.annotatedDataUrl), ko: 0 });
+  };
+  if (type === 'sport') {
+    try { await prefetchSportBilanDataPhotos(d); } catch (_e) { /* best-effort — ko au rendu */ }
+    galToImgs('_podoscopePhotos', '_podo_ph_', 'Photos podoscope / morphologie');
+    await annotated();
+  } else if (type === 'posturo') {
+    try { await prefetchPosturoPhotos(d); } catch (_e) { /* best-effort — ko au rendu */ }
+    ramOrPath('_empreinte', 'Empreinte plantaire');
+    galToImgs('_plantairePhotos', '_plant_ph_', 'Photos système plantaire');
+    ramOrPath('_feetComposite', 'Plan de semelles');
+    await annotated();
+    // Silhouettes 4 vues : composite makeSliceComposite dépendant du flux
+    // rapport — volet ultérieur si besoin terrain.
+  } else if (type === 'podopediatrie') {
+    try { await prefetchPodopediatriePhotos(d); } catch (_e) { /* best-effort — ko au rendu */ }
+    galToImgs('_morphoPhotos', '_pdp_ph_', 'Photos podoscope / morphologie');
+    const TILES = [
+      ['_podo_morpho_face', 'imgjs-morpho-face', 'podo-morpho-face'],
+      ['_podo_morpho_face2', 'imgjs-morpho-face2', 'podo-morpho-face2'],
+      ['_podo_morpho_profilG', 'imgjs-morpho-profilG', 'podo-morpho-profilG'],
+      ['_podo_morpho_profilD', 'imgjs-morpho-profilD', 'podo-morpho-profilD'],
+    ];
+    const tiles = await Promise.all(TILES.map((t) => _composePodoMorphoTile(d, t[0], t[1], t[2], true)));
+    const okTiles = tiles.filter((t) => t.status === 'ok');
+    const koTiles = tiles.filter((t) => t.status === 'ko').length;
+    if (okTiles.length || koTiles) {
+      out.push({ title: 'Silhouettes morphostatiques', imgs: okTiles.map((t) => t.dataUrl), ko: koTiles });
+    }
+    const pieds = await _composePodoPieds(d, true);
+    if (pieds.status === 'ok') out.push({ title: 'Plan de semelles', imgs: [pieds.dataUrl], ko: 0 });
+    else if (pieds.status === 'ko') out.push({ title: 'Plan de semelles', imgs: [], ko: 1 });
+    await annotated();
+  } else if (type === 'pedicurie') {
+    try { await prefetchPedicuriePhotos(d); } catch (_e) { /* best-effort — ko au rendu */ }
+    galToImgs('_dermatoPhotos', '_ped_derm_ph_', 'Photos — Examen dermatologique');
+    galToImgs('_onglesPhotos', '_ped_ong_ph_', 'Photos — Examen unguéal');
+    galToImgs('_chaussagePhotos', '_ped_chau_ph_', 'Photos — Morphostatique & chaussage');
+  }
+  return out;
+}
+
+// Jeton anti-race : un changement de <select> pendant la résolution async
+// invalide le rendu en cours (seul le dernier lancé écrit dans le DOM).
+let _compareVisualsToken = 0;
+
+async function _renderCompareVisuals(a, b, type, token) {
+  const host = document.getElementById('compare-visuals');
+  if (!host) return;
+  const [va, vb] = await Promise.all([
+    _collectCompareVisuals(type, a.bilanData),
+    _collectCompareVisuals(type, b.bilanData),
+  ]);
+  if (token !== _compareVisualsToken) return; // sélection changée entre-temps
+  const titles = [];
+  va.forEach((c) => titles.push(c.title));
+  vb.forEach((c) => { if (!titles.includes(c.title)) titles.push(c.title); });
+  if (!titles.length) { host.innerHTML = ''; return; }
+  const cell = (cat) => {
+    if (!cat || (!cat.imgs.length && !cat.ko)) {
+      return '<div style="color:rgba(255,255,255,0.4);font-style:italic;padding:8px 0;">—</div>';
+    }
+    let h = '';
+    if (cat.ko > 0) {
+      h += '<div style="font-size:11px;font-weight:600;color:#fca5a5;margin-bottom:6px;">⚠️ ' + cat.ko + ' image(s) non rechargée(s) depuis le stockage</div>';
+    }
+    if (cat.imgs.length) {
+      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">' +
+        cat.imgs.map((src) => '<img src="' + src + '" style="width:100%;border-radius:6px;background:#fff;"/>').join('') +
+        '</div>';
+    }
+    return h;
+  };
+  let html = '<div style="margin-top:18px;font-weight:700;color:#2a7a4e;padding:10px;background:rgba(45,212,191,0.06);border-top:1px solid rgba(255,255,255,0.08);">📷 Visuels</div>';
+  html += '<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;">';
+  titles.forEach((t) => {
+    const ca = va.find((c) => c.title === t);
+    const cb = vb.find((c) => c.title === t);
+    html += '<tr><td colspan="2" style="padding:8px 10px 4px;color:rgba(255,255,255,0.6);font-size:12px;font-weight:600;">' + t + '</td></tr>';
+    html += '<tr>';
+    html += '<td style="width:50%;padding:4px 10px 12px;vertical-align:top;">' + cell(ca) + '</td>';
+    html += '<td style="width:50%;padding:4px 10px 12px;vertical-align:top;border-left:2px solid rgba(255,255,255,0.18);">' + cell(cb) + '</td>';
+    html += '</tr>';
+  });
+  html += '</table>';
+  host.innerHTML = html;
 }
 
 function toggleCLVF(enabled) {
