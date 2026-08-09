@@ -128,7 +128,8 @@ export function _importMapHeaders(rawHeaders) {
     assurance: find((h) => h.includes('assurance')),
     provenance: find((h) => h.includes('provenance')),
     metier: find((h) => h.includes('profession') || h === 'metier'),
-    motif: find((h) => h === 'motif' || h.startsWith('motif ')),
+    // #223-C — pas de mapping 'motif' : le motif vit dans chaque bilan,
+    // plus sur la fiche patient.
   };
   if (map.nom === -1) {
     map.nom = find(
