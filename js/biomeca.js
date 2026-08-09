@@ -24116,6 +24116,61 @@ function renderCompare() {
 //   4 modules courant + archives)
 // - règles #148/#150 : catégorie absente si rien, compteur ko (rouge) pour
 //   les Paths non rechargés, calques vides déjà filtrés par les composeurs.
+// #117-B2 — Silhouettes posturo pour la COMPARAISON : le calque _bodyCanvas
+// (1 canvas couvrant les 4 vues) est découpé en 4 tranches, chacune composée
+// sur son gabarit avec le FALLBACK LAYOUT du rapport (aspect contain, offset
+// 45 px CSS — cf. makeSliceComposite/_buildRapportBody). Les géométries
+// « mesurées » du rapport dépendent du DOM vivant du bilan OUVERT ; pour des
+// archives, le fallback est le rendu déterministe correct. Ordre bgIds =
+// convention des assets mal nommés (piège documenté CLAUDE.md) — identique
+// au rapport, jamais réordonné. Calque vide (dessiné puis gommé) → 'nu'
+// silencieux (#148).
+async function _composePosturoBodySlices(d) {
+  const hasPath = !!d._bodyCanvasPath;
+  let dataUrl = d._bodyCanvas || null;
+  if (!dataUrl && hasPath && typeof prefetchPhotoToDataUrl === 'function') {
+    try {
+      const r = await prefetchPhotoToDataUrl(d._bodyCanvasPath);
+      if (r && r.ok) dataUrl = r.dataUrl;
+    } catch (_e) { /* → 'ko' ci-dessous */ }
+  }
+  if (!dataUrl) return { status: hasPath ? 'ko' : 'nu', imgs: [] };
+  try {
+    const bcImg = await _podoLoadImage(dataUrl);
+    if (_overlayDrawingIsEmpty(bcImg)) return { status: 'nu', imgs: [] };
+    const sw = Math.floor(bcImg.naturalWidth / 4);
+    const sh = bcImg.naturalHeight;
+    if (!sw || !sh) return { status: hasPath ? 'ko' : 'nu', imgs: [] };
+    const bgIds = ['imgjs-morpho-profilG', 'imgjs-morpho-face2', 'imgjs-morpho-face', 'imgjs-morpho-profilD'];
+    const dpr = window.devicePixelRatio || 1;
+    const dy = 45 * dpr;
+    const imgs = [];
+    for (let i = 0; i < 4; i++) {
+      const tmp = document.createElement('canvas');
+      tmp.width = sw;
+      tmp.height = sh;
+      const ctx = tmp.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, sw, sh);
+      const bgEl = document.getElementById(bgIds[i]);
+      if (bgEl && bgEl.naturalWidth > 0) {
+        const aspect = bgEl.naturalWidth / bgEl.naturalHeight;
+        let h = 200 * dpr;
+        let w = h * aspect;
+        if (h > sh) { w *= sh / h; h = sh; }
+        if (w > sw) { h *= sw / w; w = sw; }
+        ctx.drawImage(bgEl, (sw - w) / 2, Math.min(dy, Math.max(0, sh - h)), w, h);
+      }
+      ctx.drawImage(bcImg, i * sw, 0, sw, sh, 0, 0, sw, sh);
+      const b = _boundCompositeHeight(tmp, _MAX_MORPHO_COMPOSITE_H);
+      imgs.push(b.canvas.toDataURL('image/png'));
+    }
+    return { status: 'ok', imgs };
+  } catch (_e) {
+    return { status: hasPath ? 'ko' : 'nu', imgs: [] };
+  }
+}
+
 async function _collectCompareVisuals(type, d) {
   if (!d) return [];
   const out = [];
@@ -24140,16 +24195,34 @@ async function _collectCompareVisuals(type, d) {
   };
   if (type === 'sport') {
     try { await prefetchSportBilanDataPhotos(d); } catch (_e) { /* best-effort — ko au rendu */ }
+    // #117-B2 — silhouettes morpho + schéma plantaire sport : mêmes calques
+    // individuels sur gabarits que la podopédiatrie → réutilisation directe
+    // du composeur générique (noLive : archives, jamais le canvas vivant).
+    const S_TILES = [
+      ['_morpho_face', 'imgjs-morpho-face', 'morpho-face'],
+      ['_morpho_face2', 'imgjs-morpho-face2', 'morpho-face2'],
+      ['_morpho_profilG', 'imgjs-morpho-profilG', 'morpho-profilG'],
+      ['_morpho_profilD', 'imgjs-morpho-profilD', 'morpho-profilD'],
+    ];
+    const sTiles = await Promise.all(S_TILES.map((t) => _composePodoMorphoTile(d, t[0], t[1], t[2], true)));
+    const sOk = sTiles.filter((t) => t.status === 'ok');
+    const sKo = sTiles.filter((t) => t.status === 'ko').length;
+    if (sOk.length || sKo) out.push({ title: 'Silhouettes morphostatiques', imgs: sOk.map((t) => t.dataUrl), ko: sKo });
+    const sPieds = await _composePodoMorphoTile(d, '_pieds', 'sp-pieds-img', 'pieds-canvas', true);
+    if (sPieds.status === 'ok') out.push({ title: 'Schéma plantaire', imgs: [sPieds.dataUrl], ko: 0 });
+    else if (sPieds.status === 'ko') out.push({ title: 'Schéma plantaire', imgs: [], ko: 1 });
     galToImgs('_podoscopePhotos', '_podo_ph_', 'Photos podoscope / morphologie');
     await annotated();
   } else if (type === 'posturo') {
     try { await prefetchPosturoPhotos(d); } catch (_e) { /* best-effort — ko au rendu */ }
+    // #117-B2 — silhouettes 4 vues (calque _bodyCanvas slicé + gabarits).
+    const sil = await _composePosturoBodySlices(d);
+    if (sil.status === 'ok') out.push({ title: 'Silhouettes morphostatiques', imgs: sil.imgs, ko: 0 });
+    else if (sil.status === 'ko') out.push({ title: 'Silhouettes morphostatiques', imgs: [], ko: 1 });
     ramOrPath('_empreinte', 'Empreinte plantaire');
     galToImgs('_plantairePhotos', '_plant_ph_', 'Photos système plantaire');
     ramOrPath('_feetComposite', 'Plan de semelles');
     await annotated();
-    // Silhouettes 4 vues : composite makeSliceComposite dépendant du flux
-    // rapport — volet ultérieur si besoin terrain.
   } else if (type === 'podopediatrie') {
     try { await prefetchPodopediatriePhotos(d); } catch (_e) { /* best-effort — ko au rendu */ }
     galToImgs('_morphoPhotos', '_pdp_ph_', 'Photos podoscope / morphologie');
