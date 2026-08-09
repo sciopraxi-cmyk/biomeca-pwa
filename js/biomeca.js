@@ -5967,8 +5967,17 @@ async function supprimerBilanSport(patIdx, bilanIdx) {
   // public.bilans dont l'archive correspondante vient d'être supprimée en
   // RAM resterait fantôme en base sans ce DELETE explicite. Best-effort,
   // même discipline que le reste de la sync (jamais de blocage/alerte).
-  if (bilanId) {
-    authFetch(SUPA_URL + '/rest/v1/bilans?id=eq.' + bilanId, { method: 'DELETE' }).catch((e) =>
+  // #216-fix résurrection — l'identité de la ligne public.bilans d'une archive
+  // SPORT est bilan._bilanId à la RACINE (cf. _syncPatientToNormalizedTables
+  // L~1045 `id: b._bilanId` et ARCHIVE_ID_READERS de bilan-merge.mjs), PAS
+  // mesures._bilanId (qui identifie le DOSSIER Storage des photos, cf. cleanup
+  // ci-dessus). L'ancien DELETE visait mesures._bilanId → la ligne cloud
+  // survivait → la resync (#171) + fusion additive (#102-A) ressuscitaient
+  // l'archive supprimée à chaque selectPatient (retour terrain : doublon
+  // Contrôle 1 réapparaissant après suppression + hard refresh).
+  const rowId = bilan._bilanId;
+  if (rowId) {
+    authFetch(SUPA_URL + '/rest/v1/bilans?id=eq.' + rowId, { method: 'DELETE' }).catch((e) =>
       console.warn('[#102 Phase 3] delete bilan normalisé échoué (sans impact) :', e instanceof Error ? e.message : String(e))
     );
   }
