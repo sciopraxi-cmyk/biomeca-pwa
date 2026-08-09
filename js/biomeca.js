@@ -5381,6 +5381,14 @@ function renderPatientList() {
         </div>`).join('')}
       </div>` : '';
 
+    // #117-pédicurie — Bouton « Comparer les bilans » (≥ 2 bilans, archives +
+    // en cours), miroir sport/posturo, palette ambre.
+    const nbPedicurieComparables = bilansPedicurie.length + (hasBilanPedicurieEnCours ? 1 : 0);
+    const comparePedicurieHtml = nbPedicurieComparables >= 2 ? `
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+        <button onclick="openComparePedicurie(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(217,119,6,0.18);color:#f0bd7e;border:1px solid rgba(217,119,6,0.3);">🔄 Comparer les bilans</button>
+      </div>` : '';
+
     // #140 Phase 0 — Liste des archives podopédiatrie (miroir pédicurie, palette rose).
     const bilansPodopediatrieHtml = bilansPodopediatrie.length ? `
       <div style="margin-top:10px;">
@@ -5393,6 +5401,14 @@ function renderPatientList() {
           <button onclick="ouvrirBilanPodopediatrie(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#9f1239;color:#fff;">Ouvrir</button>
           <button onclick="supprimerBilanPodopediatrie(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
         </div>`).join('')}
+      </div>` : '';
+
+    // #117-podo — Bouton « Comparer les bilans » (≥ 2 bilans, archives + en
+    // cours), miroir sport/posturo, palette rose.
+    const nbPodopediatrieComparables = bilansPodopediatrie.length + (hasBilanPodopediatrieEnCours ? 1 : 0);
+    const comparePodopediatrieHtml = nbPodopediatrieComparables >= 2 ? `
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+        <button onclick="openComparePodopediatrie(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(225,29,72,0.18);color:#f2a1b5;border:1px solid rgba(225,29,72,0.3);">🔄 Comparer les bilans</button>
       </div>` : '';
 
     // Modules bilans
@@ -5493,7 +5509,7 @@ function renderPatientList() {
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:${_hasAnyExpandedBilan?'4px':'0'};">
           ${modPosturo}${modSport}${modPedicurie}${modPodo}
         </div>
-        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilanPodopediatrieEnCoursHtml}${bilansPosturoHtml}${comparePosturoHtml}${bilansPedicurieHtml}${bilansPodopediatrieHtml}${bilansSportHtml}${compareSportHtml}
+        ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilanPodopediatrieEnCoursHtml}${bilansPosturoHtml}${comparePosturoHtml}${bilansPedicurieHtml}${comparePedicurieHtml}${bilansPodopediatrieHtml}${comparePodopediatrieHtml}${bilansSportHtml}${compareSportHtml}
       </div>
     </div>`;
   }).join('');
@@ -17518,13 +17534,21 @@ function _podoMcoChanged() {
 // deuxième fois → impossibilité de divergence entre l'interprétation
 // écran et le verdict alerte.
 // =====================================================================
-function _collectPodopediatrieSyntheseSections() {
+// #117-podo — Paramètre srcData OPTIONNEL : quand fourni (comparaison de 2
+// bilans, #117), les VALEURS sont lues dans cet objet bilanDataPodopediatrie
+// (bilan courant OU archive) au lieu des inputs du DOM ; le DOM statique ne
+// sert plus que de dictionnaire de LIBELLÉS (labels, options). Sans argument,
+// comportement historique inchangé (synthèse écran + rapport lisent le DOM,
+// état de vérité du bilan ouvert). Une seule source de collecte pour les 3
+// consommateurs — le principe #96/#117 étendu à la comparaison.
+function _collectPodopediatrieSyntheseSections(srcData) {
   var root = document.getElementById('pg-podopediatrie');
   if (!root) return [];
-  var d = (typeof currentPatient !== 'undefined' && currentPatient)
-    ? (currentPatient.bilanDataPodopediatrie || {}) : {};
+  var src = srcData || null;
+  var d = srcData || ((typeof currentPatient !== 'undefined' && currentPatient)
+    ? (currentPatient.bilanDataPodopediatrie || {}) : {});
 
-  // ─── Lecteurs génériques ───────────────────────────────────────
+  // ─── Lecteurs génériques (bimodes : src → données, sinon DOM) ────
   function labelOf(el) {
     var lab = el.closest('label');
     var txt = lab ? lab.textContent : '';
@@ -17533,23 +17557,57 @@ function _collectPodopediatrieSyntheseSections() {
   function checkedBoxes() {
     var res = [];
     root.querySelectorAll('input[type="checkbox"].podopediatrie-field').forEach(function (cb) {
-      if (!cb.checked) return;
       var f = cb.getAttribute('data-field') || '';
+      var on = src ? !!src[f] : cb.checked;
+      if (!on) return;
       res.push({ field: f, label: labelOf(cb) });
     });
     return res;
   }
   function radioVal(name) {
+    if (src) {
+      var v = src[name];
+      if (v == null || v === '') return null;
+      var opt = root.querySelector('input[name="' + name + '"][value="' + v + '"]');
+      return { value: String(v), label: opt ? labelOf(opt) : String(v) };
+    }
     var el = root.querySelector('input[name="' + name + '"]:checked');
     return el ? { value: el.value, label: labelOf(el) } : null;
   }
+  // Valeur BRUTE d'un radio (les branches d'interprétation comparent la value).
+  function radioRaw(name) {
+    if (src) {
+      var v = src[name];
+      return v == null || v === '' ? undefined : String(v);
+    }
+    return (root.querySelector('input[name="' + name + '"]:checked') || {}).value;
+  }
+  // État booléen d'une checkbox par data-field.
+  function boxOn(f) {
+    if (src) return !!src[f];
+    return !!root.querySelector('[data-field="' + f + '"]:checked');
+  }
   function fieldVal(f) {
+    if (src) {
+      var v = src[f];
+      return v == null ? '' : String(v).trim();
+    }
     var el = root.querySelector('[data-field="' + f + '"]');
     if (!el) return '';
     return (el.value || '').trim();
   }
   function selectText(f) {
     var el = root.querySelector('select[data-field="' + f + '"]');
+    if (src) {
+      var v = src[f];
+      if (v == null || v === '') return '';
+      if (el) {
+        for (var i = 0; i < el.options.length; i++) {
+          if (el.options[i].value === String(v)) return el.options[i].textContent.trim();
+        }
+      }
+      return String(v);
+    }
     if (!el || !el.value) return '';
     var opt = el.options[el.selectedIndex];
     return opt ? opt.textContent.trim() : el.value;
@@ -17587,7 +17645,7 @@ function _collectPodopediatrieSyntheseSections() {
 
   // Axe calcanéen ≥ _PODO_THR_AXECALC_DEG° (par pied)
   ['g', 'd'].forEach(function (side) {
-    var dir = (root.querySelector('input[name="podo_axecalc_' + side + '_dir"]:checked') || {}).value;
+    var dir = radioRaw('podo_axecalc_' + side + '_dir');
     var degRaw = fieldVal('podo_axecalc_' + side + '_deg');
     if (dir && dir !== 'neutre' && degRaw !== '' && parseFloat(degRaw) >= _PODO_THR_AXECALC_DEG) {
       alertItem('Axe calcanéen pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : tendance ' + dir + ' ' + degRaw + '° (≥ ' + _PODO_THR_AXECALC_DEG + '°)');
@@ -17610,7 +17668,7 @@ function _collectPodopediatrieSyntheseSections() {
   ['g', 'd'].forEach(function (side) {
     var sum = 0, filled = 0;
     _FPI_ITEMS.forEach(function (it) {
-      var v = (root.querySelector('input[name="podo_fpi_' + side + '_' + it + '"]:checked') || {}).value;
+      var v = radioRaw('podo_fpi_' + side + '_' + it);
       if (v != null) { sum += parseInt(v, 10); filled++; }
     });
     if (filled === 6) {
@@ -17666,7 +17724,7 @@ function _collectPodopediatrieSyntheseSections() {
   checkAsym('podo_tte_g', 'podo_tte_d', 'TTE');
   checkAsym('podo_af_g',  'podo_af_d',  'AF');
   // Genou : inter-mall > _PODO_THR_GENU_INTERMALL_CM ou inter-cond > _PODO_THR_GENU_INTERCOND_CM
-  var genuType = (root.querySelector('input[name="podo_genu_type"]:checked') || {}).value;
+  var genuType = radioRaw('podo_genu_type');
   if (genuType === 'valgum') {
     var mall = fieldVal('podo_genu_intermall');
     if (mall !== '' && parseFloat(mall) > _PODO_THR_GENU_INTERMALL_CM) {
@@ -17690,7 +17748,7 @@ function _collectPodopediatrieSyntheseSections() {
   checkFleche('podo_fleche_cervicale', _PODO_THR_FLECHE_CERVICALE, 'Flèche cervicale');
   checkFleche('podo_fleche_lombaire',  _PODO_THR_FLECHE_LOMBAIRE,  'Flèche lombaire');
   // Test d'Adam avec gibbosité
-  var adam = (root.querySelector('input[name="podo_adam_gibbosite"]:checked') || {}).value;
+  var adam = radioRaw('podo_adam_gibbosite');
   if (adam === 'oui') alertItem('Test d\'Adam : gibbosité présente');
   // Cyphose : distance ≤ _PODO_THR_CYPHOSE_MIN_CM cm
   var cyph = fieldVal('podo_cyphose_dist');
@@ -17699,7 +17757,7 @@ function _collectPodopediatrieSyntheseSections() {
   }
   // Trendelenburg grade 3 ou 4 (par côté)
   ['g', 'd'].forEach(function (side) {
-    var g = (root.querySelector('input[name="podo_trendelenburg_' + side + '"]:checked') || {}).value;
+    var g = radioRaw('podo_trendelenburg_' + side);
     if (g === '3' || g === '4') {
       alertItem('Trendelenburg pied ' + (side === 'g' ? 'gauche' : 'droit') + ' : grade ' + g);
     }
@@ -17707,16 +17765,16 @@ function _collectPodopediatrieSyntheseSections() {
   // Instabilité monopodale cochée (cheville ou genou)
   ['g', 'd'].forEach(function (side) {
     var sideLbl = side === 'g' ? 'gauche' : 'droit';
-    if (root.querySelector('[data-field="podo_stab_' + side + '_cheville"]:checked')) {
+    if (boxOn('podo_stab_' + side + '_cheville')) {
       alertItem('Instabilité monopodale de cheville pied ' + sideLbl);
     }
-    if (root.querySelector('[data-field="podo_stab_' + side + '_genou"]:checked')) {
+    if (boxOn('podo_stab_' + side + '_genou')) {
       alertItem('Instabilité monopodale de genou pied ' + sideLbl);
     }
   });
   // Suspicion d'Achille court (marche talons impossible ET accroupissement impossible)
-  var talons  = (root.querySelector('input[name="podo_marche_talons"]:checked')  || {}).value;
-  var accroup = (root.querySelector('input[name="podo_accroupissement"]:checked') || {}).value;
+  var talons = radioRaw('podo_marche_talons');
+  var accroup = radioRaw('podo_accroupissement');
   if (talons === 'impossible' && accroup === 'non') {
     alertItem('Suspicion d\'Achille court (marche sur talons impossible + accroupissement impossible)');
   }
@@ -17727,7 +17785,7 @@ function _collectPodopediatrieSyntheseSections() {
     genou: 'Pathologie du genou',      pied: 'Pathologie du pied'
   };
   Object.keys(_SUSP_LABELS).forEach(function (k) {
-    var r = (root.querySelector('input[name="podo_susp_' + k + '"]:checked') || {}).value;
+    var r = radioRaw('podo_susp_' + k);
     if (r === 'oui') {
       var prec = fieldVal('podo_susp_' + k + '_precision');
       alertItem('Suspicion : ' + _SUSP_LABELS[k] + (prec ? ' — ' + prec : ''));
@@ -17810,7 +17868,7 @@ function _collectPodopediatrieSyntheseSections() {
   ['g', 'd'].forEach(function (side) {
     var sum = 0, filled = 0;
     _FPI_ITEMS.forEach(function (it) {
-      var v = (root.querySelector('input[name="podo_fpi_' + side + '_' + it + '"]:checked') || {}).value;
+      var v = radioRaw('podo_fpi_' + side + '_' + it);
       if (v != null) { sum += parseInt(v, 10); filled++; }
     });
     if (filled === 6) {
@@ -17829,9 +17887,9 @@ function _collectPodopediatrieSyntheseSections() {
     // Lecture manuelle car ce n'est plus un radio simple. Compose l'énumération
     // « aucune / droite / gauche / droite et gauche ». Vide si aucune n'est cochée.
     (function () {
-      var a = !!root.querySelector('[data-field="podo_nucale_lim_aucune"]:checked');
-      var dr = !!root.querySelector('[data-field="podo_nucale_lim_droite"]:checked');
-      var g = !!root.querySelector('[data-field="podo_nucale_lim_gauche"]:checked');
+      var a = boxOn('podo_nucale_lim_aucune');
+      var dr = boxOn('podo_nucale_lim_droite');
+      var g = boxOn('podo_nucale_lim_gauche');
       var parts = [];
       if (a)  parts.push('Aucune');
       if (dr) parts.push('À droite');
@@ -18212,32 +18270,66 @@ var _PED_ONGLE_LABELS={mycose:'Onychomycose',epaissi:'Onychauxis',decolle:'Onych
 var _PED_ONGLE_ORDER=['mycose','epaissi','decolle','incarne','hematome','courb','perionyxis','suspect'];
 var _PED_GRADE_SIGN={'0':"population générale (pas de neuropathie, pas d'artériopathie)",'1':'neuropathie OU artériopathie isolée','2':'neuropathie + déformation et/ou artériopathie','3':"antécédent de plaie ou d'amputation"};
 var _PED_ALERTE_FIELDS={ped_derm_ulceration:1,ped_derm_malperf:1};
-function genererSynthesePedicurie(){
-  var out=document.getElementById('pedicurie-synthese-result'); if(!out)return;
-  var root=document.getElementById('pg-pedicurie'); if(!root){out.innerHTML='';return;}
+// #117-pédicurie — Collecteur STRUCTURÉ des sections de synthèse. Extrait de
+// genererSynthesePedicurie (qui n'assurait que le rendu HTML écran) pour
+// servir 2 consommateurs : la synthèse écran/rapport (rendu HTML ci-dessous)
+// ET le comparateur de bilans (#117). Paramètre srcData optionnel : quand
+// fourni (comparaison, bilan courant OU archive bilanDataPedicurie), les
+// VALEURS viennent de cet objet ; le DOM statique ne sert que de dictionnaire
+// de libellés. Sans argument : lecture DOM historique (bilan ouvert).
+// Retour : [{ titre, items: [html strings non vides] }] — sections vides omises.
+function _collectPedicurieSections(srcData){
+  var root=document.getElementById('pg-pedicurie'); if(!root)return [];
+  var src=srcData||null;
   function labelOf(el){var lab=el.closest('label');var txt=lab?lab.textContent:'';return txt.replace(/\s+/g,' ').trim();}
-  function checkedBoxes(){var res=[];root.querySelectorAll('input[type="checkbox"].pedicurie-field').forEach(function(cb){if(!cb.checked)return;var f=cb.getAttribute('data-field')||'';if(f.indexOf('ped_ongle_')===0)return;res.push({field:f,label:labelOf(cb)});});return res;}
-  function radioVal(name){var el=root.querySelector('input[name="'+name+'"]:checked');return el?{value:el.value,label:labelOf(el)}:null;}
-  function fieldVal(f){var el=root.querySelector('[data-field="'+f+'"]');if(!el)return '';return (el.value||'').trim();}
-  function selectText(f){var el=root.querySelector('select[data-field="'+f+'"]');if(!el||!el.value)return '';var opt=el.options[el.selectedIndex];return opt?opt.textContent.trim():el.value;}
-  var blocks=[];
-  function section(title,items){var real=items.filter(function(x){return x&&x.trim()!=='';});if(!real.length)return '';var lis=real.map(function(it){return '<li style="margin:2px 0;">'+it+'</li>';}).join('');return '<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#b7740a;border-bottom:1px solid rgba(217,119,6,0.25);padding-bottom:3px;margin-bottom:6px;">'+title+'</div><ul style="margin:0;padding-left:18px;list-style:disc;font-size:13px;color:#222;line-height:1.5;">'+lis+'</ul></div>';}
+  function checkedBoxes(){var res=[];root.querySelectorAll('input[type="checkbox"].pedicurie-field').forEach(function(cb){var f=cb.getAttribute('data-field')||'';if(f.indexOf('ped_ongle_')===0)return;var on=src?!!src[f]:cb.checked;if(!on)return;res.push({field:f,label:labelOf(cb)});});return res;}
+  function radioVal(name){
+    if(src){var v=src[name];if(v==null||v==='')return null;var opt=root.querySelector('input[name="'+name+'"][value="'+v+'"]');return {value:String(v),label:opt?labelOf(opt):String(v)};}
+    var el=root.querySelector('input[name="'+name+'"]:checked');return el?{value:el.value,label:labelOf(el)}:null;
+  }
+  function fieldVal(f){
+    if(src){var v=src[f];return v==null?'':String(v).trim();}
+    var el=root.querySelector('[data-field="'+f+'"]');if(!el)return '';return (el.value||'').trim();
+  }
+  function selectText(f){
+    var el=root.querySelector('select[data-field="'+f+'"]');
+    if(src){var v=src[f];if(v==null||v==='')return '';if(el){for(var i=0;i<el.options.length;i++){if(el.options[i].value===String(v))return el.options[i].textContent.trim();}}return String(v);}
+    if(!el||!el.value)return '';var opt=el.options[el.selectedIndex];return opt?opt.textContent.trim():el.value;
+  }
+  function boxOn(f){
+    if(src)return !!src[f];
+    var el=root.querySelector('[data-field="'+f+'"]');return !!(el&&el.checked);
+  }
   function kv(label,value){return '<strong>'+label+'</strong> : '+_pedEscapeHtml(value);}
   function chk(field,label){var safe=_pedEscapeHtml(label);if(_PED_ALERTE_FIELDS[field]||/⚠/.test(label)){return '<span style="color:#c0392b;font-weight:600;">'+safe+'</span>';}return safe;}
   function boxesItems(predicate){return checkedBoxes().filter(predicate).map(function(b){return chk(b.field,b.label);});}
   function radioItem(name){var r=radioVal(name);if(!r)return '';return kv(_PED_RADIO_LABELS[name]||name,r.label);}
   function txtItem(f){var v=(f==='ped_suivi_freq')?selectText(f):fieldVal(f);if(!v)return '';if(f==='ped_suivi_rdv'){var d=new Date(v+'T00:00:00');if(!isNaN(d.getTime()))v=d.toLocaleDateString('fr-FR');}return kv(_PED_TXT_LABELS[f]||f,v);}
   function pfx(){var prefixes=Array.prototype.slice.call(arguments);return function(b){return prefixes.some(function(p){return b.field.indexOf(p)===0;});};}
-  function ongleItems(){var items=[];var orteilLabel={1:'O1 (Hallux)',2:'O2',3:'O3',4:'O4',5:'O5'};[['d','Pied D'],['g','Pied G']].forEach(function(pied){var side=pied[0],sideLbl=pied[1];for(var o=1;o<=5;o++){var anomalies=[];_PED_ONGLE_ORDER.forEach(function(suf){var f='ped_ongle_'+side+o+'_'+suf;var el=root.querySelector('[data-field="'+f+'"]');if(el&&el.checked){var lbl=_PED_ONGLE_LABELS[suf];anomalies.push(suf==='suspect'?'<span style="color:#c0392b;font-weight:600;">⚠ '+lbl+'</span>':lbl);}});if(anomalies.length){items.push('<strong>'+sideLbl+' — '+orteilLabel[o]+'</strong> : '+anomalies.join(', '));}}var prec=fieldVal('ped_ongle_'+side+'_autre_txt');if(prec)items.push('<em>'+sideLbl+' — précisions</em> : '+_pedEscapeHtml(prec));});return items;}
-  blocks.push(section('📋 Anamnèse',[].concat(boxesItems(pfx('ped_motif_')).length?['<strong>Motif</strong> : '+boxesItems(pfx('ped_motif_')).join(', ')]:[],[txtItem('ped_motif_autre_txt')],boxesItems(pfx('ped_atcd_')).length?['<strong>ATCD médicaux</strong> : '+boxesItems(pfx('ped_atcd_')).join(', ')]:[],[radioItem('ped_diabete_type'),radioItem('ped_diabete_equilibre'),txtItem('ped_hba1c')],boxesItems(pfx('ped_atcdp_')).length?['<strong>ATCD podologiques</strong> : '+boxesItems(pfx('ped_atcdp_')).join(', ')]:[],[radioItem('ped_autonomie'),radioItem('ped_vue')],boxesItems(pfx('ped_hygiene_')).length?['<strong>Hygiène</strong> : '+boxesItems(pfx('ped_hygiene_')).join(', ')]:[],boxesItems(pfx('ped_chaussage_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussage_')).join(', ')]:[],[txtItem('ped_chaussage_autre_txt')],boxesItems(pfx('ped_activite_')).length?['<strong>Activité</strong> : '+boxesItems(pfx('ped_activite_')).join(', ')]:[],[txtItem('ped_profession')],boxesItems(pfx('ped_ttt_')).length?['<strong>Traitements</strong> : '+boxesItems(pfx('ped_ttt_')).join(', ')]:[],[txtItem('ped_ttt_autre_txt')])));
-  blocks.push(section('🔬 Examen dermatologique',[].concat(boxesItems(pfx('ped_derm_')),[radioItem('ped_derm_cor_type'),txtItem('ped_derm_eva'),radioItem('ped_derm_etat'),radioItem('ped_derm_trophicite'),txtItem('ped_derm_autre_txt')])));
-  blocks.push(section('🦶 Examen unguéal',ongleItems()));
-  blocks.push(section('🩸 Dépistage vasculaire',[radioItem('ped_vasc_pedieux_d'),radioItem('ped_vasc_pedieux_g'),radioItem('ped_vasc_tibial_d'),radioItem('ped_vasc_tibial_g'),radioItem('ped_vasc_trc'),radioItem('ped_vasc_temp')].concat(boxesItems(pfx('ped_vasc_')).length?['<strong>Autres signes</strong> : '+boxesItems(pfx('ped_vasc_')).join(', ')]:[],[radioItem('ped_vasc_conclusion')])));
-  blocks.push(section('🧠 Dépistage neurologique',[radioItem('ped_neuro_mono_d'),radioItem('ped_neuro_mono_g'),radioItem('ped_neuro_vibra_d'),radioItem('ped_neuro_vibra_g'),radioItem('ped_neuro_conclusion')]));
-  var gradeItems=[];boxesItems(pfx('ped_grade_')).forEach(function(it){gradeItems.push(it);});var gradeR=radioVal('ped_grade_value');if(gradeR){var sign=_PED_GRADE_SIGN[gradeR.value]||'';gradeItems.push('<span style="display:inline-block;background:rgba(217,119,6,0.12);border-left:4px solid #d97706;border-radius:4px;padding:3px 8px;font-weight:700;color:#1f2937;">Grade retenu : '+_pedEscapeHtml(gradeR.value)+' — '+_pedEscapeHtml(sign)+'</span>');}blocks.push(section('📊 Gradation du risque (HAS)',gradeItems));
-  blocks.push(section('🦴 Morphostatique & chaussage',[].concat(boxesItems(pfx('ped_morpho_hallux_valgus','ped_morpho_griffes','ped_morpho_quintus','ped_morpho_pied_')).length?['<strong>Déformations</strong> : '+boxesItems(pfx('ped_morpho_hallux_valgus','ped_morpho_griffes','ped_morpho_quintus','ped_morpho_pied_')).join(', ')]:[],boxesItems(pfx('ped_morpho_appui_')).length?['<strong>Hyperappui</strong> : '+boxesItems(pfx('ped_morpho_appui_')).join(', ')]:[],boxesItems(pfx('ped_chaussex_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussex_')).join(', ')]:[],[txtItem('ped_chaussex_autre_txt')])));
-  blocks.push(section('💊 Soins & projet thérapeutique',[].concat(boxesItems(pfx('ped_soin_')).length?['<strong>Soins réalisés</strong> : '+boxesItems(pfx('ped_soin_')).join(', ')]:[],boxesItems(pfx('ped_appar_')).length?['<strong>Appareillages</strong> : '+boxesItems(pfx('ped_appar_')).join(', ')]:[],boxesItems(pfx('ped_conseil_')).length?['<strong>Conseils</strong> : '+boxesItems(pfx('ped_conseil_')).join(', ')]:[],[txtItem('ped_suivi_freq'),txtItem('ped_suivi_rdv')],boxesItems(pfx('ped_adress_')).length?['<strong>Adressage</strong> : '+boxesItems(pfx('ped_adress_')).join(', ')]:[],[txtItem('ped_adress_motif')],boxesItems(function(b){return b.field==='ped_consentement';}),[txtItem('ped_soin_autre_txt')])));
-  var html=blocks.filter(function(b){return b;}).join('');
+  function ongleItems(){var items=[];var orteilLabel={1:'O1 (Hallux)',2:'O2',3:'O3',4:'O4',5:'O5'};[['d','Pied D'],['g','Pied G']].forEach(function(pied){var side=pied[0],sideLbl=pied[1];for(var o=1;o<=5;o++){var anomalies=[];_PED_ONGLE_ORDER.forEach(function(suf){var f='ped_ongle_'+side+o+'_'+suf;if(boxOn(f)){var lbl=_PED_ONGLE_LABELS[suf];anomalies.push(suf==='suspect'?'<span style="color:#c0392b;font-weight:600;">⚠ '+lbl+'</span>':lbl);}});if(anomalies.length){items.push('<strong>'+sideLbl+' — '+orteilLabel[o]+'</strong> : '+anomalies.join(', '));}}var prec=fieldVal('ped_ongle_'+side+'_autre_txt');if(prec)items.push('<em>'+sideLbl+' — précisions</em> : '+_pedEscapeHtml(prec));});return items;}
+  var sections=[];
+  function pushSection(titre,items){var real=items.filter(function(x){return x&&x.trim()!=='';});if(real.length)sections.push({titre:titre,items:real});}
+  pushSection('📋 Anamnèse',[].concat(boxesItems(pfx('ped_motif_')).length?['<strong>Motif</strong> : '+boxesItems(pfx('ped_motif_')).join(', ')]:[],[txtItem('ped_motif_autre_txt')],boxesItems(pfx('ped_atcd_')).length?['<strong>ATCD médicaux</strong> : '+boxesItems(pfx('ped_atcd_')).join(', ')]:[],[radioItem('ped_diabete_type'),radioItem('ped_diabete_equilibre'),txtItem('ped_hba1c')],boxesItems(pfx('ped_atcdp_')).length?['<strong>ATCD podologiques</strong> : '+boxesItems(pfx('ped_atcdp_')).join(', ')]:[],[radioItem('ped_autonomie'),radioItem('ped_vue')],boxesItems(pfx('ped_hygiene_')).length?['<strong>Hygiène</strong> : '+boxesItems(pfx('ped_hygiene_')).join(', ')]:[],boxesItems(pfx('ped_chaussage_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussage_')).join(', ')]:[],[txtItem('ped_chaussage_autre_txt')],boxesItems(pfx('ped_activite_')).length?['<strong>Activité</strong> : '+boxesItems(pfx('ped_activite_')).join(', ')]:[],[txtItem('ped_profession')],boxesItems(pfx('ped_ttt_')).length?['<strong>Traitements</strong> : '+boxesItems(pfx('ped_ttt_')).join(', ')]:[],[txtItem('ped_ttt_autre_txt')]));
+  pushSection('🔬 Examen dermatologique',[].concat(boxesItems(pfx('ped_derm_')),[radioItem('ped_derm_cor_type'),txtItem('ped_derm_eva'),radioItem('ped_derm_etat'),radioItem('ped_derm_trophicite'),txtItem('ped_derm_autre_txt')]));
+  pushSection('🦶 Examen unguéal',ongleItems());
+  pushSection('🩸 Dépistage vasculaire',[radioItem('ped_vasc_pedieux_d'),radioItem('ped_vasc_pedieux_g'),radioItem('ped_vasc_tibial_d'),radioItem('ped_vasc_tibial_g'),radioItem('ped_vasc_trc'),radioItem('ped_vasc_temp')].concat(boxesItems(pfx('ped_vasc_')).length?['<strong>Autres signes</strong> : '+boxesItems(pfx('ped_vasc_')).join(', ')]:[],[radioItem('ped_vasc_conclusion')]));
+  pushSection('🧠 Dépistage neurologique',[radioItem('ped_neuro_mono_d'),radioItem('ped_neuro_mono_g'),radioItem('ped_neuro_vibra_d'),radioItem('ped_neuro_vibra_g'),radioItem('ped_neuro_conclusion')]);
+  var gradeItems=[];boxesItems(pfx('ped_grade_')).forEach(function(it){gradeItems.push(it);});var gradeR=radioVal('ped_grade_value');if(gradeR){var sign=_PED_GRADE_SIGN[gradeR.value]||'';gradeItems.push('<span style="display:inline-block;background:rgba(217,119,6,0.12);border-left:4px solid #d97706;border-radius:4px;padding:3px 8px;font-weight:700;color:#1f2937;">Grade retenu : '+_pedEscapeHtml(gradeR.value)+' — '+_pedEscapeHtml(sign)+'</span>');}pushSection('📊 Gradation du risque (HAS)',gradeItems);
+  pushSection('🦴 Morphostatique & chaussage',[].concat(boxesItems(pfx('ped_morpho_hallux_valgus','ped_morpho_griffes','ped_morpho_quintus','ped_morpho_pied_')).length?['<strong>Déformations</strong> : '+boxesItems(pfx('ped_morpho_hallux_valgus','ped_morpho_griffes','ped_morpho_quintus','ped_morpho_pied_')).join(', ')]:[],boxesItems(pfx('ped_morpho_appui_')).length?['<strong>Hyperappui</strong> : '+boxesItems(pfx('ped_morpho_appui_')).join(', ')]:[],boxesItems(pfx('ped_chaussex_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussex_')).join(', ')]:[],[txtItem('ped_chaussex_autre_txt')]));
+  pushSection('💊 Soins & projet thérapeutique',[].concat(boxesItems(pfx('ped_soin_')).length?['<strong>Soins réalisés</strong> : '+boxesItems(pfx('ped_soin_')).join(', ')]:[],boxesItems(pfx('ped_appar_')).length?['<strong>Appareillages</strong> : '+boxesItems(pfx('ped_appar_')).join(', ')]:[],boxesItems(pfx('ped_conseil_')).length?['<strong>Conseils</strong> : '+boxesItems(pfx('ped_conseil_')).join(', ')]:[],[txtItem('ped_suivi_freq'),txtItem('ped_suivi_rdv')],boxesItems(pfx('ped_adress_')).length?['<strong>Adressage</strong> : '+boxesItems(pfx('ped_adress_')).join(', ')]:[],[txtItem('ped_adress_motif')],boxesItems(function(b){return b.field==='ped_consentement';}),[txtItem('ped_soin_autre_txt')]));
+  return sections;
+}
+
+// Rendu HTML écran de la synthèse — délègue la collecte à
+// _collectPedicurieSections() (mode DOM), rendu inchangé.
+function genererSynthesePedicurie(){
+  var out=document.getElementById('pedicurie-synthese-result'); if(!out)return;
+  var root=document.getElementById('pg-pedicurie'); if(!root){out.innerHTML='';return;}
+  var sections=_collectPedicurieSections();
+  var html=sections.map(function(s){
+    var lis=s.items.map(function(it){return '<li style="margin:2px 0;">'+it+'</li>';}).join('');
+    return '<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#b7740a;border-bottom:1px solid rgba(217,119,6,0.25);padding-bottom:3px;margin-bottom:6px;">'+s.titre+'</div><ul style="margin:0;padding-left:18px;list-style:disc;font-size:13px;color:#222;line-height:1.5;">'+lis+'</ul></div>';
+  }).join('');
   if(!html){out.innerHTML='<div style="font-size:13px;color:#666;font-style:italic;padding:8px 0;">Aucune donnée renseignée pour le moment.</div>';return;}
   out.innerHTML='<div style="background:rgba(217,119,6,0.04);border:1px solid rgba(217,119,6,0.18);border-radius:8px;padding:12px 14px;">'+html+'</div>';
 }
@@ -23681,6 +23773,54 @@ function openComparePosturo(patIdx) {
   renderCompare();
 }
 
+// #117-podo/pédicurie — Ouverture générique de la comparaison pour les 2
+// nouveaux modules (mêmes règles que openCompareSport/openComparePosturo :
+// options = archives en ordre push PUIS « Bilan en cours », défaut A=plus
+// ancien / B=plus récent). Factorisé plutôt que dupliqué une 3e et 4e fois.
+function _openCompareGeneric(patIdx, type, archives, hasCurrent) {
+  const p = patients[patIdx];
+  if (!p) return;
+  selectPatient(p);
+  const selA = document.getElementById('compare-sel-a');
+  const selB = document.getElementById('compare-sel-b');
+  if (!selA || !selB) return;
+  const options = [];
+  (archives || []).forEach((b, idx) => {
+    options.push({ value: 'archive:' + idx, label: (b.label || 'Bilan'), date: b.date || '' });
+  });
+  if (hasCurrent) options.push({ value: 'current', label: 'Bilan en cours', date: '' });
+  const optionsHtml = options.map(o =>
+    '<option value="' + o.value + '">' + o.label + (o.date ? ' — ' + o.date : '') + '</option>'
+  ).join('');
+  selA.innerHTML = optionsHtml;
+  selB.innerHTML = optionsHtml;
+  if (options.length >= 2) {
+    selA.value = options[0].value;
+    selB.value = options[options.length - 1].value;
+  }
+  _compareType = type;
+  selA.onchange = renderCompare;
+  selB.onchange = renderCompare;
+  const nameEl = document.getElementById('compare-patient-name');
+  if (nameEl) nameEl.textContent = (p.prenom || '') + ' ' + (p.nom || '');
+  nav('pg-compare');
+  renderCompare();
+}
+
+function openComparePodopediatrie(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  _openCompareGeneric(patIdx, 'podopediatrie', p.bilansPodopediatrie,
+    !!p.currentBilanPodopediatrieSousType);
+}
+
+function openComparePedicurie(patIdx) {
+  const p = patients[patIdx];
+  if (!p) return;
+  _openCompareGeneric(patIdx, 'pedicurie', p.bilansPedicurie,
+    !!p.currentBilanPedicurieSousType);
+}
+
 // #117 Étape A / #196 — Résout une valeur de <select> ('current' ou
 // 'archive:N') vers { label, bilanData, mesures }. Le label inclut la date
 // pour les archives ; « Bilan en cours » n'a pas de date affichée. Renvoie
@@ -23688,21 +23828,35 @@ function openComparePosturo(patIdx) {
 // entre 2 selects). type='posturo' lit bilansPosturo/bilanDataPosturo — les
 // archives posturo n'ont pas de champ mesures séparé (contrairement au sport,
 // tout est dans bilanDataPosturo) → mesures reste null dans ce cas.
+// #117-podo/pédicurie — types 'podopediatrie' et 'pedicurie' ajoutés : objet
+// de données unique (bilanDataPodopediatrie / bilanDataPedicurie), mesures null.
 function _resolveCompareBilan(p, value, type) {
   if (!p || !value) return null;
-  const isPosturo = type === 'posturo';
+  // Par type : [collection d'archives, clé de données dans l'archive/le patient]
+  const CFG = {
+    sport:         { arr: 'bilansSport',         key: 'bilanData' },
+    posturo:       { arr: 'bilansPosturo',       key: 'bilanDataPosturo' },
+    podopediatrie: { arr: 'bilansPodopediatrie', key: 'bilanDataPodopediatrie' },
+    pedicurie:     { arr: 'bilansPedicurie',     key: 'bilanDataPedicurie' },
+  };
+  const cfg = CFG[type] || CFG.sport;
+  const isSport = type === 'sport' || !CFG[type];
   if (value === 'current') {
-    return isPosturo
-      ? { label: 'Bilan en cours', bilanData: p.bilanDataPosturo || {}, mesures: null }
-      : { label: 'Bilan en cours', bilanData: p.bilanData || {}, mesures: p.mesures || {} };
+    return {
+      label: 'Bilan en cours',
+      bilanData: p[cfg.key] || {},
+      mesures: isSport ? (p.mesures || {}) : null,
+    };
   }
   const m = value.match(/^archive:(\d+)$/);
   if (!m) return null;
-  const b = (isPosturo ? p.bilansPosturo : p.bilansSport || [])[parseInt(m[1], 10)];
+  const b = (p[cfg.arr] || [])[parseInt(m[1], 10)];
   if (!b) return null;
-  return isPosturo
-    ? { label: (b.label || 'Bilan') + (b.date ? ' — ' + b.date : ''), bilanData: b.bilanDataPosturo || {}, mesures: null }
-    : { label: (b.label || 'Bilan') + (b.date ? ' — ' + b.date : ''), bilanData: b.bilanData || {}, mesures: b.mesures || {} };
+  return {
+    label: (b.label || 'Bilan') + (b.date ? ' — ' + b.date : ''),
+    bilanData: b[cfg.key] || {},
+    mesures: isSport ? (b.mesures || {}) : null,
+  };
 }
 
 // #117 Étape A / #196 — Rendu générique du tableau de comparaison 3 colonnes
@@ -23729,8 +23883,17 @@ function renderCompare() {
     content.innerHTML = '<div style="color:#888;font-style:italic;padding:8px 0;">Sélectionnez 2 bilans à comparer.</div>';
     return;
   }
-  const sectionsA = _compareType === 'posturo' ? _extractPosturoSections(a.bilanData) : _extractSportSections(a.bilanData, a.mesures);
-  const sectionsB = _compareType === 'posturo' ? _extractPosturoSections(b.bilanData) : _extractSportSections(b.bilanData, b.mesures);
+  // #117-podo/pédicurie — extracteur par type. podo/pédicurie passent par les
+  // collecteurs de synthèse en mode DONNÉES (srcData) : même source que la
+  // synthèse écran et le rapport, zéro divergence possible.
+  const extractFor = (bilan) => {
+    if (_compareType === 'posturo') return _extractPosturoSections(bilan.bilanData);
+    if (_compareType === 'podopediatrie') return _collectPodopediatrieSyntheseSections(bilan.bilanData);
+    if (_compareType === 'pedicurie') return _collectPedicurieSections(bilan.bilanData);
+    return _extractSportSections(bilan.bilanData, bilan.mesures);
+  };
+  const sectionsA = extractFor(a);
+  const sectionsB = extractFor(b);
   // Filtre défensif : ne garder que les sections texte (items). posturo comme
   // sport n'en produisent aujourd'hui que de ce type (les sections visuelles
   // — silhouettes, photos annotées, empreinte, plan de semelles — sont
