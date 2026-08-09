@@ -13212,7 +13212,9 @@ function _extractPosturoSections(d) {
   if(d.activiteQuot) anam.push(['Activité quotidienne', d.activiteQuot]);
   if(d.eva !== undefined && d.eva !== '') anam.push(['EVA Douleur', d.eva+'/10']);
   if(d.douleur) anam.push(['Douleur', d.douleur]);
-  if(d.douleurDetail) anam.push(['Douleur — localisation/horaire', d.douleurDetail]);
+  // #226-C — label court : l'ancien « Douleur — localisation/horaire »
+  // débordait de la colonne label du rapport (retour terrain, texte collé).
+  if(d.douleurDetail) anam.push(['Localisation douleur', d.douleurDetail]);
   if(anam.length) sections.push({titre:'1. Anamnèse', items:anam, color:'#2a7a4e'});
 
   // 2. Morphostatique (texte — les silhouettes sont gérées séparément par
@@ -14763,7 +14765,6 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
     <div class="rp-pt-item"><strong>Âge · Latéralité</strong>${age} · ${_escHtml(p.lat||'—')}</div>
     <div class="rp-pt-item"><strong>Sport</strong>${_escHtml(p.sport||'—')}</div>
     <div class="rp-pt-item"><strong>Poids · Taille</strong>${_escHtml(p.poids||'—')} kg · ${_escHtml(p.taille||'—')} cm</div>
-    ${p.motif ? `<div class="rp-pt-item"><strong>Motif</strong>${_escHtml(p.motif)}</div>` : ''}
     <div class="rp-pt-item"><strong>Date</strong>${p.date}</div>`;
 
   // 3. Corps : sectionsHTML (tests bioméca) + concluHTML + bilanSection
@@ -14926,10 +14927,13 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
   // affichés dans rp-pt-info-block L5734-5740).
   h += sec('Anamnèse');
   h += '<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px;">';
+  // #226-C — la localisation de la douleur est déplacée APRÈS la ligne
+  // « Douleur » (radio), et objectif/chaussage sportif (#226-B) sont ajoutés.
   [
     ['Sport(s) pratiqué(s) — type, fréquence, intensité, niveau','sport_detail'],
+    ['Objectif sportif / échéance','objectif_sportif'],
+    ['Chaussage sportif','chaussage_sportif'],
     ['Motif de consultation','motif'],
-    ['Localisation et horaire de la douleur (texte libre)','douleur'],
     ['Antécédents (personnel / familiaux)','antecedents'],
     ['Examens déjà réalisés','examens'],
     ['Travail / Profession','travail'],
@@ -14944,6 +14948,8 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
   // EVA Douleur (range 0-10) — affiché seulement si valeur numérique > 0
   const evaNum = parseInt(bd.eva, 10);
   if(!isNaN(evaNum) && evaNum > 0) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">EVA Douleur</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+evaNum+'/10</td></tr>';
+  // #226-C — localisation/horaire juste sous la douleur (retour terrain).
+  if(bd.douleur) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Localisation et horaire de la douleur</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+_escHtml(bd.douleur)+'</td></tr>';
   // Consultation 1ère intention (radio) — affiché seulement si 'oui' (parité synthèse)
   if(bd['1ere_intention'] === 'oui') h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Consultation 1ère intention</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">Oui</td></tr>';
   if(bd.ttt_podo) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;font-size:9px;">Traitement podologique</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">'+yn('ttt_podo')+(bd.ttt_podo_detail?' — '+_escHtml(bd.ttt_podo_detail):'')+'</td></tr>';
