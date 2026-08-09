@@ -957,6 +957,50 @@ async function _syncPatientToNormalizedTables(p) {
     const podopediatrieEnCours = p.currentBilanPodopediatrieSousType != null;
     const pedicurieEnCours = p.currentBilanPedicurieSousType != null;
 
+    // #220 — Payload de sync SANS les dataURLs déjà migrées vers Storage
+    // (Path jumeau présent). Les prefetch (rapports, comparaison #117-B)
+    // réhydratent les dataURLs dans les objets RAM — y compris les ARCHIVES ;
+    // le strip #35 protège le localStorage mais la sync envoyait l'objet RAM
+    // tel quel → payloads de plusieurs Mo → Postgres 57014 « statement
+    // timeout » (retour terrain, POST /bilans 500). Copie clé à clé, critère
+    // générique dataURL + Path jumeau (couvre clés fixes ET dynamiques des
+    // galeries) ; les dataURLs NON migrées (pas de Path) restent dans le
+    // payload — elles n'existent nulle part ailleurs. Objets RAM non mutés.
+    const cleanPayload = (obj) => {
+      if (!obj || typeof obj !== 'object') return obj;
+      const out = {};
+      for (const k in obj) {
+        const v = obj[k];
+        if (typeof v === 'string' && v.startsWith('data:') && obj[k + 'Path']) continue;
+        out[k] = v;
+      }
+      return out;
+    };
+    // Idem pour mesures sport : entrées photos/frames { dataUrl, path } —
+    // le dataUrl est omis quand path est présent (miroir stripMesures #35).
+    const cleanMesures = (mesures) => {
+      if (!mesures) return {};
+      const out = {};
+      for (const tid in mesures) {
+        const t = mesures[tid];
+        if (!t || typeof t !== 'object' || tid.startsWith('_')) { out[tid] = t; continue; }
+        const ct = Object.assign({}, t);
+        ['photos', 'frames'].forEach((arrKey) => {
+          if (!Array.isArray(ct[arrKey])) return;
+          ct[arrKey] = ct[arrKey].map((e) => {
+            if (e && e.path && typeof e.dataUrl === 'string' && e.dataUrl.startsWith('data:')) {
+              const ce = Object.assign({}, e);
+              delete ce.dataUrl;
+              return ce;
+            }
+            return e;
+          });
+        });
+        out[tid] = ct;
+      }
+      return out;
+    };
+
     // Bilan sport en cours (non archivé) — clé de contenu = mesures OU bilanData.
     if (sportEnCours && ((p.mesures && Object.keys(p.mesures).length > 0) || hasBilanDataContent(p.bilanData))) {
       if (!p.mesures) p.mesures = {};
@@ -975,7 +1019,7 @@ async function _syncPatientToNormalizedTables(p) {
         // dans renderPatientList() (js/biomeca.js), pour rester la même valeur
         // le jour où la liste passera à une lecture légère.
         nb_tests: Object.keys(p.mesures).length,
-        payload: { mesures: p.mesures, bilanData: p.bilanData || {} },
+        payload: { mesures: cleanMesures(p.mesures), bilanData: cleanPayload(p.bilanData || {}) },
       });
     }
 
@@ -999,7 +1043,7 @@ async function _syncPatientToNormalizedTables(p) {
         // module échoue silencieusement (authFetch ne relance/n'alerte pas
         // sur un 400 générique). Découvert via le shadow-read #167.
         nb_tests: null,
-        payload: p.bilanDataPosturo,
+        payload: cleanPayload(p.bilanDataPosturo),
       });
     }
 
@@ -1016,7 +1060,7 @@ async function _syncPatientToNormalizedTables(p) {
         label: null,
         bilan_date: null,
         nb_tests: null, // cf. commentaire sur la ligne posturo ci-dessus
-        payload: p.bilanDataPodopediatrie,
+        payload: cleanPayload(p.bilanDataPodopediatrie),
       });
     }
 
@@ -1033,7 +1077,7 @@ async function _syncPatientToNormalizedTables(p) {
         label: null,
         bilan_date: null,
         nb_tests: null, // cf. commentaire sur la ligne posturo ci-dessus
-        payload: p.bilanDataPedicurie,
+        payload: cleanPayload(p.bilanDataPedicurie),
       });
     }
 
@@ -1050,7 +1094,7 @@ async function _syncPatientToNormalizedTables(p) {
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
         nb_tests: null, // archive, pas de sous-libellé "en cours" — cf. commentaire ci-dessus
-        payload: { mesures: b.mesures || {}, bilanData: b.bilanData || {} },
+        payload: { mesures: cleanMesures(b.mesures || {}), bilanData: cleanPayload(b.bilanData || {}) },
       });
     });
 
@@ -1068,7 +1112,7 @@ async function _syncPatientToNormalizedTables(p) {
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
         nb_tests: null, // cf. commentaire sur la ligne posturo en cours ci-dessus
-        payload: b.bilanDataPosturo,
+        payload: cleanPayload(b.bilanDataPosturo),
       });
     });
 
@@ -1086,7 +1130,7 @@ async function _syncPatientToNormalizedTables(p) {
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
         nb_tests: null, // cf. commentaire sur la ligne posturo en cours ci-dessus
-        payload: b.bilanDataPodopediatrie,
+        payload: cleanPayload(b.bilanDataPodopediatrie),
       });
     });
 
@@ -1104,7 +1148,7 @@ async function _syncPatientToNormalizedTables(p) {
         label: b.label || null,
         bilan_date: _parseFrDateToISO(b.date),
         nb_tests: null, // cf. commentaire sur la ligne posturo en cours ci-dessus
-        payload: b.bilanDataPedicurie,
+        payload: cleanPayload(b.bilanDataPedicurie),
       });
     });
 
