@@ -23305,12 +23305,12 @@ function _collectSportSyntheseSections(d, readers) {
     an.push('TTT podologique' + (d.ttt_podo_detail ? ': ' + d.ttt_podo_detail : ''));
   }
   if(d.notes_generales) an.push('Notes: ' + d.notes_generales);
-  if(an.length) sections.push({ titre: '🩺 Anamnèse', items: [an.join(' · ')] });
+  if(an.length) sections.push({ titre: '🩺 Anamnèse', items: an });
 
   // 2. Morphostatique (ssec-1) — Hypothèse chaîne musculaire (textarea).
   const morpho = [];
   if(d.chaine_musculaire) morpho.push('Hypothèse chaîne musculaire: ' + d.chaine_musculaire);
-  if(morpho.length) sections.push({ titre: '🧍 Morphostatique', items: [morpho.join(' · ')] });
+  if(morpho.length) sections.push({ titre: '🧍 Morphostatique', items: morpho });
 
   // #106-B fix2 — Analyse posturale profil DANS la source partagée (synthèse +
   // rapport sport). _buildSportSyntheseHTMLForRapport reçoit currentPatient.bilanData
@@ -23429,7 +23429,7 @@ function _collectSportSyntheseSections(d, readers) {
   }
   if(d.sp_dyn_equilibre) ec.push('Équilibré: ' + d.sp_dyn_equilibre);
   if(d.sp_dyn_scoliose) ec.push('Scoliose: ' + d.sp_dyn_scoliose);
-  if(ec.length) sections.push({ titre: '⚖️ Examen en charge / décharge', items: [ec.join(' · ')] });
+  if(ec.length) sections.push({ titre: '⚖️ Examen en charge / décharge', items: ec });
 
   // 4. Rotation nucale (ssec-3, B1 #73) — 4 selects 1/5 → 5/5
   const rot = [];
@@ -23437,7 +23437,7 @@ function _collectSportSyntheseSections(d, readers) {
   if(d.sp_rotn_g_mousse) rot.push('Rot. G mousse: ' + d.sp_rotn_g_mousse + '/5');
   if(d.sp_rotn_d_std) rot.push('Rot. D standard: ' + d.sp_rotn_d_std + '/5');
   if(d.sp_rotn_d_mousse) rot.push('Rot. D mousse: ' + d.sp_rotn_d_mousse + '/5');
-  if(rot.length) sections.push({ titre: '🔄 Rotation nucale', items: [rot.join(' · ')] });
+  if(rot.length) sections.push({ titre: '🔄 Rotation nucale', items: rot });
 
   // 5. Mobilité axe corporel (ssec-4, B1 #73) — 16 cb limitation
   const mob = [];
@@ -23449,8 +23449,17 @@ function _collectSportSyntheseSections(d, readers) {
     if(d['sp_mob_'+k+'_d_mousse']) cols.push('D mousse');
     if(cols.length) mob.push('Limitation ' + lbl + ' (' + cols.join(', ') + ')');
   });
-  if(mob.length) sections.push({ titre: '📐 Mobilité axe corporel', items: [mob.join(' · ')] });
+  if(mob.length) sections.push({ titre: '📐 Mobilité axe corporel', items: mob });
 
+  // #117-grain — les 8 sections « listes » de ce collecteur (Anamnèse,
+  // Morphostatique, Charge/décharge, Rotation nucale, Mobilité axe, Mandibule,
+  // Traitements, Tests avant/après) émettaient UNE chaîne agrégée
+  // items:[xx.join(' · ')] : dans la comparaison de bilans, le label = la
+  // liste entière → le moindre écart de cases empêchait tout matching et la
+  // partie IDENTIQUE (« Serrage de dent: amélioration ») ressortait surlignée
+  // (retour terrain Scio, section Mandibule). Désormais items = éléments
+  // séparés : matching fin par élément dans le comparateur, et une puce par
+  // élément dans synthèse/rapport — aligné sur le style posturo/podo/pédicurie.
   // 6. Mandibule (ssec-5, A3) — radios + cb sous-conditionnelles + 3 ATM cb
   //    (post-A3 ajust). + tonicite_ouv (Amélioration ouverture de bouche /
   //    ATM secondaire) ajouté (audit v3).
@@ -23485,7 +23494,7 @@ function _collectSportSyntheseSections(d, readers) {
   if(d.atm_reductible) atms.push('articulaire réductible');
   if(d.atm_irreductible) atms.push('articulaire irréductible');
   if(atms.length) man.push('ATM: ' + atms.join(', '));
-  if(man.length) sections.push({ titre: '🦷 Mandibule', items: [man.join(' · ')] });
+  if(man.length) sections.push({ titre: '🦷 Mandibule', items: man });
 
   // 7. Stabilométrique (ssec-6) — couverture complète des 4 niveaux YO/YF/YOM/YFM
   //    × 4 paramètres (surface, ratio1, romberg, plantaire) + conclusion. Tous
@@ -23577,7 +23586,7 @@ function _collectSportSyntheseSections(d, readers) {
   if(ttt.recouvrement && ttt.recouvrement.length) tt.push('Recouvrement: ' + ttt.recouvrement.join(', '));
   if(ttt.semellesDesc) tt.push('Semelles: ' + ttt.semellesDesc);
   if(ttt.prochainRdv) tt.push('Prochain RDV: ' + _escHtml(ttt.prochainRdv));
-  if(tt.length) sections.push({ titre: '💊 Traitements', items: [tt.join(' · ')] });
+  if(tt.length) sections.push({ titre: '💊 Traitements', items: tt });
 
   // #93 — Tests avant/après (ssec-9, parité synthèse posturo Batch 4). Lecture
   // DOM live des radios sport ta_* (cohérent avec le reste de genererSyntheseSport
@@ -23590,7 +23599,7 @@ function _collectSportSyntheseSections(d, readers) {
     const v = rad(k);
     if(v) taTests.push(TESTS_AVANT_APRES_LABELS[SPORT_TESTS_AVANT_APRES[k]]+': '+v);
   });
-  if(taTests.length) sections.push({ titre: '✅ Tests avant/après', items: [taTests.join(' · ')] });
+  if(taTests.length) sections.push({ titre: '✅ Tests avant/après', items: taTests });
 
   // 11. Schémas du patient (ssec-10, A5 — cette section).
   const sp = [];
