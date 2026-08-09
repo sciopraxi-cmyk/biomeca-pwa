@@ -265,6 +265,11 @@
       <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Informations cabinet</div>
       <div id="mc-cabinet" style="font-size:13px;color:var(--fg);"></div>
     </div>
+    <!-- #229-A — Support technique (mailto, pas de dépendance backend) -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Assistance</div>
+      <a href="mailto:contact@verticy.fr?subject=Support%20Verticy" style="display:block;text-align:center;background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:9px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;">✉️ Contacter le support</a>
+    </div>
     <!-- Actions -->
     <!-- Changer mot de passe -->
     <div style="margin-bottom:16px;">
@@ -3167,6 +3172,7 @@
       style="flex:1;font-size:13px;" oninput="renderPatientList()">
     <button class="btn" onclick="openNewPatientModal()" style="background:#2dd4bf;color:#04342C;font-size:13px;white-space:nowrap;">+ Nouveau patient</button>
     <button class="btn" onclick="document.getElementById('doctolib-csv-input').click()" title="Import CSV : base patients / export RDV Doctolib, export DrSanté" style="background:#0e4d91;color:#fff;font-size:13px;white-space:nowrap;">📥 Import CSV</button>
+    <button class="btn" onclick="exportPatientsCSV()" title="Télécharger le répertoire patients au format CSV" style="background:#0e6b5c;color:#fff;font-size:13px;white-space:nowrap;">📤 Export CSV</button>
     <input type="file" id="doctolib-csv-input" accept=".csv" style="display:none;" onchange="importPatientsCSV(this)">
   </div>
   <div id="pt-list-el"></div>
