@@ -13205,10 +13205,14 @@ function _extractPosturoSections(d) {
   if(d.travail) anam.push(['Travail', d.travail]);
   if(d.atcd) anam.push(['Antécédents traumatiques', d.atcd]);
   if(d.appareillage) anam.push(['Appareillage', d.appareillage]);
+  // #226-B — traitements en cours, chaussage, localisation/horaire douleur.
+  if(d.tttCours) anam.push(['Traitements en cours', d.tttCours]);
+  if(d.chaussage) anam.push(['Chaussage', d.chaussage]);
   if(d.examens) anam.push(['Examens complémentaires', d.examens]);
   if(d.activiteQuot) anam.push(['Activité quotidienne', d.activiteQuot]);
   if(d.eva !== undefined && d.eva !== '') anam.push(['EVA Douleur', d.eva+'/10']);
   if(d.douleur) anam.push(['Douleur', d.douleur]);
+  if(d.douleurDetail) anam.push(['Douleur — localisation/horaire', d.douleurDetail]);
   if(anam.length) sections.push({titre:'1. Anamnèse', items:anam, color:'#2a7a4e'});
 
   // 2. Morphostatique (texte — les silhouettes sont gérées séparément par
@@ -17177,6 +17181,13 @@ function _podoPrefillSportDefault() {
 // supprime le sousType à l'ouverture d'archive). Les archives conservent leur
 // instantané : la fiche est la donnée vivante, chaque bilan archivé fige la
 // sienne.
+// #226-B — date du jour ISO pour l'auto-remplissage des dates de consultation
+// (le cas courant : la consultation, c'est aujourd'hui ; champ modifiable).
+function _todayISO() {
+  const n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+}
+
 const _FICHE_PREFILL = {
   sport: {
     enCours: () => currentPatient?.currentBilanSportSousType != null,
@@ -17186,6 +17197,7 @@ const _FICHE_PREFILL = {
       { sel: 'travail', key: 'travail', from: (p) => p.metier },
       { sel: 'sport_detail', key: 'sport_detail', from: (p) => p.sport },
       { sel: 'medecin', key: 'medecin', from: (p) => p.medecinTraitant },
+      { sel: 'date_consult', key: 'date_consult', from: () => _todayISO() },
       { sel: 'antecedents', key: 'antecedents', from: (p) => p.antecedents, up: 'antecedents' },
       { sel: 'examens', key: 'examens', from: (p) => p.examens, up: 'examens' },
     ],
@@ -17198,6 +17210,7 @@ const _FICHE_PREFILL = {
       { sel: 'po-travail', key: 'travail', from: (p) => p.metier },
       { sel: 'po-activite', key: 'activite', from: (p) => p.sport },
       { sel: 'po-medecin', key: 'medecin', from: (p) => p.medecinTraitant },
+      { sel: 'po-date-consult', key: 'dateConsult', from: () => _todayISO() },
       { sel: 'po-atcd', key: 'atcd', from: (p) => p.antecedents, up: 'antecedents' },
       { sel: 'po-examens', key: 'examens', from: (p) => p.examens, up: 'examens' },
     ],
@@ -17207,13 +17220,19 @@ const _FICHE_PREFILL = {
     data: () => currentPatient?.bilanDataPodopediatrie || {},
     el: (f) => document.querySelector('#pg-podopediatrie [data-field="' + f.sel + '"]'),
     // podo_sport reste géré par _podoPrefillSportDefault (#140 Phase 1).
-    fields: [{ sel: 'podo_atcd_txt', key: 'podo_atcd_txt', from: (p) => p.antecedents, up: 'antecedents' }],
+    fields: [
+      { sel: 'podo_atcd_txt', key: 'podo_atcd_txt', from: (p) => p.antecedents, up: 'antecedents' },
+      { sel: 'podo_date_consult', key: 'podo_date_consult', from: () => _todayISO() },
+    ],
   },
   pedicurie: {
     enCours: () => currentPatient?.currentBilanPedicurieSousType != null,
     data: () => currentPatient?.bilanDataPedicurie || {},
     el: (f) => document.querySelector('#pg-pedicurie [data-field="' + f.sel + '"]'),
-    fields: [{ sel: 'ped_profession', key: 'ped_profession', from: (p) => p.metier }],
+    fields: [
+      { sel: 'ped_profession', key: 'ped_profession', from: (p) => p.metier },
+      { sel: 'ped_date_consult', key: 'ped_date_consult', from: () => _todayISO() },
+    ],
   },
 };
 
@@ -18049,12 +18068,23 @@ function _collectPodopediatrieSyntheseSections(srcData) {
   // / podo_exam_* / podo_doul_* remonte automatiquement via boxItems+pfx).
   // Corrections audit : txt/pres/loc/type inexistants supprimés, podo_sport
   // est un data-field text (pas radio), douleur = radio podo_douleur_eva.
+  // #226-B — date de consultation formatée fr (ISO en stockage).
+  var podoDateConsult = fieldVal('podo_date_consult');
+  if (podoDateConsult) {
+    var pdcD = new Date(podoDateConsult + 'T00:00:00');
+    if (!isNaN(pdcD.getTime())) podoDateConsult = pdcD.toLocaleDateString('fr-FR');
+  }
   sections.push({ titre: '📋 Interrogatoire', items: [].concat(
+    podoDateConsult ? ['<strong>Date de consultation</strong> : ' + podoDateConsult] : []
+  ).concat(
     boxItems(pfx('podo_motif_')).length ? ['<strong>Motif</strong> : ' + boxItems(pfx('podo_motif_')).join(', ')] : []
   ).concat(
     boxItems(pfx('podo_atcd_')).length ? ['<strong>ATCD</strong> : ' + boxItems(pfx('podo_atcd_')).join(', ')] : []
   ).concat([
-    txtItem('podo_atcd_txt', 'ATCD précisions')
+    txtItem('podo_atcd_txt', 'ATCD précisions'),
+    // #226-B — développement (âge de la marche, terme de naissance).
+    txtItem('podo_age_marche', 'Âge de la marche'),
+    txtItem('podo_terme', 'Terme de naissance')
   ]).concat(
     boxItems(pfx('podo_exam_')).length ? ['<strong>Examens</strong> : ' + boxItems(pfx('podo_exam_')).join(', ')] : []
   ).concat(
@@ -18526,7 +18556,7 @@ function applyPedicurieGradeSuggestion() {
 // dépendance à bilanDataPedicurie (le DOM est l'état de vérité au moment de
 // la génération, après le balayage save/load). Aucune écriture parasite.
 function _pedEscapeHtml(s){ if(s==null)return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-var _PED_TXT_LABELS={ped_motif_autre_txt:'Autre motif',ped_hba1c:'HbA1c',ped_chaussage_autre_txt:'Chaussage (autre)',ped_profession:'Profession',ped_ttt_autre_txt:'Traitement (autre)',ped_derm_eva:'Douleur (EVA)',ped_derm_autre_txt:'Dermato (précisions)',ped_chaussex_autre_txt:'Chaussage (autre)',ped_suivi_freq:'Fréquence de suivi',ped_suivi_rdv:'Prochain RDV',ped_adress_motif:"Motif d'adressage",ped_soin_autre_txt:'Précisions'};
+var _PED_TXT_LABELS={ped_date_consult:'Date de consultation',ped_allergies_txt:'Allergies',ped_motif_autre_txt:'Autre motif',ped_hba1c:'HbA1c',ped_chaussage_autre_txt:'Chaussage (autre)',ped_profession:'Profession',ped_ttt_autre_txt:'Traitement (autre)',ped_derm_eva:'Douleur (EVA)',ped_derm_autre_txt:'Dermato (précisions)',ped_chaussex_autre_txt:'Chaussage (autre)',ped_suivi_freq:'Fréquence de suivi',ped_suivi_rdv:'Prochain RDV',ped_adress_motif:"Motif d'adressage",ped_soin_autre_txt:'Précisions'};
 var _PED_RADIO_LABELS={ped_diabete_type:'Diabète — type',ped_diabete_equilibre:'Diabète — équilibre',ped_autonomie:'Autonomie soin des pieds',ped_vue:'Vue',ped_derm_cor_type:'Cor — type',ped_derm_etat:'État cutané',ped_derm_trophicite:'Coloration (trophicité)',ped_vasc_pedieux_d:'Pouls pédieux (D)',ped_vasc_pedieux_g:'Pouls pédieux (G)',ped_vasc_tibial_d:'Pouls tibial post. (D)',ped_vasc_tibial_g:'Pouls tibial post. (G)',ped_vasc_trc:'TRC',ped_vasc_temp:'Température des téguments',ped_vasc_conclusion:'Conclusion vasculaire',ped_neuro_mono_d:'Monofilament 10 g (D)',ped_neuro_mono_g:'Monofilament 10 g (G)',ped_neuro_vibra_d:'Sensibilité vibratoire (D)',ped_neuro_vibra_g:'Sensibilité vibratoire (G)',ped_neuro_conclusion:'Conclusion neuro'};
 var _PED_ONGLE_LABELS={mycose:'Onychomycose',epaissi:'Onychauxis',decolle:'Onycholyse',incarne:'Onychocryptose',hematome:'Hématome',courb:'Hypercourbure',perionyxis:'Périonyxis',suspect:'Lésion suspecte'};
 var _PED_ONGLE_ORDER=['mycose','epaissi','decolle','incarne','hematome','courb','perionyxis','suspect'];
@@ -18566,12 +18596,12 @@ function _collectPedicurieSections(srcData){
   function chk(field,label){var safe=_pedEscapeHtml(label);if(_PED_ALERTE_FIELDS[field]||/⚠/.test(label)){return '<span style="color:#c0392b;font-weight:600;">'+safe+'</span>';}return safe;}
   function boxesItems(predicate){return checkedBoxes().filter(predicate).map(function(b){return chk(b.field,b.label);});}
   function radioItem(name){var r=radioVal(name);if(!r)return '';return kv(_PED_RADIO_LABELS[name]||name,r.label);}
-  function txtItem(f){var v=(f==='ped_suivi_freq')?selectText(f):fieldVal(f);if(!v)return '';if(f==='ped_suivi_rdv'){var d=new Date(v+'T00:00:00');if(!isNaN(d.getTime()))v=d.toLocaleDateString('fr-FR');}return kv(_PED_TXT_LABELS[f]||f,v);}
+  function txtItem(f){var v=(f==='ped_suivi_freq')?selectText(f):fieldVal(f);if(!v)return '';if(f==='ped_suivi_rdv'||f==='ped_date_consult'){var d=new Date(v+'T00:00:00');if(!isNaN(d.getTime()))v=d.toLocaleDateString('fr-FR');}return kv(_PED_TXT_LABELS[f]||f,v);}
   function pfx(){var prefixes=Array.prototype.slice.call(arguments);return function(b){return prefixes.some(function(p){return b.field.indexOf(p)===0;});};}
   function ongleItems(){var items=[];var orteilLabel={1:'O1 (Hallux)',2:'O2',3:'O3',4:'O4',5:'O5'};[['d','Pied D'],['g','Pied G']].forEach(function(pied){var side=pied[0],sideLbl=pied[1];for(var o=1;o<=5;o++){var anomalies=[];_PED_ONGLE_ORDER.forEach(function(suf){var f='ped_ongle_'+side+o+'_'+suf;if(boxOn(f)){var lbl=_PED_ONGLE_LABELS[suf];anomalies.push(suf==='suspect'?'<span style="color:#c0392b;font-weight:600;">⚠ '+lbl+'</span>':lbl);}});if(anomalies.length){items.push('<strong>'+sideLbl+' — '+orteilLabel[o]+'</strong> : '+anomalies.join(', '));}}var prec=fieldVal('ped_ongle_'+side+'_autre_txt');if(prec)items.push('<em>'+sideLbl+' — précisions</em> : '+_pedEscapeHtml(prec));});return items;}
   var sections=[];
   function pushSection(titre,items){var real=items.filter(function(x){return x&&x.trim()!=='';});if(real.length)sections.push({titre:titre,items:real});}
-  pushSection('📋 Anamnèse',[].concat(boxesItems(pfx('ped_motif_')).length?['<strong>Motif</strong> : '+boxesItems(pfx('ped_motif_')).join(', ')]:[],[txtItem('ped_motif_autre_txt')],boxesItems(pfx('ped_atcd_')).length?['<strong>ATCD médicaux</strong> : '+boxesItems(pfx('ped_atcd_')).join(', ')]:[],[radioItem('ped_diabete_type'),radioItem('ped_diabete_equilibre'),txtItem('ped_hba1c')],boxesItems(pfx('ped_atcdp_')).length?['<strong>ATCD podologiques</strong> : '+boxesItems(pfx('ped_atcdp_')).join(', ')]:[],[radioItem('ped_autonomie'),radioItem('ped_vue')],boxesItems(pfx('ped_hygiene_')).length?['<strong>Hygiène</strong> : '+boxesItems(pfx('ped_hygiene_')).join(', ')]:[],boxesItems(pfx('ped_chaussage_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussage_')).join(', ')]:[],[txtItem('ped_chaussage_autre_txt')],boxesItems(pfx('ped_activite_')).length?['<strong>Activité</strong> : '+boxesItems(pfx('ped_activite_')).join(', ')]:[],[txtItem('ped_profession')],boxesItems(pfx('ped_ttt_')).length?['<strong>Traitements</strong> : '+boxesItems(pfx('ped_ttt_')).join(', ')]:[],[txtItem('ped_ttt_autre_txt')]));
+  pushSection('📋 Anamnèse',[].concat([txtItem('ped_date_consult')],boxesItems(pfx('ped_motif_')).length?['<strong>Motif</strong> : '+boxesItems(pfx('ped_motif_')).join(', ')]:[],[txtItem('ped_motif_autre_txt')],boxesItems(pfx('ped_atcd_')).length?['<strong>ATCD médicaux</strong> : '+boxesItems(pfx('ped_atcd_')).join(', ')]:[],[radioItem('ped_diabete_type'),radioItem('ped_diabete_equilibre'),txtItem('ped_hba1c')],boxesItems(pfx('ped_atcdp_')).length?['<strong>ATCD podologiques</strong> : '+boxesItems(pfx('ped_atcdp_')).join(', ')]:[],[radioItem('ped_autonomie'),radioItem('ped_vue')],boxesItems(pfx('ped_hygiene_')).length?['<strong>Hygiène</strong> : '+boxesItems(pfx('ped_hygiene_')).join(', ')]:[],boxesItems(pfx('ped_chaussage_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussage_')).join(', ')]:[],[txtItem('ped_chaussage_autre_txt')],boxesItems(pfx('ped_activite_')).length?['<strong>Activité</strong> : '+boxesItems(pfx('ped_activite_')).join(', ')]:[],[txtItem('ped_profession')],boxesItems(pfx('ped_ttt_')).length?['<strong>Traitements</strong> : '+boxesItems(pfx('ped_ttt_')).join(', ')]:[],[txtItem('ped_ttt_autre_txt'),txtItem('ped_allergies_txt')]));
   pushSection('🔬 Examen dermatologique',[].concat(boxesItems(pfx('ped_derm_')),[radioItem('ped_derm_cor_type'),txtItem('ped_derm_eva'),radioItem('ped_derm_etat'),radioItem('ped_derm_trophicite'),txtItem('ped_derm_autre_txt')]));
   pushSection('🦶 Examen unguéal',ongleItems());
   pushSection('🩸 Dépistage vasculaire',[radioItem('ped_vasc_pedieux_d'),radioItem('ped_vasc_pedieux_g'),radioItem('ped_vasc_tibial_d'),radioItem('ped_vasc_tibial_g'),radioItem('ped_vasc_trc'),radioItem('ped_vasc_temp')].concat(boxesItems(pfx('ped_vasc_')).length?['<strong>Autres signes</strong> : '+boxesItems(pfx('ped_vasc_')).join(', ')]:[],[radioItem('ped_vasc_conclusion')]));
@@ -20684,6 +20714,17 @@ function getBilanPosturoHTML() {
           <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">🦺 Appareillage</div>
           <input class="inp" id="po-appareillage" placeholder="Semelles, lunettes..." style="background:#fff;color:#222;"/>
         </div>
+        <!-- #226-B — traitements en cours + chaussage (manques relevés par
+             l'audit des anamnèses : influence posturale des médicaments,
+             pertinence du chaussage dès qu'on parle semelles). -->
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">💊 Traitements en cours</div>
+          <input class="inp" id="po-ttt-cours" placeholder="Antalgiques, psychotropes..." style="background:#fff;color:#222;"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">👟 Chaussage</div>
+          <input class="inp" id="po-chaussage" placeholder="Type, usure, talon..." style="background:#fff;color:#222;"/>
+        </div>
         <div style="grid-column:1/-1;">
           <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin-bottom:3px;">🔬 Examens complémentaires</div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -20720,6 +20761,12 @@ function getBilanPosturoHTML() {
         <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 12px;color:#222;">
           <input type="radio" name="po-douleur" value="non"/> Non
         </label>
+      </div>
+      <!-- #226-B — localisation/horaire (miroir du champ sport 'douleur') :
+           sans lui, le rapport posturo ne peut pas dire OÙ le patient a mal. -->
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:3px;">Localisation et horaire (1ère fois / récidive)</div>
+        <textarea class="inp" id="po-douleur-detail" rows="2" placeholder="Ex: lombaires le soir, récidive..." style="background:#fff;color:#222;"></textarea>
       </div>
       <div style="background:linear-gradient(90deg,#4CAF50,#FFEB3B,#FF9800,#F44336);border-radius:10px;padding:12px 16px;">
         <div style="font-size:13px;font-weight:700;text-align:center;color:#222;margin-bottom:6px;">Échelle Visuelle Analogique</div>
@@ -22472,6 +22519,13 @@ async function genererSynthese() {
   if(anamMotif) anamParts.push('Motif: '+anamMotif);
   const anamDouleur = document.querySelector('input[name="po-douleur"]:checked')?.value;
   if(anamDouleur === 'oui') anamParts.push('Douleur présente');
+  // #226-B — localisation/horaire, traitements en cours, chaussage.
+  const anamDouleurDetail = document.getElementById('po-douleur-detail')?.value?.trim();
+  if(anamDouleurDetail) anamParts.push('Douleur — localisation/horaire: '+anamDouleurDetail);
+  const anamTttCours = document.getElementById('po-ttt-cours')?.value?.trim();
+  if(anamTttCours) anamParts.push('Traitements en cours: '+anamTttCours);
+  const anamChaussage = document.getElementById('po-chaussage')?.value?.trim();
+  if(anamChaussage) anamParts.push('Chaussage: '+anamChaussage);
   const anamEvaTxt = document.getElementById('po-eva-val')?.textContent;
   const anamEvaNum = parseInt(anamEvaTxt, 10);
   if(!isNaN(anamEvaNum) && anamEvaNum > 0) anamParts.push('EVA: '+anamEvaNum+'/10');
@@ -23536,6 +23590,10 @@ function _collectSportSyntheseSections(d, readers) {
   if(d.examens) an.push('Examens: ' + d.examens);
   if(rad('1ere_intention') === 'oui') an.push('Consultation 1ère intention');
   if(d.sport_detail) an.push('Sport: ' + d.sport_detail);
+  // #226-B — objectif/échéance, chaussage sportif, localisation douleur.
+  if(d.objectif_sportif) an.push('Objectif: ' + d.objectif_sportif);
+  if(d.chaussage_sportif) an.push('Chaussage sportif: ' + d.chaussage_sportif);
+  if(d.douleur) an.push('Douleur — localisation/horaire: ' + d.douleur);
   if(d.activite_quot) an.push('Activité quotidienne: ' + d.activite_quot);
   if(rad('ttt_podo') === 'oui') {
     an.push('TTT podologique' + (d.ttt_podo_detail ? ': ' + d.ttt_podo_detail : ''));
@@ -25044,6 +25102,9 @@ async function savePosturoBilan(silent = false) {
   d.atcd=getPoVal('po-atcd'); d.appareillage=getPoVal('po-appareillage');
   d.examens=getPoVal('po-examens'); d['1ereIntention']=getPosturoRadio('po-1ere-intention');
   d.activiteQuot=getPoVal('po-activite-quot'); d.motif=getPoVal('po-motif');
+  // #226-B — traitements en cours, chaussage, localisation/horaire douleur.
+  d.tttCours=getPoVal('po-ttt-cours'); d.chaussage=getPoVal('po-chaussage');
+  d.douleurDetail=getPoVal('po-douleur-detail');
   d.douleur=getPosturoRadio('po-douleur'); d.eva=getPoVal('po-eva');
   d.terrainPred=getPosturoRadio('po-terrain-pred'); d.tactique=getPosturoRadio('po-tactique');
   d.terrain=getPosturoRadio('po-terrain'); d.tensionPrincipal=getPoVal('po-tension-principal');
@@ -25345,6 +25406,9 @@ function loadPosturoBilan() {
   setPoVal('po-atcd',d.atcd); setPoVal('po-appareillage',d.appareillage);
   setPoVal('po-examens',d.examens); setPosturoRadio('po-1ere-intention',d['1ereIntention']);
   setPoVal('po-activite-quot',d.activiteQuot); setPoVal('po-motif',d.motif);
+  // #226-B — traitements en cours, chaussage, localisation/horaire douleur.
+  setPoVal('po-ttt-cours',d.tttCours); setPoVal('po-chaussage',d.chaussage);
+  setPoVal('po-douleur-detail',d.douleurDetail);
   setPosturoRadio('po-douleur',d.douleur);
   if(d.eva!==undefined){setPoVal('po-eva',d.eva);const ev=document.getElementById('po-eva-val');if(ev)ev.textContent=d.eva;}
   setPosturoRadio('po-terrain-pred',d.terrainPred); setPosturoRadio('po-tactique',d.tactique);
