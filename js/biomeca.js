@@ -18610,6 +18610,35 @@ async function _downscaleDataUrl(dataUrl, maxW, quality) {
 // (_userDirty) → modèle RAM (d[key]) → Storage (d[key+'Path']). Sinon un
 // dessin fait dans la session juste avant le clic Rapport (débounce
 // autosave 1 s non écoulé, cf. _readLiveDrawCanvas) était invisible.
+// #148-podo — Un calque PNG peut EXISTER tout en étant VIDE : dessiner puis
+// tout gommer produit un PNG transparent que _serializeDrawCanvas persiste
+// (retour terrain Scio : silhouettes/pieds bruts dans le rapport après
+// effacement). Ce détecteur scanne l'alpha du calque : aucun pixel visible
+// (seuil > 8 pour ignorer les résidus d'anti-aliasing de la soustraction du
+// baseSnapshot) → calque vide, à traiter comme « jamais dessiné » ('nu',
+// silencieux) À L'AFFICHAGE du rapport uniquement. AUCUNE écriture ni
+// suppression de clé (interdit CLAUDE.md : un canvas vide ne prouve rien).
+// En cas d'erreur d'analyse → false : dans le doute on AFFICHE, jamais
+// d'amputation silencieuse du rapport.
+function _overlayDrawingIsEmpty(img) {
+  try {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) return true;
+    var c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    var data = ctx.getImageData(0, 0, w, h).data;
+    for (var i = 3; i < data.length; i += 4) {
+      if (data[i] > 8) return false;
+    }
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
 async function _composePodoMorphoTile(bd, key, baseId, canvasId) {
   var d = bd || {};
   var baseEl = document.getElementById(baseId);
@@ -18637,6 +18666,10 @@ async function _composePodoMorphoTile(bd, key, baseId, canvasId) {
     var drawing = await _podoLoadImage(dataUrl);
     var Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
     if (!Wd || !Hd) return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+    // #148-podo — calque rechargé avec SUCCÈS mais vide (dessiné puis gommé) :
+    // équivalent clinique de « jamais dessiné » → 'nu' silencieux, la tuile
+    // n'imposera pas le bloc. Distinct du 'ko' (rechargement ÉCHOUÉ, rouge).
+    if (_overlayDrawingIsEmpty(drawing)) return { status: 'nu', dataUrl: baseSrc };
     var outH = Math.min(Hd, _MAX_MORPHO_COMPOSITE_H);
     var outW = Math.round(Wd * (outH / Hd));
     var tmp = document.createElement('canvas');
@@ -18685,6 +18718,9 @@ async function _composePodoPieds(bd) {
     var drawing = await _podoLoadImage(dataUrl);
     var Wd = drawing.naturalWidth, Hd = drawing.naturalHeight;
     if (!Wd || !Hd) return { status: hasPath ? 'ko' : 'nu', dataUrl: baseSrc };
+    // #148-podo — calque vide (dessiné puis gommé) → 'nu' silencieux, le bloc
+    // Plan de semelles est omis (miroir de la règle des silhouettes).
+    if (_overlayDrawingIsEmpty(drawing)) return { status: 'nu', dataUrl: baseSrc };
     var outW = Math.min(Wd, _PODO_MAX_PLANTAIRE_W);
     var outH = Math.round(Hd * (outW / Wd));
     var tmp = document.createElement('canvas');
