@@ -12989,6 +12989,15 @@ async function _resolvePosturoRapportImages(bd) {
       : Promise.resolve([]),
     resolvePlantGallery()
   ]);
+  // #148-posturo — calque silhouettes résolu avec SUCCÈS mais VIDE (dessiné
+  // puis tout gommé : _serializeDrawCanvas persiste un PNG transparent vide,
+  // retour terrain Scio, miroir du fix #148-podo). Requalifié 'nu' silencieux
+  // → la section « Morphostatique — Silhouettes » n'est pas splicée, les
+  // gabarits nus n'apparaissent plus. Affichage uniquement, AUCUNE écriture.
+  // Le 'ko' (rechargement Storage ÉCHOUÉ, mention rouge) reste inchangé.
+  if (results[0].status === 'ok' && (await _overlayDataUrlIsEmpty(results[0].dataUrl))) {
+    results[0] = { status: 'nu', dataUrl: null };
+  }
   return {
     bodyCanvas:     results[0],
     empreinte:      results[1],
@@ -18634,6 +18643,18 @@ function _overlayDrawingIsEmpty(img) {
       if (data[i] > 8) return false;
     }
     return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+// #148-posturo — variante dataURL du détecteur ci-dessus : charge l'image
+// puis scanne l'alpha. Erreur de chargement/analyse → false (on affiche).
+async function _overlayDataUrlIsEmpty(dataUrl) {
+  if (!dataUrl) return false;
+  try {
+    var img = await _podoLoadImage(dataUrl);
+    return _overlayDrawingIsEmpty(img);
   } catch (_e) {
     return false;
   }
