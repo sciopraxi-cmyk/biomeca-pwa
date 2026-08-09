@@ -18224,13 +18224,29 @@ function showPodopediatrieSection(idx) {
     if (bodyEl && typeof buildPodopediatrieRapportHTML === 'function') {
       bodyEl.innerHTML = '<div style="font-style:italic;color:var(--mut);padding:12px 0;">⏳ Préparation de l\'aperçu…</div>';
       buildPodopediatrieRapportHTML()
-        .then(function (html) { bodyEl.innerHTML = html; })
+        .then(function (html) { _renderRapportPreviewIframe(bodyEl, html); })
         .catch(function (e) {
           console.error('[podo rapport preview] build échoué :', e);
           bodyEl.innerHTML = '<div style="color:#b91c1c;padding:12px 0;">Erreur lors de la préparation de l\'aperçu.</div>';
         });
     }
   }
+}
+
+// #222 — Aperçu de rapport dans un IFRAME sandboxé. Le document rapport
+// embarque un <style> à sélecteurs GLOBAUX (`*{margin:0…}`, `body{background:
+// #fff}`) : injecté en innerHTML dans la page, il repeignait TOUTE l'app en
+// blanc (« ← Patients » invisible) et PERSISTAIT après navigation, le div
+// d'aperçu restant dans le DOM masqué (retour terrain, podo + pédicurie).
+// L'iframe isole les styles nativement et rend l'aperçu exactement comme le
+// PDF. sandbox vide : aucun script dans le document rapport.
+function _renderRapportPreviewIframe(bodyEl, html) {
+  bodyEl.innerHTML = '';
+  const ifr = document.createElement('iframe');
+  ifr.setAttribute('sandbox', '');
+  ifr.style.cssText = 'width:100%;height:75vh;border:none;background:#fff;border-radius:8px;display:block;';
+  ifr.srcdoc = html;
+  bodyEl.appendChild(ifr);
 }
 
 function showPedicurieSection(idx) {
@@ -18262,7 +18278,9 @@ function showPedicurieSection(idx) {
     const bodyEl = document.getElementById('pedicurie-rapport-body');
     if (bodyEl && typeof buildPedicurieRapportHTML === 'function') {
       try {
-        bodyEl.innerHTML = buildPedicurieRapportHTML();
+        // #222 — iframe sandboxé : les styles globaux du document rapport ne
+        // fuient plus dans l'app (cf. _renderRapportPreviewIframe).
+        _renderRapportPreviewIframe(bodyEl, buildPedicurieRapportHTML());
       } catch (e) {
         console.error('[pedicurie rapport preview] build échoué :', e);
         bodyEl.innerHTML =
