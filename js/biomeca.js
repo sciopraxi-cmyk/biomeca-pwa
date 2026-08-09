@@ -25900,98 +25900,248 @@ async function resilierAbonnement() {
   }
 }
 
-// ===== IMPORT DOCTOLIB CSV =====
-function importDoctolibCSV(input) {
-  const file = input.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const text = e.target.result;
-    const lines = text.split('\n').filter(l => l.trim());
-    if(lines.length < 2) { alert('Fichier CSV vide ou invalide.'); return; }
-    
-    // Détecter les colonnes (Doctolib utilise ; ou ,)
-    const sep = lines[0].includes(';') ? ';' : ',';
-    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/['"]/g,''));
-    
-    // Mapper les colonnes Doctolib
-    const colMap = {
-      nom: headers.findIndex(h => h.includes('nom') && !h.includes('prénom') && !h.includes('prenom')),
-      prenom: headers.findIndex(h => h.includes('prénom') || h.includes('prenom') || h.includes('first')),
-      ddn: headers.findIndex(h => h.includes('naissance') || h.includes('birth') || h.includes('dob')),
-      email: headers.findIndex(h => h.includes('email') || h.includes('mail')),
-      tel: headers.findIndex(h => h.includes('téléphone') || h.includes('telephone') || h.includes('phone') || h.includes('mobile')),
-      sexe: headers.findIndex(h => h.includes('sexe') || h.includes('genre') || h.includes('gender')),
-    };
-    
-    console.log('Headers:', headers);
-    console.log('ColMap:', colMap);
-    
-    let imported = 0, skipped = 0;
-    const newPatients = [];
-    
-    for(let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(sep).map(c => c.trim().replace(/^["']|["']$/g,''));
-      if(cols.length < 2) continue;
-      
-      const nom = colMap.nom >= 0 ? cols[colMap.nom] : '';
-      const prenom = colMap.prenom >= 0 ? cols[colMap.prenom] : '';
-      
-      if(!nom && !prenom) { skipped++; continue; }
-      
-      // Vérifier doublon
-      const exists = patients.some(p => 
-        p.nom?.toLowerCase() === nom.toLowerCase() && 
-        p.prenom?.toLowerCase() === prenom.toLowerCase()
-      );
-      if(exists) { skipped++; continue; }
-      
-      // Formater la date
-      let ddn = colMap.ddn >= 0 ? cols[colMap.ddn] : '';
-      if(ddn) {
-        // Convertir DD/MM/YYYY en YYYY-MM-DD
-        const parts = ddn.split(/[/\-.]/);
-        if(parts.length === 3) {
-          if(parts[2].length === 4) ddn = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
-          else if(parts[0].length === 4) ddn = parts[0]+'-'+parts[1].padStart(2,'0')+'-'+parts[2].padStart(2,'0');
-        }
+// ===== IMPORT CSV PATIENTS (#223-B) — Doctolib (base patients / RDV) et DrSanté =====
+// Remplace l'ancien importDoctolibCSV : parseur CSV réel (l'ancien split(';')
+// cassait sur tout champ quoté contenant le séparateur — adresse, remarque),
+// dictionnaire d'en-têtes couvrant la fiche étendue #223-A, et appariement
+// idempotent nom+prénom+ddn : réimporter le même fichier ne crée RIEN, un
+// patient reconnu voit uniquement ses champs VIDES complétés (jamais
+// d'écrasement d'une saisie Verticy). Le NIR est détecté et volontairement
+// ignoré (cf. #223-A — pas de FSE, pas de stockage hors HDS).
+//
+// ⚠️ Miroir de test : js/patient-import.mjs — répercuter toute modification
+// des helpers purs ci-dessous dans le module miroir (dette #132).
+
+// Séparateur le plus fréquent hors guillemets sur la ligne d'en-tête
+// (';' Doctolib/DrSanté, ',' ou tabulation sinon). Défaut ';'.
+function _csvDetectSep(line) {
+  const counts = { ';': 0, ',': 0, '\t': 0 };
+  let inQ = false;
+  for (const c of String(line || '')) {
+    if (c === '"') inQ = !inQ;
+    else if (!inQ && c in counts) counts[c]++;
+  }
+  let best = ';', bestN = -1;
+  for (const s of [';', ',', '\t']) {
+    if (counts[s] > bestN) { best = s; bestN = counts[s]; }
+  }
+  return bestN > 0 ? best : ';';
+}
+
+// Parseur CSV RFC 4180 minimal : champs quotés (séparateurs ET retours à la
+// ligne internes, guillemets doublés ""), BOM UTF-8, lignes vides ignorées.
+// Retourne un tableau de lignes (tableaux de champs bruts, non trimés).
+function _csvParse(text) {
+  let t = String(text || '');
+  if (t.charCodeAt(0) === 0xfeff) t = t.slice(1);
+  if (!t.trim()) return [];
+  const firstNl = t.indexOf('\n');
+  const sep = _csvDetectSep(firstNl === -1 ? t : t.slice(0, firstNl));
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inQ) {
+      if (c === '"') {
+        if (t[i + 1] === '"') { field += '"'; i++; }
+        else inQ = false;
+      } else field += c;
+    } else if (c === '"' && field === '') {
+      inQ = true;
+    } else if (c === sep) {
+      row.push(field); field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && t[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.some((f) => f.trim() !== '')) rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  row.push(field);
+  if (row.some((f) => f.trim() !== '')) rows.push(row);
+  return rows;
+}
+
+// Normalisation pour appariement et matching d'en-têtes : minuscules, accents
+// retirés, espaces/traits d'union/apostrophes réduits à un espace.
+function _importNormName(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s\-']+/g, ' ')
+    .trim();
+}
+
+// 'DD/MM/YYYY' | 'DD-MM-YYYY' | 'DD.MM.YYYY' | ISO → 'YYYY-MM-DD', sinon ''.
+function _importNormDdn(s) {
+  const v = String(s || '').trim();
+  if (!v) return '';
+  let m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = v.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  return '';
+}
+
+// 'M'|'Monsieur'|'Mr'|'Homme' → 'M.' ; 'Mme'|'Madame'|'F'|'Mlle'... → 'Mme'.
+function _importNormCivilite(s) {
+  const v = _importNormName(s).replace(/\./g, '');
+  if (v === 'm' || v === 'mr' || v === 'monsieur' || v === 'homme' || v === 'h') return 'M.';
+  if (v === 'mme' || v === 'madame' || v === 'f' || v === 'femme' || v === 'mlle' || v === 'mademoiselle') return 'Mme';
+  return '';
+}
+
+// En-têtes bruts → index de colonne par champ Verticy (-1 si absente).
+// Dictionnaire calé sur patients.csv Doctolib (Civilité, Nom, Prénom, Date de
+// naissance, E-mail, Téléphone portable/secondaire, Adresse, Code postal,
+// Ville, Type d'assurance, Profession, Nom/Ville du médecin traitant,
+// Provenance), l'export RDV Doctolib et les libellés génériques DrSanté.
+// nirIdx repère une éventuelle colonne NIR pour l'ignorer EXPLICITEMENT.
+function _importMapHeaders(rawHeaders) {
+  const hs = (rawHeaders || []).map((h) => _importNormName(String(h || '').replace(/["']/g, '')));
+  const find = (pred) => hs.findIndex(pred);
+  const map = {
+    nom: find((h) => h === 'nom' || h === 'nom de famille' || h === 'last name' || h === 'lastname'),
+    prenom: find((h) => h.includes('prenom') || h === 'first name' || h === 'firstname'),
+    ddn: find((h) => (h.includes('naissance') && h.includes('date')) || h === 'ddn' || h.includes('birth') || h === 'dob' || h.startsWith('ne(e)')),
+    email: find((h) => h.includes('mail')),
+    civilite: find((h) => h.includes('civilite') || h === 'sexe' || h === 'genre'),
+    adresse: find((h) => h.includes('adresse') && !h.includes('mail')),
+    cp: find((h) => h === 'cp' || h.includes('code postal')),
+    medecinTraitant: find((h) => h.includes('medecin traitant') && !h.startsWith('ville')),
+    assurance: find((h) => h.includes('assurance')),
+    provenance: find((h) => h.includes('provenance')),
+    metier: find((h) => h.includes('profession') || h === 'metier'),
+    motif: find((h) => h === 'motif' || h.startsWith('motif ')),
+  };
+  // Repli nom : premier en-tête commençant par 'nom' qui n'est ni le médecin
+  // traitant, ni le nom de naissance, ni un 'nom prénom' agrégé ambigu.
+  if (map.nom === -1) {
+    map.nom = find((h) => h.startsWith('nom') && !h.includes('medecin') && !h.includes('naissance') && !h.includes('prenom'));
+  }
+  // Ville : exact d'abord ('ville du médecin traitant' exclue), repli souple.
+  map.ville = find((h) => h === 'ville');
+  if (map.ville === -1) map.ville = find((h) => h.includes('ville') && !h.includes('medecin'));
+  // Téléphone : portable prioritaire, puis générique hors 'secondaire', puis repli.
+  map.tel = find((h) => h.includes('portable') || h.includes('mobile'));
+  if (map.tel === -1) map.tel = find((h) => (h.includes('telephone') || h.includes('phone') || h === 'tel') && !h.includes('secondaire'));
+  if (map.tel === -1) map.tel = find((h) => h.includes('telephone'));
+  const nirIdx = find((h) => h.includes('securite sociale') || h === 'nir' || h.includes('insee'));
+  return { map, nirIdx };
+}
+
+// Décision d'appariement idempotent. candidates = patients dont nom+prénom
+// normalisés correspondent ([{idx, ddn}]). Une ddn DIFFÉRENTE des deux côtés
+// = homonyme → création ; plusieurs candidats indécidables = ambigu → ligne
+// ignorée (jamais de fusion hasardeuse sur des données patient).
+function _importMatchDecision(candidates, rowDdn) {
+  if (!candidates.length) return { action: 'create' };
+  if (rowDdn) {
+    const exact = candidates.filter((c) => c.ddn === rowDdn);
+    if (exact.length === 1) return { action: 'match', idx: exact[0].idx };
+    if (exact.length > 1) return { action: 'ambiguous' };
+    const noDdn = candidates.filter((c) => !c.ddn);
+    if (noDdn.length === 1) return { action: 'match', idx: noDdn[0].idx };
+    if (noDdn.length > 1) return { action: 'ambiguous' };
+    return { action: 'create' };
+  }
+  if (candidates.length === 1) return { action: 'match', idx: candidates[0].idx };
+  return { action: 'ambiguous' };
+}
+
+// Champs texte importables → clés de la fiche patient (#223-A incluse).
+const _IMPORT_FIELDS = ['civilite', 'email', 'tel', 'adresse', 'cp', 'ville', 'medecinTraitant', 'assurance', 'provenance', 'metier', 'motif'];
+
+// Cœur de l'import, séparé du FileReader pour rester lisible.
+function _runPatientsCSVImport(text) {
+  const rows = _csvParse(text);
+  if (rows.length < 2) { alert('Fichier CSV vide ou invalide.'); return; }
+  const { map, nirIdx } = _importMapHeaders(rows[0]);
+  if (map.nom === -1 && map.prenom === -1) {
+    alert('❌ En-têtes non reconnues — colonnes attendues type Doctolib / DrSanté (Nom, Prénom, Date de naissance...).\n\nEn-têtes lues : ' + rows[0].join(' | '));
+    return;
+  }
+  const val = (cols, i) => (i >= 0 && cols[i] != null ? String(cols[i]).trim() : '');
+  let created = 0, completed = 0, unchanged = 0, ambiguous = 0, skipped = 0;
+  for (let r = 1; r < rows.length; r++) {
+    const cols = rows[r];
+    const nom = val(cols, map.nom);
+    const prenom = val(cols, map.prenom);
+    if (!nom && !prenom) { skipped++; continue; }
+    const ddn = _importNormDdn(val(cols, map.ddn));
+    const nameKey = _importNormName(nom) + '|' + _importNormName(prenom);
+    const candidates = [];
+    patients.forEach((p, idx) => {
+      if (_importNormName(p.nom) + '|' + _importNormName(p.prenom) === nameKey) {
+        candidates.push({ idx, ddn: p.ddn || '' });
       }
-      
-      const patient = {
+    });
+    const dec = _importMatchDecision(candidates, ddn);
+    if (dec.action === 'ambiguous') { ambiguous++; continue; }
+    const rowVals = {};
+    _IMPORT_FIELDS.forEach((f) => { rowVals[f] = val(cols, map[f]); });
+    rowVals.civilite = _importNormCivilite(rowVals.civilite);
+    if (dec.action === 'match') {
+      // Complétion : uniquement les champs VIDES de la fiche existante.
+      const p = patients[dec.idx];
+      let filled = 0;
+      if (ddn && !p.ddn) { p.ddn = ddn; filled++; }
+      _IMPORT_FIELDS.forEach((f) => {
+        if (rowVals[f] && !p[f]) { p[f] = rowVals[f]; filled++; }
+      });
+      if (filled) completed++; else unchanged++;
+    } else {
+      const p = {
         id: Date.now() + Math.random(),
-        nom: nom,
-        prenom: prenom,
-        ddn: ddn,
-        email: colMap.email >= 0 ? cols[colMap.email] : '',
-        tel: colMap.tel >= 0 ? cols[colMap.tel] : '',
-        poids: '',
-        taille: '',
-        sport: '',
-        motif: '',
-        metier: '',
+        nom, prenom, ddn,
+        poids: '', taille: '', sport: '',
         lat: 'Droitier',
         pratId: pwaUser?.pratId || '',
-        bilans: [],
-        bilanDataPosturo: {}
+        date: new Date().toLocaleDateString('fr-FR'),
+        mesures: {},
       };
-      
-      newPatients.push(patient);
-      imported++;
+      _IMPORT_FIELDS.forEach((f) => { p[f] = rowVals[f] || ''; });
+      // Poussé immédiatement : les lignes suivantes du même fichier (export
+      // RDV = une ligne par rendez-vous) matchent ce patient au lieu de le
+      // dupliquer.
+      patients.push(p);
+      created++;
     }
-    
-    if(newPatients.length > 0) {
-      patients.push(...newPatients);
-      savePatients();
-      renderPatientList();
-      alert('✅ Import réussi !\n' + imported + ' patient(s) importé(s)\n' + skipped + ' ignoré(s) (doublons ou lignes vides)');
-    } else {
-      alert('Aucun nouveau patient à importer.\n' + skipped + ' ligne(s) ignorée(s).');
+  }
+  if (created || completed) { savePatients(); renderPatientList(); }
+  let msg = (created || completed) ? '✅ Import terminé.' : 'Aucune modification.';
+  msg += '\n' + created + ' patient(s) créé(s)';
+  msg += '\n' + completed + ' fiche(s) complétée(s) (champs vides uniquement)';
+  msg += '\n' + unchanged + ' déjà à jour';
+  if (ambiguous) msg += '\n' + ambiguous + ' ligne(s) ignorée(s) — homonymes ambigus, à rapprocher manuellement';
+  if (skipped) msg += '\n' + skipped + ' ligne(s) sans nom ni prénom ignorée(s)';
+  if (nirIdx >= 0) msg += '\n\nℹ️ Colonne « n° de sécurité sociale » détectée : ignorée volontairement (Verticy ne stocke pas le NIR).';
+  alert(msg);
+}
+
+function importPatientsCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    // Décodage tolérant : UTF-8 strict d'abord, repli windows-1252 (exports
+    // DrSanté/Excel) si octets invalides — évite les accents en '�'.
+    let text;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(e.target.result);
+    } catch (_e) {
+      text = new TextDecoder('windows-1252').decode(e.target.result);
     }
-    
-    // Reset input
+    try {
+      _runPatientsCSVImport(text);
+    } catch (err) {
+      console.warn('importPatientsCSV:', err);
+      alert("Erreur pendant l'import CSV : " + (err && err.message ? err.message : err));
+    }
     input.value = '';
   };
-  reader.readAsText(file, 'UTF-8');
+  reader.readAsArrayBuffer(file);
 }
 
 
