@@ -26395,6 +26395,120 @@ function _runPatientsCSVImport(text) {
   alert(msg);
 }
 
+// ===== #229-D — AIDE INTÉGRÉE (FAQ avec recherche) =====
+// Étape 1 du chantier aide : FAQ locale structurée, zéro dépendance réseau.
+// Le chatbot IA (Edge Function + plafond de messages) viendra par-dessus.
+// La recherche réutilise _importNormName (casse/accents insensibles).
+const _FAQ_DATA = [
+  {
+    theme: '👤 Patients',
+    items: [
+      { q: 'Comment créer un patient ?', a: "Liste patients → <strong>+ Nouveau patient</strong>. Seuls le nom et le prénom sont obligatoires — tous les autres champs (coordonnées, antécédents, examens réalisés…) sont facultatifs et alimenteront automatiquement les bilans et les rapports." },
+      { q: 'Comment importer mes patients depuis Doctolib ou DrSanté ?', a: "Bouton <strong>📥 Import CSV</strong> : il accepte l'export base patients Doctolib, l'export de rendez-vous Doctolib et l'export DrSanté. L'import ne crée jamais de doublon (réimporter le même fichier ne change rien) et ne remplit que les champs vides des fiches existantes — il n'écrase jamais vos saisies. Le numéro de sécurité sociale n'est jamais importé." },
+      { q: 'Comment sauvegarder ou exporter mon répertoire patients ?', a: "Bouton <strong>📤 Export CSV</strong> : télécharge tout le répertoire dans un fichier lisible par Excel (accents corrects). C'est aussi votre sauvegarde personnelle et votre export RGPD." },
+      { q: 'À quoi servent les champs Antécédents et Examens de la fiche ?', a: "Ce sont des données stables du patient : elles se pré-remplissent automatiquement dans l'anamnèse de chaque nouveau bilan. Si vous les complétez pendant un bilan en cours, la fiche se met à jour ; les bilans archivés gardent leur version d'origine." },
+      { q: 'Comment modifier ou supprimer un patient ?', a: "Sur la carte du patient : <strong>✏️</strong> pour modifier la fiche, <strong>✕</strong> pour supprimer (définitif — pensez à exporter avant)." },
+    ],
+  },
+  {
+    theme: '📋 Bilans',
+    items: [
+      { q: 'Quels types de bilans existe-t-il ?', a: "Quatre : <strong>Sportif</strong>, <strong>Posturologie</strong>, <strong>Podopédiatrie</strong> et <strong>Pédicurie</strong>. Leur disponibilité dépend de votre formule (la pédicurie est incluse partout). Chaque bilan existe en version Initial puis Contrôle." },
+      { q: 'Mes saisies sont-elles sauvegardées automatiquement ?', a: "Oui — chaque champ est enregistré automatiquement pendant la saisie et synchronisé avec le cloud. Vous pouvez naviguer entre les onglets sans rien perdre." },
+      { q: 'Comment archiver un bilan et en commencer un nouveau ?', a: "Finalisez le bilan en cours (bouton d'archivage) : il devient une archive figée, consultable à tout moment depuis la carte patient. Créez ensuite un nouveau bilan Contrôle." },
+      { q: 'Comment comparer deux bilans ?', a: "Carte patient → <strong>Comparer les bilans</strong> : deux colonnes côte à côte, différences surlignées, avec les silhouettes, empreintes et photos de chaque bilan." },
+      { q: 'La date de consultation est-elle remplie automatiquement ?', a: "Oui, à la date du jour lors de la création du bilan. Elle reste modifiable si la consultation a eu lieu un autre jour — c'est elle qui apparaît sur le rapport." },
+    ],
+  },
+  {
+    theme: '📄 Rapports',
+    items: [
+      { q: 'Comment générer et imprimer un rapport en PDF ?', a: "Dans le bilan, onglet <strong>Rapport</strong> : l'aperçu est fidèle au PDF final. Bouton Imprimer → choisissez « Enregistrer au format PDF » comme destination." },
+      { q: 'Comment envoyer un rapport par mail au patient ?', a: "Bouton <strong>✉️ Envoyer par mail</strong> dans l'onglet Rapport : votre messagerie s'ouvre pré-remplie. Joignez le PDF généré au préalable." },
+      { q: 'Comment ajouter mon logo sur les rapports ?', a: "Onglet <strong>Praticiens</strong> → ✏️ sur votre fiche → <strong>🖼️ Choisir une image</strong> (PNG/JPEG). Le logo apparaît au centre de l'en-tête des quatre types de rapports, à côté du logo Verticy." },
+      { q: 'Pourquoi une image manque-t-elle dans mon rapport ?', a: "Un dessin effacé n'apparaît volontairement pas (schéma vierge = pas d'information). Si une mention rouge signale une image non chargée, vérifiez votre connexion puis régénérez le rapport." },
+    ],
+  },
+  {
+    theme: '📷 Photos & dessins',
+    items: [
+      { q: 'Comment ajouter des photos à un bilan ?', a: "Chaque section concernée a sa galerie (podoscope, vue plantaire, dermato, ongles, chaussage…) : bouton d'ajout, photos redimensionnées et stockées de façon sécurisée dans le cloud." },
+      { q: 'Comment dessiner sur les silhouettes ou les pieds ?', a: "Outils crayon, gomme et annuler au-dessus de chaque schéma. Les dessins sont sauvegardés automatiquement et repris dans les rapports — un schéma resté vierge n'y apparaît pas." },
+    ],
+  },
+  {
+    theme: '🎤 Dictée vocale',
+    items: [
+      { q: 'Comment dicter au lieu de taper ?', a: "Cliquez le micro <strong>🎤</strong> sous les champs de texte libre (bilans podopédiatrie et pédicurie), parlez, re-cliquez pour arrêter. Nécessite Chrome ou Edge et une autorisation micro." },
+    ],
+  },
+  {
+    theme: '📅 Agenda',
+    items: [
+      { q: 'Comment connecter mon agenda ?', a: "Onglet <strong>Agenda</strong> : connectez un ou plusieurs comptes Google Calendar (lecture/écriture, chacun sa couleur) ou un calendrier Apple via lien ICS (lecture seule). Vue semaine et mois, création et modification d'événements Google directement depuis Verticy." },
+    ],
+  },
+  {
+    theme: '⚙️ Compte & abonnement',
+    items: [
+      { q: 'Comment gérer mon abonnement ou changer de formule ?', a: "<strong>👤 Mon compte</strong> → Gérer l'abonnement (portail de paiement sécurisé) ou Changer de formule." },
+      { q: 'Comment changer mon mot de passe ?', a: "<strong>👤 Mon compte</strong> → section Changer le mot de passe." },
+      { q: "Pourquoi l'application se verrouille-t-elle toute seule ?", a: "Par sécurité : un poste ouvert dans un cabinet contient des données de santé. Après une période d'inactivité, la session se verrouille — reconnectez-vous pour reprendre, rien n'est perdu." },
+      { q: 'Comment contacter le support ?', a: "<strong>👤 Mon compte</strong> → <strong>✉️ Contacter le support</strong>, ou écrivez directement à <a href='mailto:contact@verticy.fr' style='color:var(--blue);'>contact@verticy.fr</a>." },
+    ],
+  },
+  {
+    theme: '🔒 Données & sécurité',
+    items: [
+      { q: 'Où sont stockées mes données ?', a: "Sur votre appareil pour un accès instantané, et synchronisées en continu vers un cloud sécurisé européen. Chaque compte praticien ne voit que ses propres patients." },
+      { q: "Puis-je travailler sans connexion internet ?", a: "La consultation et la saisie fonctionnent hors ligne ; la synchronisation cloud reprend automatiquement au retour du réseau. Évitez toutefois de générer des rapports avec photos hors ligne." },
+      { q: 'Le numéro de sécurité sociale est-il stocké ?', a: "Non, jamais — choix délibéré : Verticy n'en a pas l'usage (pas de télétransmission) et cette donnée exige des précautions particulières. Les imports CSV qui en contiennent l'ignorent explicitement." },
+    ],
+  },
+];
+
+function _renderHelpList(filter) {
+  const norm = (s) => _importNormName(s.replace(/<[^>]+>/g, ''));
+  const f = norm(filter || '');
+  let html = '';
+  _FAQ_DATA.forEach((grp) => {
+    const items = grp.items.filter((it) => !f || norm(it.q).includes(f) || norm(it.a).includes(f));
+    if (!items.length) return;
+    html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:14px 0 6px;">' + grp.theme + '</div>';
+    items.forEach((it) => {
+      html += '<details style="background:var(--bg2);border:1px solid var(--bord);border-radius:8px;margin-bottom:6px;"' + (f ? ' open' : '') + '>';
+      html += '<summary style="padding:10px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--fg);">' + it.q + '</summary>';
+      html += '<div style="padding:0 12px 10px;font-size:12.5px;line-height:1.55;color:var(--fg);opacity:.9;">' + it.a + '</div>';
+      html += '</details>';
+    });
+  });
+  return html || '<div style="font-size:13px;color:var(--mut);padding:16px 0;text-align:center;">Aucun résultat — reformulez, ou contactez le support.</div>';
+}
+
+function closeHelp() {
+  document.getElementById('modal-help')?.remove();
+}
+
+function showHelp() {
+  closeHelp();
+  const modal = document.createElement('div');
+  modal.id = 'modal-help';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+  modal.innerHTML = `
+    <div style="background:var(--card);border-radius:14px;padding:20px 22px;width:100%;max-width:620px;max-height:88vh;display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:700;color:var(--fg);">❓ Aide Verticy</div>
+        <button onclick="closeHelp()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">✕</button>
+      </div>
+      <input id="help-search" class="inp" placeholder="🔍 Rechercher (ex : import, rapport, logo, mot de passe...)" style="width:100%;margin-bottom:4px;font-size:13px;" oninput="document.getElementById('help-list').innerHTML=_renderHelpList(this.value)"/>
+      <div id="help-list" style="overflow-y:auto;flex:1;padding-right:4px;">${_renderHelpList('')}</div>
+      <a href="mailto:contact@verticy.fr?subject=Support%20Verticy" style="display:block;text-align:center;background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:9px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;margin-top:12px;">✉️ Question sans réponse ? Contacter le support</a>
+    </div>`;
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeHelp(); });
+  document.body.appendChild(modal);
+  document.getElementById('help-search')?.focus();
+}
+
 // ===== #229-A — EXPORT CSV DU RÉPERTOIRE PATIENTS =====
 // Miroir du format d'import (ordre Doctolib puis champs propres à Verticy),
 // séparateur ';', BOM UTF-8 (Excel), échappement RFC 4180. Le NIR n'existe
