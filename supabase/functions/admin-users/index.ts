@@ -18,7 +18,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const ADMIN_EMAIL = 'sciopraxi@gmail.com';
+// #229-C — bascule sciopraxi@gmail.com → contact@verticy.fr (validée par
+// Scio le 10/08/2026). DOIT rester aligné avec VERTICY_ADMIN_EMAIL côté
+// client (js/biomeca.js) ; tout changement implique un redéploiement de
+// cette fonction dans la même fenêtre que le déploiement client.
+const ADMIN_EMAIL = 'contact@verticy.fr';
 
 const supaAdmin = createClient(
   Deno.env.get('SUPABASE_URL')!,

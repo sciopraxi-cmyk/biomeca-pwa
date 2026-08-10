@@ -6,6 +6,13 @@
 const SUPA_URL = 'https://tzivizoacdyopwfzerrb.supabase.co';
 const SUPA_KEY = 'sb_publishable_aE4_BZYwz6bGGvby4XXAgw_k8ULnrYh';
 
+// #229-C — Email admin fonctionnel de Verticy (bascule sciopraxi@gmail.com →
+// contact@verticy.fr validée par Scio le 10/08/2026). DOIT rester aligné avec
+// la constante ADMIN_EMAIL de supabase/functions/admin-users/index.ts (la
+// vérification qui fait foi est côté serveur) — toute modification implique
+// de redéployer la fonction Edge dans la même fenêtre.
+const VERTICY_ADMIN_EMAIL = 'contact@verticy.fr';
+
 // #129 — URL de retour pour les mails d'auth (confirmation signup, reset
 // password). En prod l'app vit sur https://sciopraxi-cmyk.github.io/biomeca-pwa/
 // (project page), donc le Site URL Supabase seul NE SUFFIT PAS : lorsqu'il
@@ -464,7 +471,7 @@ async function pwaLogin() {
   try {
     const { status, body } = await supa.signIn(email, pwd);
     if(body.access_token) {
-      const isAdmin = email.toLowerCase() === 'sciopraxi@gmail.com';
+      const isAdmin = email.toLowerCase() === VERTICY_ADMIN_EMAIL; // #229-C
       pwaUser = { email, token: body.access_token, id: body.user?.id, isAdmin, user_metadata: body.user?.user_metadata || {}, app_metadata: body.user?.app_metadata || {} };
       savePwaSession(body.access_token, body.refresh_token, pwaUser);
       await onPwaLoginSuccess();
@@ -3659,7 +3666,7 @@ async function initPWA() {
       session = loadPwaSession(); // re-lire : ensureSession a pu rafraîchir le token
       const userData = await supa.getUser();
       if(userData.id) {
-        const isAdmin = session.user.email?.toLowerCase() === 'sciopraxi@gmail.com';
+        const isAdmin = session.user.email?.toLowerCase() === VERTICY_ADMIN_EMAIL; // #229-C
         pwaUser = { ...session.user, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {}, app_metadata: session.user?.app_metadata || {} };
         await onPwaLoginSuccess();
         return;
