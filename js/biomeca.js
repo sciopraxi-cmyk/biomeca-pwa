@@ -4530,6 +4530,8 @@ function switchCaptureMode(mode) {
   document.getElementById('mode-video').style.display = mode==='video'?'':'none';
   document.getElementById('sw-photo').className = mode==='photo'?'btn btn-blue':'btn';
   document.getElementById('sw-video').className = mode==='video'?'btn btn-blue':'btn';
+  // #236 — le mode qui vient d'être affiché doit refléter zoom/contraste.
+  _applyCapView();
 }
 
 async function launchTest(testId) {
@@ -4609,6 +4611,9 @@ async function launchTest(testId) {
   renderPhotoGrid();
   renderFrameStrip();
   updateResults();
+  // #236 — réapplique zoom + contraste (préférences persistées) à l'ouverture
+  // du test, avant toute manipulation de capteurs.
+  _applyCapView();
 
   // Afficher les slots photos dans le mode vidéo si showPhotoSlots
   const vidSlotsEl = document.getElementById('vid-photo-slots');
@@ -12032,6 +12037,119 @@ function setMarkerOpacity(val) {
   }
 }
 
+// ===== #236 — ZOOM + CONTRASTE POUR LE PLACEMENT DES CAPTEURS =====
+// Deux aides au repérage des pastilles réfléchissantes, en photo comme en vidéo :
+//
+// - Zoom : agrandit réellement le lecteur dans un cadre défilable (largeur du
+//   conteneur #ph-zoom / #vid-zoom). Aucun transform : canvasXY convertit via
+//   getBoundingClientRect, donc les coordonnées cliquées restent exactes à tout
+//   niveau de zoom — un marqueur placé à 4x tombe au même pixel qu'à 1x, les
+//   mesures d'angles sont inchangées.
+//
+// - Contraste : agit sur l'AFFICHAGE (filtre CSS) ET sur les pixels ANALYSÉS
+//   par la détection (_capContrastPixels appliqué après getImageData). Les deux
+//   utilisent la même formule, donc ce que le praticien voit est exactement ce
+//   que la détection analyse. C'est le but recherché : faire ressortir des
+//   pastilles peu contrastées pour que « 🎯 Caler les capteurs » les trouve.
+//   Le risque de faux positifs (sol clair, bandes qui saturent) est couvert par
+//   le bouton « ◱ Zone » (#111) : la détection ne regarde que le rectangle tracé
+//   autour des pastilles.
+//   Ce qui n'est PAS touché : le canvas backing. Les photos et frames
+//   enregistrées — donc les images des rapports — gardent leur rendu d'origine,
+//   un filtre CSS n'affectant que le rendu écran et non toDataURL.
+//
+// Persistance identique à Taille/Opacité (localStorage, clamp au chargement).
+const CAP_ZOOM_KEY = 'bm4-cap-zoom';
+const CAP_ZOOM_MIN = 1, CAP_ZOOM_MAX = 4;
+const CAP_CONTRAST_KEY = 'bm4-cap-contrast';
+const CAP_CONTRAST_MIN = 1, CAP_CONTRAST_MAX = 3;
+
+function _loadCapPref(key, min, max, dflt) {
+  try {
+    const n = parseFloat(localStorage.getItem(key));
+    if (isNaN(n)) return dflt;
+    return Math.min(max, Math.max(min, n));
+  } catch (_e) {
+    return dflt;
+  }
+}
+let capZoom = _loadCapPref(CAP_ZOOM_KEY, CAP_ZOOM_MIN, CAP_ZOOM_MAX, 1);
+let capContrast = _loadCapPref(CAP_CONTRAST_KEY, CAP_CONTRAST_MIN, CAP_CONTRAST_MAX, 1);
+
+// Applique l'état courant au DOM. Idempotent — rappelé à chaque ouverture de
+// test et à chaque bascule photo/vidéo (le markup est statique mais le cadre
+// peut avoir été re-layouté).
+function _applyCapView() {
+  const pct = (capZoom * 100).toFixed(2) + '%';
+  ['ph-zoom', 'vid-zoom'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = pct;
+  });
+  // #ph-wrap est en flex centré : à zoom > 1 le centrage rendrait le bord
+  // gauche inatteignable au défilement.
+  const phWrap = document.getElementById('ph-wrap');
+  if (phWrap) phWrap.style.justifyContent = capZoom > 1 ? 'flex-start' : 'center';
+  const filter = capContrast > 1 ? 'contrast(' + capContrast.toFixed(2) + ')' : '';
+  ['ph-canvas', 'vid-canvas', 'vid-el'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.filter = filter;
+  });
+  document.querySelectorAll('.cap-zoom-slider').forEach((el) => {
+    if (parseFloat(el.value) !== capZoom) el.value = capZoom;
+  });
+  document.querySelectorAll('.cap-zoom-label').forEach((el) => {
+    el.textContent = 'Zoom:' + capZoom.toFixed(2) + 'x';
+  });
+  document.querySelectorAll('.cap-contrast-slider').forEach((el) => {
+    if (parseFloat(el.value) !== capContrast) el.value = capContrast;
+  });
+  document.querySelectorAll('.cap-contrast-label').forEach((el) => {
+    el.textContent = 'Contraste:' + capContrast.toFixed(1);
+  });
+}
+
+function setCapZoom(val) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return;
+  capZoom = Math.min(CAP_ZOOM_MAX, Math.max(CAP_ZOOM_MIN, n));
+  try { localStorage.setItem(CAP_ZOOM_KEY, String(capZoom)); } catch (_e) { /* noop */ }
+  _applyCapView();
+}
+
+function setCapContrast(val) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return;
+  capContrast = Math.min(CAP_CONTRAST_MAX, Math.max(CAP_CONTRAST_MIN, n));
+  try { localStorage.setItem(CAP_CONTRAST_KEY, String(capContrast)); } catch (_e) { /* noop */ }
+  _applyCapView();
+}
+
+// Applique le contraste courant à un buffer RGBA lu par getImageData, EN PLACE.
+// Reproduit exactement la formule du filtre CSS contrast(c) appliqué à
+// l'affichage — v' = (v - 127.5) * c + 127.5 — pour que la détection analyse
+// précisément ce que le praticien voit à l'écran. No-op à contraste 1.
+function _capContrastPixels(data) {
+  if (!(capContrast > 1)) return data;
+  const c = capContrast;
+  for (let i = 0; i < data.length; i += 4) {
+    for (let k = 0; k < 3; k++) {
+      const v = (data[i + k] - 127.5) * c + 127.5;
+      data[i + k] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+  }
+  return data;
+}
+
+function resetCapView() {
+  capZoom = 1;
+  capContrast = 1;
+  try {
+    localStorage.setItem(CAP_ZOOM_KEY, '1');
+    localStorage.setItem(CAP_CONTRAST_KEY, '1');
+  } catch (_e) { /* noop */ }
+  _applyCapView();
+}
+
 function findMarkerAt(x, y, markers, cw) {
   // feat-biomec-capteurs (A) — hit-test scalé par markerSizeFactor MAIS avec
   // plancher confortable au touch (12px min). Le marqueur visuel rétrécit, on
@@ -12159,7 +12277,9 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
   // #111 — délégué à _detectReflectiveBlobs (filtres tight par défaut). Tri/
   // assignation par index reste séquentiel (legacy path peu utilisé : tous
   // les TESTS actuels sortent par la branche prior layout ci-dessus).
-  const data = ctx.getImageData(0, 0, W, H).data;
+  // #236 — mêmes pixels que ceux affichés (filtre CSS contrast) : le réglage
+  // de contraste aide donc réellement la détection, pas seulement l'œil.
+  const data = _capContrastPixels(ctx.getImageData(0, 0, W, H).data);
   const blobs = _detectReflectiveBlobs(data, W, H);
 
   const midX=W/2;
@@ -12256,7 +12376,11 @@ function snapMarkersToReflectiveBlobs() {
   const offY = zone ? zone.y : 0;
   const dW = zone ? zone.w : W;
   const dH = zone ? zone.h : H;
-  const data = tctx.getImageData(offX, offY, dW, dH).data;
+  // #236 — contraste appliqué aux pixels analysés (identique à l'affichage).
+  // C'est l'usage visé : remonter des pastilles peu contrastées au-dessus du
+  // seuil. Les zones claires qui saturent au passage sont sans effet, la zone
+  // tracée (ci-dessous) bornant déjà la recherche autour des pastilles.
+  const data = _capContrastPixels(tctx.getImageData(offX, offY, dW, dH).data);
 
   // Seuils de luminance : global fixe par paliers, ou RELATIF à la zone
   // (percentiles hauts de l'histogramme local) — une pastille peu contrastée

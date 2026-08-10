@@ -3306,10 +3306,24 @@
           <button class="btn" id="btn-redetect" onclick="redetectMarkers()" style="display:none;">🎯 Détecter</button>
           <span class="badge bd" id="cam-st">Inactive</span>
         </div>
-        <div class="canvas-wrap" id="ph-wrap" style="min-height:200px;display:flex;align-items:center;justify-content:center;">
-          <canvas id="ph-canvas"></canvas>
-          <div class="cam-info" id="ph-info">Activez la caméra</div>
-          <div class="angle-overlay" id="ph-angles"></div>
+        <!-- #236 — #ph-zoom porte la largeur zoomée (zoom x 100%) et le cadre
+             devient défilable. Pas de transform : le canvas grandit réellement,
+             donc canvasXY (getBoundingClientRect) reste exact à tout zoom. -->
+        <div class="canvas-wrap" id="ph-wrap" style="min-height:200px;display:flex;align-items:center;justify-content:center;overflow:auto;">
+          <div id="ph-zoom" style="position:relative;width:100%;flex:0 0 auto;">
+            <canvas id="ph-canvas"></canvas>
+            <div class="cam-info" id="ph-info">Activez la caméra</div>
+            <div class="angle-overlay" id="ph-angles"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <input type="range" min="1" max="4" step="0.25" value="1" id="cap-zoom-sl-photo" class="cap-zoom-slider" style="flex:1;" oninput="setCapZoom(this.value)"/>
+          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-zoom-lbl-photo" class="cap-zoom-label">Zoom:1.00x</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <input type="range" min="1" max="3" step="0.1" value="1" id="cap-contrast-sl-photo" class="cap-contrast-slider" style="flex:1;" oninput="setCapContrast(this.value)"/>
+          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-contrast-lbl-photo" class="cap-contrast-label" title="Agit aussi sur la détection automatique des pastilles">Contraste:1.0</span>
+          <button class="btn cap-view-reset" onclick="resetCapView()" style="font-size:10px;padding:3px 8px;" title="Zoom 1x et contraste normal">⟲</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
           <input type="range" min="80" max="255" value="200" id="sens-sl" style="flex:1;" oninput="sensThr=+this.value;document.getElementById('sens-lbl').textContent='Seuil:'+this.value"/>
@@ -3344,7 +3358,10 @@
           <input type="file" id="vid-file-in" accept="video/*" style="display:none;" onchange="loadVidFile(this)"/>
           <span class="badge bd" id="vcam-st">Inactive</span>
         </div>
-        <div style="position:relative;background:#060810;border-radius:var(--r);overflow:hidden;border:1px solid var(--bord);">
+        <!-- #236 — même mécanique qu'en mode photo : #vid-zoom porte la largeur
+             zoomée, le cadre défile. Les coordonnées de clic restent exactes. -->
+        <div id="vid-wrap" style="position:relative;background:#060810;border-radius:var(--r);overflow:auto;border:1px solid var(--bord);">
+          <div id="vid-zoom" style="position:relative;width:100%;">
           <video id="vid-el" style="width:100%;display:block;opacity:.9;" playsinline></video>
           <!-- #200 — height:100% forcé cassait le ratio intrinsèque du canvas (qui suit
                videoWidth/videoHeight, cf. toggleVCam/loadVidFile/toggleRec) dès que la
@@ -3354,6 +3371,7 @@
           <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;cursor:crosshair;"></canvas>
           <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
           <div class="angle-overlay" id="vid-angles"></div>
+          </div>
         </div>
         <div class="vid-ctrls">
           <button class="btn" id="btn-play" onclick="togglePlay()">▶</button>
@@ -3370,6 +3388,17 @@
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
           <input type="range" min="0.15" max="1.0" step="0.05" value="0.5" id="marker-opacity-sl-vid" class="marker-opacity-slider" style="flex:1;" oninput="setMarkerOpacity(this.value)"/>
           <span style="font-size:10px;color:var(--mut);min-width:60px;" id="marker-opacity-lbl-vid" class="marker-opacity-label">Opacité:0.50</span>
+        </div>
+        <!-- #236 — aide au placement des capteurs : zoom (réel, défilable) et
+             contraste (affichage ET pixels analysés par la détection). -->
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <input type="range" min="1" max="4" step="0.25" value="1" id="cap-zoom-sl-vid" class="cap-zoom-slider" style="flex:1;" oninput="setCapZoom(this.value)"/>
+          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-zoom-lbl-vid" class="cap-zoom-label">Zoom:1.00x</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <input type="range" min="1" max="3" step="0.1" value="1" id="cap-contrast-sl-vid" class="cap-contrast-slider" style="flex:1;" oninput="setCapContrast(this.value)"/>
+          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-contrast-lbl-vid" class="cap-contrast-label" title="Agit aussi sur la détection automatique des pastilles">Contraste:1.0</span>
+          <button class="btn cap-view-reset" onclick="resetCapView()" style="font-size:10px;padding:3px 8px;" title="Zoom 1x et contraste normal">⟲</button>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:4px;">
           <div style="font-size:10px;color:var(--mut);">Frames (<span id="frame-count">0</span>)</div>
