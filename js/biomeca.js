@@ -25909,8 +25909,6 @@ function startDictation(targetId, btn) {
   };
   _micActive = true;
   if(btn) { btn.style.opacity='1'; btn.style.background='#fee2e2'; }
-  var fb = document.getElementById('mic-float');
-  if(fb) { fb.style.background='#dc2626'; fb.textContent='\u23F9'; }
   try { _micRecognition.start(); } catch(e) {}
 }
 
@@ -25921,34 +25919,20 @@ function _stopMic(btn) {
     b.style.opacity='0.6'; b.style.background='none'; b.classList.remove('_mic-active');
   });
   if(btn) { btn.style.opacity='0.6'; btn.style.background='none'; }
-  var fb = document.getElementById('mic-float');
-  if(fb) { fb.style.background='#0e1f38'; fb.innerHTML='&#127908;'; }
   _micTargetId = null;
 }
 
-function toggleFloatMic() {
-  if(_micActive) { _stopMic(null); return; }
-  var focused = document.activeElement;
-  var targetId = null;
-  if(focused && (focused.tagName==='INPUT'||focused.tagName==='TEXTAREA') && focused.id) {
-    targetId = focused.id;
-  } else {
-    var inputs = document.querySelectorAll('input[type="text"], textarea');
-    for(var i=0; i<inputs.length; i++) {
-      if(inputs[i].id && inputs[i].offsetParent !== null) { targetId = inputs[i].id; break; }
-    }
-  }
-  if(!targetId) { alert("Cliquez dans un champ de texte d'abord."); return; }
-  startDictation(targetId, null);
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-  // Bouton flottant
+  // #229-D étape 2 — bouton flottant assistant d'aide, visible partout dans
+  // le logiciel. Remplace l'ancien micro flottant (#204), redondant depuis
+  // les micros 🎤 par champ (_injectMicButtons). Ouvre le panneau Aide avec
+  // la zone de chat dépliée.
   var floatBtn = document.createElement('button');
-  floatBtn.id = 'mic-float';
-  floatBtn.innerHTML = '&#127908;';
-  floatBtn.onclick = toggleFloatMic;
-  floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;width:52px;height:52px;border-radius:50%;background:#0e1f38;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  floatBtn.id = 'help-float';
+  floatBtn.innerHTML = '&#128172; Assistant'; // 💬 — convention des chats de support
+  floatBtn.title = "Assistant d'aide Verticy";
+  floatBtn.onclick = function() { showHelp(); toggleHelpChat(true); };
+  floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;height:44px;padding:0 18px;border-radius:22px;background:#0e1f38;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;gap:7px;';
   document.body.appendChild(floatBtn);
   setTimeout(_injectMicButtons, 800);
 });
