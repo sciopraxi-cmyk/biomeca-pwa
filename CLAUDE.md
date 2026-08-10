@@ -89,7 +89,12 @@ filets sur des runners neufs, hors de portée du proxy.
 - **Aucune purge automatique** de données suspectes sur heuristique. Un fantôme
   persisté est indiscernable d'une saisie légitime. Prévention pour les nouveaux
   bilans, neutralité pour les anciens, nettoyage manuel.
-- `sciopraxi@gmail.com` est l'`ADMIN_EMAIL` fonctionnel — ne jamais le remplacer.
+- `contact@verticy.fr` est l'`ADMIN_EMAIL` fonctionnel (bascule #229-C validée
+  le 10/08/2026, ex-`sciopraxi@gmail.com`) — ne jamais le remplacer. Il vit à
+  DEUX endroits qui doivent rester alignés : `VERTICY_ADMIN_EMAIL`
+  (js/biomeca.js) et `ADMIN_EMAIL` (supabase/functions/admin-users/index.ts,
+  la vérification qui fait foi) — tout changement exige le redéploiement de
+  la fonction Edge dans la même fenêtre.
 - L'identifiant `imgjs-logo-sciopraxi` et le fichier `logo-sciopraxi.png` sont
   fonctionnels — ne jamais les renommer.
 
