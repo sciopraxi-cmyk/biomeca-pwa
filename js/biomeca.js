@@ -11263,7 +11263,14 @@ function _applyPostureView() {
     zoomBox.style.width = bw * _postureZoom + 'px';
     zoomBox.style.height = bh * _postureZoom + 'px';
   }
-  if (wrap) wrap.style.justifyContent = _postureZoom > 1 ? 'flex-start' : 'center';
+  // #237-fix — le centrage flex doit être relâché sur LES DEUX axes dès que le
+  // contenu dépasse : avec align-items:center, la partie qui déborde vers le
+  // haut sort de la zone défilable et devient inatteignable (tête du patient
+  // invisible, alors que le bas défile normalement).
+  if (wrap) {
+    wrap.style.justifyContent = _postureZoom > 1 ? 'flex-start' : 'center';
+    wrap.style.alignItems = _postureZoom > 1 ? 'flex-start' : 'center';
+  }
   const sl = document.getElementById('pp-zoom-sl');
   if (sl && parseFloat(sl.value) !== _postureZoom) sl.value = _postureZoom;
   const lbl = document.getElementById('pp-zoom-lbl');
@@ -12200,7 +12207,11 @@ function _applyCapView() {
   // #ph-wrap est en flex centré : à zoom > 1 le centrage rendrait le bord
   // gauche inatteignable au défilement.
   const phWrap = document.getElementById('ph-wrap');
-  if (phWrap) phWrap.style.justifyContent = capZoom > 1 ? 'flex-start' : 'center';
+  if (phWrap) {
+    phWrap.style.justifyContent = capZoom > 1 ? 'flex-start' : 'center';
+    // #237-fix — même correction sur l'axe vertical (cf. modale posturale).
+    phWrap.style.alignItems = capZoom > 1 ? 'flex-start' : 'center';
+  }
   const filter = capContrast > 1 ? 'contrast(' + capContrast.toFixed(2) + ')' : '';
   ['ph-canvas', 'vid-canvas', 'vid-el'].forEach((id) => {
     const el = document.getElementById(id);
