@@ -10836,8 +10836,13 @@ function _drawMarkersOnly(ctx, canvas, markers, selIdx) {
     ctx.beginPath(); ctx.arc(m.x, m.y, r + 4, 0, 2 * Math.PI);
     ctx.fillStyle = isSel ? 'rgba(245,166,35,.35)' : 'rgba(255,255,255,.18)';
     ctx.fill();
+    // #237 — disque semi-transparent : le repère anatomique reste visible sous
+    // le point. Le contour et le libellé restent opaques (lisibilité). Vaut
+    // aussi pour les photos annotées des rapports, qui partagent ce helper.
     ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
+    ctx.globalAlpha = 0.72;
     ctx.fillStyle = m.color; ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.strokeStyle = isSel ? '#f5a623' : '#fff';
     ctx.lineWidth = isSel ? 2.5 : 1.5; ctx.stroke();
     ctx.restore();
@@ -11221,6 +11226,83 @@ function _setupPosturePlacementCanvas(canvas) {
 // coords ; CSS max-width/max-height laisse le navigateur scaler en conservant
 // l'aspect-ratio intrinsèque du canvas. Les markers existants (nx/ny ∈ [0,1])
 // sont reconvertis en pixels canvas une fois img.naturalWidth/Height connus.
+// ===== #237 — ZOOM + CONTRASTE DE LA MODALE DE PLACEMENT POSTURAL =====
+// Même intention que #236 côté capteurs, appliquée à la morphostatique (bilans
+// sport, podopédiatrie et posturologie partagent cette modale). Deux différences
+// assumées :
+//   - l'échelle passe par `transform: scale()` sur le canvas (il est contraint
+//     par max-width/max-height pour tenir dans le cadre) ; #pp-zoom reçoit la
+//     taille correspondante pour rendre le cadre défilable. canvasXY reste exact,
+//     getBoundingClientRect renvoyant la boîte APRÈS transformation ;
+//   - l'état n'est pas persisté : il est remis à neutre à chaque ouverture.
+// Le contraste est ici purement visuel (aucune détection automatique sur ces
+// photos : les points sont placés à la main).
+let _postureZoom = 1;
+let _postureContrast = 1;
+
+function _applyPostureView() {
+  const canvas = document.getElementById('posture-placement-canvas');
+  const zoomBox = document.getElementById('pp-zoom');
+  const wrap = document.getElementById('pp-wrap');
+  if (canvas) {
+    canvas.style.transform = 'scale(' + _postureZoom + ')';
+    canvas.style.filter = _postureContrast > 1 ? 'contrast(' + _postureContrast.toFixed(2) + ')' : '';
+  }
+  if (canvas && zoomBox) {
+    // offsetWidth/Height = taille de mise en page AVANT transform : la taille
+    // réellement occupée après scale en découle par multiplication. Mémorisée
+    // à la première mesure (zoom 1) — la relire pendant qu'une transformation
+    // est active reste correct, offsetWidth ignorant les transforms, mais on
+    // évite ainsi toute dérive si le layout change entre deux réglages.
+    if (!zoomBox._baseW && canvas.offsetWidth) {
+      zoomBox._baseW = canvas.offsetWidth;
+      zoomBox._baseH = canvas.offsetHeight;
+    }
+    const bw = zoomBox._baseW || canvas.offsetWidth;
+    const bh = zoomBox._baseH || canvas.offsetHeight;
+    zoomBox.style.width = bw * _postureZoom + 'px';
+    zoomBox.style.height = bh * _postureZoom + 'px';
+  }
+  if (wrap) wrap.style.justifyContent = _postureZoom > 1 ? 'flex-start' : 'center';
+  const sl = document.getElementById('pp-zoom-sl');
+  if (sl && parseFloat(sl.value) !== _postureZoom) sl.value = _postureZoom;
+  const lbl = document.getElementById('pp-zoom-lbl');
+  if (lbl) lbl.textContent = 'Zoom:' + _postureZoom.toFixed(2) + 'x';
+  const csl = document.getElementById('pp-contrast-sl');
+  if (csl && parseFloat(csl.value) !== _postureContrast) csl.value = _postureContrast;
+  const clbl = document.getElementById('pp-contrast-lbl');
+  if (clbl) clbl.textContent = 'Contraste:' + _postureContrast.toFixed(1);
+}
+
+function setPostureZoom(val, anchor) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return;
+  const prev = _postureZoom;
+  _postureZoom = Math.min(4, Math.max(1, n));
+  _applyPostureView();
+  const ratio = _postureZoom / prev;
+  if (ratio !== 1) _capKeepAnchor(document.getElementById('pp-wrap'), ratio, anchor);
+}
+
+function setPostureContrast(val) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return;
+  _postureContrast = Math.min(3, Math.max(1, n));
+  _applyPostureView();
+}
+
+function resetPostureView() {
+  setPostureZoom(1);
+  setPostureContrast(1);
+}
+
+function _postureWheelZoom(e) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const step = e.deltaY < 0 ? 0.25 : -0.25;
+  setPostureZoom(_postureZoom + step, { clientX: e.clientX, clientY: e.clientY });
+}
+
 function openPosturePlacementModal(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd) { alert('Aucun bilan ouvert — sélectionne un patient et ouvre un bilan.'); return; }
@@ -11257,8 +11339,26 @@ function openPosturePlacementModal(prefix, viewKey) {
       </div>
       <div id="posture-placement-banner" style="padding:10px 12px;border-radius:6px;background:#fff7ed;border-left:4px solid #ccc;min-height:42px;flex:none;"></div>
       <div style="display:flex;gap:10px;flex:1;min-height:0;flex-wrap:wrap;overflow-y:auto;">
-        <div style="flex:1 1 60%;min-width:280px;min-height:280px;max-height:82vh;display:flex;align-items:center;justify-content:center;background:#000;border-radius:6px;overflow:hidden;">
-          <canvas id="posture-placement-canvas" style="max-width:100%;max-height:100%;display:block;cursor:crosshair;touch-action:none;"></canvas>
+        <div style="flex:1 1 60%;min-width:280px;display:flex;flex-direction:column;gap:6px;">
+          <!-- #237 — cadre défilable : #pp-zoom prend la taille zoomée, le canvas
+               est mis à l'échelle par transform (origin 0 0). canvasXY reste juste,
+               getBoundingClientRect reflétant la transformation. -->
+          <div id="pp-wrap" style="flex:1;min-height:280px;max-height:78vh;display:flex;align-items:center;justify-content:center;background:#000;border-radius:6px;overflow:auto;">
+            <div id="pp-zoom" style="flex:0 0 auto;">
+              <!-- Contraintes en unités viewport (et non en % du parent) : #pp-zoom
+                   reçoit sa taille de ce canvas, un % créerait une dépendance
+                   circulaire de mise en page. -->
+              <canvas id="posture-placement-canvas" style="max-width:58vw;max-height:72vh;display:block;cursor:crosshair;touch-action:none;transform-origin:0 0;"></canvas>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="range" min="1" max="4" step="0.25" value="1" id="pp-zoom-sl" style="flex:1;" oninput="setPostureZoom(this.value)"/>
+            <span style="font-size:10px;color:#555;min-width:56px;" id="pp-zoom-lbl">Zoom:1.00x</span>
+            <input type="range" min="1" max="3" step="0.1" value="1" id="pp-contrast-sl" style="flex:1;" oninput="setPostureContrast(this.value)"/>
+            <span style="font-size:10px;color:#555;min-width:74px;" id="pp-contrast-lbl">Contraste:1.0</span>
+            <button class="btn" onclick="resetPostureView()" title="Zoom 1x et contraste normal" style="font-size:10px;padding:3px 8px;">⟲</button>
+          </div>
+          <div style="font-size:10.5px;color:#666;">Astuce : <b>Ctrl + molette</b> (⌘ sur Mac) zoome sous le curseur. Molette seule = déplacement dans l'image.</div>
         </div>
         <div style="flex:0 0 280px;min-width:280px;max-height:82vh;overflow-y:auto;padding:6px;background:#f8f9fa;border-radius:6px;display:flex;flex-direction:column;gap:8px;">
           <div id="posture-placement-results" style="padding:6px 8px;border-radius:5px;background:#fff;border:1px solid #e2e8f0;font-size:12px;flex:none;"></div>
@@ -11305,6 +11405,18 @@ function openPosturePlacementModal(prefix, viewKey) {
     // Sélectionne le premier non placé (séquence guidée) ou -1 si tous placés.
     _postureModalSelIdx = _postureModalMarkers.findIndex(m => m.x === null);
     _setupPosturePlacementCanvas(canvas);
+    // #237 — vue neutre à chaque ouverture (le zoom sert au geste en cours, il
+    // n'a pas à survivre à la fermeture de la modale).
+    _postureZoom = 1;
+    _postureContrast = 1;
+    // rAF : laisse le navigateur calculer la taille de mise en page du canvas
+    // (offsetWidth/Height) avant que #pp-zoom ne s'y cale.
+    requestAnimationFrame(_applyPostureView);
+    const wrap = document.getElementById('pp-wrap');
+    if (wrap && !wrap._wheelBound) {
+      wrap.addEventListener('wheel', _postureWheelZoom, { passive: false });
+      wrap._wheelBound = true;
+    }
     _renderPostureMarkerList();
     _redrawPostureModal();
   };
@@ -12106,14 +12218,51 @@ function _applyCapView() {
   document.querySelectorAll('.cap-contrast-label').forEach((el) => {
     el.textContent = 'Contraste:' + capContrast.toFixed(1);
   });
+  // #237 — Ctrl/⌘ + molette sur les cadres (branché une seule fois, garde _wheelBound).
+  ['ph-wrap', 'vid-wrap'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && !el._wheelBound) {
+      el.addEventListener('wheel', _capWheelZoom, { passive: false });
+      el._wheelBound = true;
+    }
+  });
 }
 
-function setCapZoom(val) {
+// #237 — recentrage après changement de zoom. Sans lui, l'agrandissement part
+// du coin haut-gauche et la zone observée sort du cadre. `anchor` est un point
+// en coordonnées écran (clientX/clientY) : la portion d'image qui s'y trouvait
+// avant le zoom s'y retrouve après. Sans anchor, on conserve le centre du cadre.
+// Appelé APRÈS que la nouvelle taille ait été appliquée au DOM.
+function _capKeepAnchor(wrap, ratio, anchor) {
+  if (!wrap || !(ratio > 0)) return;
+  const rect = wrap.getBoundingClientRect();
+  const ax = anchor ? anchor.clientX - rect.left : rect.width / 2;
+  const ay = anchor ? anchor.clientY - rect.top : rect.height / 2;
+  wrap.scrollLeft = (wrap.scrollLeft + ax) * ratio - ax;
+  wrap.scrollTop = (wrap.scrollTop + ay) * ratio - ay;
+}
+
+function setCapZoom(val, anchor) {
   const n = parseFloat(val);
   if (isNaN(n)) return;
+  const prev = capZoom;
   capZoom = Math.min(CAP_ZOOM_MAX, Math.max(CAP_ZOOM_MIN, n));
   try { localStorage.setItem(CAP_ZOOM_KEY, String(capZoom)); } catch (_e) { /* noop */ }
   _applyCapView();
+  const ratio = capZoom / prev;
+  if (ratio !== 1) {
+    _capKeepAnchor(document.getElementById('ph-wrap'), ratio, anchor);
+    _capKeepAnchor(document.getElementById('vid-wrap'), ratio, anchor);
+  }
+}
+
+// Ctrl/⌘ + molette : zoom centré sous le curseur. La molette seule reste le
+// défilement natif du cadre (déplacement dans l'image agrandie).
+function _capWheelZoom(e) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const step = e.deltaY < 0 ? 0.25 : -0.25;
+  setCapZoom(capZoom + step, { clientX: e.clientX, clientY: e.clientY });
 }
 
 function setCapContrast(val) {
