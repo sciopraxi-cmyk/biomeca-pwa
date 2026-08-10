@@ -26400,9 +26400,11 @@ function _runPatientsCSVImport(text) {
   alert(msg);
 }
 
-// ===== #229-D — AIDE INTÉGRÉE (FAQ avec recherche) =====
-// Étape 1 du chantier aide : FAQ locale structurée, zéro dépendance réseau.
-// Le chatbot IA (Edge Function + plafond de messages) viendra par-dessus.
+// ===== #229-D — AIDE INTÉGRÉE (FAQ avec recherche + assistant IA) =====
+// Étape 1 : FAQ locale structurée, zéro dépendance réseau.
+// Étape 2 : assistant IA (Edge Function help-chat, plafond de messages/jour,
+// périmètre = documentation du logiciel uniquement) — la FAQ reste le repli
+// si l'assistant est indisponible ou le plafond atteint.
 // La recherche réutilise _importNormName (casse/accents insensibles).
 const _FAQ_DATA = [
   {
@@ -26506,12 +26508,93 @@ function showHelp() {
         <button onclick="closeHelp()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">✕</button>
       </div>
       <input id="help-search" class="inp" placeholder="🔍 Rechercher (ex : import, rapport, logo, mot de passe...)" style="width:100%;margin-bottom:4px;font-size:13px;" oninput="document.getElementById('help-list').innerHTML=_renderHelpList(this.value)"/>
+      <button id="help-chat-toggle" onclick="toggleHelpChat()" style="background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:8px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:6px;">🤖 Poser une question à l'assistant</button>
+      <div id="help-chat" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px;border:1px solid var(--bord);border-radius:8px;padding:8px;background:var(--bg2);">
+        <div id="help-chat-msgs" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+        <div style="display:flex;gap:6px;">
+          <input id="help-chat-input" class="inp" placeholder="Votre question sur le logiciel..." style="flex:1;font-size:12.5px;" onkeydown="if(event.key==='Enter'){event.preventDefault();sendHelpChat();}"/>
+          <button id="help-chat-send" onclick="sendHelpChat()" style="background:var(--blue);border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;">Envoyer</button>
+        </div>
+        <div style="font-size:10.5px;color:var(--mut);">Assistant limité à l'utilisation du logiciel — n'indiquez aucune donnée patient (nom, date de naissance, éléments médicaux…).</div>
+      </div>
       <div id="help-list" style="overflow-y:auto;flex:1;padding-right:4px;">${_renderHelpList('')}</div>
       <a href="mailto:contact@verticy.fr?subject=Support%20Verticy" style="display:block;text-align:center;background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:9px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;margin-top:12px;">✉️ Question sans réponse ? Contacter le support</a>
     </div>`;
   modal.addEventListener('click', (e) => { if (e.target === modal) closeHelp(); });
   document.body.appendChild(modal);
+  // #229-D étape 2 — une conversation entamée dans la session reste visible
+  // à la réouverture du panneau.
+  if (_helpChatMsgs.length) toggleHelpChat(true);
   document.getElementById('help-search')?.focus();
+}
+
+// ─── #229-D étape 2 — assistant IA (Edge Function help-chat) ────────────────
+// Historique en mémoire de session uniquement (jamais persisté). Le plafond
+// de messages/jour et la restriction au périmètre documentation sont
+// appliqués côté serveur ; ici on gère l'affichage et les replis :
+// 503 chat_unavailable → renvoi vers FAQ/support, 429 daily_limit → plafond.
+let _helpChatMsgs = [];
+let _helpChatBusy = false;
+
+function toggleHelpChat(forceOpen) {
+  const box = document.getElementById('help-chat');
+  if (!box) return;
+  const open = forceOpen === true || box.style.display === 'none';
+  box.style.display = open ? 'flex' : 'none';
+  if (open) {
+    _helpChatRender();
+    document.getElementById('help-chat-input')?.focus();
+  }
+}
+
+function _helpChatRender(typing) {
+  const box = document.getElementById('help-chat-msgs');
+  if (!box) return;
+  const bubble = (m) => {
+    const user = m.role === 'user';
+    const style = user
+      ? 'align-self:flex-end;background:var(--blue);color:#fff;'
+      : 'align-self:flex-start;background:var(--card);color:var(--fg);border:1px solid var(--bord);';
+    return '<div style="' + style + 'max-width:85%;padding:7px 10px;border-radius:10px;font-size:12.5px;line-height:1.45;white-space:pre-wrap;">' + _escHtml(m.content) + '</div>';
+  };
+  box.innerHTML = _helpChatMsgs.map(bubble).join('') + (typing ? '<div style="align-self:flex-start;color:var(--mut);font-size:12.5px;padding:4px 10px;">…</div>' : '');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendHelpChat() {
+  const inp = document.getElementById('help-chat-input');
+  const txt = (inp?.value || '').trim();
+  if (!txt || _helpChatBusy) return;
+  _helpChatBusy = true;
+  inp.value = '';
+  const sendBtn = document.getElementById('help-chat-send');
+  if (sendBtn) sendBtn.disabled = true;
+  _helpChatMsgs.push({ role: 'user', content: txt.slice(0, 1500) });
+  _helpChatRender(true);
+  let reply;
+  try {
+    const res = await authFetch(SUPA_URL + '/functions/v1/help-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: _helpChatMsgs.slice(-8) }),
+    });
+    if (res.status === 503) {
+      reply = "L'assistant n'est pas disponible pour le moment — la FAQ ci-dessous reste consultable, ou écrivez à contact@verticy.fr.";
+    } else if (res.status === 429) {
+      reply = "Vous avez atteint le nombre de questions autorisées aujourd'hui. La FAQ reste disponible, et le support répond à contact@verticy.fr.";
+    } else if (!res.ok) {
+      reply = 'Erreur inattendue — réessayez, ou contactez le support.';
+    } else {
+      const d = await res.json();
+      reply = d.reply || 'Erreur inattendue — réessayez, ou contactez le support.';
+    }
+  } catch (_e) {
+    reply = 'Connexion impossible — vérifiez votre réseau et réessayez.';
+  }
+  _helpChatMsgs.push({ role: 'assistant', content: reply });
+  _helpChatBusy = false;
+  if (sendBtn) sendBtn.disabled = false;
+  _helpChatRender();
 }
 
 // ===== #229-A — EXPORT CSV DU RÉPERTOIRE PATIENTS =====
