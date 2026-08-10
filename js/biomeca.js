@@ -5069,7 +5069,7 @@ function openNewPatientModal() {
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Civilité</div><select class="inp" id="np-civilite"><option value=""></option><option>M.</option><option>Mme</option></select></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom *</div><input class="inp" id="np-nom" placeholder="Nom"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prénom *</div><input class="inp" id="np-prenom" placeholder="Prénom"/></div>
-          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance</div><input class="inp" id="np-ddn" type="date"/></div>
+          <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance *</div><input class="inp" id="np-ddn" type="date"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Email</div><input class="inp" id="np-email" type="email" placeholder="patient@mail.fr"/></div>
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Téléphone</div><input class="inp" id="np-tel" type="tel" placeholder="06..."/></div>
           <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Adresse</div><input class="inp" id="np-adresse" placeholder="12 rue..."/></div>
@@ -5115,6 +5115,11 @@ function createPatient() {
   const prenom = document.getElementById('np-prenom').value.trim();
   const errEl = document.getElementById('np-err');
   if (!nom || !prenom) { errEl.textContent='⚠ Nom et prénom obligatoires.'; errEl.style.display='block'; return; }
+  // #229-E — ddn obligatoire à la création : l'appariement de l'import CSV
+  // (#223-B) se fait sur nom+prénom+ddn ; une fiche sans ddn expose à la
+  // création d'un doublon au premier import. Les fiches existantes ne sont
+  // pas bloquées (pas d'exigence à l'édition).
+  if (!document.getElementById('np-ddn').value) { errEl.textContent='⚠ Date de naissance obligatoire (elle évite les doublons lors des imports CSV).'; errEl.style.display='block'; return; }
   errEl.style.display = 'none';
   const pratId = document.getElementById('np-prat').value;
   const p = {
@@ -26403,7 +26408,7 @@ const _FAQ_DATA = [
   {
     theme: '👤 Patients',
     items: [
-      { q: 'Comment créer un patient ?', a: "Liste patients → <strong>+ Nouveau patient</strong>. Seuls le nom et le prénom sont obligatoires — tous les autres champs (coordonnées, antécédents, examens réalisés…) sont facultatifs et alimenteront automatiquement les bilans et les rapports." },
+      { q: 'Comment créer un patient ?', a: "Liste patients → <strong>+ Nouveau patient</strong>. Le nom, le prénom et la date de naissance sont obligatoires (la date de naissance sert à reconnaître le patient lors des imports CSV et évite les doublons) — tous les autres champs (coordonnées, antécédents, examens réalisés…) sont facultatifs et alimenteront automatiquement les bilans et les rapports." },
       { q: 'Comment importer mes patients depuis Doctolib ou DrSanté ?', a: "Bouton <strong>📥 Import CSV</strong> : il accepte l'export base patients Doctolib, l'export de rendez-vous Doctolib et l'export DrSanté. L'import ne crée jamais de doublon (réimporter le même fichier ne change rien) et ne remplit que les champs vides des fiches existantes — il n'écrase jamais vos saisies. Le numéro de sécurité sociale n'est jamais importé." },
       { q: 'Comment sauvegarder ou exporter mon répertoire patients ?', a: "Bouton <strong>📤 Export CSV</strong> : télécharge tout le répertoire dans un fichier lisible par Excel (accents corrects). C'est aussi votre sauvegarde personnelle et votre export RGPD." },
       { q: 'À quoi servent les champs Antécédents et Examens de la fiche ?', a: "Ce sont des données stables du patient : elles se pré-remplissent automatiquement dans l'anamnèse de chaque nouveau bilan. Si vous les complétez pendant un bilan en cours, la fiche se met à jour ; les bilans archivés gardent leur version d'origine." },
