@@ -1,0 +1,61 @@
+-- #240-quater — Webhook d'activation PODAXIA : mémoires d'idempotence.
+-- Contrat : docs/api-partenaire-activation-v1.md
+--
+-- ⚠️ À exécuter dans le SQL Editor Supabase AVANT de déployer l'Edge Function
+-- partner-activation. Déployée en premier, la fonction lirait des colonnes
+-- inexistantes : l'upsert PostgREST échouerait sur colonne inconnue — la
+-- contrainte exacte de #223-A / #226-A, ici sur partner_licences.
+--
+-- Idempotent : ADD COLUMN IF NOT EXISTS. Rejouable sans risque et sans effet.
+--
+-- Prérequis : partner-api-licences.sql (crée public.partner_licences).
+--
+-- Frontière santé (contrat § 1) : aucune donnée de santé, aucune donnée de
+-- patient. Données de compte praticien et de liaison commerciale uniquement.
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Mémoires nécessaires à l'idempotence stricte (contrat § 8)
+-- ═══════════════════════════════════════════════════════════════════
+--
+-- ⚠️⚠️ CES DEUX COLONNES SONT STRICTEMENT INTERNES ⚠️⚠️
+--
+-- Elles ne sont JAMAIS exposées : ni par l'API de lecture (api-partenaire),
+-- ni par une réponse de partner-activation, ni par aucune autre route.
+-- Même régime que partner_ref. Les objets de réponse des deux contrats sont
+-- CLOS — ces colonnes n'en font pas partie et ne doivent jamais y être
+-- ajoutées, même « pour aider au diagnostic ».
+--
+-- Elles servent au seul contrôle d'idempotence décrit au § 8 du contrat.
+
+ALTER TABLE public.partner_licences
+  -- compte_cree — le compte praticien a-t-il été CRÉÉ par cette activation
+  -- (true), ou existait-il déjà (false) ?
+  --
+  -- Mémorise le `statut` renvoyé au premier appel, pour le rejouer à
+  -- l'identique. Sans elle, un rejeu répondrait "existant" là où le premier
+  -- appel avait répondu "cree" : la réponse ne serait pas réellement
+  -- idempotente, alors que le contrat l'annonce octet pour octet.
+  --
+  -- ⚠️ INTERNE — jamais exposée (voir en-tête).
+  ADD COLUMN IF NOT EXISTS compte_cree boolean NOT NULL DEFAULT false,
+  -- formule_partenaire — le JETON PUBLIC de formule reçu à l'activation
+  -- ('SPORT', 'DUO', 'ESSENTIEL_POSTURO'…, cf. contrat § 6).
+  --
+  -- user_data.formule ne suffit PAS à le reconstituer : deux jetons publics
+  -- distincts partagent la même formule interne —
+  --   ESSENTIEL_POSTURO et ESSENTIEL_PEDIATRIE  → formule_1
+  --   DUO_SPORT_POSTURO et DUO_SPORT_PEDIATRIE  → formule_4
+  -- Sans cette colonne, le contrôle de concordance du § 8.1 laisserait passer
+  -- une divergence entre les deux variantes d'un même plan — précisément le
+  -- cas qu'il existe pour attraper.
+  --
+  -- Nullable : les licences émises avant ce webhook n'en ont pas. Une licence
+  -- sans jeton mémorisé ne peut pas être contrôlée sur la formule ; le
+  -- contrôle porte alors sur le seul courriel.
+  --
+  -- ⚠️ INTERNE — jamais exposée (voir en-tête).
+  ADD COLUMN IF NOT EXISTS formule_partenaire text;
+
+-- Rappel : le courriel de comparaison n'est PAS dupliqué ici. Il se lit sur
+-- le compte désigné par user_id (auth.users.email), seule source de vérité —
+-- dupliquer un courriel, c'est se condamner à le voir diverger.
