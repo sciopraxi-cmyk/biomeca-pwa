@@ -60,7 +60,7 @@ tableau récapitulatif à la fin :
     rtk proxy node --check js/biomeca.js > /tmp/f5.txt 2>&1; EX5=$?
 
 Attendu : 0 erreur ESLint (les avertissements sont une dette connue),
-123 tests au vert, `tsc` muet.
+231 tests au vert, `tsc` muet.
 
 **La CI GitHub est la référence, pas la sortie locale.** Elle exécute les mêmes
 filets sur des runners neufs, hors de portée du proxy.
