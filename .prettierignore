@@ -9,6 +9,11 @@ css/biomeca.css
 manifest.json
 package-lock.json
 
+# Golden files de l'API partenaire — octets normatifs du contrat.
+# Prettier les indenterait et ajouterait un saut de ligne final, ce qui
+# casserait la comparaison octet par octet de tests/partenaire-v1.test.mjs.
+tests/golden/
+
 # Standard
 node_modules/
 assets/
