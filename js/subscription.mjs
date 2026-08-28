@@ -112,3 +112,149 @@ export function canChangeModule(userData, now) {
     next_change_date: new Date(lastChange + thirtyDaysMs).toISOString(),
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// describeEngagement — libellé + droit de résilier (task #241)
+// ═══════════════════════════════════════════════════════════════════
+//
+// Test-mirror : le runtime réel est dupliqué dans js/biomeca.js
+// (_describeEngagement, appelé par loadAbonnement et resilierAbonnement).
+// Toute modification doit être faite dans les DEUX fichiers, sinon les
+// tests restent verts pendant que la prod dérive. Cf. access.mjs, auth-error.mjs.
+//
+// #241 — le client testait `engagement === '12_mois'`, valeur écrite par
+// PERSONNE. Les quatre valeurs réellement posées en base sont :
+//   'sans'               stripe-webhook/index.ts:130  (abonnement mensuel)
+//   '1_an'               stripe-webhook/index.ts:135  (abonnement engagé 12 mois)
+//   'admin_gratuit'      admin-users/index.ts:202     (activation manuelle)
+//   'partenaire_podaxia' _shared/partenaire-activation-v1.ts:60
+// Conséquence du test mort : badge « Sans engagement » pour tout le monde,
+// décompte des mois jamais affiché, et blocage de résiliation anticipée
+// jamais déclenché depuis l'origine.
+//
+// Le libellé était binaire (« Engagement 12 mois » / « Sans engagement »), donc
+// FAUX pour admin_gratuit et partenaire_podaxia : une licence offerte n'est pas
+// un abonnement sans engagement. Une valeur inconnue ne doit JAMAIS retomber
+// sur un libellé rassurant — elle affiche la valeur brute et invite à vérifier.
+
+// Libellés des quatre valeurs réellement écrites. Sert aussi de liste des
+// valeurs reconnues : toute clé absente d'ici bascule sur le repli explicite.
+export const ENGAGEMENT_LABELS = {
+  sans: 'Sans engagement',
+  '1_an': 'Engagement 12 mois',
+  admin_gratuit: 'Licence offerte (activation administrateur)',
+  partenaire_podaxia: 'Accès partenaire PODAXIA',
+};
+
+// Durée de la période d'engagement de la formule '1_an', en mois.
+export const ENGAGEMENT_DUREE_MOIS = 12;
+
+// Args :
+//   engagement : valeur brute du champ user_data.engagement (string | null)
+//   dateDebut  : user_data.date_debut_abonnement (string ISO | null)
+//   now        : Date (injectable pour tests déterministes)
+//
+// Retourne :
+//   etat          'absent' | 'connu' | 'inconnu'
+//   label         libellé affichable, jamais faussement rassurant
+//   peutResilier  false UNIQUEMENT pour '1_an' encore dans sa fenêtre.
+//                 'admin_gratuit' et 'partenaire_podaxia' ne sont pas des
+//                 abonnements avec engagement — les bloquer reviendrait à
+//                 retenir des comptes qui n'ont rien souscrit.
+//   moisRestants  mois restants avant l'échéance (arrondi au supérieur), sinon null
+//   finEngagement Date d'échéance de l'engagement, sinon null
+//
+// ⚠️ Le décompte NE sert PAS à décider du blocage. Compter en mois calendaires
+// (l'ancien `12 - moisEcoules`) ignore le jour du mois : un abonnement souscrit
+// le 31 janvier 2026 et évalué le 1er janvier 2027 donne (2027−2026)×12+(0−0)
+// = 12 mois « écoulés » et se serait libéré 30 jours trop tôt. Le blocage
+// compare donc `now` à la date d'échéance réelle ; les mois ne sont qu'un
+// affichage, arrondi au supérieur pour ne jamais annoncer « 0 mois restants »
+// sur un compte encore bloqué.
+export function describeEngagement(engagement, dateDebut, now = new Date()) {
+  // Champ absent : compte sans abonnement (ou remis à zéro par l'admin,
+  // admin-users/index.ts:414 écrit engagement=null). Rien à bloquer.
+  if (!engagement) {
+    return {
+      etat: 'absent',
+      label: 'Aucun abonnement actif',
+      peutResilier: true,
+      moisRestants: null,
+      finEngagement: null,
+    };
+  }
+
+  // Valeur non reconnue : ne jamais afficher « Sans engagement », qui
+  // laisserait croire à une résiliation libre sur un contrat inconnu.
+  if (!Object.prototype.hasOwnProperty.call(ENGAGEMENT_LABELS, engagement)) {
+    return {
+      etat: 'inconnu',
+      label: 'Engagement non reconnu (« ' + engagement + ' ») — contactez le support',
+      peutResilier: true,
+      moisRestants: null,
+      finEngagement: null,
+    };
+  }
+
+  const base = ENGAGEMENT_LABELS[engagement];
+
+  // Les trois valeurs sans engagement : libellé seul, résiliation libre.
+  if (engagement !== '1_an') {
+    return {
+      etat: 'connu',
+      label: base,
+      peutResilier: true,
+      moisRestants: null,
+      finEngagement: null,
+    };
+  }
+
+  // '1_an' sans date de début : l'engagement existe mais son échéance est
+  // incalculable. On ne bloque pas (un blocage sans date de sortie serait
+  // insoluble pour l'utilisateur) et on le dit au lieu de faire comme si
+  // tout était normal.
+  if (!dateDebut) {
+    return {
+      etat: 'connu',
+      label: base + ' — date de début inconnue',
+      peutResilier: true,
+      moisRestants: null,
+      finEngagement: null,
+    };
+  }
+
+  const debut = new Date(dateDebut);
+  // setMonth reporte au mois suivant quand le quantième n'existe pas
+  // (29 février + 12 mois → 1er mars). Décalage d'un jour assumé, du côté
+  // qui retient l'abonné, jamais du côté qui le libère trop tôt.
+  const finEngagement = new Date(debut.getTime());
+  finEngagement.setMonth(finEngagement.getMonth() + ENGAGEMENT_DUREE_MOIS);
+
+  // Échéance atteinte (comparaison à l'instant près, pas au mois) : libre.
+  // Le jour exact de l'échéance, l'engagement est terminé.
+  if (now.getTime() >= finEngagement.getTime()) {
+    return {
+      etat: 'connu',
+      label: base + ' — échu',
+      peutResilier: true,
+      moisRestants: 0,
+      finEngagement: finEngagement,
+    };
+  }
+
+  // Encore engagé : décompte d'affichage, arrondi au mois supérieur.
+  let moisRestants =
+    (finEngagement.getFullYear() - now.getFullYear()) * 12 +
+    (finEngagement.getMonth() - now.getMonth());
+  if (finEngagement.getDate() > now.getDate()) moisRestants += 1;
+  // Un reste strictement positif mais inférieur au mois doit s'afficher « 1 ».
+  if (moisRestants < 1) moisRestants = 1;
+
+  return {
+    etat: 'connu',
+    label: base + ' — ' + moisRestants + ' mois restants',
+    peutResilier: false,
+    moisRestants: moisRestants,
+    finEngagement: finEngagement,
+  };
+}

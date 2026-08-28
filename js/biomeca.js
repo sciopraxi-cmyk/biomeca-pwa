@@ -26334,6 +26334,72 @@ window.addEventListener('DOMContentLoaded', function() {
 // ===== GESTION ABONNEMENT =====
 var _stripePortalUrl = 'https://billing.stripe.com/p/login/cNibJ24ma8Z6a7xgFBfAc00';
 
+// ─── _describeEngagement — DUPLIQUÉ de js/subscription.mjs (#241) ────
+// Test-mirror : la source testée par Vitest est describeEngagement dans
+// js/subscription.mjs. Toute modification ici doit y être répercutée,
+// sinon les tests restent verts pendant que la prod dérive.
+//
+// #241 — le code testait `engagement === '12_mois'`, valeur qu'AUCUN chemin
+// d'écriture ne pose (ni serveur, ni client, ni migration SQL). Les quatre
+// valeurs réelles sont 'sans' et '1_an' (stripe-webhook), 'admin_gratuit'
+// (admin-users) et 'partenaire_podaxia' (partenaire-activation-v1). Le badge
+// affichait donc « Sans engagement » pour tous, le décompte des mois ne
+// s'affichait jamais, et le blocage de résiliation anticipée ne se
+// déclenchait jamais.
+var _ENGAGEMENT_LABELS = {
+  sans: 'Sans engagement',
+  '1_an': 'Engagement 12 mois',
+  admin_gratuit: 'Licence offerte (activation administrateur)',
+  partenaire_podaxia: 'Accès partenaire PODAXIA',
+};
+var _ENGAGEMENT_DUREE_MOIS = 12;
+
+function _describeEngagement(engagement, dateDebut, now) {
+  now = now || new Date();
+
+  // Champ absent : compte sans abonnement (ou remis à zéro par l'admin).
+  if(!engagement) {
+    return { etat:'absent', label:'Aucun abonnement actif', peutResilier:true, moisRestants:null, finEngagement:null };
+  }
+
+  // Valeur non reconnue : ne jamais retomber sur « Sans engagement », qui
+  // laisserait croire à une résiliation libre sur un contrat inconnu.
+  if(!Object.prototype.hasOwnProperty.call(_ENGAGEMENT_LABELS, engagement)) {
+    return { etat:'inconnu', label:'Engagement non reconnu (« ' + engagement + ' ») — contactez le support', peutResilier:true, moisRestants:null, finEngagement:null };
+  }
+
+  var base = _ENGAGEMENT_LABELS[engagement];
+
+  // admin_gratuit et partenaire_podaxia ne sont pas des abonnements avec
+  // engagement : jamais de blocage de résiliation sur ces comptes.
+  if(engagement !== '1_an') {
+    return { etat:'connu', label:base, peutResilier:true, moisRestants:null, finEngagement:null };
+  }
+
+  // '1_an' sans date de début : échéance incalculable. On ne bloque pas
+  // (blocage sans date de sortie = insoluble pour l'utilisateur) et on le dit.
+  if(!dateDebut) {
+    return { etat:'connu', label:base + ' — date de début inconnue', peutResilier:true, moisRestants:null, finEngagement:null };
+  }
+
+  var debut = new Date(dateDebut);
+  var finEngagement = new Date(debut.getTime());
+  finEngagement.setMonth(finEngagement.getMonth() + _ENGAGEMENT_DUREE_MOIS);
+
+  // Le blocage compare à l'échéance réelle, PAS à un décompte de mois
+  // calendaires : souscrit le 31/01/2026 et évalué le 01/01/2027, l'ancien
+  // `12 - moisEcoules` donnait 12 et libérait 30 jours trop tôt.
+  if(now.getTime() >= finEngagement.getTime()) {
+    return { etat:'connu', label:base + ' — échu', peutResilier:true, moisRestants:0, finEngagement:finEngagement };
+  }
+
+  var moisRestants = (finEngagement.getFullYear() - now.getFullYear()) * 12 + (finEngagement.getMonth() - now.getMonth());
+  if(finEngagement.getDate() > now.getDate()) moisRestants += 1;
+  if(moisRestants < 1) moisRestants = 1;
+
+  return { etat:'connu', label:base + ' — ' + moisRestants + ' mois restants', peutResilier:false, moisRestants:moisRestants, finEngagement:finEngagement };
+}
+
 async function loadAbonnementInfo() {
   if(!pwaUser || !pwaUser.token || !pwaUser.email) return;
   try {
@@ -26365,31 +26431,20 @@ async function loadAbonnementInfo() {
     }
 
     if(userRecord.engagement) {
-      var engTxt = userRecord.engagement === '12_mois' ? 'Engagement 12 mois' : 'Sans engagement';
-      if(engagementEl) engagementEl.textContent = '📋 ' + engTxt;
+      // #241 — libellé et décompte issus du descripteur partagé (miroir
+      // js/subscription.mjs), qui couvre les quatre valeurs réelles.
+      var eng = _describeEngagement(userRecord.engagement, userRecord.date_debut_abonnement);
+      if(engagementEl) engagementEl.textContent = '📋 ' + eng.label;
 
       // Date début abonnement
       if(userRecord.date_debut_abonnement) {
-        var debut = new Date(userRecord.date_debut_abonnement);
         var maintenant = new Date();
-        var moisEcoules = (maintenant.getFullYear() - debut.getFullYear()) * 12 + (maintenant.getMonth() - debut.getMonth());
 
-        if(userRecord.engagement === '12_mois') {
-          var moisRestants = 12 - moisEcoules;
-          if(moisRestants > 0) {
-            if(engagementEl) engagementEl.textContent += ' — ' + moisRestants + ' mois restants';
-            if(resilierWrap) {
-              resilierWrap.style.display = 'block';
-              if(resilierMsg) resilierMsg.textContent = '⚠️ Résiliation impossible avant le ' + new Date(debut.setMonth(debut.getMonth()+12)).toLocaleDateString('fr-FR');
-            }
-          } else {
-            if(resilierWrap) resilierWrap.style.display = 'block';
-            if(resilierMsg) resilierMsg.textContent = 'Résiliation effective à la prochaine date anniversaire';
-          }
-        } else {
-          // Sans engagement
-          if(resilierWrap) resilierWrap.style.display = 'block';
-          if(resilierMsg) resilierMsg.textContent = 'Résiliation effective à la prochaine date anniversaire';
+        if(resilierWrap) resilierWrap.style.display = 'block';
+        if(resilierMsg) {
+          resilierMsg.textContent = eng.peutResilier
+            ? 'Résiliation effective à la prochaine date anniversaire'
+            : '⚠️ Résiliation impossible avant le ' + eng.finEngagement.toLocaleDateString('fr-FR');
         }
 
         // Prochain renouvellement
@@ -26426,16 +26481,13 @@ async function resilierAbonnement() {
     var userRecord = await supa.getUserRecord(pwaUser.email);
     if(!userRecord) return;
 
-    // Vérifier engagement 12 mois
-    if(userRecord.engagement === '12_mois' && userRecord.date_debut_abonnement) {
-      var debut = new Date(userRecord.date_debut_abonnement);
-      var maintenant = new Date();
-      var moisEcoules = (maintenant.getFullYear() - debut.getFullYear()) * 12 + (maintenant.getMonth() - debut.getMonth());
-      if(moisEcoules < 12) {
-        var moisRestants = 12 - moisEcoules;
-        alert('⚠️ Résiliation impossible\n\nVotre abonnement avec engagement de 12 mois ne peut pas être résilié avant ' + moisRestants + ' mois.\n\nDate de fin d\'engagement : ' + new Date(new Date(userRecord.date_debut_abonnement).setMonth(new Date(userRecord.date_debut_abonnement).getMonth()+12)).toLocaleDateString('fr-FR'));
-        return;
-      }
+    // #241 — blocage de résiliation anticipée. Ne s'applique QU'à '1_an' :
+    // le descripteur renvoie peutResilier=true pour 'sans', 'admin_gratuit',
+    // 'partenaire_podaxia', l'absence de valeur et toute valeur inconnue.
+    var eng = _describeEngagement(userRecord.engagement, userRecord.date_debut_abonnement);
+    if(!eng.peutResilier) {
+      alert('⚠️ Résiliation impossible\n\nVotre abonnement avec engagement de 12 mois ne peut pas être résilié avant ' + eng.moisRestants + ' mois.\n\nDate de fin d\'engagement : ' + eng.finEngagement.toLocaleDateString('fr-FR'));
+      return;
     }
 
     if(confirm('Êtes-vous sûr de vouloir résilier votre abonnement ?\n\nLa résiliation sera effective à la prochaine date anniversaire.')) {
