@@ -4,6 +4,7 @@ import {
   defaultModulesForPlan,
   isValidModulesForPlan,
   canChangeModule,
+  describeEngagement,
 } from '../js/subscription.mjs';
 
 // Helpers de fixtures : timestamps relatifs à un point fixe pour stabilité
@@ -120,5 +121,154 @@ describe('PLAN_MODULES (defaultModulesForPlan + isValidModulesForPlan)', () => {
   it('5. Plan 4 (Intégral) : default = tous, isValid(tous) = ok', () => {
     expect(defaultModulesForPlan(4)).toEqual(['postural', 'podopedia', 'podo_sport']);
     expect(isValidModulesForPlan(4, ['postural', 'podopedia', 'podo_sport'])).toEqual({ ok: true });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// describeEngagement (#241)
+// ═══════════════════════════════════════════════════════════════════
+//
+// Ce comportement n'était couvert par RIEN — c'est pour cela que le test
+// mort `engagement === '12_mois'` a survécu depuis l'origine. Les quatre
+// valeurs couvertes ici sont celles réellement écrites en base ; aucun
+// chemin d'écriture ne pose '12_mois' (vérifié sur tout le dépôt).
+
+describe('describeEngagement — les quatre valeurs réelles', () => {
+  const NOW_ENG = new Date('2026-06-15T12:00:00Z');
+
+  it("1. 'sans' → « Sans engagement », résiliation libre", () => {
+    const r = describeEngagement('sans', '2026-01-15T00:00:00Z', NOW_ENG);
+    expect(r.etat).toBe('connu');
+    expect(r.label).toBe('Sans engagement');
+    expect(r.peutResilier).toBe(true);
+    expect(r.moisRestants).toBeNull();
+  });
+
+  it("2. '1_an' en cours → libellé avec décompte, résiliation BLOQUÉE", () => {
+    const r = describeEngagement('1_an', '2026-01-15T00:00:00Z', NOW_ENG);
+    expect(r.etat).toBe('connu');
+    expect(r.peutResilier).toBe(false);
+    expect(r.moisRestants).toBe(7);
+    expect(r.label).toBe('Engagement 12 mois — 7 mois restants');
+    expect(r.finEngagement.getFullYear()).toBe(2027);
+    expect(r.finEngagement.getMonth()).toBe(0);
+  });
+
+  it("3. 'admin_gratuit' → libellé propre, JAMAIS « Sans engagement »", () => {
+    const r = describeEngagement('admin_gratuit', '2026-01-15T00:00:00Z', NOW_ENG);
+    expect(r.label).toBe('Licence offerte (activation administrateur)');
+    expect(r.label).not.toContain('Sans engagement');
+    // Pas un abonnement avec engagement : aucun blocage de résiliation.
+    expect(r.peutResilier).toBe(true);
+  });
+
+  it("4. 'partenaire_podaxia' → libellé propre, aucun blocage", () => {
+    const r = describeEngagement('partenaire_podaxia', '2026-01-15T00:00:00Z', NOW_ENG);
+    expect(r.label).toBe('Accès partenaire PODAXIA');
+    expect(r.label).not.toContain('Sans engagement');
+    expect(r.peutResilier).toBe(true);
+  });
+
+  it("5. '12_mois' (valeur morte, écrite par personne) tombe dans le repli inconnu", () => {
+    const r = describeEngagement('12_mois', '2026-01-15T00:00:00Z', NOW_ENG);
+    expect(r.etat).toBe('inconnu');
+    expect(r.peutResilier).toBe(true);
+  });
+});
+
+describe('describeEngagement — valeurs dégradées', () => {
+  const NOW_ENG = new Date('2026-06-15T12:00:00Z');
+
+  it('6. Valeur inconnue → repli explicite, jamais un libellé rassurant', () => {
+    const r = describeEngagement('formule_mystere', '2026-01-15T00:00:00Z', NOW_ENG);
+    expect(r.etat).toBe('inconnu');
+    expect(r.label).toContain('non reconnu');
+    expect(r.label).toContain('formule_mystere');
+    expect(r.label).not.toContain('Sans engagement');
+    expect(r.peutResilier).toBe(true);
+  });
+
+  it('7. Valeur absente (null) → « Aucun abonnement actif », pas de blocage', () => {
+    const r = describeEngagement(null, null, NOW_ENG);
+    expect(r.etat).toBe('absent');
+    expect(r.label).toBe('Aucun abonnement actif');
+    expect(r.peutResilier).toBe(true);
+    expect(r.finEngagement).toBeNull();
+  });
+
+  it('8. Valeur absente (chaîne vide) → même traitement que null', () => {
+    expect(describeEngagement('', null, NOW_ENG).etat).toBe('absent');
+    expect(describeEngagement(undefined, undefined, NOW_ENG).etat).toBe('absent');
+  });
+
+  it("9. '1_an' SANS date de début → pas de blocage, mais l'anomalie est dite", () => {
+    // Un blocage sans date de sortie calculable serait insoluble pour
+    // l'utilisateur. On libère, et le libellé ne fait pas comme si tout
+    // était normal.
+    const r = describeEngagement('1_an', null, NOW_ENG);
+    expect(r.peutResilier).toBe(true);
+    expect(r.label).toBe('Engagement 12 mois — date de début inconnue');
+    expect(r.moisRestants).toBeNull();
+    expect(r.finEngagement).toBeNull();
+  });
+
+  it('10. Les trois valeurs sans engagement ne bloquent JAMAIS, même date de début récente', () => {
+    const hier = '2026-06-14T00:00:00Z';
+    for (const v of ['sans', 'admin_gratuit', 'partenaire_podaxia']) {
+      expect(describeEngagement(v, hier, NOW_ENG).peutResilier).toBe(true);
+    }
+  });
+});
+
+describe('describeEngagement — bornes de date (#241)', () => {
+  it("11. Évalué le jour EXACT de l'échéance → échu, résiliation libre", () => {
+    const r = describeEngagement('1_an', '2026-03-10T09:00:00Z', new Date('2027-03-10T09:00:00Z'));
+    expect(r.peutResilier).toBe(true);
+    expect(r.moisRestants).toBe(0);
+    expect(r.label).toBe('Engagement 12 mois — échu');
+  });
+
+  it("12. La veille de l'échéance → encore bloqué, décompte arrondi à 1", () => {
+    const r = describeEngagement('1_an', '2026-03-10T09:00:00Z', new Date('2027-03-09T09:00:00Z'));
+    expect(r.peutResilier).toBe(false);
+    expect(r.moisRestants).toBe(1);
+  });
+
+  it("13. Souscrit le DERNIER jour du mois, évalué au 1er du mois d'échéance → encore bloqué", () => {
+    // Le calcul en mois calendaires de l'ancien code donnait
+    // (2027−2026)×12 + (0−0) = 12 mois « écoulés » et libérait l'abonné
+    // 30 jours trop tôt. La comparaison à l'échéance réelle le retient.
+    const r = describeEngagement('1_an', '2026-01-31T00:00:00Z', new Date('2027-01-01T00:00:00Z'));
+    expect(r.peutResilier).toBe(false);
+    expect(r.moisRestants).toBe(1);
+    expect(r.finEngagement.getDate()).toBe(31);
+    expect(r.finEngagement.getMonth()).toBe(0);
+    expect(r.finEngagement.getFullYear()).toBe(2027);
+  });
+
+  it("14. Souscrit le dernier jour du mois, évalué au lendemain de l'échéance → échu", () => {
+    const r = describeEngagement('1_an', '2026-01-31T00:00:00Z', new Date('2027-02-01T00:00:00Z'));
+    expect(r.peutResilier).toBe(true);
+    expect(r.moisRestants).toBe(0);
+  });
+
+  it('15. 29 février : setMonth reporte au 1er mars, décalage du côté qui retient', () => {
+    const r = describeEngagement('1_an', '2024-02-29T00:00:00Z', new Date('2025-02-28T00:00:00Z'));
+    expect(r.peutResilier).toBe(false);
+    expect(r.finEngagement.getMonth()).toBe(2);
+    expect(r.finEngagement.getDate()).toBe(1);
+  });
+
+  it('16. Le décompte affiché ne vaut jamais 0 tant que le compte est bloqué', () => {
+    // Balayage sur toute la durée d'engagement : dès que peutResilier est
+    // false, moisRestants doit être ≥ 1 — sinon le badge annoncerait
+    // « 0 mois restants » sur un compte encore retenu.
+    const debut = '2026-01-31T00:00:00Z';
+    for (let j = 0; j < 400; j++) {
+      const now = new Date(Date.UTC(2026, 0, 31) + j * 86400000);
+      const r = describeEngagement('1_an', debut, now);
+      if (!r.peutResilier) expect(r.moisRestants).toBeGreaterThanOrEqual(1);
+      else expect(r.moisRestants).toBe(0);
+    }
   });
 });
