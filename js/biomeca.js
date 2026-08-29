@@ -71,6 +71,32 @@ let _idleLockTimer = null;
 
 let pwaUser = null;
 
+// ─── #47 PGREST — DÉBUT (copie de js/sentry-scrub.mjs) ───
+// Test-mirror : la source testée par Vitest est pgrestErrorCode dans
+// js/sentry-scrub.mjs. La synchronisation n'est PAS confiée à ce
+// commentaire : tests/sentry-scrub.test.mjs extrait ce bloc entre ses
+// marqueurs, l'exécute, et exige des sorties identiques à celles du
+// miroir sur la même table de cas.
+//
+// PostgREST répond {"code":"23505","details":"Key (email)=(x@y.fr)…",
+// "hint":null,"message":"…"}. `details` et `message` portent la valeur
+// rejetée — donc, sur les tables patients/bilans, du CONTENU CLINIQUE.
+// `code` est un SQLSTATE : il identifie la panne sans rien révéler.
+// Obligation du contrat HDS (matrice de responsabilités, point 4).
+function _pgrestErrorCode(body) {
+  if (typeof body !== 'string' || body === '') return '(corps absent)';
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.code === 'string' && parsed.code !== '') return parsed.code;
+    return '(code absent)';
+  } catch (_e) {
+    // Corps non-JSON (page d'erreur HTML d'un proxy, texte brut…). On ne
+    // le journalise pas : on ne sait pas ce qu'il contient.
+    return '(corps non-JSON)';
+  }
+}
+// ─── #47 PGREST — FIN ───
+
 // ─── Client Supabase léger (sans SDK) ───
 // Les méthodes signIn / signUp / signOut / refreshAccessToken n'utilisent PAS authFetch
 // (publiques ou avec auth gérée explicitement). Toutes les autres passent par authFetch
@@ -176,8 +202,11 @@ const supa = {
       body: JSON.stringify(data)
     });
     if(!post.ok) {
-      const err = await post.text();
-      console.error('Supabase saveData error', post.status, err);
+      // #47 — JAMAIS le corps brut : PostgREST renvoie la valeur rejetée
+      // dans details/message, donc potentiellement du contenu clinique.
+      // Statut + SQLSTATE suffisent au diagnostic.
+      const err = await post.text().catch(() => '');
+      console.error('Supabase saveData error', post.status, _pgrestErrorCode(err));
     }
     return post.ok;
   }
@@ -757,7 +786,8 @@ async function saveToSupabase() {
   // n'est perdu en RAM, le prochain save (post-load) propagera bien en DB.
   if(!_dataLoaded) {
     console.warn('[#64] saveToSupabase() called before loadSupabaseData completed — SKIP to prevent data loss', {
-      email: pwaUser?.email,
+      // #47 — identifiant technique, jamais l'adresse (donnée personnelle).
+      userId: pwaUser?.id,
       patientsCount: patients.length,
       praticiensCount: praticiens.length,
     });
@@ -816,7 +846,8 @@ async function saveToSupabase() {
       if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
       console.error('[#38] saveToSupabase failed', {
         event: 'sync_failed_response_not_ok',
-        email: pwaUser?.email,
+        // #47 — identifiant technique, jamais l'adresse (donnée personnelle).
+        userId: pwaUser?.id,
         patientsCount: patients.length,
         praticiensCount: praticiens.length,
         timestamp: new Date().toISOString(),
@@ -832,7 +863,8 @@ async function saveToSupabase() {
       _hideSyncErrorBanner();
       console.log('[#38] saveToSupabase recovered', {
         event: 'sync_recovered',
-        email: pwaUser?.email,
+        // #47 — identifiant technique, jamais l'adresse (donnée personnelle).
+        userId: pwaUser?.id,
         timestamp: new Date().toISOString(),
       });
     }
@@ -847,7 +879,8 @@ async function saveToSupabase() {
     if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
     console.error('[#38] saveToSupabase exception', {
       event: 'sync_failed_exception',
-      email: pwaUser?.email,
+      // #47 — identifiant technique, jamais l'adresse (donnée personnelle).
+      userId: pwaUser?.id,
       patientsCount: patients.length,
       praticiensCount: praticiens.length,
       error: e instanceof Error ? e.message : String(e),
@@ -951,8 +984,9 @@ async function _syncPatientToNormalizedTables(p) {
       body: JSON.stringify(patientRow),
     });
     if (!patientRes.ok) {
+      // #47 — code SQLSTATE seul, jamais le corps (table patients).
       const body = await patientRes.text().catch(() => '');
-      console.warn('[#102 Phase 2a] sync patients échouée (' + patientRes.status + ') : ' + body);
+      console.warn('[#102 Phase 2a] sync patients échouée (' + patientRes.status + ') code ' + _pgrestErrorCode(body));
       return; // bilans.patient_id référence patients.id — inutile de continuer
     }
 
@@ -1181,8 +1215,9 @@ async function _syncPatientToNormalizedTables(p) {
         body: JSON.stringify(bilanRows),
       });
       if (!bilansRes.ok) {
+        // #47 — code SQLSTATE seul, jamais le corps (table bilans).
         const body = await bilansRes.text().catch(() => '');
-        console.warn('[#102 Phase 2a] sync bilans échouée (' + bilansRes.status + ') : ' + body);
+        console.warn('[#102 Phase 2a] sync bilans échouée (' + bilansRes.status + ') code ' + _pgrestErrorCode(body));
       }
     }
   } catch (e) {
@@ -2727,8 +2762,10 @@ function computeAccessLevel({ isAdmin, meta, userData }, now) {
 
   // État illégitime : formule sans licence. Log + blocked défensif (cf. Q1).
   if (!licence && formule) {
+    // #47 — l'adresse est retirée : le miroir js/access.mjs ne la journalisait
+    // déjà pas, c'est le runtime qui divergeait. `formule` suffit à qualifier
+    // l'état illégitime.
     console.error('[access] Illegitimate state detected: formule set without licence', {
-      email: pwaUser && pwaUser.email,
       formule,
     });
     return 'blocked';
