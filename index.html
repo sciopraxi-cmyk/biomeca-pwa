@@ -21,36 +21,241 @@
   // Configuration Sentry — RGPD-aware pour données de santé.
   // #74 — bundle self-hosted (SDK complet, pas le loader) : plus de
   // Sentry.onLoad, on appelle Sentry.init directement.
-  if (window.Sentry) {
-    Sentry.init({
-      dsn: 'https://0a625e33b08586126dc8aac6ca1b8a9e@o4511282988449792.ingest.de.sentry.io/4511283041009744',
-      environment:
-        location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-          ? 'development'
-          : location.hostname.includes('github.io')
-            ? 'production'
-            : 'preview',
-      release: 'biomeca-pwa@0.1.0',
-      sendDefaultPii: false,
-      replaysSessionSampleRate: 0,
-      replaysOnErrorSampleRate: 0,
-      beforeSend: function (event) {
-        var stack = '';
-        try {
-          var frames = (event.exception && event.exception.values && event.exception.values[0] && event.exception.values[0].stacktrace && event.exception.values[0].stacktrace.frames) || [];
-          stack = frames.map(function (f) { return f.filename || ''; }).join(' ');
-        } catch (e) {}
-        if (
-          stack.indexOf('extension://') !== -1 ||
-          stack.indexOf('chrome-extension://') !== -1 ||
-          stack.indexOf('moz-extension://') !== -1
-        ) {
-          return null;
-        }
-        return event;
-      },
-    });
-  }
+  //
+  // #47 — enveloppe IIFE : sans elle, les `var` et les fonctions de nettoyage
+  // ci-dessous seraient des propriétés de `window` et pourraient entrer en
+  // collision avec js/biomeca.js, chargé ensuite (aucune collision
+  // aujourd'hui — les onze noms ont été comptés dans biomeca.js, landing.js,
+  // storage.js et admin.js —, mais rien ne l'empêcherait demain).
+  //
+  // Les marqueurs d'extraction restent À L'INTÉRIEUR de l'enveloppe : le test
+  // différentiel n'extrait que des déclarations et les évalue dans sa propre
+  // portée, l'enveloppe ne le gêne donc pas.
+  (function () {
+    // ─── #47 SCRUB INLINE — DÉBUT (copie de js/sentry-scrub.mjs) ───
+    // Copie COMPORTEMENTALE du miroir js/sentry-scrub.mjs, qui est la source
+    // testée. Ce fichier ne peut pas importer de module ES : le bundle Sentry
+    // est chargé en <script> classique et beforeSend doit exister à l'appel
+    // de Sentry.init, donc avant tout import asynchrone.
+    //
+    // La synchronisation n'est PAS confiée à ce commentaire : le test
+    // tests/sentry-scrub.test.mjs extrait ce bloc entre ses marqueurs,
+    // l'exécute, et exige des sorties identiques à celles du miroir sur la
+    // même table de cas. Une divergence de comportement casse la CI.
+    //
+    // Déclarations `function` (pas `const`) placées AVANT Sentry.init : une
+    // ReferenceError ici serait avalée par les catch ci-dessous et rendrait
+    // Sentry totalement muet, sans erreur visible.
+    var MASQUE_EMAIL = '<email-masqué>';
+    var MASQUE_UUID = '<uuid-masqué>';
+    var MASQUE_JETON = '<jeton-masqué>';
+    var MASQUE_QUERY = '<query-masquée>';
+    var MASQUE_FRAGMENT = '<fragment-masqué>';
+    var MASQUE_TITRE = '<titre-masqué>';
+    var RE_EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+    var RE_UUID = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g;
+    var RE_JWT = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g;
+    var PROFONDEUR_MAX = 4;
+    // ⚠️ Sentry normalise console.warn en 'warning', PAS 'warn'.
+    var NIVEAUX_CONSOLE_GARDES = ['error', 'warning'];
+  
+    function _vScrubText(valeur) {
+      if (typeof valeur !== 'string' || valeur === '') return valeur;
+      return valeur
+        .replace(RE_JWT, MASQUE_JETON)
+        .replace(RE_EMAIL, MASQUE_EMAIL)
+        .replace(RE_UUID, MASQUE_UUID);
+    }
+  
+    function _vScrubUrl(url) {
+      if (typeof url !== 'string' || url === '') return url;
+      var reste = url;
+      var fragment = '';
+      var posFragment = reste.indexOf('#');
+      if (posFragment !== -1) {
+        fragment = '#' + MASQUE_FRAGMENT;
+        reste = reste.slice(0, posFragment);
+      }
+      var query = '';
+      var posQuery = reste.indexOf('?');
+      if (posQuery !== -1) {
+        query = '?' + MASQUE_QUERY;
+        reste = reste.slice(0, posQuery);
+      }
+      return _vScrubText(reste) + query + fragment;
+    }
+  
+    function _vScrubValue(valeur, profondeur) {
+      var p = profondeur || 0;
+      if (p > PROFONDEUR_MAX) return valeur;
+      if (typeof valeur === 'string') return _vScrubText(valeur);
+      if (Array.isArray(valeur)) {
+        return valeur.map(function (v) { return _vScrubValue(v, p + 1); });
+      }
+      if (valeur && typeof valeur === 'object') {
+        var sortie = {};
+        Object.keys(valeur).forEach(function (cle) {
+          sortie[cle] = _vScrubValue(valeur[cle], p + 1);
+        });
+        return sortie;
+      }
+      return valeur;
+    }
+  
+    function _vScrubTitleAttr(message) {
+      if (typeof message !== 'string' || message === '') return message;
+      return message.replace(/\[title="[^"]*"\]/g, '[title="' + MASQUE_TITRE + '"]');
+    }
+  
+    function _vScrubBreadcrumb(breadcrumb) {
+      if (!breadcrumb || typeof breadcrumb !== 'object') return breadcrumb;
+      var categorie = breadcrumb.category || '';
+      if (categorie === 'console' && NIVEAUX_CONSOLE_GARDES.indexOf(breadcrumb.level) === -1) {
+        return null;
+      }
+      var sortie = Object.assign({}, breadcrumb);
+      if (typeof sortie.message === 'string') {
+        sortie.message =
+          categorie === 'ui.click'
+            ? _vScrubText(_vScrubTitleAttr(sortie.message))
+            : _vScrubText(sortie.message);
+      }
+      if (sortie.data && typeof sortie.data === 'object') {
+        var data = Object.assign({}, sortie.data);
+        if (typeof data.url === 'string') data.url = _vScrubUrl(data.url);
+        if (data.arguments !== undefined) data.arguments = _vScrubValue(data.arguments);
+        Object.keys(data).forEach(function (cle) {
+          if (cle !== 'url' && cle !== 'arguments') data[cle] = _vScrubValue(data[cle]);
+        });
+        sortie.data = data;
+      }
+      return sortie;
+    }
+  
+    function _vIsExtensionEvent(event) {
+      var pile = '';
+      try {
+        var frames =
+          (event &&
+            event.exception &&
+            event.exception.values &&
+            event.exception.values[0] &&
+            event.exception.values[0].stacktrace &&
+            event.exception.values[0].stacktrace.frames) ||
+          [];
+        pile = frames
+          .map(function (f) { return f.filename || ''; })
+          .join(' ');
+      } catch (e) {
+        pile = '';
+      }
+      return (
+        pile.indexOf('extension://') !== -1 ||
+        pile.indexOf('chrome-extension://') !== -1 ||
+        pile.indexOf('moz-extension://') !== -1
+      );
+    }
+  
+    function _vScrubEvent(event) {
+      if (!event || typeof event !== 'object') return event;
+      if (_vIsExtensionEvent(event)) return null;
+      var sortie = Object.assign({}, event);
+      if (typeof sortie.message === 'string') sortie.message = _vScrubText(sortie.message);
+      if (sortie.exception && Array.isArray(sortie.exception.values)) {
+        sortie.exception = Object.assign({}, sortie.exception, {
+          values: sortie.exception.values.map(function (v) {
+            return v && typeof v.value === 'string'
+              ? Object.assign({}, v, { value: _vScrubText(v.value) })
+              : v;
+          }),
+        });
+      }
+      if (sortie.extra !== undefined) sortie.extra = _vScrubValue(sortie.extra);
+      if (sortie.request && typeof sortie.request === 'object') {
+        var request = Object.assign({}, sortie.request);
+        if (typeof request.url === 'string') request.url = _vScrubUrl(request.url);
+        sortie.request = request;
+      }
+      if (Array.isArray(sortie.breadcrumbs)) {
+        sortie.breadcrumbs = sortie.breadcrumbs
+          .map(function (b) { return _vScrubBreadcrumb(b); })
+          .filter(function (b) { return b !== null; });
+      }
+      return sortie;
+    }
+    // ─── #47 SCRUB INLINE — FIN ───
+  
+    // Trace d'échec du nettoyage, UNE SEULE FOIS par session.
+    // Un console.error dans le catch de beforeBreadcrumb crée lui-même un
+    // breadcrumb console de niveau 'error', qui rappelle beforeBreadcrumb,
+    // qui échoue à nouveau : boucle infinie. Ce drapeau la coupe.
+    var _vScrubEchecSignale = false;
+    function _vSignalerEchecScrub(e) {
+      if (_vScrubEchecSignale) return;
+      _vScrubEchecSignale = true;
+      // Le NOM de l'exception ne révèle aucune donnée ; son message pourrait.
+      console.error('[#47] scrub failed', e && e.name ? e.name : 'Error');
+    }
+  
+    if (window.Sentry) {
+      Sentry.init({
+        dsn: 'https://0a625e33b08586126dc8aac6ca1b8a9e@o4511282988449792.ingest.de.sentry.io/4511283041009744',
+        environment:
+          location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+            ? 'development'
+            : location.hostname.includes('github.io')
+              ? 'production'
+              : 'preview',
+        release: 'biomeca-pwa@0.1.0',
+        // #47 — l'option de collecte des données personnelles par défaut a
+        // été RETIRÉE : la chaîne n'existe pas dans le bundle
+        // @sentry/browser 8.55.0 embarqué (0 occurrence dans
+        // assets/vendor/sentry/bundle.min.js). Elle était ignorée en silence
+        // et donnait une fausse impression de protection. Le nettoyage
+        // effectif est assuré par beforeSend/beforeBreadcrumb.
+        //
+        // Son nom n'est volontairement pas écrit ici : le test 28 de
+        // tests/sentry-scrub.test.mjs interdit le motif dans TOUT le fichier,
+        // commentaires compris, pour que la garde reste entière.
+        replaysSessionSampleRate: 0,
+        replaysOnErrorSampleRate: 0,
+        // #47 — 25 % des événements. Le nettoyage ci-dessous est la vraie
+        // protection ; l'échantillonnage est la défense en profondeur qui
+        // borne le volume transmis. Un défaut systématique reste vu (4
+        // occurrences → ~1 événement), le bruit isolé et ses breadcrumbs ne
+        // partent plus. À remonter temporairement à 1 pour instruire un
+        // incident précis.
+        sampleRate: 0.25,
+        // #47 — 100 → 20. Les breadcrumbs sont la principale surface de
+        // fuite (URL, arguments console, cibles de clic). Les 20 derniers
+        // couvrent l'enchaînement qui précède l'erreur, seul utile au
+        // diagnostic ; les 80 plus anciens décrivaient la navigation du
+        // praticien dans ses dossiers patients.
+        maxBreadcrumbs: 20,
+        beforeBreadcrumb: function (breadcrumb) {
+          try {
+            return _vScrubBreadcrumb(breadcrumb);
+          } catch (e) {
+            // Pas de nettoyage, pas d'accumulation : on écarte plutôt que de
+            // laisser passer un breadcrumb non nettoyé. Mais on laisse une
+            // trace — un nettoyage qui échoue à chaque fois rendrait Sentry
+            // aveugle sans que rien ne le signale.
+            _vSignalerEchecScrub(e);
+            return null;
+          }
+        },
+        beforeSend: function (event) {
+          try {
+            return _vScrubEvent(event);
+          } catch (e) {
+            // Même principe : pas de nettoyage, pas d'envoi.
+            _vSignalerEchecScrub(e);
+            return null;
+          }
+        },
+      });
+    }
+  })();
 </script>
 <link rel="stylesheet" href="css/biomeca.css"/>
 <!-- Gating d'accès task #57 : .btn-disabled pour les niveaux readonly et blocked -->
