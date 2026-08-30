@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+// #132 — extraction par marqueurs et gardes anti-succès-vacant mises en
+// commun : #243 en a besoin à son tour, et les recopier aurait été résoudre
+// une duplication en en créant une autre.
+import { extraireBloc, fabriquer, TAILLE_PLANCHER, RACINE } from './helpers/mirror-diff.mjs';
 import {
   scrubText,
   scrubUrl,
@@ -35,9 +38,6 @@ import {
 // égalité de chaînes entre un fichier formaté par Prettier et un fichier
 // qui ne l'est pas crierait en permanence pour de l'indentation, et un test
 // qui crie tout le temps finit ignoré — pire que pas de test.
-
-const ICI = dirname(fileURLToPath(import.meta.url));
-const RACINE = join(ICI, '..');
 
 // Fixtures réalistes, calquées sur les fuites réelles de l'inventaire.
 const EMAIL = 'dr.martin@cabinet-lyon.fr';
@@ -163,57 +163,6 @@ const MIROIR = {
   scrubEvent,
   pgrestErrorCode,
 };
-
-// ═══════════════════════════════════════════════════════════════════
-// Extraction des copies runtime — par MARQUEURS, pas par accolades
-// ═══════════════════════════════════════════════════════════════════
-//
-// L'appariement d'accolades casse dès qu'une accolade apparaît dans une
-// chaîne, une regex ou un commentaire. Les marqueurs rendent l'extraction
-// exacte.
-//
-// TAILLE_PLANCHER : garde anti-succès-vacant. Sans elle, une extraction qui
-// échoue rendrait '' des deux côtés et le test serait VERT sans avoir rien
-// comparé — le mécanisme même de l'incident fondateur, déplacé dans un test.
-const TAILLE_PLANCHER = 400;
-
-function extraireBloc(cheminRelatif, marqueurDebut, marqueurFin) {
-  const source = readFileSync(join(RACINE, cheminRelatif), 'utf8');
-
-  const nbDebut = source.split(marqueurDebut).length - 1;
-  const nbFin = source.split(marqueurFin).length - 1;
-  if (nbDebut !== 1 || nbFin !== 1) {
-    throw new Error(
-      `${cheminRelatif} : marqueurs attendus une seule fois (début=${nbDebut}, fin=${nbFin})`
-    );
-  }
-
-  // Couper à la fin du TEXTE du marqueur laisserait la fin de sa ligne
-  // (« (copie de …) ─── ») en tête du bloc, amputée de son `//` : ce n'est
-  // pas du JavaScript valide et new Function lèverait une SyntaxError.
-  // On avance donc jusqu'au premier saut de ligne APRÈS le marqueur DÉBUT,
-  // et on recule jusqu'au DÉBUT de la ligne portant le marqueur FIN.
-  const posDebut = source.indexOf(marqueurDebut);
-  const sautApres = source.indexOf('\n', posDebut);
-  if (sautApres === -1) throw new Error(`${cheminRelatif} : marqueur DÉBUT en fin de fichier`);
-  const debut = sautApres + 1;
-
-  const posFin = source.indexOf(marqueurFin);
-  const fin = source.lastIndexOf('\n', posFin) + 1;
-  if (fin <= debut) throw new Error(`${cheminRelatif} : marqueur FIN avant marqueur DÉBUT`);
-
-  const bloc = source.slice(debut, fin);
-  if (bloc.length < TAILLE_PLANCHER) {
-    throw new Error(
-      `${cheminRelatif} : bloc extrait de ${bloc.length} caractères, plancher ${TAILLE_PLANCHER}`
-    );
-  }
-  return bloc;
-}
-
-// Évalue un bloc de déclarations et renvoie les fonctions demandées.
-// eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt, jamais d'entrée externe
-const fabriquer = (bloc, noms) => new Function(`${bloc}\nreturn {${noms.join(',')}};`)();
 
 const NOMS_INLINE = [
   '_vScrubText',

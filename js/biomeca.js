@@ -10565,12 +10565,82 @@ function _renderPosturePlacementResults() {
 // persisté (`bd._postureAnalysis[viewKey]`). Réutilisable en rapport sans
 // dépendre du contexte modale. Retourne '' si l'analyse ou ses angles manquent.
 function _buildPosturePanelHTML(viewKey, analysis) {
-  if (!analysis || !analysis.angles) return '';
-  if (viewKey === 'face') return _renderFacePlacementResults(analysis.angles);
-  if (viewKey === 'dos')  return _renderDosPlacementResults(analysis.angles);
-  if (viewKey === 'profilG' || viewKey === 'profilD') return _renderProfilPlacementResults(analysis.angles);
+  // #243 — mention « mesure incomplète », alignée sur la convention #148/#150
+  // des images non rechargées : même bandeau rouge, même niveau d'alerte.
+  // On ne crée pas une troisième convention pour un défaut de la même famille.
+  //
+  // Une vue 'endommage' porte des coordonnées écrites mais inexploitables :
+  // c'est un ACCIDENT, il doit se voir. Une vue 'absent' n'arrive pas ici
+  // (écartée en amont), et c'est voulu : ne rien poser est un CHOIX du
+  // praticien, qui reste silencieux.
+  //
+  // ⚠️ Le remède annoncé doit être VRAI et ACTIONNABLE. Un demi-état n'est pas
+  // un défaut de connexion : la donnée persistée porte elle-même une
+  // coordonnée et pas l'autre. « Régénérez le rapport » ne restaurerait rien —
+  // le praticien cliquerait, rien ne changerait, et il finirait par ne plus
+  // lire les bandeaux. Un avertissement dont le remède ne marche pas est pire
+  // qu'un avertissement absent.
+  const alerte = _classifyPostureAnalysis(analysis) === 'endommage'
+    ? '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Mesure incomplète — des points de repère sont inexploitables. La mesure peut être fausse ou manquante. Rouvrez le bilan et vérifiez le placement des points avant remise au patient.</div>'
+    : '';
+  // Le classement passe AVANT ce retour anticipé : une vue endommagée dont les
+  // angles n'ont pas pu être calculés est précisément le cas à signaler, et
+  // sortirait sinon en silence. On rend le bandeau seul, jamais ''.
+  if (!analysis || !analysis.angles) return alerte;
+  if (viewKey === 'face') return alerte + _renderFacePlacementResults(analysis.angles);
+  if (viewKey === 'dos')  return alerte + _renderDosPlacementResults(analysis.angles);
+  if (viewKey === 'profilG' || viewKey === 'profilD') return alerte + _renderProfilPlacementResults(analysis.angles);
   return '';
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// #243 — _classifyPostureAnalysis : distinguer un CHOIX d'un ACCIDENT
+// ═══════════════════════════════════════════════════════════════════
+//
+// Règle tranchée par le praticien. Trois états, à ne jamais confondre :
+//
+//   'absent'    aucune coordonnée n'a jamais été écrite → le praticien n'a pas
+//               commencé ce test. La vue N'APPARAÎT PAS dans le rapport : pas
+//               une case vide, pas un titre suivi d'un blanc. Absente.
+//   'endommage' des coordonnées ont été écrites mais au moins une est
+//               inexploitable — rechargement partiel, valeur non finie. La vue
+//               APPARAÎT, avec la mention « mesure incomplète » VISIBLE.
+//   'intact'    tout ce qui a été écrit est exploitable.
+//
+// Ce qui fait le partage : 'absent' se lit sur l'ABSENCE d'écriture, pas sur
+// l'impossibilité de mesurer. Un accident ne doit jamais ressembler à un
+// choix — c'est la règle « jamais dessiné » / « rechargement échoué » du
+// CLAUDE.md appliquée aux mesures.
+//
+// FONCTION PURE : lit le persisté, n'écrit rien, n'appelle aucune sauvegarde.
+// Générer un rapport ne doit JAMAIS déclencher de sauvegarde (incident du
+// 25/07/2026). Elle ne prend AUCUN paramètre `requis` : le nombre de points
+// nécessaires est une propriété de chaque MESURE (calcAngle3 en veut 3,
+// calcAngleSign 2), pas de la vue — une constante par vue serait fausse dès
+// la première vue portant deux mesures d'exigences différentes. Une mesure
+// incalculable dans une vue non-'absent' rend null, ce qui EST le cas (b).
+// ─── #243 CLASSIFY — DÉBUT ───
+// ⚠️ CE BLOC N'A PAS DE MIROIR — marqueurs d'EXTRACTIBILITÉ, pas de
+// surveillance de copie (cf. #243 POSTURE). Il reste ici, entre ses deux
+// appelants, et non dans le bloc #243 POSTURE : celui-ci regroupe le chemin
+// d'ÉCRITURE (sérialisation), celui-ci relève de la LECTURE (rapport).
+// Dépend de _coord : à concaténer avec le bloc #243 COORD pour être évalué.
+function _classifyPostureAnalysis(analysis) {
+  if (!analysis || !Array.isArray(analysis.markers)) return 'absent';
+  let ecrits = 0, partiels = 0;
+  for (const m of analysis.markers) {
+    if (!m || typeof m !== 'object') continue;
+    const ecritX = m.nx !== null && m.nx !== undefined;
+    const ecritY = m.ny !== null && m.ny !== undefined;
+    if (!ecritX && !ecritY) continue; // jamais touché
+    ecrits++;
+    if (_coord(m.nx) === null || _coord(m.ny) === null) partiels++;
+  }
+  if (ecrits === 0) return 'absent';
+  if (partiels > 0) return 'endommage';
+  return 'intact';
+}
+// ─── #243 CLASSIFY — FIN ───
 
 // #109-A1 — Construit une photo posturale annotée (PNG dataURL) à partir du
 // dataURL de la photo brute + des markers normalisés persistés. Réutilise
@@ -10604,8 +10674,17 @@ async function _buildAnnotatedPosturePhoto(viewKey, bd, maxWidth) {
   if (!dataUrl) return null;
   const analysis = bd._postureAnalysis && bd._postureAnalysis[viewKey];
   if (!analysis || !Array.isArray(analysis.markers)) return null;
-  const placedCount = analysis.markers.filter(m => m.nx != null && m.ny != null).length;
-  if (placedCount === 0) return null;
+  // #243 — le classement remplace le seul `placedCount === 0`, qui confondait
+  // « le praticien n'a rien posé » (choix) et « des points ont été écrits mais
+  // sont inexploitables » (accident). Un accident ne doit jamais ressembler à
+  // un choix — même règle que « jamais dessiné » / « rechargement échoué ».
+  const etatVue = _classifyPostureAnalysis(analysis);
+  // PAS de second `return null` sur un compte de marqueurs nul : une vue
+  // 'endommage' — tous ses marqueurs en demi-état — doit être RENDUE, avec sa
+  // mention « mesure incomplète » visible. La faire sortir ici la ferait
+  // disparaître du rapport exactement comme un choix du praticien, ce qui est
+  // précisément le défaut que #243 corrige.
+  if (etatVue === 'absent') return null;
   // Charge l'image — Promise wrapper sur Image.onload pour await propre.
   let img;
   try {
@@ -10638,18 +10717,21 @@ async function _buildAnnotatedPosturePhoto(viewKey, bd, maxWidth) {
   const savedByName = Object.fromEntries(analysis.markers.map(m => [m.name, m]));
   const localMarkers = template.map(t => {
     const s = savedByName[t.name];
+    // #243 — injection SYMÉTRIQUE : tester nx pour x et ny pour y
+    // indépendamment reconstruirait un marqueur à moitié posé en mémoire à
+    // partir d'un demi-état persisté. Les deux coordonnées ou aucune.
+    const ok = s && _coord(s.nx) !== null && _coord(s.ny) !== null;
     return {
       ...t,
-      x: s && s.nx != null ? s.nx * W : null,
-      y: s && s.ny != null ? s.ny * H : null,
+      x: ok ? _coord(s.nx) * W : null,
+      y: ok ? _coord(s.ny) * H : null,
     };
   });
   const savedCalib = analysis.calibration;
+  // #246 — garde symétrique, chemin RAPPORT (cf. _calibDenorm).
   const localCalib = (savedCalib && (savedCalib.p1 || savedCalib.p2)) ? {
-    p1: savedCalib.p1 && savedCalib.p1.nx != null
-      ? { x: savedCalib.p1.nx * W, y: savedCalib.p1.ny * H } : null,
-    p2: savedCalib.p2 && savedCalib.p2.nx != null
-      ? { x: savedCalib.p2.nx * W, y: savedCalib.p2.ny * H } : null,
+    p1: _calibDenorm(savedCalib.p1, W, H),
+    p2: _calibDenorm(savedCalib.p2, W, H),
   } : null;
   _drawPosturePlumb(ctx, W, H, localMarkers, localCalib, viewKey);
   // #109-B — Lignes de mesure 2 couleurs (rouge hors-norme / vert dans-norme).
@@ -11437,10 +11519,9 @@ function openPosturePlacementModal(prefix, viewKey) {
     // #85-2c-angles — restauration calibration sauvegardée (nx/ny → x/y).
     if (savedCalib) {
       _postureCalibration = {
-        p1: savedCalib.p1 && savedCalib.p1.nx != null
-          ? { x: savedCalib.p1.nx * canvas.width, y: savedCalib.p1.ny * canvas.height } : null,
-        p2: savedCalib.p2 && savedCalib.p2.nx != null
-          ? { x: savedCalib.p2.nx * canvas.width, y: savedCalib.p2.ny * canvas.height } : null,
+        // #246 — garde symétrique, chemin MODALE (cf. _calibDenorm).
+        p1: _calibDenorm(savedCalib.p1, canvas.width, canvas.height),
+        p2: _calibDenorm(savedCalib.p2, canvas.width, canvas.height),
       };
       // Si seulement p1 sauvegardé (cas dégradé), on conserve l'objet mais p2 null
       // → re-render affichera la puce orange et le statusMsg "Place le 2e point…".
@@ -11492,6 +11573,72 @@ function _cancelPosturePlacement() {
 // Save silent selon le préfixe : saveBilanSilent (sport) syncronisera ensuite
 // bilanData global → currentPatient.bilanData (cf L9273). savePosturoBilan(true)
 // écrit directement dans currentPatient.bilanDataPosturo (cf L13311).
+// ─── #243 POSTURE — DÉBUT ───
+// ⚠️ CE BLOC N'A PAS DE MIROIR. Les marqueurs ne servent PAS à surveiller une
+// copie : ils servent uniquement à rendre ces fonctions EXTRACTIBLES par les
+// tests (tests/posture-persistence.test.mjs), js/biomeca.js n'étant pas un
+// module ES. Ne cherchez pas la copie dans js/calc.mjs : il n'y en a pas.
+//
+// Distinction avec les marqueurs #47 SCRUB et #243 COORD, qui délimitent eux
+// du code DUPLIQUÉ, surveillé par comparaison de comportements.
+//
+// #243 / #246 — helpers de la sérialisation posturale. Ils portent sur la
+// forme PERSISTÉE (nx/ny), absente du miroir js/calc.mjs.
+
+// Vrai UNIQUEMENT pour un demi-état : une coordonnée exploitable et l'autre
+// non. Faux pour {null,null} — point légitimement jamais posé, qui doit rester
+// écrasable — et faux pour une entrée complète, absente ou malformée.
+// S'appuie sur _coord, jamais sur une comparaison à null : sinon les valeurs
+// coercibles ('', ' ', false, []) passeraient pour des coordonnées.
+function _estDemiEtatPersiste(entree) {
+  if (!entree || typeof entree !== 'object') return false;
+  const okX = _coord(entree.nx) !== null;
+  const okY = _coord(entree.ny) !== null;
+  return okX !== okY; // exactement une des deux exploitable
+}
+
+// #246 — la calibration exigeait seulement que p1/p2 existent, puis divisait
+// par W/H sans les vérifier et lisait .y sans garde au rechargement (:11440).
+// Une calibration fausse ne fausse pas un angle isolé : elle fausse TOUTES les
+// conversions en millimètres. La garde est donc symétrique sur les deux
+// coordonnées et sur les deux dimensions.
+function _estPointCalibValide(p, W, H) {
+  return !!p && W > 0 && H > 0 && _coord(p.x) !== null && _coord(p.y) !== null;
+}
+
+// #246 — dénormalise un point de calibration persisté (nx/ny → x/y).
+// SYMÉTRIQUE : les deux coordonnées exploitables, ou null.
+// L'ancienne écriture testait `p1.nx != null` puis lisait `p1.ny` SANS garde.
+// `null * hauteur` vaut 0 — une valeur finie, indétectable en aval : une
+// calibration à moitié persistée serait revenue avec y = 0, silencieusement.
+// Une calibration fausse ne fausse pas un angle isolé : elle fausse TOUTES
+// les conversions en millimètres du bilan.
+function _calibDenorm(p, W, H) {
+  if (!p || !(W > 0) || !(H > 0)) return null;
+  const nx = _coord(p.nx), ny = _coord(p.ny);
+  if (nx === null || ny === null) return null;
+  return { x: nx * W, y: ny * H };
+}
+
+// Rend l'entrée à persister pour UN marqueur. Fonction PURE : ses seules
+// entrées sont ses paramètres, elle n'écrit rien, ne lit aucun état global et
+// n'appelle aucune sauvegarde. Extraite telle quelle du .map() inline de
+// _validatePosturePlacement pour être testable — la préservation des
+// demi-états (pièce 3 de #243) protège la preuve d'une perte de données et ne
+// pouvait pas rester sans couverture.
+//   m     : marqueur en mémoire (x/y en pixels canvas)
+//   avant : entrée PERSISTÉE de même nom, ou undefined
+//   W, H  : dimensions du canvas
+function _serialiserMarqueurPosture(m, avant, W, H) {
+  const ok = _isPlacedPt(m) && W > 0 && H > 0;
+  if (ok) {
+    return { name: m.name, side: m.side, nx: _coord(m.x) / W, ny: _coord(m.y) / H };
+  }
+  if (_estDemiEtatPersiste(avant)) return avant;
+  return { name: m.name, side: m.side, nx: null, ny: null };
+}
+// ─── #243 POSTURE — FIN ───
+
 async function _validatePosturePlacement(prefix, viewKey) {
   const bd = _getPostureBilanData(prefix);
   if (!bd || !_postureModalCanvas) { _cancelPosturePlacement(); return; }
@@ -11531,18 +11678,44 @@ async function _validatePosturePlacement(prefix, viewKey) {
       lombaire:   readSelect('lombaire'),
     };
   }
+  // #243 — l'ancien persisté est LU AVANT d'être écrasé : c'est lui qui porte
+  // la preuve d'un rechargement partiel (cf. préservation ci-dessous).
+  const _avantParNom = Object.fromEntries(
+    (bd._postureAnalysis?.[viewKey]?.markers || []).map(e => [e.name, e])
+  );
   if (!bd._postureAnalysis) bd._postureAnalysis = {};
   bd._postureAnalysis[viewKey] = {
-    markers: _postureModalMarkers.map(m => ({
-      name: m.name,
-      side: m.side,
-      nx: (m.x !== null && W > 0) ? m.x / W : null,
-      ny: (m.y !== null && H > 0) ? m.y / H : null,
-    })),
+    // #243 — sérialisation SYMÉTRIQUE + préservation de la preuve.
+    //
+    // 1. L'ancienne écriture testait `m.x` pour nx et `m.y` pour ny
+    //    INDÉPENDAMMENT : c'était le seul site du fichier capable de CRÉER un
+    //    demi-état persisté. Il ne le faisait pas en pratique parce que W et H
+    //    viennent du même canvas — une coïncidence, pas une logique.
+    //    Les gardes W > 0 / H > 0 sont conservées et rendues symétriques :
+    //    sans elles, une division par 0 persisterait Infinity À LA PLACE d'une
+    //    coordonnée valide (rejeté à la relecture, mais la donnée est perdue).
+    //
+    // 2. Un marqueur non placé en mémoire dont l'entrée PERSISTÉE porte un
+    //    demi-état n'est pas un point jamais posé : c'est un point que la
+    //    garde du rechargement (:11432) a écarté. Cette entrée est la SEULE
+    //    preuve que le chargement a échoué. L'écraser par {null, null} ferait
+    //    passer un accident pour un choix du praticien — la faute même que
+    //    corrige ce chantier. On la conserve TELLE QUELLE : on ne fabrique
+    //    aucune coordonnée, on refuse seulement d'effacer.
+    //
+    //    Aucun effacement volontaire n'est possible dans cette modale (aucun
+    //    équivalent de clearMkr sur _postureModalMarkers), donc « non placé »
+    //    ne peut signifier que « jamais posé » ou « rejeté au rechargement ».
+    //    Le discriminant tombe des données, sans heuristique.
+    markers: _postureModalMarkers.map(m => _serialiserMarqueurPosture(m, _avantParNom[m.name], W, H)),
     // Calibration en NORMALISÉ comme les markers (cohérent inter-device).
+    // #246 — garde SYMÉTRIQUE : l'ancienne écriture ne testait que l'existence
+    // de p1/p2 et divisait sans vérifier W/H ni la validité des coordonnées.
     calibration: _postureCalibration ? {
-      p1: _postureCalibration.p1 ? { nx: _postureCalibration.p1.x / W, ny: _postureCalibration.p1.y / H } : null,
-      p2: _postureCalibration.p2 ? { nx: _postureCalibration.p2.x / W, ny: _postureCalibration.p2.y / H } : null,
+      p1: _estPointCalibValide(_postureCalibration.p1, W, H)
+        ? { nx: _coord(_postureCalibration.p1.x) / W, ny: _coord(_postureCalibration.p1.y) / H } : null,
+      p2: _estPointCalibValide(_postureCalibration.p2, W, H)
+        ? { nx: _coord(_postureCalibration.p2.x) / W, ny: _coord(_postureCalibration.p2.y) / H } : null,
     } : null,
     angles,
     curveInterp,
@@ -12347,14 +12520,65 @@ function resetCapView() {
   _applyCapView();
 }
 
+// ─── #243 COORD — DÉBUT (copie de js/calc.mjs) ───
+// Test-mirror : la source testée par Vitest est coord/isPlaced dans
+// js/calc.mjs. La synchronisation n'est PAS confiée à ce commentaire — la
+// promesse « répercuter dans les deux fichiers » est précisément ce dont
+// #132 a montré qu'elle ne tient jamais. Ce bloc est encadré de marqueurs
+// pour que le test différentiel de #132 le prenne en charge : la promesse
+// devient une vérification qui casse la CI en cas de dérive.
+//
+// L'ancien filtre `m.x !== null` laissait passer un point dont SEULE
+// l'abscisse était renseignée. `null` se coerce en 0 dans le calcul : pas de
+// NaN qui se verrait, mais un angle FAUX ET PLAUSIBLE imprimé dans un rapport
+// patient. Mesuré : trois points dont un y manquant donnent 50,69° là où la
+// mesure réelle vaut 84,81°. 34 degrés d'écart, sans aucun signal.
+//
+// La validation porte sur le TYPE avant coercition : Number(null), Number(''),
+// Number(' '), Number(false) et Number([]) valent tous 0 et passeraient donc
+// pour une coordonnée valide au bord supérieur de l'image.
+//
+// Recensement du 29/08/2026 (798 marqueurs réels, posturaux ET sport) :
+// 0 demi-état, 0 coordonnée en chaîne. C'est donc une DÉFENSE, pas la
+// correction d'un défaut actif.
+function _coord(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null; // null, undefined, booléen, objet, tableau…
+}
+function _isPlacedPt(p) {
+  return !!p && _coord(p.x) !== null && _coord(p.y) !== null;
+}
+// Normalise un point APRÈS filtrage. Le calcul ne doit jamais consommer les
+// valeurs brutes, sinon '210' ne tomberait juste que par coercition implicite.
+function _normPt(p) {
+  const x = _coord(p.x), y = _coord(p.y);
+  // Précondition GARANTIE, pas seulement déclarée : _isPlacedPt et _normPt
+  // appellent la MÊME _coord, donc un point ayant franchi le filtre ne peut
+  // pas échouer ici. Un déclenchement signalerait un appel non filtré, c'est-
+  // à-dire une erreur de programmation — qui doit se voir immédiatement
+  // plutôt que produire une coordonnée nulle silencieuse.
+  if (x === null || y === null) throw new Error('_normPt: point non placé');
+  return { ...p, x, y };
+}
+// ─── #243 COORD — FIN ───
+
 function findMarkerAt(x, y, markers, cw) {
   // feat-biomec-capteurs (A) — hit-test scalé par markerSizeFactor MAIS avec
   // plancher confortable au touch (12px min). Le marqueur visuel rétrécit, on
   // doit toujours pouvoir l'attraper au doigt même quand markerSizeFactor=0.3.
   const r = Math.max(12, (cw / 40) * markerSizeFactor);
   for(let i=markers.length-1;i>=0;i--){
-    const m=markers[i]; if(m.x===null)continue;
-    if(Math.hypot(m.x-x,m.y-y)<r) return i;
+    // #243 — filtre seul. Le RAYON ci-dessus relève de #244 (le miroir
+    // calc.mjs ignore markerSizeFactor), il n'est pas touché ici.
+    const m=markers[i]; if(!_isPlacedPt(m))continue;
+    const n=_normPt(m);
+    if(Math.hypot(n.x-x,n.y-y)<r) return i;
   }
   return -1;
 }
@@ -12796,7 +13020,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
 
   // Dessiner segments par groupe (D et G)
   ['D','G',''].forEach(side=>{
-    const grp=markers.filter(m=>m.side===side&&m.x!==null);
+    const grp=markers.filter(m=>m.side===side&&_isPlacedPt(m));
     if(grp.length<2) return;
     const col=side==='D'?'rgba(74,158,255,0.7)':side==='G'?'rgba(62,207,114,0.7)':'rgba(167,139,250,0.7)';
     // Dessiner rectangle entre chaque paire consécutive
@@ -12837,7 +13061,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
 
   // Arc d'angle pour chaque groupe de 3
   ['D','G',''].forEach(side=>{
-    const grp=markers.filter(m=>m.side===side&&m.x!==null);
+    const grp=markers.filter(m=>m.side===side&&_isPlacedPt(m));
     if(grp.length>=3){
       const ang=calcAngle3(grp);
       if(ang!==null){
@@ -12886,7 +13110,7 @@ function updateAngleOverlay(elId, markers, view) {
   const el=document.getElementById(elId); if(!el) return;
   let html='';
   ['D','G'].forEach(side=>{
-    const grp=markers.filter(m=>m.side===side&&m.x!==null);
+    const grp=markers.filter(m=>m.side===side&&_isPlacedPt(m));
     if(grp.length>=3){
       const ang=calcAngle3(grp);
       if(ang!==null){
@@ -12897,7 +13121,7 @@ function updateAngleOverlay(elId, markers, view) {
     }
   });
   // Si marqueurs sans side
-  const grpNone=markers.filter(m=>m.side===''&&m.x!==null);
+  const grpNone=markers.filter(m=>m.side===''&&_isPlacedPt(m));
   if(grpNone.length>=3){
     const ang=calcAngle3(grpNone);
     if(ang!==null){
@@ -12912,8 +13136,19 @@ function updateAngleOverlay(elId, markers, view) {
 // CALCULS GÉOMÉTRIQUES
 // ══════════════════════════════════════════════════════
 function calcAngle3(pts) {
-  const placed=pts.filter(p=>p.x!==null);
+  // #243 — filtre complet (x ET y valides) puis NORMALISATION : le calcul
+  // ci-dessous consomme les valeurs normalisées, jamais les brutes.
+  const placed=pts.filter(_isPlacedPt).map(_normPt);
   if(placed.length<3) return null;
+  // ⚠️ CHOIX D'INDICES DÉLIBÉRÉ ET CLINIQUE — NE PAS « SIMPLIFIER ».
+  // Sur un gabarit à 4 points (Milieu mollet, Jonction musculo-tendineuse,
+  // Calca supérieur, Calca inférieur — Amorti/Propulsion Marche et Course,
+  // mobilité AP, verrouillage AP), l'angle se mesure au sommet CALCA
+  // SUPÉRIEUR, donc sur les TROIS POINTS INFÉRIEURS : [1], [2], [3].
+  // Le premier point (Milieu mollet) sert au TRACÉ, pas à la mesure.
+  // Prendre les trois premiers points ferait basculer toutes les mesures à
+  // 4 points sur une autre articulation, silencieusement. Règle définie et
+  // validée par le praticien.
   const [A,B,C] = placed.length>=4 ? [placed[1],placed[2],placed[3]] : placed;
   const v1={x:A.x-B.x,y:A.y-B.y},v2={x:C.x-B.x,y:C.y-B.y};
   const dot=v1.x*v2.x+v1.y*v2.y;
@@ -12941,8 +13176,26 @@ function kfppaLabel(ang, side) {
   return ang>=0 ? 'Valgus +'+deg : 'Varus −'+deg;
 }
 
+// ⚠️ LE TRIPLET UTILISÉ ICI DIFFÈRE VOLONTAIREMENT DE CELUI DE calcAngle3.
+// calcAngle3 mesure l'ANGLE sur [1],[2],[3] (sommet Calca supérieur) ;
+// calcAngleSign détermine le SENS sur [0],[1],[dernier]. Ce n'est pas une
+// incohérence : le sens (valgus/varus en vue face, inversion/éversion en vue
+// dos) suit des règles propres, définies par le praticien et VALIDÉES
+// CLINIQUEMENT À L'USAGE sur des cas réels.
+// NE PAS aligner ce triplet sur celui de calcAngle3 sans validation clinique
+// explicite : on inverserait des constats, pas seulement des précisions.
+//
+// Le `return 1` ci-dessous est inatteignable TANT QUE `pts` est bien le
+// tableau ayant produit l'angle : moins de trois points placés → calcAngle3
+// rend null → computeCorrectedAngle sort avant d'appeler cette fonction.
+// L'inatteignabilité tient donc à une propriété des APPELANTS, pas de cette
+// fonction. Tout appelant passant à `pts` autre chose que ce tableau la
+// rendrait atteignable — et le `return 1` affirmerait alors une orientation
+// inconnue au lieu de la signaler.
 function calcAngleSign(pts) {
-  const placed=pts.filter(p=>p.x!==null);
+  // #243 — filtre complet et normalisation, comme calcAngle3. N'écarte que
+  // des points réellement invalides ; recensement du 29/08/2026 : aucun.
+  const placed=pts.filter(_isPlacedPt).map(_normPt);
   if(placed.length<2) return 1;
   if(placed.length>=3) {
     // Point central (Rotule pour KFPPA, CalcaSup pour AP)
@@ -13003,7 +13256,7 @@ function getAngleColor(ang) {
 // CALCULS BILATÉRAUX & RÉSULTATS
 // ══════════════════════════════════════════════════════
 function calcBilateral(markers, view, side) {
-  const grp = markers.filter(m=>m.side===side&&m.x!==null);
+  const grp = markers.filter(m=>m.side===side&&_isPlacedPt(m));
   const ang = calcAngle3(grp);
   return computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||'', TESTS[currentTestId]?.type||"");
 }

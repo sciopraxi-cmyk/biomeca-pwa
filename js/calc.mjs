@@ -40,9 +40,85 @@
  * @param {Marker} p
  * @returns {p is PlacedMarker}
  */
-function isPlaced(p) {
-  return p.x !== null && p.y !== null;
+// ─── #243 COORD — DÉBUT (copie de js/biomeca.js) ───
+// Le runtime réel est _coord / _isPlacedPt / _normPt dans js/biomeca.js, entre
+// les marqueurs #243 COORD. Modifier js/biomeca.js D'ABORD, ce miroir ensuite.
+// La synchronisation n'est pas confiée à ce commentaire : le test différentiel
+// de #132 extrait les deux blocs et exige des comportements identiques.
+export function isPlaced(p) {
+  return coord(p.x) !== null && coord(p.y) !== null;
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// #243 — coord() : normalise une coordonnée, ou rend null
+// ═══════════════════════════════════════════════════════════════════
+//
+// L'ancien `p.x !== null` laissait passer TROIS familles de valeurs qui se
+// coercent silencieusement en 0 dans le calcul, produisant un angle FAUX
+// MAIS PLAUSIBLE — pas un NaN qui se verrait, une mesure crédible imprimée
+// dans un rapport patient :
+//
+//   {x:100,y:200} {x:150,y:260} {x:200,y:null}  →  50,69°
+//   les mêmes points avec y = 210 réellement mesuré  →  84,81°
+//
+// 34 degrés d'écart, sans aucun signal. `null - 210` vaut -210, pas NaN.
+//
+// La validation porte sur le TYPE avant toute coercition. Une garde du genre
+// `Number.isFinite(Number(v))` réintroduirait le défaut en pire : Number(null),
+// Number(''), Number(' '), Number(false) et Number([]) valent tous 0, donc
+// passeraient pour une coordonnée valide au bord supérieur de l'image.
+//
+// Les chaînes numériques sont acceptées (relecture d'un JSON ancien), mais le
+// calcul DOIT utiliser la valeur normalisée — sinon '210' ne tomberait juste
+// que par coercition implicite, c'est-à-dire par accident.
+//
+// Recensement du 29/08/2026 sur les données réelles : 798 marqueurs examinés,
+// 0 demi-état, 0 coordonnée en chaîne. Cette garde est donc une DÉFENSE, pas
+// la correction d'un défaut actif — aucun chemin d'écriture ne produit
+// aujourd'hui {x: valeur, y: null} (init, sérialisation et rechargement sont
+// tous appariés ou gardés).
+/**
+ * Normalise une coordonnée brute, ou rend null si elle n'est pas exploitable.
+ *
+ * @param {unknown} v  Valeur brute lue d'un marqueur (nombre, chaîne, null…).
+ * @returns {number|null}  La coordonnée en nombre fini, ou null.
+ */
+export function coord(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null; // null, undefined, booléen, objet, tableau…
+}
+
+// Rend un point aux coordonnées normalisées. À utiliser APRÈS filtrage par
+// isPlaced : le calcul ne doit jamais consommer les valeurs brutes.
+/**
+ * Rend une copie du point avec ses coordonnées normalisées.
+ *
+ * PRÉCONDITION : n'appeler qu'APRÈS filtrage par isPlaced. Le type de retour
+ * l'exprime — sans quoi `.filter(isPlaced).map(normaliser)` annulerait le
+ * rétrécissement apporté par le type guard, et tsc perdrait la garantie que
+ * les coordonnées sont des nombres.
+ *
+ * @param {Marker} p  Point à normaliser, déjà validé par isPlaced.
+ * @returns {PlacedMarker}  Copie dont x et y sont des nombres finis.
+ */
+export function normaliser(p) {
+  const x = coord(p.x),
+    y = coord(p.y);
+  // Précondition GARANTIE, pas seulement déclarée : isPlaced et normaliser
+  // appellent la MÊME coord, donc un point ayant franchi le filtre ne peut pas
+  // échouer ici. Un déclenchement signalerait un appel non filtré, c'est-à-dire
+  // une erreur de programmation — qui doit se voir immédiatement plutôt que
+  // produire une coordonnée nulle silencieuse.
+  if (x === null || y === null) throw new Error('normaliser: point non placé');
+  return { ...p, x, y };
+}
+// ─── #243 COORD — FIN ───
 
 // ============================================================================
 // CATÉGORIE A — Calculs cliniques
@@ -67,7 +143,9 @@ export function findMarkerAt(x, y, markers, cw) {
   for (let i = markers.length - 1; i >= 0; i--) {
     const m = markers[i];
     if (!isPlaced(m)) continue;
-    if (Math.hypot(m.x - x, m.y - y) < r) return i;
+    // #243 — le calcul consomme les valeurs NORMALISÉES, jamais les brutes.
+    const n = normaliser(m);
+    if (Math.hypot(n.x - x, n.y - y) < r) return i;
   }
   return -1;
 }
@@ -83,8 +161,19 @@ export function findMarkerAt(x, y, markers, cw) {
  *   calcAngle3([{x:0,y:0},{x:1,y:0},{x:1,y:1}]) // → 90
  */
 export function calcAngle3(pts) {
-  const placed = pts.filter(isPlaced);
+  // #243 — filtre complet puis NORMALISATION : le calcul consomme les
+  // valeurs normalisées, jamais les brutes.
+  const placed = pts.filter(isPlaced).map(normaliser);
   if (placed.length < 3) return null;
+  // ⚠️ CHOIX D'INDICES DÉLIBÉRÉ ET CLINIQUE — NE PAS « SIMPLIFIER ».
+  // Sur un gabarit à 4 points (Milieu mollet, Jonction musculo-tendineuse,
+  // Calca supérieur, Calca inférieur — Amorti/Propulsion Marche et Course,
+  // mobilité AP, verrouillage AP), l'angle se mesure au sommet CALCA
+  // SUPÉRIEUR, donc sur les TROIS POINTS INFÉRIEURS : [1], [2], [3].
+  // Le premier point (Milieu mollet) sert au TRACÉ, pas à la mesure.
+  // Prendre les trois premiers points ferait basculer toutes les mesures à
+  // 4 points sur une autre articulation, silencieusement. Règle définie et
+  // validée par le praticien.
   const [A, B, C] = placed.length >= 4 ? [placed[1], placed[2], placed[3]] : placed;
   const v1 = { x: A.x - B.x, y: A.y - B.y },
     v2 = { x: C.x - B.x, y: C.y - B.y };
@@ -108,8 +197,24 @@ export function calcAngle3(pts) {
  * @param {Marker[]} pts  Liste de points, dont les non-placés ont x ou y à null.
  * @returns {1|-1}  Signe de l'angle.
  */
+// ⚠️ LE TRIPLET UTILISÉ ICI DIFFÈRE VOLONTAIREMENT DE CELUI DE calcAngle3.
+// calcAngle3 mesure l'ANGLE sur [1],[2],[3] (sommet Calca supérieur) ;
+// calcAngleSign détermine le SENS sur [0],[1],[dernier]. Ce n'est pas une
+// incohérence : le sens (valgus/varus en vue face, inversion/éversion en vue
+// dos) suit des règles propres, définies par le praticien et VALIDÉES
+// CLINIQUEMENT À L'USAGE sur des cas réels.
+// NE PAS aligner ce triplet sur celui de calcAngle3 sans validation clinique
+// explicite : on inverserait des constats, pas seulement des précisions.
+//
+// Le `return 1` ci-dessous est inatteignable TANT QUE `pts` est bien le
+// tableau ayant produit l'angle : moins de trois points placés → calcAngle3
+// rend null → computeCorrectedAngle sort avant d'appeler cette fonction.
+// L'inatteignabilité tient donc à une propriété des APPELANTS, pas de cette
+// fonction.
 export function calcAngleSign(pts) {
-  const placed = pts.filter(isPlaced);
+  // #243 — filtre complet puis NORMALISATION : le calcul consomme les
+  // valeurs normalisées, jamais les brutes.
+  const placed = pts.filter(isPlaced).map(normaliser);
   if (placed.length < 2) return 1;
   if (placed.length >= 3) {
     // Point central (Rotule pour KFPPA, CalcaSup pour AP)
