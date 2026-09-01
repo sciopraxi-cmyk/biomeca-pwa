@@ -3880,7 +3880,18 @@ let selectedVidMkrIdx = -1;
 // Photos et frames
 // photoSlots = [{label, side:'D'|'G'|'', dataUrl, angle}, ...]
 let photoSlots = [];
-let capturedFrames = []; // [{time, dataUrl, angleD, angleG, markersSnapshot}]
+// #250 — commentaire corrigé : il annonçait `angleD`, `angleG` et
+// `markersSnapshot`, trois noms que le code n'a jamais écrits.
+//
+// Les deux formes ont des origines DISTINCTES, à ne pas confondre :
+//   après captureFrame  : {time, dataUrl, angD, angG, markers, dims,
+//                          markersConnus}   — markersConnus POSÉ à true
+//   après launchTest    : les mêmes, plus `path` ; markersConnus y est
+//                         DÉRIVÉ de la présence de `markers` dans le persisté
+//
+// `markers` porte le gabarit ENTIER (marqueurs non posés compris) ; le
+// filtrage par _isPlacedPt n'a lieu qu'à la persistance.
+let capturedFrames = [];
 let selectedFrameIdx = -1;
 
 // Images morphostatiques originales (extraites du PDF bilan)
@@ -4593,16 +4604,31 @@ async function launchTest(testId) {
       angle: p.angle !== undefined ? p.angle : null,
       angleD: p.angleD !== undefined ? p.angleD : null,
       angleG: p.angleG !== undefined ? p.angleG : null,
+      // #250 — RÈGLE : `markers` reste TOUJOURS un tableau ; l'information
+      // « la géométrie est-elle connue ? » vit à CÔTÉ, dans markersConnus,
+      // jamais encodée dans la valeur de markers. Un champ qui porterait
+      // trois états (absent / vide / peuplé) obligerait chaque consommateur
+      // à les distinguer, et le premier qui l'oublierait lèverait.
+      // Ici le champ est NEUF, sans consommateur existant : la règle est
+      // appliquée par cohérence. Le cas mesuré est côté frames, plus bas.
+      ..._relireMarqueurs(p),
       path: p.path || null
     }));
     // Compléter si slots manquants
     while(photoSlots.length < t.photoLabels.length) {
       const i = photoSlots.length;
-      photoSlots.push({label:t.photoLabels[i]||'Photo '+(i+1), side:t.photoSides?.[i]||'', dataUrl:null, angle:null, path:null});
+      // #250 — markersConnus:false EXPLICITE. undefined serait falsy comme
+      // false, donc équivalent aujourd'hui — mais par coïncidence, pas par
+      // garantie : un futur `=== false` laisserait passer les undefined en
+      // silence. On ne laisse pas une absence se confondre avec un état.
+      photoSlots.push({label:t.photoLabels[i]||'Photo '+(i+1), side:t.photoSides?.[i]||'', dataUrl:null, angle:null, path:null, markersConnus:false});
     }
   } else {
     photoSlots = t.photoLabels.map((l,i) => ({
-      label:l, side: t.photoSides?.[i]||'', dataUrl:null, angle:null, path:null
+      // #250 — créneaux VIERGES : markersConnus:false explicite (cf. le push
+      // ci-dessus). À ne pas confondre avec le map de relecture plus haut, où
+      // il est DÉRIVÉ d'Array.isArray — y poser false écraserait la dérivation.
+      label:l, side: t.photoSides?.[i]||'', dataUrl:null, angle:null, path:null, markersConnus:false
     }));
   }
 
@@ -4612,7 +4638,12 @@ async function launchTest(testId) {
       time: f.time||0, dataUrl: f.dataUrl||null,
       angD: f.angD!==undefined?f.angD:null,
       angG: f.angG!==undefined?f.angG:null,
-      markers: f.markers||[],
+      // #250 — `markers` reste TOUJOURS un tableau, et le cas est MESURÉ ici :
+      // selectFrame réinjecte cette valeur dans vidMarkers, que updateResults
+      // passe à calcBilateral, qui fait markers.filter(...) sans aucune garde.
+      // Un « ?? null » y lèverait un TypeError dès la sélection d'une image.
+      // markersConnus porte donc l'information à côté, jamais dans markers.
+      ..._relireMarqueurs(f),
       path: f.path || null
     }));
   } else {
@@ -6930,8 +6961,18 @@ function restorePedicuriePhotosStash(d, stash) {
 // Helpers Storage — bilan sport (Task #53 PR B2)
 // ───────────────────────────────────────────────────────────────────
 // Les photos sport sont stockées dans des arrays d'objets :
-//   mesures[testId].photos[i] = { label, side, dataUrl, angle, angleD, angleG, path }
-//   mesures[testId].frames[i] = { time, angD, angG, dataUrl, markers, path }
+//   mesures[testId].photos[i] = { label, side, dataUrl, angle, angleD, angleG,
+//                                 path [, markers, dims] }  ← #250, conditionnels
+//   mesures[testId].frames[i] = { time, angD, angG, dataUrl, path
+//                                 [, markers, dims] }       ← #250, conditionnels
+//
+// #250 — `markers` figurait ici pour frames[i] alors qu'AUCUN chemin ne
+// l'écrivait : le map de validateAndSave l'omettait, et le repli `|| []` de
+// launchTest était systématiquement pris. La documentation décrivait donc un
+// champ inexistant.
+// Depuis #250, `markers` et `dims` sont écrits sur photos[i] ET frames[i],
+// mais SEULEMENT quand la géométrie est connue — leur ABSENCE reste porteuse
+// de sens : elle distingue « jamais eu de points » de « rien posé ».
 //
 // Lifecycle de `path` (différent de posturo qui utilise des clés parallèles `_xxxPath`) :
 //   - vide initial          → { dataUrl: null, path: null }
@@ -8089,6 +8130,17 @@ function captureVidPhotoSlot(slotIdx) {
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
   photoSlots[slotIdx].path = null; // remplacement → migration ré-uploadera (B2)
+  // #250 — les points sont enregistrés avec l'image, pour rendre la mesure
+  // recalculable. `markersConnus` marque une capture dont la géométrie EST
+  // connue : c'est lui, et non un numéro de version, qui distingue plus tard
+  // « jamais eu de points » de « rien posé ».
+  // `dims` rend le jeu auto-descriptif : les coordonnées sont en pixels de la
+  // SOURCE (cf. canvasXY), donc liées à la résolution de la caméra. Sans elles,
+  // deux bilans pris sur deux appareils porteraient des points dans deux
+  // repères, indiscernables.
+  photoSlots[slotIdx].markers = JSON.parse(JSON.stringify(markersForPhoto));
+  photoSlots[slotIdx].dims = { w: vcanvas.width, h: vcanvas.height };
+  photoSlots[slotIdx].markersConnus = true;
 
   // Mobilité AP : stocker angles D et G séparément
   if(t?.mobiliteAP) {
@@ -8161,7 +8213,11 @@ function deletePhotoSlot(i) {
 
 function resetPhotoSlots() {
   const t=TESTS[currentTestId]; if(!t) return;
-  photoSlots=t.photoLabels.map((l,i)=>({label:l,side:t.photoSides[i]||'',dataUrl:null,angle:null,path:null}));
+  // #250 — remise à zéro : créneaux VIERGES, markersConnus:false explicite.
+  // L'absence de `markers` fait que la persistance omettra le champ, donc les
+  // points précédemment enregistrés seront bien effacés — comportement voulu
+  // pour une remise à zéro.
+  photoSlots=t.photoLabels.map((l,i)=>({label:l,side:t.photoSides[i]||'',dataUrl:null,angle:null,path:null,markersConnus:false}));
   renderPhotoGrid(); updateResults();
 }
 
@@ -8188,6 +8244,16 @@ function capturePhotoSlot(slotIdx) {
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
   photoSlots[slotIdx].path = null; // remplacement → migration ré-uploadera (B2)
+  // #250 — cf. captureVidPhotoSlot pour le rôle de markersConnus.
+  // `dims` est celui de `canvas` (ph-canvas, déclaré L8181), et NON de
+  // vid-canvas : c'est l'élément contre lequel canvasXY a mesuré ces
+  // coordonnées (toggleCam L8233 → setupPhotoCanvas L8257/8271), et il est
+  // dimensionné sur vEl.videoWidth (L8226). Des dimensions ne correspondant
+  // pas au repère des points seraient pires qu'absentes : elles auraient
+  // l'air d'une information.
+  photoSlots[slotIdx].markers = JSON.parse(JSON.stringify(markersForPhoto));
+  photoSlots[slotIdx].dims = { w: canvas.width, h: canvas.height };
+  photoSlots[slotIdx].markersConnus = true;
   if(t && t.mobiliteAP) {
     const mkrD = liveMarkers.filter(m=>m.side==='D');
     const mkrG = liveMarkers.filter(m=>m.side==='G');
@@ -12267,7 +12333,16 @@ function captureFrame() {
 
   capturedFrames.push({
     time:player.currentTime||0, dataUrl, angD, angG,
-    markers:JSON.parse(JSON.stringify(vidMarkers))
+    // #250 — `markers` existait déjà mais n'était PAS persisté (cf. le map de
+    // validateAndSave). La copie reste ENTIÈRE, marqueurs non posés compris :
+    // selectFrame la réinjecte dans vidMarkers, et un tableau amputé priverait
+    // le praticien des emplacements restant à pourvoir. Le filtrage par
+    // _isPlacedPt se fait à la PERSISTANCE, jamais ici.
+    markers:JSON.parse(JSON.stringify(vidMarkers)),
+    // #250 — repère de ces coordonnées : vid-canvas, dimensionné sur
+    // player.videoWidth. Les points sont en pixels de la source.
+    dims:{ w: vcanvas.width, h: vcanvas.height },
+    markersConnus:true
   });
   renderFrameStrip(); updateResults();
 }
@@ -13623,6 +13698,35 @@ function clrGen(p){if(isNaN(p)||p===null)return'var(--mut)';const v=p*100;if(v>=
 function badgeGenou(p){if(p===null)return'<span class="badge bd">—</span>';const v=p*100;if(v>=80&&v<=120)return'<span class="badge bg">Normal</span>';if(v>=50&&v<=150)return'<span class="badge bo">Limite</span>';return'<span class="badge br">Hors norme</span>';}
 function badgeGen(p){if(p===null)return'<span class="badge bd">—</span>';const v=p*100;if(v>=66)return'<span class="badge bg">Normal</span>';if(v>=33)return'<span class="badge bo">Limite</span>';return'<span class="badge br">Hors norme</span>';}
 
+// ─── #250 PERSIST — DÉBUT ───
+// ⚠️ Marqueurs présents UNIQUEMENT pour la testabilité : ce bloc n'est
+// dupliqué nulle part, il n'a pas de miroir. Convention #132 — ne cherchez pas
+// la copie, il n'y en a pas.
+//
+// La logique de l'aller-retour n'existe qu'ICI. Elle vivait auparavant en cinq
+// expressions inline, dont trois identiques recopiées à des indentations
+// différentes. Les commentaires qui expliquent POURQUOI restent aux sites
+// d'appel, là où on les lit.
+
+// Fragment écrit à la persistance : {} ou { markers, dims }.
+// Le filtrage par _isPlacedPt a lieu ici, jamais à la capture.
+function _serialiserMarqueurs(e) {
+  return e.markersConnus
+    ? { markers: (e.markers || []).filter(_isPlacedPt), dims: e.dims || null }
+    : {};
+}
+
+// Champs dérivés à la relecture. `markers` reste TOUJOURS un tableau ;
+// l'information « la géométrie est-elle connue ? » vit à côté.
+function _relireMarqueurs(brut) {
+  return {
+    markers: brut.markers || [],
+    markersConnus: Array.isArray(brut.markers),
+    dims: brut.dims || null,
+  };
+}
+// ─── #250 PERSIST — FIN ───
+
 // ══════════════════════════════════════════════════════
 // VALIDER & SAUVEGARDER
 // ══════════════════════════════════════════════════════
@@ -13633,10 +13737,49 @@ async function validateAndSave() {
   let result={photos:[],frames:[],date:new Date().toLocaleString('fr-FR')};
 
   if(t.mode==='video'){
-    result.frames=capturedFrames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl,path:f.path}));
+    // #250 — ÉCRITURE CONDITIONNELLE, et cette condition est le cœur du
+    // chantier. Écrire `markers` inconditionnellement ferait basculer
+    // « jamais eu de points » en « rien posé » dès la PREMIÈRE revalidation,
+    // et de façon IRRÉVERSIBLE : une image d'avant #250 est relue avec
+    // `markers: []` (le repli de launchTest), et ce tableau vide serait alors
+    // persisté comme s'il était un choix du praticien. Un accident déguisé en
+    // choix — la faute même que #243 a corrigée sur les rapports.
+    // Simulé et vérifié sur valeurs : markersConnus bascule false → true en un
+    // aller-retour, markers.length restant à 0.
+    //
+    // LIMITE ASSUMÉE : la perte de points par réécriture depuis un client
+    // d'une version ANTÉRIEURE reste indétectable. Ce client reconstruit
+    // `result` en énumérant ses propres champs et n'emporte pas ceux qu'il
+    // ignore — donc ni `markers`, ni aucun témoin qui aurait pu le signaler.
+    // Aucun marqueur de génération ne corrige cela : il serait emporté par la
+    // même réécriture que la donnée qu'il surveille. La seule parade est hors
+    // bande — une fenêtre de déploiement courte.
+    //
+    // PORTÉE DE CE CHANTIER : #250 fait EXISTER la distinction dans la donnée
+    // (markersConnus + présence de markers). Il ne l'AFFICHE pas encore —
+    // aucun chemin de rapport ne la lit à ce jour. Sans conséquence tant
+    // qu'aucun bilan ne porte de points : la perte devient possible seulement
+    // à partir de cette version. L'affichage de la mention « points perdus »
+    // reste à faire.
+    //
+    // Le filtrage par _isPlacedPt se fait ICI, jamais à la capture : la copie
+    // en mémoire doit rester entière pour que selectFrame restitue au
+    // praticien les emplacements restant à pourvoir.
+    //
+    // LECTURE PAR VÉRITÉ, jamais par identité : `f.markersConnus`, jamais
+    // `=== true`. Sinon la normalisation à false n'aurait fait que déplacer le
+    // piège — une entrée restée à undefined y échapperait en silence.
+    result.frames=capturedFrames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl,path:f.path,
+      ..._serialiserMarqueurs(f)}));
     // Pour les tests video avec encadrés photos (Mobilité, Verrouillage, MLA, Amorti)
     if(t.showPhotoSlots && photoSlots.length) {
-      result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path}));
+      // #250 — écriture CONDITIONNELLE, et lecture par vérité (jamais
+      // `=== true`). Voir result.frames plus haut pour la justification
+      // complète : ne jamais écrire le champ quand il n'a jamais existé, sous
+      // peine de faire basculer « jamais eu de points » en « rien posé »,
+      // irréversiblement.
+      result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
+        ..._serialiserMarqueurs(s)}));
     }
     if(t.div!==undefined){
       // KFPPA : calcul depuis photoSlots (unipodalD et unipodalG vs bipodale)
@@ -13680,7 +13823,10 @@ async function validateAndSave() {
       }
     }
   } else {
-    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path}));
+    // #250 — écriture CONDITIONNELLE, second chemin, et lecture par vérité
+    // (jamais `=== true`). Voir result.frames plus haut pour la justification.
+    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
+      ..._serialiserMarqueurs(s)}));
     if(t.normDiv!==undefined){
       const sD=result.photos.filter(s=>s.side==='D');
       const sG=result.photos.filter(s=>s.side==='G');
