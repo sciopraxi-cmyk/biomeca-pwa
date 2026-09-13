@@ -5420,6 +5420,12 @@ function migrateBilanFlags(patientsList) {
   return migrated;
 }
 
+// --- #257 ZONE — DÉBUT ---
+// Palette centralisée dans css/biomeca.css (bloc #257 PALETTE). Les couleurs
+// de bilan de cette zone passent par var(--...) : aucune valeur hexadécimale
+// ne doit y réapparaître. La sortie de cette fonction n'est écrite que dans
+// #pt-list-el (voir plus bas) — jamais dans une fenêtre d'impression, où les
+// variables ne se résoudraient pas.
 function renderPatientList() {
   const el = document.getElementById('pt-list-el');
   const search = (document.getElementById('pt-search')?.value||'').toLowerCase().trim();
@@ -5476,11 +5482,11 @@ function renderPatientList() {
       <div style="margin-top:10px;">
         <div style="font-size:10px;font-weight:700;color:rgba(247,165,40,0.85);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⏳ Bilan sport en cours</div>
         <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(247,165,40,0.08);border:1px solid rgba(247,165,40,0.30);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#f7a528;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--encours);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">Bilan ${typeEnCoursLabel} · ${sousLibelle}</span>
-          <button onclick="ouvrirBilanSport(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
+          <button onclick="ouvrirBilanSport(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-btn);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanSport(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(240,64,96,0.9);color:#fff;">🗑️ Abandonner</button>
-          <button onclick="finalizeBilanSport(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
+          <button onclick="finalizeBilanSport(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-btn);color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
@@ -5493,11 +5499,11 @@ function renderPatientList() {
       <div style="margin-top:10px;">
         <div style="font-size:10px;font-weight:700;color:rgba(247,165,40,0.85);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⏳ Bilan postural en cours</div>
         <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(247,165,40,0.08);border:1px solid rgba(247,165,40,0.30);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#f7a528;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--encours);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">Bilan ${typePosturoLabel} · ${sousLibellePosturo}</span>
-          <button onclick="ouvrirBilanPosturo(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
+          <button onclick="ouvrirBilanPosturo(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-btn);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanPosturo(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(240,64,96,0.9);color:#fff;">🗑️ Abandonner</button>
-          <button onclick="finalizeBilanPosturo(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
+          <button onclick="finalizeBilanPosturo(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-btn);color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
@@ -5511,11 +5517,11 @@ function renderPatientList() {
       <div style="margin-top:10px;">
         <div style="font-size:10px;font-weight:700;color:rgba(247,165,40,0.85);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⏳ Bilan podopédiatrie en cours</div>
         <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(247,165,40,0.08);border:1px solid rgba(247,165,40,0.30);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#f7a528;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--encours);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">Bilan ${typePodopediatrieLabel}${periodePodopediatrieLabel} · ${sousLibellePodopediatrie}</span>
-          <button onclick="ouvrirBilanPodopediatrie(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
+          <button onclick="ouvrirBilanPodopediatrie(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-btn);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanPodopediatrie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(240,64,96,0.9);color:#fff;">🗑️ Abandonner</button>
-          <button onclick="finalizeBilanPodopediatrie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
+          <button onclick="finalizeBilanPodopediatrie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-btn);color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
@@ -5528,11 +5534,11 @@ function renderPatientList() {
       <div style="margin-top:10px;">
         <div style="font-size:10px;font-weight:700;color:rgba(247,165,40,0.85);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⏳ Bilan pédicurie en cours</div>
         <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(247,165,40,0.08);border:1px solid rgba(247,165,40,0.30);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#f7a528;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--encours);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">Bilan ${typePedicurieLabel} · ${sousLibellePedicurie}</span>
-          <button onclick="ouvrirBilanPedicurie(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">📝 Continuer</button>
+          <button onclick="ouvrirBilanPedicurie(${i},null)" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-btn);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanPedicurie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(240,64,96,0.9);color:#fff;">🗑️ Abandonner</button>
-          <button onclick="finalizeBilanPedicurie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">✓ Finaliser</button>
+          <button onclick="finalizeBilanPedicurie(${i})" style="border:none;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-btn);color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
@@ -5541,10 +5547,10 @@ function renderPatientList() {
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans sportifs</div>
         ${bilansSport.map((b,bi) => `
         <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(55,138,221,0.06);border:1px solid rgba(55,138,221,0.15);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#378ADD;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--sport-vif);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
           <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
-          <button onclick="ouvrirBilanSport(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#185FA5;color:#fff;">Ouvrir</button>
+          <button onclick="ouvrirBilanSport(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:var(--sport-btn);color:#fff;">Ouvrir</button>
           <button onclick="supprimerBilanSport(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
         </div>`).join('')}
       </div>` : '';
@@ -5554,7 +5560,7 @@ function renderPatientList() {
     const nbSportComparables = bilansSport.length + (hasBilanEnCours ? 1 : 0);
     const compareSportHtml = nbSportComparables >= 2 ? `
       <div style="margin-top:8px;display:flex;justify-content:flex-end;">
-        <button onclick="openCompareSport(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(55,138,221,0.18);color:#9cc4ed;border:1px solid rgba(55,138,221,0.3);">🔄 Comparer les bilans</button>
+        <button onclick="openCompareSport(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(55,138,221,0.18);color:var(--sport-clair);border:1px solid rgba(55,138,221,0.3);">🔄 Comparer les bilans</button>
       </div>` : '';
 
     const bilansPosturoHtml = bilansPosturo.length ? `
@@ -5562,10 +5568,10 @@ function renderPatientList() {
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans posturaux</div>
         ${bilansPosturo.map((b,bi) => `
         <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(45,212,191,0.06);border:1px solid rgba(45,212,191,0.15);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#2dd4bf;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--posturo-vif);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
           <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
-          <button onclick="ouvrirBilanPosturo(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#1D9E75;color:#fff;">Ouvrir</button>
+          <button onclick="ouvrirBilanPosturo(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:var(--posturo-btn);color:#fff;">Ouvrir</button>
           <button onclick="supprimerBilanPosturo(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
         </div>`).join('')}
       </div>` : '';
@@ -5576,7 +5582,7 @@ function renderPatientList() {
     const nbPosturoComparables = bilansPosturo.length + (hasBilanPosturoEnCours ? 1 : 0);
     const comparePosturoHtml = nbPosturoComparables >= 2 ? `
       <div style="margin-top:8px;display:flex;justify-content:flex-end;">
-        <button onclick="openComparePosturo(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(45,212,191,0.18);color:#7fe0d1;border:1px solid rgba(45,212,191,0.3);">🔄 Comparer les bilans</button>
+        <button onclick="openComparePosturo(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(45,212,191,0.18);color:var(--posturo-clair);border:1px solid rgba(45,212,191,0.3);">🔄 Comparer les bilans</button>
       </div>` : '';
 
     // #121 Phase 0 — Liste des archives pédicurie (miroir posturo, palette ambre).
@@ -5585,10 +5591,10 @@ function renderPatientList() {
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans pédicurie</div>
         ${bilansPedicurie.map((b,bi) => `
         <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.18);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#d97706;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--pedicurie-vif);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
           <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
-          <button onclick="ouvrirBilanPedicurie(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#b45309;color:#fff;">Ouvrir</button>
+          <button onclick="ouvrirBilanPedicurie(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:var(--pedicurie-btn);color:#fff;">Ouvrir</button>
           <button onclick="supprimerBilanPedicurie(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
         </div>`).join('')}
       </div>` : '';
@@ -5598,7 +5604,7 @@ function renderPatientList() {
     const nbPedicurieComparables = bilansPedicurie.length + (hasBilanPedicurieEnCours ? 1 : 0);
     const comparePedicurieHtml = nbPedicurieComparables >= 2 ? `
       <div style="margin-top:8px;display:flex;justify-content:flex-end;">
-        <button onclick="openComparePedicurie(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(217,119,6,0.18);color:#f0bd7e;border:1px solid rgba(217,119,6,0.3);">🔄 Comparer les bilans</button>
+        <button onclick="openComparePedicurie(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(217,119,6,0.18);color:var(--pedicurie-clair);border:1px solid rgba(217,119,6,0.3);">🔄 Comparer les bilans</button>
       </div>` : '';
 
     // #140 Phase 0 — Liste des archives podopédiatrie (miroir pédicurie, palette rose).
@@ -5607,10 +5613,10 @@ function renderPatientList() {
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Bilans podopédiatrie</div>
         ${bilansPodopediatrie.map((b,bi) => `
         <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(225,29,72,0.06);border:1px solid rgba(225,29,72,0.18);border-radius:8px;margin-bottom:5px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#e11d48;flex-shrink:0;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--podo-vif);flex-shrink:0;"></div>
           <span style="font-size:12px;color:rgba(255,255,255,0.85);flex:1;">${b.label}</span>
           <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-right:6px;">${b.date}</span>
-          <button onclick="ouvrirBilanPodopediatrie(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#9f1239;color:#fff;">Ouvrir</button>
+          <button onclick="ouvrirBilanPodopediatrie(${i},${bi})" style="border:none;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:var(--podo-sombre);color:#fff;">Ouvrir</button>
           <button onclick="supprimerBilanPodopediatrie(${i},${bi})" style="background:none;border:none;color:rgba(240,64,96,0.7);font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
         </div>`).join('')}
       </div>` : '';
@@ -5620,12 +5626,12 @@ function renderPatientList() {
     const nbPodopediatrieComparables = bilansPodopediatrie.length + (hasBilanPodopediatrieEnCours ? 1 : 0);
     const comparePodopediatrieHtml = nbPodopediatrieComparables >= 2 ? `
       <div style="margin-top:8px;display:flex;justify-content:flex-end;">
-        <button onclick="openComparePodopediatrie(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(225,29,72,0.18);color:#f2a1b5;border:1px solid rgba(225,29,72,0.3);">🔄 Comparer les bilans</button>
+        <button onclick="openComparePodopediatrie(${i})" style="border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(225,29,72,0.18);color:var(--podo-clair);border:1px solid rgba(225,29,72,0.3);">🔄 Comparer les bilans</button>
       </div>` : '';
 
     // Modules bilans
     const modPosturo = `
-      <div style="border-radius:12px;overflow:hidden;background:#0d4a32;border:1px solid #1a7a52;">
+      <div style="border-radius:12px;overflow:hidden;background:var(--posturo-sombre);border:1px solid var(--posturo-bord);">
         <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
           <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(45,212,191,0.35),transparent);"></div>
           <span style="font-size:42px;position:relative;z-index:1;">🧍</span>
@@ -5635,15 +5641,15 @@ function renderPatientList() {
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Étude posture · 9 sections</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
             ${canPosturo
-              ? `<button onclick="creerBilanPosturo(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#2dd4bf;color:#04342C;">Initial</button>
-                 <button onclick="creerBilanPosturo(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#0d4a32;">Contrôle</button>`
+              ? `<button onclick="creerBilanPosturo(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:var(--posturo-vif);color:var(--posturo-contraste);">Initial</button>
+                 <button onclick="creerBilanPosturo(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:var(--posturo-sombre);">Contrôle</button>`
               : `<button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.3);grid-column:1/-1;">Non disponible</button>`}
           </div>
         </div>
       </div>`;
 
     const modSport = `
-      <div style="border-radius:12px;overflow:hidden;background:#0d2e5c;border:1px solid #1a4a8a;">
+      <div style="border-radius:12px;overflow:hidden;background:var(--sport-sombre);border:1px solid var(--sport-bord);">
         <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
           <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,0.35),transparent);"></div>
           <span style="font-size:42px;position:relative;z-index:1;">🏃</span>
@@ -5653,8 +5659,8 @@ function renderPatientList() {
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Analyse cinématique</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
             ${canSport
-              ? `<button onclick="creerBilanSport(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#378ADD;color:#fff;">Initial</button>
-                 <button onclick="creerBilanSport(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#0d2e5c;">Contrôle</button>`
+              ? `<button onclick="creerBilanSport(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:var(--sport-vif);color:#fff;">Initial</button>
+                 <button onclick="creerBilanSport(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:var(--sport-sombre);">Contrôle</button>`
               : `<button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.3);grid-column:1/-1;">Non disponible</button>`}
           </div>
         </div>
@@ -5665,7 +5671,7 @@ function renderPatientList() {
     // dans le plan de l'utilisateur (comme sport/posturo). Le gate abonnement
     // (accessLevel) est vérifié serveur-side dans creerBilanPodopediatrie.
     const modPodo = `
-      <div style="border-radius:12px;overflow:hidden;background:#9f1239;border:1px solid #e11d48;">
+      <div style="border-radius:12px;overflow:hidden;background:var(--podo-sombre);border:1px solid var(--podo-vif);">
         <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
           <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(251,113,133,0.4),transparent);"></div>
           <span style="font-size:42px;position:relative;z-index:1;">👶</span>
@@ -5675,8 +5681,8 @@ function renderPatientList() {
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Bilan pédiatrique · 4 périodes</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
             ${canPodopedia
-              ? `<button onclick="creerBilanPodopediatrie(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#e11d48;color:#fff;">Initial</button>
-                 <button onclick="creerBilanPodopediatrie(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#9f1239;">Contrôle</button>`
+              ? `<button onclick="creerBilanPodopediatrie(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:var(--podo-vif);color:#fff;">Initial</button>
+                 <button onclick="creerBilanPodopediatrie(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:var(--podo-sombre);">Contrôle</button>`
               : `<button disabled style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:not-allowed;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.3);grid-column:1/-1;">Non disponible</button>`}
           </div>
         </div>
@@ -5686,7 +5692,7 @@ function renderPatientList() {
     // boutons TOUJOURS actifs. Le gate _accessLevel se gère dans creerBilanPedicurie
     // + via applyReadOnlyUI (cf. selector ajouté dans la liste applyReadOnlyUI).
     const modPedicurie = `
-      <div style="border-radius:12px;overflow:hidden;background:#3d2410;border:1px solid #7c3a0e;">
+      <div style="border-radius:12px;overflow:hidden;background:var(--pedicurie-sombre);border:1px solid var(--pedicurie-bord);">
         <div style="height:80px;display:flex;align-items:center;justify-content:center;position:relative;">
           <div style="position:absolute;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(217,119,6,0.35),transparent);"></div>
           <span style="font-size:42px;position:relative;z-index:1;">🦶</span>
@@ -5695,8 +5701,8 @@ function renderPatientList() {
           <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;">Pédicurie</div>
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Soin des pieds · inclus</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
-            <button onclick="creerBilanPedicurie(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#d97706;color:#fff;">Initial</button>
-            <button onclick="creerBilanPedicurie(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#7c3a0e;">Contrôle</button>
+            <button onclick="creerBilanPedicurie(${i},'initial')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:var(--pedicurie-vif);color:#fff;">Initial</button>
+            <button onclick="creerBilanPedicurie(${i},'controle')" style="border:none;padding:7px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:var(--pedicurie-bord);">Contrôle</button>
           </div>
         </div>
       </div>`;
@@ -5715,7 +5721,7 @@ function renderPatientList() {
           <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">${age} · ${_escHtml(p.sport||'—')}${prat?' · '+_escHtml(prat.nom):''}</div>
         </div>
         <button onclick="editPatient(${i})" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
-        <button onclick="deletePatient(${i})" style="background:rgba(240,64,96,0.08);border:1px solid rgba(240,64,96,0.2);color:#f04060;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✕</button>
+        <button onclick="deletePatient(${i})" style="background:rgba(240,64,96,0.08);border:1px solid rgba(240,64,96,0.2);color:var(--red);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✕</button>
       </div>
       <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-top:none;border-radius:0 0 12px 12px;padding:14px;">
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:${_hasAnyExpandedBilan?'4px':'0'};">
@@ -5731,6 +5737,7 @@ function renderPatientList() {
   // Cf. commentaire d'en-tête de applyReadOnlyUI.
   if (typeof applyReadOnlyUI === 'function') applyReadOnlyUI(window._accessLevel);
 }
+// --- #257 ZONE — FIN ---
 
 // ══════════════════════════════════════════════════════
 // #114-export — EXPORT JSON COMPLET (sauvegarde manuelle)
