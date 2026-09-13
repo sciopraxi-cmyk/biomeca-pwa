@@ -20,6 +20,29 @@
   --f:'DM Sans',sans-serif;--fm:'DM Mono',monospace;
 }
 
+/* --- #257 PALETTE — DÉBUT ---
+   Palette par type de bilan, extraite de renderPatientList().
+   ATTENTION Marqueurs présents UNIQUEMENT pour la testabilité : ce bloc
+   n'est dupliqué nulle part, il n'a pas de miroir. Convention #132 — ne
+   cherchez pas la copie, il n'y en a pas.
+   Les valeurs sont celles de la production, reprises à l'identique : ce lot
+   ne change aucune couleur. */
+:root{
+  --posturo-vif:#2dd4bf;    --posturo-btn:#1D9E75;
+  --posturo-sombre:#0d4a32; --posturo-bord:#1a7a52;
+  --posturo-contraste:#04342C; --posturo-clair:#7fe0d1;
+  --sport-vif:#378ADD;      --sport-btn:#185FA5;
+  --sport-sombre:#0d2e5c;   --sport-bord:#1a4a8a;
+  --sport-clair:#9cc4ed;
+  --pedicurie-vif:#d97706;  --pedicurie-btn:#b45309;
+  --pedicurie-sombre:#3d2410; --pedicurie-bord:#7c3a0e;
+  --pedicurie-clair:#f0bd7e;
+  --podo-vif:#e11d48;       --podo-sombre:#9f1239;
+  --podo-clair:#f2a1b5;
+  --encours:#f7a528;
+}
+/* --- #257 PALETTE — FIN --- */
+
 /* ==========================================================================
    2. Reset / base + composants app (préserve l'ordre original du bloc source
       pour ne rien casser dans la cascade)
