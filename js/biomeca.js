@@ -4367,10 +4367,22 @@ function getMkrsBySet(markers, targetSet) {
 // pg-patients, donc la page peut exister à l'écran sans qu'aucun nav() ne soit
 // passé ; et un futur chemin d'affichage qui oublierait nav() ne pourra pas
 // désynchroniser le thème de la page.
-// Lot 3 : la bascule deviendra globale et cette fonction disparaîtra.
+// Lot 3 (#263) : la bascule ne devient PAS globale. pg-capture —
+// l'interface des tests cinématiques — reste volontairement sombre :
+// c'est une surface de mesure vidéo, où un marqueur coloré et un tracé
+// fin ressortent mieux sur fond sombre. Cette fonction ne disparaît donc
+// pas, elle devient le lecteur de la classe page-claire.
+//
+// #263 — la page déclare elle-même si elle est claire, par la classe
+// page-claire posée dans le balisage. On lit cette classe au lieu de comparer
+// un identifiant : #258 en tenait la liste à DEUX endroits — le sélecteur CSS
+// et ce test — et chaque page ajoutée coûtait deux entrées à garder accordées.
+// Une seule source de vérité, dans le balisage, lue par les deux.
+// Vaut aussi pour les pages injectées à l'exécution : il leur suffira de
+// porter la classe, sans qu'aucune liste n'ait à être mise à jour ici.
 function _appliquerTheme() {
   const active = document.querySelector('.page.active');
-  document.body.classList.toggle('theme-clair', !!active && active.id === 'pg-patients');
+  document.body.classList.toggle('theme-clair', !!active && active.classList.contains('page-claire'));
 }
 
 function nav(id) {

@@ -468,3 +468,112 @@ describe('#257 la sortie de la zone reste dans le document courant', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 Lot 3A — la portée du thème clair passe par une CLASSE
+// ═══════════════════════════════════════════════════════════════════
+//
+// #258 tenait la liste des pages claires à DEUX endroits — le sélecteur CSS
+// et le test dans _appliquerTheme — donc chaque page ajoutée coûtait deux
+// entrées à garder accordées. Un miroir manuel finit toujours par dériver.
+// Désormais la page déclare elle-même qu'elle est claire, et les deux
+// lecteurs lisent la même source : le balisage.
+//
+// Ce que ces tests refusent : qu'un des trois maillons disparaisse sans les
+// autres. Une classe posée sans sélecteur CSS ne fait rien ; un sélecteur
+// sans classe ne fait rien ; et un JS qui compare encore un identifiant
+// ignorerait les six pages ajoutées — le tout en silence, puisque rien ne
+// lève quand une règle CSS ne s'applique à personne.
+
+const HTML = readFileSync(join(RACINE, 'index.html'), 'utf8');
+const CSS_ENTIER = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
+const JS_ENTIER = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
+
+// Les sept pages qui doivent porter la classe. pg-patients y est inclus :
+// #258 l'avait scopée par identifiant, ce lot la migre vers le même
+// mécanisme que les six autres.
+const PAGES_CLAIRES = [
+  'pg-sport',
+  'pg-posturo',
+  'pg-params',
+  'pg-patients',
+  'pg-compare',
+  'pg-praticiens',
+  'pg-agenda',
+];
+
+// Et celles qui ne doivent PAS l'avoir. pg-capture reste volontairement
+// sombre : c'est une surface de mesure vidéo. Les deux rapports sont déjà
+// clairs par leur propre style. Les trois bilans sont les lots 3B et 3C.
+const PAGES_SOMBRES = [
+  'pg-capture',
+  'pg-bilan',
+  'pg-pedicurie',
+  'pg-podopediatrie',
+  'pg-rapport',
+  'pg-rapport-posturo',
+];
+
+// Extrait la valeur de class="…" de la balise portant cet identifiant.
+function classesDe(id) {
+  const m = HTML.match(new RegExp(`<div class="([^"]*)" id="${id}"`));
+  return m ? m[1].split(/\s+/) : null;
+}
+
+describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
+  it('10. Les sept pages du lot portent page-claire', () => {
+    let executes = 0;
+    for (const id of PAGES_CLAIRES) {
+      const cl = classesDe(id);
+      expect(cl, `${id} : balise introuvable`).not.toBeNull();
+      expect(cl, `${id} doit porter page-claire`).toContain('page-claire');
+      expect(cl, `${id} doit rester une page`).toContain('page');
+      executes++;
+    }
+    expect(executes).toBe(PAGES_CLAIRES.length);
+  });
+
+  it('10b. Les pages hors périmètre ne l’ont PAS', () => {
+    // Sans cette moitié, poser la classe partout passerait le test 10.
+    let executes = 0;
+    for (const id of PAGES_SOMBRES) {
+      const cl = classesDe(id);
+      expect(cl, `${id} : balise introuvable`).not.toBeNull();
+      expect(cl, `${id} ne doit PAS porter page-claire`).not.toContain('page-claire');
+      executes++;
+    }
+    expect(executes).toBe(PAGES_SOMBRES.length);
+  });
+
+  it('10c. Exactement sept balises portent la classe', () => {
+    // Compte d'occurrences, pas de lignes : une huitième page ajoutée
+    // ailleurs dans le fichier échapperait aux deux listes ci-dessus.
+    const n = (HTML.match(/class="[^"]*\bpage-claire\b/g) || []).length;
+    expect(n).toBe(PAGES_CLAIRES.length);
+  });
+});
+
+describe('#263 les trois maillons du mécanisme sont présents', () => {
+  it('11. Le CSS porte un sélecteur .page-claire', () => {
+    expect(CSS_ENTIER).toContain('body.theme-clair .page-claire');
+  });
+
+  it('11b. Le CSS ne scope plus par identifiant', () => {
+    // Deux mécanismes qui font la même chose, c'est le piège qu'on évite —
+    // et #pg-patients, plus spécifique, l'emporterait silencieusement.
+    expect(CSS_ENTIER).not.toContain('body.theme-clair #pg-patients');
+  });
+
+  it('11c. _appliquerTheme lit la CLASSE, pas un identifiant', () => {
+    // Les deux bornes sont affirmées sur ce qu'elles valent : un indexOf à -1
+    // donnerait un slice(-1, …) qui rend le dernier caractère du fichier —
+    // longueur 1, donc « > 0 » vert, sur une chaîne qui n'est pas la fonction.
+    const iDeb = JS_ENTIER.indexOf('function _appliquerTheme');
+    expect(iDeb, '_appliquerTheme introuvable dans js/biomeca.js').toBeGreaterThan(-1);
+    const iFin = JS_ENTIER.indexOf('\n}', iDeb);
+    expect(iFin, 'fin de _appliquerTheme introuvable').toBeGreaterThan(iDeb);
+    const fn = JS_ENTIER.slice(iDeb, iFin);
+    expect(fn).toContain("classList.contains('page-claire')");
+    expect(fn).not.toContain('pg-patients');
+  });
+});

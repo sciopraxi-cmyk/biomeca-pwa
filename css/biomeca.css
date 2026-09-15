@@ -113,8 +113,23 @@
    Elles s'héritent : tout ce qui est dedans suit, tout ce qui est dehors garde
    la palette sombre. */
 body.theme-clair{ background:#F6F7F9; }
+
+/* #263 LOT 3A — portée du thème clair par CLASSE.
+   La page déclare elle-même qu'elle est claire (class page-claire) ; CSS et
+   JS la lisent, aucune liste à tenir en phase. #258 scopait par identifiant
+   en DEUX endroits — le sélecteur ici et le test dans _appliquerTheme — donc
+   chaque page ajoutée coûtait deux entrées à maintenir accordées. Un miroir
+   manuel finit toujours par dériver.
+   Les propriétés personnalisées héritent : les redéfinir sur le conteneur de
+   page est une vraie portée. Sur body, non — cf. l'incident consigné juste
+   au-dessus.
+   #pg-patients n'était PAS une règle à lui seul, mais un sélecteur de cette
+   règle partagée avec .topbar : il est donc REMPLACÉ ici, pas supprimé
+   ailleurs puis recréé. Le compte de règles de la feuille est inchangé pour
+   une raison plus forte que la compensation — rien n'est ajouté ni retiré.
+   .topbar reste : ce n'est pas une page. */
 body.theme-clair .topbar,
-body.theme-clair #pg-patients{
+body.theme-clair .page-claire{
   --bg:#F6F7F9; --surf:#FFFFFF; --card:#FFFFFF; --bord:#E4E8EE;
   --txt:#0B1220; --mut:#6B7A90; --dim:#9AA5B5;
   --verticy-bleu:#2563EB; --verticy-bleu-trait:#BBD0F7;
