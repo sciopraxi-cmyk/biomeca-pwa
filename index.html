@@ -613,14 +613,14 @@
     <button onclick="nav('pg-agenda')" id="tn-agenda">📅 Agenda</button>
   </div>
   <div style="flex:1;"></div>
-  <a href="https://www.doctolib.fr" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:6px;background:#fff;border-radius:6px;padding:4px 12px;text-decoration:none;margin-right:8px;font-size:11px;font-weight:700;color:#0e4d91;white-space:nowrap;">
+  <a href="https://www.doctolib.fr" target="_blank" rel="noopener noreferrer" class="tb-doctolib" style="display:flex;align-items:center;gap:6px;background:#fff;border-radius:6px;padding:4px 12px;text-decoration:none;margin-right:8px;font-size:11px;font-weight:700;color:#0e4d91;white-space:nowrap;">
     <svg width="16" height="16" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="50" fill="#0e4d91"/><path d="M30 50 Q50 20 70 50 Q50 80 30 50Z" fill="#fff"/></svg>
     Doctolib
   </a>
   <!-- #229-D — aide intégrée (FAQ avec recherche) -->
-  <button onclick="showHelp()" id="btn-aide" title="Aide et questions fréquentes" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.75);font-size:11px;cursor:pointer;padding:6px 14px;border-radius:6px;font-weight:500;white-space:nowrap;">❓ Aide</button>
-  <button onclick="showMonCompte()"  id="btn-mon-compte" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.75);font-size:11px;cursor:pointer;padding:6px 14px;border-radius:6px;font-weight:500;white-space:nowrap;">👤 Mon compte</button>
-  <button onclick="pwaLogout()" style="background:none;border:none;color:rgba(255,255,255,0.35);font-size:11px;cursor:pointer;padding:4px 10px;border-radius:6px;white-space:nowrap;" title="Se déconnecter">⎋ Déconnexion</button>
+  <button onclick="showHelp()" id="btn-aide" class="tb-btn" title="Aide et questions fréquentes" style="font-size:11px;cursor:pointer;padding:6px 14px;border-radius:6px;font-weight:500;white-space:nowrap;">❓ Aide</button>
+  <button onclick="showMonCompte()"  id="btn-mon-compte" class="tb-btn" style="font-size:11px;cursor:pointer;padding:6px 14px;border-radius:6px;font-weight:500;white-space:nowrap;">👤 Mon compte</button>
+  <button onclick="pwaLogout()" class="tb-lien" style="background:none;border:none;font-size:11px;cursor:pointer;padding:4px 10px;border-radius:6px;white-space:nowrap;" title="Se déconnecter">⎋ Déconnexion</button>
 </div>
 <div class="main">
 <div class="page" id="pg-sport">

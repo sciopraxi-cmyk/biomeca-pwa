@@ -43,6 +43,158 @@
 }
 /* --- #257 PALETTE — FIN --- */
 
+
+/* --- #258 ENCRES — DÉBUT ---
+   Déclinaisons fond clair de la palette #257. Les APLATS d'identité
+   (--*-vif) restent inchangés : ils servent les surfaces pleines et les
+   rapports. Les encres servent le TEXTE et les CONTOURS sur blanc, où les
+   aplats sont illisibles — #2dd4bf sur blanc donne 1,86:1, le minimum
+   lisible est 4,5:1.
+   Contrastes mesurés sur blanc : posturo 5,47:1 · sport 6,48:1 ·
+   pédicurie 6,26:1 · podopédiatrie 6,29:1.
+   Traits et fonds = l'encre mélangée à du blanc (32 %, 55 %, 6 %),
+   valeurs calculées et figées ici plutôt que par color-mix() : une
+   déclaration color-mix non supportée est ignorée en silence, et un
+   contour qui disparaît ne se voit pas en revue. */
+:root{
+  --posturo-encre:#0F766E;   --posturo-trait:#b2d3d1;
+  --posturo-trait-survol:#7bb4af; --posturo-fond:#f1f7f6;
+  --sport-encre:#175FA8;     --sport-trait:#b5cce3;
+  --sport-trait-survol:#7fa7cf;   --sport-fond:#f1f5fa;
+  --pedicurie-encre:#9A4A06; --pedicurie-trait:#dfc5af;
+  --pedicurie-trait-survol:#c79b76; --pedicurie-fond:#f9f4f0;
+  --podo-encre:#BE123C;      --podo-trait:#eab3c1;
+  --podo-trait-survol:#db7d94;    --podo-fond:#fbf1f3;
+  /* Ambre « en cours ». #f7a528 donne 2,03:1 sur blanc : illisible en texte.
+     #B45309 aurait convenu au contraste mais vaut déjà --pedicurie-btn ;
+     #8A5A00 en est distinct (ΔE 16,5 avec --pedicurie-encre) et monte à 5,93:1. */
+  --encours-encre:#8A5A00;   --encours-trait:#dacaad;
+  --encours-trait-survol:#bfa473; --encours-fond:#f8f5f0;
+  /* Danger — UNE seule couleur, franchement séparée des quatre identités, pour
+     les deux usages : le ✕ au survol et l'aplat du bouton « Abandonner ».
+     Une couleur de danger qui ressemble à une couleur de catégorie n'est plus
+     une couleur de danger, et sur fond clair les deux deviennent co-présentes
+     dans la même fiche patient (carte podopédiatrie + bandeau « en cours »).
+     Écarts mesurés en CIE76 avec #B91C1C :
+       --podo-vif #e11d48 20,1 · --podo-encre #BE123C 18,2 ·
+       --pedicurie-vif 41,1 · --encours 58,5 · --sport-vif 108,7 ·
+       --posturo-vif 119,3
+     Deux candidats écartés pour cette raison : #E11D48 (ΔE 0,0 avec --podo-vif,
+     c'est la même couleur) et #D11A3C (ΔE 5,9 avec --podo-vif, deux aplats
+     indiscernables).
+     Contraste : 6,47:1 dans les deux sens sur blanc.
+     Le ✕ reste NEUTRE au repos et ne rougit qu'au survol, à l'intention : une
+     suppression ne doit pas crier en permanence dans une liste parcourue dix
+     fois par jour. */
+  --danger-repos:#C2CBD6;    --danger-actif:#B91C1C;
+  --danger-fond:#fbf1f1;
+}
+/* --- #258 ENCRES — FIN --- */
+
+/* --- #258 CLAIR — DÉBUT ---
+   Bascule scopée. Le lot 3 la rendra globale en supprimant la condition ;
+   tant qu'elle est là, les 4 pages de bilan restent strictement inchangées.
+   --mut passait de rgba(255,255,255,0.4) — du blanc transparent — à un gris
+   lisible : sans ça « Aucun patient. » et « Aucun résultat. » (js:5432, 5437)
+   deviendraient invisibles sur fond clair.
+
+   SCOPE — corrigé après incident. Redéfinir ces variables sur `body` n'est
+   PAS un scope : tout le document en hérite tant que pg-patients est active,
+   modales et surcouches comprises. Le défaut observé : la modale d'abonnement
+   affichait « / an » sans montant — sa carte est en var(--card), devenu blanc,
+   et le montant est en color:#fff EN DUR (js/biomeca.js:3190). Blanc sur blanc.
+   La période, elle, passe par var(--mut), que ce lot rend justement lisible.
+   Mesuré : les 5 surcouches déclarées (modal-subscribe, modal-mon-compte,
+   trial-expired-overlay, modal-podopediatrie-age, pwa-login), les 3 bandeaux
+   (trial, idle-warn, sync-error) et les 5 modales créées à l'exécution sont
+   TOUTES hors de #pg-patients — les runtime sont rattachées à document.body.
+   Seul #pt-list-el est dedans.
+   Les variables vivent donc sur les DEUX conteneurs qui doivent être clairs.
+   Elles s'héritent : tout ce qui est dedans suit, tout ce qui est dehors garde
+   la palette sombre. */
+body.theme-clair{ background:#F6F7F9; }
+body.theme-clair .topbar,
+body.theme-clair #pg-patients{
+  --bg:#F6F7F9; --surf:#FFFFFF; --card:#FFFFFF; --bord:#E4E8EE;
+  --txt:#0B1220; --mut:#6B7A90; --dim:#9AA5B5;
+  --verticy-bleu:#2563EB; --verticy-bleu-trait:#BBD0F7;
+  --verticy-bleu-fond:#EEF4FF;
+}
+body.theme-clair .topbar{ background:#fff; border-bottom:2px solid var(--verticy-bleu); }
+body.theme-clair .tnav button.act{ background:var(--verticy-bleu-fond); color:var(--verticy-bleu); }
+body.theme-clair .tnav button:hover:not(.act){ background:#F1F3F7; color:var(--txt); }
+
+/* Les trois boutons de droite de la topbar portaient leurs couleurs EN INLINE
+   (index.html), donc hors de portée de tout sélecteur : un style inline bat
+   la spécificité. Sorties ici à l'identique — ces deux premières règles
+   reproduisent exactement l'apparence sombre d'avant, la topbar étant partagée
+   par les 4 pages de bilan que ce lot ne doit pas toucher.
+   Sur blanc elles étaient toutes trois INVISIBLES : blanc à 75 % et à 35 %
+   sur fond blanc.
+
+   Sorties : les déclarations de COULEUR, plus le raccourci `border` en ENTIER.
+   Un raccourci ne se coupe pas en deux — laisser `border:1px solid` en inline
+   reposerait border-color à currentColor, à la spécificité inline, donc par
+   dessus toute règle d'ici. Padding, rayon, taille, curseur restent en inline.
+   Pour Déconnexion, `background:none` et `border:none` ne sont pas des
+   couleurs : ils restent en inline, .tb-lien se limite à `color`. */
+.tb-btn{ background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+         color:rgba(255,255,255,0.75); }
+.tb-lien{ color:rgba(255,255,255,0.35); }
+body.theme-clair .tb-btn{ background:#fff; border-color:var(--bord); color:var(--txt); }
+body.theme-clair .tb-btn:hover{ background:var(--verticy-bleu-fond); border-color:var(--verticy-bleu-trait); }
+body.theme-clair .tb-lien{ color:var(--mut); }
+/* Doctolib reste lisible sur blanc (#0e4d91 sur #fff), mais sa pastille blanche
+   se fondait dans la barre : on lui rend un contour, on ne touche pas sa couleur. */
+body.theme-clair .tb-doctolib{ border:1px solid var(--bord); }
+/* --- #258 CLAIR — FIN --- */
+
+/* --- #258 COMPOSANTS — DÉBUT ---
+   Ce que le style inline de renderPatientList() ne peut pas faire : les états
+   de survol et les points de rupture. Chaque famille pose ses trois teintes
+   dans des propriétés LOCALES (--t, --ts, --f), que les règles génériques
+   consomment — une seule règle de survol au lieu de quatre.
+   Rien ici n'est scopé à .theme-clair : ces composants ne vivent que dans
+   pg-patients, qui est toujours en thème clair depuis ce lot. */
+.bl-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+@media (max-width:1100px){ .bl-grid{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:620px){ .bl-grid{ grid-template-columns:1fr; } }
+
+.bl-carte{ background:#fff; border:1px solid var(--bord); border-radius:12px;
+           overflow:hidden; display:flex; flex-direction:column;
+           transition:box-shadow .16s, transform .16s; }
+.bl-carte:hover{ box-shadow:0 2px 4px rgba(11,18,32,.05), 0 16px 34px -24px rgba(11,18,32,.45);
+                 transform:translateY(-1px); }
+
+.bl-ligne{ background:#fff; border:1.5px solid var(--t);
+           transition:border-color .14s, background .14s; }
+.bl-ligne:hover{ border-color:var(--ts); background:var(--f); }
+
+.bl-posturo{ --t:var(--posturo-trait); --ts:var(--posturo-trait-survol); --f:var(--posturo-fond); }
+.bl-sport{ --t:var(--sport-trait); --ts:var(--sport-trait-survol); --f:var(--sport-fond); }
+.bl-pedicurie{ --t:var(--pedicurie-trait); --ts:var(--pedicurie-trait-survol); --f:var(--pedicurie-fond); }
+.bl-podo{ --t:var(--podo-trait); --ts:var(--podo-trait-survol); --f:var(--podo-fond); }
+.bl-encours{ --t:var(--encours-trait); --ts:var(--encours-trait-survol); --f:var(--encours-fond); }
+
+/* Le ✕ : neutre au repos, rouge seulement quand on le vise. */
+.bl-x{ color:var(--danger-repos); background:none; border:none; cursor:pointer;
+       border-radius:7px; transition:color .12s, background .12s; }
+.bl-x:hover{ color:var(--danger-actif); background:var(--danger-fond); }
+/* .bl-cmp porte LUI-MÊME sa classe de famille (class="bl-cmp bl-posturo") :
+   le bouton « Comparer » vit dans un <div> séparé de la liste des lignes,
+   aucun ancêtre commun ne porterait la famille par héritage. */
+.bl-cmp{ background:var(--card); cursor:pointer; transition:background .14s; }
+.bl-cmp:hover{ background:var(--f); }
+
+/* .av — l'avatar patient. Mesuré : UNE seule utilisation dans tout le dépôt,
+   et elle est dans la zone #257. Il portait --blue-d (#0d4a32) et --blue
+   (#2dd4bf), soit un disque vert bouteille à initiales turquoise hérité du
+   rebrand : même défaut que .tnav button.act, invisible tant que le fond
+   restait sombre. Scopé à .theme-clair, donc sans effet ailleurs.
+   Hors de la liste du brief — signalé comme tel. */
+body.theme-clair .av{ background:linear-gradient(145deg,var(--verticy-bleu),#5B8DEF); color:#fff; }
+/* --- #258 COMPOSANTS — FIN --- */
+
 /* ==========================================================================
    2. Reset / base + composants app (préserve l'ordre original du bloc source
       pour ne rien casser dans la cascade)

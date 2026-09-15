@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { extraireBloc } from './helpers/mirror-diff.mjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { extraireBloc, RACINE } from './helpers/mirror-diff.mjs';
 
 // ═══════════════════════════════════════════════════════════════════
 // #257 Lot 1 — palette par type de bilan centralisée dans le CSS
@@ -23,6 +25,7 @@ import { extraireBloc } from './helpers/mirror-diff.mjs';
 // déclaration entière satisfait ce critère aussi.
 
 const BLOC_PALETTE = extraireBloc('css/biomeca.css', '#257 PALETTE — DÉBUT', '#257 PALETTE — FIN');
+const BLOC_ENCRES = extraireBloc('css/biomeca.css', '#258 ENCRES — DÉBUT', '#258 ENCRES — FIN');
 const BLOC_ZONE = extraireBloc('js/biomeca.js', '#257 ZONE — DÉBUT', '#257 ZONE — FIN');
 
 // Valeurs de production relevées dans renderPatientList() AVANT la refonte
@@ -57,18 +60,58 @@ const PALETTE = {
 // 21 hexadécimaux qui doivent avoir disparu de la zone.
 const HEX_RED = '#f04060';
 
-// Attendu APRÈS remplacement, dans la zone. 42 substitutions + 2 var(--mut)
-// préexistants (« Aucun patient. » / « Aucun résultat. ») = 44.
-// --mut est autorisé à EXACTEMENT 2 : ce n'est pas une exception large. Un
-// troisième var hors palette est un changement que personne n'a demandé.
+// Comptes de var() dans la zone. Mesure FRAÎCHE du 14/09/2026, après la
+// bascule en fond clair de #258 : les valeurs du lot 1 (12/11/7/7/4/1/2 = 44)
+// ne valent plus, la zone ayant été réécrite. Elles sont relevées, jamais
+// devinées — un attendu recopié d'une version précédente ne teste rien.
+//
+// var(--red) a DISPARU de la zone : le ✕ de suppression patient passe
+// désormais par la classe .bl-x, qui le laisse neutre au repos et ne le rougit
+// qu'au survol. Sa présence ici serait donc une régression, pas un oubli.
 const COMPTES_ATTENDUS = {
-  '--posturo-*': 12,
-  '--sport-*': 11,
-  '--pedicurie-*': 7,
-  '--podo-*': 7,
+  '--posturo-*': 14,
+  '--sport-*': 13,
+  '--mut': 12,
+  '--txt': 9,
+  '--pedicurie-*': 9,
+  '--podo-*': 9,
+  '--card': 7,
+  '--bord': 6,
+  '--encours-*': 4,
   '--encours': 4,
-  '--red': 1,
-  '--mut': 2,
+  '--danger-*': 4,
+  '--dim': 3,
+};
+
+// #258 — le bloc ENCRES, valeurs exactes. Les quatre premières familles sont
+// les encres lisibles sur blanc ; suivent l'ambre « en cours » et la couleur
+// de danger. Traits et fonds sont l'encre mélangée à du blanc (32 %, 55 %, 6 %),
+// figés ici plutôt que calculés par color-mix() : une déclaration color-mix non
+// supportée est ignorée en silence.
+const ENCRES = {
+  '--posturo-encre': '#0F766E',
+  '--posturo-trait': '#b2d3d1',
+  '--posturo-trait-survol': '#7bb4af',
+  '--posturo-fond': '#f1f7f6',
+  '--sport-encre': '#175FA8',
+  '--sport-trait': '#b5cce3',
+  '--sport-trait-survol': '#7fa7cf',
+  '--sport-fond': '#f1f5fa',
+  '--pedicurie-encre': '#9A4A06',
+  '--pedicurie-trait': '#dfc5af',
+  '--pedicurie-trait-survol': '#c79b76',
+  '--pedicurie-fond': '#f9f4f0',
+  '--podo-encre': '#BE123C',
+  '--podo-trait': '#eab3c1',
+  '--podo-trait-survol': '#db7d94',
+  '--podo-fond': '#fbf1f3',
+  '--encours-encre': '#8A5A00',
+  '--encours-trait': '#dacaad',
+  '--encours-trait-survol': '#bfa473',
+  '--encours-fond': '#f8f5f0',
+  '--danger-repos': '#C2CBD6',
+  '--danger-actif': '#B91C1C',
+  '--danger-fond': '#fbf1f1',
 };
 
 // Regroupe un nom de variable en famille. Un nom composé (--posturo-btn) rend
@@ -189,10 +232,208 @@ describe('#257 aucune couleur n’a été perdue au passage aux variables', () =
     expect(obtenus).toEqual(COMPTES_ATTENDUS);
   });
 
-  it('3b. Le total de la zone vaut 42 substitutions + 2 préexistants', () => {
+  it('3b. Le total de la zone vaut la somme des familles', () => {
     const vars = BLOC_ZONE.match(/var\(--[a-z-]+\)/g) || [];
     const attenduTotal = Object.values(COMPTES_ATTENDUS).reduce((a, b) => a + b, 0);
     expect(vars.length).toBe(attenduTotal);
+  });
+
+  it('3c. var(--red) a bien QUITTÉ la zone', () => {
+    // Le ✕ de suppression patient passe par .bl-x : neutre au repos, rouge au
+    // survol seulement. Un var(--red) qui réapparaîtrait ici signifierait un
+    // retour au ✕ rouge permanent, que #258 a délibérément écarté.
+    expect(BLOC_ZONE).not.toContain('var(--red)');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// #258 — bascule en fond clair : encres, et plus aucune couleur littérale
+// ═══════════════════════════════════════════════════════════════════
+
+describe('#258 le bloc ENCRES déclare les valeurs calculées', () => {
+  it('5. Chaque encre est déclarée avec exactement sa valeur', () => {
+    let executes = 0;
+    for (const [nom, hex] of Object.entries(ENCRES)) {
+      expect(BLOC_ENCRES, `${nom} déclaré à ${hex}`).toContain(`${nom}:${hex}`);
+      executes++;
+    }
+    expect(executes).toBeGreaterThan(0);
+    // Et rien d'autre : une variable ajoutée en douce échapperait à la boucle,
+    // qui ne vérifie que dans un sens.
+    const declarees = (BLOC_ENCRES.match(/--[a-z-]+(?=\s*:)/g) || []).sort();
+    expect(declarees).toEqual(Object.keys(ENCRES).sort());
+  });
+
+  it('5b. Les encres ne redéclarent aucune variable de la palette #257', () => {
+    // Les deux blocs coexistent dans la cascade : une même variable déclarée
+    // dans les deux ferait gagner la dernière, silencieusement.
+    const enPalette = new Set(BLOC_PALETTE.match(/--[a-z-]+(?=\s*:)/g) || []);
+    const enEncres = new Set(BLOC_ENCRES.match(/--[a-z-]+(?=\s*:)/g) || []);
+    expect(enPalette.size).toBeGreaterThan(0);
+    expect(enEncres.size).toBeGreaterThan(0);
+    const communes = [...enEncres].filter((v) => enPalette.has(v));
+    expect(communes).toEqual([]);
+  });
+});
+
+describe('#258 les commentaires CSS sont équilibrés', () => {
+  it('9. Chaque bloc balisé ouvre et ferme autant de commentaires', () => {
+    // DEUX incidents dans ce chantier, tous deux silencieux :
+    //   — un commentaire contenant le motif qu'il proscrivait ;
+    //   — un `*/` prématuré, après quoi le texte du commentaire est devenu du
+    //     CSS brut. Le parseur a consommé jusqu'à la première accolade et a
+    //     jeté la règle body.theme-clair{background:#F6F7F9} qui suivait.
+    // Rien n'a été signalé : un CSS mal commenté est ignoré sans bruit, et le
+    // fichier semblait correct alors que le rendu ne l'était pas.
+    //
+    // NB : on ne peut PAS réutiliser extraireBloc ici. Il coupe APRÈS la ligne
+    // du marqueur d'ouverture, or le `/*` vit sur cette ligne même
+    // (« /* --- #258 CLAIR — DÉBUT --- »). Chaque bloc extrait porterait donc
+    // un `*/` orphelin, et le test échouerait sur tous les blocs, y compris
+    // sains. On relit le fichier en incluant les lignes de marqueur.
+    const css = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
+    const lignes = css.split('\n');
+    const region = (marqueur) => {
+      const d = lignes.findIndex((l) => l.includes(`${marqueur} — DÉBUT`));
+      const f = lignes.findIndex((l) => l.includes(`${marqueur} — FIN`));
+      expect(d, `${marqueur} : marqueur DÉBUT`).toBeGreaterThanOrEqual(0);
+      expect(f, `${marqueur} : marqueur FIN après DÉBUT`).toBeGreaterThan(d);
+      return lignes.slice(d, f + 1).join('\n');
+    };
+
+    let executes = 0;
+    for (const marqueur of ['#257 PALETTE', '#258 ENCRES', '#258 CLAIR', '#258 COMPOSANTS']) {
+      const bloc = region(marqueur);
+      const ouvrants = (bloc.match(/\/\*/g) || []).length;
+      const fermants = (bloc.match(/\*\//g) || []).length;
+      expect(ouvrants, `${marqueur} : /* et */ doivent s'équilibrer`).toBe(fermants);
+      executes++;
+    }
+    expect(executes).toBe(4);
+
+    // Et le fichier entier : un déséquilibre hors des blocs balisés compte
+    // autant. C'est cette forme-là qui aurait attrapé le `*/` prématuré.
+    const totalOuvrants = (css.match(/\/\*/g) || []).length;
+    const totalFermants = (css.match(/\*\//g) || []).length;
+    expect(totalOuvrants).toBeGreaterThan(0);
+    expect(totalOuvrants, 'css/biomeca.css entier').toBe(totalFermants);
+  });
+
+  it('9b. TÉMOIN — le compteur voit un déséquilibre quand il y en a un', () => {
+    // Le cas nominal étant l'équilibre, rien ne distinguerait sans cela
+    // « équilibré » de « compteur incapable de compter ».
+    const sain = '/* a */\n.x{color:red}\n/* b */';
+    const casse = '/* a */\n.x{color:red}\n*/'; // le `*/` prématuré du lot #258
+    const compte = (s) => [(s.match(/\/\*/g) || []).length, (s.match(/\*\//g) || []).length];
+    expect(compte(sain)[0]).toBe(compte(sain)[1]);
+    expect(compte(casse)[0]).not.toBe(compte(casse)[1]);
+  });
+});
+
+// Repère les blocs style="…" qui posent À LA FOIS une surface thémée et du
+// texte blanc en dur. Le travail se fait DÉCLARATION PAR DÉCLARATION, pas par
+// proximité textuelle : un motif qui exigerait background avant color laisserait
+// passer l'ordre inverse, et n'aurait rien vu quand les deux propriétés vivaient
+// sur des lignes voisines — c'est exactement ce qui est arrivé pendant ce lot.
+function blancSurSurfaceThemee(source) {
+  const styles = source.match(/style="[^"]*"/g) || [];
+  return styles.filter((s) => {
+    const decls = s
+      .slice(7, -1)
+      .split(';')
+      .map((d) => d.replace(/\s+/g, '').toLowerCase())
+      .filter(Boolean);
+    const surface = decls.some((d) => /^background(-color)?:var\(--(card|surf)\)$/.test(d));
+    const blanc = decls.some((d) => /^color:#(fff|ffffff)$/.test(d));
+    return surface && blanc;
+  });
+}
+
+describe('#258 la zone ne contient plus aucune couleur littérale', () => {
+  it('6c. Aucun color:#fff posé sur une surface thémée', () => {
+    // Trois caractères : invisible aux deux gardes existantes — ni « zéro
+    // rgba( » ni « zéro hexadécimal à SIX chiffres » ne l'attrapent. C'est
+    // pourtant le motif exact qui a produit le défaut de la modale
+    // d'abonnement : color:#fff en dur sur var(--card) devenu blanc.
+    // Le blanc reste légitime comme ENCRE sur un aplat d'identité, où le fond
+    // est une couleur pleine ; il ne l'est pas sur une surface thémée.
+    expect(blancSurSurfaceThemee(BLOC_ZONE)).toEqual([]);
+  });
+
+  it('6d. TÉMOIN — le détecteur trouve le défaut dans les DEUX ordres', () => {
+    // Sans ce témoin, 6c reste vert sur un prédicat aveugle : le cas nominal
+    // étant précisément l'absence, rien ne distinguerait « rien trouvé » de
+    // « incapable de trouver ».
+    const surfacePuisTexte = '<div style="background:var(--card);color:#fff;">x</div>';
+    const textePuisSurface = '<div style="color:#fff;padding:4px;background:var(--surf);">x</div>';
+    const separeParUnAttribut =
+      '<div class="k" style="color:#FFFFFF; border:none; background:var(--card)">x</div>';
+    expect(blancSurSurfaceThemee(surfacePuisTexte)).toHaveLength(1);
+    expect(blancSurSurfaceThemee(textePuisSurface)).toHaveLength(1);
+    expect(blancSurSurfaceThemee(separeParUnAttribut)).toHaveLength(1);
+    // Contre-épreuve : ni un blanc sur aplat d'identité, ni une surface thémée
+    // à texte thémé ne doivent être signalés — sinon 6c échouerait à tort et
+    // on serait tenté de l'assouplir.
+    expect(
+      blancSurSurfaceThemee('<div style="background:var(--podo-vif);color:#fff;">x</div>')
+    ).toEqual([]);
+    expect(
+      blancSurSurfaceThemee('<div style="background:var(--card);color:var(--txt);">x</div>')
+    ).toEqual([]);
+  });
+
+  it('6. Aucun rgba( dans la zone', () => {
+    // Formulation volontairement large : une liste de motifs interdits
+    // laisserait passer la teinte qu'on aurait oublié d'énumérer.
+    // Le commentaire d'en-tête de la zone est rédigé pour ne pas écrire
+    // lui-même ce motif — sans quoi ce test échouerait sur sa propre doctrine.
+    const restants = BLOC_ZONE.match(/rgba\(/g) || [];
+    expect(restants).toEqual([]);
+  });
+
+  it('6b. TÉMOIN — le même détecteur trouve des rgba( là où il en reste', () => {
+    // Sans ce témoin, le test 6 serait vert même si le motif ne savait rien
+    // trouver. css/biomeca.css en contient encore beaucoup : c'est le
+    // périmètre des lots 2B et 3, et cela suffit à prouver le détecteur.
+    const cssEntier = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
+    expect((cssEntier.match(/rgba\(/g) || []).length).toBeGreaterThan(0);
+  });
+
+  it('7. Les 4 illustrations de carte sont référencées', () => {
+    const chemins = [
+      ...new Set(BLOC_ZONE.match(/assets\/bilans\/illus-[a-z]+\.jpg/g) || []),
+    ].sort();
+    expect(chemins).toEqual([
+      'assets/bilans/illus-pedicurie.jpg',
+      'assets/bilans/illus-podopediatrie.jpg',
+      'assets/bilans/illus-postural.jpg',
+      'assets/bilans/illus-sport.jpg',
+    ]);
+  });
+
+  it('8. Tout .bl-ligne et tout .bl-cmp porte une classe de FAMILLE', () => {
+    // Les teintes de survol passent par les propriétés locales --t/--ts/--f,
+    // posées par les classes de famille. Une propriété personnalisée inconnue
+    // rend la déclaration invalide au calcul : la règle de survol serait
+    // ignorée EN SILENCE, sans erreur ni avertissement. C'est le mode de
+    // défaillance que ce test interdit.
+    const FAMILLES = '(posturo|sport|pedicurie|podo|encours)';
+    for (const base of ['bl-ligne', 'bl-cmp']) {
+      const avec = BLOC_ZONE.match(new RegExp(`class="${base} bl-${FAMILLES}"`, 'g')) || [];
+      const sans = BLOC_ZONE.match(new RegExp(`class="${base}"`, 'g')) || [];
+      expect(avec.length, `${base} avec famille`).toBeGreaterThan(0);
+      expect(sans.length, `${base} SANS famille`).toBe(0);
+    }
+  });
+
+  it('7b. Ces 4 chemins sont AUSSI au précache du service worker', () => {
+    // Une carte dont l'image n'est pas au cache s'affiche vide hors ligne —
+    // mode de fonctionnement réel en cabinet, pas un cas limite.
+    const sw = readFileSync(join(RACINE, 'service-worker.js'), 'utf8');
+    const dansJs = [...new Set(BLOC_ZONE.match(/assets\/bilans\/illus-[a-z]+\.jpg/g) || [])].sort();
+    const dansSw = [...new Set(sw.match(/assets\/bilans\/illus-[a-z]+\.jpg/g) || [])].sort();
+    expect(dansJs.length).toBe(4);
+    expect(dansSw).toEqual(dansJs);
   });
 });
 

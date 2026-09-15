@@ -10,7 +10,7 @@
 // 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
 // clients sur du code de mois précédents). Toute évolution ultérieure du code
 // applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
-const CACHE_VERSION = 'biomeca-v148';
+const CACHE_VERSION = 'biomeca-v149';
 const CACHE_PREFIX  = 'biomeca-';
 
 // #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur
@@ -38,6 +38,13 @@ const PRECACHE_URLS = [
   './assets/morpho-profil-gauche.png',
   './assets/morpho-profil-droit.png',
   './assets/plan-semelles-schema-plantaire.png',
+  // #258 — illustrations des cartes de bilan de la page d'accueil. Sans elles
+  // au précache, une carte s'afficherait vide hors ligne : mode de
+  // fonctionnement réel en cabinet, pas un cas limite.
+  './assets/bilans/illus-postural.jpg',
+  './assets/bilans/illus-sport.jpg',
+  './assets/bilans/illus-pedicurie.jpg',
+  './assets/bilans/illus-podopediatrie.jpg',
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/apple-touch-icon.png',
