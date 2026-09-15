@@ -96,8 +96,25 @@
    tant qu'elle est là, les 4 pages de bilan restent strictement inchangées.
    --mut passait de rgba(255,255,255,0.4) — du blanc transparent — à un gris
    lisible : sans ça « Aucun patient. » et « Aucun résultat. » (js:5432, 5437)
-   deviendraient invisibles sur fond clair. */
-body.theme-clair{
+   deviendraient invisibles sur fond clair.
+
+   SCOPE — corrigé après incident. Redéfinir ces variables sur `body` n'est
+   PAS un scope : tout le document en hérite tant que pg-patients est active,
+   modales et surcouches comprises. Le défaut observé : la modale d'abonnement
+   affichait « / an » sans montant — sa carte est en var(--card), devenu blanc,
+   et le montant est en color:#fff EN DUR (js/biomeca.js:3190). Blanc sur blanc.
+   La période, elle, passe par var(--mut), que ce lot rend justement lisible.
+   Mesuré : les 5 surcouches déclarées (modal-subscribe, modal-mon-compte,
+   trial-expired-overlay, modal-podopediatrie-age, pwa-login), les 3 bandeaux
+   (trial, idle-warn, sync-error) et les 5 modales créées à l'exécution sont
+   TOUTES hors de #pg-patients — les runtime sont rattachées à document.body.
+   Seul #pt-list-el est dedans.
+   Les variables vivent donc sur les DEUX conteneurs qui doivent être clairs.
+   Elles s'héritent : tout ce qui est dedans suit, tout ce qui est dehors garde
+   la palette sombre. */
+body.theme-clair{ background:#F6F7F9; }
+body.theme-clair .topbar,
+body.theme-clair #pg-patients{
   --bg:#F6F7F9; --surf:#FFFFFF; --card:#FFFFFF; --bord:#E4E8EE;
   --txt:#0B1220; --mut:#6B7A90; --dim:#9AA5B5;
   --verticy-bleu:#2563EB; --verticy-bleu-trait:#BBD0F7;
@@ -113,7 +130,8 @@ body.theme-clair .tnav button:hover:not(.act){ background:#F1F3F7; color:var(--t
    reproduisent exactement l'apparence sombre d'avant, la topbar étant partagée
    par les 4 pages de bilan que ce lot ne doit pas toucher.
    Sur blanc elles étaient toutes trois INVISIBLES : blanc à 75 % et à 35 %
-   sur fond blanc. */
+   sur fond blanc.
+
    Sorties : les déclarations de COULEUR, plus le raccourci `border` en ENTIER.
    Un raccourci ne se coupe pas en deux — laisser `border:1px solid` en inline
    reposerait border-color à currentColor, à la spécificité inline, donc par

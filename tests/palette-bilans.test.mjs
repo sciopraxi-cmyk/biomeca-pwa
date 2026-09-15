@@ -276,7 +276,112 @@ describe('#258 le bloc ENCRES déclare les valeurs calculées', () => {
   });
 });
 
+describe('#258 les commentaires CSS sont équilibrés', () => {
+  it('9. Chaque bloc balisé ouvre et ferme autant de commentaires', () => {
+    // DEUX incidents dans ce chantier, tous deux silencieux :
+    //   — un commentaire contenant le motif qu'il proscrivait ;
+    //   — un `*/` prématuré, après quoi le texte du commentaire est devenu du
+    //     CSS brut. Le parseur a consommé jusqu'à la première accolade et a
+    //     jeté la règle body.theme-clair{background:#F6F7F9} qui suivait.
+    // Rien n'a été signalé : un CSS mal commenté est ignoré sans bruit, et le
+    // fichier semblait correct alors que le rendu ne l'était pas.
+    //
+    // NB : on ne peut PAS réutiliser extraireBloc ici. Il coupe APRÈS la ligne
+    // du marqueur d'ouverture, or le `/*` vit sur cette ligne même
+    // (« /* --- #258 CLAIR — DÉBUT --- »). Chaque bloc extrait porterait donc
+    // un `*/` orphelin, et le test échouerait sur tous les blocs, y compris
+    // sains. On relit le fichier en incluant les lignes de marqueur.
+    const css = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
+    const lignes = css.split('\n');
+    const region = (marqueur) => {
+      const d = lignes.findIndex((l) => l.includes(`${marqueur} — DÉBUT`));
+      const f = lignes.findIndex((l) => l.includes(`${marqueur} — FIN`));
+      expect(d, `${marqueur} : marqueur DÉBUT`).toBeGreaterThanOrEqual(0);
+      expect(f, `${marqueur} : marqueur FIN après DÉBUT`).toBeGreaterThan(d);
+      return lignes.slice(d, f + 1).join('\n');
+    };
+
+    let executes = 0;
+    for (const marqueur of ['#257 PALETTE', '#258 ENCRES', '#258 CLAIR', '#258 COMPOSANTS']) {
+      const bloc = region(marqueur);
+      const ouvrants = (bloc.match(/\/\*/g) || []).length;
+      const fermants = (bloc.match(/\*\//g) || []).length;
+      expect(ouvrants, `${marqueur} : /* et */ doivent s'équilibrer`).toBe(fermants);
+      executes++;
+    }
+    expect(executes).toBe(4);
+
+    // Et le fichier entier : un déséquilibre hors des blocs balisés compte
+    // autant. C'est cette forme-là qui aurait attrapé le `*/` prématuré.
+    const totalOuvrants = (css.match(/\/\*/g) || []).length;
+    const totalFermants = (css.match(/\*\//g) || []).length;
+    expect(totalOuvrants).toBeGreaterThan(0);
+    expect(totalOuvrants, 'css/biomeca.css entier').toBe(totalFermants);
+  });
+
+  it('9b. TÉMOIN — le compteur voit un déséquilibre quand il y en a un', () => {
+    // Le cas nominal étant l'équilibre, rien ne distinguerait sans cela
+    // « équilibré » de « compteur incapable de compter ».
+    const sain = '/* a */\n.x{color:red}\n/* b */';
+    const casse = '/* a */\n.x{color:red}\n*/'; // le `*/` prématuré du lot #258
+    const compte = (s) => [(s.match(/\/\*/g) || []).length, (s.match(/\*\//g) || []).length];
+    expect(compte(sain)[0]).toBe(compte(sain)[1]);
+    expect(compte(casse)[0]).not.toBe(compte(casse)[1]);
+  });
+});
+
+// Repère les blocs style="…" qui posent À LA FOIS une surface thémée et du
+// texte blanc en dur. Le travail se fait DÉCLARATION PAR DÉCLARATION, pas par
+// proximité textuelle : un motif qui exigerait background avant color laisserait
+// passer l'ordre inverse, et n'aurait rien vu quand les deux propriétés vivaient
+// sur des lignes voisines — c'est exactement ce qui est arrivé pendant ce lot.
+function blancSurSurfaceThemee(source) {
+  const styles = source.match(/style="[^"]*"/g) || [];
+  return styles.filter((s) => {
+    const decls = s
+      .slice(7, -1)
+      .split(';')
+      .map((d) => d.replace(/\s+/g, '').toLowerCase())
+      .filter(Boolean);
+    const surface = decls.some((d) => /^background(-color)?:var\(--(card|surf)\)$/.test(d));
+    const blanc = decls.some((d) => /^color:#(fff|ffffff)$/.test(d));
+    return surface && blanc;
+  });
+}
+
 describe('#258 la zone ne contient plus aucune couleur littérale', () => {
+  it('6c. Aucun color:#fff posé sur une surface thémée', () => {
+    // Trois caractères : invisible aux deux gardes existantes — ni « zéro
+    // rgba( » ni « zéro hexadécimal à SIX chiffres » ne l'attrapent. C'est
+    // pourtant le motif exact qui a produit le défaut de la modale
+    // d'abonnement : color:#fff en dur sur var(--card) devenu blanc.
+    // Le blanc reste légitime comme ENCRE sur un aplat d'identité, où le fond
+    // est une couleur pleine ; il ne l'est pas sur une surface thémée.
+    expect(blancSurSurfaceThemee(BLOC_ZONE)).toEqual([]);
+  });
+
+  it('6d. TÉMOIN — le détecteur trouve le défaut dans les DEUX ordres', () => {
+    // Sans ce témoin, 6c reste vert sur un prédicat aveugle : le cas nominal
+    // étant précisément l'absence, rien ne distinguerait « rien trouvé » de
+    // « incapable de trouver ».
+    const surfacePuisTexte = '<div style="background:var(--card);color:#fff;">x</div>';
+    const textePuisSurface = '<div style="color:#fff;padding:4px;background:var(--surf);">x</div>';
+    const separeParUnAttribut =
+      '<div class="k" style="color:#FFFFFF; border:none; background:var(--card)">x</div>';
+    expect(blancSurSurfaceThemee(surfacePuisTexte)).toHaveLength(1);
+    expect(blancSurSurfaceThemee(textePuisSurface)).toHaveLength(1);
+    expect(blancSurSurfaceThemee(separeParUnAttribut)).toHaveLength(1);
+    // Contre-épreuve : ni un blanc sur aplat d'identité, ni une surface thémée
+    // à texte thémé ne doivent être signalés — sinon 6c échouerait à tort et
+    // on serait tenté de l'assouplir.
+    expect(
+      blancSurSurfaceThemee('<div style="background:var(--podo-vif);color:#fff;">x</div>')
+    ).toEqual([]);
+    expect(
+      blancSurSurfaceThemee('<div style="background:var(--card);color:var(--txt);">x</div>')
+    ).toEqual([]);
+  });
+
   it('6. Aucun rgba( dans la zone', () => {
     // Formulation volontairement large : une liste de motifs interdits
     // laisserait passer la teinte qu'on aurait oublié d'énumérer.
