@@ -165,12 +165,70 @@ const supa = {
     return res.json();
   },
 
-  async getUserRecord(email) {
-    const res = await authFetch(SUPA_URL + '/rest/v1/user_data?email=eq.' + encodeURIComponent(email) + '&select=*');
-    if(!res.ok) return null;
-    const rows = await res.json();
-    return rows && rows.length > 0 ? rows[0] : null;
+  // --- #261 LECTURE — DÉBUT ---
+  // ATTENTION Marqueurs présents UNIQUEMENT pour la testabilité : ce bloc
+  // n'est dupliqué nulle part, il n'a pas de miroir. Convention #132 — ne
+  // cherchez pas la copie, il n'y en a pas.
+  //
+  // #261 — RECHERCHE PAR user_id, JAMAIS PAR E-MAIL.
+  //
+  // PostgREST traite `eq` en égalité STRICTE, sensible à la casse ; Supabase
+  // Auth authentifie SANS en tenir compte. Une adresse saisie avec une
+  // majuscule — un clavier mobile suffit — produit donc une connexion réussie
+  // et une requête qui ne trouve rien. Mesuré le 15/09/2026 : la requête par
+  // e-mail rendait 200 avec un corps vide, la même requête sans filtre rendait
+  // la ligne. La RLS n'y était pour rien.
+  //
+  // Ce filtre ne retire RIEN de ce que le client pouvait déjà lire : la RLS
+  // user_data restreint déjà à `auth.uid() = user_id` (select_own), donc
+  // l'ensemble visible est exactement {lignes dont user_id = auth.uid()}.
+  // Filtrer dessus est un no-op sur cet ensemble — le changement ne peut
+  // qu'AJOUTER la ligne que la casse faisait manquer, jamais en retirer une.
+  //
+  // Motif aligné sur celui déjà présent dans ce fichier
+  // (rows.find(r => r.user_id === pwaUser.id)) plutôt que d'en créer un second.
+  //
+  // REND UN ÉTAT, PAS UNE LIGNE. Les trois cas étaient auparavant confondus
+  // en `null`, et l'appelant en faisait `{}` : un 4xx/5xx se lisait
+  // « praticien sans entrée payante », soit l'interprétation la PLUS
+  // PERMISSIVE d'un échec, sur un outil clinique.
+  //   { ok:false, row:null }   requête impossible ou en échec
+  //   { ok:true,  row:null }   requête réussie, aucune ligne
+  //   { ok:true,  row:{...} }  ligne trouvée
+  async getUserRecord(userId) {
+    // Sans identifiant : requête SANS FILTRE, surtout pas d'abandon.
+    // `user_id=eq.undefined` produirait un 400 que le code lirait comme une
+    // absence de licence ; et abandonner bloquerait un praticien qui
+    // fonctionnait la veille.
+    //
+    // Ce cas EXISTE par construction, il n'est pas théorique : pwaLogin pose
+    // `email` depuis le champ du formulaire — toujours présent — mais `id`
+    // depuis `body.user?.id`, en chaînage optionnel, sous une garde qui
+    // n'exige que `body.access_token`. Et JSON.stringify supprimant les clés
+    // undefined, un identifiant manquant ne réapparaît jamais à la
+    // restauration de session.
+    //
+    // Sans filtre est SÛR : la RLS user_data (select_own, auth.uid() =
+    // user_id) ne rend que la ligne du porteur du jeton. rows[0] est donc
+    // cette ligne, ou rien.
+    const filtre = userId ? 'user_id=eq.' + encodeURIComponent(userId) + '&' : '';
+    let res;
+    try {
+      res = await authFetch(SUPA_URL + '/rest/v1/user_data?' + filtre + 'select=*');
+    } catch (_e) {
+      return { ok: false, row: null };
+    }
+    if(!res.ok) return { ok: false, row: null };
+    let rows;
+    try {
+      rows = await res.json();
+    } catch (_e) {
+      // Corps illisible : la requête n'a pas abouti à un état connu.
+      return { ok: false, row: null };
+    }
+    return { ok: true, row: rows && rows.length > 0 ? rows[0] : null };
   },
+  // --- #261 LECTURE — FIN ---
 
   async loadData(table) {
     const res = await authFetch(SUPA_URL + '/rest/v1/' + table + '?select=*', {
@@ -549,23 +607,33 @@ async function pwaLogin() {
 //   - undefined : fetch jamais lancé (1re frame, transitoire) → 'loading'
 //   - null      : fetch lancé et échoué → 'blocked' (fail-secure)
 //   - {...}     : fetch OK → matrice normale
+// --- #261 FETCH — DÉBUT ---
+// ATTENTION Marqueurs présents UNIQUEMENT pour la testabilité — pas de miroir.
 async function fetchUserDataAtLogin() {
-  if (!pwaUser?.email) {
-    pwaUser && (pwaUser.user_data = null);
+  // #261 — la garde ne porte plus ni sur l'e-mail ni sur l'identifiant.
+  // Exiger l'identifiant aurait transformé un cas jusqu'ici inoffensif — un
+  // `id` absent, possible par construction — en blocage complet d'un
+  // praticien qui fonctionnait la veille. getUserRecord retombe sur une
+  // requête sans filtre, que la RLS restreint déjà à la bonne ligne.
+  if (!pwaUser) return;
+  const res = await supa.getUserRecord(pwaUser.id);
+  // #261 — TROIS ÉTATS, TROIS VALEURS. Le commentaire précédent affirmait
+  // cette distinction ; le code ne la faisait pas : `row || {}` confondait
+  // l'échec HTTP et l'absence de ligne, et seule une exception réseau
+  // atteignait le null prévu pour l'échec.
+  if (!res.ok) {
+    // #47 — identifiant technique, jamais l'adresse (donnée personnelle).
+    console.error('[access] fetchUserDataAtLogin: lecture user_data en échec', {
+      userId: pwaUser.id,
+    });
+    pwaUser.user_data = null;
     return;
   }
-  try {
-    const row = await supa.getUserRecord(pwaUser.email);
-    // getUserRecord retourne null si pas de row, ou l'objet user_data.
-    // Pour la matrice : pas de row = utilisateur sans entrée payante = équivalent
-    // à licence_payee=false + formule=null. On stocke un objet vide pour bien
-    // distinguer du fetch échoué (null).
-    pwaUser.user_data = row || {};
-  } catch (e) {
-    console.error('[access] fetchUserDataAtLogin failed:', e);
-    pwaUser.user_data = null;
-  }
+  // Requête réussie : soit la ligne, soit {} pour « aucune entrée payante »,
+  // qui est un état légitime et non un échec.
+  pwaUser.user_data = res.row || {};
 }
+// --- #261 FETCH — FIN ---
 
 // ─── Après login réussi ───
 async function onPwaLoginSuccess() {
@@ -613,6 +681,13 @@ async function onPwaLoginSuccess() {
   // Recharger user_metadata frais depuis Supabase
   try {
     const freshUser = await supa.getUser();
+    // #261 — l'identifiant faisant autorité est ICI, et il était jeté.
+    // pwaLogin le pose depuis `body.user?.id`, en chaînage optionnel, sous une
+    // garde qui n'exige que `body.access_token` : il peut donc manquer alors
+    // que l'e-mail, lu du formulaire, est toujours là. Ce repli le rétablit
+    // AVANT fetchUserDataAtLogin (8 lignes plus bas) et sans requête
+    // supplémentaire — cet appel existait déjà.
+    if (freshUser?.id && !pwaUser.id) pwaUser.id = freshUser.id;
     if(freshUser?.user_metadata) {
       pwaUser.user_metadata = freshUser.user_metadata;
       pwaUser.app_metadata = freshUser.app_metadata || {};
@@ -2832,6 +2907,14 @@ function checkAccessStatus() {
   // la défense en profondeur (early-returns + showAccessRestrictedModal dans les fonctions
   // cibles) protège quand même contre un click légitime trop rapide.
   if (level === 'blocked' && userData && typeof userData === 'object'
+      // #261 — SEUL prédicat licence_payee volontairement laissé en véracité
+      // simple, et ce n'est PAS un oubli d'alignement. Les six autres gardent
+      // une LECTURE ; celui-ci garde une ÉCRITURE — tryStartTrial() démarre un
+      // essai gratuit. En strict (`!== true`), une valeur corrompue
+      // véridique-mais-pas-true ferait partir cet essai pour un compte dont
+      // l'enregistrement porte une licence, fût-elle malformée. Aligner ici
+      // changerait un comportement d'écriture, pas un affichage.
+      // Ne pas « finir l'alignement » sans rouvrir cette question.
       && !userData.licence_payee && !userData.formule
       && !meta.trial_start && !meta.acces) {
     window._accessLevel = 'loading';
@@ -2900,7 +2983,16 @@ function checkAccessStatus() {
     // Cause : essai expiré (trial_start présent) vs jamais payé (cas fallback rare
     // — l'auto-trial gère normalement ce cas en amont, sauf si conditions auto-trial
     // pas réunies ex. user créé manuellement par admin sans acces ni licence).
-    const cause = meta.trial_start ? 'trial_expired' : 'never_paid';
+    //
+    // #261 — TROISIÈME CAUSE. userData === null signifie que les données
+    // d'abonnement n'ont PAS PU ÊTRE LUES : ce n'est pas un état d'abonnement,
+    // c'est une absence d'information. Sur un outil clinique, une panne réseau
+    // passagère pendant une consultation ne doit pas annoncer à un praticien
+    // que son abonnement a expiré. Le blocage reste — fail-secure — mais il
+    // est dit pour ce qu'il est.
+    const cause = userData === null
+      ? 'donnees_indisponibles'
+      : (meta.trial_start ? 'trial_expired' : 'never_paid');
     _showAccessOverlay({ cause });
     applyReadOnlyUI(window._accessLevel);
     return;
@@ -3517,6 +3609,21 @@ function _showAccessOverlay({ cause }) {
   } else if (cause === 'never_paid') {
     if (titleEl) titleEl.textContent = 'Bienvenue';
     if (msgEl) msgEl.textContent = 'Démarrez votre essai gratuit de 14 jours ou choisissez une formule.';
+  } else if (cause === 'donnees_indisponibles') {
+    // #261 — ne parle NI d'essai, NI de formule, NI de paiement : la lecture
+    // ayant échoué, on ignore dans quel état est l'abonnement. C'est
+    // précisément le problème. Le message dit ce qui est vrai et ce qui est
+    // actionnable.
+    if (titleEl) titleEl.textContent = 'Informations indisponibles';
+    if (msgEl) msgEl.textContent = "Vos informations d'abonnement n'ont pas pu être lues. Vérifiez votre connexion puis rechargez la page. Si le problème persiste, contactez le support.";
+  } else {
+    // #261 — sans ce repli, une cause inconnue laisserait les deux éléments
+    // porter le texte de l'affichage PRÉCÉDENT : le praticien lirait un
+    // message qui ne correspond à rien, et rien ne le signalerait. C'est la
+    // famille de défaut que ce chantier corrige, transposée à l'affichage.
+    console.error('[access] _showAccessOverlay: cause inattendue', { cause });
+    if (titleEl) titleEl.textContent = 'Accès indisponible';
+    if (msgEl) msgEl.textContent = "Votre accès n'a pas pu être déterminé. Rechargez la page. Si le problème persiste, contactez le support.";
   }
 }
 
@@ -3709,7 +3816,12 @@ async function initPWA() {
       const userData = await supa.getUser();
       if(userData.id) {
         const isAdmin = session.user.email?.toLowerCase() === VERTICY_ADMIN_EMAIL; // #229-C
-        pwaUser = { ...session.user, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {}, app_metadata: session.user?.app_metadata || {} };
+        // #261 — l'identifiant faisant autorité vient de supa.getUser(), déjà
+        // appelé ci-dessus et déjà testé par `if(userData.id)`. On le pose en
+        // repli : un `id` perdu au chemin 1 (body.user?.id en chaînage
+        // optionnel, puis JSON.stringify qui supprime la clé undefined) est
+        // ainsi RÉTABLI au premier rechargement, au lieu de manquer à jamais.
+        pwaUser = { ...session.user, id: session.user?.id || userData.id, token: session.token, isAdmin, user_metadata: session.user?.user_metadata || {}, app_metadata: session.user?.app_metadata || {} };
         await onPwaLoginSuccess();
         return;
       }
@@ -4440,7 +4552,11 @@ async function renderParamsPratList() {
 }
 
 function _adminUserRowHTML(u, idx) {
-  const licenceBadge = u.licence_payee
+  // #261 — MÊME prédicat que computeAccessLevel. Ce badge existe pour alerter
+  // l'exploitant ; en véracité simple, il affichait « ✅ Licence » sur une
+  // valeur que le contrôle d'accès, strict, refusait — le panneau censé
+  // signaler le problème était précisément celui qui ne pouvait pas le voir.
+  const licenceBadge = u.licence_payee === true
     ? '<span style="color:#2a7a4e;font-weight:600;">✅ Licence</span>'
     : '<span style="color:#e74c3c;font-weight:600;">⚠️ Sans licence</span>';
   const formuleTxt = u.formule ? _escHtml(u.formule) : '<span style="color:var(--mut);">—</span>';
@@ -4483,7 +4599,7 @@ function openEditUserModal(idx) {
 
       <div style="margin-bottom:14px;">
         <label style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="eu-licence" ${u.licence_payee ? 'checked' : ''}/>
+          <input type="checkbox" id="eu-licence" ${u.licence_payee === true ? 'checked' : ''}/>
           Licence activée
         </label>
         ${u.engagement ? `<div style="font-size:11px;color:var(--mut);margin-top:4px;margin-left:24px;">Engagement actuel : <strong>${_escHtml(u.engagement)}</strong>${u.date_debut_abonnement ? ` depuis ${_escHtml(new Date(u.date_debut_abonnement).toLocaleDateString('fr-FR'))}` : ''}</div>` : ''}
@@ -4558,7 +4674,11 @@ async function saveEditUser(idx) {
   // (colonnes différentes pour licence/formule, table différente pour modules)
   // donc Promise.all est safe — pas de course critique.
   const tasks = [];
-  if (newLicence !== !!u.licence_payee) {
+  // #261 — aligné sur le prédicat strict : `!!` rendait true sur une valeur
+  // corrompue véridique, et le formulaire concluait « inchangé » là où le
+  // contrôle d'accès voyait une absence de licence. Le correctif ne serait
+  // jamais parti.
+  if (newLicence !== (u.licence_payee === true)) {
     tasks.push(adminSetLicencePayee(u.email, newLicence));
   }
   if (newFormule && newFormule !== (u.formule || '')) {
@@ -26860,15 +26980,26 @@ function _describeEngagement(engagement, dateDebut, now) {
 }
 
 async function loadAbonnementInfo() {
-  if(!pwaUser || !pwaUser.token || !pwaUser.email) return;
+  if(!pwaUser || !pwaUser.token) return;
   try {
-    var userRecord = await supa.getUserRecord(pwaUser.email);
-    if(!userRecord) return;
+    // #261 — getUserRecord rend un état { ok, row }. Comportement conservé :
+    // on renonce aussi bien sur échec que sur absence de ligne, comme avant.
+    //
+    // #262 — à revoir : avec { ok } désormais disponible, un échec de lecture
+    // pourrait afficher un message au lieu d'un abandon muet. Ce return nu
+    // devient un CHOIX et non plus une fatalité. Conservé tel quel ici pour
+    // ne pas mêler un changement d'UX à une correction de contrôle d'accès.
+    var _rec = await supa.getUserRecord(pwaUser.id);
+    if(!_rec.ok || !_rec.row) return;
+    var userRecord = _rec.row;
 
     // Licence
     var licenceEl = document.getElementById('mc-licence-status');
     if(licenceEl) {
-      if(userRecord.licence_payee) {
+      // #261 — même prédicat que le contrôle d'accès. En véracité simple,
+      // « Mon compte » annonçait « ✅ Licence activée » au praticien pendant
+      // que l'application lui refusait l'accès.
+      if(userRecord.licence_payee === true) {
         licenceEl.innerHTML = '<span style="color:#2a7a4e;font-weight:600;">✅ Licence activée</span>';
       } else {
         licenceEl.innerHTML = '<span style="color:#e74c3c;">⚠️ Licence non activée</span>';
@@ -26935,10 +27066,20 @@ function changerFormule() {
 }
 
 async function resilierAbonnement() {
-  if(!pwaUser || !pwaUser.token || !pwaUser.email) return;
+  if(!pwaUser || !pwaUser.token) return;
   try {
-    var userRecord = await supa.getUserRecord(pwaUser.email);
-    if(!userRecord) return;
+    // #261 — getUserRecord rend un état { ok, row }. Comportement conservé.
+    //
+    // #262 — à revoir : avec { ok } désormais disponible, un échec de lecture
+    // pourrait afficher un message au lieu d'un abandon muet. Ici le risque
+    // est SUPÉRIEUR à celui de « Mon compte » : un écran vide se voit et
+    // invite à recharger, tandis qu'un bouton « Résilier » qui ne fait rien
+    // laisse le praticien croire qu'il a résilié — il le découvrira au
+    // prélèvement suivant. Conservé tel quel pour ne pas mêler un changement
+    // d'UX à une correction d'accès.
+    var _rec = await supa.getUserRecord(pwaUser.id);
+    if(!_rec.ok || !_rec.row) return;
+    var userRecord = _rec.row;
 
     // #241 — blocage de résiliation anticipée. Ne s'applique QU'à '1_an' :
     // le descripteur renvoie peutResilier=true pour 'sans', 'admin_gratuit',
