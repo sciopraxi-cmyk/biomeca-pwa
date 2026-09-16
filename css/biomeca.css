@@ -135,6 +135,45 @@ body.theme-clair .page-claire{
   --verticy-bleu:#2563EB; --verticy-bleu-trait:#BBD0F7;
   --verticy-bleu-fond:#EEF4FF;
 }
+/* --- #263 ENCRES-CLAIR — DÉBUT ---
+   Marqueurs présents UNIQUEMENT pour la testabilité (convention #132) : le
+   sélecteur `body.theme-clair .page-claire` apparaît AUSSI dans la règle
+   partagée ci-dessus, et une extraction par chaîne y tomberait d'abord —
+   elle rendrait les surfaces au lieu des encres.
+
+   Les trois ENCRES d'accent, portée .page-claire SEULEMENT.
+   Règle SÉPARÉE de celle ci-dessus, et c'est délibéré : celle-là est
+   partagée avec .topbar, qui est livrée et validée. Y ajouter ces trois
+   variables les ferait fuir dans la barre sans qu'aucune mesure l'ait
+   autorisé. Une règle à part, un périmètre à part.
+
+   Motif : --blue et --green valaient la MÊME menthe #2dd4bf — les noms
+   promettaient une distinction que les valeurs ne tenaient pas — et aucune
+   des trois ne passait le seuil sur le fond clair.
+
+   Contrastes mesurés sur #F6F7F9, le fond réel de la portée claire (et non
+   sur le blanc pur, qui donnait les 6,48 et 5,47 relevés en #258) :
+     --blue  #175FA8  6,05:1     (était #2dd4bf, 1,74:1)
+     --green #0F766E  5,11:1     (était #2dd4bf, 1,74:1)
+     --red   #B91C1C  6,04:1     (était #f04060, 3,49:1)
+   Seuil WCAG AA texte normal : 4,5:1. Les trois valeurs viennent des encres
+   déjà mesurées et validées en #258, aucune n'est nouvelle. */
+body.theme-clair .page-claire{
+  --blue:#175FA8; --green:#0F766E; --red:#B91C1C;
+  /* L'héritage CSS propage une valeur CALCULÉE, pas l'expression var().
+     `body{color:var(--txt)}` est résolu SUR body, où --txt vaut encore
+     #ffffff ; redéfinir --txt sur .page-claire n'y change rien, les
+     descendants héritent du blanc déjà calculé. Seul un élément qui
+     REDÉCLARE color:var(--txt) obtient la valeur locale — la page le fait
+     donc pour toute sa descendance.
+     C'est le défaut que Scio a photographié : .tcard-title ne déclare
+     aucune couleur, elle héritait du blanc de body sur une carte devenue
+     blanche. Mesuré avant correctif : 125 des 142 éléments de pg-sport
+     calculaient en blanc pur. Aucun ne portait color:#fff — le blanc
+     n'était écrit nulle part, donc invisible à toute recherche de motif. */
+  color:var(--txt);
+}
+/* --- #263 ENCRES-CLAIR — FIN --- */
 body.theme-clair .topbar{ background:#fff; border-bottom:2px solid var(--verticy-bleu); }
 body.theme-clair .tnav button.act{ background:var(--verticy-bleu-fond); color:var(--verticy-bleu); }
 body.theme-clair .tnav button:hover:not(.act){ background:#F1F3F7; color:var(--txt); }

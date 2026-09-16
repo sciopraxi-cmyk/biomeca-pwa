@@ -4578,10 +4578,15 @@ function _adminUserRowHTML(u, idx) {
     ? u.modules.map(_escHtml).join(', ')
     : '<span style="color:var(--mut);">—</span>';
   const engagement = u.engagement ? ' · ' + _escHtml(u.engagement) : '';
+  // #263 bis — var(--txt) et non une valeur fixe : cette liste est rendue
+  // dans #params-prat-list, donc DANS pg-params, une page claire. Le blanc
+  // en dur y devenait invisible sur var(--card) passé au blanc. --txt vaut
+  // #ffffff en thème sombre et #0B1220 en clair : une valeur fixe réglerait
+  // un thème en cassant l'autre.
   return `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--card);border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;">${_escHtml(u.email)}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;">${_escHtml(u.email)}</div>
         <div style="font-size:11px;color:var(--mut);margin-top:3px;">
           ${licenceBadge} · Formule : ${formuleTxt} · Modules : ${modulesTxt}${engagement}
         </div>

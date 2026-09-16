@@ -577,3 +577,247 @@ describe('#263 les trois maillons du mécanisme sont présents', () => {
     expect(fn).not.toContain('pg-patients');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 bis — les encres de la portée claire passent le seuil WCAG
+// ═══════════════════════════════════════════════════════════════════
+//
+// --blue et --green valaient la MÊME menthe #2dd4bf : les noms promettaient
+// une distinction que les valeurs ne tenaient pas, et aucune des trois
+// n'atteignait le seuil sur le fond clair (1,74:1 et 3,49:1).
+//
+// Ce test est le vrai apport du lot : il refuse PAR AVANCE qu'une encre sous
+// le seuil entre dans la portée claire, y compris aux lots 3B et 3C. Aucun
+// test de structure ne verrait ce défaut — seule une mesure de contraste.
+
+const FOND_CLAIR = '#F6F7F9';
+
+function contraste(a, b) {
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const lum = ([r, g, bl]) => {
+    const f = (v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(bl);
+  };
+  const [l1, l2] = [lum(hex(a)), lum(hex(b))].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+// Extraction par MARQUEURS, pas par chaîne : le sélecteur
+// `body.theme-clair .page-claire` apparaît aussi dans la règle partagée avec
+// .topbar, et un indexOf y tombait d'abord — il rendait les surfaces
+// (--card #FFFFFF sur #F6F7F9, soit 1,05:1) au lieu des encres, faisant
+// échouer le test pour une raison fausse.
+function encresDeLaPorteeClaire() {
+  const bloc = extraireBloc(
+    'css/biomeca.css',
+    '#263 ENCRES-CLAIR — DÉBUT',
+    '#263 ENCRES-CLAIR — FIN'
+  );
+  const out = {};
+  for (const m of bloc.matchAll(/(--[a-z-]+)\s*:\s*(#[0-9a-fA-F]{6})/g)) out[m[1]] = m[2];
+  return out;
+}
+
+describe('#263 bis les encres de la portée claire sont lisibles', () => {
+  it('12. TÉMOIN — la fonction de contraste sait mesurer', () => {
+    expect(contraste('#000000', '#ffffff')).toBeCloseTo(21, 1);
+    expect(contraste('#ffffff', '#ffffff')).toBeCloseTo(1, 2);
+    // Et elle sait rendre une valeur BASSE sur un cas connu : la menthe
+    // d'avant, mesurée à 1,74:1 sur ce fond.
+    expect(contraste('#2dd4bf', FOND_CLAIR)).toBeLessThan(2);
+  });
+
+  it('12b. Chaque encre atteint 4,5:1 sur le fond clair réel', () => {
+    const encres = encresDeLaPorteeClaire();
+    expect(Object.keys(encres).length, 'bloc ENCRES-CLAIR vide').toBeGreaterThan(0);
+    const noms = Object.keys(encres);
+    expect(noms.length, 'aucune encre déclarée — mesure non concluante').toBeGreaterThan(0);
+    let executes = 0;
+    for (const [nom, valeur] of Object.entries(encres)) {
+      const k = contraste(valeur, FOND_CLAIR);
+      expect(
+        k,
+        `${nom} = ${valeur} donne ${k.toFixed(2)}:1 sur ${FOND_CLAIR}`
+      ).toBeGreaterThanOrEqual(4.5);
+      executes++;
+    }
+    expect(executes).toBe(noms.length);
+  });
+
+  it('12c. --blue et --green ne valent plus la même couleur', () => {
+    const e = encresDeLaPorteeClaire();
+    expect(e['--blue']).toBeDefined();
+    expect(e['--green']).toBeDefined();
+    expect(e['--blue']).not.toBe(e['--green']);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 bis — tout blanc en dur d'une page claire est MESURÉ, pas classé
+// ═══════════════════════════════════════════════════════════════════
+//
+// La version précédente demandait « y a-t-il un aplat ? ». Ce n'était qu'un
+// SUBSTITUT de « le texte est-il lisible ? », et il produisait des faux
+// positifs — quatre cas refusés alors qu'ils mesuraient 5,47:1 et 6,48:1 —
+// en même temps qu'il laissait passer deux boutons à 3,59:1 sur #378ADD.
+// Assouplir le substitut aurait été le mauvais remède : on mesure la chose.
+//
+// C'est le même contrôle que le test 12b, appliqué au texte au lieu des
+// encres. Une seule notion pour tout le lot : le contraste mesuré.
+
+// Valeurs des variables TELLES QU'ELLES SE RÉSOLVENT en portée claire :
+// le :root de base, puis les redéfinitions sous body.theme-clair qui les
+// écrasent. Dérivé du CSS, jamais écrit à la main.
+function valeursEnPorteeClaire() {
+  const vals = {};
+  for (const bloc of CSS_ENTIER.match(/:root\s*\{[^}]*\}/g) || [])
+    for (const m of bloc.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;}]+)/g)) vals[m[1]] = m[2].trim();
+  for (const m of CSS_ENTIER.matchAll(/body\.theme-clair[^{]*\{([^}]*)\}/g))
+    for (const v of m[1].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;}]+)/g)) vals[v[1]] = v[2].trim();
+  return vals;
+}
+
+const versRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const versHex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+
+// Résout une expression de fond en couleur opaque, ou rend null si la
+// résolution statique est impossible. Un null n'est PAS une conformité.
+function resoudreFond(expr, vals, prof = 0) {
+  if (prof > 6 || !expr) return null;
+  const e = expr.trim();
+  const mv = e.match(/^var\(\s*(--[a-z0-9-]+)\s*(?:,([\s\S]*))?\)$/);
+  if (mv) {
+    if (vals[mv[1]] !== undefined) return resoudreFond(vals[mv[1]], vals, prof + 1);
+    if (mv[2]) return resoudreFond(mv[2], vals, prof + 1); // valeur de repli
+    return null;
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(e)) return e.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(e))
+    return ('#' + [...e.slice(1)].map((c) => c + c).join('')).toLowerCase();
+  const mr = e.match(/^rgba?\(([^)]+)\)$/i);
+  if (mr) {
+    const p = mr[1].split(',').map((s) => parseFloat(s));
+    if (p.length < 3 || p.some(Number.isNaN)) return null;
+    const a = p.length > 3 ? p[3] : 1;
+    // Un fond translucide se compose sur le fond de page clair — c'est ainsi
+    // que le champ de recherche, blanc à 6 % sur blanc, se révèle à 1,00:1.
+    const base = versRgb(FOND_CLAIR);
+    return versHex(p.slice(0, 3).map((v, i) => v * a + base[i] * (1 - a)));
+  }
+  return null; // dégradé, transparent, mot-clé : non résoluble
+}
+
+// Pour chaque blanc en dur d'une source, rend {ligne, fond, contraste} ou
+// {ligne, indetermine:true}. Aucun cas n'est écarté en silence.
+function blancsMesures(source, vals) {
+  const BLANC = /color:\s*#fff\b/i;
+  const FOND = /background(-color)?:\s*([^;"]+)/i;
+  const out = [];
+  for (const l of source.split('\n')) {
+    if (!BLANC.test(l)) continue;
+    const parts = l.split(/style="/).filter((x) => BLANC.test(x));
+    const seg = parts.length ? parts[0] : l;
+    const mf = seg.match(FOND);
+    const resolu = mf ? resoudreFond(mf[2], vals) : null;
+    const txt = l.trim().slice(0, 100);
+    if (!resolu) {
+      // Pas de fond sur la déclaration, ou fond non résoluble : on ne sait pas
+      // mesurer, donc on ne conclut pas à l'absence de risque.
+      out.push({
+        txt,
+        indetermine: true,
+        raison: mf
+          ? `fond « ${mf[2].trim().slice(0, 40)} » non résoluble`
+          : 'aucun fond sur la déclaration',
+      });
+    } else {
+      out.push({ txt, fond: resolu, contraste: contraste('#ffffff', resolu) });
+    }
+  }
+  return out;
+}
+
+describe('#263 bis chaque blanc en dur d’une page claire est lisible', () => {
+  const VALS = valeursEnPorteeClaire();
+
+  it('13z. TÉMOIN — la résolution des variables en portée claire', () => {
+    // Un ensemble vide, ou des valeurs sombres, rendraient les tests suivants
+    // verts par construction ou faux par construction.
+    expect(Object.keys(VALS).length, 'aucune variable résolue').toBeGreaterThan(0);
+    expect(resoudreFond('var(--card)', VALS), '--card doit valoir le blanc clair').toBe('#ffffff');
+    expect(resoudreFond('var(--blue)', VALS), '--blue doit valoir l’encre').toBe('#175fa8');
+    expect(resoudreFond('var(--sport-btn)', VALS), '--sport-btn non redéfini').toBe('#185fa5');
+    expect(
+      resoudreFond('var(--inexistante)', VALS),
+      'variable inconnue → non résoluble'
+    ).toBeNull();
+    expect(
+      resoudreFond('linear-gradient(90deg,#fff,#000)', VALS),
+      'dégradé → non résoluble'
+    ).toBeNull();
+    // Un blanc translucide sur le fond clair se compose en quasi-blanc. On
+    // affirme la PROPRIÉTÉ, pas un littéral écrit de tête : la première
+    // rédaction attendait #f6f7f9 quand le calcul donne #f7f7f9, et c'était
+    // l'attendu qui avait tort.
+    const compose = resoudreFond('rgba(255,255,255,0.06)', VALS);
+    expect(compose, 'un blanc translucide doit se résoudre').not.toBeNull();
+    expect(contraste('#ffffff', compose), 'blanc sur blanc translucide').toBeLessThan(1.1);
+  });
+
+  it('13y. TÉMOIN — les deux cas que la règle structurelle confondait', () => {
+    const surCard = contraste('#ffffff', resoudreFond('var(--card)', VALS));
+    const surBlue = contraste('#ffffff', resoudreFond('var(--blue)', VALS));
+    expect(surCard, 'blanc sur var(--card) doit ÉCHOUER').toBeLessThan(4.5);
+    expect(surBlue, 'blanc sur var(--blue) doit PASSER').toBeGreaterThanOrEqual(4.5);
+    // Et la fonction de contraste elle-même.
+    expect(contraste('#000000', '#ffffff')).toBeCloseTo(21, 1);
+    expect(contraste('#ffffff', '#ffffff')).toBeCloseTo(1, 2);
+  });
+
+  // Intervalles DÉRIVÉS : les coder en dur les laisserait périmer au premier
+  // commentaire ajouté — ce qui est arrivé deux fois pendant ce lot.
+  const lignes = HTML.split('\n');
+  const ouvertures = [];
+  lignes.forEach((l, i) => {
+    const m = l.match(/<div class="page[^"]*" id="(pg-[a-z0-9-]+)"/);
+    if (m) ouvertures.push({ id: m[1], d: i + 1, claire: l.includes('page-claire') });
+  });
+  const claires = ouvertures
+    .map((o, k) => ({
+      ...o,
+      f: k + 1 < ouvertures.length ? ouvertures[k + 1].d - 1 : lignes.length,
+    }))
+    .filter((o) => o.claire);
+
+  it('13. Tout blanc en dur du balisage clair atteint 4,5:1', () => {
+    expect(claires.length, 'aucune page claire — mesure non concluante').toBe(7);
+    const sousSeuil = [];
+    const indetermines = [];
+    let examines = 0;
+    for (const p of claires) {
+      const zone = lignes.slice(p.d - 1, p.f).join('\n');
+      for (const c of blancsMesures(zone, VALS)) {
+        examines++;
+        if (c.indetermine) indetermines.push(`${p.id} : ${c.raison} — ${c.txt}`);
+        else if (c.contraste < 4.5)
+          sousSeuil.push(`${p.id} : ${c.contraste.toFixed(2)}:1 sur ${c.fond} — ${c.txt}`);
+      }
+    }
+    expect(examines, 'aucun blanc examiné — le balayage ne trouve rien').toBeGreaterThan(0);
+    expect(sousSeuil).toEqual([]);
+    // Un cas qu'on ne sait pas mesurer n'est pas un cas sans risque.
+    expect(indetermines).toEqual([]);
+  });
+
+  it('13b. _adminUserRowHTML non plus — il est rendu dans pg-params', () => {
+    const i = JS_ENTIER.indexOf('function _adminUserRowHTML');
+    expect(i, '_adminUserRowHTML introuvable').toBeGreaterThan(-1);
+    const j = JS_ENTIER.indexOf('\n}', i);
+    expect(j, 'fin de _adminUserRowHTML introuvable').toBeGreaterThan(i);
+    const cas = blancsMesures(JS_ENTIER.slice(i, j), VALS);
+    expect(cas.filter((c) => c.indetermine || c.contraste < 4.5)).toEqual([]);
+  });
+});
