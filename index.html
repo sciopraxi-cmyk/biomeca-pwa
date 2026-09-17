@@ -623,17 +623,20 @@
   <button onclick="pwaLogout()" class="tb-lien" style="background:none;border:none;font-size:11px;cursor:pointer;padding:4px 10px;border-radius:6px;white-space:nowrap;" title="Se déconnecter">⎋ Déconnexion</button>
 </div>
 <div class="main">
-<div class="page" id="pg-sport">
+<div class="page page-claire" id="pg-sport">
   <div class="home-hdr" style="position:relative;">
     <button onclick="nav('pg-patients')" style="position:absolute;left:0;top:0;background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
     <h1 style="color:var(--blue);">🦶 Podologie du Sport</h1>
     <p id="sport-sub">Sélectionnez un patient</p>
     <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
-      <button onclick="nav('pg-bilan')" class="btn" style="background:#378ADD;color:#fff;padding:8px 18px;font-size:13px;">📋 Bilan Clinique Sportif</button>
-      <button onclick="nav('pg-rapport')" class="btn" style="background:#378ADD;color:#fff;padding:8px 18px;font-size:13px;">📄 Rapport Sportif</button>
+      <button onclick="nav('pg-bilan')" class="btn" style="background:var(--sport-btn);color:#fff;padding:8px 18px;font-size:13px;">📋 Bilan Clinique Sportif</button>
+      <button onclick="nav('pg-rapport')" class="btn" style="background:var(--sport-btn);color:#fff;padding:8px 18px;font-size:13px;">📄 Rapport Sportif</button>
     </div>
   </div>
-  <div id="bilan-header-sport-landing" style="font-size:15px;font-weight:700;color:#fff;background:rgba(55,138,221,0.3);border:1px solid rgba(55,138,221,0.55);padding:8px 14px;border-radius:8px;margin:0 20px 14px;"></div>
+  <!-- #263 bis — var(--txt) : ce bandeau vit dans pg-sport, page claire. Son
+       fond est un bleu à 30 %, qui sur #F6F7F9 donne un bleu pâle où le blanc
+       tombait à 1,49:1. --txt suit le thème, une valeur fixe n'en suivrait qu'un. -->
+  <div id="bilan-header-sport-landing" style="font-size:15px;font-weight:700;color:var(--txt);background:rgba(55,138,221,0.3);border:1px solid rgba(55,138,221,0.55);padding:8px 14px;border-radius:8px;margin:0 20px 14px;"></div>
 
   <div class="tc-cat">Valgus dynamique du genou — KFPPA</div>
   <div class="tgrid">
@@ -713,7 +716,7 @@
 
 <!-- ══ PRATICIENS ══ -->
 
-<div class="page" id="pg-posturo">
+<div class="page page-claire" id="pg-posturo">
   <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
@@ -3273,7 +3276,7 @@
   </div>
 </div>
 
-<div class="page" id="pg-params">
+<div class="page page-claire" id="pg-params">
   <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
     <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">⚙️ Paramètres</h2>
 
@@ -3370,13 +3373,16 @@
 
 <!-- ══ PATIENTS ══ -->
 
-<div class="page active" id="pg-patients" style="display:block;">
+<div class="page page-claire active" id="pg-patients" style="display:block;">
   <div class="section">
     <div class="stitle">Dossiers patients</div>
     <div class="card">
   <div style="display:flex;gap:8px;margin-bottom:10px;">
-    <input style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:10px;" id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..." 
-      style="flex:1;font-size:13px;" oninput="renderPatientList()">
+    <!-- #263 bis — var(--txt) : champ de recherche de pg-patients, page claire.
+         Son fond est du blanc à 6 %, donc blanc sur blanc en thème clair —
+         1,00:1, le texte saisi était invisible. -->
+    <input style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:var(--txt);border-radius:10px;flex:1;font-size:13px;" id="pt-search" class="inp" type="text" placeholder="🔍 Rechercher un patient..."
+      oninput="renderPatientList()">
     <button class="btn" onclick="openNewPatientModal()" style="background:#2dd4bf;color:#04342C;font-size:13px;white-space:nowrap;">+ Nouveau patient</button>
     <button class="btn" onclick="document.getElementById('doctolib-csv-input').click()" title="Import CSV : base patients / export RDV Doctolib, export DrSanté" style="background:#0e4d91;color:#fff;font-size:13px;white-space:nowrap;">📥 Import CSV</button>
     <button class="btn" onclick="exportPatientsCSV()" title="Télécharger le répertoire patients au format CSV" style="background:#0e6b5c;color:#fff;font-size:13px;white-space:nowrap;">📤 Export CSV</button>
@@ -3389,7 +3395,7 @@
 
 <!-- ══ COMPARAISON BILANS SPORT (#117 Étape A) ══ -->
 
-<div class="page" id="pg-compare">
+<div class="page page-claire" id="pg-compare">
   <div class="home-hdr" style="position:relative;">
     <button onclick="nav('pg-patients')" style="position:absolute;left:0;top:0;background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
     <h1 style="color:var(--blue);">🔄 Comparaison de bilans</h1>
@@ -3414,7 +3420,7 @@
 
 <!-- ══ PRATICIENS ══ -->
 
-<div class="page" id="pg-praticiens">
+<div class="page page-claire" id="pg-praticiens">
   <div class="section">
     <div class="stitle">Praticiens / Cabinets</div>
     <div class="card"><div id="prat-list-el"><div style="font-size:12px;color:var(--mut);padding:8px 0;">Aucun praticien enregistré.</div></div></div>
@@ -3447,7 +3453,7 @@
 
 <!-- ══ AGENDA (#177/#179) ══ -->
 
-<div class="page" id="pg-agenda">
+<div class="page page-claire" id="pg-agenda">
   <div style="padding:16px 20px;max-width:1040px;margin:0 auto;">
     <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">📅 Agenda</h2>
 

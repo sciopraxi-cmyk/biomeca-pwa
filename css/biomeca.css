@@ -113,13 +113,90 @@
    Elles s'héritent : tout ce qui est dedans suit, tout ce qui est dehors garde
    la palette sombre. */
 body.theme-clair{ background:#F6F7F9; }
+
+/* #263 LOT 3A — portée du thème clair par CLASSE.
+   La page déclare elle-même qu'elle est claire (class page-claire) ; CSS et
+   JS la lisent, aucune liste à tenir en phase. #258 scopait par identifiant
+   en DEUX endroits — le sélecteur ici et le test dans _appliquerTheme — donc
+   chaque page ajoutée coûtait deux entrées à maintenir accordées. Un miroir
+   manuel finit toujours par dériver.
+   Les propriétés personnalisées héritent : les redéfinir sur le conteneur de
+   page est une vraie portée. Sur body, non — cf. l'incident consigné juste
+   au-dessus.
+   #pg-patients n'était PAS une règle à lui seul, mais un sélecteur de cette
+   règle partagée avec .topbar : il est donc REMPLACÉ ici, pas supprimé
+   ailleurs puis recréé. Le compte de règles de la feuille est inchangé pour
+   une raison plus forte que la compensation — rien n'est ajouté ni retiré.
+   .topbar reste : ce n'est pas une page. */
 body.theme-clair .topbar,
-body.theme-clair #pg-patients{
+body.theme-clair .page-claire{
   --bg:#F6F7F9; --surf:#FFFFFF; --card:#FFFFFF; --bord:#E4E8EE;
   --txt:#0B1220; --mut:#6B7A90; --dim:#9AA5B5;
   --verticy-bleu:#2563EB; --verticy-bleu-trait:#BBD0F7;
   --verticy-bleu-fond:#EEF4FF;
 }
+/* --- #263 ENCRES-CLAIR — DÉBUT ---
+   Marqueurs présents UNIQUEMENT pour la testabilité (convention #132) : le
+   sélecteur `body.theme-clair .page-claire` apparaît AUSSI dans la règle
+   partagée ci-dessus, et une extraction par chaîne y tomberait d'abord —
+   elle rendrait les surfaces au lieu des encres.
+
+   Les trois ENCRES d'accent, portée .page-claire SEULEMENT.
+   Règle SÉPARÉE de celle ci-dessus, et c'est délibéré : celle-là est
+   partagée avec .topbar, qui est livrée et validée. Y ajouter ces trois
+   variables les ferait fuir dans la barre sans qu'aucune mesure l'ait
+   autorisé. Une règle à part, un périmètre à part.
+
+   Motif : --blue et --green valaient la MÊME menthe #2dd4bf — les noms
+   promettaient une distinction que les valeurs ne tenaient pas — et aucune
+   des trois ne passait le seuil sur le fond clair.
+
+   Contrastes mesurés sur #F6F7F9, le fond réel de la portée claire (et non
+   sur le blanc pur, qui donnait les 6,48 et 5,47 relevés en #258) :
+     --blue  #175FA8  6,05:1     (était #2dd4bf, 1,74:1)
+     --green #0F766E  5,11:1     (était #2dd4bf, 1,74:1)
+     --red   #B91C1C  6,04:1     (était #f04060, 3,49:1)
+   Seuil WCAG AA texte normal : 4,5:1. Les trois valeurs viennent des encres
+   déjà mesurées et validées en #258, aucune n'est nouvelle. */
+body.theme-clair .page-claire{
+  --blue:#175FA8; --green:#0F766E; --red:#B91C1C;
+  /* L'héritage CSS propage une valeur CALCULÉE, pas l'expression var().
+     `body{color:var(--txt)}` est résolu SUR body, où --txt vaut encore
+     #ffffff ; redéfinir --txt sur .page-claire n'y change rien, les
+     descendants héritent du blanc déjà calculé. Seul un élément qui
+     REDÉCLARE color:var(--txt) obtient la valeur locale — la page le fait
+     donc pour toute sa descendance.
+     C'est le défaut que Scio a photographié : .tcard-title ne déclare
+     aucune couleur, elle héritait du blanc de body sur une carte devenue
+     blanche. Mesuré avant correctif : 125 des 142 éléments de pg-sport
+     calculaient en blanc pur. Aucun ne portait color:#fff — le blanc
+     n'était écrit nulle part, donc invisible à toute recherche de motif. */
+  color:var(--txt);
+}
+/* --- #263 ENCRES-CLAIR — FIN --- */
+/* #263 — contour des cartes de test, portée claire UNIQUEMENT.
+   Les neuf .tcard vivent toutes dans pg-sport (mesuré : 9 balises, 1 seule
+   page), donc aucun autre module n'hérite d'un contour sport et l'identité
+   par module de #257 reste intacte.
+   Le trait de base --bord #E4E8EE mesure 1,23:1 sur la carte blanche — un
+   contour quasi invisible ; #2563EB le porte à 5,17:1. Le seuil d'un
+   composant NON TEXTUEL est 3:1, pas 4,5 : un trait n'est pas du texte.
+
+   POURQUOI PAS var(--blue) AU REPOS : le survol pose déjà
+   border-color:var(--blue) #175FA8. Le prendre aussi au repos rendrait les
+   deux états STRICTEMENT identiques — ΔE CIE76 de 0,00. Avec #2563EB
+   l'écart vaut 38,24, franchement distinct (seuil du perceptible : 2,3).
+
+   POURQUOI LA SECONDE LIGNE : sans elle, la première TUE le survol, et
+   c'est invisible à la relecture. En [identifiants, classes, éléments] —
+   la notation que calcule le test 14 — `body.theme-clair .tcard` pèse
+   [0,2,1] contre [0,2,0] pour `.tcard:hover` : à égalité de classes,
+   l'élément body départage, donc le repos l'emporterait même au survol.
+   La seconde règle pèse [0,3,1] et rétablit l'ordre. Le survol ne serait
+   pas confondu avec le repos : il serait MORT.
+   Ni .tcard de base ni .tcard:hover ne sont modifiés — surcharge seule. */
+body.theme-clair .tcard{ border-color:var(--verticy-bleu); }
+body.theme-clair .tcard:hover{ border-color:var(--blue); }
 body.theme-clair .topbar{ background:#fff; border-bottom:2px solid var(--verticy-bleu); }
 body.theme-clair .tnav button.act{ background:var(--verticy-bleu-fond); color:var(--verticy-bleu); }
 body.theme-clair .tnav button:hover:not(.act){ background:#F1F3F7; color:var(--txt); }

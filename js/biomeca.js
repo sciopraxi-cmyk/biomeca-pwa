@@ -4367,10 +4367,22 @@ function getMkrsBySet(markers, targetSet) {
 // pg-patients, donc la page peut exister à l'écran sans qu'aucun nav() ne soit
 // passé ; et un futur chemin d'affichage qui oublierait nav() ne pourra pas
 // désynchroniser le thème de la page.
-// Lot 3 : la bascule deviendra globale et cette fonction disparaîtra.
+// Lot 3 (#263) : la bascule ne devient PAS globale. pg-capture —
+// l'interface des tests cinématiques — reste volontairement sombre :
+// c'est une surface de mesure vidéo, où un marqueur coloré et un tracé
+// fin ressortent mieux sur fond sombre. Cette fonction ne disparaît donc
+// pas, elle devient le lecteur de la classe page-claire.
+//
+// #263 — la page déclare elle-même si elle est claire, par la classe
+// page-claire posée dans le balisage. On lit cette classe au lieu de comparer
+// un identifiant : #258 en tenait la liste à DEUX endroits — le sélecteur CSS
+// et ce test — et chaque page ajoutée coûtait deux entrées à garder accordées.
+// Une seule source de vérité, dans le balisage, lue par les deux.
+// Vaut aussi pour les pages injectées à l'exécution : il leur suffira de
+// porter la classe, sans qu'aucune liste n'ait à être mise à jour ici.
 function _appliquerTheme() {
   const active = document.querySelector('.page.active');
-  document.body.classList.toggle('theme-clair', !!active && active.id === 'pg-patients');
+  document.body.classList.toggle('theme-clair', !!active && active.classList.contains('page-claire'));
 }
 
 function nav(id) {
@@ -4566,10 +4578,15 @@ function _adminUserRowHTML(u, idx) {
     ? u.modules.map(_escHtml).join(', ')
     : '<span style="color:var(--mut);">—</span>';
   const engagement = u.engagement ? ' · ' + _escHtml(u.engagement) : '';
+  // #263 bis — var(--txt) et non une valeur fixe : cette liste est rendue
+  // dans #params-prat-list, donc DANS pg-params, une page claire. Le blanc
+  // en dur y devenait invisible sur var(--card) passé au blanc. --txt vaut
+  // #ffffff en thème sombre et #0B1220 en clair : une valeur fixe réglerait
+  // un thème en cassant l'autre.
   return `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--card);border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;">${_escHtml(u.email)}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;">${_escHtml(u.email)}</div>
         <div style="font-size:11px;color:var(--mut);margin-top:3px;">
           ${licenceBadge} · Formule : ${formuleTxt} · Modules : ${modulesTxt}${engagement}
         </div>

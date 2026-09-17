@@ -468,3 +468,482 @@ describe('#257 la sortie de la zone reste dans le document courant', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 Lot 3A — la portée du thème clair passe par une CLASSE
+// ═══════════════════════════════════════════════════════════════════
+//
+// #258 tenait la liste des pages claires à DEUX endroits — le sélecteur CSS
+// et le test dans _appliquerTheme — donc chaque page ajoutée coûtait deux
+// entrées à garder accordées. Un miroir manuel finit toujours par dériver.
+// Désormais la page déclare elle-même qu'elle est claire, et les deux
+// lecteurs lisent la même source : le balisage.
+//
+// Ce que ces tests refusent : qu'un des trois maillons disparaisse sans les
+// autres. Une classe posée sans sélecteur CSS ne fait rien ; un sélecteur
+// sans classe ne fait rien ; et un JS qui compare encore un identifiant
+// ignorerait les six pages ajoutées — le tout en silence, puisque rien ne
+// lève quand une règle CSS ne s'applique à personne.
+
+const HTML = readFileSync(join(RACINE, 'index.html'), 'utf8');
+const CSS_ENTIER = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
+const JS_ENTIER = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
+
+// Les sept pages qui doivent porter la classe. pg-patients y est inclus :
+// #258 l'avait scopée par identifiant, ce lot la migre vers le même
+// mécanisme que les six autres.
+const PAGES_CLAIRES = [
+  'pg-sport',
+  'pg-posturo',
+  'pg-params',
+  'pg-patients',
+  'pg-compare',
+  'pg-praticiens',
+  'pg-agenda',
+];
+
+// Et celles qui ne doivent PAS l'avoir. pg-capture reste volontairement
+// sombre : c'est une surface de mesure vidéo. Les deux rapports sont déjà
+// clairs par leur propre style. Les trois bilans sont les lots 3B et 3C.
+const PAGES_SOMBRES = [
+  'pg-capture',
+  'pg-bilan',
+  'pg-pedicurie',
+  'pg-podopediatrie',
+  'pg-rapport',
+  'pg-rapport-posturo',
+];
+
+// Extrait la valeur de class="…" de la balise portant cet identifiant.
+function classesDe(id) {
+  const m = HTML.match(new RegExp(`<div class="([^"]*)" id="${id}"`));
+  return m ? m[1].split(/\s+/) : null;
+}
+
+describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
+  it('10. Les sept pages du lot portent page-claire', () => {
+    let executes = 0;
+    for (const id of PAGES_CLAIRES) {
+      const cl = classesDe(id);
+      expect(cl, `${id} : balise introuvable`).not.toBeNull();
+      expect(cl, `${id} doit porter page-claire`).toContain('page-claire');
+      expect(cl, `${id} doit rester une page`).toContain('page');
+      executes++;
+    }
+    expect(executes).toBe(PAGES_CLAIRES.length);
+  });
+
+  it('10b. Les pages hors périmètre ne l’ont PAS', () => {
+    // Sans cette moitié, poser la classe partout passerait le test 10.
+    let executes = 0;
+    for (const id of PAGES_SOMBRES) {
+      const cl = classesDe(id);
+      expect(cl, `${id} : balise introuvable`).not.toBeNull();
+      expect(cl, `${id} ne doit PAS porter page-claire`).not.toContain('page-claire');
+      executes++;
+    }
+    expect(executes).toBe(PAGES_SOMBRES.length);
+  });
+
+  it('10c. Exactement sept balises portent la classe', () => {
+    // Compte d'occurrences, pas de lignes : une huitième page ajoutée
+    // ailleurs dans le fichier échapperait aux deux listes ci-dessus.
+    const n = (HTML.match(/class="[^"]*\bpage-claire\b/g) || []).length;
+    expect(n).toBe(PAGES_CLAIRES.length);
+  });
+});
+
+describe('#263 les trois maillons du mécanisme sont présents', () => {
+  it('11. Le CSS porte un sélecteur .page-claire', () => {
+    expect(CSS_ENTIER).toContain('body.theme-clair .page-claire');
+  });
+
+  it('11b. Le CSS ne scope plus par identifiant', () => {
+    // Deux mécanismes qui font la même chose, c'est le piège qu'on évite —
+    // et #pg-patients, plus spécifique, l'emporterait silencieusement.
+    expect(CSS_ENTIER).not.toContain('body.theme-clair #pg-patients');
+  });
+
+  it('11c. _appliquerTheme lit la CLASSE, pas un identifiant', () => {
+    // Les deux bornes sont affirmées sur ce qu'elles valent : un indexOf à -1
+    // donnerait un slice(-1, …) qui rend le dernier caractère du fichier —
+    // longueur 1, donc « > 0 » vert, sur une chaîne qui n'est pas la fonction.
+    const iDeb = JS_ENTIER.indexOf('function _appliquerTheme');
+    expect(iDeb, '_appliquerTheme introuvable dans js/biomeca.js').toBeGreaterThan(-1);
+    const iFin = JS_ENTIER.indexOf('\n}', iDeb);
+    expect(iFin, 'fin de _appliquerTheme introuvable').toBeGreaterThan(iDeb);
+    const fn = JS_ENTIER.slice(iDeb, iFin);
+    expect(fn).toContain("classList.contains('page-claire')");
+    expect(fn).not.toContain('pg-patients');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 bis — les encres de la portée claire passent le seuil WCAG
+// ═══════════════════════════════════════════════════════════════════
+//
+// --blue et --green valaient la MÊME menthe #2dd4bf : les noms promettaient
+// une distinction que les valeurs ne tenaient pas, et aucune des trois
+// n'atteignait le seuil sur le fond clair (1,74:1 et 3,49:1).
+//
+// Ce test est le vrai apport du lot : il refuse PAR AVANCE qu'une encre sous
+// le seuil entre dans la portée claire, y compris aux lots 3B et 3C. Aucun
+// test de structure ne verrait ce défaut — seule une mesure de contraste.
+
+const FOND_CLAIR = '#F6F7F9';
+
+function contraste(a, b) {
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const lum = ([r, g, bl]) => {
+    const f = (v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(bl);
+  };
+  const [l1, l2] = [lum(hex(a)), lum(hex(b))].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+// Extraction par MARQUEURS, pas par chaîne : le sélecteur
+// `body.theme-clair .page-claire` apparaît aussi dans la règle partagée avec
+// .topbar, et un indexOf y tombait d'abord — il rendait les surfaces
+// (--card #FFFFFF sur #F6F7F9, soit 1,05:1) au lieu des encres, faisant
+// échouer le test pour une raison fausse.
+function encresDeLaPorteeClaire() {
+  const bloc = extraireBloc(
+    'css/biomeca.css',
+    '#263 ENCRES-CLAIR — DÉBUT',
+    '#263 ENCRES-CLAIR — FIN'
+  );
+  const out = {};
+  for (const m of bloc.matchAll(/(--[a-z-]+)\s*:\s*(#[0-9a-fA-F]{6})/g)) out[m[1]] = m[2];
+  return out;
+}
+
+describe('#263 bis les encres de la portée claire sont lisibles', () => {
+  it('12. TÉMOIN — la fonction de contraste sait mesurer', () => {
+    expect(contraste('#000000', '#ffffff')).toBeCloseTo(21, 1);
+    expect(contraste('#ffffff', '#ffffff')).toBeCloseTo(1, 2);
+    // Et elle sait rendre une valeur BASSE sur un cas connu : la menthe
+    // d'avant, mesurée à 1,74:1 sur ce fond.
+    expect(contraste('#2dd4bf', FOND_CLAIR)).toBeLessThan(2);
+  });
+
+  it('12b. Chaque encre atteint 4,5:1 sur le fond clair réel', () => {
+    const encres = encresDeLaPorteeClaire();
+    expect(Object.keys(encres).length, 'bloc ENCRES-CLAIR vide').toBeGreaterThan(0);
+    const noms = Object.keys(encres);
+    expect(noms.length, 'aucune encre déclarée — mesure non concluante').toBeGreaterThan(0);
+    let executes = 0;
+    for (const [nom, valeur] of Object.entries(encres)) {
+      const k = contraste(valeur, FOND_CLAIR);
+      expect(
+        k,
+        `${nom} = ${valeur} donne ${k.toFixed(2)}:1 sur ${FOND_CLAIR}`
+      ).toBeGreaterThanOrEqual(4.5);
+      executes++;
+    }
+    expect(executes).toBe(noms.length);
+  });
+
+  it('12c. --blue et --green ne valent plus la même couleur', () => {
+    const e = encresDeLaPorteeClaire();
+    expect(e['--blue']).toBeDefined();
+    expect(e['--green']).toBeDefined();
+    expect(e['--blue']).not.toBe(e['--green']);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 bis — tout blanc en dur d'une page claire est MESURÉ, pas classé
+// ═══════════════════════════════════════════════════════════════════
+//
+// La version précédente demandait « y a-t-il un aplat ? ». Ce n'était qu'un
+// SUBSTITUT de « le texte est-il lisible ? », et il produisait des faux
+// positifs — quatre cas refusés alors qu'ils mesuraient 5,47:1 et 6,48:1 —
+// en même temps qu'il laissait passer deux boutons à 3,59:1 sur #378ADD.
+// Assouplir le substitut aurait été le mauvais remède : on mesure la chose.
+//
+// C'est le même contrôle que le test 12b, appliqué au texte au lieu des
+// encres. Une seule notion pour tout le lot : le contraste mesuré.
+
+// Valeurs des variables TELLES QU'ELLES SE RÉSOLVENT en portée claire :
+// le :root de base, puis les redéfinitions sous body.theme-clair qui les
+// écrasent. Dérivé du CSS, jamais écrit à la main.
+function valeursEnPorteeClaire() {
+  const vals = {};
+  for (const bloc of CSS_ENTIER.match(/:root\s*\{[^}]*\}/g) || [])
+    for (const m of bloc.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;}]+)/g)) vals[m[1]] = m[2].trim();
+  for (const m of CSS_ENTIER.matchAll(/body\.theme-clair[^{]*\{([^}]*)\}/g))
+    for (const v of m[1].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;}]+)/g)) vals[v[1]] = v[2].trim();
+  return vals;
+}
+
+const versRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const versHex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+
+// Résout une expression de fond en couleur opaque, ou rend null si la
+// résolution statique est impossible. Un null n'est PAS une conformité.
+function resoudreFond(expr, vals, prof = 0) {
+  if (prof > 6 || !expr) return null;
+  const e = expr.trim();
+  const mv = e.match(/^var\(\s*(--[a-z0-9-]+)\s*(?:,([\s\S]*))?\)$/);
+  if (mv) {
+    if (vals[mv[1]] !== undefined) return resoudreFond(vals[mv[1]], vals, prof + 1);
+    if (mv[2]) return resoudreFond(mv[2], vals, prof + 1); // valeur de repli
+    return null;
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(e)) return e.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(e))
+    return ('#' + [...e.slice(1)].map((c) => c + c).join('')).toLowerCase();
+  const mr = e.match(/^rgba?\(([^)]+)\)$/i);
+  if (mr) {
+    const p = mr[1].split(',').map((s) => parseFloat(s));
+    if (p.length < 3 || p.some(Number.isNaN)) return null;
+    const a = p.length > 3 ? p[3] : 1;
+    // Un fond translucide se compose sur le fond de page clair — c'est ainsi
+    // que le champ de recherche, blanc à 6 % sur blanc, se révèle à 1,00:1.
+    const base = versRgb(FOND_CLAIR);
+    return versHex(p.slice(0, 3).map((v, i) => v * a + base[i] * (1 - a)));
+  }
+  return null; // dégradé, transparent, mot-clé : non résoluble
+}
+
+// Pour chaque blanc en dur d'une source, rend {ligne, fond, contraste} ou
+// {ligne, indetermine:true}. Aucun cas n'est écarté en silence.
+function blancsMesures(source, vals) {
+  const BLANC = /color:\s*#fff\b/i;
+  const FOND = /background(-color)?:\s*([^;"]+)/i;
+  const out = [];
+  for (const l of source.split('\n')) {
+    if (!BLANC.test(l)) continue;
+    const parts = l.split(/style="/).filter((x) => BLANC.test(x));
+    const seg = parts.length ? parts[0] : l;
+    const mf = seg.match(FOND);
+    const resolu = mf ? resoudreFond(mf[2], vals) : null;
+    const txt = l.trim().slice(0, 100);
+    if (!resolu) {
+      // Pas de fond sur la déclaration, ou fond non résoluble : on ne sait pas
+      // mesurer, donc on ne conclut pas à l'absence de risque.
+      out.push({
+        txt,
+        indetermine: true,
+        raison: mf
+          ? `fond « ${mf[2].trim().slice(0, 40)} » non résoluble`
+          : 'aucun fond sur la déclaration',
+      });
+    } else {
+      out.push({ txt, fond: resolu, contraste: contraste('#ffffff', resolu) });
+    }
+  }
+  return out;
+}
+
+describe('#263 bis chaque blanc en dur d’une page claire est lisible', () => {
+  const VALS = valeursEnPorteeClaire();
+
+  it('13z. TÉMOIN — la résolution des variables en portée claire', () => {
+    // Un ensemble vide, ou des valeurs sombres, rendraient les tests suivants
+    // verts par construction ou faux par construction.
+    expect(Object.keys(VALS).length, 'aucune variable résolue').toBeGreaterThan(0);
+    expect(resoudreFond('var(--card)', VALS), '--card doit valoir le blanc clair').toBe('#ffffff');
+    expect(resoudreFond('var(--blue)', VALS), '--blue doit valoir l’encre').toBe('#175fa8');
+    expect(resoudreFond('var(--sport-btn)', VALS), '--sport-btn non redéfini').toBe('#185fa5');
+    expect(
+      resoudreFond('var(--inexistante)', VALS),
+      'variable inconnue → non résoluble'
+    ).toBeNull();
+    expect(
+      resoudreFond('linear-gradient(90deg,#fff,#000)', VALS),
+      'dégradé → non résoluble'
+    ).toBeNull();
+    // Un blanc translucide sur le fond clair se compose en quasi-blanc. On
+    // affirme la PROPRIÉTÉ, pas un littéral écrit de tête : la première
+    // rédaction attendait #f6f7f9 quand le calcul donne #f7f7f9, et c'était
+    // l'attendu qui avait tort.
+    const compose = resoudreFond('rgba(255,255,255,0.06)', VALS);
+    expect(compose, 'un blanc translucide doit se résoudre').not.toBeNull();
+    expect(contraste('#ffffff', compose), 'blanc sur blanc translucide').toBeLessThan(1.1);
+  });
+
+  it('13y. TÉMOIN — les deux cas que la règle structurelle confondait', () => {
+    const surCard = contraste('#ffffff', resoudreFond('var(--card)', VALS));
+    const surBlue = contraste('#ffffff', resoudreFond('var(--blue)', VALS));
+    expect(surCard, 'blanc sur var(--card) doit ÉCHOUER').toBeLessThan(4.5);
+    expect(surBlue, 'blanc sur var(--blue) doit PASSER').toBeGreaterThanOrEqual(4.5);
+    // Et la fonction de contraste elle-même.
+    expect(contraste('#000000', '#ffffff')).toBeCloseTo(21, 1);
+    expect(contraste('#ffffff', '#ffffff')).toBeCloseTo(1, 2);
+  });
+
+  // Intervalles DÉRIVÉS : les coder en dur les laisserait périmer au premier
+  // commentaire ajouté — ce qui est arrivé deux fois pendant ce lot.
+  const lignes = HTML.split('\n');
+  const ouvertures = [];
+  lignes.forEach((l, i) => {
+    const m = l.match(/<div class="page[^"]*" id="(pg-[a-z0-9-]+)"/);
+    if (m) ouvertures.push({ id: m[1], d: i + 1, claire: l.includes('page-claire') });
+  });
+  const claires = ouvertures
+    .map((o, k) => ({
+      ...o,
+      f: k + 1 < ouvertures.length ? ouvertures[k + 1].d - 1 : lignes.length,
+    }))
+    .filter((o) => o.claire);
+
+  it('13. Tout blanc en dur du balisage clair atteint 4,5:1', () => {
+    expect(claires.length, 'aucune page claire — mesure non concluante').toBe(7);
+    const sousSeuil = [];
+    const indetermines = [];
+    let examines = 0;
+    for (const p of claires) {
+      const zone = lignes.slice(p.d - 1, p.f).join('\n');
+      for (const c of blancsMesures(zone, VALS)) {
+        examines++;
+        if (c.indetermine) indetermines.push(`${p.id} : ${c.raison} — ${c.txt}`);
+        else if (c.contraste < 4.5)
+          sousSeuil.push(`${p.id} : ${c.contraste.toFixed(2)}:1 sur ${c.fond} — ${c.txt}`);
+      }
+    }
+    expect(examines, 'aucun blanc examiné — le balayage ne trouve rien').toBeGreaterThan(0);
+    expect(sousSeuil).toEqual([]);
+    // Un cas qu'on ne sait pas mesurer n'est pas un cas sans risque.
+    expect(indetermines).toEqual([]);
+  });
+
+  it('13b. _adminUserRowHTML non plus — il est rendu dans pg-params', () => {
+    const i = JS_ENTIER.indexOf('function _adminUserRowHTML');
+    expect(i, '_adminUserRowHTML introuvable').toBeGreaterThan(-1);
+    const j = JS_ENTIER.indexOf('\n}', i);
+    expect(j, 'fin de _adminUserRowHTML introuvable').toBeGreaterThan(i);
+    const cas = blancsMesures(JS_ENTIER.slice(i, j), VALS);
+    expect(cas.filter((c) => c.indetermine || c.contraste < 4.5)).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 — le contour des cartes de test, et le piège de cascade
+// ═══════════════════════════════════════════════════════════════════
+//
+// Le piège réel de ces deux règles n'est PAS la couleur, c'est la
+// spécificité. `body.theme-clair .tcard` pèse (0,2,1) contre (0,2,0) pour
+// `.tcard:hover` : à égalité de classes, l'élément body départage, donc la
+// règle scopée l'emporterait AUSSI au survol. Sans la seconde ligne, le
+// survol ne serait pas confondu avec le repos — il serait MORT.
+// Ce défaut est invisible à la relecture : les deux règles ont l'air justes
+// séparément. Seul le calcul de la cascade le montre.
+//
+// Ce test ne vérifie donc pas la PRÉSENCE des règles, il calcule QUI GAGNE
+// dans chaque état et exige que les deux vainqueurs diffèrent.
+
+// Spécificité CSS : [identifiants, classes+pseudo-classes+attributs, éléments].
+function specificite(sel) {
+  const ids = (sel.match(/#[\w-]+/g) || []).length;
+  const cls =
+    (sel.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)(?!hover\b)[\w-]+(\([^)]*\))?/g) || []).length +
+    (sel.match(/:hover\b/g) || []).length;
+  const els = (sel.replace(/[.#:[][^\s>+~]*/g, ' ').match(/[a-zA-Z][\w-]*/g) || []).length;
+  return [ids, cls, els];
+}
+const plusFort = (a, b) => {
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return true; // à égalité, la dernière déclarée gagne
+};
+
+// Couleur de bordure d'un bloc de déclarations : `border-color` s'il existe,
+// sinon la couleur extraite du RACCOURCI `border`. Sans ce second cas, la
+// règle .tcard — qui pose `border:1px solid var(--bord)` — serait invisible,
+// et le repos n'aurait aucune valeur à comparer.
+function couleurDeBordure(bloc) {
+  const direct = bloc.match(/(?:^|;)\s*border-color\s*:\s*([^;]+)/);
+  if (direct) return direct[1].trim();
+  const raccourci = bloc.match(/(?:^|;)\s*border\s*:\s*([^;]+)/);
+  if (!raccourci) return null;
+  const couleur = raccourci[1].match(/(var\([^)]*\)|#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))/);
+  return couleur ? couleur[1] : null;
+}
+
+// Parcourt le CSS et rend la déclaration gagnante de la couleur de bordure
+// sur un élément portant `classes`, dans l'état demandé.
+// Les COMMENTAIRES sont retirés d'abord : sans cela le commentaire qui
+// précède une règle est capturé dans son sélecteur, et la règle entière est
+// écartée — c'est ce qui rendait ce test aveugle à sa première rédaction.
+function gagnante(cssBrut, classes, avecSurvol) {
+  const css = cssBrut.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  let vainqueur = null;
+  for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const sel = m[1].trim();
+    if (sel.startsWith('@')) continue;
+    const survol = sel.includes(':hover');
+    if (survol && !avecSurvol) continue;
+    // Le sélecteur cible-t-il notre élément ? On exige que chaque classe
+    // nommée dans le sélecteur soit portée par l'élément ou son contexte.
+    const requises = sel.match(/\.[\w-]+/g) || [];
+    if (!requises.length || !requises.every((c) => classes.includes(c.slice(1)))) continue;
+    const val = couleurDeBordure(m[2]);
+    if (!val) continue;
+    const md = [null, val];
+    const s = specificite(sel);
+    if (!vainqueur || plusFort(s, vainqueur.spec)) vainqueur = { sel, val: md[1].trim(), spec: s };
+  }
+  return vainqueur;
+}
+
+describe('#263 le contour des cartes distingue repos et survol', () => {
+  const VALS = valeursEnPorteeClaire();
+  // Contexte d'une carte en page claire : body.theme-clair > … > .tcard
+  const CONTEXTE = ['theme-clair', 'page-claire', 'tcard'];
+
+  it('14z. TÉMOIN — le calcul de spécificité', () => {
+    expect(specificite('body.theme-clair .tcard'), 'body + 2 classes').toEqual([0, 2, 1]);
+    expect(specificite('.tcard:hover'), '1 classe + 1 pseudo-classe').toEqual([0, 2, 0]);
+    expect(specificite('body.theme-clair .tcard:hover'), 'body + 3').toEqual([0, 3, 1]);
+    expect(specificite('#pg-patients'), 'un identifiant').toEqual([1, 0, 0]);
+    // Et l'ordre : (0,3,1) doit battre (0,2,1), qui doit battre (0,2,0).
+    expect(plusFort([0, 3, 1], [0, 2, 1])).toBe(true);
+    expect(plusFort([0, 2, 1], [0, 2, 0])).toBe(true);
+    expect(plusFort([0, 2, 0], [0, 2, 1])).toBe(false);
+  });
+
+  it('14y. TÉMOIN — la recherche de règle gagnante trouve quelque chose', () => {
+    // Un null ferait passer le test 14 par absence de comparaison.
+    const repos = gagnante(CSS_ENTIER, CONTEXTE, false);
+    expect(repos, 'aucune règle de border-color trouvée au repos').not.toBeNull();
+    const survol = gagnante(CSS_ENTIER, CONTEXTE, true);
+    expect(survol, 'aucune règle de border-color trouvée au survol').not.toBeNull();
+  });
+
+  it('14. Repos et survol ne se résolvent PAS sur la même couleur', () => {
+    const repos = gagnante(CSS_ENTIER, CONTEXTE, false);
+    const survol = gagnante(CSS_ENTIER, CONTEXTE, true);
+    const cRepos = resoudreFond(repos.val, VALS);
+    const cSurvol = resoudreFond(survol.val, VALS);
+    expect(cRepos, `repos non résoluble : ${repos.val}`).not.toBeNull();
+    expect(cSurvol, `survol non résoluble : ${survol.val}`).not.toBeNull();
+    // LE test : si la règle scopée du survol disparaît, c'est « body.theme-clair
+    // .tcard » qui gagne les deux états, et ces deux valeurs deviennent égales.
+    // Le message nomme les DEUX vainqueurs : selon la cause, ce sont deux
+    // règles différentes qui rendent la même couleur, ou une seule règle qui
+    // gagne les deux états — et le lecteur doit savoir laquelle il regarde.
+    const memeRegle = repos.sel === survol.sel;
+    expect(
+      cSurvol,
+      memeRegle
+        ? `le survol est MORT : « ${survol.sel} » l'emporte dans les DEUX états ` +
+            `(la règle scopée du survol manque, ou perd la cascade) — tout vaut ${cRepos}`
+        : `repos « ${repos.sel} » et survol « ${survol.sel} » se résolvent tous ` +
+            `deux sur ${cRepos} : les deux états seraient indistinguables`
+    ).not.toBe(cRepos);
+  });
+
+  it('14b. Le contour au repos est visible — seuil composant 3:1', () => {
+    const repos = gagnante(CSS_ENTIER, CONTEXTE, false);
+    const c = resoudreFond(repos.val, VALS);
+    // Fond de carte en page claire : --card, redéfini au blanc.
+    const fond = resoudreFond('var(--card)', VALS);
+    expect(fond).toBe('#ffffff');
+    const k = contraste(c, fond);
+    expect(k, `${repos.val} = ${c} donne ${k.toFixed(2)}:1 sur la carte`).toBeGreaterThanOrEqual(3);
+  });
+});
