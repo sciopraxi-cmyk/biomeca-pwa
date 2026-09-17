@@ -821,3 +821,129 @@ describe('#263 bis chaque blanc en dur d’une page claire est lisible', () => {
     expect(cas.filter((c) => c.indetermine || c.contraste < 4.5)).toEqual([]);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// #263 — le contour des cartes de test, et le piège de cascade
+// ═══════════════════════════════════════════════════════════════════
+//
+// Le piège réel de ces deux règles n'est PAS la couleur, c'est la
+// spécificité. `body.theme-clair .tcard` pèse (0,2,1) contre (0,2,0) pour
+// `.tcard:hover` : à égalité de classes, l'élément body départage, donc la
+// règle scopée l'emporterait AUSSI au survol. Sans la seconde ligne, le
+// survol ne serait pas confondu avec le repos — il serait MORT.
+// Ce défaut est invisible à la relecture : les deux règles ont l'air justes
+// séparément. Seul le calcul de la cascade le montre.
+//
+// Ce test ne vérifie donc pas la PRÉSENCE des règles, il calcule QUI GAGNE
+// dans chaque état et exige que les deux vainqueurs diffèrent.
+
+// Spécificité CSS : [identifiants, classes+pseudo-classes+attributs, éléments].
+function specificite(sel) {
+  const ids = (sel.match(/#[\w-]+/g) || []).length;
+  const cls =
+    (sel.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)(?!hover\b)[\w-]+(\([^)]*\))?/g) || []).length +
+    (sel.match(/:hover\b/g) || []).length;
+  const els = (sel.replace(/[.#:[][^\s>+~]*/g, ' ').match(/[a-zA-Z][\w-]*/g) || []).length;
+  return [ids, cls, els];
+}
+const plusFort = (a, b) => {
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return true; // à égalité, la dernière déclarée gagne
+};
+
+// Couleur de bordure d'un bloc de déclarations : `border-color` s'il existe,
+// sinon la couleur extraite du RACCOURCI `border`. Sans ce second cas, la
+// règle .tcard — qui pose `border:1px solid var(--bord)` — serait invisible,
+// et le repos n'aurait aucune valeur à comparer.
+function couleurDeBordure(bloc) {
+  const direct = bloc.match(/(?:^|;)\s*border-color\s*:\s*([^;]+)/);
+  if (direct) return direct[1].trim();
+  const raccourci = bloc.match(/(?:^|;)\s*border\s*:\s*([^;]+)/);
+  if (!raccourci) return null;
+  const couleur = raccourci[1].match(/(var\([^)]*\)|#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))/);
+  return couleur ? couleur[1] : null;
+}
+
+// Parcourt le CSS et rend la déclaration gagnante de la couleur de bordure
+// sur un élément portant `classes`, dans l'état demandé.
+// Les COMMENTAIRES sont retirés d'abord : sans cela le commentaire qui
+// précède une règle est capturé dans son sélecteur, et la règle entière est
+// écartée — c'est ce qui rendait ce test aveugle à sa première rédaction.
+function gagnante(cssBrut, classes, avecSurvol) {
+  const css = cssBrut.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  let vainqueur = null;
+  for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const sel = m[1].trim();
+    if (sel.startsWith('@')) continue;
+    const survol = sel.includes(':hover');
+    if (survol && !avecSurvol) continue;
+    // Le sélecteur cible-t-il notre élément ? On exige que chaque classe
+    // nommée dans le sélecteur soit portée par l'élément ou son contexte.
+    const requises = sel.match(/\.[\w-]+/g) || [];
+    if (!requises.length || !requises.every((c) => classes.includes(c.slice(1)))) continue;
+    const val = couleurDeBordure(m[2]);
+    if (!val) continue;
+    const md = [null, val];
+    const s = specificite(sel);
+    if (!vainqueur || plusFort(s, vainqueur.spec)) vainqueur = { sel, val: md[1].trim(), spec: s };
+  }
+  return vainqueur;
+}
+
+describe('#263 le contour des cartes distingue repos et survol', () => {
+  const VALS = valeursEnPorteeClaire();
+  // Contexte d'une carte en page claire : body.theme-clair > … > .tcard
+  const CONTEXTE = ['theme-clair', 'page-claire', 'tcard'];
+
+  it('14z. TÉMOIN — le calcul de spécificité', () => {
+    expect(specificite('body.theme-clair .tcard'), 'body + 2 classes').toEqual([0, 2, 1]);
+    expect(specificite('.tcard:hover'), '1 classe + 1 pseudo-classe').toEqual([0, 2, 0]);
+    expect(specificite('body.theme-clair .tcard:hover'), 'body + 3').toEqual([0, 3, 1]);
+    expect(specificite('#pg-patients'), 'un identifiant').toEqual([1, 0, 0]);
+    // Et l'ordre : (0,3,1) doit battre (0,2,1), qui doit battre (0,2,0).
+    expect(plusFort([0, 3, 1], [0, 2, 1])).toBe(true);
+    expect(plusFort([0, 2, 1], [0, 2, 0])).toBe(true);
+    expect(plusFort([0, 2, 0], [0, 2, 1])).toBe(false);
+  });
+
+  it('14y. TÉMOIN — la recherche de règle gagnante trouve quelque chose', () => {
+    // Un null ferait passer le test 14 par absence de comparaison.
+    const repos = gagnante(CSS_ENTIER, CONTEXTE, false);
+    expect(repos, 'aucune règle de border-color trouvée au repos').not.toBeNull();
+    const survol = gagnante(CSS_ENTIER, CONTEXTE, true);
+    expect(survol, 'aucune règle de border-color trouvée au survol').not.toBeNull();
+  });
+
+  it('14. Repos et survol ne se résolvent PAS sur la même couleur', () => {
+    const repos = gagnante(CSS_ENTIER, CONTEXTE, false);
+    const survol = gagnante(CSS_ENTIER, CONTEXTE, true);
+    const cRepos = resoudreFond(repos.val, VALS);
+    const cSurvol = resoudreFond(survol.val, VALS);
+    expect(cRepos, `repos non résoluble : ${repos.val}`).not.toBeNull();
+    expect(cSurvol, `survol non résoluble : ${survol.val}`).not.toBeNull();
+    // LE test : si la règle scopée du survol disparaît, c'est « body.theme-clair
+    // .tcard » qui gagne les deux états, et ces deux valeurs deviennent égales.
+    // Le message nomme les DEUX vainqueurs : selon la cause, ce sont deux
+    // règles différentes qui rendent la même couleur, ou une seule règle qui
+    // gagne les deux états — et le lecteur doit savoir laquelle il regarde.
+    const memeRegle = repos.sel === survol.sel;
+    expect(
+      cSurvol,
+      memeRegle
+        ? `le survol est MORT : « ${survol.sel} » l'emporte dans les DEUX états ` +
+            `(la règle scopée du survol manque, ou perd la cascade) — tout vaut ${cRepos}`
+        : `repos « ${repos.sel} » et survol « ${survol.sel} » se résolvent tous ` +
+            `deux sur ${cRepos} : les deux états seraient indistinguables`
+    ).not.toBe(cRepos);
+  });
+
+  it('14b. Le contour au repos est visible — seuil composant 3:1', () => {
+    const repos = gagnante(CSS_ENTIER, CONTEXTE, false);
+    const c = resoudreFond(repos.val, VALS);
+    // Fond de carte en page claire : --card, redéfini au blanc.
+    const fond = resoudreFond('var(--card)', VALS);
+    expect(fond).toBe('#ffffff');
+    const k = contraste(c, fond);
+    expect(k, `${repos.val} = ${c} donne ${k.toFixed(2)}:1 sur la carte`).toBeGreaterThanOrEqual(3);
+  });
+});

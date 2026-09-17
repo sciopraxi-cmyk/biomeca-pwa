@@ -174,6 +174,29 @@ body.theme-clair .page-claire{
   color:var(--txt);
 }
 /* --- #263 ENCRES-CLAIR — FIN --- */
+/* #263 — contour des cartes de test, portée claire UNIQUEMENT.
+   Les neuf .tcard vivent toutes dans pg-sport (mesuré : 9 balises, 1 seule
+   page), donc aucun autre module n'hérite d'un contour sport et l'identité
+   par module de #257 reste intacte.
+   Le trait de base --bord #E4E8EE mesure 1,23:1 sur la carte blanche — un
+   contour quasi invisible ; #2563EB le porte à 5,17:1. Le seuil d'un
+   composant NON TEXTUEL est 3:1, pas 4,5 : un trait n'est pas du texte.
+
+   POURQUOI PAS var(--blue) AU REPOS : le survol pose déjà
+   border-color:var(--blue) #175FA8. Le prendre aussi au repos rendrait les
+   deux états STRICTEMENT identiques — ΔE CIE76 de 0,00. Avec #2563EB
+   l'écart vaut 38,24, franchement distinct (seuil du perceptible : 2,3).
+
+   POURQUOI LA SECONDE LIGNE : sans elle, la première TUE le survol, et
+   c'est invisible à la relecture. En [identifiants, classes, éléments] —
+   la notation que calcule le test 14 — `body.theme-clair .tcard` pèse
+   [0,2,1] contre [0,2,0] pour `.tcard:hover` : à égalité de classes,
+   l'élément body départage, donc le repos l'emporterait même au survol.
+   La seconde règle pèse [0,3,1] et rétablit l'ordre. Le survol ne serait
+   pas confondu avec le repos : il serait MORT.
+   Ni .tcard de base ni .tcard:hover ne sont modifiés — surcharge seule. */
+body.theme-clair .tcard{ border-color:var(--verticy-bleu); }
+body.theme-clair .tcard:hover{ border-color:var(--blue); }
 body.theme-clair .topbar{ background:#fff; border-bottom:2px solid var(--verticy-bleu); }
 body.theme-clair .tnav button.act{ background:var(--verticy-bleu-fond); color:var(--verticy-bleu); }
 body.theme-clair .tnav button:hover:not(.act){ background:#F1F3F7; color:var(--txt); }
