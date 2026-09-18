@@ -513,18 +513,39 @@ const PAGES_CLAIRES = [
   // cette seule page. L'écart réel est bien plus mince que ce qu'on croyait,
   // et la bascule reste justifiée, mais pas par les chiffres d'origine.
   'pg-bilan',
-];
-
-// Et celles qui ne doivent PAS l'avoir. pg-capture reste volontairement
-// sombre : c'est une surface de mesure vidéo. Les deux rapports sont déjà
-// clairs par leur propre style. Les deux bilans restants sont le lot 3C.
-const PAGES_SOMBRES = [
+  // #266 — l'interface de capture des tests cinématiques, et la vue écran du
+  // rapport biomécanique sport. pg-capture est un conteneur UNIQUE, paramétré
+  // par launchTest(testId) : les neuf tests cinématiques y sont rendus, un
+  // seul nav('pg-capture') existe dans tout le code. Une bascule les couvre
+  // tous.
   'pg-capture',
-  'pg-pedicurie',
-  'pg-podopediatrie',
+  // Les deux vues de rapport basculent ENSEMBLE. Ce sont deux écrans de même
+  // nature, ouverts l'un après l'autre par le même praticien : n'en éclaircir
+  // qu'un donnerait deux thèmes pour la même chose — le défaut du jumeau qu'on
+  // vient de traiter sur le bouton de synthèse.
   'pg-rapport',
   'pg-rapport-posturo',
 ];
+
+// Et celles qui ne doivent PAS l'avoir : les deux bilans du lot 3C.
+//
+// DEUX AFFIRMATIONS DE CE COMMENTAIRE ONT ÉTÉ CORRIGÉES AU LOT #266.
+//
+// « Les deux rapports sont déjà clairs par leur propre style » n'était vrai
+// que pour UN des deux. pg-rapport-posturo porte bien `background:#fff` en
+// style de ligne — mais pg-rapport n'a rien de tel : .rapport-page ne pose que
+// du padding et une largeur, et le blanc qu'on lui prêtait venait du bloc
+// @media print, donc de l'impression et non de l'affichage. Pire, un fond
+// blanc SANS la classe laissait le texte suivre le thème sombre, où --txt vaut
+// #ffffff : c'est ce que la mesure de ce lot est allée vérifier.
+//
+// « pg-capture reste volontairement sombre, c'est une surface de mesure
+// vidéo » décrivait un choix perceptif : un marqueur coloré ressortirait mieux
+// sur fond sombre. L'argument ne porte pas — marqueurs et tracés sont dessinés
+// SUR le média, qui a son propre fond, et la surface de rendu (.canvas-wrap,
+// background:#060810) est un littéral que le thème n'atteint pas. Le fond de
+// page n'a aucune incidence sur leur lisibilité.
+const PAGES_SOMBRES = ['pg-pedicurie', 'pg-podopediatrie'];
 
 // Extrait la valeur de class="…" de la balise portant cet identifiant.
 function classesDe(id) {

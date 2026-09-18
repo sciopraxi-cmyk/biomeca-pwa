@@ -4367,11 +4367,20 @@ function getMkrsBySet(markers, targetSet) {
 // pg-patients, donc la page peut exister à l'écran sans qu'aucun nav() ne soit
 // passé ; et un futur chemin d'affichage qui oublierait nav() ne pourra pas
 // désynchroniser le thème de la page.
-// Lot 3 (#263) : la bascule ne devient PAS globale. pg-capture —
-// l'interface des tests cinématiques — reste volontairement sombre :
-// c'est une surface de mesure vidéo, où un marqueur coloré et un tracé
-// fin ressortent mieux sur fond sombre. Cette fonction ne disparaît donc
-// pas, elle devient le lecteur de la classe page-claire.
+// Lot 3 (#263) : la bascule ne devenait PAS globale. Cette fonction ne
+// disparaît donc pas, elle devient le lecteur de la classe page-claire.
+//
+// #266 — pg-capture EST DÉSORMAIS CLAIRE, et ce commentaire disait l'inverse.
+// Il justifiait le fond sombre ainsi : « c'est une surface de mesure vidéo, où
+// un marqueur coloré et un tracé fin ressortent mieux sur fond sombre. »
+// L'argument ne porte pas. Marqueurs et tracés sont dessinés SUR le média, qui
+// porte son propre fond, et la surface de rendu est .canvas-wrap dont le fond
+// #060810 est un LITTÉRAL que le thème n'atteint pas. Le fond de page n'a
+// aucune incidence sur leur lisibilité ; ce qui se voyait, c'était une
+// application qui changeait de thème d'un écran à l'autre.
+// Un conteneur unique suffit à couvrir les neuf tests cinématiques :
+// launchTest(testId) remplit le même DOM puis navigue, et il n'existe qu'un
+// seul nav('pg-capture') dans tout le code.
 //
 // #263 — la page déclare elle-même si elle est claire, par la classe
 // page-claire posée dans le balisage. On lit cette classe au lieu de comparer
@@ -8181,7 +8190,7 @@ function renderMkrList() {
       <span style="flex:1;font-size:11px;font-weight:500;">${_escHtml(m.name)}</span>
       <span style="font-size:9px;color:var(--dim);font-family:var(--fm);">${m.x!==null?`${Math.round(m.x)},${Math.round(m.y)}`:'—'}</span>
       <span>${m.x!==null?'<span class="badge bg">✓</span>':'<span class="badge bd">—</span>'}</span>
-      ${m.x!==null?`<button onclick="event.stopPropagation();clearMkr(${i})" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:11px;">✕</button>`:''}
+      ${m.x!==null?`<button class="mkr-del" onclick="event.stopPropagation();clearMkr(${i})" style="border:none;background:none;cursor:pointer;font-size:11px;">✕</button>`:''}
     </div>`).join('');
 }
 
