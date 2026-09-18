@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { extraireBloc, RACINE } from './helpers/mirror-diff.mjs';
+import { contraste, verdictDegrade, fondsDegrades } from './helpers/contraste.mjs';
 
 // ═══════════════════════════════════════════════════════════════════
 // #257 Lot 1 — palette par type de bilan centralisée dans le CSS
@@ -500,14 +501,25 @@ const PAGES_CLAIRES = [
   'pg-compare',
   'pg-praticiens',
   'pg-agenda',
+  // #265 lot 3B — le bilan clinique sportif. La bascule y AMÉLIORE la
+  // lisibilité, mesuré : 147 éléments porteurs de texte sous 4,5:1 en sombre,
+  // 127 en clair. Le thème sombre accumulait des blancs translucides à 0,3-0,5
+  // d'opacité qui plafonnaient sous le seuil.
+  //
+  // CES CHIFFRES ONT ÉTÉ CORRIGÉS. La première mesure annonçait 262 → 91 :
+  // elle traversait les background-IMAGE en silence. getComputedStyle rend
+  // rgba(0,0,0,0) pour un dégradé, et la mesure remontait alors aux ancêtres,
+  // lisant un fond qui n'était pas celui qui est peint — sur 201 éléments de
+  // cette seule page. L'écart réel est bien plus mince que ce qu'on croyait,
+  // et la bascule reste justifiée, mais pas par les chiffres d'origine.
+  'pg-bilan',
 ];
 
 // Et celles qui ne doivent PAS l'avoir. pg-capture reste volontairement
 // sombre : c'est une surface de mesure vidéo. Les deux rapports sont déjà
-// clairs par leur propre style. Les trois bilans sont les lots 3B et 3C.
+// clairs par leur propre style. Les deux bilans restants sont le lot 3C.
 const PAGES_SOMBRES = [
   'pg-capture',
-  'pg-bilan',
   'pg-pedicurie',
   'pg-podopediatrie',
   'pg-rapport',
@@ -592,18 +604,9 @@ describe('#263 les trois maillons du mécanisme sont présents', () => {
 
 const FOND_CLAIR = '#F6F7F9';
 
-function contraste(a, b) {
-  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  const lum = ([r, g, bl]) => {
-    const f = (v) => {
-      const s = v / 255;
-      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-    };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(bl);
-  };
-  const [l1, l2] = [lum(hex(a)), lum(hex(b))].sort((x, y) => y - x);
-  return (l1 + 0.05) / (l2 + 0.05);
-}
+// La fonction de contraste vit désormais dans tests/helpers/contraste.mjs :
+// elle y a existé un temps en double, et les deux exemplaires ont divergé
+// sur le traitement des dégradés. Une seule implémentation (#132).
 
 // Extraction par MARQUEURS, pas par chaîne : le sélecteur
 // `body.theme-clair .page-claire` apparaît aussi dans la règle partagée avec
@@ -671,6 +674,25 @@ describe('#263 bis les encres de la portée claire sont lisibles', () => {
 // Valeurs des variables TELLES QU'ELLES SE RÉSOLVENT en portée claire :
 // le :root de base, puis les redéfinitions sous body.theme-clair qui les
 // écrasent. Dérivé du CSS, jamais écrit à la main.
+// Variables dont la valeur DÉPEND DU THÈME. Toute variable déclarée dans une
+// portée `body.theme-clair` y vaut autre chose qu'ailleurs — ou n'y existe
+// qu'en clair. Elle n'a donc pas de valeur unique résoluble statiquement.
+//
+// POURQUOI C'EST UN REFUS ET NON UNE COMMODITÉ
+// VALS porte les valeurs en portée CLAIRE. Un même dégradé, écrit une seule
+// fois, peut être rendu sur une page claire ET sur une page sombre : c'est
+// exactement le cas du bouton « Générer la synthèse », dont le jumeau est
+// injecté par getBilanPosturoHTML dans pg-bilan-posturo, restée sombre.
+// Résoudre une variable dépendante du thème avec sa valeur claire affirmerait
+// sur la page sombre un contraste qui n'y est pas rendu — un faux conforme,
+// invisible. Elle reste donc INDÉTERMINÉE.
+function variablesDependantesDuTheme() {
+  const dep = new Set();
+  for (const m of CSS_ENTIER.matchAll(/body\.theme-clair[^{]*\{([^}]*)\}/g))
+    for (const v of m[1].matchAll(/(--[a-z0-9-]+)\s*:/g)) dep.add(v[1]);
+  return dep;
+}
+
 function valeursEnPorteeClaire() {
   const vals = {};
   for (const bloc of CSS_ENTIER.match(/:root\s*\{[^}]*\}/g) || [])
@@ -712,6 +734,55 @@ function resoudreFond(expr, vals, prof = 0) {
 
 // Pour chaque blanc en dur d'une source, rend {ligne, fond, contraste} ou
 // {ligne, indetermine:true}. Aucun cas n'est écarté en silence.
+//
+// Les DÉGRADÉS sont résolus par le helper partagé, qui prend le PIRE arrêt :
+// un dégradé n'est lisible que si son point le moins contrasté l'est. Un
+// arrêt non résoluble — translucide, oklch(), nom inconnu — rend le tout
+// indéterminé, jamais conforme.
+// Dégradés portant du texte BLANC, dans du balisage rendu depuis JavaScript.
+//
+// POURQUOI UNE SECONDE FONCTION
+// blancsMesures balaie le BALISAGE des pages claires d'index.html. Un bouton
+// rendu depuis un littéral de gabarit n'y figure pas — c'est l'angle mort qui
+// a valu son test 13b à _adminUserRowHTML, et c'est par là que le jumeau du
+// bouton « Générer la synthèse » a vécu à 2,87:1 sans qu'aucune garde le voie.
+//
+// CE QU'ELLE NE VOIT PAS, ET QUI RESTE UNE DETTE
+// Elle exige que le blanc ET le fond soient dans la MÊME déclaration
+// style="…", en guillemets doubles. Un blanc posé par une classe ou hérité
+// d'un parent lui échappe — or c'est précisément le mécanisme qui a causé
+// cette refonte, où le blanc n'était écrit nulle part. Le compte qu'elle rend
+// est donc un PLANCHER, jamais un total.
+//
+// L'extraction du fond passe par fondsDegrades, à parenthèses équilibrées :
+// un `[^)]*` s'arrêterait au `)` d'un rgba() imbriqué et perdrait la fin de la
+// déclaration en silence.
+function degradesBlancsDuJs(source) {
+  const out = [];
+  for (const m of source.matchAll(/style="([^"]*)"/g)) {
+    const attr = m[1];
+    if (!/color\s*:\s*(#fff\b|#ffffff\b|white\b)/i.test(attr)) continue;
+    for (const { decl, tronquee } of fondsDegrades(attr).degrades) {
+      out.push({ decl, tronquee, ligne: source.slice(0, m.index).split('\n').length });
+    }
+  }
+  return out;
+}
+
+// Le résolveur d'ARRÊT DE DÉGRADÉ : resoudreFond, précédé du refus des
+// variables dépendantes du thème. C'est ici — et nulle part ailleurs — que
+// variablesDependantesDuTheme() est consommée ; une garde déclarée et jamais
+// appelée ne garde rien.
+const DEPENDANTES_DU_THEME = variablesDependantesDuTheme();
+
+function resoudreArret(vals) {
+  return (expr) => {
+    const m = expr.match(/^var\(\s*(--[a-z0-9-]+)/);
+    if (m && DEPENDANTES_DU_THEME.has(m[1])) return null; // valeur non unique
+    return resoudreFond(expr, vals);
+  };
+}
+
 function blancsMesures(source, vals) {
   const BLANC = /color:\s*#fff\b/i;
   const FOND = /background(-color)?:\s*([^;"]+)/i;
@@ -721,18 +792,30 @@ function blancsMesures(source, vals) {
     const parts = l.split(/style="/).filter((x) => BLANC.test(x));
     const seg = parts.length ? parts[0] : l;
     const mf = seg.match(FOND);
-    const resolu = mf ? resoudreFond(mf[2], vals) : null;
     const txt = l.trim().slice(0, 100);
+    if (!mf) {
+      out.push({ txt, indetermine: true, raison: 'aucun fond sur la déclaration' });
+      continue;
+    }
+    const expr = mf[2].trim();
+    if (/gradient\s*\(/i.test(expr)) {
+      // blancsMesures travaille LIGNE PAR LIGNE : un dégradé écrit sur deux
+      // lignes rend une expression aux parenthèses déséquilibrées. Sans ce
+      // calcul, le verdict tomberait sur « aucun arrêt extrait » — bonne
+      // direction, mauvais diagnostic, et le message ne dirait pas la cause.
+      const tronquee = (expr.match(/\(/g) || []).length !== (expr.match(/\)/g) || []).length;
+      // Le résolveur du test traverse la frontière du dégradé : un arrêt
+      // var(--x) se résout par LA MÊME fonction qu'un fond var(--x), avec la
+      // même table. Écrire une seconde résolution dans le helper recréerait
+      // la divergence que ce fichier existe pour éviter.
+      const v = verdictDegrade(expr, '#ffffff', { tronquee, resoudre: resoudreArret(vals) });
+      if (v.etat === 'INDÉTERMINÉ') out.push({ txt, indetermine: true, raison: v.raison });
+      else out.push({ txt, fond: `${v.pireArret} (pire arrêt du dégradé)`, contraste: v.pire });
+      continue;
+    }
+    const resolu = resoudreFond(expr, vals);
     if (!resolu) {
-      // Pas de fond sur la déclaration, ou fond non résoluble : on ne sait pas
-      // mesurer, donc on ne conclut pas à l'absence de risque.
-      out.push({
-        txt,
-        indetermine: true,
-        raison: mf
-          ? `fond « ${mf[2].trim().slice(0, 40)} » non résoluble`
-          : 'aucun fond sur la déclaration',
-      });
+      out.push({ txt, indetermine: true, raison: `fond « ${expr.slice(0, 40)} » non résoluble` });
     } else {
       out.push({ txt, fond: resolu, contraste: contraste('#ffffff', resolu) });
     }
@@ -767,6 +850,47 @@ describe('#263 bis chaque blanc en dur d’une page claire est lisible', () => {
     expect(contraste('#ffffff', compose), 'blanc sur blanc translucide').toBeLessThan(1.1);
   });
 
+  it('13x. TÉMOIN — un var() DANS un dégradé se résout, et le refus mord', () => {
+    const R = resoudreArret(VALS);
+    const G = (arret) => `linear-gradient(90deg,#2a7a4e,${arret})`;
+
+    // (a) Variable INVARIANTE et présente : l'arrêt se résout, verdict chiffré.
+    // --sport-btn n'est déclarée qu'au :root : sa valeur ne dépend pas du thème.
+    expect(DEPENDANTES_DU_THEME.has('--sport-btn'), '--sport-btn doit être invariante').toBe(false);
+    const a = verdictDegrade(G('var(--sport-btn)'), '#ffffff', { resoudre: R });
+    expect(a.etat).toBe('CONFORME');
+    expect(a.pire, 'le pire arrêt doit être CHIFFRÉ, pas absent').toBeGreaterThan(0);
+    // Valeur DÉRIVÉE de la table, jamais retapée : un littéral ici serait un
+    // miroir manuel de plus (#132), qui casserait le test pour une raison
+    // fausse le jour où la palette bouge.
+    expect(a.resolus, 'les deux arrêts doivent être résolus').toEqual([
+      '#2a7a4e',
+      VALS['--sport-btn'].toLowerCase(),
+    ]);
+
+    // (b) CONTRE-TÉMOIN — variable ABSENTE de la table : rien à résoudre.
+    expect(verdictDegrade(G('var(--inexistante)'), '#ffffff', { resoudre: R }).etat).toBe(
+      'INDÉTERMINÉ'
+    );
+
+    // (c) CONTRE-TÉMOIN — variable REDÉFINIE sous body.theme-clair : deux
+    // valeurs selon le thème, donc aucune valeur unique. C'est ce cas qui
+    // protège le jumeau rendu sur une page restée sombre.
+    expect(DEPENDANTES_DU_THEME.has('--blue'), '--blue doit être dépendante du thème').toBe(true);
+    expect(resoudreFond('var(--blue)', VALS), '--blue est pourtant résoluble en clair').toBe(
+      '#175fa8'
+    );
+    expect(
+      verdictDegrade(G('var(--blue)'), '#ffffff', { resoudre: R }).etat,
+      'résoluble en clair ne veut pas dire résoluble tout court'
+    ).toBe('INDÉTERMINÉ');
+
+    // (d) TÉMOIN DE TRANSMISSION — sans résolveur, (a) doit RETOMBER en
+    // indéterminé. Si (a) restait vert ici, c'est que le var() n'a jamais eu
+    // besoin d'être résolu, et les trois cas ci-dessus ne prouveraient rien.
+    expect(verdictDegrade(G('var(--sport-btn)'), '#ffffff').etat).toBe('INDÉTERMINÉ');
+  });
+
   it('13y. TÉMOIN — les deux cas que la règle structurelle confondait', () => {
     const surCard = contraste('#ffffff', resoudreFond('var(--card)', VALS));
     const surBlue = contraste('#ffffff', resoudreFond('var(--blue)', VALS));
@@ -793,7 +917,9 @@ describe('#263 bis chaque blanc en dur d’une page claire est lisible', () => {
     .filter((o) => o.claire);
 
   it('13. Tout blanc en dur du balisage clair atteint 4,5:1', () => {
-    expect(claires.length, 'aucune page claire — mesure non concluante').toBe(7);
+    // Dérivé de PAGES_CLAIRES plutôt que d'un nombre écrit : ce compte a déjà
+    // périmé une fois au lot 3B, et un attendu recopié ne teste rien.
+    expect(claires.length, 'aucune page claire — mesure non concluante').toBe(PAGES_CLAIRES.length);
     const sousSeuil = [];
     const indetermines = [];
     let examines = 0;
@@ -807,9 +933,16 @@ describe('#263 bis chaque blanc en dur d’une page claire est lisible', () => {
       }
     }
     expect(examines, 'aucun blanc examiné — le balayage ne trouve rien').toBeGreaterThan(0);
-    expect(sousSeuil).toEqual([]);
-    // Un cas qu'on ne sait pas mesurer n'est pas un cas sans risque.
-    expect(indetermines).toEqual([]);
+    // UNE SEULE assertion pour les deux listes. Enchaîner deux expect ferait
+    // qu'un SOUS SEUIL masquerait tous les INDÉTERMINÉ : le rapport d'échec
+    // s'arrête au premier, et on croirait la seconde liste vide. Un cas qu'on
+    // ne sait pas mesurer n'est pas un cas sans risque — il doit se voir en
+    // même temps que les autres.
+    expect({ examines, sousSeuil, indetermines }).toEqual({
+      examines,
+      sousSeuil: [],
+      indetermines: [],
+    });
   });
 
   it('13b. _adminUserRowHTML non plus — il est rendu dans pg-params', () => {
@@ -819,6 +952,93 @@ describe('#263 bis chaque blanc en dur d’une page claire est lisible', () => {
     expect(j, 'fin de _adminUserRowHTML introuvable').toBeGreaterThan(i);
     const cas = blancsMesures(JS_ENTIER.slice(i, j), VALS);
     expect(cas.filter((c) => c.indetermine || c.contraste < 4.5)).toEqual([]);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 13c — LES DÉGRADÉS RENDUS DEPUIS JAVASCRIPT
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // Le test 13 balaie le balisage des pages claires d'index.html. Le bouton
+  // « Générer la synthèse » y a été vu à 2,87:1 — mais son JUMEAU, écrit dans
+  // getBilanPosturoHTML et injecté par injectBilanPosturoPage, portait le même
+  // dégradé sans qu'aucune garde l'atteigne. Corriger l'un en laissant l'autre
+  // aurait éteint le voyant : la garde qui suit couvre le second chemin.
+  //
+  // Les témoins viennent AVANT la garde : une garde dont on ne sait pas si
+  // elle discrimine ne prouve rien, et un zéro ne vaut que si la mesure sait
+  // trouver quelque chose.
+
+  it('13w. TÉMOIN — la garde des dégradés JS discrimine les trois états', () => {
+    const R = resoudreArret(VALS);
+    const v = (d) => verdictDegrade(d, '#ffffff', { resoudre: R }).etat;
+    // Trois verdicts DIFFÉRENTS : sans cela, une fonction qui rendrait toujours
+    // la même chose passerait les trois cas.
+    const conforme = v('linear-gradient(135deg,#2a7a4e,#0f766e)');
+    const sousSeuil = v('linear-gradient(135deg,#2a7a4e,#27ae60)');
+    const indetermine = v('linear-gradient(135deg,#2a7a4e,rgba(0,0,0,.2))');
+    expect(conforme).toBe('CONFORME');
+    expect(sousSeuil).toBe('SOUS SEUIL');
+    expect(indetermine).toBe('INDÉTERMINÉ');
+    expect(new Set([conforme, sousSeuil, indetermine]).size, 'la garde ne discrimine pas').toBe(3);
+
+    // Et l'EXTRACTION, pas seulement le verdict : un attribut sans texte blanc
+    // ne doit pas entrer dans le balayage, un attribut avec texte blanc oui.
+    const avec = '<b style="background:linear-gradient(90deg,#000,#111);color:#fff;">x</b>';
+    const sans = '<b style="background:linear-gradient(90deg,#000,#111);color:#222;">x</b>';
+    expect(degradesBlancsDuJs(avec).length, 'un dégradé à texte blanc doit être vu').toBe(1);
+    expect(degradesBlancsDuJs(sans).length, 'un dégradé à texte sombre ne la concerne pas').toBe(0);
+  });
+
+  it('13v. TÉMOIN — la garde s’exécute sur le FICHIER RÉEL, pas sur une démo', () => {
+    // Le témoin décisif. Les cas ci-dessus sont des chaînes écrites ici : ils
+    // prouvent que l'outil discrimine, pas qu'il est branché sur js/biomeca.js.
+    // On réintroduit le défaut dans une COPIE du fichier réel et on exige que
+    // la garde le retrouve, à sa ligne. Si ce témoin restait vert avec zéro
+    // trouvaille, c'est que la garde ne lit pas ce qu'elle prétend lire.
+    const mute = JS_ENTIER.replace('var(--valider-fond)', '#27ae60');
+    expect(mute, 'la mutation n’a rien changé — le témoin serait creux').not.toBe(JS_ENTIER);
+
+    const R = resoudreArret(VALS);
+    const trouves = degradesBlancsDuJs(mute)
+      .map((c) => ({
+        c,
+        v: verdictDegrade(c.decl, '#ffffff', { tronquee: c.tronquee, resoudre: R }),
+      }))
+      .filter((x) => x.v.etat === 'SOUS SEUIL');
+
+    expect(trouves.length, 'le défaut réintroduit doit être RETROUVÉ').toBe(1);
+    expect(trouves[0].v.pireArret).toBe('#27ae60');
+    expect(trouves[0].v.pire).toBeLessThan(4.5);
+    // La ligne doit être celle de getBilanPosturoHTML, pas une autre.
+    expect(mute.split('\n')[trouves[0].c.ligne - 1]).toContain('genererSynthese()');
+  });
+
+  it('13c. Aucun dégradé rendu depuis JavaScript ne porte de texte blanc illisible', () => {
+    const cas = degradesBlancsDuJs(JS_ENTIER);
+    // Garde anti-succès-vacant : un balayage qui ne trouve rien passerait les
+    // deux listes vides sans avoir rien mesuré.
+    expect(
+      cas.length,
+      'aucun dégradé à texte blanc dans le JS — balayage non concluant'
+    ).toBeGreaterThan(0);
+
+    const R = resoudreArret(VALS);
+    const sousSeuil = [];
+    const indetermines = [];
+    for (const c of cas) {
+      const v = verdictDegrade(c.decl, '#ffffff', { tronquee: c.tronquee, resoudre: R });
+      if (v.etat === 'INDÉTERMINÉ') {
+        indetermines.push(`js/biomeca.js:${c.ligne} — ${v.raison}`);
+      } else if (v.etat === 'SOUS SEUIL') {
+        sousSeuil.push(`js/biomeca.js:${c.ligne} — ${v.pire.toFixed(2)}:1 sur ${v.pireArret}`);
+      }
+    }
+    // Une seule assertion : un SOUS SEUIL ne doit pas masquer les INDÉTERMINÉ.
+    expect({ n: cas.length, sousSeuil, indetermines }).toEqual({
+      n: cas.length,
+      sousSeuil: [],
+      indetermines: [],
+    });
   });
 });
 
