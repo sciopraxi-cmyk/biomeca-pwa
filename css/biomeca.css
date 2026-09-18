@@ -16,6 +16,13 @@
   --orange:#f5a623;--orange-d:#3d2a08;
   --red:#f04060;--red-d:rgba(240,64,96,0.15);
   --purple:#a78bfa;
+  /* #265 — fond de l'action « générer / valider ». Nomme une ACTION, pas une
+     famille de bilan : ce bouton vit sur le bilan sportif, emprunter une encre
+     de posturologie aurait donné une couleur juste sous un nom faux. Déclarée
+     ici, au :root de base, et nulle part ailleurs : sa valeur ne dépend pas du
+     thème, sans quoi le jumeau rendu sur une page restée sombre serait affirmé
+     à tort. */
+  --valider-fond:#0f766e;
   --r:10px;--rs:6px;
   --f:'DM Sans',sans-serif;--fm:'DM Mono',monospace;
 }

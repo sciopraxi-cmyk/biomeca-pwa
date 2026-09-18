@@ -23208,7 +23208,7 @@ function getBilanPosturoHTML() {
     <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
       <div style="font-weight:700;color:#2a7a4e;font-size:14px;margin-bottom:4px;">📋 Bilan synthèse</div>
       <div style="font-size:11px;color:#555;margin-bottom:10px;">Compilation automatique des éléments positifs du bilan</div>
-      <button onclick="genererSynthese()" style="background:linear-gradient(135deg,#2a7a4e,#27ae60);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px;">
+      <button onclick="genererSynthese()" style="background:linear-gradient(135deg,#2a7a4e,var(--valider-fond));color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px;">
         ✨ Générer la synthèse
       </button>
     </div>
