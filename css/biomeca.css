@@ -277,6 +277,55 @@ body.theme-clair .tb-doctolib{ border:1px solid var(--bord); }
    restait sombre. Scopé à .theme-clair, donc sans effet ailleurs.
    Hors de la liste du brief — signalé comme tel. */
 body.theme-clair .av{ background:linear-gradient(145deg,var(--verticy-bleu),#5B8DEF); color:#fff; }
+
+/* #266 — les pastilles à FOND SOMBRE dont le texte suivait le thème.
+   .btn-green, .btn-blue, .bg et .bb posent un fond (--green-d / --blue-d,
+   tous deux #0d4a32) et un texte (--green / --blue). Le FOND n'est pas
+   redéfini en portée claire, le TEXTE l'est : le vert bouteille reste, la
+   menthe #2dd4bf devient l'encre #0f766e ou #175fa8, et on obtient du sombre
+   sur sombre — 1,88:1 et 1,59:1.
+
+   C'est la bascule qui CRÉE ce défaut, elle ne le révèle pas : en thème
+   sombre ces mêmes règles rendent 5,52:1. Même mécanisme que .av et
+   .tnav button.act, traités au #258 ; ces quatre-là avaient été manquées
+   parce qu'aucune page claire ne les portait encore.
+
+   On pose une couleur de TEXTE explicite, jamais un fond plus clair : le vert
+   bouteille est l'identité de ces boutons. Le blanc est le seul candidat
+   conforme sur les trois états — 10,28:1 au repos, 5,47:1 au survol vert.
+   La menthe d'origine (5,52:1 au repos) tombe à 2,94:1 au survol.
+
+   Les règles de survol sont écrites EXPLICITEMENT. Sans elles, ce sélecteur
+   à [0,2,1] battrait .btn-green:hover à [0,2,0] et le survol serait mort,
+   pas confus — le piège rencontré sur .tcard au lot 3A. */
+body.theme-clair .btn-green,
+body.theme-clair .btn-blue,
+body.theme-clair .bg,
+body.theme-clair .bb{ color:#FFFFFF; }
+body.theme-clair .btn-green:hover,
+body.theme-clair .btn-blue:hover{ color:#FFFFFF; }
+
+/* #266 — la ligne de marqueur SÉLECTIONNÉE, dans la liste de pg-capture.
+   Famille de défaut DIFFÉRENTE des boutons ci-dessus, et c'est ce qui l'avait
+   fait manquer : .mkr-item.sel pose un fond (--orange-d, brun #3d2a08) et
+   AUCUNE couleur de texte. Le nom du marqueur hérite donc de --txt, blanc en
+   sombre et encre sombre en clair — « Tarse D » passait de 13,70:1 à 1,37:1.
+   La première mesure ne retenait que les règles posant fond ET texte : elle
+   était structurellement aveugle à celle-ci.
+
+   La sélection elle-même est posée en JavaScript (renderMkrList ajoute la
+   classe .sel), mais le STYLE est en CSS : le remède est donc bien ici.
+   Spécificité : [0,3,1] contre [0,2,0] pour .mkr-item.sel, et .mkr-item:hover
+   ne pose qu'une bordure — aucun état n'est écrasé.
+
+   Le ✕ de suppression faisait exception : sa couleur était posée en STYLE DE
+   LIGNE dans le gabarit, que nulle règle CSS ne peut battre. Elle en a été
+   sortie vers .mkr-del, ce qui la rend gouvernable sans !important. Hors
+   sélection il reste rouge sur blanc (6,47:1) ; sélectionné il passe de
+   2,12:1 à 13,70:1. */
+.mkr-del{ color:var(--red); }
+body.theme-clair .mkr-item.sel{ color:#FFFFFF; }
+body.theme-clair .mkr-item.sel .mkr-del{ color:#FFFFFF; }
 /* --- #258 COMPOSANTS — FIN --- */
 
 /* ==========================================================================
