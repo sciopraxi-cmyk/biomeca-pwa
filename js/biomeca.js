@@ -13449,9 +13449,13 @@ function calcAngleSign(pts) {
     const bot=placed[placed.length-1]; // Tarse ou CalcaInf
     // Position de mid par rapport à la ligne top→bot
     // Produit vectoriel : (bot-top) × (mid-top)
-    // En coordonnées écran (y vers le bas), cross>0 = mid à droite
+    // En coordonnées écran (y vers le bas), cross<0 = mid à DROITE.
+    // (Cette ligne disait « cross>0 = mid à droite » : c'était faux, et la
+    // ligne suivante — elle, correcte — la contredisait deux caractères plus
+    // loin. Deux commentaires opposés sur la même quantité, dans la même
+    // fonction, c'est ce qui a rendu le défaut de signe illisible.)
     const cross=(bot.x-top.x)*(mid.y-top.y)-(bot.y-top.y)*(mid.x-top.x);
-    return cross<0?1:-1; // cross<0 en écran = point à droite
+    return cross<0?1:-1; // cross<0 en écran = point à droite ⇒ +1 = à DROITE
   }
   const top=placed[0];
   const bot=placed[placed.length-1];
@@ -13468,19 +13472,36 @@ function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   const incl = 180 - rawAng;
   // KFPPA : utiliser incl (180-rawAng) sans correction de signe latéral
   if(testType==='kfppa') return incl;
-  // Vue dos : utiliser le cross product pour détecter le sens réel
-  // cross > 0 = calca penche à droite
-  // Pied D : droite = inversion(+), gauche = éversion(-)
-  // Pied G : droite = éversion(-), gauche = inversion(+)
+  // ─── Vue dos : signe inversion / éversion ───
+  //
+  // CONVENTION CLINIQUE, établie par le praticien sur cas réel le 19/09/2026 :
+  // en vue dos, la STATIQUE du pied droit telle qu'observée sur sa capture est
+  // une ÉVERSION (−), et la POINTE une INVERSION (+). Le bandeau des tests
+  // annonce « Inversion=+ Éversion=− » : c'est cette convention-là.
+  //
+  // CE QUI A ÉTÉ CORRIGÉ le 19/09/2026 : le signe était inversé, pour les deux
+  // pieds et pour les quatre tests en vue dos. Les magnitudes étaient justes,
+  // la fonction de qualification aussi — seul ce signe était faux.
+  //
+  // calcAngleSign rend +1 quand le point central est à DROITE en repère écran,
+  // −1 quand il est à gauche. MESURÉ, pas déduit du produit vectoriel, et fixé
+  // par tests/inv-ev-signe.test.mjs. Les deux commentaires qui vivaient ici
+  // affirmaient l'inverse l'un de l'autre.
+  //
+  // Les deux pieds ont des signes opposés parce que la latéralité s'inverse en
+  // vue dos : un même sens de bascule à l'écran correspond à des côtés
+  // anatomiques opposés selon le pied.
   if(view==='dos' && pts) {
     const sign = calcAngleSign(pts);
-    // calcAngleSign: +1 = calca penche à gauche, -1 = calca penche à droite
-    // Pied D : penche droite(-1) = inversion(+), penche gauche(+1) = éversion(-)
-    // Pied G : penche gauche(+1) = inversion(+), penche droite(-1) = éversion(-)
-    if(side==='D') return -sign * incl; // D: droite(-1)=Inv(+) → inverser signe
-    if(side==='G') return sign * incl;  // G: gauche(+1)=Inv(+) → même signe
+    if(side==='D') return sign * incl;
+    if(side==='G') return -sign * incl;
     return incl;
   }
+  // Repli SANS points : aucune géométrie n'est disponible, ce signe ne mesure
+  // donc rien — il est posé sur le seul côté. VOLONTAIREMENT LAISSÉ INCHANGÉ
+  // par la correction du 19/09/2026 : l'inverser reviendrait à remplacer une
+  // valeur arbitraire par une autre, sans observation qui l'appuie. À trancher
+  // séparément, idéalement en rendant null plutôt qu'un signe inventé.
   if(view==='dos' && side==='G') return -incl;
   // Vue face (KFPPA) : genou D pointe droite=valgus(+), genou G pointe droite=varus(-)
   if(view==='face' && pts) {
