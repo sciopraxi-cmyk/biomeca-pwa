@@ -8228,7 +8228,9 @@ function renderVidPhotoGrid() {
     // MLA : 2 colonnes (pied D et pied G)
     const slotsD=photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='D');
     const slotsG=photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='G');
-    let html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    // #268 — ordre du DOM déjà D puis G : rien n'est déplacé ici. Seule la
+    // classe est ajoutée, le style en ligne reste intact.
+    let html='<div class="photo-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
     html+='<div><div style="font-size:10px;font-weight:700;color:#4a9eff;margin-bottom:5px;">🦶 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
     slotsD.forEach(slot=>{ html+=vidPhotoSlotHTML(slot,slot.idx); });
     html+='</div></div>';
@@ -8241,12 +8243,19 @@ function renderVidPhotoGrid() {
 
   const slotsG = photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='G');
   const slotsD = photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='D');
-  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-  html += '<div><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:5px;">🦵 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
-  slotsG.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
-  html += '</div></div>';
+  // #268 — ordre du DOM NORMALISÉ en D puis G. Cette branche émettait G puis D
+  // alors que la branche mlaTest, dix lignes plus haut, émettait D puis G :
+  // deux branches voisines en ordres contraires sont exactement la
+  // configuration qui rend ce genre de défaut invisible. Les DEUX BLOCS
+  // ENTIERS ont été déplacés — jamais les libellés, jamais les clés : chaque
+  // bloc emporte son titre ET ses photos, filtrées par slot.side.
+  // Le rendu final ne change pas : .photo-pair réinverse en CSS.
+  let html = '<div class="photo-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
   html += '<div><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:5px;">🦵 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
   slotsD.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
+  html += '</div></div>';
+  html += '<div><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:5px;">🦵 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
+  slotsG.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
   html += '</div></div></div>';
   el.innerHTML = html;
 }

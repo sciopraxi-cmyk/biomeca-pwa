@@ -1108,3 +1108,42 @@ body.printing #rpt-print{display:block!important;}
   background:var(--card); border:1px solid var(--bord); border-radius:var(--r);
   padding:16px; width:340px; max-width:100%;
 }
+
+
+/* --- #268 CONVENTION CÔTÉ — DÉBUT ---
+   Convention d'affichage : côté DROIT à droite, côté GAUCHE à gauche.
+
+   L'ORDRE DU DOM RESTE D PUIS G PARTOUT. Seul le rendu est inversé, par ces
+   règles. C'est délibéré et ce n'est pas un détail de style : un bloc déplacé
+   par le CSS emporte son titre ET ses chiffres, qui sont écrits dans le même
+   élément. Les deux autres façons d'obtenir la même capture d'écran —
+   échanger les libellés, ou échanger les clés de données — impriment les
+   mesures d'un pied sous le nom de l'autre. NE JAMAIS corriger ce sens
+   autrement qu'ici. C'est la règle « profils inversés » du CLAUDE.md.
+
+   Les sélecteurs :first-child / :last-child ne sont légitimes que parce que
+   les quatorze conteneurs visés ont été mesurés à EXACTEMENT deux enfants
+   directs, et tous dans l'ordre D puis G après normalisation. Un troisième
+   enfant ajouté à l'un d'eux rendrait ces règles fausses en silence.
+
+   POURQUOI grid-row:1 EST INDISPENSABLE, et pas seulement grid-column.
+   Sans lui, la colonne gauche se décalait d'une rangée vers le bas. Forcer
+   le premier enfant en colonne 2 fait dépasser le curseur de placement
+   automatique au-delà de la colonne 1 de la première rangée ; le second
+   enfant réclame la colonne 1, ne peut pas revenir en arrière, et bascule
+   sur la rangée suivante. Épingler la rangée supprime le placement
+   automatique des deux côtés.
+
+   grid-row:1 sur les DEUX enfants n'est légitime que pour la même raison
+   mesurée : exactement deux enfants directs. Un troisième rendrait donc ces
+   règles fausses DE DEUX FAÇONS — il perdrait sa colonne, et il viendrait
+   se superposer sur la rangée 1.
+
+   .res-side n'a pas ce problème : c'est un flex en row-reverse, sans
+   placement automatique en grille. */
+.res-side{ flex-direction:row-reverse; }
+.rp-side-grid > *:first-child{ grid-column:2; grid-row:1; }
+.rp-side-grid > *:last-child { grid-column:1; grid-row:1; }
+.photo-pair  > *:first-child{ grid-column:2; grid-row:1; }
+.photo-pair  > *:last-child { grid-column:1; grid-row:1; }
+/* --- #268 CONVENTION CÔTÉ — FIN --- */
