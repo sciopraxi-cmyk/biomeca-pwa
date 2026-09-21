@@ -8448,9 +8448,18 @@ async function toggleCam() {
   if (camStream) { stopCam(); return; }
   try {
     const selCam = document.getElementById('cam-select')?.value;
+    // #272-A — 1280×720 -> 1920×1080. Raison MESURÉE, pas préférence : au
+    // cadrage hanche-au-sol d'un KFPPA, environ 95 cm sur la hauteur de
+    // l'image, une pastille de 5 mm ne fait que 4 à 6 px en 720p. Or entre
+    // 4 et 6 px le détecteur ne la trouve qu'UNE FOIS SUR NEUF à UNE FOIS
+    // SUR DEUX selon le calage sous-pixel — tableau mesuré au-dessus de
+    // sizeMin dans _detectReflectiveBlobs. En 1080p la même pastille fait
+    // 6 à 9 px, donc au-dessus du seuil de fiabilité.
+    // « ideal » et jamais « exact » : une caméra incapable de 1080p doit
+    // continuer à fonctionner en dégradé plutôt qu'échouer à s'ouvrir.
     camStream = await navigator.mediaDevices.getUserMedia(selCam
-      ? {video:{deviceId:{exact:selCam},width:{ideal:1280},height:{ideal:720}},audio:false}
-      : {video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},audio:false});
+      ? {video:{deviceId:{exact:selCam},width:{ideal:1920},height:{ideal:1080}},audio:false}
+      : {video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},audio:false});
     const canvas = document.getElementById('ph-canvas');
     const wrap = document.getElementById('ph-wrap');
     const vEl = document.createElement('video');
@@ -8603,11 +8612,16 @@ async function toggleVCam() {
   if(vidStream) { stopVCam(); return; }
   try {
     const selCam = document.getElementById('vcam-select')?.value;
+    // #272-A — 1280×720 -> 1920×1080, même raison mesurée que la caméra
+    // photo : en 720p une pastille de 5 mm fait 4 à 6 px au cadrage de
+    // travail, plage où la détection est INTERMITTENTE selon le calage
+    // sous-pixel. « ideal » conservé : une caméra qui ne sait pas faire
+    // 1080p doit continuer en dégradé.
     const constraints = {
       audio: false,
       video: selCam
-        ? {deviceId:{exact:selCam}, width:{ideal:1280}, height:{ideal:720}}
-        : {facingMode:'environment', width:{ideal:1280}, height:{ideal:720}}
+        ? {deviceId:{exact:selCam}, width:{ideal:1920}, height:{ideal:1080}}
+        : {facingMode:'environment', width:{ideal:1920}, height:{ideal:1080}}
     };
     vidStream=await navigator.mediaDevices.getUserMedia(constraints);
     const player=document.getElementById('vid-el');
@@ -12837,6 +12851,33 @@ function findMarkerAt(x, y, markers, cw) {
 }
 
 // Détection automatique des marqueurs réfléchissants
+// #272-A — Borne HAUTE de taille, proportionnelle à la définition de l'image.
+//
+// POURQUOI ELLE NE PEUT PAS RESTER ABSOLUE. Le compte de blob est un nombre
+// d'échantillons, donc une SURFACE : il croît comme le carré de la définition.
+// Une borne fixe à 200 convenait au 1280×720 ; en 1920×1080, la même pastille
+// vue au même cadrage compte 2,25 fois plus d'échantillons et se ferait
+// rejeter comme TROP GROSSE. On déplacerait le défaut d'un bout à l'autre.
+//
+// CALAGE : 200 exactement en 1280×720, pour ne rien changer au comportement
+// à cette définition. C'est la garde de non-régression, fixée par un test.
+//
+// LE PLANCHER À 200 N'EST PAS UNE COMMODITÉ. Cette fonction reçoit parfois
+// les dimensions d'une ZONE de calage, pas de l'image entière : sans plancher,
+// une petite zone rendrait une borne minuscule et rejetterait les pastilles
+// qu'elle est censée isoler. Le plancher garantit que la borne ne peut que
+// CROÎTRE par rapport à aujourd'hui, jamais se resserrer.
+//
+// LIMITE CONNUE, non traitée par ce lot : en 1080p AVEC une zone posée, la
+// borne retombe au plancher de 200 alors que les pastilles y sont plus
+// grosses. Corriger cela demanderait de transmettre la définition de l'image
+// entière depuis les appelants — hors du périmètre de #272-A, qui n'éprouve
+// qu'une hypothèse à la fois.
+function _blobSizeMaxFor(W, H) {
+  const REF = 1280 * 720;
+  return Math.max(200, Math.round((200 * (W * H)) / REF));
+}
+
 // #111 — Détecteur partagé de pastilles réfléchissantes. Flood-fill near-white
 // blobs ; filtres tight par défaut pour matcher les pastilles argent/blanc (et
 // exclure les gros reflets sol clair / bandes). Réutilisé par detectMarkersAuto
@@ -12846,8 +12887,41 @@ function _detectReflectiveBlobs(data, W, H, opts) {
   const o = opts || {};
   const lumMin = o.lumMin !== undefined ? o.lumMin : sensThr;
   const satMax = o.satMax !== undefined ? o.satMax : 25;
+  // #272-A — sizeMin reste ABSOLU : c'est un plancher de bruit, pas une
+  // mesure d'objet.
+  //
+  // CE QUE CE PLANCHER LAISSE PASSER, MESURÉ et non déduit. Le remplissage
+  // avance par pas de 2 : les échantillons sont sur une grille dont l'origine
+  // dépend du balayage, donc le compte d'un petit disque dépend de son CALAGE
+  // SOUS-PIXEL. Mesuré sur disques synthétiques, neuf calages par diamètre
+  // (tests/detection-taille-blob.test.mjs) :
+  //     ≤ 3 px  jamais détecté
+  //       4 px  détecté 1 fois sur 9
+  //       5 px  5 fois sur 9
+  //       6 px  8 fois sur 9
+  //     ≥ 7 px  toujours détecté
+  //
+  // C'EST LE CŒUR DU DÉFAUT QUE #272-A ÉPROUVE. Entre 4 et 6 px, la détection
+  // est INTERMITTENTE, et le calage sous-pixel change à chaque image dès que
+  // le corps bouge : le point lâche son capteur puis le retrouve au hasard.
+  //
+  // LES PASTILLES NE FONT PAS TOUTES LA MÊME TAILLE : de 5 à 10 mm selon le
+  // fournisseur et le repère, soit un facteur 2 en diamètre et 4 en surface.
+  // En 1280×720, au cadrage hanche-au-sol, une pastille de 10 mm fait 8 à
+  // 12 px — fiable — quand une de 5 mm en fait 4 à 6 — intermittente. Cela
+  // explique que la détection réussisse sur certains points et échoue sur
+  // d'autres DANS LA MÊME capture, ce qui ressemble à un défaut capricieux
+  // alors que c'est une question de taille apparente.
+  //
+  // La falaise HAUTE est gardée par le même fichier de test : en 1280×720 un
+  // disque passe jusqu'à 30 px et est rejeté à 34 ; en 1920×1080, grâce à la
+  // borne relative, jusqu'à 46 px et rejeté à 50.
+  //
+  // Une dérivation continue (π·d²/16 échantillons) annonçait un rejet net en
+  // dessous de 5,05 px : elle est FAUSSE à ces tailles, où la discrétisation
+  // domine. Ne pas la réintroduire — la mesure fait foi.
   const sizeMin = o.sizeMin !== undefined ? o.sizeMin : 5;
-  const sizeMax = o.sizeMax !== undefined ? o.sizeMax : 200;
+  const sizeMax = o.sizeMax !== undefined ? o.sizeMax : _blobSizeMaxFor(W, H);
   const step = o.step !== undefined ? o.step : 2;
   // Tolérance flood-fill : -35 lum / +30 sat pour autoriser le bord du blob
   // (gradient) sans noyer en cas de pastille brillante mais bord moins net.
