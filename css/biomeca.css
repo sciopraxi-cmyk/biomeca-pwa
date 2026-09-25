@@ -1147,3 +1147,258 @@ body.printing #rpt-print{display:block!important;}
 .photo-pair  > *:first-child{ grid-column:2; grid-row:1; }
 .photo-pair  > *:last-child { grid-column:1; grid-row:1; }
 /* --- #268 CONVENTION CÔTÉ — FIN --- */
+
+
+/* --- #269 HAUTEUR LECTEUR — DÉBUT ---
+   Le lecteur vidéo occupait toute la largeur disponible, donc une hauteur
+   proportionnelle, et repoussait hors de l'écran la lecture, la timeline et
+   le contraste. Rien ne le bornait : zéro max-height dans cette feuille.
+
+   ON BORNE LA LARGEUR DU CONTENEUR, JAMAIS LA HAUTEUR DE LA VIDÉO.
+   Le canevas des marqueurs est en position:absolute, width:100%, posé sur la
+   vidéo. Borner la hauteur de la <video> la ferait rétrécir sans que le
+   canevas la suive : les points se décaleraient de l'image, et ce décalage
+   ne se verrait pas comme un défaut — il ressemblerait à une mauvaise pose
+   de marqueurs. En bornant le CONTENEUR, les deux enfants restent en
+   width:100% et demeurent alignés par construction.
+
+   --vid-ar est le rapport RÉEL du flux, posé par le script à la lecture des
+   métadonnées. Ce n'est pas 16/9 par principe : les contraintes de caméra
+   sont en « ideal » et non « exact », et une vidéo importée peut avoir
+   n'importe quel format. La valeur de repli ne sert qu'avant le premier
+   chargement.
+
+   --vid-chrome est la hauteur de ce qui doit rester visible en même temps que
+   le lecteur. ELLE EST POSÉE PAR LE SCRIPT, MESURÉE AU RENDU (_majVidChrome).
+   La valeur de repli 368px ne sert qu'avant le premier appel : elle vient
+   d'un relevé sur UNE machine — fenêtre de 767px, chrome de 367,5 — et n'a
+   donc aucune valeur générale. Une hauteur rendue dépend des polices, de la
+   largeur de fenêtre et du navigateur ; elle ne se lit pas dans la source.
+
+   Un premier repli de 288px avait été DÉRIVÉ du balisage bloc par bloc. Il
+   était faux de 79,5px, et le lecteur débordait d'autant. D'où la règle : on
+   mesure, on ne dérive pas. */
+#vid-wrap{
+  max-width: calc((100vh - var(--vid-chrome, 368px)) * var(--vid-ar, 1.7778));
+  margin: 0;                 /* #273 — collé à gauche, plus centré */
+}
+/* --- #269 HAUTEUR LECTEUR — FIN --- */
+
+
+/* --- #273 CAPTURES À DROITE DU LECTEUR — DÉBUT ---
+   Les emplacements photo étaient EMPILÉS SOUS le lecteur et pesaient 1779 px
+   à eux seuls — mesuré. Ils obligeaient à défiler pour voir une capture et la
+   vidéo en même temps. Ils passent en colonne à droite du lecteur.
+
+   #vid-left a été AJOUTÉ DANS LE BALISAGE pour envelopper le lecteur et ses
+   commandes. Sans lui, #mode-video aurait onze enfants à placer un par un
+   dans une grille — et forcer la colonne d'un seul enfant décale le curseur
+   de placement automatique, ce qui avait déjà provoqué la régression de
+   décalage vertical de #268. Un flex à DEUX enfants n'a pas ce piège.
+
+   ARITHMÉTIQUE, ET ELLE NE PASSE PAS PARTOUT : à 240 px de large, une vignette
+   au format 4/3 fait 180 px de haut. Deux tiennent à côté d'un lecteur de
+   400 px, quatre non. Les tests à quatre captures — MLA, et les gabarits à
+   deux colonnes pied droit / pied gauche — resteront défilants. La colonne
+   est donc bornée en hauteur et défile pour elle-même, plutôt que de
+   repousser la page entière.
+
+   min-width:0 sur #vid-left est INDISPENSABLE : un enfant flex a une taille
+   minimale automatique égale à son contenu, et le lecteur refuserait de
+   rétrécir sans lui. */
+#mode-video{
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  /* PART MINIMALE DE LA RANGÉE RÉSERVÉE AU LECTEUR — VALEUR PROVISOIRE,
+     NON DÉRIVÉE, et il faut le savoir en la lisant.
+
+     J'ai cherché à la fonder sur findMarkerAt, et la recherche l'a RÉFUTÉE.
+     Cette fonction reçoit cw = canvas.width, soit 1920, et canvasXY y ramène
+     le clic : rayon d'attrape et écart entre marqueurs vivent tous deux en
+     pixels de canevas, donc leur rapport NE DÉPEND PAS de la largeur affichée.
+     Mesuré sur une capture KFPPA réelle, le plus petit écart entre deux
+     marqueurs voisins d'une même jambe (EIAS G ↔ Rotule G) vaut 192 px de
+     canevas, quand la zone d'attrape fait au maximum 144 px de diamètre à
+     f=1,50. Les zones ne se chevauchent à AUCUNE position du curseur :
+     rétrécir le lecteur ne rend jamais deux marqueurs ambigus pour le code.
+
+     Ce qui cède en rétrécissant est la visée humaine — à 200 px de lecteur,
+     deux voisins sont à 20 px d'écran et le rayon d'attrape à f=0,55 fait
+     2,8 px. Ce seuil-là n'est écrit nulle part dans le dépôt. D'où un tiers,
+     choisi et non calculé.
+
+     LA RÉFÉRENCE QUI DEVRAIT LE REMPLACER EXISTE, HORS DU DÉPÔT : WCAG 2.2,
+     critère 2.5.8 « Target Size (Minimum) », niveau AA — 24 × 24 pixels CSS.
+     Ce qu'elle implique, consigné ici et NON corrigé par ce lot : à f=0,55 le
+     rayon d'attrape vaut 26,4 px de canevas ; pour qu'il atteigne 12 px
+     d'écran, moitié de 24, il faudrait un lecteur de 12 × 1920 / 26,4 ≈ 873 px.
+     La rangée entière chez Scio en fait 627. Même SANS la colonne des
+     captures, la cible est donc déjà sous le seuil sur son écran. La cause
+     n'est pas la disposition mais le plancher de 12 dans findMarkerAt, exprimé
+     en pixels de CANEVAS là où le critère parle de pixels d'ÉCRAN — un
+     plancher qui ne planche donc rien de ce qu'on croit. Tâche à part.
+
+     ELLE EST DÉCLARÉE ICI ET NULLE PART AILLEURS : la feuille l'applique en
+     min-width, le script la relit pour son plafonnement. Deux écritures
+     séparées finiraient par diverger. */
+  --vid-left-min-part: 0.3333;
+}
+/* min-width:0 était là pour que le lecteur ACCEPTE de rétrécir — un enfant
+   flex a une taille minimale automatique égale à son contenu. Le besoin reste,
+   mais zéro l'autorisait aussi à DISPARAÎTRE : relevé chez Scio, #vid-left à
+   0 px et #vid-wrap à 2×2. Il faut un plancher, pas un zéro.
+   DEUX PROTECTIONS INDÉPENDANTES : la feuille tient en permanence, le script
+   affine et avertit. La garde JavaScript seule ne vaut qu'aux instants où
+   _majVignetteTaille s'exécute — entre deux appels, ou si elle sort par une de
+   ses gardes, il ne resterait rien pour s'opposer à l'effondrement. */
+#vid-left{
+  flex: 1 1 auto;
+  min-width: calc(100% * var(--vid-left-min-part, 0.3333));
+}
+
+/* LES 240 px FIXES ONT ÉTÉ RETIRÉS. Ils étaient faux dans les deux sens :
+   trop larges pour un test à une colonne, trop étroits pour un test à deux.
+   La largeur vient maintenant de --vign-col-w, posée par le script d'après la
+   hauteur d'une vignette et le NOMBRE DE COLONNES LU DANS LE DOM.
+
+   AUCUN NOMBRE DE RANGS N'EST ÉCRIT ICI NI DANS LE SCRIPT : le script compte
+   les enfants de chaque pile au moment du rendu. Si un gabarit change, la
+   disposition suit sans qu'on y touche.
+
+   overflow-y reste un filet : quand la fenêtre est si basse que la hauteur
+   calculée passerait sous le plancher de lisibilité, le script plafonne et la
+   colonne défile pour elle-même plutôt que de rendre les vignettes illisibles
+   ou de repousser la page. */
+#vid-photo-slots{
+  flex: 0 0 auto;
+  width: var(--vign-col-w, 240px);
+  /* La rangée, moins la part réservée au lecteur, moins l'écart : la colonne
+     ne peut pas réclamer davantage, même si le script n'a pas encore tourné
+     ou s'il est sorti par une de ses gardes. C'est la même règle que le
+     plafonnement du script, écrite ici avec la MÊME variable. */
+  max-width: calc(100% - 100% * var(--vid-left-min-part, 0.3333) - 12px);
+  max-height: calc(100vh - var(--vid-chrome, 368px));
+  overflow: auto;
+}
+
+/* LA HAUTEUR EST LE PILOTE, LA LARGEUR SUIT. Une hauteur définie plus un
+   aspect-ratio donnent une largeur définie — c'est ce qui permet au script de
+   calculer la largeur de colonne sans jamais la mesurer sur le rendu, donc
+   sans boucler.
+
+   LE RAPPORT EST CELUI DU FLUX, PAS 4/3. Les emplacements étaient en 4/3 avec
+   object-fit:cover. Une capture fait 1920×1080, soit 16/9 : versée en cover
+   dans une boîte 4/3 elle perd un quart de sa largeur, rogné à gauche et à
+   droite. En KFPPA les marqueurs sont sur les deux jambes, donc près de ces
+   bords-là : ils pouvaient disparaître de la vignette sans que rien ne le
+   signale, alors que ces vignettes servent justement à vérifier que les points
+   sont bien posés. --vid-ar porte le rapport réel du flux ; le repli 1.7778
+   ne sert que tant qu'aucune vidéo n'a été chargée.
+
+   --vid-ar EST ÉCRITE SUR #mode-video, PAS SUR #vid-wrap. Établi par
+   équilibrage des balises : #vid-wrap ouvre à la profondeur 2 sous
+   #mode-video et #vid-left ferme AVANT #vid-photo-slots, qui ouvre à la
+   profondeur 1. La colonne des captures est donc une SŒUR du lecteur — une
+   variable posée sur le lecteur ne lui parviendrait jamais. L'ancêtre commun
+   la rend lisible aux deux. */
+.vig-stack{ display: flex; flex-direction: column; gap: 6px; }
+
+/* CES DEUX TEXTES NE SE REPLIENT PAS, ET C'EST UNE DÉCISION, PAS UN DÉTAIL.
+   _majVignetteTaille retranche leur hauteur rendue de la hauteur disponible
+   pour en déduire --vign-col-w. Si leur hauteur dépendait de la largeur — à
+   240 px l'intitulé tient sur deux lignes, à 400 px sur une seule — la mesure
+   dépendrait de son propre résultat, et deux appels successifs rendraient deux
+   mises en page différentes selon l'ordre des événements. nowrap coupe ce lien
+   à la racine : une seule ligne, quelle que soit la largeur.
+
+   EN CAS DE DÉBORDEMENT, LE TEXTE EST TRONQUÉ PAR UNE ELLIPSE, PAS REPLIÉ.
+   C'est acceptable ICI et nulle part ailleurs : ce sont des intitulés fixes de
+   l'interface — une consigne et un côté — jamais une donnée clinique ni une
+   mesure. Une image rognée se tait, une phrase tronquée se voit. */
+.vig-entete, .vig-col-titre{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vig-entete{ font-size: 11px; font-weight: 600; color: var(--mut); margin-bottom: 6px; }
+.vig-col-titre{ font-size: 10px; font-weight: 700; margin-bottom: 5px; }
+
+.vig, .vig-vide{
+  height: var(--vign-h, 120px);
+  aspect-ratio: var(--vid-ar, 1.7778);
+  width: auto;
+  flex: 0 0 auto;
+  position: relative;
+  border-radius: var(--rs);
+  overflow: hidden;
+  background: var(--surf);
+}
+.vig{ border: 1px solid var(--bord); cursor: zoom-in; }
+.vig-vide{
+  border: 1px dashed var(--bord);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.vig-vide:hover{ border-color: var(--blue); }
+/* contain, jamais cover — même raison que pour la modale : rien ne doit être
+   rogné en silence. Avec .vig au rapport du flux il n'y a de toute façon plus
+   d'écart à combler, et contain garantit qu'un changement de format futur
+   laissera des bandes visibles plutôt qu'une image amputée. */
+.vig-img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.vig-ico{ font-size: 16px; }
+.vig-vide-lbl{ font-size: 9px; color: var(--mut); margin-top: 3px; text-align: center; padding: 0 4px; }
+.vig-ang{
+  position: absolute; top: 3px; left: 3px;
+  background: rgba(0,0,0,.8); border: 1px solid #FFD700; border-radius: 2px;
+  font-size: 10px; font-weight: 700; color: #FFD700;
+  padding: 1px 4px; font-family: var(--fm);
+}
+.vig-del{
+  position: absolute; top: 3px; right: 3px;
+  background: rgba(200,30,30,.85); border: none; border-radius: 2px;
+  color: #fff; cursor: pointer; padding: 0 4px; font-size: 10px;
+}
+.vig-lbl{
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,.7); font-size: 9px; color: #fff; padding: 2px 4px;
+}
+
+/* AGRANDISSEMENT — object-fit:contain, JAMAIS cover. La modale sert à juger un
+   angle : un marqueur près du bord serait rogné par cover, et l'image amputée
+   n'aurait pas l'air amputée. Même règle que pour les rapports.
+
+   LA VISIBILITÉ EST PILOTÉE PAR LA CLASSE .ouverte, pas par un display en
+   ligne. Les quatre modales existantes du projet portent display:none en
+   style en ligne et le script bascule sur flex ; ce motif fonctionne, mais il
+   remet un style en ligne au-dessus de la feuille — exactement ce que ce lot
+   défait ailleurs. Ici display:flex vit dans la classe, et le script ne touche
+   qu'à classList. Les deux moitiés doivent rester d'accord : si l'une change,
+   l'autre aussi, sans quoi la modale cesse de s'ouvrir sans rien signaler. */
+.vig-modal{
+  display: none;
+  position: fixed; inset: 0; z-index: 10050;
+  background: rgba(0,0,0,.85);
+  align-items: center; justify-content: center;
+  padding: 24px; box-sizing: border-box;
+}
+.vig-modal.ouverte{ display: flex; }
+.vig-modal-inner{ position: relative; max-width: 96vw; max-height: 88vh; display: flex; flex-direction: column; }
+.vig-modal-inner img{
+  max-width: 96vw; max-height: 82vh;
+  width: auto; height: auto;
+  object-fit: contain;
+  display: block; border-radius: 6px; background: #000;
+}
+.vig-modal-bar{
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px; font-size: 12px; color: #fff;
+}
+.vig-modal-ang{ font-family: var(--fm); font-weight: 700; color: #FFD700; }
+.vig-modal-x{
+  position: absolute; top: 12px; right: 16px;
+  background: none; border: none; color: #fff;
+  font-size: 30px; line-height: 1; cursor: pointer;
+}
+/* --- #273 CAPTURES À DROITE DU LECTEUR — FIN --- */

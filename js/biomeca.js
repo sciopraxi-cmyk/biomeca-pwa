@@ -4147,6 +4147,24 @@ const TESTS = {
 // Sépare la logique de calcul de la config TESTS pour permettre
 // une boucle générique de génération des conclusions.
 // ══════════════════════════════════════════════════════
+// #275-B — AUCUN REPLI SUR LES VALEURS ENREGISTRÉES POUR LE KFPPA.
+// data.deltaD/deltaG/pctD/pctG ont été calculées avec bipodal.angle, un angle
+// mesuré sur six points À CHEVAL SUR LES DEUX JAMBES. Les relire donnerait un
+// valgus dynamique faux.
+//
+// ORDRE DE GRANDEUR, PAS UNE MESURE : en prenant les points unipodaux de la
+// capture de référence COMME S'ILS ÉTAIENT une frame bipodale, l'écart sur le
+// statique ressort à 2,8° d'un côté et 9,7° de l'autre — soit 55 et 194 points
+// de pourcentage de la norme marche. Aucune frame bipodale réelle n'a été
+// relevée ; ces chiffres situent l'ampleur, ils ne la mesurent pas.
+//
+// Un bilan sans angleD/angleG n'est donc PAS recalculable, et on le dit :
+// aucun degré, aucun pourcentage, aucune interprétation. Rien n'est modifié ni
+// effacé dans les bilans existants — on cesse seulement de relire la valeur
+// fausse. LA DÉCISION EST LOCALE À CHAQUE RENDU : pas d'état partagé, qui
+// resterait vrai d'un bilan au suivant.
+const KFPPA_NON_RECALC = 'valgus dynamique non recalculable (bilan antérieur)';
+
 const MEASURE_COMPUTERS = {
   // KFPPA : recompute live depuis photos (cohérent avec rendu actuel)
   kfppa: (t, data, side) => {
@@ -4155,7 +4173,7 @@ const MEASURE_COMPUTERS = {
     const _toI = (v) => v == null ? null : (v > 90 ? 180 - v : v);
     const _bd = _toI(side === 'D' ? _bip?.angleD : _bip?.angleG);
     const _ud = _toI(_uni?.angle);
-    const _delta = (_bd != null && _ud != null) ? (_ud - _bd) : _toI(side === 'D' ? data.deltaD : data.deltaG);
+    const _delta = (_bd != null && _ud != null) ? (_ud - _bd) : null; // #275-B
     return (_delta != null) ? _delta / t.div : null;
   },
   // MLA : ratio persisté OU fallback recompute depuis photos (mirror du render L4470-4476)
@@ -8218,10 +8236,13 @@ function renderVidPhotoGrid() {
   const el = document.getElementById('vid-photo-grid'); if(!el) return;
 
   if(t.kfppaPhotos || t.mobiliteAP) {
-    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    // #273 — .vig-stack remplace le style en ligne display:flex : c'est cette
+    // classe que _majVignetteTaille interroge pour compter les rangs.
+    let html = '<div class="vig-stack">';
     photoSlots.forEach((slot, i) => { html += vidPhotoSlotHTML(slot, i); });
     html += '</div>';
     el.innerHTML = html;
+    _majVignetteTaille();
     return;
   }
   if(t.mlaTest) {
@@ -8230,14 +8251,18 @@ function renderVidPhotoGrid() {
     const slotsG=photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='G');
     // #268 — ordre du DOM déjà D puis G : rien n'est déplacé ici. Seule la
     // classe est ajoutée, le style en ligne reste intact.
+    // #273 — le conteneur .photo-pair et son grid-template-columns en ligne
+    // sont INTACTS : c'est la convention côté de #268, livrée en production.
+    // Seules les piles internes et les titres reçoivent leurs classes.
     let html='<div class="photo-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-    html+='<div><div style="font-size:10px;font-weight:700;color:#4a9eff;margin-bottom:5px;">🦶 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
+    html+='<div><div class="vig-col-titre" style="color:#4a9eff;">🦶 Pied Droit</div><div class="vig-stack">';
     slotsD.forEach(slot=>{ html+=vidPhotoSlotHTML(slot,slot.idx); });
     html+='</div></div>';
-    html+='<div><div style="font-size:10px;font-weight:700;color:#3ecf72;margin-bottom:5px;">🦶 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
+    html+='<div><div class="vig-col-titre" style="color:#3ecf72;">🦶 Pied Gauche</div><div class="vig-stack">';
     slotsG.forEach(slot=>{ html+=vidPhotoSlotHTML(slot,slot.idx); });
     html+='</div></div></div>';
     el.innerHTML=html;
+    _majVignetteTaille();
     return;
   }
 
@@ -8250,30 +8275,136 @@ function renderVidPhotoGrid() {
   // ENTIERS ont été déplacés — jamais les libellés, jamais les clés : chaque
   // bloc emporte son titre ET ses photos, filtrées par slot.side.
   // Le rendu final ne change pas : .photo-pair réinverse en CSS.
+  // #273 — branche par défaut : Verrouillage AP (4 captures, 2 rangs) et
+  // Amorti/Propulsion (6 captures, 3 rangs), le cas le plus contraint.
+  // Conteneur .photo-pair et grid-template-columns en ligne INTACTS — #268.
   let html = '<div class="photo-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-  html += '<div><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:5px;">🦵 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
+  html += '<div><div class="vig-col-titre" style="color:var(--blue);">🦵 Pied Droit</div><div class="vig-stack">';
   slotsD.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
   html += '</div></div>';
-  html += '<div><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:5px;">🦵 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
+  html += '<div><div class="vig-col-titre" style="color:var(--green);">🦵 Pied Gauche</div><div class="vig-stack">';
   slotsG.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
   html += '</div></div></div>';
   el.innerHTML = html;
+  _majVignetteTaille();
 }
 
 
+// #273 — LES STYLES EN LIGNE DE MISE EN BOÎTE SONT PARTIS EN CLASSES.
+// Un style en ligne bat la feuille : tant que width:100% et aspect-ratio:4/3
+// restaient écrits ici, aucune règle CSS n'aurait pu piloter la taille des
+// vignettes, et ajouter !important pour passer devant aurait figé la chose une
+// seconde fois. Ce qui a été DÉPLACÉ, sans rien changer d'autre :
+//   emplacement plein  -> .vig        (position, fond, bordure, rayon, débord)
+//   image              -> .vig-img    (inset:0 + width/height 100% + contain)
+//                         elle était en width:100% + aspect-ratio:4/3 + cover.
+//                         C'est .vig qui porte désormais le rapport, et ce
+//                         rapport est celui du flux (--vid-ar), pas 4/3 :
+//                         une capture 1920×1080 versée en cover dans une boîte
+//                         4/3 perdait un quart de sa largeur, là où sont
+//                         justement les marqueurs des deux jambes en KFPPA.
+//   badge d'angle      -> .vig-ang
+//   bouton supprimer   -> .vig-del
+//   libellé            -> .vig-lbl
+//   emplacement vide   -> .vig-vide + .vig-ico + .vig-vide-lbl
+// Ce qui est RESTÉ en ligne : les onclick, qui sont du comportement et non de
+// la présentation.
+// #275-B — texte d'angle d'un créneau BIPODAL de KFPPA : deux mesures, une par
+// jambe, jamais un angle unique.
+//
+// LA DISCRIMINATION SE FAIT SUR t.kfppaPhotos, PAS SUR « créneau sans côté ».
+// Le test `mobilite` a lui aussi deux créneaux sans côté et écrit lui aussi
+// angleD/angleG : une condition fondée sur le seul côté vide les attraperait et
+// changerait leur affichage, ce qui n'est pas l'objet de ce lot. La table des
+// tests est la bonne source, et elle vaut AUSSI pour les bilans déjà
+// enregistrés, puisqu'elle ne dépend pas de ce qui a été stocké.
+//
+// LES ANCIENS BILANS S'AFFICHENT CORRECTEMENT SANS RECALCUL NI EFFACEMENT :
+// ils portent le nombre faux dans `angle` et les bonnes valeurs dans
+// angleD/angleG. On préfère ces dernières ; le nombre faux cesse d'être lu
+// sans être touché.
+// AUCUN REPLI SUR slot.angle POUR CE CRÉNEAU, MÊME SANS VALEUR D NI G. Retomber
+// sur `angle` y ferait réapparaître le nombre faux des anciens bilans — le
+// défaut qu'on corrige. Sans mesure, on écrit « D — · G — » : l'absence se voit,
+// elle ne se déguise pas en mesure.
+function _kfppaBipodalTexte(t, slot) {
+  if (!t || !t.kfppaPhotos || slot.side) return null;
+  const f = (v) => (v == null ? '—' : v.toFixed(1) + '°');
+  return 'D ' + f(slot.angleD) + ' · G ' + f(slot.angleG);
+}
+
 function vidPhotoSlotHTML(slot, idx) {
   if(slot.dataUrl) {
-    return '<div style="position:relative;background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);overflow:hidden;">'
-      + '<img src="'+slot.dataUrl+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block;"/>'
-      + (slot.angle !== null ? '<span style="position:absolute;top:3px;left:3px;background:rgba(0,0,0,.8);border:1px solid #FFD700;border-radius:2px;font-size:10px;font-weight:700;color:#FFD700;padding:1px 4px;font-family:var(--fm);">'+slot.angle.toFixed(1)+'°</span>' : '')
-      + '<button onclick="deletePhotoSlot('+idx+');renderVidPhotoGrid();" style="position:absolute;top:3px;right:3px;background:rgba(200,30,30,.85);border:none;border-radius:2px;color:#fff;cursor:pointer;padding:0 4px;font-size:10px;">✕</button>'
-      + '<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);font-size:9px;color:#fff;padding:2px 4px;">'+slot.label+'</span>'
+    const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
+    // L'agrandissement est sur le conteneur ; la croix appelle stopPropagation
+    // pour que supprimer ne déclenche jamais l'agrandissement au passage.
+    return '<div class="vig" onclick="ouvrirVignette('+idx+')">'
+      + '<img class="vig-img" src="'+slot.dataUrl+'"/>'
+      + (bip ? '<span class="vig-ang">'+bip+'</span>'
+             : (slot.angle != null ? '<span class="vig-ang">'+slot.angle.toFixed(1)+'°</span>' : ''))
+      + '<button class="vig-del" onclick="event.stopPropagation();deletePhotoSlot('+idx+');renderVidPhotoGrid();">✕</button>'
+      + '<span class="vig-lbl">'+slot.label+'</span>'
       + '</div>';
   }
-  return '<div style="background:var(--surf);border:1px dashed var(--bord);border-radius:var(--rs);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="captureVidPhotoSlot('+idx+')">'
-    + '<span style="font-size:16px;">📷</span>'
-    + '<span style="font-size:9px;color:var(--mut);margin-top:3px;text-align:center;padding:0 4px;">'+slot.label+'</span>'
+  return '<div class="vig-vide" onclick="captureVidPhotoSlot('+idx+')">'
+    + '<span class="vig-ico">📷</span>'
+    + '<span class="vig-vide-lbl">'+slot.label+'</span>'
     + '</div>';
+}
+
+// #273 — agrandissement d'une capture. Il n'existait AUCUNE modale d'image
+// réutilisable dans le projet : les quatre modales présentes sont toutes
+// spécialisées (compte, modules, abonnement, âge podopédiatrie). Celle-ci est
+// volontairement minimale.
+//
+// object-fit:contain est porté par .vig-modal-inner img — jamais cover. La
+// modale sert à vérifier un angle : rogner couperait un marqueur de bord et
+// l'image tronquée n'aurait pas l'air tronquée.
+//
+// Ni zoom ni déplacement : la résolution stockée est 1920, l'afficher en
+// entier suffit à juger. Ce sera un ajout séparé si Scio le demande.
+let _vigEchap = null;
+function ouvrirVignette(idx) {
+  const slot = photoSlots[idx];
+  if (!slot || !slot.dataUrl) return;
+  // PAS DE RETOUR SILENCIEUX SUR UN ÉLÉMENT MANQUANT. Un identifiant renommé
+  // un jour rendrait le clic inopérant sans message ni trace : une fonction
+  // morte qui a l'air normale. On nomme celui qui manque.
+  const ids = ['modal-vignette', 'vig-modal-img', 'vig-modal-lbl', 'vig-modal-ang'];
+  const els = ids.map((id) => document.getElementById(id));
+  const manquants = ids.filter((id, i) => !els[i]);
+  if (manquants.length) {
+    console.error('#273 ouvrirVignette : balisage de la modale introuvable —', manquants.join(', '));
+    return;
+  }
+  const [m, img, lbl, ang] = els;
+  img.src = slot.dataUrl;
+  lbl.textContent = slot.label || '';
+  const a = (slot.angle !== null && slot.angle !== undefined) ? slot.angle.toFixed(1) + '°' : '';
+  ang.textContent = a;
+  ang.style.display = a ? '' : 'none';
+  // classList, jamais style.display : display:flex vit dans .vig-modal.ouverte.
+  m.classList.add('ouverte');
+  // L'écouteur n'existe QUE pendant l'ouverture : pas de touche Échap captée
+  // en permanence au détriment du reste de l'application.
+  _vigEchap = (e) => { if (e.key === 'Escape') fermerVignette(); };
+  document.addEventListener('keydown', _vigEchap);
+}
+function fermerVignette() {
+  const m = document.getElementById('modal-vignette');
+  if (m) m.classList.remove('ouverte');
+  const img = document.getElementById('vig-modal-img');
+  // removeAttribute plutôt que src='' : une chaîne vide relance une requête
+  // vers la page courante et salit la console.
+  if (img) img.removeAttribute('src');
+  if (_vigEchap) { document.removeEventListener('keydown', _vigEchap); _vigEchap = null; }
+}
+// Clic sur le FOND uniquement. e.target === e.currentTarget n'est vrai que si
+// le clic a atterri sur le fond lui-même : un clic sur l'image, sur le libellé
+// ou sur l'angle a une autre cible et ne ferme rien. Sans cette égalité, la
+// modale se refermerait sous le doigt dès qu'on approche un marqueur.
+function _vigFondClic(e) {
+  if (e.target === e.currentTarget) fermerVignette();
 }
 
 function captureVidPhotoSlot(slotIdx) {
@@ -8303,7 +8434,7 @@ function captureVidPhotoSlot(slotIdx) {
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
   // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
-  const mlaType = t?.markers==='mla' ? 'mla' : (t?.markers==='genou-bi' ? 'kfppa' : (t?.type||''));
+  const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
@@ -8338,6 +8469,19 @@ function captureVidPhotoSlot(slotIdx) {
     const mkrG = vidMarkers.filter(m=>m.side==='G');
     photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,'kfppa',mkrD);
     photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,'kfppa',mkrG);
+    // #275-B — LE CRÉNEAU BIPODAL NE PORTE PLUS D'ANGLE UNIQUE.
+    //
+    // Ce créneau n'a pas de côté, donc `markersForPhoto` vaut tous les
+    // marqueurs — les six, D et G confondus. calcAngle3 applique alors sa règle
+    // des gabarits à quatre points et mesure sur [1], [2], [3] : un sommet À
+    // CHEVAL SUR LES DEUX JAMBES. Le nombre obtenu n'a aucun sens
+    // géométrique, et il partait dans le rapport du patient — relevé par le
+    // praticien : 124,0° sur une station bipodale jambes droites.
+    //
+    // Les deux vraies mesures viennent d'être calculées juste au-dessus, par
+    // jambe. On efface donc l'angle unique plutôt que de le laisser cohabiter
+    // avec elles : une valeur fausse qui reste lisible finit par être lue.
+    photoSlots[slotIdx].angle = null;
   }
 
   renderVidPhotoGrid();
@@ -8386,6 +8530,11 @@ function photoSlotHTML(slot, idx) {
 
 function deletePhotoSlot(i) {
   photoSlots[i].dataUrl=null; photoSlots[i].angle=null; photoSlots[i].path=null;
+  // #275-B — angleD et angleG DOIVENT partir avec le reste. Ils n'étaient pas
+  // effacés : après suppression d'une photo bipodale de KFPPA, la vignette
+  // aurait continué d'afficher les deux mesures d'une capture qui n'existe
+  // plus. Le défaut ne se voyait pas tant que seul `angle` était affiché.
+  photoSlots[i].angleD=null; photoSlots[i].angleG=null;
   renderPhotoGrid(); updateResults();
 }
 
@@ -8417,7 +8566,7 @@ function capturePhotoSlot(slotIdx) {
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
   // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
-  const mlaType = t?.markers==='mla' ? 'mla' : (t?.markers==='genou-bi' ? 'kfppa' : (t?.type||''));
+  const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
@@ -8629,6 +8778,8 @@ async function toggleVCam() {
     player.srcObject=vidStream; player.play();
     player.onloadedmetadata=()=>{
       vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
+      _majVidRatio(player); // #269 publie le rapport reel du flux
+      _majVidLayout(); // #273 chrome PUIS vignettes — l ordre importe
       document.getElementById('vid-info').textContent=`Live ${vcanvas.width}×${vcanvas.height}`;
       document.getElementById('btn-vrec').style.display='';
       document.getElementById('btn-vauto').style.display='';
@@ -8660,6 +8811,8 @@ function loadVidFile(input) {
   player.srcObject=null; player.src=URL.createObjectURL(file);
   player.onloadedmetadata=()=>{
     vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
+    _majVidRatio(player); // #269 publie le rapport reel du flux
+    _majVidLayout(); // #273 chrome PUIS vignettes — l ordre importe
     document.getElementById('vid-info').textContent=`${player.videoWidth}×${player.videoHeight} · ${player.duration.toFixed(1)}s`;
     document.getElementById('btn-vauto').style.display='';
     document.getElementById('btn-vsnap').style.display='';
@@ -12487,6 +12640,8 @@ function toggleRec() {
       };
       player.onloadedmetadata=()=>{
         vcanvas.width=player.videoWidth; vcanvas.height=player.videoHeight;
+        _majVidRatio(player); // #269 publie le rapport reel du flux
+        _majVidLayout(); // #273 chrome PUIS vignettes — l ordre importe
         document.getElementById('vid-info').textContent=`Enreg. · ${player.duration.toFixed(1)}s`;
         setupVidCanvas(player,vcanvas);
       };
@@ -12714,6 +12869,306 @@ function _applyCapView() {
       el._wheelBound = true;
     }
   });
+  // #270 — molette SIMPLE sur le lecteur : défilement image par image.
+  const vw = document.getElementById('vid-wrap');
+  if (vw && !vw._wheelStepBound) {
+    vw.addEventListener('wheel', _capWheelStep, { passive: false });
+    vw._wheelStepBound = true;
+  }
+  // #269 — le chrome dépend de la largeur de fenêtre : les barres de boutons
+  // passent à la ligne quand elle rétrécit. Remesurer au redimensionnement,
+  // sinon la borne resterait calée sur la mise en page du premier rendu.
+  // #273 — L'ORDRE EST IMPOSÉ : _majVidChrome PUIS _majVignetteTaille.
+  // La seconde divise la hauteur disponible, qui vaut innerHeight moins
+  // --vid-chrome. Appelée avant, elle travaillerait sur le repli de la feuille
+  // au lieu de la valeur mesurée — relevé chez Scio : 368 au lieu de 448, donc
+  // 80 px de hauteur de trop répartis sur les vignettes, donc une colonne trop
+  // large. C'est cet ordre inversé qui a produit --vign-col-w = 1054 px.
+  if (!window._vidLayoutBound) {
+    window.addEventListener('resize', _majVidLayout);
+    window._vidLayoutBound = true;
+  }
+  _majVidLayout();
+}
+
+// #273 — l'ordre des deux mesures, en UN SEUL endroit. Deux appels séparés à
+// recopier sur chaque site, c'est deux occasions de les inverser.
+function _majVidLayout() {
+  _majVidChrome();
+  _majVignetteTaille();
+}
+
+// #269 — publie le rapport d'aspect RÉEL du flux dans --vid-ar, que la règle
+// CSS de #vid-wrap emploie pour borner sa largeur d'après la hauteur
+// disponible. On ne suppose pas 16/9 : les contraintes de caméra sont en
+// « ideal » et non « exact », et une vidéo importée peut avoir n'importe quel
+// format.
+//
+// APPELÉ AUX TROIS SITES DU LECTEUR, ET NULLE PART AILLEURS : caméra en
+// direct (toggleVCam), vidéo importée (loadVidFile), relecture du clip
+// enregistré (toggleRec). Le fichier dimensionne d'autres canevas à partir
+// d'autres flux — la galerie photo, la caméra photo, l'empreinte podo — et
+// ceux-là n'ont rien à voir avec #vid-wrap : y appeler cette fonction
+// publierait sur le conteneur du lecteur le format d'une image étrangère.
+function _majVidRatio(player) {
+  const w = player && player.videoWidth;
+  const h = player && player.videoHeight;
+  if (!w || !h) return;
+  // #273 — ÉCRITE SUR #mode-video, PLUS SUR #vid-wrap. Les vignettes de la
+  // colonne de droite prennent désormais ce rapport pour ne rien rogner, et
+  // #vid-photo-slots est une SŒUR du lecteur, pas sa descendante : une
+  // variable posée sur #vid-wrap ne lui serait jamais parvenue. Établi par
+  // équilibrage des balises — #vid-left ferme avant que #vid-photo-slots
+  // n'ouvre, les deux à la profondeur 1 sous #mode-video.
+  // #vid-wrap continue de la lire : il ouvre à la profondeur 2 sous
+  // #mode-video, donc il en hérite.
+  const mv = document.getElementById('mode-video');
+  if (mv) mv.style.setProperty('--vid-ar', String(w / h));
+  // #273 — CETTE FONCTION N'APPELLE PLUS _majVignetteTaille. Elle s'exécute
+  // avant que _majVidChrome n'ait posé --vid-chrome, donc le calcul serait
+  // fait sur le repli de la feuille. Les sites appellent _majVidLayout, qui
+  // enchaîne les deux dans le bon ordre.
+}
+
+// #273 — taille des vignettes de la colonne de captures.
+//
+// AUCUN NOMBRE DE RANGS N'EST ÉCRIT ICI. Les rangs sont COMPTÉS DANS LE DOM
+// RENDU : chaque pile est un .vig-stack, ses enfants sont les emplacements.
+// Un gabarit qui changerait de nombre de captures serait suivi sans retouche.
+// C'est aussi la raison pour laquelle on ne lit pas TESTS[] : le tableau des
+// dispositions déduit du code s'était révélé faux sur quatre cas sur cinq.
+//
+// LE SENS DU CALCUL EST : hauteur -> largeur -> largeur de colonne.
+// La hauteur disponible ne dépend d'aucune largeur, la hauteur d'une vignette
+// s'en déduit par division, sa largeur par --vid-ar, et la largeur de colonne
+// par le nombre de colonnes. À AUCUN MOMENT ON NE MESURE UNE LARGEUR RENDUE :
+// c'est ce qui empêche la boucle « la colonne s'élargit -> le lecteur rétrécit
+// -> la colonne s'élargit ».
+//
+// UNE CIRCULARITÉ INTERNE A ÉTÉ LEVÉE DANS LA FEUILLE, PAS ICI. On retranche
+// plus bas la hauteur RENDUE de l'intitulé « Assigner les captures… » et du
+// titre de colonne. Or la hauteur d'un texte dépend de la largeur qui lui est
+// donnée — à 240 px l'intitulé tenait sur deux lignes, à 400 px sur une seule —
+// et cette largeur est justement --vign-col-w, calculée à partir de lui. La
+// mesure aurait dépendu de son propre résultat : pas d'oscillation, puisque
+// rien ne relance la fonction en boucle, mais deux appels successifs auraient
+// rendu deux mises en page différentes selon l'ordre des événements.
+// .vig-entete et .vig-col-titre sont donc en white-space:nowrap, avec ellipse
+// en cas de débordement. LEUR HAUTEUR NE DÉPEND PLUS DE LA LARGEUR.
+// Rétablir le repli à la ligne sur l'une de ces deux classes rouvrirait le
+// défaut, et il ne se verrait pas.
+//
+// COUPLAGE RÉSIDUEL, ASSUMÉ ET NON RÉSOLU : élargir la colonne rétrécit
+// #vid-left, ce qui peut faire passer la rangée de boutons à la ligne et donc
+// augmenter le chrome mesuré par _majVidChrome. Rien ici ne relance ce calcul,
+// donc il n'y a pas d'oscillation ; mais après un tel repli la hauteur
+// disponible est surestimée jusqu'au prochain redimensionnement. Le seuil de
+// 1 px plus bas évite en outre de réécrire les variables pour un cheveu.
+const _VIGN_H_MIN = 56;   // plancher de lisibilité, en pixels
+function _majVignetteTaille() {
+  const mv = document.getElementById('mode-video');
+  const slots = document.getElementById('vid-photo-slots');
+  if (!mv || !slots) return;
+  const piles = slots.querySelectorAll('.vig-stack');
+  const cols = piles.length;
+  if (!cols) return;
+  // Le nombre de rangs est celui de la pile la plus fournie : en deux colonnes
+  // D et G peuvent être dépareillées si une capture manque.
+  let rangs = 0;
+  piles.forEach((p) => { if (p.children.length > rangs) rangs = p.children.length; });
+  // GARDE : aucun emplacement rendu. On ne divise pas, on n'écrit rien, et les
+  // replis de la feuille continuent de s'appliquer.
+  if (rangs <= 0) return;
+
+  const cs = getComputedStyle(mv);
+  const ar = parseFloat(cs.getPropertyValue('--vid-ar')) || 1.7778;
+  const chrome = parseFloat(cs.getPropertyValue('--vid-chrome')) || 368;
+
+  // Hauteur disponible : la MÊME expression que celle dont la feuille borne le
+  // lecteur, donc la colonne fait exactement la hauteur du lecteur.
+  let dispo = window.innerHeight - chrome;
+
+  // Ce qui, dans la colonne, n'est pas une vignette : son propre intitulé, et
+  // le titre « Pied Droit / Pied Gauche » des dispositions à deux colonnes.
+  // Mesurés, jamais supposés.
+  for (const enfant of slots.children) {
+    if (enfant.id === 'vid-photo-grid') continue;
+    const s = getComputedStyle(enfant);
+    if (s.display === 'none') continue;
+    dispo -= enfant.getBoundingClientRect().height
+      + parseFloat(s.marginTop) + parseFloat(s.marginBottom);
+  }
+  const titre = slots.querySelector('.vig-col-titre');
+  if (titre) {
+    const st = getComputedStyle(titre);
+    dispo -= titre.getBoundingClientRect().height
+      + parseFloat(st.marginTop) + parseFloat(st.marginBottom);
+  }
+
+  const ecartRang = parseFloat(getComputedStyle(piles[0]).rowGap) || 0;
+  const paire = slots.querySelector('.photo-pair');
+  const ecartCol = paire ? (parseFloat(getComputedStyle(paire).columnGap) || 0) : 0;
+
+  let h = (dispo - (rangs - 1) * ecartRang) / rangs;
+  if (!isFinite(h)) return;
+  // PLANCHER : sous cette hauteur les vignettes ne servent plus à vérifier
+  // quoi que ce soit. On plafonne et #vid-photo-slots défile pour lui-même,
+  // plutôt que de rendre illisible ce que Scio doit justement regarder.
+  if (h < _VIGN_H_MIN) h = _VIGN_H_MIN;
+
+  let largeur = h * ar;
+  let colW = cols * largeur + (cols - 1) * ecartCol;
+  if (!isFinite(colW) || colW <= 0) return;
+
+  // ── TÉMOIN : LA COLONNE NE DOIT JAMAIS ÉCRASER LE LECTEUR ──────────────
+  // Relevé chez Scio avant cette garde : --vign-col-w = 1054,4 px, #vid-left
+  // réduit à 0, #vid-wrap à 2×2. min-width:0 autorisait le lecteur à
+  // disparaître, et rien ne plafonnait la colonne. Un écrasement silencieux
+  // du lecteur ne doit plus être possible.
+  //
+  // mv.clientWidth EST UNE LARGEUR MESURÉE, et ce n'est pas une entorse à la
+  // règle de non-circularité : c'est la largeur de la RANGÉE, imposée par
+  // .cap-main. #mode-video est un conteneur de niveau bloc, sa largeur vient
+  // de son parent et non de ses enfants. La colonne n'y a aucune influence.
+  const rangee = mv.clientWidth;
+  const ecartRangee = parseFloat(getComputedStyle(mv).columnGap) || 0;
+  // La part réservée au lecteur est DÉCLARÉE DANS LA FEUILLE, sur #mode-video,
+  // et relue ici. Écrite deux fois, elle finirait par diverger — et une
+  // divergence entre le max-width de la feuille et le plafonnement du script
+  // se manifesterait par une colonne qui saute d'une largeur à l'autre.
+  const part = parseFloat(getComputedStyle(mv).getPropertyValue('--vid-left-min-part')) || 0.3333;
+  const minLecteur = rangee * part;
+  const reste = rangee - colW - ecartRangee;
+  if (rangee > 0 && reste < minLecteur) {
+    const colMax = rangee - minLecteur - ecartRangee;
+    console.warn(
+      '#273 — colonne de captures plafonnée : ' + colW.toFixed(1) + ' px demandés, '
+      + colMax.toFixed(1) + ' px accordés. Le lecteur garde ' + minLecteur.toFixed(1)
+      + ' px (un tiers de la rangée de ' + rangee.toFixed(1) + ' px).'
+    );
+    colW = colMax;
+    if (colW <= 0) return; // rangée absurde : on n'écrit rien
+    // La hauteur suit la largeur accordée, sinon les vignettes seraient
+    // rognées par le conteneur au lieu de rétrécir.
+    largeur = (colW - (cols - 1) * ecartCol) / cols;
+    h = largeur / ar;
+    if (h < _VIGN_H_MIN) {
+      // Les deux bornes sont incompatibles sur cette fenêtre. LE LECTEUR NE
+      // CÈDE PAS : on garde le plancher de lisibilité et la colonne défile
+      // pour elle-même, horizontalement s'il le faut.
+      console.warn(
+        '#273 — fenêtre trop étroite pour ' + cols + ' colonne(s) de vignettes : '
+        + h.toFixed(1) + ' px de haut calculés, plancher à ' + _VIGN_H_MIN
+        + ' px. La colonne défile ; le lecteur n\'est pas réduit.'
+      );
+      h = _VIGN_H_MIN;
+    }
+  }
+
+  // Seuil de 1 px : ne pas réécrire pour une variation invisible.
+  const hAct = parseFloat(cs.getPropertyValue('--vign-h'));
+  const wAct = parseFloat(cs.getPropertyValue('--vign-col-w'));
+  if (!(Math.abs(hAct - h) < 1)) mv.style.setProperty('--vign-h', h.toFixed(1) + 'px');
+  if (!(Math.abs(wAct - colW) < 1)) mv.style.setProperty('--vign-col-w', colW.toFixed(1) + 'px');
+}
+
+// #269 — publie dans --vid-chrome la hauteur RÉELLEMENT occupée par tout ce qui
+// doit rester visible en même temps que le lecteur. La règle CSS de #vid-wrap
+// retranche cette valeur de 100vh et multiplie le reste par --vid-ar.
+//
+// LA VALEUR 288 DU DÉPART ÉTAIT DÉRIVÉE DU BALISAGE, ET ELLE ÉTAIT FAUSSE.
+// Relevé sur la machine de Scio : fenêtre de 767 px, chrome réel de 367,5 —
+// 136 px d'en-tête, fil d'Ariane et note au-dessus de #mode-video, 45,5 pour
+// la barre Zone/contraste, 186 pour la lecture, la timeline et les curseurs.
+// Il restait 399,5 px pour un lecteur qui en occupait 433,4 : il débordait de
+// 34 px. Une hauteur rendue dépend des polices, de la largeur de fenêtre et du
+// navigateur — elle ne se lit pas dans la source, elle se mesure.
+//
+// CE QUI EST AU-DESSUS N'EST PAS ÉNUMÉRÉ : la position du lecteur dans le
+// document le donne d'un coup, en-tête compris, sans risquer d'oublier un
+// élément. Ce qui est en dessous l'est, parce qu'il faut y faire un tri.
+//
+// #frames-strip et #vid-photo-slots sont VOLONTAIREMENT EXCLUS : ils pèsent
+// 1835 px à eux deux et vivent sous la ligne de flottaison. Les inclure ferait
+// tendre la hauteur disponible vers zéro.
+//
+// NON CIRCULAIRE, ET C'EST MESURÉ : la hauteur du lecteur n'entre dans aucun
+// terme. Un relevé imposant quatre largeurs au lecteur — 260, 520, 900 px et
+// la règle de la feuille — a montré la somme des frères stable à 0 px près.
+// C'est .cap-main qui variait de 286 px, parce que sa hauteur EST celle de son
+// contenu ; elle est donc écartée. window.innerHeight, lui, ne dépend de rien.
+const _VID_SOUS_LIGNE = ['frames-strip', 'vid-photo-slots'];
+function _majVidChrome() {
+  const wrap = document.getElementById('vid-wrap');
+  const mv = document.getElementById('mode-video');
+  if (!wrap || !mv) return;
+  // LES FRÈRES SONT PRIS SUR LE PARENT RÉEL DU LECTEUR, JAMAIS SUR
+  // #mode-video : depuis #273 le lecteur est enveloppé dans #vid-left, et
+  // lire les enfants de #mode-video ne donnerait plus que deux colonnes. Le
+  // parent réel reste juste, quelle que soit la profondeur d'enveloppement.
+  const parent = wrap.parentElement;
+  if (!parent) return;
+  // Décalage du lecteur depuis le haut du DOCUMENT : insensible au défilement,
+  // et il englobe tout ce qui le précède sans qu'on ait à le lister.
+  let chrome = wrap.getBoundingClientRect().top + window.scrollY;
+  let apres = false;
+  for (const el of parent.children) {
+    if (el === wrap || el.contains(wrap)) { apres = true; continue; }
+    if (!apres) continue; // déjà compté dans le décalage ci-dessus
+    if (_VID_SOUS_LIGNE.indexOf(el.id) !== -1) continue;
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden') continue;
+    chrome += el.getBoundingClientRect().height
+      + parseFloat(s.marginTop) + parseFloat(s.marginBottom);
+  }
+  // Une mesure absurde ne doit pas écraser le repli de la feuille.
+  if (!isFinite(chrome) || chrome <= 0 || chrome >= window.innerHeight) return;
+  // POSÉE SUR #mode-video, PAS SUR LE LECTEUR : la colonne des captures est
+  // une SŒUR du lecteur et non sa descendante, donc elle ne verrait pas une
+  // variable écrite sur #vid-wrap. Un ancêtre commun la rend lisible aux deux.
+  mv.style.setProperty('--vid-chrome', chrome.toFixed(1) + 'px');
+}
+
+// #270 — Défilement de la vidéo enregistrée à la molette, pour choisir les
+// instants de capture sans viser la timeline.
+//
+// IL RÉUTILISE stepFrame, la fonction des boutons −1 et +1 : il n'y a qu'UNE
+// façon d'avancer d'une image, et deux implémentations divergeraient.
+//
+// Il ne fait rien avec Ctrl ou ⌘ : la molette modifiée reste au zoom, dont
+// _capWheelZoom continue de s'occuper. Les deux gestionnaires cohabitent sur
+// le même élément, chacun sortant quand l'autre est concerné.
+//
+// Il ne fait rien non plus sans vidéo chargée : en direct sur la caméra il
+// n'y a pas d'instants à parcourir, et la page doit continuer de défiler
+// normalement.
+//
+// preventDefault est indispensable, sinon la page défile en même temps que la
+// vidéo — et il exige {passive:false} à la liaison, sans quoi le navigateur
+// l'ignore silencieusement.
+function _capWheelStep(e) {
+  if (e.ctrlKey || e.metaKey) return; // zoom : affaire de _capWheelZoom
+  const p = document.getElementById('vid-el');
+  // Une source de flux (caméra) n'a rien à parcourir ; une durée non finie
+  // non plus.
+  //
+  // LE SEUIL EST 1, PAS 2, ET C'EST MESURÉ. Un relevé de 32 événements molette
+  // sur une vidéo de 8,3 s montre readyState oscillant entre 4 et 1 : écrire
+  // currentTime déclenche un déplacement, pendant lequel readyState retombe à
+  // HAVE_METADATA. Avec un seuil à 2, l'événement suivant sortait ici sans
+  // appeler preventDefault — deux molettes sur trois perdues, et la PAGE
+  // DÉFILAIT à leur place. Le défaut se voyait d'un seul côté : en reculant la
+  // page était déjà en haut, donc rien ne bougeait ; en avançant elle partait.
+  //
+  // HAVE_METADATA (1) suffit à ce gestionnaire, qui ne fait qu'écrire
+  // currentTime : à ce stade duration est connue, ce que la condition suivante
+  // vérifie de toute façon. Exiger HAVE_CURRENT_DATA (2) demandait une image
+  // décodée dont on n'a pas besoin pour déplacer la tête de lecture.
+  if (!p || p.srcObject || p.readyState < 1 || !isFinite(p.duration) || p.duration <= 0) return;
+  e.preventDefault();
+  // Molette vers le bas = avancer. Si le sens paraît inversé à l'usage,
+  // c'est ce signe-là qu'il faut changer, et lui seul.
+  stepFrame(e.deltaY > 0 ? 1 : -1);
 }
 
 // #237 — recentrage après changement de zoom. Sans lui, l'agrandissement part
@@ -13336,10 +13791,59 @@ function snapMarkersToReflectiveBlobs() {
   }
 }
 
+// ─── #271 PROPORTIONS DES DÉCORATIONS DU MARQUEUR ───────────────────────────
+//
+// CE DESSIN NE RESTE PAS À L'ÉCRAN. drawOverlay est appelée sur un canevas
+// temporaire par captureVidPhotoSlot, capturePhotoSlot et captureFrame, dont
+// le toDataURL alimente photoSlots[].dataUrl — l'image que le rapport affiche.
+// Ce qui est tracé ici PART DANS LES DOSSIERS REMIS AUX PATIENTS. Le rapport
+// ne rejoue pas drawOverlay à l'impression, mais c'est drawOverlay qui a
+// produit l'image. Toucher à ces valeurs n'est pas une affaire d'affichage.
+//
+// POURQUOI CES DEUX COEFFICIENTS. Le diviseur du rayon était passé de 72 à 288,
+// mais lineWidth restait figé à 1,5 px et le halo planché à 2 px : les
+// décorations n'avaient pas suivi. Mesuré à 1920 et f=0,55, l'anneau couvrait
+// 5,8 à 8,8 px de diamètre quand une pastille de 8 mm en fait 6 à 9 en 1080p.
+// Un anneau BLANC posé exactement sur le bord d'une pastille BLANCHE : le
+// marqueur se confondait avec ce qu'il désigne, et le seul geste qui compte —
+// voir d'un coup d'œil si le point est sur la pastille ou à côté — devenait
+// impossible. Part colorée 24,7 %, trait 32,0 %.
+//
+// ILS SONT DÉRIVÉS, PAS CHOISIS : ce sont les rapports qu'avaient l'épaisseur
+// et le halo dans l'état ÷72, au point de travail 1920 / f=0,55, où r valait
+// 14,667 px pour lw=1,5 et halo=2,2.
+//
+// RÉSERVE, RELEVÉE ET NON MASQUÉE : lw/r n'était PAS constant en ÷72 — il vaut
+// 0,1534 à 1280 / f=0,55. Cette dérivation privilégie donc 1920. halo/r, lui,
+// valait 0,1500 exactement partout où le plancher de 2 px n'agissait pas.
+const MKR_TRAIT_PART = 0.1023;
+// Plancher : en dessous de 1 px un trait ne se rend pas — il s'étale en gris
+// sur deux pixels au lieu de marquer un bord.
+//
+// ET C'EST LUI QUI GOUVERNE PRESQUE PARTOUT — mesuré sur ce code, pas supposé.
+// 0,1023 × r ne dépasse 1 px que si r > 9,78, ce qui n'arrive qu'à 1920 avec
+// f=1,50 (trait 1,02). Sur les SEPT autres combinaisons des quatre positions du
+// curseur et des deux définitions, l'épaisseur vaut exactement 1 px.
+// Autrement dit : le trait est de fait CONSTANT à 1 px sur toute la plage
+// utile, et MKR_TRAIT_PART ne se réveille qu'à l'extrémité haute du curseur en
+// 1080p. Ce n'est pas un défaut — 1 px reste bien plus fin que les 1,5 px
+// figés d'avant, et c'était l'objet du lot — mais il ne faut pas croire le mot
+// « proportionnel » : si l'on veut une vraie progression, c'est ce plancher
+// qu'il faudra discuter, pas le coefficient.
+const MKR_TRAIT_MIN = 1;
+const MKR_HALO_PART = 0.15;
+// Le sélectionné garde le rapport d'épaisseur qu'il avait : 2,5 contre 1,5.
+const MKR_TRAIT_SEL = 2.5 / 1.5;
+// JAMAIS DE BLANC SUR UN MARQUEUR NON SÉLECTIONNÉ : la cible est blanche.
+// Cette teinte n'est pas nouvelle — elle sert déjà au contour des textes de
+// _drawMarkersOnly. Pas de palette parallèle.
+const MKR_TRAIT_COUL = 'rgba(0,0,0,.7)';
+const MKR_TRAIT_COUL_SEL = '#f5a623';
+
 // Dessin overlay avec SEGMENTS RECTANGULAIRES (style OPS)
 function drawOverlay(ctx, canvas, markers, selIdx, view) {
   const W=canvas.width;
-  const segW=Math.max(8,W/55); // largeur du rectangle segment
+  const segW=_mkrSegW(W); // largeur du rectangle segment — formule partagée
 
   // #111-Zone — la zone de calage posée reste visible sur le canvas vidéo
   // (et seulement lui : drawOverlay sert aussi aux canvas photo).
@@ -13364,9 +13868,45 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
   // dominerait visuellement le point lui-même).
   markers.forEach((m,i)=>{
     if(m.x===null) return;
-    const r = Math.max(4, (W / 72) * markerSizeFactor);
-    const haloPad = Math.max(2, 4 * markerSizeFactor);
+    // #271 — diviseur 72 -> 288. MESURÉ : à 72, le diamètre dessiné valait
+    // 1,53 % de la largeur d'image, soit 29 px sur 1920, quand une pastille
+    // de 8 mm au cadrage de travail en fait 5 à 7. Quatre à six fois trop
+    // gros : le cercle masquait la pastille qu'il désigne.
+    //
+    // Valeurs obtenues à 1920, diamètre en pixels de canevas :
+    //     f=0,30 -> 4,0   f=0,55 -> 7,3   f=1,00 -> 13,3   f=1,50 -> 20,0
+    //
+    // LE PLANCHER PASSE DE 4 À 2 px DE RAYON, et ce n'est pas un détail.
+    // Mesuré : avec le diviseur 288 et un plancher à 4, celui-ci devient
+    // actif sous f ≈ 0,60 à 1920 et f ≈ 0,90 à 1280 — le curseur serait
+    // inerte sur la moitié basse de sa course, et le défaut de 0,55 rendrait
+    // 8,0 px écrasés par le plancher au lieu des 7,3 visés. À 2 px, plus
+    // aucune plage morte à 1920 : le plancher se libère exactement au minimum
+    // du curseur. Il reste une plage morte de 0,30 à 0,45 à 1280.
+    //
+    // Le plancher garde sa raison d'être — sur un petit canevas, 640 px de
+    // large, f=0,3 donnerait 0,67 px et le point disparaîtrait. À 2 px de
+    // rayon il fait 4 px de diamètre, plus le halo d'au moins 2 px de chaque
+    // côté : 8 px visibles.
+    //
+    // LE CERCLE DESSINÉ EST DÉSORMAIS PLUS PETIT QUE LA ZONE DE PRÉHENSION,
+    // et c'est voulu. Le test de clic (findMarkerAt) garde cw/40 avec un
+    // plancher de 12 px : c'est lui qui rend les points attrapables au doigt.
+    // NE PAS « corriger » cet écart en alignant les deux.
+    //
+    // CE DIVISEUR EST UNE APPROXIMATION, PAS UNE VÉRITÉ. Il sera remplacé par
+    // le diamètre MESURÉ de la pastille quand la calibration automatique
+    // existera : le logiciel connaîtra alors l'échelle réelle de
+    // l'installation, et le cercle pourra coller à la pastille plutôt qu'à
+    // une fraction arbitraire de la largeur d'image.
+    const r = Math.max(2, (W / 288) * markerSizeFactor);
     const isSel=selIdx===i;
+    // #271 — épaisseur et halo PROPORTIONNELS AU RAYON. Ils étaient figés à
+    // 1,5 px et planchés à 2 px, hérités du diviseur 72, et écrasaient un point
+    // quatre fois plus petit. Le plancher s'applique AVANT le facteur du
+    // sélectionné, pour que celui-ci reste plus épais même au minimum.
+    const trait = Math.max(MKR_TRAIT_MIN, MKR_TRAIT_PART * r) * (isSel ? MKR_TRAIT_SEL : 1);
+    const haloPad = MKR_HALO_PART * r;
     ctx.save();
     // Halo : alpha déjà très bas (0.15/0.3) — conservé tel quel pour repère.
     ctx.beginPath(); ctx.arc(m.x, m.y, r + haloPad, 0, 2 * Math.PI);
@@ -13379,33 +13919,456 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     ctx.globalAlpha = markerOpacity;
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle=isSel?'#f5a623':'#fff'; ctx.lineWidth=isSel?2.5:1.5; ctx.stroke();
+    ctx.strokeStyle=isSel?MKR_TRAIT_COUL_SEL:MKR_TRAIT_COUL; ctx.lineWidth=trait; ctx.stroke();
     ctx.restore();
-    ctx.fillStyle='#fff';
-    ctx.font = `bold ${Math.max(8, (W / 60) * markerSizeFactor)}px DM Sans,sans-serif`;
-    ctx.fillText(m.name, m.x + r + 3, m.y + 3);
   });
 
-  // Arc d'angle pour chaque groupe de 3
-  ['D','G',''].forEach(side=>{
-    const grp=markers.filter(m=>m.side===side&&_isPlacedPt(m));
-    if(grp.length>=3){
-      const ang=calcAngle3(grp);
-      if(ang!==null){
-        const B=grp.length>=4?grp[2]:grp[1]; // AP: sommet=CalcaSup(idx2), sinon centre
-        const grpPts=grp;
-        const _mlaT=TESTS[currentTestId]?.markers==='mla'?'mla':(TESTS[currentTestId]?.type||"");
-        const corrAng=computeCorrectedAngle(ang, side, view, _mlaT, grpPts);
-        const r2=Math.max(16,W/24);
-        const a1=Math.atan2(grp[0].y-B.y,grp[0].x-B.x),a2=Math.atan2(grp[2].y-B.y,grp[2].x-B.x);
-        const col=side==='D'?'#4a9eff':side==='G'?'#3ecf72':'#FFD700';
-        ctx.save(); ctx.beginPath(); ctx.arc(B.x,B.y,r2,a1,a2,false);
-        ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.stroke(); ctx.restore();
-        ctx.fillStyle=col; ctx.font=`bold 13px DM Mono,monospace`;
-        ctx.fillText(corrAng.toFixed(1)+'°',B.x+r2+4,B.y-3);
-      }
-    }
+  // ─── #271-B PLACEMENT : LA MESURE D'ABORD, L'ÉTIQUETTE ENSUITE ───────────
+  //
+  // SUR CES IMAGES, LA VALEUR D'ANGLE EST LA MESURE ET LA LÉGENDE EST UNE
+  // ÉTIQUETTE. SI L'UNE DOIT CÉDER, C'EST L'ÉTIQUETTE. Et ce dessin ne reste
+  // pas à l'écran : captureVidPhotoSlot, capturePhotoSlot et captureFrame
+  // l'incrustent dans photoSlots[].dataUrl, l'image que le rapport affiche.
+  // Ce qui est tracé ici part dans les dossiers remis aux patients.
+  //
+  // RÈGLE DE PLACEMENT, donnée par le praticien et non déduite du code :
+  // l'arc et sa valeur vont DANS LE CREUX de l'angle ; les LÉGENDES VIVENT À
+  // L'EXTÉRIEUR de leur jambe, toujours, quelle que soit la position des
+  // genoux — elles ne peuvent donc plus se rencontrer au milieu.
+  //
+  // LE CALCUL EST DANS _mkrDisposition, fonction PURE : drawOverlay ne fait
+  // plus que dessiner ce qu'elle renvoie. C'est ce qui rend le placement
+  // vérifiable par un test sur la configuration réelle de la capture.
+  const _ANG_ECART = Math.max(4, W / 240);
+  const pxAng = _mkrFontAngle(W);
+  // LEUR TAILLE EST INCHANGÉE — W/60 × facteur, plancher 8. Les réduire dans la
+  // proportion des cercles avait été envisagé puis ABANDONNÉ : elles seraient
+  // tombées au plancher, soit une dizaine de pixels de canevas, environ 2 px à
+  // l'écran. La règle de placement rend la réduction inutile.
+  //
+  // CONSTAT À PART, NON TRAITÉ ICI : ces tailles sont en pixels de CANEVAS et
+  // la lisibilité dépend de l'échelle d'affichage, que cette fonction ignore.
+  // À 1920 rendus sur un lecteur de 700 px, 17,6 px de canevas font 6,4 px à
+  // l'écran. Même nature que le plancher de findMarkerAt. Tâche séparée.
+  const pxLbl = Math.max(8, (W / 60) * markerSizeFactor);
+  const rPoint = Math.max(2, (W / 288) * markerSizeFactor);
+
+  // Les textes d'angle sont calculés ici parce qu'ils dépendent de TESTS et de
+  // computeCorrectedAngle ; la disposition, elle, n'a besoin que des chaînes.
+  const _textesAngle = new Map();
+  ['D','G',''].forEach((side) => {
+    const grp = markers.filter((m) => m.side === side && _isPlacedPt(m));
+    if (grp.length < 3) return;
+    const ang = calcAngle3(grp);
+    if (ang === null) return;
+    const _mlaT = _mkrTypeTest(TESTS[currentTestId]);
+    _textesAngle.set(side, computeCorrectedAngle(ang, side, view, _mlaT, grp).toFixed(1) + '°');
   });
+
+  const dispo = _mkrDisposition(ctx, markers, W, _textesAngle, pxAng, pxLbl, rPoint, _ANG_ECART);
+
+  // ── Arcs et valeurs d'angle ──
+  dispo.valeurs.forEach((v) => {
+    const col = v.side === 'D' ? '#4a9eff' : v.side === 'G' ? '#3ecf72' : '#FFD700';
+    ctx.save();
+    ctx.beginPath();
+    // Le sens de parcours vient de _mkrCreux : il met l'arc du côté choisi.
+    ctx.arc(v.arc.x, v.arc.y, v.arc.r, v.arc.a1, v.arc.a2, v.arc.sens);
+    ctx.strokeStyle = col; ctx.lineWidth = v.arc.lw; ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.font = `bold ${pxAng}px DM Mono,monospace`;
+    ctx.fillStyle = col; ctx.textAlign = v.aligne; ctx.textBaseline = 'middle';
+    ctx.fillText(v.texte, v.x, v.y);
+    ctx.restore();
+  });
+
+  // ── Légendes EN DERNIER, pour n'être jamais recouvertes ──
+  ctx.save();
+  ctx.font = `bold ${pxLbl}px DM Sans,sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  dispo.legendes.forEach((l) => {
+    ctx.textAlign = l.aligne;
+    ctx.fillText(l.texte, l.x, l.y);
+  });
+  ctx.restore();
+}
+
+// Centre d'un groupe de points. Sert à définir « l'extérieur » par la position
+// RÉELLE des deux groupes, et non par une moitié d'image : le patient n'est pas
+// forcément centré dans le cadre.
+function _mkrCentre(grp) {
+  let sx = 0, sy = 0;
+  for (const p of grp) { sx += p.x; sy += p.y; }
+  return { x: sx / grp.length, y: sy / grp.length };
+}
+
+// DIRECTION DE L'EXTÉRIEUR, calculée et non supposée.
+//   deux jambes -> le côté opposé au centre de l'autre groupe ;
+//   un seul groupe -> le côté opposé au centre de l'image.
+//
+// LE GROUPE SANS CÔTÉ, celui des tests MLA, tombe dans le second cas : il n'a
+// pas de controlatéral, donc son extérieur est calculé par rapport au milieu de
+// l'image. C'est le seul choix disponible, et il est sans conséquence puisqu'il
+// n'y a alors aucune autre légende avec laquelle se rencontrer.
+//
+// PUREMENT HORIZONTALE : « extérieur » est un côté gauche/droite. Prendre le
+// vecteur entre les deux centres introduirait une composante verticale dès que
+// les jambes ne sont pas à la même hauteur, et ferait dériver les légendes.
+// À égalité stricte, un côté fixe — arbitraire mais constant d'une image à
+// l'autre, ce qui est tout ce qu'on demande ici.
+function _mkrExterieur(grp, autreGrp, W) {
+  const cx = _mkrCentre(grp).x;
+  const refX = autreGrp ? _mkrCentre(autreGrp).x : W / 2;
+  return { x: cx - refX >= 0 ? 1 : -1, y: 0 };
+}
+
+// Position de la légende du SOMMET quand l'arc est lui aussi à l'extérieur :
+// elle se range AU-DELÀ DE L'ARC, du côté extérieur, à la hauteur du sommet.
+//
+// ELLE SE RANGEAIT AUPARAVANT APRÈS LA BOÎTE DE LA VALEUR. Cela n'a plus de
+// sens depuis que la valeur vit DANS le disque : la légende se serait posée à
+// l'intérieur de l'arc, par-dessus lui. C'est le rayon qui fait désormais
+// référence — celui de l'arc EFFECTIF, agrandi le cas échéant.
+function _mkrAncreSommet(arc, ext) {
+  return { x: arc.x + ext.x * arc.r, y: arc.y };
+}
+
+// SAUF QUAND LA VALEUR S'EST REPLIÉE HORS DE L'ARC. Elle se pose alors sur la
+// bissectrice, au-delà du rayon ; si l'arc est lui-même du côté extérieur, la
+// bissectrice pointe vers l'extérieur — précisément là où _mkrAncreSommet
+// range la légende. Les deux se recouvreraient. Dans ce seul cas, la légende
+// repart d'après la BOÎTE MESURÉE de la valeur, comme avant #271-C.
+function _mkrAncreApresValeur(boiteValeur, ext) {
+  const cy = (boiteValeur.y0 + boiteValeur.y1) / 2;
+  return ext.x >= 0 ? { x: boiteValeur.x1, y: cy } : { x: boiteValeur.x0, y: cy };
+}
+
+// DISPOSITION COMPLÈTE — fonction pure, ne dessine rien.
+function _mkrDisposition(ctx, markers, W, textesAngle, pxAng, pxLbl, rPoint, ecart) {
+  const grps = new Map();
+  ['D','G',''].forEach((s) => {
+    const g = markers.filter((m) => m.side === s && _isPlacedPt(m));
+    if (g.length >= 3) grps.set(s, g);
+  });
+
+  const geo = new Map();
+  grps.forEach((grp, side) => {
+    const B = grp.length >= 4 ? grp[2] : grp[1]; // AP: sommet=CalcaSup(idx2)
+    let autre = null;
+    grps.forEach((g2, s2) => { if (s2 !== side && !autre) autre = g2; });
+    const creux = _mkrCreux(
+      { x: grp[0].x - B.x, y: grp[0].y - B.y },
+      { x: grp[2].x - B.x, y: grp[2].y - B.y },
+      B, autre ? _mkrCentre(autre) : null
+    );
+    if (creux) geo.set(side, { grp, B, creux, ext: _mkrExterieur(grp, autre, W) });
+  });
+
+  const r2 = Math.max(16, W / 24);
+  const segW = _mkrSegW(W); // MÊME formule que les bandes dessinées
+  const valeurs = [];
+  ctx.font = `bold ${pxAng}px DM Mono,monospace`;
+  geo.forEach((g, side) => {
+    const texte = textesAngle.get(side);
+    if (texte == null) return;
+    // LA VALEUR VIT DANS SON DEMI-CERCLE : _mkrValeurDansArc donne la distance
+    // au sommet le long de la bissectrice, et le rayon de l'arc — agrandi si
+    // le texte ne tenait pas, ou repli hors de l'arc si même l'agrandissement
+    // ne suffit pas.
+    const v = _mkrValeurDansArc(
+      ctx, texte, pxAng, r2, MKR_ARC_LW, segW, g.creux.sinDemi,
+      Math.min(g.creux.nu, g.creux.nv)
+    );
+    const x = g.B.x + g.creux.bx * v.d;
+    const y = g.B.y + g.creux.by * v.d;
+    valeurs.push({
+      side, texte, x, y, aligne: 'center',
+      agrandi: v.agrandi, dehors: v.dehors,
+      boite: _mkrBoite(ctx, texte, x, y, 'center', pxAng),
+      arc: {
+        x: g.B.x, y: g.B.y, r: v.rayon, lw: MKR_ARC_LW, sens: g.creux.sens,
+        a1: Math.atan2(g.grp[0].y - g.B.y, g.grp[0].x - g.B.x),
+        a2: Math.atan2(g.grp[2].y - g.B.y, g.grp[2].x - g.B.x),
+      },
+    });
+  });
+
+  ctx.font = `bold ${pxLbl}px DM Sans,sans-serif`;
+  const legendes = [];
+  markers.forEach((m) => {
+    if (m.x === null) return;
+    const g = geo.get(m.side);
+    const ext = g ? g.ext : { x: 1, y: 0 };
+    const val = valeurs.find((v) => v.side === m.side);
+    let ancre = m, base = rPoint + ecart;
+    // CAS DE LA ROTULE. Le sommet, et seulement lui, et seulement quand l'arc
+    // est LUI AUSSI du côté extérieur : sa légende passe après la valeur.
+    // Quand l'arc est à l'intérieur, rien de spécial — la légende va à
+    // l'extérieur, à côté du point, comme toutes les autres.
+    const arcDehors = g && g.creux.bx * ext.x > 0;
+    if (g && val && m === g.B && arcDehors) {
+      // Après le RAYON dans le cas courant ; après la BOÎTE DE LA VALEUR quand
+      // celle-ci s'est repliée hors de l'arc, sur cette même bissectrice.
+      ancre = val.dehors ? _mkrAncreApresValeur(val.boite, ext) : _mkrAncreSommet(val.arc, ext);
+      base = ecart;
+    }
+    // La garde controlatérale RESTE, en filet pour les cas extrêmes — jambes
+    // croisées ou quasi superposées. Avec la règle de l'extérieur elle ne
+    // devrait plus se déclencher sur une acquisition normale ; `decale` et
+    // `raccourci` disent si elle l'a fait.
+    const p = _mkrPlaceLegende(
+      ctx, m.name, ancre, ext, base, pxLbl,
+      valeurs.filter((v) => v.side !== m.side)
+    );
+    legendes.push({ nom: m.name, side: m.side, sommet: !!(g && m === g.B), arcDehors: !!arcDehors, ...p });
+  });
+
+  return { geo, valeurs, legendes };
+}
+
+// ─── #271-B OUTILS DE PLACEMENT ─────────────────────────────────────────────
+
+// LA VALEUR D'ANGLE SUIT LA LARGEUR D'IMAGE. Elle était à « bold 13px » FIXE,
+// donc en pixels de canevas, alors que les légendes suivent W/60 et l'arc W/24.
+// #272-A ayant fait passer la capture de 1280 à 1920, elle a perdu un tiers de
+// sa proportion sans que rien ne le signale : 13/1280 = 1,0156 % de la largeur
+// contre 13/1920 = 0,6771 %. On lui rend AU MOINS la proportion qu'elle avait
+// à 1280 — 19,5 px à 1920 — le plancher gardant les 13 px d'origine en dessous.
+const MKR_ANG_W_REF = 1280;
+const MKR_ANG_PX_REF = 13;
+
+// UNE SEULE SOURCE POUR DEUX EMPLOIS. La largeur de la bande de segment sert à
+// la dessiner (drawSegmentRect) ET à en écarter la valeur d'angle ; l'épaisseur
+// de l'arc sert à le tracer ET à calculer la place libre dans son disque. Deux
+// écritures séparées de la même grandeur finiraient par diverger, et le défaut
+// serait une valeur posée sur une bande — invisible tant que les deux nombres
+// coïncident encore.
+function _mkrSegW(W) {
+  return Math.max(8, W / 55);
+}
+const MKR_ARC_LW = 2.5;
+function _mkrFontAngle(W) {
+  return Math.max(MKR_ANG_PX_REF, (W / MKR_ANG_W_REF) * MKR_ANG_PX_REF);
+}
+
+// SEUIL DE DÉVIATION, en SINUS de l'angle de déviation : |u × v| / (|u|·|v|).
+// Sans dimension, donc indépendant de la définition de l'image et de la
+// longueur des segments — contrairement au produit vectoriel brut.
+//
+// JUSTIFIÉ PAR LES DEUX JAMBES RÉELLES du relevé #272-B : la jambe D est à
+// 0,0621 (3,56° de déviation), la jambe G à 0,00124 (0,071°). Un facteur 50
+// les sépare. Le seuil de 0,02 — soit 1,15° — laisse la première très au-dessus
+// et la seconde très en dessous, sans être calé sur ni l'une ni l'autre.
+//
+// D'OÙ VIENT 0,02 : de la précision de pose d'un marqueur, que j'estime à
+// ±2 px — c'est la seule entrée choisie de tout ce calcul. Sur un segment de
+// 200 px cela fait 0,01 radian d'incertitude angulaire ; on prend le double.
+// Une jambe G à 0,00124 est donc indiscernable d'une jambe droite : décider
+// d'un côté par le SIGNE du produit vectoriel reviendrait à décider par le
+// bruit, et un pixel sur le genou ferait sauter l'arc d'une image à l'autre.
+const MKR_SIN_DEV_MIN = 0.02;
+
+// Direction du creux, et sens de parcours de l'arc.
+//
+// AU PASSAGE DU SEUIL, IL RESTE UN SAUT, ET JE NE LE CACHE PAS. Si la jambe se
+// fléchit lentement vers l'INTÉRIEUR pendant une vidéo, le côté choisi passe de
+// « extérieur » à « concavité » au franchissement de 1,15°, et l'arc bascule une
+// fois. Ce qui a été supprimé, c'est le battement autour de zéro, là où le bruit
+// vit ; il subsiste une bascule unique et monotone, à une déviation désormais
+// signifiante. L'éliminer tout à fait demanderait de se souvenir du choix de
+// l'image précédente, ce que cette fonction ne peut pas faire : elle est sans
+// état et sert aussi aux captures uniques.
+function _mkrCreux(u, v, B, autreB) {
+  const nu = Math.hypot(u.x, u.y), nv = Math.hypot(v.x, v.y);
+  if (!nu || !nv) return null;
+  const croix = u.x * v.y - u.y * v.x;
+  const sinDev = Math.abs(croix) / (nu * nv);
+  // Normale au segment proximal : toujours bien conditionnée.
+  const n = { x: -u.y / nu, y: u.x / nu };
+  let cote;
+  if (sinDev < MKR_SIN_DEV_MIN) {
+    // Trop droit pour que le signe veuille dire quelque chose. On place du côté
+    // OPPOSÉ À L'AUTRE JAMBE : stable, et cela éloigne l'arc du membre voisin.
+    // Sans autre jambe, un côté fixe — arbitraire mais constant.
+    cote = autreB
+      ? (n.x * (B.x - autreB.x) + n.y * (B.y - autreB.y) >= 0 ? 1 : -1)
+      : 1;
+  } else {
+    cote = croix >= 0 ? 1 : -1;
+  }
+  // Le sens de parcours découle du côté : cote=+1 -> horaire (false).
+  const sens = cote < 0;
+  let bx, by;
+  const sx = u.x / nu + v.x / nv, sy = u.y / nu + v.y / nv;
+  const ns = Math.hypot(sx, sy);
+  if (sinDev < MKR_SIN_DEV_MIN || ns < 1e-9) {
+    bx = n.x * cote; by = n.y * cote;
+  } else {
+    bx = sx / ns; by = sy / ns;
+  }
+  // cos de l'angle intérieur, et sinus du DEMI-angle : c'est lui qui donne la
+  // distance d'un point de la bissectrice aux deux segments — d × sin(θ/2).
+  const cos = (u.x * v.x + u.y * v.y) / (nu * nv);
+  const sinDemi = Math.sqrt(Math.max(0, (1 - cos) / 2));
+  return { bx, by, croix, sinDev, cote, sens, cos, sinDemi, nu, nv, stable: sinDev >= MKR_SIN_DEV_MIN };
+}
+
+// Boîte englobante d'un texte, MESURÉE par measureText et jamais estimée.
+function _mkrBoite(ctx, texte, x, y, aligne, hauteur) {
+  const w = ctx.measureText(texte).width;
+  const x0 = aligne === 'right' ? x - w : aligne === 'center' ? x - w / 2 : x;
+  return { x0, y0: y - hauteur / 2, x1: x0 + w, y1: y + hauteur / 2 };
+}
+
+// ─── LA VALEUR D'ANGLE VIT DANS SON DEMI-CERCLE ─────────────────────────────
+//
+// Posée AU-DELÀ de l'arc, elle sortait du disque de son genou. Quand les deux
+// genoux pointent vers l'extérieur, les deux arcs passent à l'intérieur, entre
+// les jambes, et les deux valeurs se retrouvaient face à face au milieu.
+// MESURÉ sur la troisième capture : rotules à 245 px, arcs de 80 px de rayon,
+// 85 px libres entre eux. Les textes RÉELLEMENT DESSINÉS y sont « -1.9° » à
+// droite et « 12.7° » à gauche — le signe est porté par D, pas par G — et
+// leurs boîtes se recouvraient de 38,0 px. Placées dans leur disque, elles
+// laissent 94 px. (Un premier calcul avait donné 27,3 px : il employait
+// « 1.9° » et « 12.7° », c'est-à-dire les valeurs de l'encadré, sans le signe.)
+//
+// DEUX BORNES OPPOSÉES, toutes deux calculées :
+//   dMin — la valeur ne doit pas se poser sur la BANDE du segment. Un point de
+//     la bissectrice à distance d est à d × sin(θ/2) de chaque segment ; il
+//     faut donc d ≥ (demi-bande + demi-diagonale du texte) / sin(θ/2).
+//     La demi-bande vient de segW, LU dans drawOverlay et passé en argument :
+//     Math.max(8, W/55), soit 34,9 px à 1920, donc 17,45 de demi-bande.
+//   dMax — la boîte doit tenir ENTIÈRE dans le disque sans toucher l'arc :
+//     d ≤ rayon − épaisseur de l'arc − demi-diagonale du texte.
+//
+// On prend d = dMax : la valeur se colle à l'arc par l'intérieur, donc au plus
+// loin du sommet et des segments.
+//
+// SI LES DEUX BORNES SE CROISENT, C'EST L'ARC QUI S'AGRANDIT, JAMAIS LE TEXTE
+// QUI RAPETISSE — il garde la proportion qu'il avait à 1280, acquise plus haut.
+// Mesuré à 1920 sur la jambe G de la troisième capture : « 1.9° », « 12.7° » et
+// « -1.9° » tiennent dans 80 px ; « -12.7° », six caractères, ne tient pas et
+// porte l'arc à 87,5 px ; « -123.4° » le porte à 97,9.
+//
+// L'AGRANDISSEMENT NE FAIT PAS SE CROISER LES ARCS sur cette capture : 80 et
+// 87,5 pour 245 px d'écart, soit 77,5 px libres ; même avec « -123.4° » des deux
+// côtés, 195,8 contre 245.
+//
+// LIMITE, ET ELLE N'EST PAS TRAITÉE : sous 2 × rayon d'écart entre rotules —
+// 160 px ici — les deux disques se chevauchent, et sous environ 155 px les deux
+// valeurs peuvent de nouveau se toucher. Rien ne l'empêche alors : la garde
+// controlatérale ne déplace que les LÉGENDES, jamais les valeurs. Deux genoux
+// si proches supposent des jambes quasi superposées ; le cas n'a pas été vu.
+//
+// ─── TROIS EXIGENCES QUI NE TIENNENT PAS TOUJOURS ENSEMBLE ─────────────────
+//   la valeur exige un rayon MINIMAL pour tenir dans le disque ;
+//   l'arc ne doit pas dépasser la longueur du segment le plus court, sinon il
+//     sort au-delà des marqueurs d'extrémité ;
+//   le texte ne rapetisse jamais sous la proportion qu'il avait à 1280.
+//
+// QUAND LE MINIMAL DÉPASSE LE MAXIMAL, C'EST LE PLACEMENT QUI CÈDE, ni le
+// texte ni l'arc : l'arc garde son rayon maximal et la valeur repasse À
+// L'EXTÉRIEUR, sur la bissectrice, comme avant. Jamais de valeur qui déborde
+// silencieusement sur un segment ou sur l'arc.
+//
+// LE CAS TYPIQUE EST LE MLA, et il n'est pas marginal : l'angle d'arche tourne
+// entre 130 et 150°, donc les valeurs y ont trois chiffres — « 143.2° » y est
+// la norme, pas un pire cas. Mesuré à 1920 : l'arc s'agrandit alors à 89,0 px
+// (150°), 90,5 (140°) et 92,5 (130°). LE REPLI SE DÉCLENCHE sous une longueur
+// de segment de 98,9 / 100,5 / 102,7 px respectivement.
+//
+// NON VÉRIFIÉ, ET JE NE PEUX PAS LE VÉRIFIER ICI : je n'ai aucun relevé de
+// coordonnées MLA. La borne empêche l'arc de sortir de l'arche, mais le seuil
+// exact dépend de la longueur réelle des segments d'arche, qui reste à mesurer.
+//
+// CETTE BORNE NE LIMITE QUE L'AGRANDISSEMENT, PAS LE RAYON DE BASE — c'est ce
+// que fait Math.max, et c'est délibéré. Sur un segment plus court que le rayon
+// de base, l'arc dépasse déjà aujourd'hui le marqueur d'extrémité : défaut
+// PRÉEXISTANT, hors du périmètre de ce lot. En faire un vrai plafond
+// changerait le rendu des captures prises de loin, ce qui n'a pas été demandé.
+//
+// DES SEGMENTS PLUS COURTS QUE 80 px À 1920 signifient une caméra très
+// éloignée — la même limite que celle qui fait échouer la détection des
+// pastilles. Ce n'est pas une configuration de travail.
+//
+// 0,9 EST UN CHOIX, PAS UNE DÉRIVATION : c'est la marge qui fait que l'arc
+// agrandi s'arrête avant le marqueur d'extrémité plutôt que dessus. Rien dans
+// le code ni dans les mesures ne la fixe.
+const MKR_ARC_PART_SEGMENT = 0.9;
+function _mkrValeurDansArc(ctx, texte, px, rayonBase, lwArc, segW, sinDemi, lSegment) {
+  const w = ctx.measureText(texte).width;
+  const demiDiag = Math.hypot(w / 2, px / 2);
+  // sinDemi vaut 1 quand l'angle est PLAT (180°, demi-angle de 90°) et tend
+  // vers zéro quand l'angle se FERME, segments repliés l'un sur l'autre : la
+  // bissectrice longe alors les deux et aucune distance ne les éviterait. La
+  // borne à 0,05 protège de cet angle quasi nul — elle ne joue ni sur un genou
+  // ni sur une arche, qui sont toujours largement ouverts.
+  const dMin = (segW / 2 + demiDiag) / Math.max(sinDemi, 0.05);
+  const requis = dMin + demiDiag + lwArc;
+  const rayonMax = Math.max(rayonBase, MKR_ARC_PART_SEGMENT * lSegment);
+  if (requis <= rayonMax) {
+    const rayon = Math.max(rayonBase, requis);
+    return {
+      d: rayon - lwArc - demiDiag, rayon, demiDiag, dMin,
+      agrandi: rayon > rayonBase, dehors: false,
+    };
+  }
+  return {
+    d: rayonMax + lwArc + demiDiag, rayon: rayonMax, demiDiag, dMin,
+    agrandi: rayonMax > rayonBase, dehors: true,
+  };
+}
+
+function _mkrBoitesSeCoupent(a, b) {
+  return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+}
+
+// Boîte contre arc : on teste l'anneau COMPLET de rayon r et d'épaisseur lw,
+// sans tenir compte du secteur réellement tracé. C'est volontairement prudent —
+// au pire une légende est écartée sans nécessité, et c'est le bon sens d'erreur
+// puisque c'est l'étiquette qui cède.
+function _mkrBoiteCoupeArc(b, arc) {
+  const dx = Math.max(b.x0 - arc.x, 0, arc.x - b.x1);
+  const dy = Math.max(b.y0 - arc.y, 0, arc.y - b.y1);
+  const dMin = Math.hypot(dx, dy);
+  const dMax = Math.max(
+    Math.hypot(b.x0 - arc.x, b.y0 - arc.y), Math.hypot(b.x1 - arc.x, b.y0 - arc.y),
+    Math.hypot(b.x0 - arc.x, b.y1 - arc.y), Math.hypot(b.x1 - arc.x, b.y1 - arc.y)
+  );
+  return dMin <= arc.r + arc.lw && dMax >= arc.r - arc.lw;
+}
+
+// GARDE CONTROLATÉRALE. Ordre imposé : on DÉCALE d'abord, on ne raccourcit
+// qu'en dernier recours — et après un raccourcissement on RECOMMENCE les
+// décalages avec le texte plus court, d'où la remise à zéro du décalage.
+const MKR_LEG_PAS_MAX = 6;
+function _mkrPlaceLegende(ctx, nom, pt, dir, base, px, zones) {
+  const aligne = dir.x >= 0 ? 'left' : 'right';
+  let texte = nom, pas = 0;
+  for (;;) {
+    const x = pt.x + dir.x * (base + pas);
+    const y = pt.y + dir.y * (base + pas);
+    const boite = _mkrBoite(ctx, texte, x, y, aligne, px);
+    const heurte = zones.some(
+      (z) => _mkrBoitesSeCoupent(boite, z.boite) || _mkrBoiteCoupeArc(boite, z.arc)
+    );
+    if (!heurte) return { texte, x, y, aligne, decale: pas > 0, raccourci: texte !== nom };
+    pas += px;
+    if (pas > MKR_LEG_PAS_MAX * px) {
+      if (texte.length > 2) {
+        texte = texte.slice(0, texte.length - 2) + '…';
+        pas = 0; // on rejoue TOUS les décalages avec le texte raccourci
+        continue;
+      }
+      // Plus rien à céder : on repose la légende à sa place nominale.
+      return {
+        texte, x: pt.x + dir.x * base, y: pt.y + dir.y * base,
+        aligne, decale: false, raccourci: true,
+      };
+    }
+  }
 }
 
 // Dessiner un segment rectangulaire entre 2 points (style OPS)
@@ -13441,7 +14404,7 @@ function updateAngleOverlay(elId, markers, view) {
     if(grp.length>=3){
       const ang=calcAngle3(grp);
       if(ang!==null){
-        const corr=computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||"");
+        const corr=computeCorrectedAngle(ang, side, view, _mkrTypeTest(TESTS[currentTestId]), grp);
         const clr=side==='D'?'blue':'';
         html+=`<span class="angle-tag ${clr}" style="${side==='G'?'border-color:#3ecf72;color:#3ecf72;':''}">${side}: ${corr.toFixed(1)}°</span>`;
       }
@@ -13452,7 +14415,7 @@ function updateAngleOverlay(elId, markers, view) {
   if(grpNone.length>=3){
     const ang=calcAngle3(grpNone);
     if(ang!==null){
-      const corr=computeCorrectedAngle(ang, '', view, TESTS[currentTestId]?.type||"");
+      const corr=computeCorrectedAngle(ang, '', view, _mkrTypeTest(TESTS[currentTestId]), grpNone);
       html+=`<span class="angle-tag">${corr.toFixed(1)}°</span>`;
     }
   }
@@ -13545,9 +14508,48 @@ function calcAngleSign(pts) {
   return bot.x>top.x?1:-1;
 }
 
+// #271-D — LE TYPE DE TEST PASSÉ À computeCorrectedAngle, EN UN SEUL ENDROIT.
+//
+// Il était choisi à la main, avec TROIS formules différentes :
+//   captures        markers===mla ? mla : markers===genou-bi ? kfppa : type
+//   image           markers===mla ? mla : type              (pas de kfppa)
+//   encadré direct  type                                    (ni mla ni kfppa)
+// D’où l’écart relevé par le praticien sur un MLA : l’image affichait 113,5 —
+// l’angle brut, par le retour anticipé du cas « mla » — et l’encadré 66,5,
+// soit 180 − 113,5, faute d’avoir reçu « mla ». Deux nombres, une mesure.
+//
+// L’ENCADRÉ N’ÉCRIT NULLE PART. La valeur enregistrée est celle de la capture :
+// photoSlots[].angle → result.photos[].angle → rapport. C’est donc l’encadré
+// seul qui était faux, et aucun bilan ne contient 66,5.
+//
+// CE LOT NE TOUCHE QUE L’AFFICHAGE. Cinq appels choisissent encore leur type à
+// la main, et ils RESTENT TELS QUELS parce que leurs valeurs partent dans le
+// bilan et le rapport — les changer sans vérification propre modifierait des
+// mesures cliniques :
+//   captureVidPhotoSlot / capturePhotoSlot — angleD et angleG de la
+//     Mobilité AP, et angleD/angleG du KFPPA bipodal ;
+//   captureFrame — angD et angG des frames ;
+//   calcBilateral — qui passe en outre le type À LA PLACE des points.
+// Tâches séparées, #248 pour calcBilateral.
+//
+// CE QUI CHANGE À L'ÉCRAN POUR LE KFPPA : l'image recevait « » comme type — la
+// formule de drawOverlay n'avait pas la correspondance genou-bi → kfppa — et
+// tombait donc dans la branche « vue face » qui applique un SIGNE latéral. Elle
+// recevra désormais « kfppa », dont le retour anticipé rend 180 − angle SANS
+// signe. L'image affichera donc exactement la valeur déjà enregistrée par les
+// captures et imprimée dans le rapport, là où elle en montrait jusqu'ici une
+// version signée. C'est un alignement sur la valeur du dossier, pas un
+// changement de mesure.
+function _mkrTypeTest(t) {
+  if (!t) return '';
+  if (t.markers === 'mla') return 'mla';
+  if (t.markers === 'genou-bi') return 'kfppa';
+  return t.type || '';
+}
 // Calculer l'angle corrigé selon le contexte
 // MLA: angle aigu brut (pas de correction)
-// KFPPA: 180 - angle (valgum=+, varum=-)
+// KFPPA: 180 − angle, SANS signe — donc toujours positif, que le genou soit
+//   en valgus ou en varus. Défaut clinique connu, voir #275.
 // Arrière-pied: angle brut avec signe (inversion=+, éversion=-)
 function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   if(rawAng===null) return null;
@@ -13633,14 +14635,18 @@ function updateResults() {
             <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
             <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipD,'D')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
             <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
+            ${(pBip?.dataUrl||pBip?.path) && pBip.angleD==null
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${KFPPA_NON_RECALC}</div>`
+              : `<div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>`}
             <div class="rs-pct" style="color:${clrKfppa(pctD)};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
             <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipG,'G')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
             <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
+            ${(pBip?.dataUrl||pBip?.path) && pBip.angleG==null
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${KFPPA_NON_RECALC}</div>`
+              : `<div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>`}
             <div class="rs-pct" style="color:${clrKfppa(pctG)};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
           </div>
         </div>`;
@@ -14061,12 +15067,19 @@ async function validateAndSave() {
       const bipodal=photoSlots.find(s=>s.side==='');
       const uniD=slotsD[0]; const uniG=slotsG[0];
       // KFPPA = angle unipodal - angle bipodal
-      if(bipodal?.angle!=null && uniD?.angle!=null){
-        result.deltaD=uniD.angle-bipodal.angle;
+      // #275-B — LE BIPODAL SE LIT PAR JAMBE, PLUS PAR SON ANGLE UNIQUE.
+      // `bipodal.angle` valait un angle mesuré à cheval sur les deux jambes et
+      // vaut désormais null ; continuer à le lire rendrait Δ et pct
+      // DÉFINITIVEMENT NULS, donc un KFPPA sans résultat. On prend la valeur du
+      // côté concerné, qui était déjà calculée correctement.
+      // Les anciens bilans portent eux aussi angleD/angleG : ils restent donc
+      // calculables, sans recalcul ni migration.
+      if(bipodal?.angleD!=null && uniD?.angle!=null){
+        result.deltaD=uniD.angle-bipodal.angleD;
         result.pctD=result.deltaD/t.div;
       }
-      if(bipodal?.angle!=null && uniG?.angle!=null){
-        result.deltaG=uniG.angle-bipodal.angle;
+      if(bipodal?.angleG!=null && uniG?.angle!=null){
+        result.deltaG=uniG.angle-bipodal.angleG;
         result.pctG=result.deltaG/t.div;
       }
       // Fallback sur capturedFrames
@@ -15307,6 +16320,9 @@ function buildTestPreview(t,data) {
 }
 
 function buildSidePreview(side,t,data) {
+  // #275-B — LOCAL À CE RENDU. Une globale resterait vraie d'un bilan au
+  // suivant et ferait apparaître le message sur un bilan correct.
+  let _nonRecalc=false;
   let pct=null,ang=null,label=side==='D'?'Côté Droit':'Côté Gauche';
   const sideC=side==='D'?'var(--blue)':'var(--green)';
   if(t.div!==undefined){
@@ -15316,14 +16332,14 @@ function buildSidePreview(side,t,data) {
     const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
     const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
     const uniAng=_toIncl(uni?.angle);
-    console.log('KFPPA debug',side,'bipodal=',bipodal,'uni=',uni,'bipAng=',bipAng,'uniAng=',uniAng);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
     } else {
-      pct=side==='D'?data.pctD:data.pctG;
-      ang=side==='D'?data.deltaD:data.deltaG;
-      if(ang!=null) ang=_toIncl(ang)<ang?_toIncl(ang):ang;
+      // #275-B — pas de repli sur les valeurs enregistrées : elles viennent de
+      // l'angle à cheval. La décision est LOCALE, d'après la seule présence de
+      // angleD/angleG pour ce bilan — aucun état partagé entre deux rendus.
+      pct=null; ang=null; _nonRecalc=true;
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -15450,7 +16466,7 @@ function buildSidePreview(side,t,data) {
   const clr=t.div?clrGenou(pct):clrGen(pct);
   return `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
     <div style="font-size:11px;font-weight:700;color:${sideC};margin-bottom:6px;">${label}</div>
-    ${buildGaugeMini(pctVal,ang?ang.toFixed(1)+'°':'—',clr)}
+    ${buildGaugeMini(pctVal,_nonRecalc?KFPPA_NON_RECALC:(ang?ang.toFixed(1)+'°':'—'),clr)}
     ${buildPhotoMini(data,side,t)}
   </div>`;
 }
@@ -16708,6 +17724,18 @@ function _collectTestAlerts(t, data, opts = {}) {
     if(!compute) return;
     ['D', 'G'].forEach(side => {
       const ratio = compute(t, data, side);
+      // #275-B — un KFPPA dont le bipodal n'a pas de valeur par jambe n'est
+      // pas recalculable. On le DIT, au lieu de laisser l'absence passer pour
+      // une mesure dans la norme. Décidé localement, sur CE bilan.
+      // La présence de la photo se teste par (dataUrl || path) : la dataURL
+      // est retirée après envoi vers le stockage, seul path subsiste.
+      if (ratio == null && m.interpretFn === 'kfppa') {
+        const _bip = data.photos?.find((ph) => ph.side === '');
+        const _parJambe = side === 'D' ? _bip?.angleD : _bip?.angleG;
+        if ((_bip?.dataUrl || _bip?.path) && _parJambe == null) {
+          alerts.push(`${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label} — ${KFPPA_NON_RECALC}`);
+        }
+      }
       if(ratio == null) return;
       const ratioForInterpret = isAbs ? Math.abs(ratio) : ratio;
       const classification = interpret(ratioForInterpret);
@@ -16751,15 +17779,26 @@ function buildPrintSection(t, data, conclusions) {
       const _toI=(v)=>v==null?null:(v>90?180-v:v);
       const _bdD=_toI(_bip?.angleD), _bdG=_toI(_bip?.angleG);
       const _udD=_toI(_uD?.angle), _udG=_toI(_uG?.angle);
-      const _dD=(_bdD!=null&&_udD!=null)?_udD-_bdD:_toI(data.deltaD);
-      const _dG=(_bdG!=null&&_udG!=null)?_udG-_bdG:_toI(data.deltaG);
+      const _dD=(_bdD!=null&&_udD!=null)?_udD-_bdD:null; // #275-B aucun repli
+      const _dG=(_bdG!=null&&_udG!=null)?_udG-_bdG:null;
       const _pD=_dD!=null?_dD/t.div:null;
       const _pG=_dG!=null?_dG/t.div:null;
       const pD=_pD,pG=_pG;
       const vD=pD!=null&&!isNaN(pD)?Math.round(pD*100):null,vG=pG!=null&&!isNaN(pG)?Math.round(pG*100):null;
       const normStr=`${t.normeMin}°–${t.normeMax}°`;
-      if(vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${data.deltaD?.toFixed(1)||'—'}° (${vD}%) — ${interpretKfppa(pD)}`);
-      if(vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${data.deltaG?.toFixed(1)||'—'}° (${vG}%) — ${interpretKfppa(pG)}`);
+      // #275-B — LES DEGRÉS VIENNENT DE _dD/_dG, LA MÊME VALEUR QUE LE
+      // POURCENTAGE ET L'INTERPRÉTATION. Ils lisaient data.deltaD, calculée
+      // avec l'angle à cheval : des degrés faux à côté d'un pourcentage juste.
+      //
+      // LA CONDITION PORTE SUR _dD, PAS SUR vD. vD dérive de _dD par deux
+      // étapes (_pD puis l'arrondi), donc aujourd'hui vD non nul implique _dD
+      // non nul — mais c'est une chaîne implicite. Si une étape changeait,
+      // _dD.toFixed(1) lèverait sur null et ferait échouer TOUT le rapport.
+      // On teste donc directement ce qu'on s'apprête à lire.
+      if(_dD!=null&&vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${_dD.toFixed(1)}° (${vD}%) — ${interpretKfppa(pD)}`);
+      else lines.push(`<strong>Genou droit :</strong> ${KFPPA_NON_RECALC}`);
+      if(_dG!=null&&vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${_dG.toFixed(1)}° (${vG}%) — ${interpretKfppa(pG)}`);
+      else lines.push(`<strong>Genou gauche :</strong> ${KFPPA_NON_RECALC}`);
       lines.push(`Norme physiologique : ${normStr}`);
     } else if(t.normDiv!==undefined||t.mlaTest){
       const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
@@ -16872,6 +17911,8 @@ function buildPrintSection(t, data, conclusions) {
 }
 
 function buildPrintSide(side, t, data) {
+  // #275-B — LOCAL À CE RENDU, jamais partagé.
+  let _nonRecalc=false;
   const sideC=side==='D'?'#185FA5':'#0B6B2C';
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
   let pct=null,ang=null,_kfppaUniAng=null;
@@ -16887,10 +17928,10 @@ function buildPrintSide(side, t, data) {
       ang=uniAng-bipAng;
       pct=ang/t.div;
     } else {
-      pct=side==='D'?data.pctD:data.pctG;
-      ang=side==='D'?data.deltaD:data.deltaG;
-      const _ti2=(v)=>v==null?null:(v>90?180-v:v);
-      if(ang!=null) ang=_ti2(ang);
+      // #275-B — pas de repli sur les valeurs enregistrées : elles viennent de
+      // l'angle à cheval. La décision est LOCALE, d'après la seule présence de
+      // angleD/angleG pour ce bilan — aucun état partagé entre deux rendus.
+      pct=null; ang=null; _nonRecalc=true;
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -17029,7 +18070,7 @@ function buildPrintSide(side, t, data) {
         </svg>
         <div class="rp-gauge-inner">
           <div class="rp-gauge-pct" style="color:${cssC};">${pctVal!==null?pctVal+'%':'—'}</div>
-          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
+          <div class="rp-gauge-deg">${_nonRecalc?KFPPA_NON_RECALC:(ang!=null?Number(ang).toFixed(1)+'°':'—')}</div>
         </div>
       </div>
       ${ph}
