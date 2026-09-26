@@ -4789,6 +4789,9 @@ async function launchTest(testId) {
       angle: p.angle !== undefined ? p.angle : null,
       angleD: p.angleD !== undefined ? p.angleD : null,
       angleG: p.angleG !== undefined ? p.angleG : null,
+      // #275-A — relu seulement s'il a été écrit : un bilan antérieur reste
+      // sans marqueur, donc lu comme non signé.
+      ...(p.kfppaSigne ? { kfppaSigne: true } : {}),
       // #250 — RÈGLE : `markers` reste TOUJOURS un tableau ; l'information
       // « la géométrie est-elle connue ? » vit à CÔTÉ, dans markersConnus,
       // jamais encodée dans la valeur de markers. Un champ qui porterait
@@ -8433,7 +8436,7 @@ function captureVidPhotoSlot(slotIdx) {
   // Calculer l'angle selon le côté
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
-  // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
+  // KFPPA : incl (180-rawAng) signé valgus+/varus− en vue de face (#275-A)
   const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
@@ -8483,6 +8486,14 @@ function captureVidPhotoSlot(slotIdx) {
     // avec elles : une valeur fausse qui reste lisible finit par être lue.
     photoSlots[slotIdx].angle = null;
   }
+
+  // #275-A — kfppaSigne. Créneau bipodal : le signe porte sur angleD/angleG,
+  // calculés par jambe ci-dessus ; créneau unipodal : sur l'angle du créneau.
+  const _sl = photoSlots[slotIdx];
+  _poserKfppaSigne(_sl, (t?.kfppaPhotos && !side)
+    ? (_kfppaSigneCalcule('kfppa', view, 'D', vidMarkers.filter(m=>m.side==='D'), _sl.angleD)
+      || _kfppaSigneCalcule('kfppa', view, 'G', vidMarkers.filter(m=>m.side==='G'), _sl.angleG))
+    : _kfppaSigneCalcule(mlaType, view, side, markersForPhoto, corrAng));
 
   renderVidPhotoGrid();
   updateResults();
@@ -8535,6 +8546,7 @@ function deletePhotoSlot(i) {
   // aurait continué d'afficher les deux mesures d'une capture qui n'existe
   // plus. Le défaut ne se voyait pas tant que seul `angle` était affiché.
   photoSlots[i].angleD=null; photoSlots[i].angleG=null;
+  delete photoSlots[i].kfppaSigne; // #275-A — plus de capture, plus de signe
   renderPhotoGrid(); updateResults();
 }
 
@@ -8565,7 +8577,7 @@ function capturePhotoSlot(slotIdx) {
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
-  // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
+  // KFPPA : incl (180-rawAng) signé valgus+/varus− en vue de face (#275-A)
   const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
@@ -8587,6 +8599,9 @@ function capturePhotoSlot(slotIdx) {
     photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t.type||'',mkrD);
     photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t.type||'',mkrG);
   }
+  // #275-A — kfppaSigne, même règle que captureVidPhotoSlot. Ce mode n'a pas
+  // de créneau bipodal KFPPA : seul l'angle du créneau compte.
+  _poserKfppaSigne(photoSlots[slotIdx], _kfppaSigneCalcule(mlaType, view, side, markersForPhoto, corrAng));
   renderPhotoGrid(); updateResults();
 }
 
@@ -14548,14 +14563,35 @@ function _mkrTypeTest(t) {
 }
 // Calculer l'angle corrigé selon le contexte
 // MLA: angle aigu brut (pas de correction)
-// KFPPA: 180 − angle, SANS signe — donc toujours positif, que le genou soit
-//   en valgus ou en varus. Défaut clinique connu, voir #275.
+// KFPPA: 180 − angle, signé valgus (+) / varus (−) en vue de face avec points,
+//   magnitude non signée sinon (#275-A).
 // Arrière-pied: angle brut avec signe (inversion=+, éversion=-)
 function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   if(rawAng===null) return null;
   if(testType==='mla') return rawAng;
   const incl = 180 - rawAng;
-  // KFPPA : utiliser incl (180-rawAng) sans correction de signe latéral
+  // #275-A — SIGNE DU KFPPA : VALGUS POSITIF, VARUS NÉGATIF (décision du
+  // praticien). Il remplace un retour anticipé qui rendait incl sans signe :
+  // un varus s'affichait comme un valgus de même amplitude.
+  //
+  // Le signe n'est calculé QUE dans cette branche : vue de face ET points
+  // fournis. Même règle que la branche face générique plus bas — genou D,
+  // rotule à droite de la ligne EIAS→tarse à l'écran = valgus ; genou G,
+  // l'inverse. Cas de référence du praticien fixé par
+  // tests/kfppa-signe-275a.test.mjs (D +14,8°, G −7,9°).
+  //
+  // Array.isArray et non la seule vérité de `pts` : calcBilateral passait une
+  // CHAÎNE à cet endroit (#248). Une chaîne non vide aurait fait lever
+  // calcAngleSign ; elle rend maintenant la magnitude non signée.
+  if(testType==='kfppa' && view==='face' && Array.isArray(pts)) {
+    const sign=calcAngleSign(pts);
+    if(side==='D') return sign*incl;
+    if(side==='G') return -sign*incl;
+    return incl;
+  }
+  // Tout autre KFPPA — sans points, ou dans une autre vue — rend la magnitude
+  // NON SIGNÉE : jamais un signe inventé. Ce retour doit précéder la branche
+  // dos, qui poserait sinon un signe inversion/éversion sur un genou.
   if(testType==='kfppa') return incl;
   // ─── Vue dos : signe inversion / éversion ───
   //
@@ -14597,6 +14633,25 @@ function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   return incl;
 }
 
+// #275-A — LE SIGNE DU KFPPA A-T-IL RÉELLEMENT ÉTÉ CALCULÉ ?
+// Même condition que la branche signée de computeCorrectedAngle, plus deux
+// exigences : un côté D ou G (le côté vide y rend incl sans signe) et une
+// valeur non nulle (moins de trois points placés → aucune mesure, donc aucun
+// signe). C'est ce qui pose kfppaSigne:true sur une capture : il distingue un
+// angle signé d'une magnitude d'avant #275-A, que rien d'autre ne sépare.
+// Toute modification de la branche signée DOIT se répercuter ici.
+function _kfppaSigneCalcule(testType, view, side, pts, valeur) {
+  return testType==='kfppa' && view==='face' && Array.isArray(pts)
+    && (side==='D' || side==='G') && valeur!=null;
+}
+
+// Pose ou RETIRE le marqueur : une capture remplacée sans signe ne doit pas
+// garder celui de la capture précédente.
+function _poserKfppaSigne(slot, signe) {
+  if (signe) slot.kfppaSigne = true;
+  else delete slot.kfppaSigne;
+}
+
 function getAngleColor(ang) {
   if(ang===null) return '#FFD700';
   return '#FFD700'; // Surcharge par le résultat si besoin
@@ -14608,7 +14663,12 @@ function getAngleColor(ang) {
 function calcBilateral(markers, view, side) {
   const grp = markers.filter(m=>m.side===side&&_isPlacedPt(m));
   const ang = calcAngle3(grp);
-  return computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||'', TESTS[currentTestId]?.type||"");
+  // #275-A (#248) — le 5e argument recevait le type du test, une CHAÎNE, à la
+  // place des points : aucun signe ne pouvait être calculé. Et le type lui-même
+  // venait de t.type, qu'aucun test ne déclare : la mesure n'était jamais
+  // reconnue comme KFPPA. On passe le groupe mesuré et le type par
+  // _mkrTypeTest, la source unique des autres appelants (#271-D).
+  return computeCorrectedAngle(ang, side, view, _mkrTypeTest(TESTS[currentTestId]), grp);
 }
 
 function updateResults() {
@@ -14995,6 +15055,16 @@ function _serialiserMarqueurs(e) {
     : {};
 }
 
+// Sérialisation d'un créneau photo sport. Sortie telle quelle du map de
+// validateAndSave, mêmes champs dans le même ordre, pour la rendre testable.
+// #275-A — kfppaSigne est écrit CONDITIONNELLEMENT, même règle que #250 :
+// son absence dit « signe non calculé », elle ne doit jamais devenir false.
+function _serialiserPhoto(s) {
+  return {label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
+    ...(s.kfppaSigne ? { kfppaSigne: true } : {}),
+    ..._serialiserMarqueurs(s)};
+}
+
 // Champs dérivés à la relecture. `markers` reste TOUJOURS un tableau ;
 // l'information « la géométrie est-elle connue ? » vit à côté.
 function _relireMarqueurs(brut) {
@@ -15057,8 +15127,7 @@ async function validateAndSave() {
       // complète : ne jamais écrire le champ quand il n'a jamais existé, sous
       // peine de faire basculer « jamais eu de points » en « rien posé »,
       // irréversiblement.
-      result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
-        ..._serialiserMarqueurs(s)}));
+      result.photos=photoSlots.map(_serialiserPhoto);
     }
     if(t.div!==undefined){
       // KFPPA : calcul depuis photoSlots (unipodalD et unipodalG vs bipodale)
@@ -15111,8 +15180,9 @@ async function validateAndSave() {
   } else {
     // #250 — écriture CONDITIONNELLE, second chemin, et lecture par vérité
     // (jamais `=== true`). Voir result.frames plus haut pour la justification.
-    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
-      ..._serialiserMarqueurs(s)}));
+    // #275-A — même sérialiseur que le chemin vidéo : une copie du map
+    // aurait perdu kfppaSigne en silence.
+    result.photos=photoSlots.map(_serialiserPhoto);
     if(t.normDiv!==undefined){
       const sD=result.photos.filter(s=>s.side==='D');
       const sG=result.photos.filter(s=>s.side==='G');

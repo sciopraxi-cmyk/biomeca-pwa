@@ -244,7 +244,8 @@ export function calcAngleSign(pts) {
  * Applique la correction d'angle clinique selon le contexte du test.
  *
  * - testType 'mla'   : retourne l'angle brut (pas de correction).
- * - testType 'kfppa' : retourne 180 − rawAng (incl).
+ * - testType 'kfppa' : retourne 180 − rawAng (incl), signé valgus (+) / varus (−)
+ *     en vue 'face' avec points ; magnitude non signée sinon (#275-A).
  * - autres testTypes :
  *     vue 'dos'  : utilise calcAngleSign + côté pour le signe inversion/éversion.
  *     vue 'face' : utilise calcAngleSign + côté pour le signe valgus/varus.
@@ -261,7 +262,18 @@ export function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   if (rawAng === null) return null;
   if (testType === 'mla') return rawAng;
   const incl = 180 - rawAng;
-  // KFPPA : utiliser incl (180-rawAng) sans correction de signe latéral
+  // #275-A — signe du KFPPA : valgus positif, varus négatif, UNIQUEMENT en vue
+  // de face avec points. Copie de js/biomeca.js, où la justification complète
+  // est écrite ; l'accord des deux copies est vérifié par exécution dans
+  // tests/inv-ev-signe.test.mjs et tests/kfppa-signe-275a.test.mjs.
+  if (testType === 'kfppa' && view === 'face' && Array.isArray(pts)) {
+    const sign = calcAngleSign(pts);
+    if (side === 'D') return sign * incl;
+    if (side === 'G') return -sign * incl;
+    return incl;
+  }
+  // Tout autre KFPPA : magnitude non signée, jamais un signe inventé. Doit
+  // précéder la branche dos.
   if (testType === 'kfppa') return incl;
   // ─── Vue dos : signe inversion / éversion ───
   //
