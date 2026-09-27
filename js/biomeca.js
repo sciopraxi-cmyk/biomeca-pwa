@@ -4050,15 +4050,15 @@ const TESTS = {
     ],
   },
   'kfppa-sldj': {
-    name:'KFPPA SLDJ', mode:'video', view:'face',
-    note:'Vue face · Chute 30 cm · Marqueurs bilatéraux · 2 frames : repos + réception',
+    name:'KFPPA USL', mode:'video', view:'face',
+    note:'Descendre d\'une marche de 30 cm et se réceptionner sur une jambe. Mesure à la première réception, au maximum de flexion du genou.',
     markers:'genou-bi', div:7.5, normeMin:5, normeMax:10,
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
-    frameLabels:['Repos bipodal','Réception saut'],
+    frameLabels:['Repos bipodal','Première réception unipodale'],
     target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
     measures:[
-      { key:'kfppa', label:'KFPPA SLDJ (valgus dynamique sur drop jump)', norm:'60-140 %', interpretFn:'kfppa' },
+      { key:'kfppa', label:'KFPPA USL (valgus dynamique en réception unipodale)', norm:'60-140 %', interpretFn:'kfppa' },
     ],
   },
   // MLA : 3 marqueurs par pied, 2 photos par pied = 4 photos
@@ -4164,6 +4164,34 @@ const TESTS = {
 // fausse. LA DÉCISION EST LOCALE À CHAQUE RENDU : pas d'état partagé, qui
 // resterait vrai d'un bilan au suivant.
 const KFPPA_NON_RECALC = 'valgus dynamique non recalculable (bilan antérieur)';
+// #275-B — message DISTINCT pour une photo bipodale simplement absente. Le
+// précédent ne vaut que pour une photo PRÉSENTE sans valeur par jambe : un
+// nouveau bilan incomplet n'est pas un « bilan antérieur ».
+const KFPPA_BIP_MANQUANTE = 'photo bipodale manquante';
+
+// #275-B — état du créneau bipodal pour UNE jambe, source unique des cinq
+// sites (écran de résultats, alertes, aperçu, lignes et jauge du rapport).
+//   'ok'        : photo présente, valeur de cette jambe présente ;
+//   'nonRecalc' : photo présente (dataUrl OU path — la dataURL est retirée
+//                 après envoi vers le stockage), valeur absente ;
+//   'manquante' : pas de photo bipodale, alors qu'une autre photo du test
+//                 existe ;
+//   'vide'      : aucune photo du tout — test non réalisé, rien à dire.
+function _kfppaEtatBipodal(photos, side) {
+  const ph = photos || [];
+  const present = (p) => !!(p && (p.dataUrl || p.path));
+  const bip = ph.find((p) => p && p.side === '');
+  if (present(bip)) {
+    return (side === 'D' ? bip.angleD : bip.angleG) == null ? 'nonRecalc' : 'ok';
+  }
+  return ph.some(present) ? 'manquante' : 'vide';
+}
+// Message à afficher pour cet état, ou null.
+function _kfppaMessageBipodal(etat) {
+  if (etat === 'nonRecalc') return KFPPA_NON_RECALC;
+  if (etat === 'manquante') return KFPPA_BIP_MANQUANTE;
+  return null;
+}
 
 const MEASURE_COMPUTERS = {
   // KFPPA : recompute live depuis photos (cohérent avec rendu actuel)
@@ -8383,7 +8411,11 @@ function ouvrirVignette(idx) {
   const [m, img, lbl, ang] = els;
   img.src = slot.dataUrl;
   lbl.textContent = slot.label || '';
-  const a = (slot.angle !== null && slot.angle !== undefined) ? slot.angle.toFixed(1) + '°' : '';
+  // #275-B — même règle que la vignette : le créneau bipodal KFPPA affiche
+  // « D x° · G y° », jamais slot.angle.
+  const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
+  const a = bip != null ? bip
+    : (slot.angle !== null && slot.angle !== undefined) ? slot.angle.toFixed(1) + '°' : '';
   ang.textContent = a;
   ang.style.display = a ? '' : 'none';
   // classList, jamais style.display : display:flex vit dans .vig-modal.ouverte.
@@ -14481,6 +14513,152 @@ function kfppaLabel(ang, side) {
   return ang>=0 ? 'Valgus +'+deg : 'Varus −'+deg;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// #275-C — KFPPA : normes, grille de U, classement de S
+// ═══════════════════════════════════════════════════════════════════
+//
+// DÉCISIONS DU PRATICIEN (Scio) :
+//   U = angle unipodal ABSOLU signé (valgus +, varus −) : c'est lui qui reçoit
+//       le verdict, par la grille ancrée sur la norme applicable.
+//   S = statique bipodal : classé Neutre / Valgus / Varus constitutionnel.
+//   Δ = U − S est affiché pour expliquer, jamais classé.
+//
+// TÂCHE À VENIR — normes réglables dans les Paramètres : lot séparé, avec sa
+// PROPRE clé app_config et une modification serveur validée à part. Elles ne
+// doivent PAS aller dans posture_thresholds : _mergeThresholds n'y relit que
+// ses cinq sections connues, et un client resté sur une version antérieure
+// effacerait une section kfppa au premier seuil postural enregistré.
+//
+// Une norme absente ou incomplète rend « norme non définie » : JAMAIS de
+// valeur par défaut substituée.
+const KFPPA_SOURCE_REPERE = 'repère clinique de travail, pas de norme 2D publiée';
+const KFPPA_SOURCE_USL =
+  'Norme de référence : réception unipodale (Herrington & Munro, 2010) — mesure à la première réception';
+const KFPPA_NORMES = {
+  'kfppa-marche': { parSexe: false, min: 3, max: 7, source: KFPPA_SOURCE_REPERE },
+  'kfppa-course': { parSexe: false, min: 5, max: 12, source: KFPPA_SOURCE_REPERE },
+  'kfppa-sldj': {
+    parSexe: true,
+    femmes: { min: 5, max: 12 },
+    hommes: { min: 1, max: 9 },
+    source: KFPPA_SOURCE_USL,
+  },
+};
+const KFPPA_MSG_CIVILITE = 'civilité non renseignée : norme non appliquée';
+const KFPPA_MSG_NORME_ND = 'norme non définie';
+
+// Sexe d'après la civilité, seules valeurs reconnues : « Mme » et « M. »
+// (les seules que produisent la fiche et l'import). Tout le reste → null.
+function kfppaSexeCivilite(civilite) {
+  if (civilite === 'Mme') return 'femmes';
+  if (civilite === 'M.') return 'hommes';
+  return null;
+}
+
+// Norme applicable à un test pour une civilité.
+//   { statut: 'ok', min, max, source, sexe }  — sexe null si la norme n'en dépend pas
+//   { statut: 'civilite' }                     — norme par sexe, civilité inconnue
+//   { statut: 'non-definie' }                  — test sans norme, ou norme incomplète
+function kfppaNormeApplicable(testId, civilite, normes = KFPPA_NORMES) {
+  const n = normes && normes[testId];
+  if (!n) return { statut: 'non-definie' };
+  let sexe = null;
+  let b = n;
+  if (n.parSexe) {
+    sexe = kfppaSexeCivilite(civilite);
+    if (!sexe) return { statut: 'civilite' };
+    b = n[sexe];
+  }
+  if (!b || !Number.isFinite(b.min) || !Number.isFinite(b.max) || b.min > b.max) {
+    return { statut: 'non-definie' };
+  }
+  return { statut: 'ok', min: b.min, max: b.max, source: n.source, sexe };
+}
+
+// Valeur telle qu'AFFICHÉE (une décimale) : le verdict doit correspondre au
+// nombre imprimé. Sans cela, −3,04° s'afficherait « −3.0° » et serait classé
+// comme en dessous de −3. Le « + 0 » supprime le zéro négatif.
+function _kfppaArrondi(v) {
+  return Number(v.toFixed(1)) + 0;
+}
+// Seuils calculés sans bruit flottant (0,3 × 8,5 ne vaut pas exactement 2,55).
+function _kfppaSeuil(v) {
+  return Math.round(v * 1e9) / 1e9;
+}
+
+// Grille de U, huit classes ancrées sur la norme : m = (min + max) / 2.
+function kfppaClasseU(U, min, max) {
+  if (U == null || !Number.isFinite(U) || !Number.isFinite(min) || !Number.isFinite(max)) {
+    return null;
+  }
+  const u = _kfppaArrondi(U);
+  const m = (min + max) / 2;
+  if (u < _kfppaSeuil(-0.6 * m)) return 'Varus excessif';
+  if (u < _kfppaSeuil(-0.3 * m)) return 'Varus modéré';
+  if (u < 0) return 'Varus faible';
+  if (u < _kfppaSeuil(min / 2)) return 'Valgus faible';
+  if (u < min) return 'Valgus modéré (insuffisant)';
+  if (u <= max) return 'Dans la norme';
+  if (u <= _kfppaSeuil(max + 0.3 * m)) return 'Valgus modéré (au-dessus de la norme)';
+  return 'Valgus excessif';
+}
+
+// Statique bipodal : ±3° autour de zéro = neutre.
+function kfppaClasseS(S) {
+  if (S == null || !Number.isFinite(S)) return null;
+  const s = _kfppaArrondi(S);
+  if (s > 3) return 'Valgus constitutionnel';
+  if (s < -3) return 'Varus constitutionnel';
+  return 'Neutre';
+}
+
+// Valeur sans kfppaSigne (capture sans points, bilan antérieur) : magnitude
+// seule, aucun classement, aucun verdict.
+function kfppaTexteNonSigne(v) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return Math.abs(v).toFixed(1) + '° (sens valgus/varus non enregistré)';
+}
+// ─── #275-C — FIN ───
+
+// #275-C — bloc de VÉRIFICATION de la grille, écran de résultats : S et sa
+// classe, U, Δ = U − S (sans verdict), verdict de U et norme appliquée.
+// L'affichage définitif — plus aucun pourcentage, décomposition — est #275-D.
+// Une valeur sans kfppaSigne ne porte ni sens, ni classe, ni verdict.
+function _kfppaBlocGrilleHTML(testId, patient, bip, uni, side) {
+  const S = side === 'D' ? bip?.angleD : bip?.angleG;
+  const U = uni?.angle;
+  const sSigne = !!bip?.kfppaSigne, uSigne = !!uni?.kfppaSigne;
+  const n = kfppaNormeApplicable(testId, patient?.civilite);
+  const txtS = S == null ? '—'
+    : sSigne ? `${kfppaLabel(S)} — ${kfppaClasseS(S)}` : kfppaTexteNonSigne(S);
+  const txtU = U == null ? '—' : uSigne ? kfppaLabel(U) : kfppaTexteNonSigne(U);
+  const txtDelta = (U != null && S != null && uSigne && sSigne) ? kfppaLabel(U - S) : '—';
+  const msgNorme = n.statut === 'civilite' ? KFPPA_MSG_CIVILITE : KFPPA_MSG_NORME_ND;
+  const txtNorme = n.statut === 'ok'
+    ? `${n.min}–${n.max}°${n.sexe ? ` ${n.sexe} (d'après la civilité)` : ''} · ${n.source}`
+    : msgNorme;
+  const verdict = (U == null || !uSigne) ? '—'
+    : n.statut === 'ok' ? kfppaClasseU(U, n.min, n.max) : msgNorme;
+  return `<div class="kfppa-grille" style="font-size:9px;color:var(--mut);margin-top:4px;line-height:1.5;">
+      <div>Statique S : <b>${txtS}</b></div>
+      <div>Unipodal U : <b>${txtU}</b></div>
+      <div>Δ = U − S : <b>${txtDelta}</b></div>
+      <div>Verdict (U) : <b class="kfppa-verdict">${verdict}</b></div>
+      <div>Norme : ${txtNorme}</div>
+    </div>`;
+}
+
+// #275-C — norme APPLIQUÉE, figée avec le bilan : { min, max, source, sexe }.
+// Relire le bilan plus tard doit montrer la norme de ce jour-là, même si la
+// constante ou la civilité changent ensuite. null quand aucune norme ne
+// s'applique (civilité inconnue pour l'USL, norme non définie) : rien n'est
+// enregistré, jamais une norme par défaut.
+function _kfppaNormePourBilan(testId, patient) {
+  const n = kfppaNormeApplicable(testId, patient?.civilite);
+  if (n.statut !== 'ok') return null;
+  return { min: n.min, max: n.max, source: n.source, sexe: n.sexe };
+}
+
 // ⚠️ LE TRIPLET UTILISÉ ICI DIFFÈRE VOLONTAIREMENT DE CELUI DE calcAngle3.
 // calcAngle3 mesure l'ANGLE sur [1],[2],[3] (sommet Calca supérieur) ;
 // calcAngleSign détermine le SENS sur [0],[1],[dernier]. Ce n'est pas une
@@ -14693,20 +14871,18 @@ function updateResults() {
         html=`<div class="res-side">
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipD,'D')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
-            ${(pBip?.dataUrl||pBip?.path) && pBip.angleD==null
-              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${KFPPA_NON_RECALC}</div>`
-              : `<div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>`}
+            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, pBip, pUniD, 'D') /* #275-C */}
+            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D')) // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D'))}</div>`
+              : '' /* #275-C — Δ est dans le bloc de la grille, signé seulement si U et S le sont */}
             <div class="rs-pct" style="color:${clrKfppa(pctD)};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipG,'G')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
-            ${(pBip?.dataUrl||pBip?.path) && pBip.angleG==null
-              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${KFPPA_NON_RECALC}</div>`
-              : `<div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>`}
+            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, pBip, pUniG, 'G') /* #275-C */}
+            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G')) // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G'))}</div>`
+              : '' /* #275-C — Δ est dans le bloc de la grille, signé seulement si U et S le sont */}
             <div class="rs-pct" style="color:${clrKfppa(pctG)};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
           </div>
         </div>`;
@@ -15130,6 +15306,10 @@ async function validateAndSave() {
       result.photos=photoSlots.map(_serialiserPhoto);
     }
     if(t.div!==undefined){
+      // #275-C — la norme appliquée part avec le bilan, écrite seulement
+      // quand une norme s'applique (voir _kfppaNormePourBilan).
+      const _normeKfppa=_kfppaNormePourBilan(currentTestId, currentPatient);
+      if(_normeKfppa) result.kfppaNorme=_normeKfppa;
       // KFPPA : calcul depuis photoSlots (unipodalD et unipodalG vs bipodale)
       const slotsD=photoSlots.filter(s=>s.side==='D');
       const slotsG=photoSlots.filter(s=>s.side==='G');
@@ -16392,7 +16572,7 @@ function buildTestPreview(t,data) {
 function buildSidePreview(side,t,data) {
   // #275-B — LOCAL À CE RENDU. Une globale resterait vraie d'un bilan au
   // suivant et ferait apparaître le message sur un bilan correct.
-  let _nonRecalc=false;
+  let _kfppaMsg=null; // message éventuel, jamais partagé entre deux rendus
   let pct=null,ang=null,label=side==='D'?'Côté Droit':'Côté Gauche';
   const sideC=side==='D'?'var(--blue)':'var(--green)';
   if(t.div!==undefined){
@@ -16409,7 +16589,7 @@ function buildSidePreview(side,t,data) {
       // #275-B — pas de repli sur les valeurs enregistrées : elles viennent de
       // l'angle à cheval. La décision est LOCALE, d'après la seule présence de
       // angleD/angleG pour ce bilan — aucun état partagé entre deux rendus.
-      pct=null; ang=null; _nonRecalc=true;
+      pct=null; ang=null; _kfppaMsg=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -16536,7 +16716,7 @@ function buildSidePreview(side,t,data) {
   const clr=t.div?clrGenou(pct):clrGen(pct);
   return `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
     <div style="font-size:11px;font-weight:700;color:${sideC};margin-bottom:6px;">${label}</div>
-    ${buildGaugeMini(pctVal,_nonRecalc?KFPPA_NON_RECALC:(ang?ang.toFixed(1)+'°':'—'),clr)}
+    ${buildGaugeMini(pctVal,_kfppaMsg?_kfppaMsg:(ang?ang.toFixed(1)+'°':'—'),clr)}
     ${buildPhotoMini(data,side,t)}
   </div>`;
 }
@@ -16558,11 +16738,19 @@ function buildPhotoMini(data,side,t) {
   const frames=(data.frames||[]);
   if(!photos.length&&!frames.length) return '';
   const items=photos.length?photos:frames.slice(0,2).map((f,i)=>({label:t.frameLabels?.[i]||'Frame '+(i+1),dataUrl:f.dataUrl,angle:side==='D'?f.angD:f.angG}));
+  // #275-B — créneau bipodal KFPPA : jamais ph.angle (le nombre à cheval sur
+  // les deux jambes, 124° sur les anciens bilans), toujours « D x° · G y° ».
+  // Seulement pour les PHOTOS : les éléments tirés des frames n'ont pas de
+  // côté et seraient pris à tort pour le créneau bipodal.
+  const _txt=(ph)=>{
+    const bip=photos.length?_kfppaBipodalTexte(t,ph):null;
+    return bip!=null?bip:(ph?.angle!=null?ph.angle.toFixed(1)+'°':ph?.label||'');
+  };
   return `<div style="display:flex;gap:4px;margin-top:6px;">${items.slice(0,2).map(ph=>`
     <div style="flex:1;text-align:center;">
       ${ph?.dataUrl?`<img src="${ph.dataUrl}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid var(--bord);"/>`
       :`<div style="aspect-ratio:4/3;background:var(--card);border:1px dashed var(--bord);border-radius:4px;"></div>`}
-      <div style="font-size:9px;color:var(--mut);margin-top:2px;">${ph?.angle!=null?ph.angle.toFixed(1)+'°':ph?.label||''}</div>
+      <div style="font-size:9px;color:var(--mut);margin-top:2px;">${_txt(ph)}</div>
     </div>`).join('')}</div>`;
 }
 
@@ -17800,10 +17988,9 @@ function _collectTestAlerts(t, data, opts = {}) {
       // La présence de la photo se teste par (dataUrl || path) : la dataURL
       // est retirée après envoi vers le stockage, seul path subsiste.
       if (ratio == null && m.interpretFn === 'kfppa') {
-        const _bip = data.photos?.find((ph) => ph.side === '');
-        const _parJambe = side === 'D' ? _bip?.angleD : _bip?.angleG;
-        if ((_bip?.dataUrl || _bip?.path) && _parJambe == null) {
-          alerts.push(`${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label} — ${KFPPA_NON_RECALC}`);
+        const _msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+        if (_msg) {
+          alerts.push(`${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label} — ${_msg}`);
         }
       }
       if(ratio == null) return;
@@ -17865,10 +18052,14 @@ function buildPrintSection(t, data, conclusions) {
       // non nul — mais c'est une chaîne implicite. Si une étape changeait,
       // _dD.toFixed(1) lèverait sur null et ferait échouer TOUT le rapport.
       // On teste donc directement ce qu'on s'apprête à lire.
+      // #275-B — sans valeur : le message de l'état bipodal ; s'il n'y en a
+      // pas (photo unipodale absente), un tiret — jamais « bilan antérieur ».
+      const _msgD=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos,'D'))||'—';
+      const _msgG=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos,'G'))||'—';
       if(_dD!=null&&vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${_dD.toFixed(1)}° (${vD}%) — ${interpretKfppa(pD)}`);
-      else lines.push(`<strong>Genou droit :</strong> ${KFPPA_NON_RECALC}`);
+      else lines.push(`<strong>Genou droit :</strong> ${_msgD}`);
       if(_dG!=null&&vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${_dG.toFixed(1)}° (${vG}%) — ${interpretKfppa(pG)}`);
-      else lines.push(`<strong>Genou gauche :</strong> ${KFPPA_NON_RECALC}`);
+      else lines.push(`<strong>Genou gauche :</strong> ${_msgG}`);
       lines.push(`Norme physiologique : ${normStr}`);
     } else if(t.normDiv!==undefined||t.mlaTest){
       const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
@@ -17982,7 +18173,7 @@ function buildPrintSection(t, data, conclusions) {
 
 function buildPrintSide(side, t, data) {
   // #275-B — LOCAL À CE RENDU, jamais partagé.
-  let _nonRecalc=false;
+  let _kfppaMsg=null; // message éventuel, jamais partagé entre deux rendus
   const sideC=side==='D'?'#185FA5':'#0B6B2C';
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
   let pct=null,ang=null,_kfppaUniAng=null;
@@ -18001,7 +18192,7 @@ function buildPrintSide(side, t, data) {
       // #275-B — pas de repli sur les valeurs enregistrées : elles viennent de
       // l'angle à cheval. La décision est LOCALE, d'après la seule présence de
       // angleD/angleG pour ce bilan — aucun état partagé entre deux rendus.
-      pct=null; ang=null; _nonRecalc=true;
+      pct=null; ang=null; _kfppaMsg=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -18140,7 +18331,7 @@ function buildPrintSide(side, t, data) {
         </svg>
         <div class="rp-gauge-inner">
           <div class="rp-gauge-pct" style="color:${cssC};">${pctVal!==null?pctVal+'%':'—'}</div>
-          <div class="rp-gauge-deg">${_nonRecalc?KFPPA_NON_RECALC:(ang!=null?Number(ang).toFixed(1)+'°':'—')}</div>
+          <div class="rp-gauge-deg">${_kfppaMsg?_kfppaMsg:(ang!=null?Number(ang).toFixed(1)+'°':'—')}</div>
         </div>
       </div>
       ${ph}

@@ -341,6 +341,139 @@ export function kfppaLabel(ang, _side) {
   return ang >= 0 ? 'Valgus +' + deg : 'Varus −' + deg;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// #275-C — KFPPA : normes, grille de U, classement de S
+// ═══════════════════════════════════════════════════════════════════
+//
+// DÉCISIONS DU PRATICIEN (Scio) :
+//   U = angle unipodal ABSOLU signé (valgus +, varus −) : c'est lui qui reçoit
+//       le verdict, par la grille ancrée sur la norme applicable.
+//   S = statique bipodal : classé Neutre / Valgus / Varus constitutionnel.
+//   Δ = U − S est affiché pour expliquer, jamais classé.
+//
+// TÂCHE À VENIR — normes réglables dans les Paramètres : lot séparé, avec sa
+// PROPRE clé app_config et une modification serveur validée à part. Elles ne
+// doivent PAS aller dans posture_thresholds : _mergeThresholds n'y relit que
+// ses cinq sections connues, et un client resté sur une version antérieure
+// effacerait une section kfppa au premier seuil postural enregistré.
+//
+// Une norme absente ou incomplète rend « norme non définie » : JAMAIS de
+// valeur par défaut substituée.
+export const KFPPA_SOURCE_REPERE = 'repère clinique de travail, pas de norme 2D publiée';
+export const KFPPA_SOURCE_USL =
+  'Norme de référence : réception unipodale (Herrington & Munro, 2010) — mesure à la première réception';
+export const KFPPA_NORMES = {
+  'kfppa-marche': { parSexe: false, min: 3, max: 7, source: KFPPA_SOURCE_REPERE },
+  'kfppa-course': { parSexe: false, min: 5, max: 12, source: KFPPA_SOURCE_REPERE },
+  'kfppa-sldj': {
+    parSexe: true,
+    femmes: { min: 5, max: 12 },
+    hommes: { min: 1, max: 9 },
+    source: KFPPA_SOURCE_USL,
+  },
+};
+export const KFPPA_MSG_CIVILITE = 'civilité non renseignée : norme non appliquée';
+export const KFPPA_MSG_NORME_ND = 'norme non définie';
+
+// Sexe d'après la civilité, seules valeurs reconnues : « Mme » et « M. »
+// (les seules que produisent la fiche et l'import). Tout le reste → null.
+/**
+ * @param {string|null|undefined} civilite
+ * @returns {'femmes'|'hommes'|null}
+ */
+export function kfppaSexeCivilite(civilite) {
+  if (civilite === 'Mme') return 'femmes';
+  if (civilite === 'M.') return 'hommes';
+  return null;
+}
+
+// Norme applicable à un test pour une civilité.
+//   { statut: 'ok', min, max, source, sexe }  — sexe null si la norme n'en dépend pas
+//   { statut: 'civilite' }                     — norme par sexe, civilité inconnue
+//   { statut: 'non-definie' }                  — test sans norme, ou norme incomplète
+/**
+ * @param {string} testId
+ * @param {string|null|undefined} civilite
+ * @param {Record<string, any>} [normes]
+ * @returns {{statut: string, min?: number, max?: number, source?: string, sexe?: string|null}}
+ */
+export function kfppaNormeApplicable(testId, civilite, normes = KFPPA_NORMES) {
+  const n = normes && normes[testId];
+  if (!n) return { statut: 'non-definie' };
+  let sexe = null;
+  let b = n;
+  if (n.parSexe) {
+    sexe = kfppaSexeCivilite(civilite);
+    if (!sexe) return { statut: 'civilite' };
+    b = n[sexe];
+  }
+  if (!b || !Number.isFinite(b.min) || !Number.isFinite(b.max) || b.min > b.max) {
+    return { statut: 'non-definie' };
+  }
+  return { statut: 'ok', min: b.min, max: b.max, source: n.source, sexe };
+}
+
+// Valeur telle qu'AFFICHÉE (une décimale) : le verdict doit correspondre au
+// nombre imprimé. Sans cela, −3,04° s'afficherait « −3.0° » et serait classé
+// comme en dessous de −3. Le « + 0 » supprime le zéro négatif.
+/** @param {number} v */
+function _kfppaArrondi(v) {
+  return Number(v.toFixed(1)) + 0;
+}
+// Seuils calculés sans bruit flottant (0,3 × 8,5 ne vaut pas exactement 2,55).
+/** @param {number} v */
+function _kfppaSeuil(v) {
+  return Math.round(v * 1e9) / 1e9;
+}
+
+// Grille de U, huit classes ancrées sur la norme : m = (min + max) / 2.
+/**
+ * @param {number|null|undefined} U
+ * @param {number} min
+ * @param {number} max
+ * @returns {string|null}
+ */
+export function kfppaClasseU(U, min, max) {
+  if (U == null || !Number.isFinite(U) || !Number.isFinite(min) || !Number.isFinite(max)) {
+    return null;
+  }
+  const u = _kfppaArrondi(U);
+  const m = (min + max) / 2;
+  if (u < _kfppaSeuil(-0.6 * m)) return 'Varus excessif';
+  if (u < _kfppaSeuil(-0.3 * m)) return 'Varus modéré';
+  if (u < 0) return 'Varus faible';
+  if (u < _kfppaSeuil(min / 2)) return 'Valgus faible';
+  if (u < min) return 'Valgus modéré (insuffisant)';
+  if (u <= max) return 'Dans la norme';
+  if (u <= _kfppaSeuil(max + 0.3 * m)) return 'Valgus modéré (au-dessus de la norme)';
+  return 'Valgus excessif';
+}
+
+// Statique bipodal : ±3° autour de zéro = neutre.
+/**
+ * @param {number|null|undefined} S
+ * @returns {string|null}
+ */
+export function kfppaClasseS(S) {
+  if (S == null || !Number.isFinite(S)) return null;
+  const s = _kfppaArrondi(S);
+  if (s > 3) return 'Valgus constitutionnel';
+  if (s < -3) return 'Varus constitutionnel';
+  return 'Neutre';
+}
+
+// Valeur sans kfppaSigne (capture sans points, bilan antérieur) : magnitude
+// seule, aucun classement, aucun verdict.
+/**
+ * @param {number|null|undefined} v
+ * @returns {string}
+ */
+export function kfppaTexteNonSigne(v) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return Math.abs(v).toFixed(1) + '° (sens valgus/varus non enregistré)';
+}
+// ─── #275-C — FIN ───
+
 /**
  * Classifie un score KFPPA (ratio) par rapport aux seuils physiologiques.
  * Retourne uniquement la zone factuelle ; ne formule aucun jugement clinique.

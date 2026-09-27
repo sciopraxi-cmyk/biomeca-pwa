@@ -8,6 +8,16 @@
 // réduit à des bouchons minimaux.
 
 import { fonction, objet, ligneConst } from './extraire-biomeca.mjs';
+import { extraireBloc } from './mirror-diff.mjs';
+
+// #275-C — bloc des normes et de la grille, extrait entre ses marqueurs
+// (usage « rendre testable » ; son miroir est js/calc.mjs, comparé par
+// exécution dans tests/kfppa-grille-275c.test.mjs).
+export const BLOC_275C = extraireBloc(
+  'js/biomeca.js',
+  '// #275-C — KFPPA : normes, grille de U, classement de S',
+  '// ─── #275-C — FIN ───'
+);
 
 export const FONCTIONS = [
   '_coord',
@@ -31,6 +41,9 @@ export const FONCTIONS = [
   'rp_badgeTxt',
   'sectionTitle',
   '_kfppaBipodalTexte',
+  '_kfppaEtatBipodal',
+  '_kfppaMessageBipodal',
+  'ouvrirVignette',
   'vidPhotoSlotHTML',
   'captureVidPhotoSlot',
   'updateResults',
@@ -43,6 +56,8 @@ export const FONCTIONS = [
   'buildPrintPhotos',
   '_serialiserMarqueurs',
   '_serialiserPhoto',
+  '_kfppaBlocGrilleHTML',
+  '_kfppaNormePourBilan',
 ];
 
 // Chaque chargement rend un environnement NEUF : aucun état ne passe d'un
@@ -53,8 +68,12 @@ export function charger() {
     let photoSlots = [];
     let vidMarkers = [];
     let _elements = {};
+    let _vigEchap = null;
+    let currentPatient = null;
     const document = {
       getElementById: (id) => _elements[id] || null,
+      addEventListener() {},
+      removeEventListener() {},
       createElement: () => ({
         width: 0, height: 0,
         getContext: () => ({ drawImage() {} }),
@@ -67,16 +86,20 @@ export function charger() {
     function quickAngleCard(side) { return '<carte-rapide ' + side + '>'; }
     ${objet('TESTS')}
     ${ligneConst('KFPPA_NON_RECALC')}
+    ${ligneConst('KFPPA_BIP_MANQUANTE')}
     ${objet('MEASURE_COMPUTERS')}
+    ${BLOC_275C}
     ${FONCTIONS.map(fonction).join('\n')}
     return {
-      TESTS, KFPPA_NON_RECALC,
+      TESTS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
+      kfppaSexeCivilite, kfppaNormeApplicable, kfppaClasseU, kfppaClasseS, kfppaTexteNonSigne,
       ${FONCTIONS.join(', ')},
       poser(o) {
         if ('test' in o) currentTestId = o.test;
         if ('slots' in o) photoSlots = o.slots;
         if ('marqueurs' in o) vidMarkers = o.marqueurs;
         if ('elements' in o) _elements = o.elements;
+        if ('patient' in o) currentPatient = o.patient;
       },
       slots: () => photoSlots,
     };

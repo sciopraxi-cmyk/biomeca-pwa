@@ -280,3 +280,158 @@ describe('#275-B — mobilité AP inchangée', () => {
     expect(typeof s.angleG).toBe('number');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// #275-B, suite — nouvelle capture bipodale et photo bipodale manquante
+// ═══════════════════════════════════════════════════════════════════
+
+// Nouvelle capture bipodale : angle unique nul, mesures par jambe présentes.
+// Valeurs de la vérification du praticien sur localhost (D +11,2°, G −3,4°).
+const bipNouveau = () => ({
+  label: 'Station bipodale',
+  side: '',
+  dataUrl: 'data:bip',
+  angle: null,
+  angleD: 11.2,
+  angleG: -3.4,
+  kfppaSigne: true,
+});
+
+describe('#275-B — vignette agrandie et miniature, nouvelle capture', () => {
+  it('B8a. ouvrirVignette : pas de plantage, « D x° · G y° » affiché', () => {
+    const env = charger();
+    const classes = new Set();
+    const ang = { textContent: '', style: {} };
+    env.poser({
+      test: 'kfppa-marche',
+      slots: [bipNouveau()],
+      elements: {
+        'modal-vignette': {
+          classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) },
+        },
+        'vig-modal-img': {},
+        'vig-modal-lbl': { textContent: '' },
+        'vig-modal-ang': ang,
+      },
+    });
+    expect(() => env.ouvrirVignette(0)).not.toThrow();
+    expect(classes.has('ouverte')).toBe(true);
+    expect(ang.textContent).toBe('D 11.2° · G -3.4°');
+    expect(ang.style.display).toBe('');
+  });
+
+  it('B8b. buildPhotoMini : pas de plantage, « D x° · G y° » sous la photo bipodale', () => {
+    const env = charger();
+    const t = env.TESTS['kfppa-marche'];
+    const data = {
+      photos: [bipNouveau(), { label: 'U D', side: 'D', dataUrl: 'data:d', angle: 11.2 }],
+    };
+    let html;
+    expect(() => (html = env.buildPhotoMini(data, 'D', t))).not.toThrow();
+    expect(html).toContain('D 11.2° · G -3.4°');
+  });
+
+  it('B8c. buildPhotoMini : les frames gardent leur angle, pas de « D — · G — »', () => {
+    const env = charger();
+    const t = env.TESTS['kfppa-marche'];
+    const data = { photos: [], frames: [{ dataUrl: 'data:f0', angD: 4.2, angG: 1.1 }] };
+    const html = env.buildPhotoMini(data, 'D', t);
+    expect(html).toContain('4.2°');
+    expect(html).not.toContain('D — · G —');
+  });
+});
+
+// Nouveau bilan INCOMPLET : créneau bipodal jamais capturé, unipodaux présents.
+const photosSansBipodal = () => [
+  { label: 'Station bipodale', side: '', dataUrl: null, angle: null, path: null },
+  {
+    label: 'Valgum dynamique unipodal G',
+    side: 'G',
+    dataUrl: 'data:g',
+    angle: -3.4,
+    kfppaSigne: true,
+  },
+  {
+    label: 'Valgum dynamique unipodal D',
+    side: 'D',
+    dataUrl: 'data:d',
+    angle: 11.2,
+    kfppaSigne: true,
+  },
+];
+
+describe('#275-B — photo bipodale manquante : message distinct, cinq sites', () => {
+  const verifier = (env, txt, site) => {
+    expect(txt, site).toContain(env.KFPPA_BIP_MANQUANTE);
+    expect(txt, `${site} : ce n'est pas un bilan antérieur`).not.toContain(env.KFPPA_NON_RECALC);
+  };
+
+  it('B9a. Écran de résultats', () => {
+    const env = charger();
+    const res = envCapture(env, 'kfppa-marche', photosSansBipodal());
+    env.updateResults();
+    expect(nbOcc(res.innerHTML, env.KFPPA_BIP_MANQUANTE), 'un message par genou').toBe(2);
+    verifier(env, res.innerHTML, 'résultats');
+  });
+
+  it('B9b. Alertes', () => {
+    const env = charger();
+    const t = env.TESTS['kfppa-marche'];
+    const a = env._collectTestAlerts(t, { photos: photosSansBipodal() });
+    expect(a.filter((x) => x.includes(env.KFPPA_BIP_MANQUANTE))).toHaveLength(2);
+    verifier(env, a.join('\n'), 'alertes');
+  });
+
+  it('B9c. Aperçu', () => {
+    const env = charger();
+    const t = env.TESTS['kfppa-marche'];
+    for (const side of ['D', 'G'])
+      verifier(env, env.buildSidePreview(side, t, { photos: photosSansBipodal() }), side);
+  });
+
+  it('B9d. Lignes du rapport', () => {
+    const env = charger();
+    const t = env.TESTS['kfppa-marche'];
+    const html = env.buildPrintSection(t, { photos: photosSansBipodal() }, []);
+    expect(html).toContain(`<strong>Genou droit :</strong> ${env.KFPPA_BIP_MANQUANTE}`);
+    expect(html).toContain(`<strong>Genou gauche :</strong> ${env.KFPPA_BIP_MANQUANTE}`);
+    verifier(env, html, 'rapport');
+  });
+
+  it('B9e. Jauge du rapport', () => {
+    const env = charger();
+    const t = env.TESTS['kfppa-marche'];
+    for (const side of ['D', 'G'])
+      verifier(env, env.buildPrintSide(side, t, { photos: photosSansBipodal() }), side);
+  });
+
+  it('B10a. _kfppaEtatBipodal : les quatre états', () => {
+    const env = charger();
+    const e = env._kfppaEtatBipodal;
+    expect(e([bipNouveau()], 'G')).toBe('ok');
+    expect(e([{ side: '', path: 'u/b.jpg', angle: 124 }], 'D')).toBe('nonRecalc');
+    expect(e(photosSansBipodal(), 'D')).toBe('manquante');
+    expect(
+      e(
+        [
+          { side: '', dataUrl: null },
+          { side: 'D', dataUrl: null },
+        ],
+        'D'
+      )
+    ).toBe('vide');
+    expect(e(undefined, 'D')).toBe('vide');
+  });
+
+  it('B10b. Photo UNIPODALE absente, bipodale présente : un tiret, aucun des deux messages', () => {
+    const env = charger();
+    const t = env.TESTS['kfppa-marche'];
+    const data = {
+      photos: [bipNouveau(), { label: 'U G', side: 'G', dataUrl: null, angle: null }],
+    };
+    const html = env.buildPrintSection(t, data, []);
+    expect(html).toContain('<strong>Genou gauche :</strong> —');
+    expect(html).not.toContain(env.KFPPA_NON_RECALC);
+    expect(html).not.toContain(env.KFPPA_BIP_MANQUANTE);
+  });
+});
