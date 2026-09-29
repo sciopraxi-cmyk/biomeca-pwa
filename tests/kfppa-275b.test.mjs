@@ -142,18 +142,25 @@ describe('#275-B — nouvelle capture bipodale', () => {
 });
 
 describe('#275-B — ligne du rapport', () => {
-  it('B4. Degrés et pourcentage issus de la MÊME valeur', () => {
+  it('B4. Ligne du rapport : valeurs par jambe, jamais le nombre faux ni data.deltaD', () => {
+    // #275-D — l'ancienne attente « KFPPA = Δ° (y %) » est remplacée : plus
+    // aucun pourcentage (décision du praticien), une phrase par genou. Ce
+    // bilan n'a pas de kfppaSigne : magnitudes seules, sans classe ni Δ.
     const env = charger();
     const t = env.TESTS['kfppa-marche'];
     const html = env.buildPrintSection(t, bilanAncienAvecDG(), []);
-    const lignes = [...html.matchAll(/KFPPA = (-?\d+\.\d)° \((-?\d+)%\)/g)];
-    expect(lignes.length, 'une ligne par genou').toBe(2);
-    for (const [, deg, pct] of lignes) {
-      expect(Number(pct)).toBe(Math.round((Number(deg) / t.div) * 100));
-    }
-    // Et ce sont les valeurs recalculées, pas data.deltaD/G.
-    expect(lignes[0][1]).toBe((14.8 - 3.1).toFixed(1));
-    expect(lignes[1][1]).toBe((7.8 - 2.4).toFixed(1));
+    expect(html).toContain(
+      '<strong>Genou droit :</strong> statique 3.1° (sens valgus/varus non enregistré), ' +
+        'composante dynamique —, valeur unipodale 14.8° (sens valgus/varus non enregistré).'
+    );
+    expect(html).toContain(
+      '<strong>Genou gauche :</strong> statique 2.4° (sens valgus/varus non enregistré), ' +
+        'composante dynamique —, valeur unipodale 7.8° (sens valgus/varus non enregistré).'
+    );
+    // Le cœur de B4 : ni le nombre faux, ni les valeurs enregistrées fausses.
+    expect(html).not.toContain('124');
+    expect(html).not.toContain('109.2');
+    expect(html).not.toContain('%');
   });
 });
 
@@ -241,14 +248,22 @@ describe('#275-B — un bilan normal rendu JUSTE APRÈS un ancien', () => {
     for (const [site, txt] of Object.entries(sorties)) {
       expect(txt, `${site} : message hérité du rendu précédent`).not.toContain(M);
     }
-    // Et les mesures du bilan normal sont bien là.
-    expect(sorties.rapport).toContain('KFPPA = 5.0° (100%)');
+    // Et les mesures du bilan normal sont bien là. #275-D — plus de
+    // « KFPPA = 5.0° (100%) » : plus aucun pourcentage ; bilan sans
+    // kfppaSigne, donc magnitudes seules et pas de Δ.
+    expect(sorties.rapport).toContain(
+      '<strong>Genou droit :</strong> statique 2.0° (sens valgus/varus non enregistré), ' +
+        'composante dynamique —, valeur unipodale 7.0° (sens valgus/varus non enregistré).'
+    );
     expect(sorties.apercuD).toContain('5.0°');
     // TÉMOIN des motifs de B5c et B5e : ils savent trouver un pourcentage
     // affiché quand il existe. Sans cela, leur « not.toMatch » pourrait être
-    // vert parce que le motif ne trouve jamais rien.
+    // vert parce que le motif ne trouve jamais rien. #275-D — le KFPPA n'a
+    // plus de jauge en pourcentage : le témoin du motif de B5e passe sur le
+    // bloc d'un test MLA, qui en affiche encore une.
     expect(sorties.apercuD).toMatch(/>-?\d+%</);
-    expect(sorties.jaugeD).toMatch(/rp-gauge-pct[^>]*>-?\d+%/);
+    const jaugeMla = env.buildPrintSide('D', env.TESTS['mla-marche'], { pctD: 0.8, deltaD: 16 });
+    expect(jaugeMla).toMatch(/rp-gauge-pct[^>]*>-?\d+%/);
   });
 });
 
@@ -423,14 +438,20 @@ describe('#275-B — photo bipodale manquante : message distinct, cinq sites', (
     expect(e(undefined, 'D')).toBe('vide');
   });
 
-  it('B10b. Photo UNIPODALE absente, bipodale présente : un tiret, aucun des deux messages', () => {
+  it('B10b. Photo UNIPODALE absente, bipodale présente : valeur unipodale « — », aucun des deux messages', () => {
+    // #275-D — la ligne n'est plus un simple tiret : formulation par genou
+    // « identique dans tous les cas » (décision du praticien). Le statique
+    // est connu et signé ; la valeur unipodale manque, donc pas de Δ.
     const env = charger();
     const t = env.TESTS['kfppa-marche'];
     const data = {
       photos: [bipNouveau(), { label: 'U G', side: 'G', dataUrl: null, angle: null }],
     };
     const html = env.buildPrintSection(t, data, []);
-    expect(html).toContain('<strong>Genou gauche :</strong> —');
+    expect(html).toContain(
+      '<strong>Genou gauche :</strong> statique −3.4° (varus constitutionnel), ' +
+        'composante dynamique —, valeur unipodale —.'
+    );
     expect(html).not.toContain(env.KFPPA_NON_RECALC);
     expect(html).not.toContain(env.KFPPA_BIP_MANQUANTE);
   });

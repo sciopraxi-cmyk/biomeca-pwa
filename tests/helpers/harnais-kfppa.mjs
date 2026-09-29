@@ -13,6 +13,13 @@ import { extraireBloc } from './mirror-diff.mjs';
 // #275-C — bloc des normes et de la grille, extrait entre ses marqueurs
 // (usage « rendre testable » ; son miroir est js/calc.mjs, comparé par
 // exécution dans tests/kfppa-grille-275c.test.mjs).
+// #275-D — bloc de l'affichage (textes signés, Δ, couleurs, phrases), même
+// principe : extrait entre ses marqueurs, comparé à js/calc.mjs par exécution.
+export const BLOC_275D = extraireBloc(
+  'js/biomeca.js',
+  '// #275-D — KFPPA : textes signés, Δ, couleurs, phrases du rapport',
+  '// ─── #275-D — FIN ───'
+);
 export const BLOC_275C = extraireBloc(
   'js/biomeca.js',
   '// #275-C — KFPPA : normes, grille de U, classement de S',
@@ -57,6 +64,15 @@ export const FONCTIONS = [
   '_serialiserMarqueurs',
   '_serialiserPhoto',
   '_kfppaBlocGrilleHTML',
+  '_kfppaGenou',
+  '_kfppaTexteU',
+  '_kfppaMagnitude',
+  '_kfppaNormeDetail',
+  '_kfppaPhotoBipodaleHTML',
+  '_photoNonRechargeeHTML',
+  '_kfppaPrintSideHTML',
+  '_kfppaAlertes',
+  '_escHtml',
   '_kfppaNormePourBilan',
 ];
 
@@ -70,6 +86,21 @@ export function charger() {
     let _elements = {};
     let _vigEchap = null;
     let currentPatient = null;
+    // #275-D — ESPIONS D'ÉCRITURE. Chacun se note PUIS lève : un rapport ou
+    // un panneau ne doit jamais sauvegarder (CLAUDE.md, incident du 25/07).
+    const _espions = [];
+    const _espion = (nom) => () => { _espions.push(nom); throw new Error('écriture interdite : ' + nom); };
+    const saveBilanSilent = _espion('saveBilanSilent');
+    const saveBilan = _espion('saveBilan');
+    const savePatients = _espion('savePatients');
+    const _stockage = (nom) => ({
+      getItem: () => null,
+      setItem: _espion(nom + '.setItem'),
+      removeItem: _espion(nom + '.removeItem'),
+      clear: _espion(nom + '.clear'),
+    });
+    const localStorage = _stockage('localStorage');
+    const sessionStorage = _stockage('sessionStorage');
     const document = {
       getElementById: (id) => _elements[id] || null,
       addEventListener() {},
@@ -87,12 +118,19 @@ export function charger() {
     ${objet('TESTS')}
     ${ligneConst('KFPPA_NON_RECALC')}
     ${ligneConst('KFPPA_BIP_MANQUANTE')}
+    ${ligneConst('_KFPPA_COUL_ECRAN')}
+    ${ligneConst('_KFPPA_COUL_RAPPORT')}
+    ${ligneConst('_KFPPA_BADGE_RAPPORT')}
     ${objet('MEASURE_COMPUTERS')}
     ${BLOC_275C}
+    ${BLOC_275D}
     ${FONCTIONS.map(fonction).join('\n')}
     return {
       TESTS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
       kfppaSexeCivilite, kfppaNormeApplicable, kfppaClasseU, kfppaClasseS, kfppaTexteNonSigne,
+      kfppaSigneTxt, kfppaDelta, kfppaTexteDelta, kfppaTexteS, kfppaCouleurClasse,
+      kfppaNormeBilan, kfppaTexteNorme, kfppaAnalyseGenou, kfppaPhraseGenou, kfppaPhraseAsymetrie,
+      kfppaTexteUnipodal,
       ${FONCTIONS.join(', ')},
       poser(o) {
         if ('test' in o) currentTestId = o.test;
@@ -102,6 +140,10 @@ export function charger() {
         if ('patient' in o) currentPatient = o.patient;
       },
       slots: () => photoSlots,
+      espions: () => _espions.slice(),
+      saveBilanSilent,
+      savePatients,
+      localStorage,
     };
   `;
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt, jamais d'entrée externe

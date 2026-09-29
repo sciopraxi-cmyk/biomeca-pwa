@@ -4028,37 +4028,37 @@ const TESTS = {
   'kfppa-marche': {
     name:'KFPPA Marche', mode:'video', view:'face',
     note:'Vue face · 4 km/h · Marqueurs bilatéraux (EIAS→Rotule→Tarse) · 2 frames : repos bipodal + plantigrade unipodal',
-    markers:'genou-bi', div:5, normeMin:3, normeMax:7,
+    markers:'genou-bi', div:5, // #275-D — norme : KFPPA_NORMES, figée avec le bilan
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
     frameLabels:['Repos bipodal','Phase plantigrade (dynamique)'],
     target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
     measures:[
-      { key:'kfppa', label:'KFPPA Marche (valgus dynamique du genou)', norm:'60-140 %', interpretFn:'kfppa' },
+      { key:'kfppa', label:'KFPPA Marche (valgus dynamique du genou)', interpretFn:'kfppa' },
     ],
   },
   'kfppa-course': {
     name:'KFPPA Course', mode:'video', view:'face',
     note:'Vue face · 8 km/h · Marqueurs bilatéraux (EIAS→Rotule→Tarse) · 2 frames : repos + phase appui',
-    markers:'genou-bi', div:8.5, normeMin:5, normeMax:12,
+    markers:'genou-bi', div:8.5, // #275-D — norme : KFPPA_NORMES, figée avec le bilan
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
     frameLabels:['Repos bipodal','Phase appui (dynamique)'],
     target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
     measures:[
-      { key:'kfppa', label:'KFPPA Course (valgus dynamique du genou)', norm:'60-140 %', interpretFn:'kfppa' },
+      { key:'kfppa', label:'KFPPA Course (valgus dynamique du genou)', interpretFn:'kfppa' },
     ],
   },
   'kfppa-sldj': {
     name:'KFPPA USL', mode:'video', view:'face',
     note:'Descendre d\'une marche de 30 cm et se réceptionner sur une jambe. Mesure à la première réception, au maximum de flexion du genou.',
-    markers:'genou-bi', div:7.5, normeMin:5, normeMax:10,
+    markers:'genou-bi', div:7.5, // #275-D — norme : KFPPA_NORMES, figée avec le bilan
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
     frameLabels:['Repos bipodal','Première réception unipodale'],
     target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
     measures:[
-      { key:'kfppa', label:'KFPPA USL (valgus dynamique en réception unipodale)', norm:'60-140 %', interpretFn:'kfppa' },
+      { key:'kfppa', label:'KFPPA USL (valgus dynamique en réception unipodale)', interpretFn:'kfppa' },
     ],
   },
   // MLA : 3 marqueurs par pied, 2 photos par pied = 4 photos
@@ -4194,16 +4194,9 @@ function _kfppaMessageBipodal(etat) {
 }
 
 const MEASURE_COMPUTERS = {
-  // KFPPA : recompute live depuis photos (cohérent avec rendu actuel)
-  kfppa: (t, data, side) => {
-    const _bip = data.photos?.find(p => p.side === '');
-    const _uni = data.photos?.find(p => p.side === side);
-    const _toI = (v) => v == null ? null : (v > 90 ? 180 - v : v);
-    const _bd = _toI(side === 'D' ? _bip?.angleD : _bip?.angleG);
-    const _ud = _toI(_uni?.angle);
-    const _delta = (_bd != null && _ud != null) ? (_ud - _bd) : null; // #275-B
-    return (_delta != null) ? _delta / t.div : null;
-  },
+  // #275-D — plus d'entrée kfppa : elle rendait Δ ÷ div, un POURCENTAGE.
+  // Les alertes KFPPA viennent de la classe de U (_kfppaAlertes), par une
+  // branche de _collectTestAlerts placée avant la recherche de ce calculateur.
   // MLA : ratio persisté OU fallback recompute depuis photos (mirror du render L4470-4476)
   mla: (t, data, side) => {
     const persisted = side === 'D' ? data.pctD : data.pctG;
@@ -14494,14 +14487,6 @@ function calcAngle3(pts) {
 }
 
 // Détecte si l'angle des points AP s'ouvre à droite (+) ou à gauche (-)
-// Couleur spécifique KFPPA : <20%=rouge, 20-60%=orange, 60-140%=vert, 140-180%=orange, >180%=rouge
-function clrKfppa(pct) {
-  if(pct==null||isNaN(pct)) return 'var(--mut)';
-  const p=Math.abs(pct)*100;
-  if(p<20||p>180) return 'var(--red)';
-  if(p<60||p>140) return 'var(--orange)';
-  return 'var(--green)';
-}
 
 // Détecter valgus/varus pour KFPPA
 // Vue face : genou D pointe droite = valgus(+), gauche = varus(-)
@@ -14616,45 +14601,280 @@ function kfppaClasseS(S) {
 // seule, aucun classement, aucun verdict.
 function kfppaTexteNonSigne(v) {
   if (v == null || !Number.isFinite(v)) return '—';
-  return Math.abs(v).toFixed(1) + '° (sens valgus/varus non enregistré)';
+  return _kfppaMagnitudeTxt(v) + ' (sens valgus/varus non enregistré)';
+}
+
+// #275-D — PARTIE NUMÉRIQUE d'une valeur non signée, source unique : la
+// phrase du genou (via kfppaTexteNonSigne), le grand chiffre U et la légende
+// de la photo passent tous par elle, donc par le même arrondi (_kfppaArrondi).
+function _kfppaMagnitudeTxt(v) {
+  return Math.abs(_kfppaArrondi(v)).toFixed(1) + '°';
 }
 // ─── #275-C — FIN ───
 
-// #275-C — bloc de VÉRIFICATION de la grille, écran de résultats : S et sa
-// classe, U, Δ = U − S (sans verdict), verdict de U et norme appliquée.
-// L'affichage définitif — plus aucun pourcentage, décomposition — est #275-D.
-// Une valeur sans kfppaSigne ne porte ni sens, ni classe, ni verdict.
-function _kfppaBlocGrilleHTML(testId, patient, bip, uni, side) {
-  const S = side === 'D' ? bip?.angleD : bip?.angleG;
-  const U = uni?.angle;
-  const sSigne = !!bip?.kfppaSigne, uSigne = !!uni?.kfppaSigne;
-  const n = kfppaNormeApplicable(testId, patient?.civilite);
-  const txtS = S == null ? '—'
-    : sSigne ? `${kfppaLabel(S)} — ${kfppaClasseS(S)}` : kfppaTexteNonSigne(S);
-  const txtU = U == null ? '—' : uSigne ? kfppaLabel(U) : kfppaTexteNonSigne(U);
-  const txtDelta = (U != null && S != null && uSigne && sSigne) ? kfppaLabel(U - S) : '—';
-  const msgNorme = n.statut === 'civilite' ? KFPPA_MSG_CIVILITE : KFPPA_MSG_NORME_ND;
-  const txtNorme = n.statut === 'ok'
-    ? `${n.min}–${n.max}°${n.sexe ? ` ${n.sexe} (d'après la civilité)` : ''} · ${n.source}`
-    : msgNorme;
-  const verdict = (U == null || !uSigne) ? '—'
-    : n.statut === 'ok' ? kfppaClasseU(U, n.min, n.max) : msgNorme;
+// ═══════════════════════════════════════════════════════════════════
+// #275-D — KFPPA : textes signés, Δ, couleurs, phrases du rapport
+// ═══════════════════════════════════════════════════════════════════
+//
+// DÉCISIONS DU PRATICIEN (Scio) :
+//   - plus aucun pourcentage ; des degrés signés, le mot en clair ;
+//   - Δ = U − S n'a JAMAIS de verdict ni le mot Valgus/Varus comme état :
+//     « +5.9° (vers le valgus) », « −4.8° (vers le varus) », « 0.0° » ;
+//   - Δ et l'asymétrie sont calculés sur les valeurs AFFICHÉES (au dixième),
+//     pour que le praticien retombe sur le même nombre en faisant la
+//     soustraction lui-même ;
+//   - un statique nul s'écrit « 0.0° — Neutre », jamais « Valgus +0.0° » ;
+//   - une valeur sans kfppaSigne ne reçoit ni classe, ni verdict, ni Δ.
+//
+// Aucune de ces fonctions n'écrit quoi que ce soit : elles ne font que
+// calculer et composer du texte (garde : tests/kfppa-affichage-275d.test.mjs).
+
+// Valeur en DIXIÈMES entiers, depuis la valeur affichée : les sommes et
+// différences se font sur des entiers, donc tombent juste.
+function _kfppaDixiemes(v) {
+  return Math.round(_kfppaArrondi(v) * 10);
+}
+function _kfppaTxtDixiemes(d) {
+  if (d === 0) return '0.0°';
+  return (d > 0 ? '+' : '−') + (Math.abs(d) / 10).toFixed(1) + '°';
+}
+
+// Valeur signée telle qu'affichée : « +9.3° », « −2.4° », « 0.0° ».
+function kfppaSigneTxt(v) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return _kfppaTxtDixiemes(_kfppaDixiemes(v));
+}
+
+// Δ = U − S, sur les valeurs affichées.
+function kfppaDelta(S, U) {
+  if (S == null || U == null || !Number.isFinite(S) || !Number.isFinite(U)) return null;
+  return (_kfppaDixiemes(U) - _kfppaDixiemes(S)) / 10;
+}
+
+function kfppaTexteDelta(d) {
+  if (d == null || !Number.isFinite(d)) return '—';
+  const t = _kfppaDixiemes(d);
+  if (t === 0) return '0.0°';
+  return _kfppaTxtDixiemes(t) + (t > 0 ? ' (vers le valgus)' : ' (vers le varus)');
+}
+
+// Statique : « +3.4° — Valgus constitutionnel », « 0.0° — Neutre ».
+function kfppaTexteS(S, signe) {
+  if (S == null || !Number.isFinite(S)) return '—';
+  if (!signe) return kfppaTexteNonSigne(S);
+  return kfppaSigneTxt(S) + ' — ' + kfppaClasseS(S);
+}
+
+// Couleur d'une classe de U : 'vert' | 'orange' | 'rouge' | 'neutre'.
+// Chaque affichage la traduit dans sa propre palette.
+function kfppaCouleurClasse(classe) {
+  if (classe === 'Dans la norme') return 'vert';
+  if (classe === 'Varus excessif' || classe === 'Valgus excessif') return 'rouge';
+  if (
+    classe === 'Varus modéré' ||
+    classe === 'Varus faible' ||
+    classe === 'Valgus faible' ||
+    classe === 'Valgus modéré (insuffisant)' ||
+    classe === 'Valgus modéré (au-dessus de la norme)'
+  ) {
+    return 'orange';
+  }
+  return 'neutre';
+}
+
+// Norme d'un bilan ENREGISTRÉ : celle figée avec lui (result.kfppaNorme).
+// Absente ou incohérente → « norme non définie » ; motif civilité conservé.
+function kfppaNormeBilan(data) {
+  const n = data && data.kfppaNorme;
+  if (n && n.statut === 'civilite') return { statut: 'civilite' };
+  if (!n || !Number.isFinite(n.min) || !Number.isFinite(n.max) || n.min > n.max) {
+    return { statut: 'non-definie' };
+  }
+  return { statut: 'ok', min: n.min, max: n.max, source: n.source, sexe: n.sexe == null ? null : n.sexe };
+}
+
+// « norme 5–12°, femmes », « norme 3–7° », ou le message.
+function kfppaTexteNorme(norme) {
+  if (!norme || norme.statut === 'non-definie') return KFPPA_MSG_NORME_ND;
+  if (norme.statut === 'civilite') return KFPPA_MSG_CIVILITE;
+  return 'norme ' + norme.min + '–' + norme.max + '°' + (norme.sexe ? ', ' + norme.sexe : '');
+}
+
+// Analyse d'un genou. Une valeur non signée garde sa magnitude mais ne porte
+// ni classe, ni verdict, ni Δ.
+function kfppaAnalyseGenou(e) {
+  const ok = (v) => v != null && Number.isFinite(v);
+  const S = ok(e.S) ? e.S : null;
+  const U = ok(e.U) ? e.U : null;
+  const sSigne = S != null && !!e.sSigne;
+  const uSigne = U != null && !!e.uSigne;
+  const n0 = e.norme || { statut: 'non-definie' };
+  // VÉRIFICATION, pas promesse : un statut 'ok' sans bornes numériques
+  // cohérentes est traité comme une norme non définie, sans verdict.
+  const mn = n0.min, mx = n0.max;
+  const normeValide = n0.statut === 'ok'
+    && typeof mn === 'number' && typeof mx === 'number'
+    && Number.isFinite(mn) && Number.isFinite(mx) && mn <= mx;
+  const norme = normeValide || n0.statut === 'civilite' ? n0 : { statut: 'non-definie' };
+  const classeU = uSigne && normeValide ? kfppaClasseU(U, mn, mx) : null;
+  return {
+    S,
+    U,
+    sSigne,
+    uSigne,
+    norme,
+    classeS: sSigne ? kfppaClasseS(S) : null,
+    classeU,
+    delta: sSigne && uSigne ? kfppaDelta(S, U) : null,
+    couleur: kfppaCouleurClasse(classeU),
+  };
+}
+
+function _kfppaMinuscule(s) {
+  return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+// « valeur unipodale −2.4° : varus faible (norme 5–12°, femmes) », ou, sans
+// norme appliquée, « valeur unipodale −2.4° (norme non définie) ». Partie de
+// kfppaPhraseGenou, isolée pour la ligne d'un genou dont le statique manque.
+function kfppaTexteUnipodal(a) {
+  if (a.U == null) return 'valeur unipodale —';
+  if (!a.uSigne) return 'valeur unipodale ' + kfppaTexteNonSigne(a.U);
+  if (a.classeU) {
+    return 'valeur unipodale ' + kfppaSigneTxt(a.U) + ' : ' + _kfppaMinuscule(a.classeU) + ' (' + kfppaTexteNorme(a.norme) + ')';
+  }
+  return 'valeur unipodale ' + kfppaSigneTxt(a.U) + ' (' + kfppaTexteNorme(a.norme) + ')';
+}
+
+// « Genou gauche : statique +2.4° (neutre), composante dynamique −4.8° (vers
+// le varus), valeur unipodale −2.4° : varus faible (norme 5–12°, femmes). »
+function kfppaPhraseGenou(cote, a) {
+  const nom = cote === 'D' ? 'Genou droit' : 'Genou gauche';
+  const st =
+    a.S == null
+      ? 'statique —'
+      : a.sSigne
+        ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
+        : 'statique ' + kfppaTexteNonSigne(a.S);
+  const dyn = 'composante dynamique ' + (a.delta != null ? kfppaTexteDelta(a.delta) : '—');
+  return nom + ' : ' + st + ', ' + dyn + ', ' + kfppaTexteUnipodal(a) + '.';
+}
+
+// « Asymétrie D − G : +11.7° en unipodal, dont +1.0° de statique et +10.7° de
+// dynamique. » Calculée en dixièmes sur les valeurs affichées : la somme des
+// deux parts vaut EXACTEMENT l'écart unipodal. null si une des quatre valeurs
+// manque ou n'est pas signée : pas d'asymétrie sur une magnitude.
+function kfppaPhraseAsymetrie(aD, aG) {
+  if (!aD || !aG || !aD.sSigne || !aD.uSigne || !aG.sSigne || !aG.uSigne) return null;
+  const dU = _kfppaDixiemes(aD.U) - _kfppaDixiemes(aG.U);
+  const dS = _kfppaDixiemes(aD.S) - _kfppaDixiemes(aG.S);
+  const dDyn = dU - dS;
+  return (
+    'Asymétrie D − G : ' +
+    _kfppaTxtDixiemes(dU) +
+    ' en unipodal, dont ' +
+    _kfppaTxtDixiemes(dS) +
+    ' de statique et ' +
+    _kfppaTxtDixiemes(dDyn) +
+    ' de dynamique.'
+  );
+}
+// ─── #275-D — FIN ───
+
+// #275-D — palettes des catégories de kfppaCouleurClasse : l'écran suit le
+// thème (variables CSS), le rapport imprimé garde les couleurs fixes de rp_*.
+const _KFPPA_COUL_ECRAN = { vert: 'var(--green)', orange: 'var(--orange)', rouge: 'var(--red)', neutre: 'var(--mut)' };
+const _KFPPA_COUL_RAPPORT = { vert: '#1a7a3e', orange: '#856404', rouge: '#b30021', neutre: '#aaa' };
+const _KFPPA_BADGE_RAPPORT = { vert: 'rp-badge-g', orange: 'rp-badge-o', rouge: 'rp-badge-r' };
+
+// #275-D — analyse d'UN genou depuis les photos : créneaux en cours de
+// capture (photoSlots) ou bilan enregistré (data.photos), même forme.
+// S = bipodal angleD/angleG (signé si la photo bipodale porte kfppaSigne),
+// U = angle du créneau unipodal du côté (signé si lui-même porte kfppaSigne).
+function _kfppaGenou(photos, side, norme) {
+  const ph = photos || [];
+  const bip = ph.find((p) => p && p.side === '');
+  const uni = ph.find((p) => p && p.side === side);
+  return kfppaAnalyseGenou({
+    S: side === 'D' ? bip?.angleD : bip?.angleG,
+    sSigne: !!bip?.kfppaSigne,
+    U: uni?.angle,
+    uSigne: !!uni?.kfppaSigne,
+    norme,
+  });
+}
+
+// #275-D — magnitude seule, sans mention : grand chiffre U et légende de la
+// photo d'une valeur SANS kfppaSigne. La mention « sens valgus/varus non
+// enregistré » est portée une seule fois, en petit sous le grand chiffre.
+function _kfppaMagnitude(v) {
+  return v == null || !Number.isFinite(v) ? '—' : _kfppaMagnitudeTxt(v);
+}
+
+// Texte d'une valeur unipodale : signée, ou magnitude « sens non enregistré ».
+function _kfppaTexteU(a) {
+  if (a.U == null) return '—';
+  return a.uSigne ? kfppaSigneTxt(a.U) : kfppaTexteNonSigne(a.U);
+}
+
+// Norme détaillée : « 5–12°, femmes (d'après la civilité) · <source> », ou le message.
+function _kfppaNormeDetail(norme) {
+  if (!norme || norme.statut !== 'ok') return kfppaTexteNorme(norme);
+  return `${norme.min}–${norme.max}°${norme.sexe ? `, ${norme.sexe} (d'après la civilité)` : ''} · ${norme.source}`;
+}
+
+// #275-D — clrKfppa SUIT LA CLASSE DE U (et non plus un pourcentage) : vert
+// dans la norme, orange pour les classes faibles et modérées, rouge pour les
+// deux excessifs, neutre sans classe (valeur non signée, norme non appliquée).
+function clrKfppa(classe) {
+  return _KFPPA_COUL_ECRAN[kfppaCouleurClasse(classe)];
+}
+
+// #275-C/D — bloc du panneau Résultats pour un genou : S et sa classe, U,
+// Δ = U − S (jamais de verdict), verdict de U coloré, norme appliquée.
+// Norme de la SAISIE EN COURS : KFPPA_NORMES d'après la civilité du patient.
+function _kfppaBlocGrilleHTML(testId, patient, photos, side) {
+  const norme = kfppaNormeApplicable(testId, patient?.civilite);
+  const a = _kfppaGenou(photos, side, norme);
+  const verdict = a.classeU || (a.U != null && a.uSigne ? kfppaTexteNorme(a.norme) : '—');
   return `<div class="kfppa-grille" style="font-size:9px;color:var(--mut);margin-top:4px;line-height:1.5;">
-      <div>Statique S : <b>${txtS}</b></div>
-      <div>Unipodal U : <b>${txtU}</b></div>
-      <div>Δ = U − S : <b>${txtDelta}</b></div>
-      <div>Verdict (U) : <b class="kfppa-verdict">${verdict}</b></div>
-      <div>Norme : ${txtNorme}</div>
+      <div>Statique S : <b>${kfppaTexteS(a.S, a.sSigne)}</b></div>
+      <div>Unipodal U : <b>${_kfppaTexteU(a)}</b></div>
+      <div>Δ = U − S : <b>${kfppaTexteDelta(a.delta)}</b></div>
+      <div>Verdict (U) : <b class="kfppa-verdict" style="color:${clrKfppa(a.classeU)};">${verdict}</b></div>
+      <div>Norme : ${_kfppaNormeDetail(a.norme)}</div>
     </div>`;
 }
 
-// #275-C — norme APPLIQUÉE, figée avec le bilan : { min, max, source, sexe }.
+// #275-D — photo « Station bipodale » dans la section KFPPA du rapport, UNE
+// fois pour les deux genoux, légende « D x° · G y° ». Elle n'y figurait
+// jamais : buildPrintPhotos filtre par côté et le créneau bipodal n'en a pas.
+// Photo présente mais non rechargée (path sans dataURL) : mention rouge,
+// jamais une disparition silencieuse. Jamais prise : rien.
+function _kfppaPhotoBipodaleHTML(data, t) {
+  const bip = (data.photos || []).find((p) => p && p.side === '');
+  if (!bip) return '';
+  if (bip.dataUrl) {
+    const leg = _kfppaBipodalTexte(t, bip) || '';
+    return `<div class="kfppa-photo-bip" style="text-align:center;margin:6px 0;">
+      <img src="${bip.dataUrl}" style="height:90px;width:auto;max-width:200px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:inline-block;"/>
+      <div style="font-size:7px;color:#666;margin-top:2px;">${bip.label || 'Station bipodale'}</div>
+      <div style="font-size:8px;font-weight:700;color:#333;">${leg}</div>
+    </div>`;
+  }
+  if (bip.path) return _photoNonRechargeeHTML(bip.label || 'Station bipodale');
+  return '';
+}
+
+// #275-D — norme APPLIQUÉE, figée avec le bilan : { min, max, source, sexe }.
 // Relire le bilan plus tard doit montrer la norme de ce jour-là, même si la
-// constante ou la civilité changent ensuite. null quand aucune norme ne
-// s'applique (civilité inconnue pour l'USL, norme non définie) : rien n'est
-// enregistré, jamais une norme par défaut.
+// constante ou la civilité changent ensuite. Civilité inconnue pour l'USL :
+// le MOTIF est enregistré, { statut: 'civilite' }, pour que le rapport le
+// dise. Norme non définie : null, rien n'est enregistré — jamais une norme
+// par défaut.
 function _kfppaNormePourBilan(testId, patient) {
   const n = kfppaNormeApplicable(testId, patient?.civilite);
+  if (n.statut === 'civilite') return { statut: 'civilite' };
   if (n.statut !== 'ok') return null;
   return { min: n.min, max: n.max, source: n.source, sexe: n.sexe };
 }
@@ -14859,31 +15079,29 @@ function updateResults() {
     // KFPPA : 2 frames nécessaires
     if(t.div!==undefined) {
       const pBip=photoSlots[0], pUniG=photoSlots[1], pUniD=photoSlots[2];
-      const _ti=(v)=>v==null?null:(v>90?180-v:v);
-      const bipD=_ti(pBip?.angleD), bipG=_ti(pBip?.angleG);
-      const uniD=_ti(pUniD?.angle), uniG=_ti(pUniG?.angle);
-      const angD=(uniD!=null&&bipD!=null)?uniD-bipD:null;
-      const angG=(uniG!=null&&bipG!=null)?uniG-bipG:null;
-      // Pour KFPPA, angD>0 = valgus dynamique (genou plus incliné en dynamique)
-      const pctD=angD!=null?angD/t.div:null;
-      const pctG=angG!=null?angG/t.div:null;
-      if(angD!=null||angG!=null||pBip?.dataUrl||pUniG?.dataUrl||pUniD?.dataUrl){
+      // #275-D — PLUS AUCUN POURCENTAGE. Le bloc de la grille porte S et sa
+      // classe, U, Δ (sur les valeurs affichées, jamais de verdict), le
+      // verdict de U coloré par sa classe, et la norme appliquée.
+      // PRÉSENCE = dataUrl OU path (règle de #275-B). launchTest attend le
+      // rechargement avant updateResults, mais un rechargement ÉCHOUÉ laisse
+      // path sans dataUrl : sur dataUrl seul, le panneau d'un test déjà fait
+      // basculerait sur « Capturez 3 photos » (#276).
+      const _present=(p)=>!!(p&&(p.dataUrl||p.path));
+      if(_present(pBip)||_present(pUniG)||_present(pUniD)){
         html=`<div class="res-side">
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
-            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, pBip, pUniD, 'D') /* #275-C */}
+            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'D')}
             ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D')) // #275-B — état partagé des cinq sites
               ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D'))}</div>`
-              : '' /* #275-C — Δ est dans le bloc de la grille, signé seulement si U et S le sont */}
-            <div class="rs-pct" style="color:${clrKfppa(pctD)};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
+              : ''}
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
-            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, pBip, pUniG, 'G') /* #275-C */}
+            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'G')}
             ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G')) // #275-B — état partagé des cinq sites
               ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G'))}</div>`
-              : '' /* #275-C — Δ est dans le bloc de la grille, signé seulement si U et S le sont */}
-            <div class="rs-pct" style="color:${clrKfppa(pctG)};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
+              : ''}
           </div>
         </div>`;
       } else {
@@ -15324,20 +15542,16 @@ async function validateAndSave() {
       // Les anciens bilans portent eux aussi angleD/angleG : ils restent donc
       // calculables, sans recalcul ni migration.
       if(bipodal?.angleD!=null && uniD?.angle!=null){
-        result.deltaD=uniD.angle-bipodal.angleD;
-        result.pctD=result.deltaD/t.div;
+        result.deltaD=uniD.angle-bipodal.angleD; // #275-D — plus de pctD
       }
       if(bipodal?.angleG!=null && uniG?.angle!=null){
-        result.deltaG=uniG.angle-bipodal.angleG;
-        result.pctG=result.deltaG/t.div;
+        result.deltaG=uniG.angle-bipodal.angleG; // #275-D — plus de pctG
       }
       // Fallback sur capturedFrames
       if(result.deltaD==null && capturedFrames.length>=2){
         const f0=capturedFrames[0],f1=capturedFrames[1];
         result.deltaD=f1.angD!=null&&f0.angD!=null?f1.angD-f0.angD:null;
         result.deltaG=f1.angG!=null&&f0.angG!=null?f1.angG-f0.angG:null;
-        result.pctD=result.deltaD!=null?result.deltaD/t.div:null;
-        result.pctG=result.deltaG!=null?result.deltaG/t.div:null;
       }
     }
     if(t.normAm!==undefined){
@@ -17971,11 +18185,43 @@ function sectionTitle(t) {
 //     consommé par _buildSportSyntheseHTMLForRapport (résumé en tête de la synthèse
 //     de clôture du rapport — cadrage option C : détail complet en haut + résumé
 //     condensé en bas, doublon INTENTIONNEL pour rappel synthétique en fin de page).
+// #275-D — alertes KFPPA d'un bilan, pour les deux genoux :
+//   - message bipodal (non recalculable, photo manquante) : repris tel quel ;
+//   - U signé hors « Dans la norme » : sa classe, avec la norme ENREGISTRÉE ;
+//   - U signé sans norme appliquée : le motif (civilité, norme non définie) ;
+//   - U non signé ou absent : RIEN — pas de verdict sans signe.
+// Aucune chaîne vide ; aucun pourcentage.
+function _kfppaAlertes(t, m, data, condensed) {
+  const norme = kfppaNormeBilan(data);
+  const out = [];
+  ['D', 'G'].forEach(side => {
+    const lib = `${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label}`;
+    const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+    if (msg) out.push(`${lib} — ${msg}`);
+    const a = _kfppaGenou(data.photos, side, norme);
+    if (a.U == null || !a.uSigne) return;
+    if (!a.classeU) { out.push(`${lib} — ${kfppaTexteNorme(a.norme)}`); return; }
+    if (a.classeU === 'Dans la norme') return;
+    out.push(condensed
+      ? `${lib} — ${a.classeU}`
+      : `${lib} : U ${kfppaSigneTxt(a.U)} — ${a.classeU} (${kfppaTexteNorme(a.norme)})`);
+  });
+  return out.filter(x => typeof x === 'string' && x.trim() !== '');
+}
+
 function _collectTestAlerts(t, data, opts = {}) {
   if(!t) return [];
   const condensed = !!opts.condensed;
   const alerts = [];
   (t.measures || []).forEach(m => {
+    // #275-D — KFPPA : l'alerte vient de la CLASSE de U, jamais d'un
+    // pourcentage. Branche placée AVANT `if(!compute) return` : sans elle, le
+    // retrait de MEASURE_COMPUTERS.kfppa ferait sortir en silence, messages
+    // bipodaux compris. Seules des chaînes non vides sont poussées.
+    if (m.interpretFn === 'kfppa') {
+      _kfppaAlertes(t, m, data, condensed).forEach(a => { if (a) alerts.push(a); });
+      return;
+    }
     const compute = MEASURE_COMPUTERS[m.key];
     const interpret = m.interpretFn === 'kfppa' ? interpretKfppa : interpretGen;
     const isAbs = m.interpretFn !== 'kfppa'; // KFPPA conserve le signe (valgus/varus)
@@ -17987,12 +18233,6 @@ function _collectTestAlerts(t, data, opts = {}) {
       // une mesure dans la norme. Décidé localement, sur CE bilan.
       // La présence de la photo se teste par (dataUrl || path) : la dataURL
       // est retirée après envoi vers le stockage, seul path subsiste.
-      if (ratio == null && m.interpretFn === 'kfppa') {
-        const _msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
-        if (_msg) {
-          alerts.push(`${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label} — ${_msg}`);
-        }
-      }
       if(ratio == null) return;
       const ratioForInterpret = isAbs ? Math.abs(ratio) : ratio;
       const classification = interpret(ratioForInterpret);
@@ -18024,43 +18264,34 @@ function buildPrintSection(t, data, conclusions) {
       <div class="rp-side-grid">
         ${buildPrintSide('D',t,data)}
         ${buildPrintSide('G',t,data)}
-      </div>`;
+      </div>
+      ${t.div!==undefined?_kfppaPhotoBipodaleHTML(data,t):''}`;
 
     // Texte clinique
     const lines=[];
     if(t.div!==undefined){
-      // Recalculer depuis photos pour la synthèse
-      const _bip=data.photos?.find(p=>p.side==='');
-      const _uD=data.photos?.find(p=>p.side==='D');
-      const _uG=data.photos?.find(p=>p.side==='G');
-      const _toI=(v)=>v==null?null:(v>90?180-v:v);
-      const _bdD=_toI(_bip?.angleD), _bdG=_toI(_bip?.angleG);
-      const _udD=_toI(_uD?.angle), _udG=_toI(_uG?.angle);
-      const _dD=(_bdD!=null&&_udD!=null)?_udD-_bdD:null; // #275-B aucun repli
-      const _dG=(_bdG!=null&&_udG!=null)?_udG-_bdG:null;
-      const _pD=_dD!=null?_dD/t.div:null;
-      const _pG=_dG!=null?_dG/t.div:null;
-      const pD=_pD,pG=_pG;
-      const vD=pD!=null&&!isNaN(pD)?Math.round(pD*100):null,vG=pG!=null&&!isNaN(pG)?Math.round(pG*100):null;
-      const normStr=`${t.normeMin}°–${t.normeMax}°`;
-      // #275-B — LES DEGRÉS VIENNENT DE _dD/_dG, LA MÊME VALEUR QUE LE
-      // POURCENTAGE ET L'INTERPRÉTATION. Ils lisaient data.deltaD, calculée
-      // avec l'angle à cheval : des degrés faux à côté d'un pourcentage juste.
-      //
-      // LA CONDITION PORTE SUR _dD, PAS SUR vD. vD dérive de _dD par deux
-      // étapes (_pD puis l'arrondi), donc aujourd'hui vD non nul implique _dD
-      // non nul — mais c'est une chaîne implicite. Si une étape changeait,
-      // _dD.toFixed(1) lèverait sur null et ferait échouer TOUT le rapport.
-      // On teste donc directement ce qu'on s'apprête à lire.
-      // #275-B — sans valeur : le message de l'état bipodal ; s'il n'y en a
-      // pas (photo unipodale absente), un tiret — jamais « bilan antérieur ».
-      const _msgD=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos,'D'))||'—';
-      const _msgG=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos,'G'))||'—';
-      if(_dD!=null&&vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${_dD.toFixed(1)}° (${vD}%) — ${interpretKfppa(pD)}`);
-      else lines.push(`<strong>Genou droit :</strong> ${_msgD}`);
-      if(_dG!=null&&vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${_dG.toFixed(1)}° (${vG}%) — ${interpretKfppa(pG)}`);
-      else lines.push(`<strong>Genou gauche :</strong> ${_msgG}`);
-      lines.push(`Norme physiologique : ${normStr}`);
+      // #275-D — PLUS AUCUN POURCENTAGE ni t.normeMin/normeMax. La norme est
+      // celle ENREGISTRÉE avec le bilan (data.kfppaNorme) : absente ou
+      // incohérente → « norme non définie », jamais une valeur par défaut.
+      // Chaque genou : statique et sa classe, composante dynamique Δ (sans
+      // verdict), valeur unipodale U et son verdict. Puis l'asymétrie D − G
+      // décomposée, calculée sur les valeurs affichées.
+      const _norme=kfppaNormeBilan(data);
+      const _aD=_kfppaGenou(data.photos,'D',_norme), _aG=_kfppaGenou(data.photos,'G',_norme);
+      const _ligne=(cote,a)=>{
+        const nom=cote==='D'?'Genou droit':'Genou gauche';
+        // Statique inconnu (photo bipodale manquante ou non recalculable) :
+        // le message, puis la valeur unipodale seule — ni statique ni Δ.
+        const msg=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos,cote));
+        if(msg) return `<strong>${nom} :</strong> ${msg} ; ${kfppaTexteUnipodal(a)}.`;
+        // kfppaPhraseGenou commence par « <nom> : » : le libellé passe en gras.
+        return `<strong>${nom} :</strong>${kfppaPhraseGenou(cote,a).slice(nom.length+2)}`;
+      };
+      lines.push(_ligne('D',_aD));
+      lines.push(_ligne('G',_aG));
+      const _asym=kfppaPhraseAsymetrie(_aD,_aG);
+      if(_asym) lines.push(_asym);
+      lines.push(`Norme appliquée : ${_kfppaNormeDetail(_norme)}`);
     } else if(t.normDiv!==undefined||t.mlaTest){
       const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
       const vG=(data.pctG!=null&&!isNaN(data.pctG))?Math.round(data.pctG*100):null;
@@ -18172,30 +18403,14 @@ function buildPrintSection(t, data, conclusions) {
 }
 
 function buildPrintSide(side, t, data) {
-  // #275-B — LOCAL À CE RENDU, jamais partagé.
-  let _kfppaMsg=null; // message éventuel, jamais partagé entre deux rendus
+  // #275-D — le KFPPA a son propre bloc : plus de jauge en pourcentage ni de
+  // t.normeMin/normeMax. Voir _kfppaPrintSideHTML.
+  if(t.div!==undefined) return _kfppaPrintSideHTML(side, t, data);
   const sideC=side==='D'?'#185FA5':'#0B6B2C';
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
-  let pct=null,ang=null,_kfppaUniAng=null;
+  let pct=null,ang=null;
 
-  if(t.div!==undefined){
-    const bipodal=data.photos?.find(p=>p.side==='');
-    const uni=data.photos?.find(p=>p.side===side);
-    const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
-    const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
-    const uniAng=_toIncl(uni?.angle);
-    _kfppaUniAng=uniAng;
-    if(bipAng!=null&&uniAng!=null){
-      ang=uniAng-bipAng;
-      pct=ang/t.div;
-    } else {
-      // #275-B — pas de repli sur les valeurs enregistrées : elles viennent de
-      // l'angle à cheval. La décision est LOCALE, d'après la seule présence de
-      // angleD/angleG pour ce bilan — aucun état partagé entre deux rendus.
-      pct=null; ang=null; _kfppaMsg=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
-    }
-  }
-  else if(t.normDiv!==undefined||t.mlaTest){
+  if(t.normDiv!==undefined||t.mlaTest){
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
     // Si pas de données calculées, recalculer depuis photos
@@ -18314,12 +18529,12 @@ function buildPrintSide(side, t, data) {
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
-  const isGenou=t.div!==undefined;
+  const isGenou=false; // #275-D — le KFPPA ne passe plus par ici
   const cssC=rp_cssColor(pct,isGenou);
   const r=35,circ=2*Math.PI*r,fill=circ*Math.min(100,Math.max(0,pctVal||0))/100;
   const badgeCls=rp_badgeCls(pct,isGenou);
   const badgeTxt=rp_badgeTxt(pct,isGenou);
-  const ph=buildPrintPhotos(data,side,t,_kfppaUniAng||undefined);
+  const ph=buildPrintPhotos(data,side,t);
 
   return `<div class="rp-side-block rp-side-${side}">
     <div class="rp-side-title">${sideLabel}</div>
@@ -18331,13 +18546,46 @@ function buildPrintSide(side, t, data) {
         </svg>
         <div class="rp-gauge-inner">
           <div class="rp-gauge-pct" style="color:${cssC};">${pctVal!==null?pctVal+'%':'—'}</div>
-          <div class="rp-gauge-deg">${_kfppaMsg?_kfppaMsg:(ang!=null?Number(ang).toFixed(1)+'°':'—')}</div>
+          <div class="rp-gauge-deg">${ang!=null?Number(ang).toFixed(1)+'°':'—'}</div>
         </div>
       </div>
       ${ph}
     </div>
     <div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>
-    ${t.normeMin!==undefined?`<div class="rp-gauge-norm">Norme : ${t.normeMin}°–${t.normeMax}°</div>`:''}
+  </div>`;
+}
+
+// #275-D — bloc d'UN genou dans le rapport imprimé et son aperçu : valeur
+// unipodale U colorée par sa classe, verdict en badge, statique S et sa
+// classe, composante dynamique Δ (jamais de verdict), norme ENREGISTRÉE avec
+// le bilan, photo unipodale. Aucun pourcentage.
+function _kfppaPrintSideHTML(side, t, data) {
+  const norme = kfppaNormeBilan(data);
+  const a = _kfppaGenou(data.photos, side, norme);
+  const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+  const coul = _KFPPA_COUL_RAPPORT[a.couleur];
+  // Sans norme appliquée, la place du verdict reste VIDE : le motif (norme non
+  // définie, civilité non renseignée) figure une seule fois, ligne de la norme.
+  const verdict = a.classeU
+    ? `<span class="${_KFPPA_BADGE_RAPPORT[a.couleur]}">${a.classeU}</span>`
+    : '';
+  const txtNorme = a.norme.statut === 'ok'
+    ? `Norme : ${a.norme.min}–${a.norme.max}°${a.norme.sexe ? `, ${a.norme.sexe}` : ''}`
+    : kfppaTexteNorme(a.norme);
+  return `<div class="rp-side-block rp-side-${side}">
+    <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+    <div class="rp-gauge-photos">
+      <div class="rp-kfppa-u" style="text-align:center;min-width:90px;">
+        <div style="font-size:8px;color:#666;">Unipodal (U)</div>
+        <div class="rp-gauge-deg" style="font-size:15px;font-weight:700;color:${coul};">${a.U == null ? '—' : a.uSigne ? kfppaSigneTxt(a.U) : _kfppaMagnitude(a.U)}</div>
+        ${a.U != null && !a.uSigne ? '<div class="rp-kfppa-sans-signe" style="font-size:7px;color:#888;">sens valgus/varus non enregistré</div>' : ''}
+      </div>
+      ${buildPrintPhotos(data, side, t)}
+    </div>
+    <div style="font-size:9px;margin-top:4px;">Statique (S) : ${msg || kfppaTexteS(a.S, a.sSigne)}</div>
+    <div style="font-size:9px;">Composante dynamique (Δ) : ${kfppaTexteDelta(a.delta)}</div>
+    <div style="margin-top:4px;text-align:center;">${verdict}</div>
+    <div class="rp-gauge-norm">${txtNorme}</div>
   </div>`;
 }
 
@@ -18401,6 +18649,17 @@ function buildPrintSingleSide(t,data) {
     </div>`;
 }
 
+// #275-D — photo de test qui EXISTE (path en stockage) mais dont la dataURL
+// n'a pas pu être rechargée avant le rendu. Même mention rouge et même palette
+// que les images non chargées du rapport sport (#150, buildBilanPrintSection :
+// #b91c1c / #fef2f2 / #fecaca) : un rapport amputé ne doit pas avoir l'air
+// normal. Le rendu n'a lieu qu'APRÈS _prefetchAllSportMesuresPhotos (attendu
+// par buildRapport et printReport) : aucun chargement n'est encore en cours.
+function _photoNonRechargeeHTML(label) {
+  return '<div class="rp-photo-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;">⚠️ Photo « '
+    + _escHtml(label || 'photo du test') + ' » non rechargée depuis le stockage — régénérez le rapport (connexion requise) avant remise au patient.</div>';
+}
+
 function buildPrintPhotos(data,side,t,angleOverride) {
   const allPhotos=data.photos||[];
   // Filtrer par côté si side est défini, sinon prendre toutes les photos sans côté
@@ -18415,17 +18674,24 @@ function buildPrintPhotos(data,side,t,angleOverride) {
     items=frames.slice(0,3).map((f,i)=>({
       label:t.frameLabels?.[i]||'Frame '+(i+1),
       dataUrl:f.dataUrl,
+      path:f.path, // #275-D — pour distinguer « non rechargée » de « jamais prise »
       angle:side==='D'?f.angD:f.angG
     }));
   }
   if(!items.length) return '';
+  // #275-D — KFPPA : la légende reprend EXACTEMENT le grand chiffre U
+  // (« +11.2° », « −3.4° », ou magnitude seule « 4.4° » sans signe). Les
+  // autres tests gardent leur légende.
+  const _legende=(ph)=>t?.kfppaPhotos
+    ? (ph.kfppaSigne ? kfppaSigneTxt(ph.angle) : _kfppaMagnitude(ph.angle))
+    : Number(angleOverride!=null?angleOverride:ph.angle).toFixed(1)+'°';
   return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;justify-content:flex-start;">
     ${items.map(ph=>ph?.dataUrl?`
       <div style="text-align:center;flex:0 0 auto;">
         <img src="${ph.dataUrl}" style="height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block;"/>
         <div style="font-size:7px;color:#666;margin-top:2px;">${ph.label||''}</div>
-        ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${Number(angleOverride!=null?angleOverride:ph.angle).toFixed(1)}°</div>`:''}
-      </div>`:'').join('')}
+        ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${_legende(ph)}</div>`:''}
+      </div>`:(ph?.path?_photoNonRechargeeHTML(ph.label):'')).join('')}
   </div>`;
 }
 

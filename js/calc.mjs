@@ -470,9 +470,245 @@ export function kfppaClasseS(S) {
  */
 export function kfppaTexteNonSigne(v) {
   if (v == null || !Number.isFinite(v)) return '—';
-  return Math.abs(v).toFixed(1) + '° (sens valgus/varus non enregistré)';
+  return _kfppaMagnitudeTxt(v) + ' (sens valgus/varus non enregistré)';
+}
+
+// #275-D — PARTIE NUMÉRIQUE d'une valeur non signée, source unique : la
+// phrase du genou (via kfppaTexteNonSigne), le grand chiffre U et la légende
+// de la photo passent tous par elle, donc par le même arrondi (_kfppaArrondi).
+/** @param {number} v @returns {string} */
+function _kfppaMagnitudeTxt(v) {
+  return Math.abs(_kfppaArrondi(v)).toFixed(1) + '°';
 }
 // ─── #275-C — FIN ───
+
+// ═══════════════════════════════════════════════════════════════════
+// #275-D — KFPPA : textes signés, Δ, couleurs, phrases du rapport
+// ═══════════════════════════════════════════════════════════════════
+//
+// DÉCISIONS DU PRATICIEN (Scio) :
+//   - plus aucun pourcentage ; des degrés signés, le mot en clair ;
+//   - Δ = U − S n'a JAMAIS de verdict ni le mot Valgus/Varus comme état :
+//     « +5.9° (vers le valgus) », « −4.8° (vers le varus) », « 0.0° » ;
+//   - Δ et l'asymétrie sont calculés sur les valeurs AFFICHÉES (au dixième),
+//     pour que le praticien retombe sur le même nombre en faisant la
+//     soustraction lui-même ;
+//   - un statique nul s'écrit « 0.0° — Neutre », jamais « Valgus +0.0° » ;
+//   - une valeur sans kfppaSigne ne reçoit ni classe, ni verdict, ni Δ.
+//
+// Aucune de ces fonctions n'écrit quoi que ce soit : elles ne font que
+// calculer et composer du texte (garde : tests/kfppa-affichage-275d.test.mjs).
+
+// Valeur en DIXIÈMES entiers, depuis la valeur affichée : les sommes et
+// différences se font sur des entiers, donc tombent juste.
+/** @param {number} v @returns {number} */
+function _kfppaDixiemes(v) {
+  return Math.round(_kfppaArrondi(v) * 10);
+}
+/** @param {number} d @returns {string} */
+function _kfppaTxtDixiemes(d) {
+  if (d === 0) return '0.0°';
+  return (d > 0 ? '+' : '−') + (Math.abs(d) / 10).toFixed(1) + '°';
+}
+
+// Valeur signée telle qu'affichée : « +9.3° », « −2.4° », « 0.0° ».
+/** @param {number|null|undefined} v @returns {string} */
+export function kfppaSigneTxt(v) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return _kfppaTxtDixiemes(_kfppaDixiemes(v));
+}
+
+// Δ = U − S, sur les valeurs affichées.
+/**
+ * @param {number|null|undefined} S
+ * @param {number|null|undefined} U
+ * @returns {number|null}
+ */
+export function kfppaDelta(S, U) {
+  if (S == null || U == null || !Number.isFinite(S) || !Number.isFinite(U)) return null;
+  return (_kfppaDixiemes(U) - _kfppaDixiemes(S)) / 10;
+}
+
+/** @param {number|null|undefined} d @returns {string} */
+export function kfppaTexteDelta(d) {
+  if (d == null || !Number.isFinite(d)) return '—';
+  const t = _kfppaDixiemes(d);
+  if (t === 0) return '0.0°';
+  return _kfppaTxtDixiemes(t) + (t > 0 ? ' (vers le valgus)' : ' (vers le varus)');
+}
+
+// Statique : « +3.4° — Valgus constitutionnel », « 0.0° — Neutre ».
+/**
+ * @param {number|null|undefined} S
+ * @param {boolean} signe
+ * @returns {string}
+ */
+export function kfppaTexteS(S, signe) {
+  if (S == null || !Number.isFinite(S)) return '—';
+  if (!signe) return kfppaTexteNonSigne(S);
+  return kfppaSigneTxt(S) + ' — ' + kfppaClasseS(S);
+}
+
+// Couleur d'une classe de U : 'vert' | 'orange' | 'rouge' | 'neutre'.
+// Chaque affichage la traduit dans sa propre palette.
+/** @param {string|null|undefined} classe @returns {'vert'|'orange'|'rouge'|'neutre'} */
+export function kfppaCouleurClasse(classe) {
+  if (classe === 'Dans la norme') return 'vert';
+  if (classe === 'Varus excessif' || classe === 'Valgus excessif') return 'rouge';
+  if (
+    classe === 'Varus modéré' ||
+    classe === 'Varus faible' ||
+    classe === 'Valgus faible' ||
+    classe === 'Valgus modéré (insuffisant)' ||
+    classe === 'Valgus modéré (au-dessus de la norme)'
+  ) {
+    return 'orange';
+  }
+  return 'neutre';
+}
+
+// Norme d'un bilan ENREGISTRÉ : celle figée avec lui (result.kfppaNorme).
+// Absente ou incohérente → « norme non définie » ; motif civilité conservé.
+/** @param {any} data @returns {{statut: string, min?: number, max?: number, source?: string, sexe?: string|null}} */
+export function kfppaNormeBilan(data) {
+  const n = data && data.kfppaNorme;
+  if (n && n.statut === 'civilite') return { statut: 'civilite' };
+  if (!n || !Number.isFinite(n.min) || !Number.isFinite(n.max) || n.min > n.max) {
+    return { statut: 'non-definie' };
+  }
+  return {
+    statut: 'ok',
+    min: n.min,
+    max: n.max,
+    source: n.source,
+    sexe: n.sexe == null ? null : n.sexe,
+  };
+}
+
+// « norme 5–12°, femmes », « norme 3–7° », ou le message.
+/** @param {{statut: string, min?: number, max?: number, source?: string, sexe?: string|null}|null|undefined} norme @returns {string} */
+export function kfppaTexteNorme(norme) {
+  if (!norme || norme.statut === 'non-definie') return KFPPA_MSG_NORME_ND;
+  if (norme.statut === 'civilite') return KFPPA_MSG_CIVILITE;
+  return 'norme ' + norme.min + '–' + norme.max + '°' + (norme.sexe ? ', ' + norme.sexe : '');
+}
+
+// Analyse d'un genou. Une valeur non signée garde sa magnitude mais ne porte
+// ni classe, ni verdict, ni Δ.
+/**
+ * @param {{S?: number|null, U?: number|null, sSigne?: boolean, uSigne?: boolean, norme?: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}}} e
+ * @returns {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}}
+ */
+export function kfppaAnalyseGenou(e) {
+  /** @param {any} v @returns {v is number} */
+  const ok = (v) => v != null && Number.isFinite(v);
+  const S = ok(e.S) ? e.S : null;
+  const U = ok(e.U) ? e.U : null;
+  const sSigne = S != null && !!e.sSigne;
+  const uSigne = U != null && !!e.uSigne;
+  const n0 = e.norme || { statut: 'non-definie' };
+  // VÉRIFICATION, pas promesse : un statut 'ok' sans bornes numériques
+  // cohérentes est traité comme une norme non définie, sans verdict.
+  const mn = n0.min,
+    mx = n0.max;
+  const normeValide =
+    n0.statut === 'ok' &&
+    typeof mn === 'number' &&
+    typeof mx === 'number' &&
+    Number.isFinite(mn) &&
+    Number.isFinite(mx) &&
+    mn <= mx;
+  const norme = normeValide || n0.statut === 'civilite' ? n0 : { statut: 'non-definie' };
+  const classeU = uSigne && normeValide ? kfppaClasseU(U, mn, mx) : null;
+  return {
+    S,
+    U,
+    sSigne,
+    uSigne,
+    norme,
+    classeS: sSigne ? kfppaClasseS(S) : null,
+    classeU,
+    delta: sSigne && uSigne ? kfppaDelta(S, U) : null,
+    couleur: kfppaCouleurClasse(classeU),
+  };
+}
+
+/** @param {string|null} s @returns {string|null} */
+function _kfppaMinuscule(s) {
+  return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+// « valeur unipodale −2.4° : varus faible (norme 5–12°, femmes) », ou, sans
+// norme appliquée, « valeur unipodale −2.4° (norme non définie) ». Partie de
+// kfppaPhraseGenou, isolée pour la ligne d'un genou dont le statique manque.
+/**
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}} a
+ * @returns {string}
+ */
+export function kfppaTexteUnipodal(a) {
+  if (a.U == null) return 'valeur unipodale —';
+  if (!a.uSigne) return 'valeur unipodale ' + kfppaTexteNonSigne(a.U);
+  if (a.classeU) {
+    return (
+      'valeur unipodale ' +
+      kfppaSigneTxt(a.U) +
+      ' : ' +
+      _kfppaMinuscule(a.classeU) +
+      ' (' +
+      kfppaTexteNorme(a.norme) +
+      ')'
+    );
+  }
+  return 'valeur unipodale ' + kfppaSigneTxt(a.U) + ' (' + kfppaTexteNorme(a.norme) + ')';
+}
+
+// « Genou gauche : statique +2.4° (neutre), composante dynamique −4.8° (vers
+// le varus), valeur unipodale −2.4° : varus faible (norme 5–12°, femmes). »
+/**
+ * @param {'D'|'G'} cote
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}} a
+ * @returns {string}
+ */
+export function kfppaPhraseGenou(cote, a) {
+  const nom = cote === 'D' ? 'Genou droit' : 'Genou gauche';
+  const st =
+    a.S == null
+      ? 'statique —'
+      : a.sSigne
+        ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
+        : 'statique ' + kfppaTexteNonSigne(a.S);
+  const dyn = 'composante dynamique ' + (a.delta != null ? kfppaTexteDelta(a.delta) : '—');
+  return nom + ' : ' + st + ', ' + dyn + ', ' + kfppaTexteUnipodal(a) + '.';
+}
+
+// « Asymétrie D − G : +11.7° en unipodal, dont +1.0° de statique et +10.7° de
+// dynamique. » Calculée en dixièmes sur les valeurs affichées : la somme des
+// deux parts vaut EXACTEMENT l'écart unipodal. null si une des quatre valeurs
+// manque ou n'est pas signée : pas d'asymétrie sur une magnitude.
+/**
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}|null|undefined} aD
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}|null|undefined} aG
+ * @returns {string|null}
+ */
+export function kfppaPhraseAsymetrie(aD, aG) {
+  if (!aD || !aG || !aD.sSigne || !aD.uSigne || !aG.sSigne || !aG.uSigne) return null;
+  // sSigne/uSigne vrais impliquent S et U numériques (kfppaAnalyseGenou).
+  const dU =
+    _kfppaDixiemes(/** @type {number} */ (aD.U)) - _kfppaDixiemes(/** @type {number} */ (aG.U));
+  const dS =
+    _kfppaDixiemes(/** @type {number} */ (aD.S)) - _kfppaDixiemes(/** @type {number} */ (aG.S));
+  const dDyn = dU - dS;
+  return (
+    'Asymétrie D − G : ' +
+    _kfppaTxtDixiemes(dU) +
+    ' en unipodal, dont ' +
+    _kfppaTxtDixiemes(dS) +
+    ' de statique et ' +
+    _kfppaTxtDixiemes(dDyn) +
+    ' de dynamique.'
+  );
+}
+// ─── #275-D — FIN ───
 
 /**
  * Classifie un score KFPPA (ratio) par rapport aux seuils physiologiques.
@@ -515,22 +751,22 @@ export function interpretGen(p) {
 // ============================================================================
 
 /**
- * Couleur CSS (variable) selon score KFPPA.
- * Seuils cliniques validés (Sprint 0 — 2026-04-26) :
- *   p = |pct| × 100
- *   60 ≤ p ≤ 140       → vert  (norme)
- *   20 ≤ p < 60 ou 140 < p ≤ 180 → orange (valeur limite)
- *   p < 20 ou p > 180  → rouge (hors norme)
+ * #275-D — couleur CSS (variable) selon la CLASSE de U, et non plus selon un
+ * pourcentage (le KFPPA n'en affiche plus aucun) : vert « Dans la norme »,
+ * orange pour les classes faibles et modérées, rouge pour les deux excessifs,
+ * neutre sans classe (valeur non signée, norme non appliquée).
+ * Copie de js/biomeca.js ; accord vérifié par exécution.
  *
- * @param {number|null|undefined} pct  Score signé normalisé (1.0 = 100 %) ; null/undefined/NaN → 'var(--mut)'.
- * @returns {string}  Nom de variable CSS : 'var(--red)' | 'var(--orange)' | 'var(--green)' | 'var(--mut)'.
+ * @param {string|null|undefined} classe  Classe rendue par kfppaClasseU.
+ * @returns {string}  'var(--green)' | 'var(--orange)' | 'var(--red)' | 'var(--mut)'.
  */
-export function clrKfppa(pct) {
-  if (pct == null || isNaN(pct)) return 'var(--mut)';
-  const p = Math.abs(pct) * 100;
-  if (p < 20 || p > 180) return 'var(--red)';
-  if (p < 60 || p > 140) return 'var(--orange)';
-  return 'var(--green)';
+export function clrKfppa(classe) {
+  return {
+    vert: 'var(--green)',
+    orange: 'var(--orange)',
+    rouge: 'var(--red)',
+    neutre: 'var(--mut)',
+  }[kfppaCouleurClasse(classe)];
 }
 
 /**

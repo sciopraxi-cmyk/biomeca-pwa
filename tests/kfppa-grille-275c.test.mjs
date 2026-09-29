@@ -292,8 +292,12 @@ describe('#275-C — norme enregistrée avec le bilan', () => {
         'Norme de référence : réception unipodale (Herrington & Munro, 2010) — mesure à la première réception',
       sexe: 'femmes',
     });
-    expect(env._kfppaNormePourBilan('kfppa-sldj', { civilite: '' })).toBeNull();
-    expect(env._kfppaNormePourBilan('kfppa-sldj', undefined)).toBeNull();
+    // #275-D — USL sans civilité : le MOTIF est enregistré avec le bilan
+    // (décision du praticien), pour que le rapport le dise.
+    expect(env._kfppaNormePourBilan('kfppa-sldj', { civilite: '' })).toEqual({
+      statut: 'civilite',
+    });
+    expect(env._kfppaNormePourBilan('kfppa-sldj', undefined)).toEqual({ statut: 'civilite' });
     expect(env._kfppaNormePourBilan('mobilite', { civilite: 'M.' })).toBeNull();
   });
 
@@ -371,7 +375,11 @@ describe('#275-C — panneau Résultats : bloc de vérification de la grille', (
     { label: 'Unipodal G', side: 'G', dataUrl: 'data:g', angle: -3.4, kfppaSigne: true },
     { label: 'Unipodal D', side: 'D', dataUrl: 'data:d', angle: 11.2, kfppaSigne: true },
   ];
-  const verdicts = (html) => [...html.matchAll(/class="kfppa-verdict">([^<]*)</g)].map((m) => m[1]);
+  // #275-D — le verdict est coloré par sa classe : le motif capture le texte
+  // ET la couleur, et chaque test vérifie les deux.
+  const LECTURE = /class="kfppa-verdict" style="color:([^"]*);">([^<]*)</g;
+  const verdicts = (html) => [...html.matchAll(LECTURE)].map((m) => m[2]);
+  const couleurs = (html) => [...html.matchAll(LECTURE)].map((m) => m[1]);
   const nbDelta = (html, txt) => html.split(`Δ = U − S : <b>${txt}</b>`).length - 1;
 
   it('C11a. Marche : D Valgus excessif, G Varus excessif, norme 3–7° affichée', () => {
@@ -380,8 +388,10 @@ describe('#275-C — panneau Résultats : bloc de vérification de la grille', (
     e.poser({ patient: { civilite: 'M.' } });
     e.updateResults();
     expect(verdicts(res.innerHTML)).toEqual(['Valgus excessif', 'Varus excessif']);
+    expect(couleurs(res.innerHTML)).toEqual(['var(--red)', 'var(--red)']);
     expect(res.innerHTML).toContain('Norme : 3–7° · repère clinique de travail');
-    expect(res.innerHTML).toContain('Statique S : <b>Valgus +0.0° — Neutre</b>');
+    // #275-D — un statique nul n'est pas un valgus : « 0.0° — Neutre ».
+    expect(res.innerHTML).toContain('Statique S : <b>0.0° — Neutre</b>');
     expect(res.innerHTML).not.toContain("d'après la civilité");
   });
 
@@ -394,6 +404,7 @@ describe('#275-C — panneau Résultats : bloc de vérification de la grille', (
       'civilité non renseignée : norme non appliquée',
       'civilité non renseignée : norme non appliquée',
     ]);
+    expect(couleurs(res.innerHTML)).toEqual(['var(--mut)', 'var(--mut)']);
   });
 
   it('C11c. USL, « M. » : norme hommes 1–9°, « (d’après la civilité) »', () => {
@@ -401,10 +412,12 @@ describe('#275-C — panneau Résultats : bloc de vérification de la grille', (
     const res = envCapture(e, 'kfppa-sldj', slots());
     e.poser({ patient: { civilite: 'M.' } });
     e.updateResults();
+    // #275-D — format de norme unifié entre panneau, phrase et rapport.
     expect(res.innerHTML).toContain(
-      "Norme : 1–9° hommes (d'après la civilité) · Norme de référence"
+      "Norme : 1–9°, hommes (d'après la civilité) · Norme de référence"
     );
     expect(verdicts(res.innerHTML)).toEqual(['Valgus excessif', 'Varus excessif']);
+    expect(couleurs(res.innerHTML)).toEqual(['var(--red)', 'var(--red)']);
   });
 
   it('C11d. Valeurs sans kfppaSigne (S et U) : magnitude seule, aucun sens, aucun verdict', () => {
@@ -418,21 +431,26 @@ describe('#275-C — panneau Résultats : bloc de vérification de la grille', (
     e.updateResults();
     const h = res.innerHTML;
     expect(verdicts(h)).toEqual(['—', '—']);
+    expect(couleurs(h)).toEqual(['var(--mut)', 'var(--mut)']);
     expect(h).toContain('Statique S : <b>2.1° (sens valgus/varus non enregistré)</b>');
     expect(h).toContain('Statique S : <b>1.3° (sens valgus/varus non enregistré)</b>');
     expect(h).toContain('Unipodal U : <b>11.2° (sens valgus/varus non enregistré)</b>');
     expect(h).toContain('Unipodal U : <b>3.4° (sens valgus/varus non enregistré)</b>');
     expect(nbDelta(h, '—')).toBe(2);
-    // Plus AUCUN « Valgus + » ni « Varus − » dans tout le panneau : ni les
-    // anciennes lignes Bipodal/Unipodal, ni l'ancienne ligne « Valgus dyn. ».
-    expect(h).not.toMatch(/Valgus \+|Varus [−-]/);
+    // Plus AUCUNE valeur signée ni AUCUN mot de classe dans tout le panneau.
+    // #275-D — motif renforcé : une valeur signée s'écrit désormais « +11.2° »
+    // et une classe « Varus excessif », non plus « Valgus +x° ».
+    const SIGNE_OU_CLASSE = /[+−]\d+\.\d°|Valgus |Varus /;
+    expect(h).not.toMatch(SIGNE_OU_CLASSE);
     expect(h).not.toMatch(/Bipodal:|Unipodal:|Valgus dyn\./);
-    // Témoin : le même motif TROUVE bien « Varus − » quand la valeur est signée.
+    // Témoin : le même motif TROUVE bien valeurs signées et classes quand les
+    // captures sont signées.
     const e2 = charger();
     const res2 = envCapture(e2, 'kfppa-marche', slots());
     e2.poser({ patient: { civilite: '' } });
     e2.updateResults();
-    expect(res2.innerHTML).toMatch(/Valgus \+|Varus [−-]/);
+    expect(res2.innerHTML).toMatch(/[+−]\d+\.\d°/);
+    expect(res2.innerHTML).toMatch(/Valgus |Varus /);
   });
 
   it('C11e. S signé mais U non signé : Δ non calculé, pas de verdict', () => {
@@ -443,6 +461,7 @@ describe('#275-C — panneau Résultats : bloc de vérification de la grille', (
     e.poser({ patient: { civilite: '' } });
     e.updateResults();
     expect(verdicts(res.innerHTML)).toEqual(['Valgus excessif', '—']);
+    expect(couleurs(res.innerHTML)).toEqual(['var(--red)', 'var(--mut)']);
     expect(nbDelta(res.innerHTML, '—')).toBe(1);
   });
 });
