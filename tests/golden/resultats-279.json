@@ -1,0 +1,1288 @@
+{
+  "kfppa-marche": {
+    "photos": [
+      {
+        "label": "Station bipodale",
+        "side": "",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": null,
+        "angleD": 1.2,
+        "angleG": -0.6,
+        "path": null,
+        "kfppaSigne": true,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Valgum dynamique unipodal G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -3.4,
+        "path": "u/test-1.jpg",
+        "kfppaSigne": true
+      },
+      {
+        "label": "Valgum dynamique unipodal D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 11.2,
+        "path": null,
+        "kfppaSigne": true
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ],
+    "kfppaNorme": {
+      "min": 3,
+      "max": 7,
+      "source": "repère clinique de travail, pas de norme 2D publiée",
+      "sexe": null
+    },
+    "deltaD": 10,
+    "deltaG": -2.8
+  },
+  "kfppa-course": {
+    "photos": [
+      {
+        "label": "Station bipodale",
+        "side": "",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": null,
+        "angleD": 1.2,
+        "angleG": -0.6,
+        "path": null,
+        "kfppaSigne": true,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Valgum dynamique unipodal G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -3.4,
+        "path": "u/test-1.jpg",
+        "kfppaSigne": true
+      },
+      {
+        "label": "Valgum dynamique unipodal D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 11.2,
+        "path": null,
+        "kfppaSigne": true
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ],
+    "kfppaNorme": {
+      "min": 5,
+      "max": 12,
+      "source": "repère clinique de travail, pas de norme 2D publiée",
+      "sexe": null
+    },
+    "deltaD": 10,
+    "deltaG": -2.8
+  },
+  "kfppa-sldj": {
+    "photos": [
+      {
+        "label": "Station bipodale",
+        "side": "",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": null,
+        "angleD": 1.2,
+        "angleG": -0.6,
+        "path": null,
+        "kfppaSigne": true,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Valgum dynamique unipodal G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -3.4,
+        "path": "u/test-1.jpg",
+        "kfppaSigne": true
+      },
+      {
+        "label": "Valgum dynamique unipodal D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 11.2,
+        "path": null,
+        "kfppaSigne": true
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ],
+    "kfppaNorme": {
+      "min": 5,
+      "max": 12,
+      "source": "Norme de référence : réception unipodale (Herrington & Munro, 2010) — mesure à la première réception",
+      "sexe": "femmes"
+    },
+    "deltaD": 10,
+    "deltaG": -2.8
+  },
+  "mla-marche": {
+    "photos": [
+      {
+        "label": "Attaque/Propulsion pied D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": 10,
+        "path": null,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Écrasement pied D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -11.5,
+        "path": "u/test-1.jpg"
+      },
+      {
+        "label": "Attaque/Propulsion pied G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 13,
+        "path": null
+      },
+      {
+        "label": "Écrasement pied G",
+        "side": "G",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ]
+  },
+  "mla-course": {
+    "photos": [
+      {
+        "label": "Attaque/Propulsion pied D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": 10,
+        "path": null,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Écrasement pied D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -11.5,
+        "path": "u/test-1.jpg"
+      },
+      {
+        "label": "Attaque/Propulsion pied G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 13,
+        "path": null
+      },
+      {
+        "label": "Écrasement pied G",
+        "side": "G",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ]
+  },
+  "verrou": {
+    "photos": [
+      {
+        "label": "Statique bipodal D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": 10,
+        "path": null,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Statique bipodal G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -11.5,
+        "path": "u/test-1.jpg"
+      },
+      {
+        "label": "Pointe pieds D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 13,
+        "path": null
+      },
+      {
+        "label": "Pointe pieds G",
+        "side": "G",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ]
+  },
+  "mobilite": {
+    "photos": [
+      {
+        "label": "Inversion forcée bipodal",
+        "side": "",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": 10,
+        "angleD": 12,
+        "angleG": 14,
+        "path": null,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Éversion forcée bipodal",
+        "side": "",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -11.5,
+        "angleD": -8,
+        "angleG": -4,
+        "path": "u/test-1.jpg"
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ]
+  },
+  "amorti-marche": {
+    "photos": [
+      {
+        "label": "Attaque taligrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": 10,
+        "path": null,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Attaque taligrade D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -11.5,
+        "path": "u/test-1.jpg"
+      },
+      {
+        "label": "Phase plantigrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 13,
+        "path": null
+      },
+      {
+        "label": "Phase plantigrade D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD3",
+        "angle": -14.5,
+        "path": null
+      },
+      {
+        "label": "Phase digitigrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD4",
+        "angle": 16,
+        "path": null
+      },
+      {
+        "label": "Phase digitigrade D",
+        "side": "D",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ],
+    "amD": 0.375,
+    "prD": null,
+    "phases": {
+      "D": {
+        "tal": -11.5,
+        "plan": -14.5,
+        "dig": null
+      },
+      "G": {
+        "tal": 10,
+        "plan": 13,
+        "dig": 16
+      }
+    },
+    "amG": 0.375,
+    "prG": 0.375
+  },
+  "amorti-course": {
+    "photos": [
+      {
+        "label": "Attaque taligrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": 10,
+        "path": null,
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "label": "Attaque taligrade D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -11.5,
+        "path": "u/test-1.jpg"
+      },
+      {
+        "label": "Phase plantigrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": 13,
+        "path": null
+      },
+      {
+        "label": "Phase plantigrade D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD3",
+        "angle": -14.5,
+        "path": null
+      },
+      {
+        "label": "Phase digitigrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD4",
+        "angle": 16,
+        "path": null
+      },
+      {
+        "label": "Phase digitigrade D",
+        "side": "D",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ],
+    "amD": 0.25,
+    "prD": null,
+    "phases": {
+      "D": {
+        "tal": -11.5,
+        "plan": -14.5,
+        "dig": null
+      },
+      "G": {
+        "tal": 10,
+        "plan": 13,
+        "dig": 16
+      }
+    },
+    "amG": 0.25,
+    "prG": 0.25
+  },
+  "amorti-marche#descente": {
+    "photos": [
+      {
+        "label": "Attaque taligrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD0",
+        "angle": 2,
+        "path": null
+      },
+      {
+        "label": "Attaque taligrade D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD1",
+        "angle": -3,
+        "path": null
+      },
+      {
+        "label": "Phase plantigrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD2",
+        "angle": -6,
+        "path": null
+      },
+      {
+        "label": "Phase plantigrade D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD3",
+        "angle": 7,
+        "path": null
+      },
+      {
+        "label": "Phase digitigrade G",
+        "side": "G",
+        "dataUrl": "data:image/jpeg;base64,QUJD4",
+        "angle": 4,
+        "path": null
+      },
+      {
+        "label": "Phase digitigrade D",
+        "side": "D",
+        "dataUrl": "data:image/jpeg;base64,QUJD5",
+        "angle": 5,
+        "path": null
+      }
+    ],
+    "frames": [],
+    "amD": 1.25,
+    "prD": 0.25,
+    "phases": {
+      "D": {
+        "tal": -3,
+        "plan": 7,
+        "dig": 5
+      },
+      "G": {
+        "tal": 2,
+        "plan": -6,
+        "dig": 4
+      }
+    },
+    "amG": 1,
+    "prG": 1.25
+  },
+  "kfppa-marche#repli-frames": {
+    "photos": [
+      {
+        "label": "Station bipodale",
+        "side": "",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      },
+      {
+        "label": "Valgum dynamique unipodal G",
+        "side": "G",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      },
+      {
+        "label": "Valgum dynamique unipodal D",
+        "side": "D",
+        "dataUrl": null,
+        "angle": null,
+        "path": null
+      }
+    ],
+    "frames": [
+      {
+        "time": 1.25,
+        "angD": 4.5,
+        "angG": -2.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf0",
+        "markers": [
+          {
+            "x": 100,
+            "y": 100,
+            "side": "D",
+            "name": "a"
+          },
+          {
+            "x": 110,
+            "y": 200,
+            "side": "D",
+            "name": "b"
+          },
+          {
+            "x": 100,
+            "y": 300,
+            "side": "D",
+            "name": "c"
+          },
+          {
+            "x": 300,
+            "y": 100,
+            "side": "G",
+            "name": "a"
+          },
+          {
+            "x": 290,
+            "y": 200,
+            "side": "G",
+            "name": "b"
+          }
+        ],
+        "dims": {
+          "w": 1920,
+          "h": 1080
+        }
+      },
+      {
+        "time": 2.5,
+        "angD": 9.5,
+        "angG": 1.5,
+        "dataUrl": "data:image/jpeg;base64,QUJDf1",
+        "path": "u/frame-1.jpg"
+      }
+    ],
+    "kfppaNorme": {
+      "min": 3,
+      "max": 7,
+      "source": "repère clinique de travail, pas de norme 2D publiée",
+      "sexe": null
+    },
+    "deltaD": 5,
+    "deltaG": 4
+  }
+}

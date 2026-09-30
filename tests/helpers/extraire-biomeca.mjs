@@ -14,7 +14,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RACINE } from './mirror-diff.mjs';
 
-export const SRC_BIOMECA = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
+// BIOMECA_SRC (outillage, #279) : lire une AUTRE version du fichier — par
+// exemple celle de HEAD, écrite dans un fichier temporaire — pour produire
+// une référence avec le code d'avant une modification, sans déplacer le
+// travail en cours. Jamais défini dans la suite de tests normale.
+export const SRC_BIOMECA = readFileSync(
+  process.env.BIOMECA_SRC || join(RACINE, 'js/biomeca.js'),
+  'utf8'
+);
 
 function unique(tete, nom) {
   const n = SRC_BIOMECA.split(tete).length - 1;
@@ -25,7 +32,14 @@ function unique(tete, nom) {
 // Fonction de premier niveau : de `\nfunction nom(` jusqu'au premier `\n}\n`.
 // Une fonction écrite sur une seule ligne s'arrête à la fin de cette ligne.
 export function fonction(nom) {
-  const i = unique(`\nfunction ${nom}(`, nom);
+  // #279 — les fonctions ASYNCHRONES (validateAndSave) sont aussi acceptées.
+  // L'unicité porte sur les deux formes réunies : une homonyme synchrone et
+  // une asynchrone ne doivent pas coexister.
+  const sync = `\nfunction ${nom}(`;
+  const async_ = `\nasync function ${nom}(`;
+  const n = SRC_BIOMECA.split(sync).length - 1 + SRC_BIOMECA.split(async_).length - 1;
+  if (n !== 1) throw new Error(`${nom} : ${n} définitions trouvées, 1 attendue`);
+  const i = SRC_BIOMECA.includes(async_) ? unique(async_, nom) : unique(sync, nom);
   const ligne = SRC_BIOMECA.slice(i, SRC_BIOMECA.indexOf('\n', i));
   if (ligne.trimEnd().endsWith('}') && ligne.split('{').length === ligne.split('}').length) {
     return ligne;

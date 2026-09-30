@@ -72,15 +72,26 @@ export const FONCTIONS = [
   '_photoNonRechargeeHTML',
   '_kfppaPrintSideHTML',
   '_kfppaAlertes',
+  'validateAndSave',
+  '_construireResultatTest',
   '_escHtml',
   '_kfppaNormePourBilan',
 ];
 
 // Chaque chargement rend un environnement NEUF : aucun état ne passe d'un
 // test à l'autre, sauf ce que le code de biomeca.js laisserait fuir lui-même.
-export function charger() {
+// Option `persistance` (#279) : laisse validateAndSave aller à son terme —
+// savePatients et alert sont NOTÉS sans lever, Storage et navigation bouchonnés.
+// Sans cette option, toute écriture lève (garde du rapport, #275-D).
+export function charger(opts = {}) {
+  // `exclure` : noms à NE PAS extraire — seulement pour produire une référence
+  // avec une version antérieure du fichier (BIOMECA_SRC), où ils n'existent pas.
+  const noms = FONCTIONS.filter((n) => !(opts.exclure || []).includes(n));
   const code = `
+    const _persist = !!(opts && opts.persistance);
     let currentTestId = null;
+    let capturedFrames = [];
+    let selectedFrameIdx = -1;
     let photoSlots = [];
     let vidMarkers = [];
     let _elements = {};
@@ -92,7 +103,14 @@ export function charger() {
     const _espion = (nom) => () => { _espions.push(nom); throw new Error('écriture interdite : ' + nom); };
     const saveBilanSilent = _espion('saveBilanSilent');
     const saveBilan = _espion('saveBilan');
-    const savePatients = _espion('savePatients');
+    const _enregistrements = [];
+    const savePatients = _persist
+      ? () => { _enregistrements.push('savePatients'); return true; }
+      : _espion('savePatients');
+    async function migrateSportPhotos() { return []; }
+    function restoreSportPhotosStash() {}
+    function syncOpenedBilanToHistory() {}
+    function nav(id) { _enregistrements.push('nav:' + id); }
     const _stockage = (nom) => ({
       getItem: () => null,
       setItem: _espion(nom + '.setItem'),
@@ -111,7 +129,7 @@ export function charger() {
         toDataURL: () => 'data:image/jpeg;base64,QUJD',
       }),
     };
-    function alert(m) { throw new Error('alert inattendue : ' + m); }
+    function alert(m) { if (_persist) { _enregistrements.push('alert'); return; } throw new Error('alert inattendue : ' + m); }
     function drawOverlay() {}
     function renderVidPhotoGrid() {}
     function quickAngleCard(side) { return '<carte-rapide ' + side + '>'; }
@@ -124,30 +142,33 @@ export function charger() {
     ${objet('MEASURE_COMPUTERS')}
     ${BLOC_275C}
     ${BLOC_275D}
-    ${FONCTIONS.map(fonction).join('\n')}
+    ${noms.map(fonction).join('\n')}
     return {
       TESTS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
       kfppaSexeCivilite, kfppaNormeApplicable, kfppaClasseU, kfppaClasseS, kfppaTexteNonSigne,
       kfppaSigneTxt, kfppaDelta, kfppaTexteDelta, kfppaTexteS, kfppaCouleurClasse,
       kfppaNormeBilan, kfppaTexteNorme, kfppaAnalyseGenou, kfppaPhraseGenou, kfppaPhraseAsymetrie,
       kfppaTexteUnipodal,
-      ${FONCTIONS.join(', ')},
+      ${noms.join(', ')},
       poser(o) {
         if ('test' in o) currentTestId = o.test;
         if ('slots' in o) photoSlots = o.slots;
         if ('marqueurs' in o) vidMarkers = o.marqueurs;
         if ('elements' in o) _elements = o.elements;
         if ('patient' in o) currentPatient = o.patient;
+        if ('frames' in o) capturedFrames = o.frames;
       },
       slots: () => photoSlots,
       espions: () => _espions.slice(),
+      enregistrements: () => _enregistrements.slice(),
+      patient: () => currentPatient,
       saveBilanSilent,
       savePatients,
       localStorage,
     };
   `;
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt, jamais d'entrée externe
-  return new Function(code)();
+  return new Function('opts', code)(opts);
 }
 
 // Capture de démonstration du praticien — aucune donnée patient.

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import * as calc from '../js/calc.mjs';
 import { RACINE } from './helpers/mirror-diff.mjs';
 import { charger, envCapture } from './helpers/harnais-kfppa.mjs';
+import { cas, patientFictif } from './helpers/resultats-279-donnees.mjs';
 import { SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -301,20 +302,41 @@ describe('#275-C — norme enregistrée avec le bilan', () => {
     expect(env._kfppaNormePourBilan('mobilite', { civilite: 'M.' })).toBeNull();
   });
 
-  it('C9b. validateAndSave l’écrit dans le résultat du KFPPA (garde structurelle)', () => {
-    // validateAndSave est asynchrone et dépend de tout l'écran de capture :
-    // on vérifie ici que l'appel existe, une seule fois, DANS la branche KFPPA
-    // de validateAndSave. C'est une garde de présence, pas une exécution.
+  it('C9b. validateAndSave enregistre la norme appliquée (vérifié à l’exécution)', async () => {
+    // #279 étape 2 — l'écriture de kfppaNorme vit dans _construireResultatTest.
+    // On ne cherche plus un texte : on LANCE validateAndSave sur des bilans
+    // KFPPA synthétiques et on lit ce qu'il a enregistré.
+    const enregistrer = async (id, civilite) => {
+      const e = charger({ persistance: true });
+      const c = cas(e.TESTS).find((x) => x.nom === id);
+      e.poser({
+        test: id,
+        slots: structuredClone(c.slots),
+        frames: structuredClone(c.frames),
+        patient: patientFictif(civilite),
+      });
+      await e.validateAndSave();
+      return e.patient().mesures[id].kfppaNorme;
+    };
+    expect(await enregistrer('kfppa-sldj', 'Mme')).toEqual({
+      min: 5,
+      max: 12,
+      source:
+        'Norme de référence : réception unipodale (Herrington & Munro, 2010) — mesure à la première réception',
+      sexe: 'femmes',
+    });
+    expect(await enregistrer('kfppa-marche', 'M.')).toEqual({
+      min: 3,
+      max: 7,
+      source: 'repère clinique de travail, pas de norme 2D publiée',
+      sexe: null,
+    });
+    expect(await enregistrer('kfppa-sldj', '')).toEqual({ statut: 'civilite' });
+    // Et validateAndSave passe bien par la construction extraite, une fois.
     const debut = SRC_BIOMECA.indexOf('\nasync function validateAndSave() {');
-    const fin = SRC_BIOMECA.indexOf('\n}\n', debut);
-    const corps = SRC_BIOMECA.slice(debut, fin);
-    const appel =
-      'const _normeKfppa=_kfppaNormePourBilan(currentTestId, currentPatient);\n      if(_normeKfppa) result.kfppaNorme=_normeKfppa;';
-    expect(corps.split(appel).length - 1).toBe(1);
-    const branche = corps.indexOf('if(t.div!==undefined){');
-    expect(branche).toBeGreaterThan(0);
-    expect(corps.indexOf(appel)).toBeGreaterThan(branche);
-    expect(corps.indexOf(appel) - branche).toBeLessThan(300);
+    const corps = SRC_BIOMECA.slice(debut, SRC_BIOMECA.indexOf('\n}\n', debut));
+    expect(debut).toBeGreaterThan(0);
+    expect(corps.split('_construireResultatTest(').length - 1).toBe(1);
   });
 });
 

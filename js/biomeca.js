@@ -15473,11 +15473,15 @@ function _relireMarqueurs(brut) {
 // ══════════════════════════════════════════════════════
 // VALIDER & SAUVEGARDER
 // ══════════════════════════════════════════════════════
-async function validateAndSave() {
-  if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
-  const t=TESTS[currentTestId];
-  const view=t.view||'face';
-  let result={photos:[],frames:[],date:new Date().toLocaleString('fr-FR')};
+// #279 étape 2 — CONSTRUCTION du résultat d'un test, extraite de
+// validateAndSave SANS CHANGER SON COMPORTEMENT. Elle n'écrit RIEN : ni
+// currentPatient.mesures, ni stockage, ni Storage — elle lit les créneaux et
+// les frames qu'on lui passe et rend l'objet que validateAndSave enregistre.
+// C'est la brique de la sauvegarde automatique (#279 étape 4). Résultat figé
+// pour les 9 tests par tests/golden/resultats-279.json.
+function _construireResultatTest(testId, slots, frames, patient, date) {
+  const t=TESTS[testId];
+  let result={photos:[],frames:[],date};
 
   if(t.mode==='video'){
     // #250 — ÉCRITURE CONDITIONNELLE, et cette condition est le cœur du
@@ -15512,26 +15516,26 @@ async function validateAndSave() {
     // LECTURE PAR VÉRITÉ, jamais par identité : `f.markersConnus`, jamais
     // `=== true`. Sinon la normalisation à false n'aurait fait que déplacer le
     // piège — une entrée restée à undefined y échapperait en silence.
-    result.frames=capturedFrames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl,path:f.path,
+    result.frames=frames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl,path:f.path,
       ..._serialiserMarqueurs(f)}));
     // Pour les tests video avec encadrés photos (Mobilité, Verrouillage, MLA, Amorti)
-    if(t.showPhotoSlots && photoSlots.length) {
+    if(t.showPhotoSlots && slots.length) {
       // #250 — écriture CONDITIONNELLE, et lecture par vérité (jamais
       // `=== true`). Voir result.frames plus haut pour la justification
       // complète : ne jamais écrire le champ quand il n'a jamais existé, sous
       // peine de faire basculer « jamais eu de points » en « rien posé »,
       // irréversiblement.
-      result.photos=photoSlots.map(_serialiserPhoto);
+      result.photos=slots.map(_serialiserPhoto);
     }
     if(t.div!==undefined){
       // #275-C — la norme appliquée part avec le bilan, écrite seulement
       // quand une norme s'applique (voir _kfppaNormePourBilan).
-      const _normeKfppa=_kfppaNormePourBilan(currentTestId, currentPatient);
+      const _normeKfppa=_kfppaNormePourBilan(testId, patient);
       if(_normeKfppa) result.kfppaNorme=_normeKfppa;
-      // KFPPA : calcul depuis photoSlots (unipodalD et unipodalG vs bipodale)
-      const slotsD=photoSlots.filter(s=>s.side==='D');
-      const slotsG=photoSlots.filter(s=>s.side==='G');
-      const bipodal=photoSlots.find(s=>s.side==='');
+      // KFPPA : calcul depuis slots (unipodalD et unipodalG vs bipodale)
+      const slotsD=slots.filter(s=>s.side==='D');
+      const slotsG=slots.filter(s=>s.side==='G');
+      const bipodal=slots.find(s=>s.side==='');
       const uniD=slotsD[0]; const uniG=slotsG[0];
       // KFPPA = angle unipodal - angle bipodal
       // #275-B — LE BIPODAL SE LIT PAR JAMBE, PLUS PAR SON ANGLE UNIQUE.
@@ -15547,17 +15551,17 @@ async function validateAndSave() {
       if(bipodal?.angleG!=null && uniG?.angle!=null){
         result.deltaG=uniG.angle-bipodal.angleG; // #275-D — plus de pctG
       }
-      // Fallback sur capturedFrames
-      if(result.deltaD==null && capturedFrames.length>=2){
-        const f0=capturedFrames[0],f1=capturedFrames[1];
+      // Fallback sur frames
+      if(result.deltaD==null && frames.length>=2){
+        const f0=frames[0],f1=frames[1];
         result.deltaD=f1.angD!=null&&f0.angD!=null?f1.angD-f0.angD:null;
         result.deltaG=f1.angG!=null&&f0.angG!=null?f1.angG-f0.angG:null;
       }
     }
     if(t.normAm!==undefined){
-      // Amorti : lire depuis photoSlots (TalG,TalD,PlanG,PlanD,DigG,DigD)
-      const sD=photoSlots.filter(s=>s.side==='D');
-      const sG=photoSlots.filter(s=>s.side==='G');
+      // Amorti : lire depuis slots (TalG,TalD,PlanG,PlanD,DigG,DigD)
+      const sD=slots.filter(s=>s.side==='D');
+      const sG=slots.filter(s=>s.side==='G');
       const talD=sD[0]?.angle, planD=sD[1]?.angle, digD=sD[2]?.angle;
       const talG=sG[0]?.angle, planG=sG[1]?.angle, digG=sG[2]?.angle;
       if(talD!=null||planD!=null||digD!=null){
@@ -15576,7 +15580,7 @@ async function validateAndSave() {
     // (jamais `=== true`). Voir result.frames plus haut pour la justification.
     // #275-A — même sérialiseur que le chemin vidéo : une copie du map
     // aurait perdu kfppaSigne en silence.
-    result.photos=photoSlots.map(_serialiserPhoto);
+    result.photos=slots.map(_serialiserPhoto);
     if(t.normDiv!==undefined){
       const sD=result.photos.filter(s=>s.side==='D');
       const sG=result.photos.filter(s=>s.side==='G');
@@ -15602,6 +15606,15 @@ async function validateAndSave() {
       if(inv!=null&&ev!=null) result.mobPct=(Math.abs(inv)+Math.abs(ev))/t.normMob;
     }
   }
+
+  return result;
+}
+
+async function validateAndSave() {
+  if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
+  const t=TESTS[currentTestId];
+  // #279 étape 2 — construction extraite, sans écriture (voir la fonction).
+  const result=_construireResultatTest(currentTestId, photoSlots, capturedFrames, currentPatient, new Date().toLocaleString('fr-FR'));
 
   if(!currentPatient.mesures) currentPatient.mesures={};
   // bilanId stable pour scoper les paths Storage (Task #53 PR B2). Lazy
