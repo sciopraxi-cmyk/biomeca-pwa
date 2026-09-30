@@ -50,7 +50,9 @@ const BASE = [
 ].join('\n');
 
 // LES DEUX LIGNES D'APPEL, EXTRAITES DU SOURCE.
-const L_IMG_TYPE = ligne('const _mlaT = _mkrTypeTest(TESTS[currentTestId]);');
+// #279 étape 3a — drawOverlay lit le test via `_testId`, qui vaut
+// currentTestId sans option (dessin en direct) : le harnais le déclare ainsi.
+const L_IMG_TYPE = ligne('const _mlaT = _mkrTypeTest(TESTS[_testId]);');
 const L_IMG_VAL = ligne(
   '_textesAngle.set(side, computeCorrectedAngle(ang, side, view, _mlaT, grp)'
 );
@@ -69,6 +71,7 @@ function harnais(id) {
       '\n  const ang = calcAngle3(grp);' +
       '\n  if (ang === null) return null;' +
       '\n  const _textesAngle = new Map();' +
+      '\n  const _testId = currentTestId;' +
       '\n  ' +
       L_IMG_TYPE +
       '\n  ' +

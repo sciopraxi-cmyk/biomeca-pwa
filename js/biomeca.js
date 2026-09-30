@@ -13881,7 +13881,15 @@ const MKR_TRAIT_COUL = 'rgba(0,0,0,.7)';
 const MKR_TRAIT_COUL_SEL = '#f5a623';
 
 // Dessin overlay avec SEGMENTS RECTANGULAIRES (style OPS)
-function drawOverlay(ctx, canvas, markers, selIdx, view) {
+// #279 étape 3a — `opts` facultatif : { taille, opacite, testId }. Sans lui,
+// les réglages courants (markerSizeFactor, markerOpacity, currentTestId) —
+// dessin strictement inchangé. Avec lui, les valeurs D'UNE CAPTURE : c'est ce
+// qui permet de redessiner ses points plus tard (vignette, rapport) avec
+// l'aspect qu'ils avaient, quels que soient les réglages du moment.
+function drawOverlay(ctx, canvas, markers, selIdx, view, opts) {
+  const _taille = opts && opts.taille != null ? opts.taille : markerSizeFactor;
+  const _opacite = opts && opts.opacite != null ? opts.opacite : markerOpacity;
+  const _testId = opts && opts.testId != null ? opts.testId : currentTestId;
   const W=canvas.width;
   const segW=_mkrSegW(W); // largeur du rectangle segment — formule partagée
 
@@ -13896,7 +13904,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     const col=side==='D'?'rgba(74,158,255,0.7)':side==='G'?'rgba(62,207,114,0.7)':'rgba(167,139,250,0.7)';
     // Dessiner rectangle entre chaque paire consécutive
     for(let i=0;i<grp.length-1;i++){
-      drawSegmentRect(ctx,grp[i],grp[i+1],segW,col);
+      drawSegmentRect(ctx,grp[i],grp[i+1],segW,col,_opacite);
     }
   });
 
@@ -13939,7 +13947,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     // existera : le logiciel connaîtra alors l'échelle réelle de
     // l'installation, et le cercle pourra coller à la pastille plutôt qu'à
     // une fraction arbitraire de la largeur d'image.
-    const r = Math.max(2, (W / 288) * markerSizeFactor);
+    const r = Math.max(2, (W / 288) * _taille);
     const isSel=selIdx===i;
     // #271 — épaisseur et halo PROPORTIONNELS AU RAYON. Ils étaient figés à
     // 1,5 px et planchés à 2 px, hérités du diviseur 72, et écrasaient un point
@@ -13956,7 +13964,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     // pleine intensité pour conserver le repère exact du centre.
     ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
     ctx.fillStyle=m.color;
-    ctx.globalAlpha = markerOpacity;
+    ctx.globalAlpha = _opacite;
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle=isSel?MKR_TRAIT_COUL_SEL:MKR_TRAIT_COUL; ctx.lineWidth=trait; ctx.stroke();
@@ -13990,8 +13998,8 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
   // la lisibilité dépend de l'échelle d'affichage, que cette fonction ignore.
   // À 1920 rendus sur un lecteur de 700 px, 17,6 px de canevas font 6,4 px à
   // l'écran. Même nature que le plancher de findMarkerAt. Tâche séparée.
-  const pxLbl = Math.max(8, (W / 60) * markerSizeFactor);
-  const rPoint = Math.max(2, (W / 288) * markerSizeFactor);
+  const pxLbl = Math.max(8, (W / 60) * _taille);
+  const rPoint = Math.max(2, (W / 288) * _taille);
 
   // Les textes d'angle sont calculés ici parce qu'ils dépendent de TESTS et de
   // computeCorrectedAngle ; la disposition, elle, n'a besoin que des chaînes.
@@ -14001,7 +14009,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     if (grp.length < 3) return;
     const ang = calcAngle3(grp);
     if (ang === null) return;
-    const _mlaT = _mkrTypeTest(TESTS[currentTestId]);
+    const _mlaT = _mkrTypeTest(TESTS[_testId]);
     _textesAngle.set(side, computeCorrectedAngle(ang, side, view, _mlaT, grp).toFixed(1) + '°');
   });
 
@@ -14415,7 +14423,9 @@ function _mkrPlaceLegende(ctx, nom, pt, dir, base, px, zones) {
 // feat-biomec-capteurs (B) — fill du segment modulé par markerOpacity ;
 // contour blanc fin reste à pleine intensité pour conserver le tracé visible
 // (le contour est l'indication de direction, indépendant du remplissage).
-function drawSegmentRect(ctx, p1, p2, w, color) {
+// #279 étape 3a — `opacite` facultatif : celle de la capture quand drawOverlay
+// redessine des points enregistrés ; sinon le réglage courant, comme avant.
+function drawSegmentRect(ctx, p1, p2, w, color, opacite) {
   const dx=p2.x-p1.x, dy=p2.y-p1.y;
   const len=Math.sqrt(dx*dx+dy*dy);
   if(len<1) return;
@@ -14428,7 +14438,7 @@ function drawSegmentRect(ctx, p1, p2, w, color) {
   ctx.lineTo(p1.x-nx,p1.y-ny);
   ctx.closePath();
   ctx.fillStyle=color;
-  ctx.globalAlpha = markerOpacity;
+  ctx.globalAlpha = opacite != null ? opacite : markerOpacity;
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
