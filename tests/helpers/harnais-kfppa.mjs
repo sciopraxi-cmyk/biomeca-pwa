@@ -73,6 +73,13 @@ export const FONCTIONS = [
   '_kfppaPrintSideHTML',
   '_kfppaAlertes',
   'validateAndSave',
+  'capturePhotoSlot',
+  'deletePhotoSlot',
+  '_dessinCapture',
+  '_relireImageBrute',
+  'launchTest',
+  'cloneMarkers',
+  '_relireMarqueurs',
   '_construireResultatTest',
   '_escHtml',
   '_kfppaNormePourBilan',
@@ -123,14 +130,28 @@ export function charger(opts = {}) {
       getElementById: (id) => _elements[id] || null,
       addEventListener() {},
       removeEventListener() {},
+      // #279 étape 3b — le faux canevas NOTE si des points y ont été dessinés
+      // (drawOverlay ci-dessous) : sa dataURL le dit, BRUTE ou AVECPOINTS.
       createElement: () => ({
-        width: 0, height: 0,
+        width: 0, height: 0, _points: false,
         getContext: () => ({ drawImage() {} }),
-        toDataURL: () => 'data:image/jpeg;base64,QUJD',
+        toDataURL() { return 'data:image/jpeg;base64,' + (this._points ? 'AVECPOINTS' : 'BRUTE'); },
       }),
     };
     function alert(m) { if (_persist) { _enregistrements.push('alert'); return; } throw new Error('alert inattendue : ' + m); }
-    function drawOverlay() {}
+    function drawOverlay(_ctx, canvas) { if (canvas) canvas._points = true; }
+    function renderPhotoGrid() {}
+    let markerSizeFactor = 0.7;
+    let markerOpacity = 0.4;
+    let camStream = null;
+    // #279 étape 3b — de quoi exécuter le vrai launchTest (réouverture d'un test).
+    let testMode = null, selectedMkrIdx = -1, isDragging = false, selectedVidMkrIdx = -1, isVidDragging = false;
+    function renderMkrList() {}
+    function renderFrameStrip() {}
+    function _applyCapView() {}
+    function enumerateCameras() {}
+    async function prefetchSportPhotos() {}
+    let liveMarkers = [];
     function renderVidPhotoGrid() {}
     function quickAngleCard(side) { return '<carte-rapide ' + side + '>'; }
     ${objet('TESTS')}
@@ -140,6 +161,7 @@ export function charger(opts = {}) {
     ${ligneConst('_KFPPA_COUL_RAPPORT')}
     ${ligneConst('_KFPPA_BADGE_RAPPORT')}
     ${objet('MEASURE_COMPUTERS')}
+    ${objet('MARKER_TEMPLATES')}
     ${BLOC_275C}
     ${BLOC_275D}
     ${noms.map(fonction).join('\n')}
@@ -157,6 +179,8 @@ export function charger(opts = {}) {
         if ('elements' in o) _elements = o.elements;
         if ('patient' in o) currentPatient = o.patient;
         if ('frames' in o) capturedFrames = o.frames;
+        if ('live' in o) liveMarkers = o.live;
+        if ('camera' in o) camStream = o.camera;
       },
       slots: () => photoSlots,
       espions: () => _espions.slice(),

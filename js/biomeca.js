@@ -4813,6 +4813,7 @@ async function launchTest(testId) {
       // #275-A — relu seulement s'il a été écrit : un bilan antérieur reste
       // sans marqueur, donc lu comme non signé.
       ...(p.kfppaSigne ? { kfppaSigne: true } : {}),
+      ..._relireImageBrute(p), // #279 étape 3b
       // #250 — RÈGLE : `markers` reste TOUJOURS un tableau ; l'information
       // « la géométrie est-elle connue ? » vit à CÔTÉ, dans markersConnus,
       // jamais encodée dans la valeur de markers. Un champ qui porterait
@@ -8455,7 +8456,8 @@ function captureVidPhotoSlot(slotIdx) {
   tmp.width = vcanvas.width; tmp.height = vcanvas.height;
   const ctx = tmp.getContext('2d');
   ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
-  drawOverlay(ctx, tmp, markersForPhoto, -1, view);
+  // #279 étape 3b — l'image est enregistrée SANS les points : ils sont
+  // redessinés à l'affichage d'après les coordonnées (étape 3c, puis #280).
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
 
   // Calculer l'angle selon le côté
@@ -8478,6 +8480,8 @@ function captureVidPhotoSlot(slotIdx) {
   photoSlots[slotIdx].markers = JSON.parse(JSON.stringify(markersForPhoto));
   photoSlots[slotIdx].dims = { w: vcanvas.width, h: vcanvas.height };
   photoSlots[slotIdx].markersConnus = true;
+  photoSlots[slotIdx].imageBrute = true; // #279 étape 3b
+  photoSlots[slotIdx].dessin = _dessinCapture();
 
   // Mobilité AP : stocker angles D et G séparément
   if(t?.mobiliteAP) {
@@ -8572,6 +8576,7 @@ function deletePhotoSlot(i) {
   // plus. Le défaut ne se voyait pas tant que seul `angle` était affiché.
   photoSlots[i].angleD=null; photoSlots[i].angleG=null;
   delete photoSlots[i].kfppaSigne; // #275-A — plus de capture, plus de signe
+  delete photoSlots[i].imageBrute; delete photoSlots[i].dessin; // #279 étape 3b
   renderPhotoGrid(); updateResults();
 }
 
@@ -8598,7 +8603,7 @@ function capturePhotoSlot(slotIdx) {
   tmp.width = canvas.width; tmp.height = canvas.height;
   const ctx = tmp.getContext('2d');
   ctx.drawImage(canvas, 0, 0);
-  drawOverlay(ctx, tmp, markersForPhoto, -1, view);
+  // #279 étape 3b — image SANS points, comme captureVidPhotoSlot.
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
@@ -8618,6 +8623,8 @@ function capturePhotoSlot(slotIdx) {
   photoSlots[slotIdx].markers = JSON.parse(JSON.stringify(markersForPhoto));
   photoSlots[slotIdx].dims = { w: canvas.width, h: canvas.height };
   photoSlots[slotIdx].markersConnus = true;
+  photoSlots[slotIdx].imageBrute = true; // #279 étape 3b
+  photoSlots[slotIdx].dessin = _dessinCapture();
   if(t && t.mobiliteAP) {
     const mkrD = liveMarkers.filter(m=>m.side==='D');
     const mkrG = liveMarkers.filter(m=>m.side==='G');
@@ -15466,7 +15473,23 @@ function _serialiserMarqueurs(e) {
 function _serialiserPhoto(s) {
   return {label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
     ...(s.kfppaSigne ? { kfppaSigne: true } : {}),
+    // #279 étape 3b — écrits SEULEMENT pour une capture sans points : leur
+    // absence dit « image avec points dessinés dedans » (captures antérieures).
+    ...(s.imageBrute ? { imageBrute: true, dessin: s.dessin || null } : {}),
     ..._serialiserMarqueurs(s)};
+}
+
+// #279 étape 3b — réglages de dessin AU MOMENT de la capture : taille et
+// opacité des marqueurs, test. Les points seront redessinés avec eux, pour
+// que le rapport ne change pas d'aspect si le réglage change ensuite.
+function _dessinCapture() {
+  return { taille: markerSizeFactor, opacite: markerOpacity, testId: currentTestId };
+}
+
+// #279 étape 3b — relecture d'une capture sans points (launchTest) : rien pour
+// une capture antérieure, qui garde ses points dessinés dans l'image.
+function _relireImageBrute(p) {
+  return p && p.imageBrute ? { imageBrute: true, dessin: p.dessin || null } : {};
 }
 
 // Champs dérivés à la relecture. `markers` reste TOUJOURS un tableau ;
