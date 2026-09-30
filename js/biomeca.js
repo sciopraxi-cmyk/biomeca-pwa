@@ -8358,6 +8358,13 @@ function _kfppaBipodalTexte(t, slot) {
   return 'D ' + f(slot.angleD) + ' · G ' + f(slot.angleG);
 }
 
+// #279 étape 3c — calque de la vignette : même classe que l'image, donc même
+// boîte et même object-fit, au même rapport largeur/hauteur (dims).
+function _vigCalqueHTML(slot) {
+  const calque = _calqueCapture(slot);
+  return calque ? '<img class="vig-img vig-calque" src="'+calque+'" alt="" style="pointer-events:none;"/>' : '';
+}
+
 function vidPhotoSlotHTML(slot, idx) {
   if(slot.dataUrl) {
     const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
@@ -8365,6 +8372,7 @@ function vidPhotoSlotHTML(slot, idx) {
     // pour que supprimer ne déclenche jamais l'agrandissement au passage.
     return '<div class="vig" onclick="ouvrirVignette('+idx+')">'
       + '<img class="vig-img" src="'+slot.dataUrl+'"/>'
+      + _vigCalqueHTML(slot) // #279 étape 3c
       + (bip ? '<span class="vig-ang">'+bip+'</span>'
              : (slot.angle != null ? '<span class="vig-ang">'+slot.angle.toFixed(1)+'°</span>' : ''))
       + '<button class="vig-del" onclick="event.stopPropagation();deletePhotoSlot('+idx+');renderVidPhotoGrid();">✕</button>'
@@ -8395,6 +8403,8 @@ function ouvrirVignette(idx) {
   // PAS DE RETOUR SILENCIEUX SUR UN ÉLÉMENT MANQUANT. Un identifiant renommé
   // un jour rendrait le clic inopérant sans message ni trace : une fonction
   // morte qui a l'air normale. On nomme celui qui manque.
+  // #279 étape 3c — le calque n'est PAS obligatoire : un index.html resté en
+  // cache (#141) ne l'a pas, et la modale doit s'ouvrir quand même.
   const ids = ['modal-vignette', 'vig-modal-img', 'vig-modal-lbl', 'vig-modal-ang'];
   const els = ids.map((id) => document.getElementById(id));
   const manquants = ids.filter((id, i) => !els[i]);
@@ -8404,7 +8414,19 @@ function ouvrirVignette(idx) {
   }
   const [m, img, lbl, ang] = els;
   img.src = slot.dataUrl;
-  lbl.textContent = slot.label || '';
+  // #279 étape 3c — calque des points d'une capture sans points ; retiré sinon,
+  // pour ne jamais laisser celui d'une vignette ouverte avant.
+  const calqueEl = document.getElementById('vig-modal-calque');
+  const calque = _calqueCapture(slot);
+  let calqueAffiche = false;
+  if (calqueEl) {
+    if (calque) { calqueEl.src = calque; calqueEl.hidden = false; calqueAffiche = true; }
+    else { calqueEl.removeAttribute('src'); calqueEl.hidden = true; }
+  }
+  // Une capture sans points qui s'affiche SANS son calque (élément absent,
+  // coordonnées illisibles) le dit : jamais une photo d'aspect normal sans points.
+  lbl.innerHTML = _escHtml(slot.label || '')
+    + (slot.imageBrute && !calqueAffiche ? _pointsIndisponiblesHTML() : '');
   // #275-B — même règle que la vignette : le créneau bipodal KFPPA affiche
   // « D x° · G y° », jamais slot.angle.
   const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
@@ -8426,6 +8448,8 @@ function fermerVignette() {
   // removeAttribute plutôt que src='' : une chaîne vide relance une requête
   // vers la page courante et salit la console.
   if (img) img.removeAttribute('src');
+  const calqueEl = document.getElementById('vig-modal-calque'); // #279 étape 3c
+  if (calqueEl) { calqueEl.removeAttribute('src'); calqueEl.hidden = true; }
   if (_vigEchap) { document.removeEventListener('keydown', _vigEchap); _vigEchap = null; }
 }
 // Clic sur le FOND uniquement. e.target === e.currentTarget n'est vrai que si
@@ -8555,8 +8579,9 @@ function renderPhotoGrid() {
 function photoSlotHTML(slot, idx) {
   if (slot.dataUrl) {
     const clrAng = slot.angle!==null ? getAngleColor(slot.angle) : '#FFD700';
+    const calque = _calqueCapture(slot); // #279 étape 3c — même boîte (.photo-slot img)
     return `<div class="photo-slot has-photo">
-      <img src="${slot.dataUrl}"/>
+      <img src="${slot.dataUrl}"/>${calque ? `<img class="ph-calque" src="${calque}" alt="" style="pointer-events:none;"/>` : ''}
       <button class="ph-del" onclick="deletePhotoSlot(${idx})">✕</button>
       ${slot.angle!==null?`<span class="ph-angle" style="color:${clrAng};border-color:${clrAng};">${slot.angle.toFixed(1)}°</span>`:''}
       <span class="ph-label">${slot.label}</span>
@@ -14874,7 +14899,7 @@ function _kfppaPhotoBipodaleHTML(data, t) {
   if (bip.dataUrl) {
     const leg = _kfppaBipodalTexte(t, bip) || '';
     return `<div class="kfppa-photo-bip" style="text-align:center;margin:6px 0;">
-      <img src="${bip.dataUrl}" style="height:90px;width:auto;max-width:200px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:inline-block;"/>
+      ${_imgRapportAvecCalque(bip, 'height:90px;width:auto;max-width:200px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:inline-block')}
       <div style="font-size:7px;color:#666;margin-top:2px;">${bip.label || 'Station bipodale'}</div>
       <div style="font-size:8px;font-weight:700;color:#333;">${leg}</div>
     </div>`;
@@ -15490,6 +15515,58 @@ function _dessinCapture() {
 // une capture antérieure, qui garde ses points dessinés dans l'image.
 function _relireImageBrute(p) {
   return p && p.imageBrute ? { imageBrute: true, dessin: p.dessin || null } : {};
+}
+
+// #279 étape 3c — les points d'une capture imageBrute sont-ils redessinables ?
+// Dimensions numériques positives et au moins trois points placés (un angle
+// en exige trois). Sinon : « points non disponibles » (étape 3d), jamais une
+// photo d'aspect normal sans ses points.
+function _pointsCaptureLisibles(ph) {
+  if (!ph || !ph.imageBrute) return false;
+  const d = ph.dims;
+  if (!d || !Number.isFinite(d.w) || !Number.isFinite(d.h) || d.w <= 0 || d.h <= 0) return false;
+  const pts = Array.isArray(ph.markers) ? ph.markers.filter(_isPlacedPt) : [];
+  return pts.length >= 3;
+}
+
+// #279 étape 3c — CALQUE des points d'une capture sans points : PNG transparent
+// aux dimensions de la capture, dessiné par drawOverlay avec les réglages DE LA
+// CAPTURE (taille, opacité, test), jamais ceux du moment. null si la capture
+// n'est pas imageBrute ou si ses points ne sont pas lisibles.
+// MÉMOIRE par capture : un même rendu peut afficher une photo deux fois (la
+// mobilité la montre dans les deux blocs de côté), et un PNG pleine résolution
+// ne se recalcule pas pour rien. Clé = tout ce qui détermine le dessin (dims,
+// points, réglages) : une capture modifiée n'est JAMAIS servie depuis la
+// mémoire. Bornée à 64 entrées, la plus ancienne sortant la première.
+const _CALQUES_CAPTURE = new Map();
+function _calqueCapture(ph) {
+  if (!_pointsCaptureLisibles(ph)) return null;
+  const des = ph.dessin || {};
+  const cle = JSON.stringify([ph.dims, ph.markers, des]);
+  const connu = _CALQUES_CAPTURE.get(cle);
+  if (connu) return connu;
+  const view = TESTS[des.testId]?.view || 'face';
+  const c = document.createElement('canvas');
+  c.width = ph.dims.w; c.height = ph.dims.h;
+  drawOverlay(c.getContext('2d'), c, ph.markers, -1, view,
+    { taille: des.taille, opacite: des.opacite, testId: des.testId });
+  const calque = c.toDataURL('image/png');
+  _CALQUES_CAPTURE.set(cle, calque);
+  if (_CALQUES_CAPTURE.size > 64) _CALQUES_CAPTURE.delete(_CALQUES_CAPTURE.keys().next().value);
+  return calque;
+}
+
+// #279 étape 3c — image d'un rapport, avec son calque s'il y en a un. Le cadre
+// épouse l'image (inline-block, line-height:0) ; le calque en reprend le style
+// en border-box avec une bordure TRANSPARENTE de même épaisseur, pour couvrir
+// exactement la même surface que l'image.
+function _imgRapportAvecCalque(ph, style) {
+  const calque = _calqueCapture(ph);
+  if (!calque) return `<img src="${ph.dataUrl}" style="${style}"/>`;
+  return `<span class="rp-calque-cadre" style="position:relative;display:inline-block;line-height:0;">`
+    + `<img src="${ph.dataUrl}" style="${style}"/>`
+    + `<img class="rp-calque" src="${calque}" alt="" style="${style};position:absolute;left:0;top:0;width:100%;height:100%;box-sizing:border-box;border-color:transparent;background:transparent;pointer-events:none;"/>`
+    + `</span>`;
 }
 
 // Champs dérivés à la relecture. `markers` reste TOUJOURS un tableau ;
@@ -18645,7 +18722,7 @@ function buildPrintSingleSide(t,data) {
   const phHTML=photos.slice(0,2).map((ph,i)=>`
     <div class="rp-photo-wrap">
       <div class="rp-photo-lbl">${ph.label}</div>
-      ${ph.dataUrl?`<img src="${ph.dataUrl}"/>`:'<div class="rp-photo-empty">Pas de photo</div>'}
+      ${ph.dataUrl?_imgRapportAvecCalque(ph, 'max-width:100%'):'<div class="rp-photo-empty">Pas de photo</div>'}
       ${ph.angle!=null?`<div class="rp-photo-ang" style="color:${cssC};">${ph.angle.toFixed(1)}°</div>`:''}
     </div>`).join('');
   return `<div class="rp-section">
@@ -18701,6 +18778,12 @@ function buildPrintSingleSide(t,data) {
 // #b91c1c / #fef2f2 / #fecaca) : un rapport amputé ne doit pas avoir l'air
 // normal. Le rendu n'a lieu qu'APRÈS _prefetchAllSportMesuresPhotos (attendu
 // par buildRapport et printReport) : aucun chargement n'est encore en cours.
+// #279 étape 3c/3d — capture sans points dont les points ne peuvent pas être
+// redessinés : même mention rouge que les photos non rechargées.
+function _pointsIndisponiblesHTML() {
+  return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ points non disponibles</div>';
+}
+
 function _photoNonRechargeeHTML(label) {
   return '<div class="rp-photo-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;">⚠️ Photo « '
     + _escHtml(label || 'photo du test') + ' » non rechargée depuis le stockage — régénérez le rapport (connexion requise) avant remise au patient.</div>';
@@ -18734,7 +18817,7 @@ function buildPrintPhotos(data,side,t,angleOverride) {
   return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;justify-content:flex-start;">
     ${items.map(ph=>ph?.dataUrl?`
       <div style="text-align:center;flex:0 0 auto;">
-        <img src="${ph.dataUrl}" style="height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block;"/>
+        ${_imgRapportAvecCalque(ph, 'height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block')}
         <div style="font-size:7px;color:#666;margin-top:2px;">${ph.label||''}</div>
         ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${_legende(ph)}</div>`:''}
       </div>`:(ph?.path?_photoNonRechargeeHTML(ph.label):'')).join('')}

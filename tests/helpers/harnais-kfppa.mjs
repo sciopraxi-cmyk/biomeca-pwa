@@ -80,6 +80,14 @@ export const FONCTIONS = [
   'launchTest',
   'cloneMarkers',
   '_relireMarqueurs',
+  'photoSlotHTML',
+  'getAngleColor',
+  '_pointsCaptureLisibles',
+  '_calqueCapture',
+  '_imgRapportAvecCalque',
+  '_vigCalqueHTML',
+  '_pointsIndisponiblesHTML',
+  'buildPrintSingleSide',
   '_construireResultatTest',
   '_escHtml',
   '_kfppaNormePourBilan',
@@ -135,11 +143,19 @@ export function charger(opts = {}) {
       createElement: () => ({
         width: 0, height: 0, _points: false,
         getContext: () => ({ drawImage() {} }),
-        toDataURL() { return 'data:image/jpeg;base64,' + (this._points ? 'AVECPOINTS' : 'BRUTE'); },
+        toDataURL(type) {
+          // Calque (PNG) : encode ce que drawOverlay a reçu — vue, points, options.
+          if (type === 'image/png') return 'data:image/png;base64,CALQUE' + encodeURIComponent(JSON.stringify(this._trace || null));
+          return 'data:image/jpeg;base64,' + (this._points ? 'AVECPOINTS' : 'BRUTE');
+        },
       }),
     };
     function alert(m) { if (_persist) { _enregistrements.push('alert'); return; } throw new Error('alert inattendue : ' + m); }
-    function drawOverlay(_ctx, canvas) { if (canvas) canvas._points = true; }
+    let _nbDessins = 0; // #279 étape 3c — nombre d'appels au dessin des points
+    function drawOverlay(_ctx, canvas, markers, _sel, view, opts) {
+      _nbDessins++;
+      if (canvas) { canvas._points = true; canvas._trace = { view, n: (markers || []).length, w: canvas.width, h: canvas.height, opts: opts || null }; }
+    }
     function renderPhotoGrid() {}
     let markerSizeFactor = 0.7;
     let markerOpacity = 0.4;
@@ -160,6 +176,7 @@ export function charger(opts = {}) {
     ${ligneConst('_KFPPA_COUL_ECRAN')}
     ${ligneConst('_KFPPA_COUL_RAPPORT')}
     ${ligneConst('_KFPPA_BADGE_RAPPORT')}
+    ${ligneConst('_CALQUES_CAPTURE')}
     ${objet('MEASURE_COMPUTERS')}
     ${objet('MARKER_TEMPLATES')}
     ${BLOC_275C}
@@ -181,9 +198,12 @@ export function charger(opts = {}) {
         if ('frames' in o) capturedFrames = o.frames;
         if ('live' in o) liveMarkers = o.live;
         if ('camera' in o) camStream = o.camera;
+        if ('taille' in o) markerSizeFactor = o.taille;
+        if ('opacite' in o) markerOpacity = o.opacite;
       },
       slots: () => photoSlots,
       espions: () => _espions.slice(),
+      nbDessins: () => _nbDessins,
       enregistrements: () => _enregistrements.slice(),
       patient: () => currentPatient,
       saveBilanSilent,

@@ -327,6 +327,8 @@ describe('#275-B — vignette agrandie et miniature, nouvelle capture', () => {
         'vig-modal-img': {},
         'vig-modal-lbl': { textContent: '' },
         'vig-modal-ang': ang,
+        // #279 étape 3c — PAS de 'vig-modal-calque' : B8a couvre aussi un
+        // index.html resté en cache, où la modale doit s'ouvrir sans calque.
       },
     });
     expect(() => env.ouvrirVignette(0)).not.toThrow();

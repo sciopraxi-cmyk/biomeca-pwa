@@ -3284,7 +3284,11 @@
      donc jamais depuis l'image). -->
 <div id="modal-vignette" class="vig-modal" onclick="_vigFondClic(event)">
   <div class="vig-modal-inner">
-    <img id="vig-modal-img" alt="Capture agrandie"/>
+    <!-- #279 étape 3c — cadre ajusté à l'image, pour y poser le calque des points. -->
+    <span class="vig-modal-cadre">
+      <img id="vig-modal-img" alt="Capture agrandie"/>
+      <img id="vig-modal-calque" class="vig-modal-calque" alt="" hidden/>
+    </span>
     <div class="vig-modal-bar">
       <span id="vig-modal-lbl"></span>
       <span id="vig-modal-ang" class="vig-modal-ang"></span>
