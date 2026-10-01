@@ -8362,7 +8362,10 @@ function _kfppaBipodalTexte(t, slot) {
 // boîte et même object-fit, au même rapport largeur/hauteur (dims).
 function _vigCalqueHTML(slot) {
   const calque = _calqueCapture(slot);
-  return calque ? '<img class="vig-img vig-calque" src="'+calque+'" alt="" style="pointer-events:none;"/>' : '';
+  if (calque) return '<img class="vig-img vig-calque" src="'+calque+'" alt="" style="pointer-events:none;"/>';
+  // #279 étape 3d — capture sans points non redessinable : jamais une vignette
+  // d'aspect normal.
+  return slot && slot.imageBrute ? _pointsIndisponiblesHTML() : '';
 }
 
 function vidPhotoSlotHTML(slot, idx) {
@@ -8581,7 +8584,7 @@ function photoSlotHTML(slot, idx) {
     const clrAng = slot.angle!==null ? getAngleColor(slot.angle) : '#FFD700';
     const calque = _calqueCapture(slot); // #279 étape 3c — même boîte (.photo-slot img)
     return `<div class="photo-slot has-photo">
-      <img src="${slot.dataUrl}"/>${calque ? `<img class="ph-calque" src="${calque}" alt="" style="pointer-events:none;"/>` : ''}
+      <img src="${slot.dataUrl}"/>${calque ? `<img class="ph-calque" src="${calque}" alt="" style="pointer-events:none;"/>` : (slot.imageBrute ? _pointsIndisponiblesHTML() : '') /* #279 étape 3d */}
       <button class="ph-del" onclick="deletePhotoSlot(${idx})">✕</button>
       ${slot.angle!==null?`<span class="ph-angle" style="color:${clrAng};border-color:${clrAng};">${slot.angle.toFixed(1)}°</span>`:''}
       <span class="ph-label">${slot.label}</span>
@@ -15526,7 +15529,22 @@ function _pointsCaptureLisibles(ph) {
   const d = ph.dims;
   if (!d || !Number.isFinite(d.w) || !Number.isFinite(d.h) || d.w <= 0 || d.h <= 0) return false;
   const pts = Array.isArray(ph.markers) ? ph.markers.filter(_isPlacedPt) : [];
-  return pts.length >= 3;
+  // #279 étape 3d — trois points placés PAR CÔTÉ MESURÉ.
+  //   Créneau D ou G : ce côté s'il a des points ; sinon les points SANS côté
+  //   (le MLA) ; sinon NON lisible — jamais les points de l'autre genou.
+  //   Créneau bipodal du KFPPA et de la mobilité : D ET G.
+  //   Autre créneau sans côté : les côtés présents.
+  const t = TESTS[ph.dessin?.testId];
+  let cotes;
+  if (ph.side === 'D' || ph.side === 'G') {
+    if (pts.some((m) => m.side === ph.side)) cotes = [ph.side];
+    else if (pts.some((m) => !m.side)) cotes = [''];
+    else return false;
+  }
+  else if (t && (t.kfppaPhotos || t.mobiliteAP)) cotes = ['D', 'G'];
+  else cotes = [...new Set(pts.map((m) => m.side || ''))];
+  if (!cotes.length) return false;
+  return cotes.every((c) => pts.filter((m) => (m.side || '') === c).length >= 3);
 }
 
 // #279 étape 3c — CALQUE des points d'une capture sans points : PNG transparent
@@ -15562,6 +15580,8 @@ function _calqueCapture(ph) {
 // exactement la même surface que l'image.
 function _imgRapportAvecCalque(ph, style) {
   const calque = _calqueCapture(ph);
+  // #279 étape 3d — capture sans points non redessinable : l'image ET la mention.
+  if (!calque && ph.imageBrute) return `<img src="${ph.dataUrl}" style="${style}"/>` + _pointsIndisponiblesHTML();
   if (!calque) return `<img src="${ph.dataUrl}" style="${style}"/>`;
   return `<span class="rp-calque-cadre" style="position:relative;display:inline-block;line-height:0;">`
     + `<img src="${ph.dataUrl}" style="${style}"/>`

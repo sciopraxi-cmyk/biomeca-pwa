@@ -1391,6 +1391,14 @@ body.printing #rpt-print{display:block!important;}
   object-fit: contain;
   display: block; border-radius: 6px; background: #000;
 }
+/* #279 étape 3d — « points non disponibles » dans la vignette et le mode
+   photo : l'image y est en position absolue, une mention en flux normal serait
+   peinte SOUS elle. Placée au-dessus, centrée. */
+.vig .rp-points-ko,
+.photo-slot .rp-points-ko{
+  position: absolute; left: 4px; right: 4px; top: 50%;
+  transform: translateY(-50%); z-index: 2; margin: 0;
+}
 /* #279 étape 3c — calque des points dans l'agrandissement : le cadre épouse
    l'image ; le calque en couvre exactement la surface, fond TRANSPARENT (la
    règle .vig-modal-inner img lui donnerait sinon le fond noir de l'image). */
