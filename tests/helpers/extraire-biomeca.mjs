@@ -23,6 +23,22 @@ export const SRC_BIOMECA = readFileSync(
   'utf8'
 );
 
+// #279 étape 3f — bloc entre deux marqueurs, lu dans LA MÊME source que les
+// fonctions (BIOMECA_SRC compris). Mêmes bornes qu'extraireBloc : de la ligne
+// qui suit le marqueur de début au début de la ligne du marqueur de fin.
+// Sans cela, une référence « sur HEAD » mélangeait les fonctions de HEAD et
+// les blocs du fichier de travail — mesure fausse, constatée sur K6.
+export function bloc(marqueurDebut, marqueurFin) {
+  for (const m of [marqueurDebut, marqueurFin]) {
+    const n = SRC_BIOMECA.split(m).length - 1;
+    if (n !== 1) throw new Error(`marqueur « ${m} » : ${n} occurrences, 1 attendue`);
+  }
+  const debut = SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf(marqueurDebut)) + 1;
+  const fin = SRC_BIOMECA.lastIndexOf('\n', SRC_BIOMECA.indexOf(marqueurFin)) + 1;
+  if (debut <= 0 || fin <= debut) throw new Error('marqueurs de bloc mal ordonnés');
+  return SRC_BIOMECA.slice(debut, fin);
+}
+
 function unique(tete, nom) {
   const n = SRC_BIOMECA.split(tete).length - 1;
   if (n !== 1) throw new Error(`${nom} : ${n} définitions trouvées, 1 attendue`);

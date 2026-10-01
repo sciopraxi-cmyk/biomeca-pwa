@@ -593,11 +593,27 @@ export function kfppaTexteNorme(norme) {
   return 'norme ' + norme.min + '–' + norme.max + '°' + (norme.sexe ? ', ' + norme.sexe : '');
 }
 
+// #279 étape 3f — photo NON ENVOYÉE : sa valeur reste affichée, avec ce
+// motif, mais n'entre dans AUCUN calcul dérivé (classe, verdict, Δ,
+// décomposition de l'asymétrie) tant qu'elle n'est pas recapturée.
+export const KFPPA_EXCLU_BIP = 'photo bipodale non envoyée — à recapturer';
+export const KFPPA_EXCLU_UNI = 'photo unipodale non envoyée — à recapturer';
+
+// #279 étape 3f — pourquoi Δ n'est pas calculé pour ce genou, ou null.
+/** @param {{sExclu?: boolean, uExclu?: boolean}} a @returns {string|null} */
+export function kfppaMotifDelta(a) {
+  if (a.sExclu && a.uExclu) return 'photos bipodale et unipodale non envoyées — à recapturer';
+  if (a.sExclu) return KFPPA_EXCLU_BIP;
+  if (a.uExclu) return KFPPA_EXCLU_UNI;
+  return null;
+}
+
 // Analyse d'un genou. Une valeur non signée garde sa magnitude mais ne porte
-// ni classe, ni verdict, ni Δ.
+// ni classe, ni verdict, ni Δ. #279 étape 3f — une valeur EXCLUE (photo non
+// envoyée) non plus : sExclu / uExclu le disent à chaque affichage.
 /**
- * @param {{S?: number|null, U?: number|null, sSigne?: boolean, uSigne?: boolean, norme?: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}}} e
- * @returns {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}}
+ * @param {{S?: number|null, U?: number|null, sSigne?: boolean, uSigne?: boolean, sExclu?: boolean, uExclu?: boolean, norme?: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}}} e
+ * @returns {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, sExclu?: boolean, uExclu?: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}}
  */
 export function kfppaAnalyseGenou(e) {
   /** @param {any} v @returns {v is number} */
@@ -606,6 +622,8 @@ export function kfppaAnalyseGenou(e) {
   const U = ok(e.U) ? e.U : null;
   const sSigne = S != null && !!e.sSigne;
   const uSigne = U != null && !!e.uSigne;
+  const sExclu = S != null && !!e.sExclu;
+  const uExclu = U != null && !!e.uExclu;
   const n0 = e.norme || { statut: 'non-definie' };
   // VÉRIFICATION, pas promesse : un statut 'ok' sans bornes numériques
   // cohérentes est traité comme une norme non définie, sans verdict.
@@ -619,18 +637,36 @@ export function kfppaAnalyseGenou(e) {
     Number.isFinite(mx) &&
     mn <= mx;
   const norme = normeValide || n0.statut === 'civilite' ? n0 : { statut: 'non-definie' };
-  const classeU = uSigne && normeValide ? kfppaClasseU(U, mn, mx) : null;
+  const classeU = uSigne && !uExclu && normeValide ? kfppaClasseU(U, mn, mx) : null;
   return {
     S,
     U,
     sSigne,
     uSigne,
+    sExclu,
+    uExclu,
     norme,
-    classeS: sSigne ? kfppaClasseS(S) : null,
+    classeS: sSigne && !sExclu ? kfppaClasseS(S) : null,
     classeU,
-    delta: sSigne && uSigne ? kfppaDelta(S, U) : null,
+    delta: sSigne && uSigne && !sExclu && !uExclu ? kfppaDelta(S, U) : null,
     couleur: kfppaCouleurClasse(classeU),
   };
+}
+
+// #279 étape 3f — texte d'une valeur exclue : la valeur, puis le motif.
+/**
+ * @param {number} v
+ * @param {boolean} signe
+ * @param {string} motif
+ * @returns {string}
+ */
+function _kfppaValeurExclue(v, signe, motif) {
+  return (
+    (signe ? kfppaSigneTxt(v) : kfppaTexteNonSigne(v)) +
+    ' — valeur exclue des calculs (' +
+    motif +
+    ')'
+  );
 }
 
 /** @param {string|null} s @returns {string|null} */
@@ -642,11 +678,12 @@ function _kfppaMinuscule(s) {
 // norme appliquée, « valeur unipodale −2.4° (norme non définie) ». Partie de
 // kfppaPhraseGenou, isolée pour la ligne d'un genou dont le statique manque.
 /**
- * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}} a
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, sExclu?: boolean, uExclu?: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}} a
  * @returns {string}
  */
 export function kfppaTexteUnipodal(a) {
   if (a.U == null) return 'valeur unipodale —';
+  if (a.uExclu) return 'valeur unipodale ' + _kfppaValeurExclue(a.U, a.uSigne, KFPPA_EXCLU_UNI); // #279 étape 3f
   if (!a.uSigne) return 'valeur unipodale ' + kfppaTexteNonSigne(a.U);
   if (a.classeU) {
     return (
@@ -666,7 +703,7 @@ export function kfppaTexteUnipodal(a) {
 // le varus), valeur unipodale −2.4° : varus faible (norme 5–12°, femmes). »
 /**
  * @param {'D'|'G'} cote
- * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}} a
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, sExclu?: boolean, uExclu?: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}} a
  * @returns {string}
  */
 export function kfppaPhraseGenou(cote, a) {
@@ -674,10 +711,19 @@ export function kfppaPhraseGenou(cote, a) {
   const st =
     a.S == null
       ? 'statique —'
-      : a.sSigne
-        ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
-        : 'statique ' + kfppaTexteNonSigne(a.S);
-  const dyn = 'composante dynamique ' + (a.delta != null ? kfppaTexteDelta(a.delta) : '—');
+      : a.sExclu
+        ? 'statique ' + _kfppaValeurExclue(a.S, a.sSigne, KFPPA_EXCLU_BIP) // #279 étape 3f
+        : a.sSigne
+          ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
+          : 'statique ' + kfppaTexteNonSigne(a.S);
+  // #279 étape 3f — Δ non calculé à cause d'une exclusion : le motif, en clair.
+  const motif = kfppaMotifDelta(a);
+  const dyn =
+    a.delta != null
+      ? 'composante dynamique ' + kfppaTexteDelta(a.delta)
+      : motif
+        ? 'composante dynamique non calculée (' + motif + ')'
+        : 'composante dynamique —';
   return nom + ' : ' + st + ', ' + dyn + ', ' + kfppaTexteUnipodal(a) + '.';
 }
 
@@ -686,15 +732,28 @@ export function kfppaPhraseGenou(cote, a) {
 // deux parts vaut EXACTEMENT l'écart unipodal. null si une des quatre valeurs
 // manque ou n'est pas signée : pas d'asymétrie sur une magnitude.
 /**
- * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}|null|undefined} aD
- * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}|null|undefined} aG
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, sExclu?: boolean, uExclu?: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}|null|undefined} aD
+ * @param {{S: number|null, U: number|null, sSigne: boolean, uSigne: boolean, sExclu?: boolean, uExclu?: boolean, norme: {statut: string, min?: number, max?: number, source?: string, sexe?: string|null}, classeS: string|null, classeU: string|null, delta: number|null, couleur: string}|null|undefined} aG
  * @returns {string|null}
  */
 export function kfppaPhraseAsymetrie(aD, aG) {
-  if (!aD || !aG || !aD.sSigne || !aD.uSigne || !aG.sSigne || !aG.uSigne) return null;
+  // #279 étape 3f — U exclu d'un côté : aucune asymétrie, le motif. S exclu :
+  // l'écart unipodal (U valides), SANS décomposition statique / dynamique.
+  if (!aD || !aG || !aD.uSigne || !aG.uSigne) return null;
+  if (aD.uExclu || aG.uExclu) return 'Asymétrie D − G non calculée (' + KFPPA_EXCLU_UNI + ').';
   // sSigne/uSigne vrais impliquent S et U numériques (kfppaAnalyseGenou).
   const dU =
     _kfppaDixiemes(/** @type {number} */ (aD.U)) - _kfppaDixiemes(/** @type {number} */ (aG.U));
+  if (aD.sExclu || aG.sExclu) {
+    return (
+      'Asymétrie D − G : ' +
+      _kfppaTxtDixiemes(dU) +
+      ' en unipodal ; décomposition statique / dynamique non calculée (' +
+      KFPPA_EXCLU_BIP +
+      ').'
+    );
+  }
+  if (!aD.sSigne || !aG.sSigne) return null;
   const dS =
     _kfppaDixiemes(/** @type {number} */ (aD.S)) - _kfppaDixiemes(/** @type {number} */ (aG.S));
   const dDyn = dU - dS;

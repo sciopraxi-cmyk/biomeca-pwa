@@ -4177,9 +4177,12 @@ const KFPPA_BIP_MANQUANTE = 'photo bipodale manquante';
 //   'manquante' : pas de photo bipodale, alors qu'une autre photo du test
 //                 existe ;
 //   'vide'      : aucune photo du tout — test non réalisé, rien à dire.
+// #279 étape 3f — une photo NON ENVOYÉE est PRÉSENTE : elle a été prise, sa
+// valeur existe. Jamais « manquante » ; son exclusion des calculs est dite par
+// l'analyse du genou (_kfppaGenou → sExclu / uExclu), pas par ce message.
 function _kfppaEtatBipodal(photos, side) {
   const ph = photos || [];
-  const present = (p) => !!(p && (p.dataUrl || p.path));
+  const present = (p) => !!(p && (p.dataUrl || p.path || p.nonEnvoyee));
   const bip = ph.find((p) => p && p.side === '');
   if (present(bip)) {
     return (side === 'D' ? bip.angleD : bip.angleG) == null ? 'nonRecalc' : 'ok';
@@ -14769,14 +14772,31 @@ function kfppaTexteNorme(norme) {
   return 'norme ' + norme.min + '–' + norme.max + '°' + (norme.sexe ? ', ' + norme.sexe : '');
 }
 
+// #279 étape 3f — photo NON ENVOYÉE : sa valeur reste affichée, avec ce
+// motif, mais n'entre dans AUCUN calcul dérivé (classe, verdict, Δ,
+// décomposition de l'asymétrie) tant qu'elle n'est pas recapturée.
+const KFPPA_EXCLU_BIP = 'photo bipodale non envoyée — à recapturer';
+const KFPPA_EXCLU_UNI = 'photo unipodale non envoyée — à recapturer';
+
+// #279 étape 3f — pourquoi Δ n'est pas calculé pour ce genou, ou null.
+function kfppaMotifDelta(a) {
+  if (a.sExclu && a.uExclu) return 'photos bipodale et unipodale non envoyées — à recapturer';
+  if (a.sExclu) return KFPPA_EXCLU_BIP;
+  if (a.uExclu) return KFPPA_EXCLU_UNI;
+  return null;
+}
+
 // Analyse d'un genou. Une valeur non signée garde sa magnitude mais ne porte
-// ni classe, ni verdict, ni Δ.
+// ni classe, ni verdict, ni Δ. #279 étape 3f — une valeur EXCLUE (photo non
+// envoyée) non plus : sExclu / uExclu le disent à chaque affichage.
 function kfppaAnalyseGenou(e) {
   const ok = (v) => v != null && Number.isFinite(v);
   const S = ok(e.S) ? e.S : null;
   const U = ok(e.U) ? e.U : null;
   const sSigne = S != null && !!e.sSigne;
   const uSigne = U != null && !!e.uSigne;
+  const sExclu = S != null && !!e.sExclu;
+  const uExclu = U != null && !!e.uExclu;
   const n0 = e.norme || { statut: 'non-definie' };
   // VÉRIFICATION, pas promesse : un statut 'ok' sans bornes numériques
   // cohérentes est traité comme une norme non définie, sans verdict.
@@ -14785,18 +14805,25 @@ function kfppaAnalyseGenou(e) {
     && typeof mn === 'number' && typeof mx === 'number'
     && Number.isFinite(mn) && Number.isFinite(mx) && mn <= mx;
   const norme = normeValide || n0.statut === 'civilite' ? n0 : { statut: 'non-definie' };
-  const classeU = uSigne && normeValide ? kfppaClasseU(U, mn, mx) : null;
+  const classeU = uSigne && !uExclu && normeValide ? kfppaClasseU(U, mn, mx) : null;
   return {
     S,
     U,
     sSigne,
     uSigne,
+    sExclu,
+    uExclu,
     norme,
-    classeS: sSigne ? kfppaClasseS(S) : null,
+    classeS: sSigne && !sExclu ? kfppaClasseS(S) : null,
     classeU,
-    delta: sSigne && uSigne ? kfppaDelta(S, U) : null,
+    delta: sSigne && uSigne && !sExclu && !uExclu ? kfppaDelta(S, U) : null,
     couleur: kfppaCouleurClasse(classeU),
   };
+}
+
+// #279 étape 3f — texte d'une valeur exclue : la valeur, puis le motif.
+function _kfppaValeurExclue(v, signe, motif) {
+  return (signe ? kfppaSigneTxt(v) : kfppaTexteNonSigne(v)) + ' — valeur exclue des calculs (' + motif + ')';
 }
 
 function _kfppaMinuscule(s) {
@@ -14808,6 +14835,7 @@ function _kfppaMinuscule(s) {
 // kfppaPhraseGenou, isolée pour la ligne d'un genou dont le statique manque.
 function kfppaTexteUnipodal(a) {
   if (a.U == null) return 'valeur unipodale —';
+  if (a.uExclu) return 'valeur unipodale ' + _kfppaValeurExclue(a.U, a.uSigne, KFPPA_EXCLU_UNI); // #279 étape 3f
   if (!a.uSigne) return 'valeur unipodale ' + kfppaTexteNonSigne(a.U);
   if (a.classeU) {
     return 'valeur unipodale ' + kfppaSigneTxt(a.U) + ' : ' + _kfppaMinuscule(a.classeU) + ' (' + kfppaTexteNorme(a.norme) + ')';
@@ -14822,10 +14850,19 @@ function kfppaPhraseGenou(cote, a) {
   const st =
     a.S == null
       ? 'statique —'
-      : a.sSigne
-        ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
-        : 'statique ' + kfppaTexteNonSigne(a.S);
-  const dyn = 'composante dynamique ' + (a.delta != null ? kfppaTexteDelta(a.delta) : '—');
+      : a.sExclu
+        ? 'statique ' + _kfppaValeurExclue(a.S, a.sSigne, KFPPA_EXCLU_BIP) // #279 étape 3f
+        : a.sSigne
+          ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
+          : 'statique ' + kfppaTexteNonSigne(a.S);
+  // #279 étape 3f — Δ non calculé à cause d'une exclusion : le motif, en clair.
+  const motif = kfppaMotifDelta(a);
+  const dyn =
+    a.delta != null
+      ? 'composante dynamique ' + kfppaTexteDelta(a.delta)
+      : motif
+        ? 'composante dynamique non calculée (' + motif + ')'
+        : 'composante dynamique —';
   return nom + ' : ' + st + ', ' + dyn + ', ' + kfppaTexteUnipodal(a) + '.';
 }
 
@@ -14833,9 +14870,22 @@ function kfppaPhraseGenou(cote, a) {
 // dynamique. » Calculée en dixièmes sur les valeurs affichées : la somme des
 // deux parts vaut EXACTEMENT l'écart unipodal. null si une des quatre valeurs
 // manque ou n'est pas signée : pas d'asymétrie sur une magnitude.
+// #279 étape 3f — U exclu d'un côté : aucune asymétrie, le motif. S exclu :
+// l'écart unipodal (U valides), SANS décomposition statique / dynamique.
 function kfppaPhraseAsymetrie(aD, aG) {
-  if (!aD || !aG || !aD.sSigne || !aD.uSigne || !aG.sSigne || !aG.uSigne) return null;
+  if (!aD || !aG || !aD.uSigne || !aG.uSigne) return null;
+  if (aD.uExclu || aG.uExclu) return 'Asymétrie D − G non calculée (' + KFPPA_EXCLU_UNI + ').';
   const dU = _kfppaDixiemes(aD.U) - _kfppaDixiemes(aG.U);
+  if (aD.sExclu || aG.sExclu) {
+    return (
+      'Asymétrie D − G : ' +
+      _kfppaTxtDixiemes(dU) +
+      ' en unipodal ; décomposition statique / dynamique non calculée (' +
+      KFPPA_EXCLU_BIP +
+      ').'
+    );
+  }
+  if (!aD.sSigne || !aG.sSigne) return null;
   const dS = _kfppaDixiemes(aD.S) - _kfppaDixiemes(aG.S);
   const dDyn = dU - dS;
   return (
@@ -14869,8 +14919,17 @@ function _kfppaGenou(photos, side, norme) {
     sSigne: !!bip?.kfppaSigne,
     U: uni?.angle,
     uSigne: !!uni?.kfppaSigne,
+    // #279 étape 3f — photo non envoyée : valeur gardée, exclue des calculs.
+    // SOURCE UNIQUE de l'exclusion pour le panneau, le rapport et les alertes.
+    sExclu: !!bip?.nonEnvoyee,
+    uExclu: !!uni?.nonEnvoyee,
     norme,
   });
+}
+
+// #279 étape 3f — mention d'exclusion, rouge, dans la palette de l'affichage.
+function _kfppaExcluHTML(texte, couleur) {
+  return `<span class="kfppa-exclu" style="color:${couleur};font-weight:700;">${texte}</span>`;
 }
 
 // #275-D — magnitude seule, sans mention : grand chiffre U et légende de la
@@ -14905,11 +14964,22 @@ function clrKfppa(classe) {
 function _kfppaBlocGrilleHTML(testId, patient, photos, side) {
   const norme = kfppaNormeApplicable(testId, patient?.civilite);
   const a = _kfppaGenou(photos, side, norme);
-  const verdict = a.classeU || (a.U != null && a.uSigne ? kfppaTexteNorme(a.norme) : '—');
+  // #279 étape 3f — valeur exclue : affichée, puis la mention rouge ; Δ et
+  // verdict non calculés, avec leur motif (kfppaMotifDelta, même analyse).
+  const rouge = (t) => _kfppaExcluHTML(t, 'var(--red)');
+  const motif = kfppaMotifDelta(a);
+  const verdict = a.uExclu
+    ? rouge(`non calculé (${KFPPA_EXCLU_UNI})`)
+    : a.classeU || (a.U != null && a.uSigne ? kfppaTexteNorme(a.norme) : '—');
+  const txtS = a.sExclu
+    ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
+    : kfppaTexteS(a.S, a.sSigne);
+  const txtU = _kfppaTexteU(a) + (a.uExclu ? rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_UNI})`) : '');
+  const txtD = a.delta == null && motif ? rouge(`non calculé (${motif})`) : kfppaTexteDelta(a.delta);
   return `<div class="kfppa-grille" style="font-size:9px;color:var(--mut);margin-top:4px;line-height:1.5;">
-      <div>Statique S : <b>${kfppaTexteS(a.S, a.sSigne)}</b></div>
-      <div>Unipodal U : <b>${_kfppaTexteU(a)}</b></div>
-      <div>Δ = U − S : <b>${kfppaTexteDelta(a.delta)}</b></div>
+      <div>Statique S : <b>${txtS}</b></div>
+      <div>Unipodal U : <b>${txtU}</b></div>
+      <div>Δ = U − S : <b>${txtD}</b></div>
       <div>Verdict (U) : <b class="kfppa-verdict" style="color:${clrKfppa(a.classeU)};">${verdict}</b></div>
       <div>Norme : ${_kfppaNormeDetail(a.norme)}</div>
     </div>`;
@@ -15156,7 +15226,8 @@ function updateResults() {
       // rechargement avant updateResults, mais un rechargement ÉCHOUÉ laisse
       // path sans dataUrl : sur dataUrl seul, le panneau d'un test déjà fait
       // basculerait sur « Capturez 3 photos » (#276).
-      const _present=(p)=>!!(p&&(p.dataUrl||p.path));
+      // #279 étape 3f — une photo non envoyée est présente (valeur gardée).
+      const _present=(p)=>!!(p&&(p.dataUrl||p.path||p.nonEnvoyee));
       if(_present(pBip)||_present(pUniG)||_present(pUniD)){
         html=`<div class="res-side">
           <div class="res-side-card">
@@ -15870,6 +15941,16 @@ async function validateAndSave() {
     }
     _nonEnv.forEach((e) => { delete e.dataUrl; e.nonEnvoyee = true; });
     photoStash = photoStash.filter((x) => !x.entry.nonEnvoyee);
+    // #279 étape 3f — KFPPA : un Δ persisté calculé avec une photo désormais
+    // non envoyée est RETIRÉ (bipodale → les deux côtés ; unipodale → son
+    // côté). Aucun calcul dérivé n'est gardé tant qu'elle n'est pas recapturée.
+    if (t.div !== undefined) {
+      const _ph = result.photos || [];
+      const _bipNE = _ph.some((p) => p && p.side === '' && p.nonEnvoyee);
+      ['D', 'G'].forEach((s) => {
+        if (_bipNE || _ph.some((p) => p && p.side === s && p.nonEnvoyee)) delete result['delta' + s];
+      });
+    }
     break;
   }
   syncOpenedBilanToHistory();
@@ -18457,6 +18538,11 @@ function _kfppaAlertes(t, m, data, condensed) {
     const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
     if (msg) out.push(`${lib} — ${msg}`);
     const a = _kfppaGenou(data.photos, side, norme);
+    // #279 étape 3f — exclusions : le motif de la MÊME analyse que le panneau
+    // et le rapport (kfppaMotifDelta), puis le verdict non calculé si U l'est.
+    const motif = kfppaMotifDelta(a);
+    if (a.delta == null && motif) out.push(`${lib} — ${motif} : composante dynamique non calculée`);
+    if (a.uExclu) { out.push(`${lib} — ${KFPPA_EXCLU_UNI} : verdict non calculé`); return; }
     if (a.U == null || !a.uSigne) return;
     if (!a.classeU) { out.push(`${lib} — ${kfppaTexteNorme(a.norme)}`); return; }
     if (a.classeU === 'Dans la norme') return;
@@ -18824,9 +18910,20 @@ function _kfppaPrintSideHTML(side, t, data) {
   const coul = _KFPPA_COUL_RAPPORT[a.couleur];
   // Sans norme appliquée, la place du verdict reste VIDE : le motif (norme non
   // définie, civilité non renseignée) figure une seule fois, ligne de la norme.
-  const verdict = a.classeU
-    ? `<span class="${_KFPPA_BADGE_RAPPORT[a.couleur]}">${a.classeU}</span>`
-    : '';
+  // #279 étape 3f — valeur exclue (photo non envoyée) : affichée, mention
+  // rouge ; Δ et verdict non calculés, avec le motif de la même analyse.
+  const rouge = (t) => _kfppaExcluHTML(t, '#b91c1c');
+  const motif = kfppaMotifDelta(a);
+  const verdict = a.uExclu
+    ? rouge(`verdict non calculé (${KFPPA_EXCLU_UNI})`)
+    : a.classeU
+      ? `<span class="${_KFPPA_BADGE_RAPPORT[a.couleur]}">${a.classeU}</span>`
+      : '';
+  const txtS = msg
+    || (a.sExclu
+      ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
+      : kfppaTexteS(a.S, a.sSigne));
+  const txtD = a.delta == null && motif ? rouge(`non calculé (${motif})`) : kfppaTexteDelta(a.delta);
   const txtNorme = a.norme.statut === 'ok'
     ? `Norme : ${a.norme.min}–${a.norme.max}°${a.norme.sexe ? `, ${a.norme.sexe}` : ''}`
     : kfppaTexteNorme(a.norme);
@@ -18837,11 +18934,12 @@ function _kfppaPrintSideHTML(side, t, data) {
         <div style="font-size:8px;color:#666;">Unipodal (U)</div>
         <div class="rp-gauge-deg" style="font-size:15px;font-weight:700;color:${coul};">${a.U == null ? '—' : a.uSigne ? kfppaSigneTxt(a.U) : _kfppaMagnitude(a.U)}</div>
         ${a.U != null && !a.uSigne ? '<div class="rp-kfppa-sans-signe" style="font-size:7px;color:#888;">sens valgus/varus non enregistré</div>' : ''}
+        ${a.uExclu ? `<div style="font-size:7px;">${rouge('valeur exclue des calculs')}</div>` : ''}
       </div>
       ${buildPrintPhotos(data, side, t)}
     </div>
-    <div style="font-size:9px;margin-top:4px;">Statique (S) : ${msg || kfppaTexteS(a.S, a.sSigne)}</div>
-    <div style="font-size:9px;">Composante dynamique (Δ) : ${kfppaTexteDelta(a.delta)}</div>
+    <div style="font-size:9px;margin-top:4px;">Statique (S) : ${txtS}</div>
+    <div style="font-size:9px;">Composante dynamique (Δ) : ${txtD}</div>
     <div style="margin-top:4px;text-align:center;">${verdict}</div>
     <div class="rp-gauge-norm">${txtNorme}</div>
   </div>`;

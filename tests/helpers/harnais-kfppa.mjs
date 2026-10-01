@@ -7,21 +7,20 @@
 // globales qu'elles lisent (currentTestId, photoSlots, vidMarkers) et un DOM
 // réduit à des bouchons minimaux.
 
-import { fonction, objet, ligneConst, tableau } from './extraire-biomeca.mjs';
-import { extraireBloc } from './mirror-diff.mjs';
+import { fonction, objet, ligneConst, tableau, bloc } from './extraire-biomeca.mjs';
 
 // #275-C — bloc des normes et de la grille, extrait entre ses marqueurs
 // (usage « rendre testable » ; son miroir est js/calc.mjs, comparé par
 // exécution dans tests/kfppa-grille-275c.test.mjs).
 // #275-D — bloc de l'affichage (textes signés, Δ, couleurs, phrases), même
 // principe : extrait entre ses marqueurs, comparé à js/calc.mjs par exécution.
-export const BLOC_275D = extraireBloc(
-  'js/biomeca.js',
+// #279 étape 3f — lus par `bloc`, dans la même source que les fonctions
+// (BIOMECA_SRC compris), et non plus par extraireBloc sur le fichier de travail.
+export const BLOC_275D = bloc(
   '// #275-D — KFPPA : textes signés, Δ, couleurs, phrases du rapport',
   '// ─── #275-D — FIN ───'
 );
-export const BLOC_275C = extraireBloc(
-  'js/biomeca.js',
+export const BLOC_275C = bloc(
   '// #275-C — KFPPA : normes, grille de U, classement de S',
   '// ─── #275-C — FIN ───'
 );
@@ -65,6 +64,7 @@ export const FONCTIONS = [
   '_serialiserPhoto',
   '_kfppaBlocGrilleHTML',
   '_kfppaGenou',
+  '_kfppaExcluHTML', // #279 étape 3f
   '_kfppaTexteU',
   '_kfppaMagnitude',
   '_kfppaNormeDetail',
@@ -110,7 +110,16 @@ export const FONCTIONS = [
 export function charger(opts = {}) {
   // `exclure` : noms à NE PAS extraire — seulement pour produire une référence
   // avec une version antérieure du fichier (BIOMECA_SRC), où ils n'existent pas.
-  const noms = FONCTIONS.filter((n) => !(opts.exclure || []).includes(n));
+  // #279 étape 3f — BIOMECA_EXCLURE (outillage, avec BIOMECA_SRC seulement) :
+  // noms EXPLICITES absents de la version lue, pour un passage « rouge sur
+  // HEAD » ; jamais défini dans la suite de tests normale.
+  // Garde : sans BIOMECA_SRC, elle masquerait une fonction manquante dans la
+  // suite normale ou la CI — erreur explicite.
+  if (process.env.BIOMECA_EXCLURE && !process.env.BIOMECA_SRC) {
+    throw new Error("BIOMECA_EXCLURE n'est permis qu'avec BIOMECA_SRC");
+  }
+  const exclusEnv = (process.env.BIOMECA_EXCLURE || '').split(',').filter(Boolean);
+  const noms = FONCTIONS.filter((n) => !(opts.exclure || []).includes(n) && !exclusEnv.includes(n));
   const code = `
     const _persist = !!(opts && opts.persistance);
     let currentTestId = null;
