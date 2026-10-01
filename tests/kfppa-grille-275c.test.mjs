@@ -307,13 +307,14 @@ describe('#275-C — norme enregistrée avec le bilan', () => {
     // On ne cherche plus un texte : on LANCE validateAndSave sur des bilans
     // KFPPA synthétiques et on lit ce qu'il a enregistré.
     const enregistrer = async (id, civilite) => {
-      const e = charger({ persistance: true });
+      // #279 étape 3e — scénario réel : Storage disponible (envois réussis).
+      const e = charger({ persistance: true, envoiReel: true });
       const c = cas(e.TESTS).find((x) => x.nom === id);
       e.poser({
         test: id,
         slots: structuredClone(c.slots),
         frames: structuredClone(c.frames),
-        patient: patientFictif(civilite),
+        patient: { ...patientFictif(civilite), bilanData: {} },
       });
       await e.validateAndSave();
       return e.patient().mesures[id].kfppaNorme;

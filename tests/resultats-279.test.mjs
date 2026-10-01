@@ -59,20 +59,51 @@ describe('#279 étape 2 — _construireResultatTest', () => {
     }
   });
 
-  it('E3. validateAndSave enregistre toujours exactement la référence', async () => {
+  it('E3. validateAndSave enregistre exactement la référence — envoi réussi, seul path posé', async () => {
+    // #279 étape 3e — validateAndSave envoie chaque photo sur Storage. Scénario
+    // couvert : Storage DISPONIBLE (envois réussis). Par décision, un envoi
+    // réussi pose le path ; RIEN d'autre ne change. L'exception est STRICTE :
+    //   - entrée AVEC image et path null ou absent dans la référence → path
+    //     posé, préfixe exact du test et du rang ;
+    //   - entrée qui avait DÉJÀ un path → le même, à l'identique ;
+    //   - entrée SANS image → aucun path ajouté.
+    // Tous les autres champs, dataUrl comprise, restent strictement égaux.
+    const PREFIXE = 'utilisateur-synthetique/patient-synthetique/sport/bilan-synthetique/';
+    const aImage = (e) => typeof e?.dataUrl === 'string' && e.dataUrl.startsWith('data:');
     for (const c of CAS) {
-      const env = charger({ persistance: true });
+      const env = charger({ persistance: true, envoiReel: true });
       env.poser({
         test: c.id,
         slots: structuredClone(c.slots),
         frames: structuredClone(c.frames),
-        patient: patientFictif(c.civilite),
+        patient: { ...patientFictif(c.civilite), bilanData: {} },
       });
       await env.validateAndSave();
       const r = json(env.patient().mesures[c.id]);
       expect(typeof r.date, c.nom).toBe('string');
       delete r.date;
-      expect(r, c.nom).toStrictEqual(REF[c.nom]);
+      const ref = REF[c.nom];
+      let poses = 0;
+      for (const [liste, genre] of [
+        ['photos', 'photoSlot'],
+        ['frames', 'frame'],
+      ]) {
+        (ref[liste] || []).forEach((e0, i) => {
+          const e1 = r[liste][i];
+          const cas_ = `${c.nom} ${liste}[${i}]`;
+          if (aImage(e0) && e0.path == null) {
+            expect(e1.path, `${cas_} : path posé`).toMatch(
+              new RegExp('^' + PREFIXE + c.id + '/' + genre + '_' + i + '_\\d+\\.jpg$')
+            );
+            if ('path' in e0) e1.path = e0.path;
+            else delete e1.path;
+            poses++;
+          }
+        });
+      }
+      expect(r, c.nom).toStrictEqual(ref);
+      expect(poses, `${c.nom} : au moins un envoi`).toBeGreaterThan(0);
+      expect(env.questions(), c.nom).toEqual([]);
       expect(env.enregistrements(), c.nom).toEqual(['savePatients', 'alert', 'nav:pg-sport']);
     }
   });

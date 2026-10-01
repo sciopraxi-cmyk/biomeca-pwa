@@ -63,3 +63,12 @@ export function ligneConst(nom) {
   if (!m || m.length !== 1) throw new Error(`${nom} : constante introuvable ou multiple`);
   return m[0];
 }
+
+// Tableau de premier niveau sur plusieurs lignes : `const NOM = [` … `\n];`
+// (#279 étape 3e — clés de photos lues par le filtre de persistance).
+export function tableau(nom) {
+  const i = unique(`\nconst ${nom} = [`, nom);
+  const j = SRC_BIOMECA.indexOf('\n];', i);
+  if (j < 0) throw new Error(`${nom} : fin introuvable`);
+  return SRC_BIOMECA.slice(i, j + 3);
+}

@@ -7,7 +7,7 @@
 // globales qu'elles lisent (currentTestId, photoSlots, vidMarkers) et un DOM
 // réduit à des bouchons minimaux.
 
-import { fonction, objet, ligneConst } from './extraire-biomeca.mjs';
+import { fonction, objet, ligneConst, tableau } from './extraire-biomeca.mjs';
 import { extraireBloc } from './mirror-diff.mjs';
 
 // #275-C — bloc des normes et de la grille, extrait entre ses marqueurs
@@ -78,6 +78,9 @@ export const FONCTIONS = [
   '_dessinCapture',
   '_relireImageBrute',
   'launchTest',
+  '_stripDataURLsForPersist',
+  '_galleryDynKeys',
+  '_pedicurieDynKeys',
   'cloneMarkers',
   '_relireMarqueurs',
   'photoSlotHTML',
@@ -87,6 +90,12 @@ export const FONCTIONS = [
   '_imgRapportAvecCalque',
   '_vigCalqueHTML',
   '_pointsIndisponiblesHTML',
+  '_envoyerCaptureStorage',
+  '_photoNonEnvoyeeHTML',
+  '_nonEnvoyeeCourtHTML',
+  '_entreesNonEnvoyees',
+  '_messageNonEnvoyees',
+  '_messageSansPhoto',
   'buildPrintSingleSide',
   '_construireResultatTest',
   '_escHtml',
@@ -119,11 +128,42 @@ export function charger(opts = {}) {
     const saveBilanSilent = _espion('saveBilanSilent');
     const saveBilan = _espion('saveBilan');
     const _enregistrements = [];
+    // #279 étape 3e — ce que savePatients ÉCRIRAIT : le vrai filtre
+    // _stripDataURLsForPersist appliqué, le JSON noté, puis la restauration
+    // en mémoire, exactement comme le vrai savePatients.
+    const _ecrits = [];
     const savePatients = _persist
-      ? () => { _enregistrements.push('savePatients'); return true; }
+      ? () => {
+          _enregistrements.push('savePatients');
+          if (opts.envoiReel) {
+            const stash = _stripDataURLsForPersist([currentPatient]);
+            try { _ecrits.push(JSON.stringify(currentPatient)); }
+            finally { stash.forEach(({ obj, key, dataUrl }) => { obj[key] = dataUrl; }); }
+          }
+          return true;
+        }
       : _espion('savePatients');
-    async function migrateSportPhotos() { return []; }
-    function restoreSportPhotosStash() {}
+    // Faux Storage : file de réponses 'ok' | 'echec' (défaut 'ok'), envois notés.
+    const pwaUser = { id: 'utilisateur-synthetique' };
+    const _envois = [];
+    const _reponsesEnvoi = [...((opts && opts.envois) || [])];
+    function buildPhotoPath(u, p, type, b, f) { return [u, p, type, b, f].join('/'); }
+    async function uploadPhotoBase64(dataUrl, path) {
+      // Réponse 'ok' | 'echec', ou { r, delai } pour un envoi qui finit plus tard.
+      const rep = _reponsesEnvoi.length ? _reponsesEnvoi.shift() : 'ok';
+      const r = typeof rep === 'string' ? rep : rep.r;
+      _envois.push({ path, r });
+      if (rep && rep.delai) await new Promise((ok) => setTimeout(ok, rep.delai));
+      return r === 'ok' ? { ok: true, path } : { ok: false, error: 'réseau indisponible' };
+    }
+    // Réponses du praticien aux confirm, messages notés.
+    const _questions = [];
+    const _reponsesConfirm = [...((opts && opts.reponses) || [])];
+    function confirm(m) {
+      _questions.push(m);
+      if (!_reponsesConfirm.length) throw new Error('confirm inattendu : ' + m);
+      return _reponsesConfirm.shift();
+    }
     function syncOpenedBilanToHistory() {}
     function nav(id) { _enregistrements.push('nav:' + id); }
     const _stockage = (nom) => ({
@@ -179,9 +219,14 @@ export function charger(opts = {}) {
     ${ligneConst('_CALQUES_CAPTURE')}
     ${objet('MEASURE_COMPUTERS')}
     ${objet('MARKER_TEMPLATES')}
+    ${tableau('POSTURO_PHOTO_KEYS')}
+    ${tableau('PODOPEDIATRIE_PHOTO_KEYS')}
+    ${tableau('SPORT_BILAN_PHOTO_KEYS')}
+    ${tableau('PEDICURIE_GALLERY_DEFS')}
     ${BLOC_275C}
     ${BLOC_275D}
     ${noms.map(fonction).join('\n')}
+    ${opts.envoiReel ? ['migrateSportPhotos', 'restoreSportPhotosStash'].map(fonction).join('\n') : 'async function migrateSportPhotos() { return []; }\n    function restoreSportPhotosStash() {}'}
     return {
       TESTS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
       kfppaSexeCivilite, kfppaNormeApplicable, kfppaClasseU, kfppaClasseS, kfppaTexteNonSigne,
@@ -203,6 +248,9 @@ export function charger(opts = {}) {
       },
       slots: () => photoSlots,
       espions: () => _espions.slice(),
+      ecrits: () => _ecrits.slice(),
+      envois: () => _envois.slice(),
+      questions: () => _questions.slice(),
       nbDessins: () => _nbDessins,
       enregistrements: () => _enregistrements.slice(),
       patient: () => currentPatient,

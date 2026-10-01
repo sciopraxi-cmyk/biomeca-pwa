@@ -4814,6 +4814,7 @@ async function launchTest(testId) {
       // sans marqueur, donc lu comme non signé.
       ...(p.kfppaSigne ? { kfppaSigne: true } : {}),
       ..._relireImageBrute(p), // #279 étape 3b
+      ...(p.nonEnvoyee ? { nonEnvoyee: true } : {}), // #279 étape 3e
       // #250 — RÈGLE : `markers` reste TOUJOURS un tableau ; l'information
       // « la géométrie est-elle connue ? » vit à CÔTÉ, dans markersConnus,
       // jamais encodée dans la valeur de markers. Un champ qui porterait
@@ -8369,6 +8370,18 @@ function _vigCalqueHTML(slot) {
 }
 
 function vidPhotoSlotHTML(slot, idx) {
+  // #279 étape 3e — créneau enregistré sans son image (photo non envoyée) :
+  // jamais l'emplacement vide d'un créneau jamais capturé. Mention, angle
+  // conservé ; un clic relance la capture.
+  if(!slot.dataUrl && slot.nonEnvoyee) {
+    const bipNE = _kfppaBipodalTexte(TESTS[currentTestId], slot);
+    const angNE = bipNE != null ? bipNE : (slot.angle != null ? slot.angle.toFixed(1)+'°' : '');
+    return '<div class="vig" onclick="captureVidPhotoSlot('+idx+')">'
+      + _nonEnvoyeeCourtHTML()
+      + (angNE ? '<span class="vig-ang">'+angNE+'</span>' : '')
+      + '<span class="vig-lbl">'+slot.label+'</span>'
+      + '</div>';
+  }
   if(slot.dataUrl) {
     const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
     // L'agrandissement est sur le conteneur ; la croix appelle stopPropagation
@@ -8553,6 +8566,7 @@ function captureVidPhotoSlot(slotIdx) {
 
   renderVidPhotoGrid();
   updateResults();
+  return _envoyerCaptureStorage(photoSlots[slotIdx]); // #279 étape 3e
 }
 
 function renderPhotoGrid() {
@@ -8580,6 +8594,14 @@ function renderPhotoGrid() {
 }
 
 function photoSlotHTML(slot, idx) {
+  // #279 étape 3e — même règle que la vignette pour un créneau non envoyé.
+  if (!slot.dataUrl && slot.nonEnvoyee) {
+    return `<div class="photo-slot has-photo" onclick="capturePhotoSlot(${idx})">
+      ${_nonEnvoyeeCourtHTML()}
+      ${slot.angle!=null?`<span class="ph-angle">${slot.angle.toFixed(1)}°</span>`:''}
+      <span class="ph-label">${slot.label}</span>
+    </div>`;
+  }
   if (slot.dataUrl) {
     const clrAng = slot.angle!==null ? getAngleColor(slot.angle) : '#FFD700';
     const calque = _calqueCapture(slot); // #279 étape 3c — même boîte (.photo-slot img)
@@ -8605,6 +8627,7 @@ function deletePhotoSlot(i) {
   photoSlots[i].angleD=null; photoSlots[i].angleG=null;
   delete photoSlots[i].kfppaSigne; // #275-A — plus de capture, plus de signe
   delete photoSlots[i].imageBrute; delete photoSlots[i].dessin; // #279 étape 3b
+  delete photoSlots[i].nonEnvoyee; delete photoSlots[i].envoiEchoue; delete photoSlots[i]._jetonEnvoi; // #279 étape 3e
   renderPhotoGrid(); updateResults();
 }
 
@@ -8663,6 +8686,7 @@ function capturePhotoSlot(slotIdx) {
   // de créneau bipodal KFPPA : seul l'angle du créneau compte.
   _poserKfppaSigne(photoSlots[slotIdx], _kfppaSigneCalcule(mlaType, view, side, markersForPhoto, corrAng));
   renderPhotoGrid(); updateResults();
+  return _envoyerCaptureStorage(photoSlots[slotIdx]); // #279 étape 3e
 }
 
 // ══════════════════════════════════════════════════════
@@ -14907,6 +14931,7 @@ function _kfppaPhotoBipodaleHTML(data, t) {
       <div style="font-size:8px;font-weight:700;color:#333;">${leg}</div>
     </div>`;
   }
+  if (bip.nonEnvoyee) return _photoNonEnvoyeeHTML(bip.label || 'Station bipodale'); // #279 étape 3e
   if (bip.path) return _photoNonRechargeeHTML(bip.label || 'Station bipodale');
   return '';
 }
@@ -15504,7 +15529,44 @@ function _serialiserPhoto(s) {
     // #279 étape 3b — écrits SEULEMENT pour une capture sans points : leur
     // absence dit « image avec points dessinés dedans » (captures antérieures).
     ...(s.imageBrute ? { imageBrute: true, dessin: s.dessin || null } : {}),
+    ...(s.nonEnvoyee ? { nonEnvoyee: true } : {}), // #279 étape 3e
     ..._serialiserMarqueurs(s)};
+}
+
+// #279 étape 3e — ENVOI SUR STORAGE DÈS LA CAPTURE. L'image reste en mémoire
+// pour l'affichage ; rien n'est écrit dans le stockage local ici. Succès : path
+// posé (le filtre de persistance retirera alors la dataURL). Échec :
+// envoiEchoue, nouvel essai à la validation.
+// JETON par capture : une recapture pendant l'envoi en crée un autre ; le
+// résultat d'un envoi dépassé n'est jamais appliqué — comparer les images ne
+// suffirait pas, une recapture pouvant produire exactement la même.
+async function _envoyerCaptureStorage(slot) {
+  if (!slot || typeof slot.dataUrl !== 'string' || !slot.dataUrl.startsWith('data:')) return;
+  const jeton = {};
+  slot._jetonEnvoi = jeton;
+  const patient = currentPatient, testId = currentTestId, userId = pwaUser?.id;
+  if (!patient?.id || !testId || !userId) { slot.envoiEchoue = true; return; }
+  if (!patient.mesures) patient.mesures = {};
+  if (!patient.mesures._bilanId) patient.mesures._bilanId = crypto.randomUUID();
+  const filename = `${testId}/capture_${Date.now()}_${crypto.randomUUID()}.jpg`;
+  const path = buildPhotoPath(userId, patient.id, 'sport', patient.mesures._bilanId, filename);
+  let up;
+  try { up = await uploadPhotoBase64(slot.dataUrl, path); }
+  catch (e) { up = { ok: false, error: e?.message || String(e) }; }
+  if (slot._jetonEnvoi !== jeton) return; // recapturé entre-temps
+  if (up && up.ok) { slot.path = up.path; delete slot.envoiEchoue; }
+  else { slot.envoiEchoue = true; console.warn('[#279] envoi de la capture échoué :', up?.error); }
+}
+
+// #279 étape 3e — photo non envoyée, enregistrée sans son image à la demande
+// du praticien : mention rouge au rapport, comme les photos non rechargées.
+function _photoNonEnvoyeeHTML(label) {
+  return '<div class="rp-photo-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;">⚠️ Photo « '
+    + _escHtml(label || 'photo du test') + ' » non envoyée — à recapturer</div>';
+}
+// Version courte, pour la vignette et le mode photo.
+function _nonEnvoyeeCourtHTML() {
+  return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ photo non envoyée — à recapturer</div>';
 }
 
 // #279 étape 3b — réglages de dessin AU MOMENT de la capture : taille et
@@ -15740,6 +15802,31 @@ function _construireResultatTest(testId, slots, frames, patient, date) {
   return result;
 }
 
+// #279 étape 3e — entrées d'un résultat dont l'image n'est pas sur Storage.
+function _entreesNonEnvoyees(result) {
+  return [...(result.photos || []), ...(result.frames || [])]
+    .filter((e) => e && !e.path && typeof e.dataUrl === 'string' && e.dataUrl.startsWith('data:'));
+}
+// Message de validation : nomme les photos et dit ce que fait CHAQUE bouton.
+// « Annuler » ne fait JAMAIS perdre une photo : il mène aux autres choix.
+function _messageNonEnvoyees(entrees) {
+  const noms = entrees.map((e) => '« ' + (e.label || 'photo') + ' »').join(', ');
+  const un = entrees.length === 1;
+  return (un ? 'Photo ' + noms + ' non envoyée' : 'Photos ' + noms + ' non envoyées')
+    + ' — vérifiez votre connexion.\n\n'
+    + "OK = réessayer l'envoi ; Annuler = autres choix.";
+}
+// Seconde question : la conséquence en clair ; « Annuler » revient au test.
+function _messageSansPhoto(entrees) {
+  const un = entrees.length === 1;
+  return (un
+    ? 'Enregistrer le test SANS cette photo ? Son angle et ses points sont conservés, la photo devra être recapturée.'
+    : 'Enregistrer le test SANS ces photos ? Leurs angles et leurs points sont conservés, les photos devront être recapturées.')
+    + '\n\nOK = enregistrer sans ' + (un ? 'la photo' : 'les photos')
+    + ' ; Annuler = revenir au test sans rien enregistrer (' + (un ? 'la photo reste' : 'les photos restent')
+    + ' à l’écran, vous pourrez réessayer plus tard).';
+}
+
 async function validateAndSave() {
   if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
   const t=TESTS[currentTestId];
@@ -15750,13 +15837,41 @@ async function validateAndSave() {
   // bilanId stable pour scoper les paths Storage (Task #53 PR B2). Lazy
   // creation : ne ré-écrit pas un _bilanId déjà présent (compat reopen).
   if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
+  // #279 étape 3e — valeur précédente gardée : si le praticien revient au test
+  // sans rien enregistrer, le bilan en mémoire doit être INCHANGÉ (sinon un
+  // prochain enregistrement y écrirait ce résultat, image comprise).
+  const _avaitPrecedent = Object.prototype.hasOwnProperty.call(currentPatient.mesures, currentTestId);
+  const _precedent = currentPatient.mesures[currentTestId];
   currentPatient.mesures[currentTestId]=result;
   // Migration Storage : upload des dataUrls neuves de result.photos[] et
   // result.frames[] vers patient-media. Le stash récupère les dataUrls
   // initiales pour les restaurer en RAM post-save (édition continue sans
   // re-fetch). Best-effort : si une migration échoue, la dataUrl reste
   // dans l'entry et sera retentée au prochain save.
-  const photoStash = await migrateSportPhotos(result, currentPatient.id, currentPatient.mesures._bilanId, currentTestId);
+  let photoStash = await migrateSportPhotos(result, currentPatient.id, currentPatient.mesures._bilanId, currentTestId);
+  // #279 étape 3e — photo TOUJOURS sans path après la migration : le praticien
+  // est prévenu et peut réessayer. S'il continue, le créneau est enregistré
+  // SANS son image (nonEnvoyee), coordonnées et angle gardés. JAMAIS de data:
+  // dans le stockage local : son image n'est pas non plus remise en mémoire
+  // dans le bilan, d'où un prochain enregistrement la réécrirait.
+  let _nonEnv = _entreesNonEnvoyees(result);
+  while (_nonEnv.length) {
+    if (confirm(_messageNonEnvoyees(_nonEnv))) {
+      photoStash = photoStash.concat(await migrateSportPhotos(result, currentPatient.id, currentPatient.mesures._bilanId, currentTestId));
+      _nonEnv = _entreesNonEnvoyees(result);
+      continue;
+    }
+    if (!confirm(_messageSansPhoto(_nonEnv))) {
+      // Revenir au test SANS RIEN ÉCRIRE : bilan en mémoire restauré, les
+      // photos restent dans leurs créneaux (photoSlots n'a pas été touché).
+      if (_avaitPrecedent) currentPatient.mesures[currentTestId] = _precedent;
+      else delete currentPatient.mesures[currentTestId];
+      return;
+    }
+    _nonEnv.forEach((e) => { delete e.dataUrl; e.nonEnvoyee = true; });
+    photoStash = photoStash.filter((x) => !x.entry.nonEnvoyee);
+    break;
+  }
   syncOpenedBilanToHistory();
   savePatients();
   // Restaure les dataUrls migrées en RAM (par référence) pour conserver
@@ -18742,7 +18857,7 @@ function buildPrintSingleSide(t,data) {
   const phHTML=photos.slice(0,2).map((ph,i)=>`
     <div class="rp-photo-wrap">
       <div class="rp-photo-lbl">${ph.label}</div>
-      ${ph.dataUrl?_imgRapportAvecCalque(ph, 'max-width:100%'):'<div class="rp-photo-empty">Pas de photo</div>'}
+      ${ph.dataUrl?_imgRapportAvecCalque(ph, 'max-width:100%'):ph.nonEnvoyee?_photoNonEnvoyeeHTML(ph.label):'<div class="rp-photo-empty">Pas de photo</div>'}
       ${ph.angle!=null?`<div class="rp-photo-ang" style="color:${cssC};">${ph.angle.toFixed(1)}°</div>`:''}
     </div>`).join('');
   return `<div class="rp-section">
@@ -18824,6 +18939,7 @@ function buildPrintPhotos(data,side,t,angleOverride) {
       label:t.frameLabels?.[i]||'Frame '+(i+1),
       dataUrl:f.dataUrl,
       path:f.path, // #275-D — pour distinguer « non rechargée » de « jamais prise »
+      nonEnvoyee:f.nonEnvoyee, // #279 étape 3e
       angle:side==='D'?f.angD:f.angG
     }));
   }
@@ -18840,7 +18956,7 @@ function buildPrintPhotos(data,side,t,angleOverride) {
         ${_imgRapportAvecCalque(ph, 'height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block')}
         <div style="font-size:7px;color:#666;margin-top:2px;">${ph.label||''}</div>
         ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${_legende(ph)}</div>`:''}
-      </div>`:(ph?.path?_photoNonRechargeeHTML(ph.label):'')).join('')}
+      </div>`:(ph?.nonEnvoyee?_photoNonEnvoyeeHTML(ph.label):ph?.path?_photoNonRechargeeHTML(ph.label):'')).join('')}
   </div>`;
 }
 
