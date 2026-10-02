@@ -49,6 +49,7 @@ export const FONCTIONS = [
   '_kfppaBipodalTexte',
   '_kfppaEtatBipodal',
   '_kfppaMessageBipodal',
+  '_kfppaMessageBipodalHorsPointsKo', // #279 étape 3f
   'ouvrirVignette',
   'vidPhotoSlotHTML',
   'captureVidPhotoSlot',
@@ -244,7 +245,7 @@ export function charger(opts = {}) {
       kfppaSexeCivilite, kfppaNormeApplicable, kfppaClasseU, kfppaClasseS, kfppaTexteNonSigne,
       kfppaSigneTxt, kfppaDelta, kfppaTexteDelta, kfppaTexteS, kfppaCouleurClasse,
       kfppaNormeBilan, kfppaTexteNorme, kfppaAnalyseGenou, kfppaPhraseGenou, kfppaPhraseAsymetrie,
-      kfppaTexteUnipodal,
+      kfppaTexteUnipodal, kfppaMotifDelta,
       ${noms.join(', ')},
       poser(o) {
         if ('test' in o) currentTestId = o.test;

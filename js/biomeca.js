@@ -4185,15 +4185,27 @@ function _kfppaEtatBipodal(photos, side) {
   const present = (p) => !!(p && (p.dataUrl || p.path || p.nonEnvoyee));
   const bip = ph.find((p) => p && p.side === '');
   if (present(bip)) {
-    return (side === 'D' ? bip.angleD : bip.angleG) == null ? 'nonRecalc' : 'ok';
+    // #279 étape 3f — valeur absente sur une capture NEUVE (imageBrute, posé
+    // seulement par la capture) : points non disponibles, pas un bilan antérieur.
+    if ((side === 'D' ? bip.angleD : bip.angleG) != null) return 'ok';
+    return bip.imageBrute ? 'pointsKo' : 'nonRecalc';
   }
   return ph.some(present) ? 'manquante' : 'vide';
 }
 // Message à afficher pour cet état, ou null.
 function _kfppaMessageBipodal(etat) {
   if (etat === 'nonRecalc') return KFPPA_NON_RECALC;
+  if (etat === 'pointsKo') return KFPPA_POINTS_KO_BIP; // #279 étape 3f
   if (etat === 'manquante') return KFPPA_BIP_MANQUANTE;
   return null;
+}
+
+// #279 étape 3f — message À PART des valeurs (sous le bloc du panneau, ligne S
+// du bloc genou, alertes) : 'pointsKo' y est déjà dit par l'analyse du genou
+// (sPointsKo), en rouge ou avec sa conséquence — jamais deux fois.
+function _kfppaMessageBipodalHorsPointsKo(photos, side) {
+  const etat = _kfppaEtatBipodal(photos, side);
+  return etat === 'pointsKo' ? null : _kfppaMessageBipodal(etat);
 }
 
 const MEASURE_COMPUTERS = {
@@ -8653,6 +8665,9 @@ function deletePhotoSlot(i) {
   delete photoSlots[i].kfppaSigne; // #275-A — plus de capture, plus de signe
   delete photoSlots[i].imageBrute; delete photoSlots[i].dessin; // #279 étape 3b
   delete photoSlots[i].nonEnvoyee; delete photoSlots[i].envoiEchoue; delete photoSlots[i]._jetonEnvoi; // #279 étape 3e
+  // #279 étape 3f — les points de l'ancienne capture partent aussi : sans
+  // cela, un créneau supprimé puis enregistré gardait ses coordonnées.
+  delete photoSlots[i].markers; delete photoSlots[i].dims; photoSlots[i].markersConnus = false;
   renderPhotoGrid(); updateResults();
 }
 
@@ -14801,13 +14816,22 @@ function kfppaTexteNorme(norme) {
 // décomposition de l'asymétrie) tant qu'elle n'est pas recapturée.
 const KFPPA_EXCLU_BIP = 'photo bipodale non envoyée — à recapturer';
 const KFPPA_EXCLU_UNI = 'photo unipodale non envoyée — à recapturer';
+// #279 étape 3f — capture NEUVE sans points (imageBrute, angle null) : jamais
+// « bilan antérieur » ni « — », qui disent autre chose.
+const KFPPA_POINTS_KO_BIP = 'points non disponibles sur la photo bipodale — à recapturer';
+const KFPPA_POINTS_KO_UNI = 'points non disponibles sur la photo unipodale — à recapturer';
 
-// #279 étape 3f — pourquoi Δ n'est pas calculé pour ce genou, ou null.
+// #279 étape 3f — pourquoi Δ n'est pas calculé pour ce genou, ou null. Source
+// UNIQUE du motif : panneau, rapport et alertes le disent dans les mêmes mots.
 function kfppaMotifDelta(a) {
   if (a.sExclu && a.uExclu) return 'photos bipodale et unipodale non envoyées — à recapturer';
-  if (a.sExclu) return KFPPA_EXCLU_BIP;
-  if (a.uExclu) return KFPPA_EXCLU_UNI;
-  return null;
+  if (a.sPointsKo && a.uPointsKo) return 'points non disponibles sur les photos bipodale et unipodale — à recapturer';
+  const m = [];
+  if (a.sExclu) m.push(KFPPA_EXCLU_BIP);
+  else if (a.sPointsKo) m.push(KFPPA_POINTS_KO_BIP);
+  if (a.uExclu) m.push(KFPPA_EXCLU_UNI);
+  else if (a.uPointsKo) m.push(KFPPA_POINTS_KO_UNI);
+  return m.length ? m.join(' ; ') : null;
 }
 
 // Analyse d'un genou. Une valeur non signée garde sa magnitude mais ne porte
@@ -14821,6 +14845,9 @@ function kfppaAnalyseGenou(e) {
   const uSigne = U != null && !!e.uSigne;
   const sExclu = S != null && !!e.sExclu;
   const uExclu = U != null && !!e.uExclu;
+  // #279 étape 3f — valeur ABSENTE d'une capture neuve sans points.
+  const sPointsKo = S == null && !!e.sPointsKo;
+  const uPointsKo = U == null && !!e.uPointsKo;
   const n0 = e.norme || { statut: 'non-definie' };
   // VÉRIFICATION, pas promesse : un statut 'ok' sans bornes numériques
   // cohérentes est traité comme une norme non définie, sans verdict.
@@ -14837,6 +14864,8 @@ function kfppaAnalyseGenou(e) {
     uSigne,
     sExclu,
     uExclu,
+    sPointsKo,
+    uPointsKo,
     norme,
     classeS: sSigne && !sExclu ? kfppaClasseS(S) : null,
     classeU,
@@ -14858,7 +14887,7 @@ function _kfppaMinuscule(s) {
 // norme appliquée, « valeur unipodale −2.4° (norme non définie) ». Partie de
 // kfppaPhraseGenou, isolée pour la ligne d'un genou dont le statique manque.
 function kfppaTexteUnipodal(a) {
-  if (a.U == null) return 'valeur unipodale —';
+  if (a.U == null) return a.uPointsKo ? 'valeur unipodale : ' + KFPPA_POINTS_KO_UNI : 'valeur unipodale —'; // #279 étape 3f
   if (a.uExclu) return 'valeur unipodale ' + _kfppaValeurExclue(a.U, a.uSigne, KFPPA_EXCLU_UNI); // #279 étape 3f
   if (!a.uSigne) return 'valeur unipodale ' + kfppaTexteNonSigne(a.U);
   if (a.classeU) {
@@ -14873,7 +14902,7 @@ function kfppaPhraseGenou(cote, a) {
   const nom = cote === 'D' ? 'Genou droit' : 'Genou gauche';
   const st =
     a.S == null
-      ? 'statique —'
+      ? (a.sPointsKo ? 'statique : ' + KFPPA_POINTS_KO_BIP : 'statique —') // #279 étape 3f
       : a.sExclu
         ? 'statique ' + _kfppaValeurExclue(a.S, a.sSigne, KFPPA_EXCLU_BIP) // #279 étape 3f
         : a.sSigne
@@ -14947,6 +14976,10 @@ function _kfppaGenou(photos, side, norme) {
     // SOURCE UNIQUE de l'exclusion pour le panneau, le rapport et les alertes.
     sExclu: !!bip?.nonEnvoyee,
     uExclu: !!uni?.nonEnvoyee,
+    // #279 étape 3f — capture neuve sans points : imageBrute, posé seulement
+    // par la capture (l'analyse ne le retient que si la valeur est absente).
+    sPointsKo: !!bip?.imageBrute,
+    uPointsKo: !!uni?.imageBrute,
     norme,
   });
 }
@@ -14992,13 +15025,19 @@ function _kfppaBlocGrilleHTML(testId, patient, photos, side) {
   // verdict non calculés, avec leur motif (kfppaMotifDelta, même analyse).
   const rouge = (t) => _kfppaExcluHTML(t, 'var(--red)');
   const motif = kfppaMotifDelta(a);
-  const verdict = a.uExclu
-    ? rouge(`non calculé (${KFPPA_EXCLU_UNI})`)
+  // #279 étape 3f — U non jugé : photo non envoyée, ou points non disponibles.
+  const motifU = a.uExclu ? KFPPA_EXCLU_UNI : a.uPointsKo ? KFPPA_POINTS_KO_UNI : null;
+  const verdict = motifU
+    ? rouge(`non calculé (${motifU})`)
     : a.classeU || (a.U != null && a.uSigne ? kfppaTexteNorme(a.norme) : '—');
-  const txtS = a.sExclu
-    ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
-    : kfppaTexteS(a.S, a.sSigne);
-  const txtU = _kfppaTexteU(a) + (a.uExclu ? rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_UNI})`) : '');
+  const txtS = a.sPointsKo
+    ? rouge(KFPPA_POINTS_KO_BIP)
+    : a.sExclu
+      ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
+      : kfppaTexteS(a.S, a.sSigne);
+  const txtU = a.uPointsKo
+    ? rouge(KFPPA_POINTS_KO_UNI)
+    : _kfppaTexteU(a) + (a.uExclu ? rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_UNI})`) : '');
   const txtD = a.delta == null && motif ? rouge(`non calculé (${motif})`) : kfppaTexteDelta(a.delta);
   return `<div class="kfppa-grille" style="font-size:9px;color:var(--mut);margin-top:4px;line-height:1.5;">
       <div>Statique S : <b>${txtS}</b></div>
@@ -15257,15 +15296,15 @@ function updateResults() {
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
             ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'D')}
-            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D')) // #275-B — état partagé des cinq sites
-              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D'))}</div>`
+            ${_kfppaMessageBipodalHorsPointsKo(photoSlots,'D') // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodalHorsPointsKo(photoSlots,'D')}</div>`
               : ''}
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
             ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'G')}
-            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G')) // #275-B — état partagé des cinq sites
-              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G'))}</div>`
+            ${_kfppaMessageBipodalHorsPointsKo(photoSlots,'G') // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodalHorsPointsKo(photoSlots,'G')}</div>`
               : ''}
           </div>
         </div>`;
@@ -18564,14 +18603,17 @@ function _kfppaAlertes(t, m, data, condensed) {
   const out = [];
   ['D', 'G'].forEach(side => {
     const lib = `${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label}`;
-    const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+    // #279 étape 3f — « points non disponibles » est dit par le motif du Δ.
+    const msg = _kfppaMessageBipodalHorsPointsKo(data.photos, side);
     if (msg) out.push(`${lib} — ${msg}`);
     const a = _kfppaGenou(data.photos, side, norme);
     // #279 étape 3f — exclusions : le motif de la MÊME analyse que le panneau
     // et le rapport (kfppaMotifDelta), puis le verdict non calculé si U l'est.
     const motif = kfppaMotifDelta(a);
     if (a.delta == null && motif) out.push(`${lib} — ${motif} : composante dynamique non calculée`);
-    if (a.uExclu) { out.push(`${lib} — ${KFPPA_EXCLU_UNI} : verdict non calculé`); return; }
+    // #279 étape 3f — même format pour « points non disponibles » sur U.
+    const motifU = a.uExclu ? KFPPA_EXCLU_UNI : a.uPointsKo ? KFPPA_POINTS_KO_UNI : null;
+    if (motifU) { out.push(`${lib} — ${motifU} : verdict non calculé`); return; }
     if (a.U == null || !a.uSigne) return;
     if (!a.classeU) { out.push(`${lib} — ${kfppaTexteNorme(a.norme)}`); return; }
     if (a.classeU === 'Dans la norme') return;
@@ -18935,7 +18977,7 @@ function buildPrintSide(side, t, data) {
 function _kfppaPrintSideHTML(side, t, data) {
   const norme = kfppaNormeBilan(data);
   const a = _kfppaGenou(data.photos, side, norme);
-  const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+  const msg = _kfppaMessageBipodalHorsPointsKo(data.photos, side); // #279 étape 3f
   const coul = _KFPPA_COUL_RAPPORT[a.couleur];
   // Sans norme appliquée, la place du verdict reste VIDE : le motif (norme non
   // définie, civilité non renseignée) figure une seule fois, ligne de la norme.
@@ -18943,12 +18985,14 @@ function _kfppaPrintSideHTML(side, t, data) {
   // rouge ; Δ et verdict non calculés, avec le motif de la même analyse.
   const rouge = (t) => _kfppaExcluHTML(t, '#b91c1c');
   const motif = kfppaMotifDelta(a);
-  const verdict = a.uExclu
-    ? rouge(`verdict non calculé (${KFPPA_EXCLU_UNI})`)
+  const motifU = a.uExclu ? KFPPA_EXCLU_UNI : a.uPointsKo ? KFPPA_POINTS_KO_UNI : null; // #279 étape 3f
+  const verdict = motifU
+    ? rouge(`verdict non calculé (${motifU})`)
     : a.classeU
       ? `<span class="${_KFPPA_BADGE_RAPPORT[a.couleur]}">${a.classeU}</span>`
       : '';
   const txtS = msg
+    || (a.sPointsKo ? rouge(KFPPA_POINTS_KO_BIP) : null) // #279 étape 3f
     || (a.sExclu
       ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
       : kfppaTexteS(a.S, a.sSigne));
@@ -18961,9 +19005,10 @@ function _kfppaPrintSideHTML(side, t, data) {
     <div class="rp-gauge-photos">
       <div class="rp-kfppa-u" style="text-align:center;min-width:90px;">
         <div style="font-size:8px;color:#666;">Unipodal (U)</div>
-        <div class="rp-gauge-deg" style="font-size:15px;font-weight:700;color:${coul};">${a.U == null ? '—' : a.uSigne ? kfppaSigneTxt(a.U) : _kfppaMagnitude(a.U)}</div>
+        <div class="rp-gauge-deg" style="font-size:15px;font-weight:700;color:${coul};">${a.U == null ? (a.uPointsKo ? '' : '—') : a.uSigne ? kfppaSigneTxt(a.U) : _kfppaMagnitude(a.U)}</div>
         ${a.U != null && !a.uSigne ? '<div class="rp-kfppa-sans-signe" style="font-size:7px;color:#888;">sens valgus/varus non enregistré</div>' : ''}
         ${a.uExclu ? `<div style="font-size:7px;">${rouge('valeur exclue des calculs')}</div>` : ''}
+        ${a.uPointsKo ? `<div style="font-size:7px;">${rouge(KFPPA_POINTS_KO_UNI)}</div>` : '' /* #279 étape 3f */}
       </div>
       ${buildPrintPhotos(data, side, t)}
     </div>
