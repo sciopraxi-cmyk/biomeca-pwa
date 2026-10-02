@@ -8375,13 +8375,19 @@ function _vigCalqueHTML(slot) {
 function vidPhotoSlotHTML(slot, idx) {
   // #279 étape 3e — créneau enregistré sans son image (photo non envoyée) :
   // jamais l'emplacement vide d'un créneau jamais capturé. Mention, angle
-  // conservé ; un clic relance la capture.
-  if(!slot.dataUrl && slot.nonEnvoyee) {
+  // conservé.
+  // #279 étape 3f — même règle pour une photo ENVOYÉE mais non rechargée (path
+  // sans image, hors connexion) : elle s'affichait en emplacement vide 📷.
+  // Un clic sur la vignette ne capture PLUS : il écrasait la capture, angles
+  // compris, souvent caméra inactive. La recapture passe par le bouton
+  // explicite « Recapturer », soumis à la garde du flux vidéo.
+  if(!slot.dataUrl && (slot.nonEnvoyee || slot.path)) {
     const bipNE = _kfppaBipodalTexte(TESTS[currentTestId], slot);
     const angNE = bipNE != null ? bipNE : (slot.angle != null ? slot.angle.toFixed(1)+'°' : '');
-    return '<div class="vig" onclick="captureVidPhotoSlot('+idx+')">'
-      + _nonEnvoyeeCourtHTML()
+    return '<div class="vig">'
+      + (slot.nonEnvoyee ? _nonEnvoyeeCourtHTML() : _nonRechargeeCourtHTML())
       + (angNE ? '<span class="vig-ang">'+angNE+'</span>' : '')
+      + '<button class="vig-recap" onclick="event.stopPropagation();captureVidPhotoSlot('+idx+');">Recapturer</button>'
       + '<span class="vig-lbl">'+slot.label+'</span>'
       + '</div>';
   }
@@ -8479,14 +8485,28 @@ function _vigFondClic(e) {
   if (e.target === e.currentTarget) fermerVignette();
 }
 
+// #279 étape 3f — garde capture : JAMAIS de capture sans image vidéo. Caméra
+// « Inactive » ou vidéo non chargée, drawImage produit une image NOIRE et les
+// marqueurs ne sont pas placés : la capture écraserait la précédente, angles
+// compris. Seuls les éléments étaient vérifiés, et ils existent toujours.
+function _fluxVideoPret() {
+  const p = document.getElementById('vid-el');
+  const c = document.getElementById('vid-canvas');
+  return !!(p && c && p.readyState >= 2 && p.videoWidth > 0 && c.width > 0);
+}
+
 function captureVidPhotoSlot(slotIdx) {
   const player = document.getElementById('vid-el');
   const vcanvas = document.getElementById('vid-canvas');
-  if(!player || !vcanvas) { alert('Activez la caméra ou importez une vidéo.'); return; }
+  // #279 étape 3f — refus AVANT toute écriture : le créneau reste inchangé.
+  if(!_fluxVideoPret()) { alert('Activez la caméra ou importez une vidéo.'); return; }
   const t = TESTS[currentTestId];
   const view = t?.view || 'dos';
   const slot = photoSlots[slotIdx];
   const side = slot?.side || '';
+  // #279 étape 3f — une capture repart sans le statut d'envoi de l'ancienne :
+  // un « non envoyée » résiduel exclurait à tort la nouvelle mesure des calculs.
+  if (slot) { delete slot.nonEnvoyee; delete slot.envoiEchoue; }
 
   // Filtrer les marqueurs selon le côté du slot
   // Pour MLA : pas de filtrage (tous les marqueurs sont sans side)
@@ -8598,9 +8618,11 @@ function renderPhotoGrid() {
 
 function photoSlotHTML(slot, idx) {
   // #279 étape 3e — même règle que la vignette pour un créneau non envoyé.
+  // #279 étape 3f — le clic ne capture plus ; bouton « Recapturer » explicite.
   if (!slot.dataUrl && slot.nonEnvoyee) {
-    return `<div class="photo-slot has-photo" onclick="capturePhotoSlot(${idx})">
+    return `<div class="photo-slot has-photo">
       ${_nonEnvoyeeCourtHTML()}
+      <button class="vig-recap" onclick="event.stopPropagation();capturePhotoSlot(${idx});">Recapturer</button>
       ${slot.angle!=null?`<span class="ph-angle">${slot.angle.toFixed(1)}°</span>`:''}
       <span class="ph-label">${slot.label}</span>
     </div>`;
@@ -12762,6 +12784,8 @@ function toggleVAutoDetect(){
 // CAPTURE FRAME VIDEO
 // ══════════════════════════════════════════════════════
 function captureFrame() {
+  // #279 étape 3f — garde capture (cf. _fluxVideoPret) : aucune image ajoutée.
+  if(!_fluxVideoPret()) { alert('Activez la caméra ou importez une vidéo.'); return; }
   const player=document.getElementById('vid-el');
   const vcanvas=document.getElementById('vid-canvas');
   const view=TESTS[currentTestId]?.view||'face';
@@ -15638,6 +15662,11 @@ function _photoNonEnvoyeeHTML(label) {
 // Version courte, pour la vignette et le mode photo.
 function _nonEnvoyeeCourtHTML() {
   return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ photo non envoyée — à recapturer</div>';
+}
+// #279 étape 3f — photo ENVOYÉE mais non rechargée (path sans image) : même
+// forme, autre motif — elle existe sur le stockage, il faut la connexion.
+function _nonRechargeeCourtHTML() {
+  return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ photo non rechargée — connexion requise</div>';
 }
 
 // #279 étape 3b — réglages de dessin AU MOMENT de la capture : taille et

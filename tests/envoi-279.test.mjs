@@ -210,7 +210,8 @@ describe('#279 étape 3e — rapport et relecture', () => {
       expect(h, `${site} : angle conservé`).toContain('7.0°');
       expect(h, `${site} : pas d’emplacement vide`).not.toMatch(/vig-vide|ph-lbl-empty|📷/);
     }
-    // Un clic relance la capture du créneau.
+    // #279 étape 3f — la recapture passe par le bouton « Recapturer » ; le
+    // clic sur la vignette elle-même ne capture plus (garde-capture-279f).
     expect(env.vidPhotoSlotHTML(slot, 3)).toContain('captureVidPhotoSlot(3)');
     expect(env.photoSlotHTML(slot, 3)).toContain('capturePhotoSlot(3)');
   });

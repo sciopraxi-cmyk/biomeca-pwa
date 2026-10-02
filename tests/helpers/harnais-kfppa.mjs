@@ -93,6 +93,9 @@ export const FONCTIONS = [
   '_envoyerCaptureStorage',
   '_photoNonEnvoyeeHTML',
   '_nonEnvoyeeCourtHTML',
+  '_nonRechargeeCourtHTML', // #279 étape 3f — garde capture
+  '_fluxVideoPret', // #279 étape 3f — garde capture
+  'captureFrame', // #279 étape 3f — garde capture
   '_entreesNonEnvoyees',
   '_messageNonEnvoyees',
   '_messageSansPhoto',
@@ -256,6 +259,7 @@ export function charger(opts = {}) {
         if ('opacite' in o) markerOpacity = o.opacite;
       },
       slots: () => photoSlots,
+      frames: () => capturedFrames, // #279 étape 3f
       espions: () => _espions.slice(),
       ecrits: () => _ecrits.slice(),
       envois: () => _envois.slice(),
@@ -293,7 +297,8 @@ export function envCapture(env, test, slots, marqueurs = MARQUEURS_DEMO) {
     slots,
     marqueurs: JSON.parse(JSON.stringify(marqueurs)),
     elements: {
-      'vid-el': {},
+      // #279 étape 3f — caméra ACTIVE : la garde de capture exige une image.
+      'vid-el': { readyState: 4, videoWidth: 1368 },
       'vid-canvas': { width: 1368, height: 770 },
       'cap-results': res,
     },
