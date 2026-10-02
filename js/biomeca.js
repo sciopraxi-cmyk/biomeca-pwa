@@ -4028,37 +4028,37 @@ const TESTS = {
   'kfppa-marche': {
     name:'KFPPA Marche', mode:'video', view:'face',
     note:'Vue face · 4 km/h · Marqueurs bilatéraux (EIAS→Rotule→Tarse) · 2 frames : repos bipodal + plantigrade unipodal',
-    markers:'genou-bi', div:5, normeMin:3, normeMax:7,
+    markers:'genou-bi', div:5, // #275-D — norme : KFPPA_NORMES, figée avec le bilan
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
     frameLabels:['Repos bipodal','Phase plantigrade (dynamique)'],
     target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
     measures:[
-      { key:'kfppa', label:'KFPPA Marche (valgus dynamique du genou)', norm:'60-140 %', interpretFn:'kfppa' },
+      { key:'kfppa', label:'KFPPA Marche (valgus dynamique du genou)', interpretFn:'kfppa' },
     ],
   },
   'kfppa-course': {
     name:'KFPPA Course', mode:'video', view:'face',
     note:'Vue face · 8 km/h · Marqueurs bilatéraux (EIAS→Rotule→Tarse) · 2 frames : repos + phase appui',
-    markers:'genou-bi', div:8.5, normeMin:5, normeMax:12,
+    markers:'genou-bi', div:8.5, // #275-D — norme : KFPPA_NORMES, figée avec le bilan
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
     frameLabels:['Repos bipodal','Phase appui (dynamique)'],
     target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
     measures:[
-      { key:'kfppa', label:'KFPPA Course (valgus dynamique du genou)', norm:'60-140 %', interpretFn:'kfppa' },
+      { key:'kfppa', label:'KFPPA Course (valgus dynamique du genou)', interpretFn:'kfppa' },
     ],
   },
   'kfppa-sldj': {
-    name:'KFPPA SLDJ', mode:'video', view:'face',
-    note:'Vue face · Chute 30 cm · Marqueurs bilatéraux · 2 frames : repos + réception',
-    markers:'genou-bi', div:7.5, normeMin:5, normeMax:10,
+    name:'KFPPA USL', mode:'video', view:'face',
+    note:'Descendre d\'une marche de 30 cm et se réceptionner sur une jambe. Mesure à la première réception, au maximum de flexion du genou.',
+    markers:'genou-bi', div:7.5, // #275-D — norme : KFPPA_NORMES, figée avec le bilan
     photoLabels:['Station bipodale','Valgum dynamique unipodal G','Valgum dynamique unipodal D'],
     photoSides:['','G','D'], showPhotoSlots:true, kfppaPhotos:true, minFrames:2,
-    frameLabels:['Repos bipodal','Réception saut'],
+    frameLabels:['Repos bipodal','Première réception unipodale'],
     target:'Genou', clinicalLabel:'KFPPA (valgus dynamique du genou)',
     measures:[
-      { key:'kfppa', label:'KFPPA SLDJ (valgus dynamique sur drop jump)', norm:'60-140 %', interpretFn:'kfppa' },
+      { key:'kfppa', label:'KFPPA USL (valgus dynamique en réception unipodale)', interpretFn:'kfppa' },
     ],
   },
   // MLA : 3 marqueurs par pied, 2 photos par pied = 4 photos
@@ -4147,17 +4147,59 @@ const TESTS = {
 // Sépare la logique de calcul de la config TESTS pour permettre
 // une boucle générique de génération des conclusions.
 // ══════════════════════════════════════════════════════
+// #275-B — AUCUN REPLI SUR LES VALEURS ENREGISTRÉES POUR LE KFPPA.
+// data.deltaD/deltaG/pctD/pctG ont été calculées avec bipodal.angle, un angle
+// mesuré sur six points À CHEVAL SUR LES DEUX JAMBES. Les relire donnerait un
+// valgus dynamique faux.
+//
+// ORDRE DE GRANDEUR, PAS UNE MESURE : en prenant les points unipodaux de la
+// capture de référence COMME S'ILS ÉTAIENT une frame bipodale, l'écart sur le
+// statique ressort à 2,8° d'un côté et 9,7° de l'autre — soit 55 et 194 points
+// de pourcentage de la norme marche. Aucune frame bipodale réelle n'a été
+// relevée ; ces chiffres situent l'ampleur, ils ne la mesurent pas.
+//
+// Un bilan sans angleD/angleG n'est donc PAS recalculable, et on le dit :
+// aucun degré, aucun pourcentage, aucune interprétation. Rien n'est modifié ni
+// effacé dans les bilans existants — on cesse seulement de relire la valeur
+// fausse. LA DÉCISION EST LOCALE À CHAQUE RENDU : pas d'état partagé, qui
+// resterait vrai d'un bilan au suivant.
+const KFPPA_NON_RECALC = 'valgus dynamique non recalculable (bilan antérieur)';
+// #275-B — message DISTINCT pour une photo bipodale simplement absente. Le
+// précédent ne vaut que pour une photo PRÉSENTE sans valeur par jambe : un
+// nouveau bilan incomplet n'est pas un « bilan antérieur ».
+const KFPPA_BIP_MANQUANTE = 'photo bipodale manquante';
+
+// #275-B — état du créneau bipodal pour UNE jambe, source unique des cinq
+// sites (écran de résultats, alertes, aperçu, lignes et jauge du rapport).
+//   'ok'        : photo présente, valeur de cette jambe présente ;
+//   'nonRecalc' : photo présente (dataUrl OU path — la dataURL est retirée
+//                 après envoi vers le stockage), valeur absente ;
+//   'manquante' : pas de photo bipodale, alors qu'une autre photo du test
+//                 existe ;
+//   'vide'      : aucune photo du tout — test non réalisé, rien à dire.
+// #279 étape 3f — une photo NON ENVOYÉE est PRÉSENTE : elle a été prise, sa
+// valeur existe. Jamais « manquante » ; son exclusion des calculs est dite par
+// l'analyse du genou (_kfppaGenou → sExclu / uExclu), pas par ce message.
+function _kfppaEtatBipodal(photos, side) {
+  const ph = photos || [];
+  const present = (p) => !!(p && (p.dataUrl || p.path || p.nonEnvoyee));
+  const bip = ph.find((p) => p && p.side === '');
+  if (present(bip)) {
+    return (side === 'D' ? bip.angleD : bip.angleG) == null ? 'nonRecalc' : 'ok';
+  }
+  return ph.some(present) ? 'manquante' : 'vide';
+}
+// Message à afficher pour cet état, ou null.
+function _kfppaMessageBipodal(etat) {
+  if (etat === 'nonRecalc') return KFPPA_NON_RECALC;
+  if (etat === 'manquante') return KFPPA_BIP_MANQUANTE;
+  return null;
+}
+
 const MEASURE_COMPUTERS = {
-  // KFPPA : recompute live depuis photos (cohérent avec rendu actuel)
-  kfppa: (t, data, side) => {
-    const _bip = data.photos?.find(p => p.side === '');
-    const _uni = data.photos?.find(p => p.side === side);
-    const _toI = (v) => v == null ? null : (v > 90 ? 180 - v : v);
-    const _bd = _toI(side === 'D' ? _bip?.angleD : _bip?.angleG);
-    const _ud = _toI(_uni?.angle);
-    const _delta = (_bd != null && _ud != null) ? (_ud - _bd) : _toI(side === 'D' ? data.deltaD : data.deltaG);
-    return (_delta != null) ? _delta / t.div : null;
-  },
+  // #275-D — plus d'entrée kfppa : elle rendait Δ ÷ div, un POURCENTAGE.
+  // Les alertes KFPPA viennent de la classe de U (_kfppaAlertes), par une
+  // branche de _collectTestAlerts placée avant la recherche de ce calculateur.
   // MLA : ratio persisté OU fallback recompute depuis photos (mirror du render L4470-4476)
   mla: (t, data, side) => {
     const persisted = side === 'D' ? data.pctD : data.pctG;
@@ -4771,6 +4813,11 @@ async function launchTest(testId) {
       angle: p.angle !== undefined ? p.angle : null,
       angleD: p.angleD !== undefined ? p.angleD : null,
       angleG: p.angleG !== undefined ? p.angleG : null,
+      // #275-A — relu seulement s'il a été écrit : un bilan antérieur reste
+      // sans marqueur, donc lu comme non signé.
+      ...(p.kfppaSigne ? { kfppaSigne: true } : {}),
+      ..._relireImageBrute(p), // #279 étape 3b
+      ...(p.nonEnvoyee ? { nonEnvoyee: true } : {}), // #279 étape 3e
       // #250 — RÈGLE : `markers` reste TOUJOURS un tableau ; l'information
       // « la géométrie est-elle connue ? » vit à CÔTÉ, dans markersConnus,
       // jamais encodée dans la valeur de markers. Un champ qui porterait
@@ -8218,10 +8265,13 @@ function renderVidPhotoGrid() {
   const el = document.getElementById('vid-photo-grid'); if(!el) return;
 
   if(t.kfppaPhotos || t.mobiliteAP) {
-    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    // #273 — .vig-stack remplace le style en ligne display:flex : c'est cette
+    // classe que _majVignetteTaille interroge pour compter les rangs.
+    let html = '<div class="vig-stack">';
     photoSlots.forEach((slot, i) => { html += vidPhotoSlotHTML(slot, i); });
     html += '</div>';
     el.innerHTML = html;
+    _majVignetteTaille();
     return;
   }
   if(t.mlaTest) {
@@ -8230,14 +8280,18 @@ function renderVidPhotoGrid() {
     const slotsG=photoSlots.map((s,i)=>({...s,idx:i})).filter(s=>s.side==='G');
     // #268 — ordre du DOM déjà D puis G : rien n'est déplacé ici. Seule la
     // classe est ajoutée, le style en ligne reste intact.
+    // #273 — le conteneur .photo-pair et son grid-template-columns en ligne
+    // sont INTACTS : c'est la convention côté de #268, livrée en production.
+    // Seules les piles internes et les titres reçoivent leurs classes.
     let html='<div class="photo-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-    html+='<div><div style="font-size:10px;font-weight:700;color:#4a9eff;margin-bottom:5px;">🦶 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
+    html+='<div><div class="vig-col-titre" style="color:#4a9eff;">🦶 Pied Droit</div><div class="vig-stack">';
     slotsD.forEach(slot=>{ html+=vidPhotoSlotHTML(slot,slot.idx); });
     html+='</div></div>';
-    html+='<div><div style="font-size:10px;font-weight:700;color:#3ecf72;margin-bottom:5px;">🦶 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
+    html+='<div><div class="vig-col-titre" style="color:#3ecf72;">🦶 Pied Gauche</div><div class="vig-stack">';
     slotsG.forEach(slot=>{ html+=vidPhotoSlotHTML(slot,slot.idx); });
     html+='</div></div></div>';
     el.innerHTML=html;
+    _majVignetteTaille();
     return;
   }
 
@@ -8250,40 +8304,209 @@ function renderVidPhotoGrid() {
   // ENTIERS ont été déplacés — jamais les libellés, jamais les clés : chaque
   // bloc emporte son titre ET ses photos, filtrées par slot.side.
   // Le rendu final ne change pas : .photo-pair réinverse en CSS.
+  // #273 — branche par défaut : Verrouillage AP (4 captures, 2 rangs) et
+  // Amorti/Propulsion (6 captures, 3 rangs), le cas le plus contraint.
+  // Conteneur .photo-pair et grid-template-columns en ligne INTACTS — #268.
   let html = '<div class="photo-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-  html += '<div><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:5px;">🦵 Pied Droit</div><div style="display:flex;flex-direction:column;gap:5px;">';
+  html += '<div><div class="vig-col-titre" style="color:var(--blue);">🦵 Pied Droit</div><div class="vig-stack">';
   slotsD.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
   html += '</div></div>';
-  html += '<div><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:5px;">🦵 Pied Gauche</div><div style="display:flex;flex-direction:column;gap:5px;">';
+  html += '<div><div class="vig-col-titre" style="color:var(--green);">🦵 Pied Gauche</div><div class="vig-stack">';
   slotsG.forEach(slot => { html += vidPhotoSlotHTML(slot, slot.idx); });
   html += '</div></div></div>';
   el.innerHTML = html;
+  _majVignetteTaille();
 }
 
 
+// #273 — LES STYLES EN LIGNE DE MISE EN BOÎTE SONT PARTIS EN CLASSES.
+// Un style en ligne bat la feuille : tant que width:100% et aspect-ratio:4/3
+// restaient écrits ici, aucune règle CSS n'aurait pu piloter la taille des
+// vignettes, et ajouter !important pour passer devant aurait figé la chose une
+// seconde fois. Ce qui a été DÉPLACÉ, sans rien changer d'autre :
+//   emplacement plein  -> .vig        (position, fond, bordure, rayon, débord)
+//   image              -> .vig-img    (inset:0 + width/height 100% + contain)
+//                         elle était en width:100% + aspect-ratio:4/3 + cover.
+//                         C'est .vig qui porte désormais le rapport, et ce
+//                         rapport est celui du flux (--vid-ar), pas 4/3 :
+//                         une capture 1920×1080 versée en cover dans une boîte
+//                         4/3 perdait un quart de sa largeur, là où sont
+//                         justement les marqueurs des deux jambes en KFPPA.
+//   badge d'angle      -> .vig-ang
+//   bouton supprimer   -> .vig-del
+//   libellé            -> .vig-lbl
+//   emplacement vide   -> .vig-vide + .vig-ico + .vig-vide-lbl
+// Ce qui est RESTÉ en ligne : les onclick, qui sont du comportement et non de
+// la présentation.
+// #275-B — texte d'angle d'un créneau BIPODAL de KFPPA : deux mesures, une par
+// jambe, jamais un angle unique.
+//
+// LA DISCRIMINATION SE FAIT SUR t.kfppaPhotos, PAS SUR « créneau sans côté ».
+// Le test `mobilite` a lui aussi deux créneaux sans côté et écrit lui aussi
+// angleD/angleG : une condition fondée sur le seul côté vide les attraperait et
+// changerait leur affichage, ce qui n'est pas l'objet de ce lot. La table des
+// tests est la bonne source, et elle vaut AUSSI pour les bilans déjà
+// enregistrés, puisqu'elle ne dépend pas de ce qui a été stocké.
+//
+// LES ANCIENS BILANS S'AFFICHENT CORRECTEMENT SANS RECALCUL NI EFFACEMENT :
+// ils portent le nombre faux dans `angle` et les bonnes valeurs dans
+// angleD/angleG. On préfère ces dernières ; le nombre faux cesse d'être lu
+// sans être touché.
+// AUCUN REPLI SUR slot.angle POUR CE CRÉNEAU, MÊME SANS VALEUR D NI G. Retomber
+// sur `angle` y ferait réapparaître le nombre faux des anciens bilans — le
+// défaut qu'on corrige. Sans mesure, on écrit « D — · G — » : l'absence se voit,
+// elle ne se déguise pas en mesure.
+function _kfppaBipodalTexte(t, slot) {
+  if (!t || !t.kfppaPhotos || slot.side) return null;
+  const f = (v) => (v == null ? '—' : v.toFixed(1) + '°');
+  return 'D ' + f(slot.angleD) + ' · G ' + f(slot.angleG);
+}
+
+// #279 étape 3c — calque de la vignette : même classe que l'image, donc même
+// boîte et même object-fit, au même rapport largeur/hauteur (dims).
+function _vigCalqueHTML(slot) {
+  const calque = _calqueCapture(slot);
+  if (calque) return '<img class="vig-img vig-calque" src="'+calque+'" alt="" style="pointer-events:none;"/>';
+  // #279 étape 3d — capture sans points non redessinable : jamais une vignette
+  // d'aspect normal.
+  return slot && slot.imageBrute ? _pointsIndisponiblesHTML() : '';
+}
+
 function vidPhotoSlotHTML(slot, idx) {
-  if(slot.dataUrl) {
-    return '<div style="position:relative;background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);overflow:hidden;">'
-      + '<img src="'+slot.dataUrl+'" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block;"/>'
-      + (slot.angle !== null ? '<span style="position:absolute;top:3px;left:3px;background:rgba(0,0,0,.8);border:1px solid #FFD700;border-radius:2px;font-size:10px;font-weight:700;color:#FFD700;padding:1px 4px;font-family:var(--fm);">'+slot.angle.toFixed(1)+'°</span>' : '')
-      + '<button onclick="deletePhotoSlot('+idx+');renderVidPhotoGrid();" style="position:absolute;top:3px;right:3px;background:rgba(200,30,30,.85);border:none;border-radius:2px;color:#fff;cursor:pointer;padding:0 4px;font-size:10px;">✕</button>'
-      + '<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);font-size:9px;color:#fff;padding:2px 4px;">'+slot.label+'</span>'
+  // #279 étape 3e — créneau enregistré sans son image (photo non envoyée) :
+  // jamais l'emplacement vide d'un créneau jamais capturé. Mention, angle
+  // conservé.
+  // #279 étape 3f — même règle pour une photo ENVOYÉE mais non rechargée (path
+  // sans image, hors connexion) : elle s'affichait en emplacement vide 📷.
+  // Un clic sur la vignette ne capture PLUS : il écrasait la capture, angles
+  // compris, souvent caméra inactive. La recapture passe par le bouton
+  // explicite « Recapturer », soumis à la garde du flux vidéo.
+  if(!slot.dataUrl && (slot.nonEnvoyee || slot.path)) {
+    const bipNE = _kfppaBipodalTexte(TESTS[currentTestId], slot);
+    const angNE = bipNE != null ? bipNE : (slot.angle != null ? slot.angle.toFixed(1)+'°' : '');
+    return '<div class="vig">'
+      + (slot.nonEnvoyee ? _nonEnvoyeeCourtHTML() : _nonRechargeeCourtHTML())
+      + (angNE ? '<span class="vig-ang">'+angNE+'</span>' : '')
+      + '<button class="vig-recap" onclick="event.stopPropagation();captureVidPhotoSlot('+idx+');">Recapturer</button>'
+      + '<span class="vig-lbl">'+slot.label+'</span>'
       + '</div>';
   }
-  return '<div style="background:var(--surf);border:1px dashed var(--bord);border-radius:var(--rs);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="captureVidPhotoSlot('+idx+')">'
-    + '<span style="font-size:16px;">📷</span>'
-    + '<span style="font-size:9px;color:var(--mut);margin-top:3px;text-align:center;padding:0 4px;">'+slot.label+'</span>'
+  if(slot.dataUrl) {
+    const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
+    // L'agrandissement est sur le conteneur ; la croix appelle stopPropagation
+    // pour que supprimer ne déclenche jamais l'agrandissement au passage.
+    return '<div class="vig" onclick="ouvrirVignette('+idx+')">'
+      + '<img class="vig-img" src="'+slot.dataUrl+'"/>'
+      + _vigCalqueHTML(slot) // #279 étape 3c
+      + (bip ? '<span class="vig-ang">'+bip+'</span>'
+             : (slot.angle != null ? '<span class="vig-ang">'+slot.angle.toFixed(1)+'°</span>' : ''))
+      + '<button class="vig-del" onclick="event.stopPropagation();deletePhotoSlot('+idx+');renderVidPhotoGrid();">✕</button>'
+      + '<span class="vig-lbl">'+slot.label+'</span>'
+      + '</div>';
+  }
+  return '<div class="vig-vide" onclick="captureVidPhotoSlot('+idx+')">'
+    + '<span class="vig-ico">📷</span>'
+    + '<span class="vig-vide-lbl">'+slot.label+'</span>'
     + '</div>';
+}
+
+// #273 — agrandissement d'une capture. Il n'existait AUCUNE modale d'image
+// réutilisable dans le projet : les quatre modales présentes sont toutes
+// spécialisées (compte, modules, abonnement, âge podopédiatrie). Celle-ci est
+// volontairement minimale.
+//
+// object-fit:contain est porté par .vig-modal-inner img — jamais cover. La
+// modale sert à vérifier un angle : rogner couperait un marqueur de bord et
+// l'image tronquée n'aurait pas l'air tronquée.
+//
+// Ni zoom ni déplacement : la résolution stockée est 1920, l'afficher en
+// entier suffit à juger. Ce sera un ajout séparé si Scio le demande.
+let _vigEchap = null;
+function ouvrirVignette(idx) {
+  const slot = photoSlots[idx];
+  if (!slot || !slot.dataUrl) return;
+  // PAS DE RETOUR SILENCIEUX SUR UN ÉLÉMENT MANQUANT. Un identifiant renommé
+  // un jour rendrait le clic inopérant sans message ni trace : une fonction
+  // morte qui a l'air normale. On nomme celui qui manque.
+  // #279 étape 3c — le calque n'est PAS obligatoire : un index.html resté en
+  // cache (#141) ne l'a pas, et la modale doit s'ouvrir quand même.
+  const ids = ['modal-vignette', 'vig-modal-img', 'vig-modal-lbl', 'vig-modal-ang'];
+  const els = ids.map((id) => document.getElementById(id));
+  const manquants = ids.filter((id, i) => !els[i]);
+  if (manquants.length) {
+    console.error('#273 ouvrirVignette : balisage de la modale introuvable —', manquants.join(', '));
+    return;
+  }
+  const [m, img, lbl, ang] = els;
+  img.src = slot.dataUrl;
+  // #279 étape 3c — calque des points d'une capture sans points ; retiré sinon,
+  // pour ne jamais laisser celui d'une vignette ouverte avant.
+  const calqueEl = document.getElementById('vig-modal-calque');
+  const calque = _calqueCapture(slot);
+  let calqueAffiche = false;
+  if (calqueEl) {
+    if (calque) { calqueEl.src = calque; calqueEl.hidden = false; calqueAffiche = true; }
+    else { calqueEl.removeAttribute('src'); calqueEl.hidden = true; }
+  }
+  // Une capture sans points qui s'affiche SANS son calque (élément absent,
+  // coordonnées illisibles) le dit : jamais une photo d'aspect normal sans points.
+  lbl.innerHTML = _escHtml(slot.label || '')
+    + (slot.imageBrute && !calqueAffiche ? _pointsIndisponiblesHTML() : '');
+  // #275-B — même règle que la vignette : le créneau bipodal KFPPA affiche
+  // « D x° · G y° », jamais slot.angle.
+  const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
+  const a = bip != null ? bip
+    : (slot.angle !== null && slot.angle !== undefined) ? slot.angle.toFixed(1) + '°' : '';
+  ang.textContent = a;
+  ang.style.display = a ? '' : 'none';
+  // classList, jamais style.display : display:flex vit dans .vig-modal.ouverte.
+  m.classList.add('ouverte');
+  // L'écouteur n'existe QUE pendant l'ouverture : pas de touche Échap captée
+  // en permanence au détriment du reste de l'application.
+  _vigEchap = (e) => { if (e.key === 'Escape') fermerVignette(); };
+  document.addEventListener('keydown', _vigEchap);
+}
+function fermerVignette() {
+  const m = document.getElementById('modal-vignette');
+  if (m) m.classList.remove('ouverte');
+  const img = document.getElementById('vig-modal-img');
+  // removeAttribute plutôt que src='' : une chaîne vide relance une requête
+  // vers la page courante et salit la console.
+  if (img) img.removeAttribute('src');
+  const calqueEl = document.getElementById('vig-modal-calque'); // #279 étape 3c
+  if (calqueEl) { calqueEl.removeAttribute('src'); calqueEl.hidden = true; }
+  if (_vigEchap) { document.removeEventListener('keydown', _vigEchap); _vigEchap = null; }
+}
+// Clic sur le FOND uniquement. e.target === e.currentTarget n'est vrai que si
+// le clic a atterri sur le fond lui-même : un clic sur l'image, sur le libellé
+// ou sur l'angle a une autre cible et ne ferme rien. Sans cette égalité, la
+// modale se refermerait sous le doigt dès qu'on approche un marqueur.
+function _vigFondClic(e) {
+  if (e.target === e.currentTarget) fermerVignette();
+}
+
+// #279 étape 3f — garde capture : JAMAIS de capture sans image vidéo. Caméra
+// « Inactive » ou vidéo non chargée, drawImage produit une image NOIRE et les
+// marqueurs ne sont pas placés : la capture écraserait la précédente, angles
+// compris. Seuls les éléments étaient vérifiés, et ils existent toujours.
+function _fluxVideoPret() {
+  const p = document.getElementById('vid-el');
+  const c = document.getElementById('vid-canvas');
+  return !!(p && c && p.readyState >= 2 && p.videoWidth > 0 && c.width > 0);
 }
 
 function captureVidPhotoSlot(slotIdx) {
   const player = document.getElementById('vid-el');
   const vcanvas = document.getElementById('vid-canvas');
-  if(!player || !vcanvas) { alert('Activez la caméra ou importez une vidéo.'); return; }
+  // #279 étape 3f — refus AVANT toute écriture : le créneau reste inchangé.
+  if(!_fluxVideoPret()) { alert('Activez la caméra ou importez une vidéo.'); return; }
   const t = TESTS[currentTestId];
   const view = t?.view || 'dos';
   const slot = photoSlots[slotIdx];
   const side = slot?.side || '';
+  // #279 étape 3f — une capture repart sans le statut d'envoi de l'ancienne :
+  // un « non envoyée » résiduel exclurait à tort la nouvelle mesure des calculs.
+  if (slot) { delete slot.nonEnvoyee; delete slot.envoiEchoue; }
 
   // Filtrer les marqueurs selon le côté du slot
   // Pour MLA : pas de filtrage (tous les marqueurs sont sans side)
@@ -8296,14 +8519,15 @@ function captureVidPhotoSlot(slotIdx) {
   tmp.width = vcanvas.width; tmp.height = vcanvas.height;
   const ctx = tmp.getContext('2d');
   ctx.drawImage(player, 0, 0, vcanvas.width, vcanvas.height);
-  drawOverlay(ctx, tmp, markersForPhoto, -1, view);
+  // #279 étape 3b — l'image est enregistrée SANS les points : ils sont
+  // redessinés à l'affichage d'après les coordonnées (étape 3c, puis #280).
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
 
   // Calculer l'angle selon le côté
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
-  // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
-  const mlaType = t?.markers==='mla' ? 'mla' : (t?.markers==='genou-bi' ? 'kfppa' : (t?.type||''));
+  // KFPPA : incl (180-rawAng) signé valgus+/varus− en vue de face (#275-A)
+  const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
@@ -8319,6 +8543,8 @@ function captureVidPhotoSlot(slotIdx) {
   photoSlots[slotIdx].markers = JSON.parse(JSON.stringify(markersForPhoto));
   photoSlots[slotIdx].dims = { w: vcanvas.width, h: vcanvas.height };
   photoSlots[slotIdx].markersConnus = true;
+  photoSlots[slotIdx].imageBrute = true; // #279 étape 3b
+  photoSlots[slotIdx].dessin = _dessinCapture();
 
   // Mobilité AP : stocker angles D et G séparément
   if(t?.mobiliteAP) {
@@ -8338,10 +8564,32 @@ function captureVidPhotoSlot(slotIdx) {
     const mkrG = vidMarkers.filter(m=>m.side==='G');
     photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,'kfppa',mkrD);
     photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,'kfppa',mkrG);
+    // #275-B — LE CRÉNEAU BIPODAL NE PORTE PLUS D'ANGLE UNIQUE.
+    //
+    // Ce créneau n'a pas de côté, donc `markersForPhoto` vaut tous les
+    // marqueurs — les six, D et G confondus. calcAngle3 applique alors sa règle
+    // des gabarits à quatre points et mesure sur [1], [2], [3] : un sommet À
+    // CHEVAL SUR LES DEUX JAMBES. Le nombre obtenu n'a aucun sens
+    // géométrique, et il partait dans le rapport du patient — relevé par le
+    // praticien : 124,0° sur une station bipodale jambes droites.
+    //
+    // Les deux vraies mesures viennent d'être calculées juste au-dessus, par
+    // jambe. On efface donc l'angle unique plutôt que de le laisser cohabiter
+    // avec elles : une valeur fausse qui reste lisible finit par être lue.
+    photoSlots[slotIdx].angle = null;
   }
+
+  // #275-A — kfppaSigne. Créneau bipodal : le signe porte sur angleD/angleG,
+  // calculés par jambe ci-dessus ; créneau unipodal : sur l'angle du créneau.
+  const _sl = photoSlots[slotIdx];
+  _poserKfppaSigne(_sl, (t?.kfppaPhotos && !side)
+    ? (_kfppaSigneCalcule('kfppa', view, 'D', vidMarkers.filter(m=>m.side==='D'), _sl.angleD)
+      || _kfppaSigneCalcule('kfppa', view, 'G', vidMarkers.filter(m=>m.side==='G'), _sl.angleG))
+    : _kfppaSigneCalcule(mlaType, view, side, markersForPhoto, corrAng));
 
   renderVidPhotoGrid();
   updateResults();
+  return _envoyerCaptureStorage(photoSlots[slotIdx]); // #279 étape 3e
 }
 
 function renderPhotoGrid() {
@@ -8369,10 +8617,21 @@ function renderPhotoGrid() {
 }
 
 function photoSlotHTML(slot, idx) {
+  // #279 étape 3e — même règle que la vignette pour un créneau non envoyé.
+  // #279 étape 3f — le clic ne capture plus ; bouton « Recapturer » explicite.
+  if (!slot.dataUrl && slot.nonEnvoyee) {
+    return `<div class="photo-slot has-photo">
+      ${_nonEnvoyeeCourtHTML()}
+      <button class="vig-recap" onclick="event.stopPropagation();capturePhotoSlot(${idx});">Recapturer</button>
+      ${slot.angle!=null?`<span class="ph-angle">${slot.angle.toFixed(1)}°</span>`:''}
+      <span class="ph-label">${slot.label}</span>
+    </div>`;
+  }
   if (slot.dataUrl) {
     const clrAng = slot.angle!==null ? getAngleColor(slot.angle) : '#FFD700';
+    const calque = _calqueCapture(slot); // #279 étape 3c — même boîte (.photo-slot img)
     return `<div class="photo-slot has-photo">
-      <img src="${slot.dataUrl}"/>
+      <img src="${slot.dataUrl}"/>${calque ? `<img class="ph-calque" src="${calque}" alt="" style="pointer-events:none;"/>` : (slot.imageBrute ? _pointsIndisponiblesHTML() : '') /* #279 étape 3d */}
       <button class="ph-del" onclick="deletePhotoSlot(${idx})">✕</button>
       ${slot.angle!==null?`<span class="ph-angle" style="color:${clrAng};border-color:${clrAng};">${slot.angle.toFixed(1)}°</span>`:''}
       <span class="ph-label">${slot.label}</span>
@@ -8386,6 +8645,14 @@ function photoSlotHTML(slot, idx) {
 
 function deletePhotoSlot(i) {
   photoSlots[i].dataUrl=null; photoSlots[i].angle=null; photoSlots[i].path=null;
+  // #275-B — angleD et angleG DOIVENT partir avec le reste. Ils n'étaient pas
+  // effacés : après suppression d'une photo bipodale de KFPPA, la vignette
+  // aurait continué d'afficher les deux mesures d'une capture qui n'existe
+  // plus. Le défaut ne se voyait pas tant que seul `angle` était affiché.
+  photoSlots[i].angleD=null; photoSlots[i].angleG=null;
+  delete photoSlots[i].kfppaSigne; // #275-A — plus de capture, plus de signe
+  delete photoSlots[i].imageBrute; delete photoSlots[i].dessin; // #279 étape 3b
+  delete photoSlots[i].nonEnvoyee; delete photoSlots[i].envoiEchoue; delete photoSlots[i]._jetonEnvoi; // #279 étape 3e
   renderPhotoGrid(); updateResults();
 }
 
@@ -8412,12 +8679,12 @@ function capturePhotoSlot(slotIdx) {
   tmp.width = canvas.width; tmp.height = canvas.height;
   const ctx = tmp.getContext('2d');
   ctx.drawImage(canvas, 0, 0);
-  drawOverlay(ctx, tmp, markersForPhoto, -1, view);
+  // #279 étape 3b — image SANS points, comme captureVidPhotoSlot.
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
   const rawAng = calcAngle3(markersForPhoto);
   // MLA : angle brut (pas de correction)
-  // KFPPA : stocker incl (180-rawAng) sans signe latéral (signe appliqué à l'affichage)
-  const mlaType = t?.markers==='mla' ? 'mla' : (t?.markers==='genou-bi' ? 'kfppa' : (t?.type||''));
+  // KFPPA : incl (180-rawAng) signé valgus+/varus− en vue de face (#275-A)
+  const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
   const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
   photoSlots[slotIdx].dataUrl = dataUrl;
   photoSlots[slotIdx].angle = corrAng;
@@ -8432,13 +8699,19 @@ function capturePhotoSlot(slotIdx) {
   photoSlots[slotIdx].markers = JSON.parse(JSON.stringify(markersForPhoto));
   photoSlots[slotIdx].dims = { w: canvas.width, h: canvas.height };
   photoSlots[slotIdx].markersConnus = true;
+  photoSlots[slotIdx].imageBrute = true; // #279 étape 3b
+  photoSlots[slotIdx].dessin = _dessinCapture();
   if(t && t.mobiliteAP) {
     const mkrD = liveMarkers.filter(m=>m.side==='D');
     const mkrG = liveMarkers.filter(m=>m.side==='G');
     photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t.type||'',mkrD);
     photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t.type||'',mkrG);
   }
+  // #275-A — kfppaSigne, même règle que captureVidPhotoSlot. Ce mode n'a pas
+  // de créneau bipodal KFPPA : seul l'angle du créneau compte.
+  _poserKfppaSigne(photoSlots[slotIdx], _kfppaSigneCalcule(mlaType, view, side, markersForPhoto, corrAng));
   renderPhotoGrid(); updateResults();
+  return _envoyerCaptureStorage(photoSlots[slotIdx]); // #279 étape 3e
 }
 
 // ══════════════════════════════════════════════════════
@@ -8448,9 +8721,18 @@ async function toggleCam() {
   if (camStream) { stopCam(); return; }
   try {
     const selCam = document.getElementById('cam-select')?.value;
+    // #272-A — 1280×720 -> 1920×1080. Raison MESURÉE, pas préférence : au
+    // cadrage hanche-au-sol d'un KFPPA, environ 95 cm sur la hauteur de
+    // l'image, une pastille de 5 mm ne fait que 4 à 6 px en 720p. Or entre
+    // 4 et 6 px le détecteur ne la trouve qu'UNE FOIS SUR NEUF à UNE FOIS
+    // SUR DEUX selon le calage sous-pixel — tableau mesuré au-dessus de
+    // sizeMin dans _detectReflectiveBlobs. En 1080p la même pastille fait
+    // 6 à 9 px, donc au-dessus du seuil de fiabilité.
+    // « ideal » et jamais « exact » : une caméra incapable de 1080p doit
+    // continuer à fonctionner en dégradé plutôt qu'échouer à s'ouvrir.
     camStream = await navigator.mediaDevices.getUserMedia(selCam
-      ? {video:{deviceId:{exact:selCam},width:{ideal:1280},height:{ideal:720}},audio:false}
-      : {video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},audio:false});
+      ? {video:{deviceId:{exact:selCam},width:{ideal:1920},height:{ideal:1080}},audio:false}
+      : {video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},audio:false});
     const canvas = document.getElementById('ph-canvas');
     const wrap = document.getElementById('ph-wrap');
     const vEl = document.createElement('video');
@@ -8603,11 +8885,16 @@ async function toggleVCam() {
   if(vidStream) { stopVCam(); return; }
   try {
     const selCam = document.getElementById('vcam-select')?.value;
+    // #272-A — 1280×720 -> 1920×1080, même raison mesurée que la caméra
+    // photo : en 720p une pastille de 5 mm fait 4 à 6 px au cadrage de
+    // travail, plage où la détection est INTERMITTENTE selon le calage
+    // sous-pixel. « ideal » conservé : une caméra qui ne sait pas faire
+    // 1080p doit continuer en dégradé.
     const constraints = {
       audio: false,
       video: selCam
-        ? {deviceId:{exact:selCam}, width:{ideal:1280}, height:{ideal:720}}
-        : {facingMode:'environment', width:{ideal:1280}, height:{ideal:720}}
+        ? {deviceId:{exact:selCam}, width:{ideal:1920}, height:{ideal:1080}}
+        : {facingMode:'environment', width:{ideal:1920}, height:{ideal:1080}}
     };
     vidStream=await navigator.mediaDevices.getUserMedia(constraints);
     const player=document.getElementById('vid-el');
@@ -8615,6 +8902,8 @@ async function toggleVCam() {
     player.srcObject=vidStream; player.play();
     player.onloadedmetadata=()=>{
       vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
+      _majVidRatio(player); // #269 publie le rapport reel du flux
+      _majVidLayout(); // #273 chrome PUIS vignettes — l ordre importe
       document.getElementById('vid-info').textContent=`Live ${vcanvas.width}×${vcanvas.height}`;
       document.getElementById('btn-vrec').style.display='';
       document.getElementById('btn-vauto').style.display='';
@@ -8646,6 +8935,8 @@ function loadVidFile(input) {
   player.srcObject=null; player.src=URL.createObjectURL(file);
   player.onloadedmetadata=()=>{
     vcanvas.width=player.videoWidth||640; vcanvas.height=player.videoHeight||360;
+    _majVidRatio(player); // #269 publie le rapport reel du flux
+    _majVidLayout(); // #273 chrome PUIS vignettes — l ordre importe
     document.getElementById('vid-info').textContent=`${player.videoWidth}×${player.videoHeight} · ${player.duration.toFixed(1)}s`;
     document.getElementById('btn-vauto').style.display='';
     document.getElementById('btn-vsnap').style.display='';
@@ -12473,6 +12764,8 @@ function toggleRec() {
       };
       player.onloadedmetadata=()=>{
         vcanvas.width=player.videoWidth; vcanvas.height=player.videoHeight;
+        _majVidRatio(player); // #269 publie le rapport reel du flux
+        _majVidLayout(); // #273 chrome PUIS vignettes — l ordre importe
         document.getElementById('vid-info').textContent=`Enreg. · ${player.duration.toFixed(1)}s`;
         setupVidCanvas(player,vcanvas);
       };
@@ -12491,6 +12784,8 @@ function toggleVAutoDetect(){
 // CAPTURE FRAME VIDEO
 // ══════════════════════════════════════════════════════
 function captureFrame() {
+  // #279 étape 3f — garde capture (cf. _fluxVideoPret) : aucune image ajoutée.
+  if(!_fluxVideoPret()) { alert('Activez la caméra ou importez une vidéo.'); return; }
   const player=document.getElementById('vid-el');
   const vcanvas=document.getElementById('vid-canvas');
   const view=TESTS[currentTestId]?.view||'face';
@@ -12700,6 +12995,306 @@ function _applyCapView() {
       el._wheelBound = true;
     }
   });
+  // #270 — molette SIMPLE sur le lecteur : défilement image par image.
+  const vw = document.getElementById('vid-wrap');
+  if (vw && !vw._wheelStepBound) {
+    vw.addEventListener('wheel', _capWheelStep, { passive: false });
+    vw._wheelStepBound = true;
+  }
+  // #269 — le chrome dépend de la largeur de fenêtre : les barres de boutons
+  // passent à la ligne quand elle rétrécit. Remesurer au redimensionnement,
+  // sinon la borne resterait calée sur la mise en page du premier rendu.
+  // #273 — L'ORDRE EST IMPOSÉ : _majVidChrome PUIS _majVignetteTaille.
+  // La seconde divise la hauteur disponible, qui vaut innerHeight moins
+  // --vid-chrome. Appelée avant, elle travaillerait sur le repli de la feuille
+  // au lieu de la valeur mesurée — relevé chez Scio : 368 au lieu de 448, donc
+  // 80 px de hauteur de trop répartis sur les vignettes, donc une colonne trop
+  // large. C'est cet ordre inversé qui a produit --vign-col-w = 1054 px.
+  if (!window._vidLayoutBound) {
+    window.addEventListener('resize', _majVidLayout);
+    window._vidLayoutBound = true;
+  }
+  _majVidLayout();
+}
+
+// #273 — l'ordre des deux mesures, en UN SEUL endroit. Deux appels séparés à
+// recopier sur chaque site, c'est deux occasions de les inverser.
+function _majVidLayout() {
+  _majVidChrome();
+  _majVignetteTaille();
+}
+
+// #269 — publie le rapport d'aspect RÉEL du flux dans --vid-ar, que la règle
+// CSS de #vid-wrap emploie pour borner sa largeur d'après la hauteur
+// disponible. On ne suppose pas 16/9 : les contraintes de caméra sont en
+// « ideal » et non « exact », et une vidéo importée peut avoir n'importe quel
+// format.
+//
+// APPELÉ AUX TROIS SITES DU LECTEUR, ET NULLE PART AILLEURS : caméra en
+// direct (toggleVCam), vidéo importée (loadVidFile), relecture du clip
+// enregistré (toggleRec). Le fichier dimensionne d'autres canevas à partir
+// d'autres flux — la galerie photo, la caméra photo, l'empreinte podo — et
+// ceux-là n'ont rien à voir avec #vid-wrap : y appeler cette fonction
+// publierait sur le conteneur du lecteur le format d'une image étrangère.
+function _majVidRatio(player) {
+  const w = player && player.videoWidth;
+  const h = player && player.videoHeight;
+  if (!w || !h) return;
+  // #273 — ÉCRITE SUR #mode-video, PLUS SUR #vid-wrap. Les vignettes de la
+  // colonne de droite prennent désormais ce rapport pour ne rien rogner, et
+  // #vid-photo-slots est une SŒUR du lecteur, pas sa descendante : une
+  // variable posée sur #vid-wrap ne lui serait jamais parvenue. Établi par
+  // équilibrage des balises — #vid-left ferme avant que #vid-photo-slots
+  // n'ouvre, les deux à la profondeur 1 sous #mode-video.
+  // #vid-wrap continue de la lire : il ouvre à la profondeur 2 sous
+  // #mode-video, donc il en hérite.
+  const mv = document.getElementById('mode-video');
+  if (mv) mv.style.setProperty('--vid-ar', String(w / h));
+  // #273 — CETTE FONCTION N'APPELLE PLUS _majVignetteTaille. Elle s'exécute
+  // avant que _majVidChrome n'ait posé --vid-chrome, donc le calcul serait
+  // fait sur le repli de la feuille. Les sites appellent _majVidLayout, qui
+  // enchaîne les deux dans le bon ordre.
+}
+
+// #273 — taille des vignettes de la colonne de captures.
+//
+// AUCUN NOMBRE DE RANGS N'EST ÉCRIT ICI. Les rangs sont COMPTÉS DANS LE DOM
+// RENDU : chaque pile est un .vig-stack, ses enfants sont les emplacements.
+// Un gabarit qui changerait de nombre de captures serait suivi sans retouche.
+// C'est aussi la raison pour laquelle on ne lit pas TESTS[] : le tableau des
+// dispositions déduit du code s'était révélé faux sur quatre cas sur cinq.
+//
+// LE SENS DU CALCUL EST : hauteur -> largeur -> largeur de colonne.
+// La hauteur disponible ne dépend d'aucune largeur, la hauteur d'une vignette
+// s'en déduit par division, sa largeur par --vid-ar, et la largeur de colonne
+// par le nombre de colonnes. À AUCUN MOMENT ON NE MESURE UNE LARGEUR RENDUE :
+// c'est ce qui empêche la boucle « la colonne s'élargit -> le lecteur rétrécit
+// -> la colonne s'élargit ».
+//
+// UNE CIRCULARITÉ INTERNE A ÉTÉ LEVÉE DANS LA FEUILLE, PAS ICI. On retranche
+// plus bas la hauteur RENDUE de l'intitulé « Assigner les captures… » et du
+// titre de colonne. Or la hauteur d'un texte dépend de la largeur qui lui est
+// donnée — à 240 px l'intitulé tenait sur deux lignes, à 400 px sur une seule —
+// et cette largeur est justement --vign-col-w, calculée à partir de lui. La
+// mesure aurait dépendu de son propre résultat : pas d'oscillation, puisque
+// rien ne relance la fonction en boucle, mais deux appels successifs auraient
+// rendu deux mises en page différentes selon l'ordre des événements.
+// .vig-entete et .vig-col-titre sont donc en white-space:nowrap, avec ellipse
+// en cas de débordement. LEUR HAUTEUR NE DÉPEND PLUS DE LA LARGEUR.
+// Rétablir le repli à la ligne sur l'une de ces deux classes rouvrirait le
+// défaut, et il ne se verrait pas.
+//
+// COUPLAGE RÉSIDUEL, ASSUMÉ ET NON RÉSOLU : élargir la colonne rétrécit
+// #vid-left, ce qui peut faire passer la rangée de boutons à la ligne et donc
+// augmenter le chrome mesuré par _majVidChrome. Rien ici ne relance ce calcul,
+// donc il n'y a pas d'oscillation ; mais après un tel repli la hauteur
+// disponible est surestimée jusqu'au prochain redimensionnement. Le seuil de
+// 1 px plus bas évite en outre de réécrire les variables pour un cheveu.
+const _VIGN_H_MIN = 56;   // plancher de lisibilité, en pixels
+function _majVignetteTaille() {
+  const mv = document.getElementById('mode-video');
+  const slots = document.getElementById('vid-photo-slots');
+  if (!mv || !slots) return;
+  const piles = slots.querySelectorAll('.vig-stack');
+  const cols = piles.length;
+  if (!cols) return;
+  // Le nombre de rangs est celui de la pile la plus fournie : en deux colonnes
+  // D et G peuvent être dépareillées si une capture manque.
+  let rangs = 0;
+  piles.forEach((p) => { if (p.children.length > rangs) rangs = p.children.length; });
+  // GARDE : aucun emplacement rendu. On ne divise pas, on n'écrit rien, et les
+  // replis de la feuille continuent de s'appliquer.
+  if (rangs <= 0) return;
+
+  const cs = getComputedStyle(mv);
+  const ar = parseFloat(cs.getPropertyValue('--vid-ar')) || 1.7778;
+  const chrome = parseFloat(cs.getPropertyValue('--vid-chrome')) || 368;
+
+  // Hauteur disponible : la MÊME expression que celle dont la feuille borne le
+  // lecteur, donc la colonne fait exactement la hauteur du lecteur.
+  let dispo = window.innerHeight - chrome;
+
+  // Ce qui, dans la colonne, n'est pas une vignette : son propre intitulé, et
+  // le titre « Pied Droit / Pied Gauche » des dispositions à deux colonnes.
+  // Mesurés, jamais supposés.
+  for (const enfant of slots.children) {
+    if (enfant.id === 'vid-photo-grid') continue;
+    const s = getComputedStyle(enfant);
+    if (s.display === 'none') continue;
+    dispo -= enfant.getBoundingClientRect().height
+      + parseFloat(s.marginTop) + parseFloat(s.marginBottom);
+  }
+  const titre = slots.querySelector('.vig-col-titre');
+  if (titre) {
+    const st = getComputedStyle(titre);
+    dispo -= titre.getBoundingClientRect().height
+      + parseFloat(st.marginTop) + parseFloat(st.marginBottom);
+  }
+
+  const ecartRang = parseFloat(getComputedStyle(piles[0]).rowGap) || 0;
+  const paire = slots.querySelector('.photo-pair');
+  const ecartCol = paire ? (parseFloat(getComputedStyle(paire).columnGap) || 0) : 0;
+
+  let h = (dispo - (rangs - 1) * ecartRang) / rangs;
+  if (!isFinite(h)) return;
+  // PLANCHER : sous cette hauteur les vignettes ne servent plus à vérifier
+  // quoi que ce soit. On plafonne et #vid-photo-slots défile pour lui-même,
+  // plutôt que de rendre illisible ce que Scio doit justement regarder.
+  if (h < _VIGN_H_MIN) h = _VIGN_H_MIN;
+
+  let largeur = h * ar;
+  let colW = cols * largeur + (cols - 1) * ecartCol;
+  if (!isFinite(colW) || colW <= 0) return;
+
+  // ── TÉMOIN : LA COLONNE NE DOIT JAMAIS ÉCRASER LE LECTEUR ──────────────
+  // Relevé chez Scio avant cette garde : --vign-col-w = 1054,4 px, #vid-left
+  // réduit à 0, #vid-wrap à 2×2. min-width:0 autorisait le lecteur à
+  // disparaître, et rien ne plafonnait la colonne. Un écrasement silencieux
+  // du lecteur ne doit plus être possible.
+  //
+  // mv.clientWidth EST UNE LARGEUR MESURÉE, et ce n'est pas une entorse à la
+  // règle de non-circularité : c'est la largeur de la RANGÉE, imposée par
+  // .cap-main. #mode-video est un conteneur de niveau bloc, sa largeur vient
+  // de son parent et non de ses enfants. La colonne n'y a aucune influence.
+  const rangee = mv.clientWidth;
+  const ecartRangee = parseFloat(getComputedStyle(mv).columnGap) || 0;
+  // La part réservée au lecteur est DÉCLARÉE DANS LA FEUILLE, sur #mode-video,
+  // et relue ici. Écrite deux fois, elle finirait par diverger — et une
+  // divergence entre le max-width de la feuille et le plafonnement du script
+  // se manifesterait par une colonne qui saute d'une largeur à l'autre.
+  const part = parseFloat(getComputedStyle(mv).getPropertyValue('--vid-left-min-part')) || 0.3333;
+  const minLecteur = rangee * part;
+  const reste = rangee - colW - ecartRangee;
+  if (rangee > 0 && reste < minLecteur) {
+    const colMax = rangee - minLecteur - ecartRangee;
+    console.warn(
+      '#273 — colonne de captures plafonnée : ' + colW.toFixed(1) + ' px demandés, '
+      + colMax.toFixed(1) + ' px accordés. Le lecteur garde ' + minLecteur.toFixed(1)
+      + ' px (un tiers de la rangée de ' + rangee.toFixed(1) + ' px).'
+    );
+    colW = colMax;
+    if (colW <= 0) return; // rangée absurde : on n'écrit rien
+    // La hauteur suit la largeur accordée, sinon les vignettes seraient
+    // rognées par le conteneur au lieu de rétrécir.
+    largeur = (colW - (cols - 1) * ecartCol) / cols;
+    h = largeur / ar;
+    if (h < _VIGN_H_MIN) {
+      // Les deux bornes sont incompatibles sur cette fenêtre. LE LECTEUR NE
+      // CÈDE PAS : on garde le plancher de lisibilité et la colonne défile
+      // pour elle-même, horizontalement s'il le faut.
+      console.warn(
+        '#273 — fenêtre trop étroite pour ' + cols + ' colonne(s) de vignettes : '
+        + h.toFixed(1) + ' px de haut calculés, plancher à ' + _VIGN_H_MIN
+        + ' px. La colonne défile ; le lecteur n\'est pas réduit.'
+      );
+      h = _VIGN_H_MIN;
+    }
+  }
+
+  // Seuil de 1 px : ne pas réécrire pour une variation invisible.
+  const hAct = parseFloat(cs.getPropertyValue('--vign-h'));
+  const wAct = parseFloat(cs.getPropertyValue('--vign-col-w'));
+  if (!(Math.abs(hAct - h) < 1)) mv.style.setProperty('--vign-h', h.toFixed(1) + 'px');
+  if (!(Math.abs(wAct - colW) < 1)) mv.style.setProperty('--vign-col-w', colW.toFixed(1) + 'px');
+}
+
+// #269 — publie dans --vid-chrome la hauteur RÉELLEMENT occupée par tout ce qui
+// doit rester visible en même temps que le lecteur. La règle CSS de #vid-wrap
+// retranche cette valeur de 100vh et multiplie le reste par --vid-ar.
+//
+// LA VALEUR 288 DU DÉPART ÉTAIT DÉRIVÉE DU BALISAGE, ET ELLE ÉTAIT FAUSSE.
+// Relevé sur la machine de Scio : fenêtre de 767 px, chrome réel de 367,5 —
+// 136 px d'en-tête, fil d'Ariane et note au-dessus de #mode-video, 45,5 pour
+// la barre Zone/contraste, 186 pour la lecture, la timeline et les curseurs.
+// Il restait 399,5 px pour un lecteur qui en occupait 433,4 : il débordait de
+// 34 px. Une hauteur rendue dépend des polices, de la largeur de fenêtre et du
+// navigateur — elle ne se lit pas dans la source, elle se mesure.
+//
+// CE QUI EST AU-DESSUS N'EST PAS ÉNUMÉRÉ : la position du lecteur dans le
+// document le donne d'un coup, en-tête compris, sans risquer d'oublier un
+// élément. Ce qui est en dessous l'est, parce qu'il faut y faire un tri.
+//
+// #frames-strip et #vid-photo-slots sont VOLONTAIREMENT EXCLUS : ils pèsent
+// 1835 px à eux deux et vivent sous la ligne de flottaison. Les inclure ferait
+// tendre la hauteur disponible vers zéro.
+//
+// NON CIRCULAIRE, ET C'EST MESURÉ : la hauteur du lecteur n'entre dans aucun
+// terme. Un relevé imposant quatre largeurs au lecteur — 260, 520, 900 px et
+// la règle de la feuille — a montré la somme des frères stable à 0 px près.
+// C'est .cap-main qui variait de 286 px, parce que sa hauteur EST celle de son
+// contenu ; elle est donc écartée. window.innerHeight, lui, ne dépend de rien.
+const _VID_SOUS_LIGNE = ['frames-strip', 'vid-photo-slots'];
+function _majVidChrome() {
+  const wrap = document.getElementById('vid-wrap');
+  const mv = document.getElementById('mode-video');
+  if (!wrap || !mv) return;
+  // LES FRÈRES SONT PRIS SUR LE PARENT RÉEL DU LECTEUR, JAMAIS SUR
+  // #mode-video : depuis #273 le lecteur est enveloppé dans #vid-left, et
+  // lire les enfants de #mode-video ne donnerait plus que deux colonnes. Le
+  // parent réel reste juste, quelle que soit la profondeur d'enveloppement.
+  const parent = wrap.parentElement;
+  if (!parent) return;
+  // Décalage du lecteur depuis le haut du DOCUMENT : insensible au défilement,
+  // et il englobe tout ce qui le précède sans qu'on ait à le lister.
+  let chrome = wrap.getBoundingClientRect().top + window.scrollY;
+  let apres = false;
+  for (const el of parent.children) {
+    if (el === wrap || el.contains(wrap)) { apres = true; continue; }
+    if (!apres) continue; // déjà compté dans le décalage ci-dessus
+    if (_VID_SOUS_LIGNE.indexOf(el.id) !== -1) continue;
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden') continue;
+    chrome += el.getBoundingClientRect().height
+      + parseFloat(s.marginTop) + parseFloat(s.marginBottom);
+  }
+  // Une mesure absurde ne doit pas écraser le repli de la feuille.
+  if (!isFinite(chrome) || chrome <= 0 || chrome >= window.innerHeight) return;
+  // POSÉE SUR #mode-video, PAS SUR LE LECTEUR : la colonne des captures est
+  // une SŒUR du lecteur et non sa descendante, donc elle ne verrait pas une
+  // variable écrite sur #vid-wrap. Un ancêtre commun la rend lisible aux deux.
+  mv.style.setProperty('--vid-chrome', chrome.toFixed(1) + 'px');
+}
+
+// #270 — Défilement de la vidéo enregistrée à la molette, pour choisir les
+// instants de capture sans viser la timeline.
+//
+// IL RÉUTILISE stepFrame, la fonction des boutons −1 et +1 : il n'y a qu'UNE
+// façon d'avancer d'une image, et deux implémentations divergeraient.
+//
+// Il ne fait rien avec Ctrl ou ⌘ : la molette modifiée reste au zoom, dont
+// _capWheelZoom continue de s'occuper. Les deux gestionnaires cohabitent sur
+// le même élément, chacun sortant quand l'autre est concerné.
+//
+// Il ne fait rien non plus sans vidéo chargée : en direct sur la caméra il
+// n'y a pas d'instants à parcourir, et la page doit continuer de défiler
+// normalement.
+//
+// preventDefault est indispensable, sinon la page défile en même temps que la
+// vidéo — et il exige {passive:false} à la liaison, sans quoi le navigateur
+// l'ignore silencieusement.
+function _capWheelStep(e) {
+  if (e.ctrlKey || e.metaKey) return; // zoom : affaire de _capWheelZoom
+  const p = document.getElementById('vid-el');
+  // Une source de flux (caméra) n'a rien à parcourir ; une durée non finie
+  // non plus.
+  //
+  // LE SEUIL EST 1, PAS 2, ET C'EST MESURÉ. Un relevé de 32 événements molette
+  // sur une vidéo de 8,3 s montre readyState oscillant entre 4 et 1 : écrire
+  // currentTime déclenche un déplacement, pendant lequel readyState retombe à
+  // HAVE_METADATA. Avec un seuil à 2, l'événement suivant sortait ici sans
+  // appeler preventDefault — deux molettes sur trois perdues, et la PAGE
+  // DÉFILAIT à leur place. Le défaut se voyait d'un seul côté : en reculant la
+  // page était déjà en haut, donc rien ne bougeait ; en avançant elle partait.
+  //
+  // HAVE_METADATA (1) suffit à ce gestionnaire, qui ne fait qu'écrire
+  // currentTime : à ce stade duration est connue, ce que la condition suivante
+  // vérifie de toute façon. Exiger HAVE_CURRENT_DATA (2) demandait une image
+  // décodée dont on n'a pas besoin pour déplacer la tête de lecture.
+  if (!p || p.srcObject || p.readyState < 1 || !isFinite(p.duration) || p.duration <= 0) return;
+  e.preventDefault();
+  // Molette vers le bas = avancer. Si le sens paraît inversé à l'usage,
+  // c'est ce signe-là qu'il faut changer, et lui seul.
+  stepFrame(e.deltaY > 0 ? 1 : -1);
 }
 
 // #237 — recentrage après changement de zoom. Sans lui, l'agrandissement part
@@ -12837,6 +13432,33 @@ function findMarkerAt(x, y, markers, cw) {
 }
 
 // Détection automatique des marqueurs réfléchissants
+// #272-A — Borne HAUTE de taille, proportionnelle à la définition de l'image.
+//
+// POURQUOI ELLE NE PEUT PAS RESTER ABSOLUE. Le compte de blob est un nombre
+// d'échantillons, donc une SURFACE : il croît comme le carré de la définition.
+// Une borne fixe à 200 convenait au 1280×720 ; en 1920×1080, la même pastille
+// vue au même cadrage compte 2,25 fois plus d'échantillons et se ferait
+// rejeter comme TROP GROSSE. On déplacerait le défaut d'un bout à l'autre.
+//
+// CALAGE : 200 exactement en 1280×720, pour ne rien changer au comportement
+// à cette définition. C'est la garde de non-régression, fixée par un test.
+//
+// LE PLANCHER À 200 N'EST PAS UNE COMMODITÉ. Cette fonction reçoit parfois
+// les dimensions d'une ZONE de calage, pas de l'image entière : sans plancher,
+// une petite zone rendrait une borne minuscule et rejetterait les pastilles
+// qu'elle est censée isoler. Le plancher garantit que la borne ne peut que
+// CROÎTRE par rapport à aujourd'hui, jamais se resserrer.
+//
+// LIMITE CONNUE, non traitée par ce lot : en 1080p AVEC une zone posée, la
+// borne retombe au plancher de 200 alors que les pastilles y sont plus
+// grosses. Corriger cela demanderait de transmettre la définition de l'image
+// entière depuis les appelants — hors du périmètre de #272-A, qui n'éprouve
+// qu'une hypothèse à la fois.
+function _blobSizeMaxFor(W, H) {
+  const REF = 1280 * 720;
+  return Math.max(200, Math.round((200 * (W * H)) / REF));
+}
+
 // #111 — Détecteur partagé de pastilles réfléchissantes. Flood-fill near-white
 // blobs ; filtres tight par défaut pour matcher les pastilles argent/blanc (et
 // exclure les gros reflets sol clair / bandes). Réutilisé par detectMarkersAuto
@@ -12846,8 +13468,41 @@ function _detectReflectiveBlobs(data, W, H, opts) {
   const o = opts || {};
   const lumMin = o.lumMin !== undefined ? o.lumMin : sensThr;
   const satMax = o.satMax !== undefined ? o.satMax : 25;
+  // #272-A — sizeMin reste ABSOLU : c'est un plancher de bruit, pas une
+  // mesure d'objet.
+  //
+  // CE QUE CE PLANCHER LAISSE PASSER, MESURÉ et non déduit. Le remplissage
+  // avance par pas de 2 : les échantillons sont sur une grille dont l'origine
+  // dépend du balayage, donc le compte d'un petit disque dépend de son CALAGE
+  // SOUS-PIXEL. Mesuré sur disques synthétiques, neuf calages par diamètre
+  // (tests/detection-taille-blob.test.mjs) :
+  //     ≤ 3 px  jamais détecté
+  //       4 px  détecté 1 fois sur 9
+  //       5 px  5 fois sur 9
+  //       6 px  8 fois sur 9
+  //     ≥ 7 px  toujours détecté
+  //
+  // C'EST LE CŒUR DU DÉFAUT QUE #272-A ÉPROUVE. Entre 4 et 6 px, la détection
+  // est INTERMITTENTE, et le calage sous-pixel change à chaque image dès que
+  // le corps bouge : le point lâche son capteur puis le retrouve au hasard.
+  //
+  // LES PASTILLES NE FONT PAS TOUTES LA MÊME TAILLE : de 5 à 10 mm selon le
+  // fournisseur et le repère, soit un facteur 2 en diamètre et 4 en surface.
+  // En 1280×720, au cadrage hanche-au-sol, une pastille de 10 mm fait 8 à
+  // 12 px — fiable — quand une de 5 mm en fait 4 à 6 — intermittente. Cela
+  // explique que la détection réussisse sur certains points et échoue sur
+  // d'autres DANS LA MÊME capture, ce qui ressemble à un défaut capricieux
+  // alors que c'est une question de taille apparente.
+  //
+  // La falaise HAUTE est gardée par le même fichier de test : en 1280×720 un
+  // disque passe jusqu'à 30 px et est rejeté à 34 ; en 1920×1080, grâce à la
+  // borne relative, jusqu'à 46 px et rejeté à 50.
+  //
+  // Une dérivation continue (π·d²/16 échantillons) annonçait un rejet net en
+  // dessous de 5,05 px : elle est FAUSSE à ces tailles, où la discrétisation
+  // domine. Ne pas la réintroduire — la mesure fait foi.
   const sizeMin = o.sizeMin !== undefined ? o.sizeMin : 5;
-  const sizeMax = o.sizeMax !== undefined ? o.sizeMax : 200;
+  const sizeMax = o.sizeMax !== undefined ? o.sizeMax : _blobSizeMaxFor(W, H);
   const step = o.step !== undefined ? o.step : 2;
   // Tolérance flood-fill : -35 lum / +30 sat pour autoriser le bord du blob
   // (gradient) sans noyer en cas de pastille brillante mais bord moins net.
@@ -13262,10 +13917,67 @@ function snapMarkersToReflectiveBlobs() {
   }
 }
 
+// ─── #271 PROPORTIONS DES DÉCORATIONS DU MARQUEUR ───────────────────────────
+//
+// CE DESSIN NE RESTE PAS À L'ÉCRAN. drawOverlay est appelée sur un canevas
+// temporaire par captureVidPhotoSlot, capturePhotoSlot et captureFrame, dont
+// le toDataURL alimente photoSlots[].dataUrl — l'image que le rapport affiche.
+// Ce qui est tracé ici PART DANS LES DOSSIERS REMIS AUX PATIENTS. Le rapport
+// ne rejoue pas drawOverlay à l'impression, mais c'est drawOverlay qui a
+// produit l'image. Toucher à ces valeurs n'est pas une affaire d'affichage.
+//
+// POURQUOI CES DEUX COEFFICIENTS. Le diviseur du rayon était passé de 72 à 288,
+// mais lineWidth restait figé à 1,5 px et le halo planché à 2 px : les
+// décorations n'avaient pas suivi. Mesuré à 1920 et f=0,55, l'anneau couvrait
+// 5,8 à 8,8 px de diamètre quand une pastille de 8 mm en fait 6 à 9 en 1080p.
+// Un anneau BLANC posé exactement sur le bord d'une pastille BLANCHE : le
+// marqueur se confondait avec ce qu'il désigne, et le seul geste qui compte —
+// voir d'un coup d'œil si le point est sur la pastille ou à côté — devenait
+// impossible. Part colorée 24,7 %, trait 32,0 %.
+//
+// ILS SONT DÉRIVÉS, PAS CHOISIS : ce sont les rapports qu'avaient l'épaisseur
+// et le halo dans l'état ÷72, au point de travail 1920 / f=0,55, où r valait
+// 14,667 px pour lw=1,5 et halo=2,2.
+//
+// RÉSERVE, RELEVÉE ET NON MASQUÉE : lw/r n'était PAS constant en ÷72 — il vaut
+// 0,1534 à 1280 / f=0,55. Cette dérivation privilégie donc 1920. halo/r, lui,
+// valait 0,1500 exactement partout où le plancher de 2 px n'agissait pas.
+const MKR_TRAIT_PART = 0.1023;
+// Plancher : en dessous de 1 px un trait ne se rend pas — il s'étale en gris
+// sur deux pixels au lieu de marquer un bord.
+//
+// ET C'EST LUI QUI GOUVERNE PRESQUE PARTOUT — mesuré sur ce code, pas supposé.
+// 0,1023 × r ne dépasse 1 px que si r > 9,78, ce qui n'arrive qu'à 1920 avec
+// f=1,50 (trait 1,02). Sur les SEPT autres combinaisons des quatre positions du
+// curseur et des deux définitions, l'épaisseur vaut exactement 1 px.
+// Autrement dit : le trait est de fait CONSTANT à 1 px sur toute la plage
+// utile, et MKR_TRAIT_PART ne se réveille qu'à l'extrémité haute du curseur en
+// 1080p. Ce n'est pas un défaut — 1 px reste bien plus fin que les 1,5 px
+// figés d'avant, et c'était l'objet du lot — mais il ne faut pas croire le mot
+// « proportionnel » : si l'on veut une vraie progression, c'est ce plancher
+// qu'il faudra discuter, pas le coefficient.
+const MKR_TRAIT_MIN = 1;
+const MKR_HALO_PART = 0.15;
+// Le sélectionné garde le rapport d'épaisseur qu'il avait : 2,5 contre 1,5.
+const MKR_TRAIT_SEL = 2.5 / 1.5;
+// JAMAIS DE BLANC SUR UN MARQUEUR NON SÉLECTIONNÉ : la cible est blanche.
+// Cette teinte n'est pas nouvelle — elle sert déjà au contour des textes de
+// _drawMarkersOnly. Pas de palette parallèle.
+const MKR_TRAIT_COUL = 'rgba(0,0,0,.7)';
+const MKR_TRAIT_COUL_SEL = '#f5a623';
+
 // Dessin overlay avec SEGMENTS RECTANGULAIRES (style OPS)
-function drawOverlay(ctx, canvas, markers, selIdx, view) {
+// #279 étape 3a — `opts` facultatif : { taille, opacite, testId }. Sans lui,
+// les réglages courants (markerSizeFactor, markerOpacity, currentTestId) —
+// dessin strictement inchangé. Avec lui, les valeurs D'UNE CAPTURE : c'est ce
+// qui permet de redessiner ses points plus tard (vignette, rapport) avec
+// l'aspect qu'ils avaient, quels que soient les réglages du moment.
+function drawOverlay(ctx, canvas, markers, selIdx, view, opts) {
+  const _taille = opts && opts.taille != null ? opts.taille : markerSizeFactor;
+  const _opacite = opts && opts.opacite != null ? opts.opacite : markerOpacity;
+  const _testId = opts && opts.testId != null ? opts.testId : currentTestId;
   const W=canvas.width;
-  const segW=Math.max(8,W/55); // largeur du rectangle segment
+  const segW=_mkrSegW(W); // largeur du rectangle segment — formule partagée
 
   // #111-Zone — la zone de calage posée reste visible sur le canvas vidéo
   // (et seulement lui : drawOverlay sert aussi aux canvas photo).
@@ -13278,7 +13990,7 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     const col=side==='D'?'rgba(74,158,255,0.7)':side==='G'?'rgba(62,207,114,0.7)':'rgba(167,139,250,0.7)';
     // Dessiner rectangle entre chaque paire consécutive
     for(let i=0;i<grp.length-1;i++){
-      drawSegmentRect(ctx,grp[i],grp[i+1],segW,col);
+      drawSegmentRect(ctx,grp[i],grp[i+1],segW,col,_opacite);
     }
   });
 
@@ -13290,9 +14002,45 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
   // dominerait visuellement le point lui-même).
   markers.forEach((m,i)=>{
     if(m.x===null) return;
-    const r = Math.max(4, (W / 72) * markerSizeFactor);
-    const haloPad = Math.max(2, 4 * markerSizeFactor);
+    // #271 — diviseur 72 -> 288. MESURÉ : à 72, le diamètre dessiné valait
+    // 1,53 % de la largeur d'image, soit 29 px sur 1920, quand une pastille
+    // de 8 mm au cadrage de travail en fait 5 à 7. Quatre à six fois trop
+    // gros : le cercle masquait la pastille qu'il désigne.
+    //
+    // Valeurs obtenues à 1920, diamètre en pixels de canevas :
+    //     f=0,30 -> 4,0   f=0,55 -> 7,3   f=1,00 -> 13,3   f=1,50 -> 20,0
+    //
+    // LE PLANCHER PASSE DE 4 À 2 px DE RAYON, et ce n'est pas un détail.
+    // Mesuré : avec le diviseur 288 et un plancher à 4, celui-ci devient
+    // actif sous f ≈ 0,60 à 1920 et f ≈ 0,90 à 1280 — le curseur serait
+    // inerte sur la moitié basse de sa course, et le défaut de 0,55 rendrait
+    // 8,0 px écrasés par le plancher au lieu des 7,3 visés. À 2 px, plus
+    // aucune plage morte à 1920 : le plancher se libère exactement au minimum
+    // du curseur. Il reste une plage morte de 0,30 à 0,45 à 1280.
+    //
+    // Le plancher garde sa raison d'être — sur un petit canevas, 640 px de
+    // large, f=0,3 donnerait 0,67 px et le point disparaîtrait. À 2 px de
+    // rayon il fait 4 px de diamètre, plus le halo d'au moins 2 px de chaque
+    // côté : 8 px visibles.
+    //
+    // LE CERCLE DESSINÉ EST DÉSORMAIS PLUS PETIT QUE LA ZONE DE PRÉHENSION,
+    // et c'est voulu. Le test de clic (findMarkerAt) garde cw/40 avec un
+    // plancher de 12 px : c'est lui qui rend les points attrapables au doigt.
+    // NE PAS « corriger » cet écart en alignant les deux.
+    //
+    // CE DIVISEUR EST UNE APPROXIMATION, PAS UNE VÉRITÉ. Il sera remplacé par
+    // le diamètre MESURÉ de la pastille quand la calibration automatique
+    // existera : le logiciel connaîtra alors l'échelle réelle de
+    // l'installation, et le cercle pourra coller à la pastille plutôt qu'à
+    // une fraction arbitraire de la largeur d'image.
+    const r = Math.max(2, (W / 288) * _taille);
     const isSel=selIdx===i;
+    // #271 — épaisseur et halo PROPORTIONNELS AU RAYON. Ils étaient figés à
+    // 1,5 px et planchés à 2 px, hérités du diviseur 72, et écrasaient un point
+    // quatre fois plus petit. Le plancher s'applique AVANT le facteur du
+    // sélectionné, pour que celui-ci reste plus épais même au minimum.
+    const trait = Math.max(MKR_TRAIT_MIN, MKR_TRAIT_PART * r) * (isSel ? MKR_TRAIT_SEL : 1);
+    const haloPad = MKR_HALO_PART * r;
     ctx.save();
     // Halo : alpha déjà très bas (0.15/0.3) — conservé tel quel pour repère.
     ctx.beginPath(); ctx.arc(m.x, m.y, r + haloPad, 0, 2 * Math.PI);
@@ -13302,43 +14050,468 @@ function drawOverlay(ctx, canvas, markers, selIdx, view) {
     // pleine intensité pour conserver le repère exact du centre.
     ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
     ctx.fillStyle=m.color;
-    ctx.globalAlpha = markerOpacity;
+    ctx.globalAlpha = _opacite;
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle=isSel?'#f5a623':'#fff'; ctx.lineWidth=isSel?2.5:1.5; ctx.stroke();
+    ctx.strokeStyle=isSel?MKR_TRAIT_COUL_SEL:MKR_TRAIT_COUL; ctx.lineWidth=trait; ctx.stroke();
     ctx.restore();
-    ctx.fillStyle='#fff';
-    ctx.font = `bold ${Math.max(8, (W / 60) * markerSizeFactor)}px DM Sans,sans-serif`;
-    ctx.fillText(m.name, m.x + r + 3, m.y + 3);
   });
 
-  // Arc d'angle pour chaque groupe de 3
-  ['D','G',''].forEach(side=>{
-    const grp=markers.filter(m=>m.side===side&&_isPlacedPt(m));
-    if(grp.length>=3){
-      const ang=calcAngle3(grp);
-      if(ang!==null){
-        const B=grp.length>=4?grp[2]:grp[1]; // AP: sommet=CalcaSup(idx2), sinon centre
-        const grpPts=grp;
-        const _mlaT=TESTS[currentTestId]?.markers==='mla'?'mla':(TESTS[currentTestId]?.type||"");
-        const corrAng=computeCorrectedAngle(ang, side, view, _mlaT, grpPts);
-        const r2=Math.max(16,W/24);
-        const a1=Math.atan2(grp[0].y-B.y,grp[0].x-B.x),a2=Math.atan2(grp[2].y-B.y,grp[2].x-B.x);
-        const col=side==='D'?'#4a9eff':side==='G'?'#3ecf72':'#FFD700';
-        ctx.save(); ctx.beginPath(); ctx.arc(B.x,B.y,r2,a1,a2,false);
-        ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.stroke(); ctx.restore();
-        ctx.fillStyle=col; ctx.font=`bold 13px DM Mono,monospace`;
-        ctx.fillText(corrAng.toFixed(1)+'°',B.x+r2+4,B.y-3);
-      }
-    }
+  // ─── #271-B PLACEMENT : LA MESURE D'ABORD, L'ÉTIQUETTE ENSUITE ───────────
+  //
+  // SUR CES IMAGES, LA VALEUR D'ANGLE EST LA MESURE ET LA LÉGENDE EST UNE
+  // ÉTIQUETTE. SI L'UNE DOIT CÉDER, C'EST L'ÉTIQUETTE. Et ce dessin ne reste
+  // pas à l'écran : captureVidPhotoSlot, capturePhotoSlot et captureFrame
+  // l'incrustent dans photoSlots[].dataUrl, l'image que le rapport affiche.
+  // Ce qui est tracé ici part dans les dossiers remis aux patients.
+  //
+  // RÈGLE DE PLACEMENT, donnée par le praticien et non déduite du code :
+  // l'arc et sa valeur vont DANS LE CREUX de l'angle ; les LÉGENDES VIVENT À
+  // L'EXTÉRIEUR de leur jambe, toujours, quelle que soit la position des
+  // genoux — elles ne peuvent donc plus se rencontrer au milieu.
+  //
+  // LE CALCUL EST DANS _mkrDisposition, fonction PURE : drawOverlay ne fait
+  // plus que dessiner ce qu'elle renvoie. C'est ce qui rend le placement
+  // vérifiable par un test sur la configuration réelle de la capture.
+  const _ANG_ECART = Math.max(4, W / 240);
+  const pxAng = _mkrFontAngle(W);
+  // LEUR TAILLE EST INCHANGÉE — W/60 × facteur, plancher 8. Les réduire dans la
+  // proportion des cercles avait été envisagé puis ABANDONNÉ : elles seraient
+  // tombées au plancher, soit une dizaine de pixels de canevas, environ 2 px à
+  // l'écran. La règle de placement rend la réduction inutile.
+  //
+  // CONSTAT À PART, NON TRAITÉ ICI : ces tailles sont en pixels de CANEVAS et
+  // la lisibilité dépend de l'échelle d'affichage, que cette fonction ignore.
+  // À 1920 rendus sur un lecteur de 700 px, 17,6 px de canevas font 6,4 px à
+  // l'écran. Même nature que le plancher de findMarkerAt. Tâche séparée.
+  const pxLbl = Math.max(8, (W / 60) * _taille);
+  const rPoint = Math.max(2, (W / 288) * _taille);
+
+  // Les textes d'angle sont calculés ici parce qu'ils dépendent de TESTS et de
+  // computeCorrectedAngle ; la disposition, elle, n'a besoin que des chaînes.
+  const _textesAngle = new Map();
+  ['D','G',''].forEach((side) => {
+    const grp = markers.filter((m) => m.side === side && _isPlacedPt(m));
+    if (grp.length < 3) return;
+    const ang = calcAngle3(grp);
+    if (ang === null) return;
+    const _mlaT = _mkrTypeTest(TESTS[_testId]);
+    _textesAngle.set(side, computeCorrectedAngle(ang, side, view, _mlaT, grp).toFixed(1) + '°');
   });
+
+  const dispo = _mkrDisposition(ctx, markers, W, _textesAngle, pxAng, pxLbl, rPoint, _ANG_ECART);
+
+  // ── Arcs et valeurs d'angle ──
+  dispo.valeurs.forEach((v) => {
+    const col = v.side === 'D' ? '#4a9eff' : v.side === 'G' ? '#3ecf72' : '#FFD700';
+    ctx.save();
+    ctx.beginPath();
+    // Le sens de parcours vient de _mkrCreux : il met l'arc du côté choisi.
+    ctx.arc(v.arc.x, v.arc.y, v.arc.r, v.arc.a1, v.arc.a2, v.arc.sens);
+    ctx.strokeStyle = col; ctx.lineWidth = v.arc.lw; ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.font = `bold ${pxAng}px DM Mono,monospace`;
+    ctx.fillStyle = col; ctx.textAlign = v.aligne; ctx.textBaseline = 'middle';
+    ctx.fillText(v.texte, v.x, v.y);
+    ctx.restore();
+  });
+
+  // ── Légendes EN DERNIER, pour n'être jamais recouvertes ──
+  ctx.save();
+  ctx.font = `bold ${pxLbl}px DM Sans,sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  dispo.legendes.forEach((l) => {
+    ctx.textAlign = l.aligne;
+    ctx.fillText(l.texte, l.x, l.y);
+  });
+  ctx.restore();
+}
+
+// Centre d'un groupe de points. Sert à définir « l'extérieur » par la position
+// RÉELLE des deux groupes, et non par une moitié d'image : le patient n'est pas
+// forcément centré dans le cadre.
+function _mkrCentre(grp) {
+  let sx = 0, sy = 0;
+  for (const p of grp) { sx += p.x; sy += p.y; }
+  return { x: sx / grp.length, y: sy / grp.length };
+}
+
+// DIRECTION DE L'EXTÉRIEUR, calculée et non supposée.
+//   deux jambes -> le côté opposé au centre de l'autre groupe ;
+//   un seul groupe -> le côté opposé au centre de l'image.
+//
+// LE GROUPE SANS CÔTÉ, celui des tests MLA, tombe dans le second cas : il n'a
+// pas de controlatéral, donc son extérieur est calculé par rapport au milieu de
+// l'image. C'est le seul choix disponible, et il est sans conséquence puisqu'il
+// n'y a alors aucune autre légende avec laquelle se rencontrer.
+//
+// PUREMENT HORIZONTALE : « extérieur » est un côté gauche/droite. Prendre le
+// vecteur entre les deux centres introduirait une composante verticale dès que
+// les jambes ne sont pas à la même hauteur, et ferait dériver les légendes.
+// À égalité stricte, un côté fixe — arbitraire mais constant d'une image à
+// l'autre, ce qui est tout ce qu'on demande ici.
+function _mkrExterieur(grp, autreGrp, W) {
+  const cx = _mkrCentre(grp).x;
+  const refX = autreGrp ? _mkrCentre(autreGrp).x : W / 2;
+  return { x: cx - refX >= 0 ? 1 : -1, y: 0 };
+}
+
+// Position de la légende du SOMMET quand l'arc est lui aussi à l'extérieur :
+// elle se range AU-DELÀ DE L'ARC, du côté extérieur, à la hauteur du sommet.
+//
+// ELLE SE RANGEAIT AUPARAVANT APRÈS LA BOÎTE DE LA VALEUR. Cela n'a plus de
+// sens depuis que la valeur vit DANS le disque : la légende se serait posée à
+// l'intérieur de l'arc, par-dessus lui. C'est le rayon qui fait désormais
+// référence — celui de l'arc EFFECTIF, agrandi le cas échéant.
+function _mkrAncreSommet(arc, ext) {
+  return { x: arc.x + ext.x * arc.r, y: arc.y };
+}
+
+// SAUF QUAND LA VALEUR S'EST REPLIÉE HORS DE L'ARC. Elle se pose alors sur la
+// bissectrice, au-delà du rayon ; si l'arc est lui-même du côté extérieur, la
+// bissectrice pointe vers l'extérieur — précisément là où _mkrAncreSommet
+// range la légende. Les deux se recouvreraient. Dans ce seul cas, la légende
+// repart d'après la BOÎTE MESURÉE de la valeur, comme avant #271-C.
+function _mkrAncreApresValeur(boiteValeur, ext) {
+  const cy = (boiteValeur.y0 + boiteValeur.y1) / 2;
+  return ext.x >= 0 ? { x: boiteValeur.x1, y: cy } : { x: boiteValeur.x0, y: cy };
+}
+
+// DISPOSITION COMPLÈTE — fonction pure, ne dessine rien.
+function _mkrDisposition(ctx, markers, W, textesAngle, pxAng, pxLbl, rPoint, ecart) {
+  const grps = new Map();
+  ['D','G',''].forEach((s) => {
+    const g = markers.filter((m) => m.side === s && _isPlacedPt(m));
+    if (g.length >= 3) grps.set(s, g);
+  });
+
+  const geo = new Map();
+  grps.forEach((grp, side) => {
+    const B = grp.length >= 4 ? grp[2] : grp[1]; // AP: sommet=CalcaSup(idx2)
+    let autre = null;
+    grps.forEach((g2, s2) => { if (s2 !== side && !autre) autre = g2; });
+    const creux = _mkrCreux(
+      { x: grp[0].x - B.x, y: grp[0].y - B.y },
+      { x: grp[2].x - B.x, y: grp[2].y - B.y },
+      B, autre ? _mkrCentre(autre) : null
+    );
+    if (creux) geo.set(side, { grp, B, creux, ext: _mkrExterieur(grp, autre, W) });
+  });
+
+  const r2 = Math.max(16, W / 24);
+  const segW = _mkrSegW(W); // MÊME formule que les bandes dessinées
+  const valeurs = [];
+  ctx.font = `bold ${pxAng}px DM Mono,monospace`;
+  geo.forEach((g, side) => {
+    const texte = textesAngle.get(side);
+    if (texte == null) return;
+    // LA VALEUR VIT DANS SON DEMI-CERCLE : _mkrValeurDansArc donne la distance
+    // au sommet le long de la bissectrice, et le rayon de l'arc — agrandi si
+    // le texte ne tenait pas, ou repli hors de l'arc si même l'agrandissement
+    // ne suffit pas.
+    const v = _mkrValeurDansArc(
+      ctx, texte, pxAng, r2, MKR_ARC_LW, segW, g.creux.sinDemi,
+      Math.min(g.creux.nu, g.creux.nv)
+    );
+    const x = g.B.x + g.creux.bx * v.d;
+    const y = g.B.y + g.creux.by * v.d;
+    valeurs.push({
+      side, texte, x, y, aligne: 'center',
+      agrandi: v.agrandi, dehors: v.dehors,
+      boite: _mkrBoite(ctx, texte, x, y, 'center', pxAng),
+      arc: {
+        x: g.B.x, y: g.B.y, r: v.rayon, lw: MKR_ARC_LW, sens: g.creux.sens,
+        a1: Math.atan2(g.grp[0].y - g.B.y, g.grp[0].x - g.B.x),
+        a2: Math.atan2(g.grp[2].y - g.B.y, g.grp[2].x - g.B.x),
+      },
+    });
+  });
+
+  ctx.font = `bold ${pxLbl}px DM Sans,sans-serif`;
+  const legendes = [];
+  markers.forEach((m) => {
+    if (m.x === null) return;
+    const g = geo.get(m.side);
+    const ext = g ? g.ext : { x: 1, y: 0 };
+    const val = valeurs.find((v) => v.side === m.side);
+    let ancre = m, base = rPoint + ecart;
+    // CAS DE LA ROTULE. Le sommet, et seulement lui, et seulement quand l'arc
+    // est LUI AUSSI du côté extérieur : sa légende passe après la valeur.
+    // Quand l'arc est à l'intérieur, rien de spécial — la légende va à
+    // l'extérieur, à côté du point, comme toutes les autres.
+    const arcDehors = g && g.creux.bx * ext.x > 0;
+    if (g && val && m === g.B && arcDehors) {
+      // Après le RAYON dans le cas courant ; après la BOÎTE DE LA VALEUR quand
+      // celle-ci s'est repliée hors de l'arc, sur cette même bissectrice.
+      ancre = val.dehors ? _mkrAncreApresValeur(val.boite, ext) : _mkrAncreSommet(val.arc, ext);
+      base = ecart;
+    }
+    // La garde controlatérale RESTE, en filet pour les cas extrêmes — jambes
+    // croisées ou quasi superposées. Avec la règle de l'extérieur elle ne
+    // devrait plus se déclencher sur une acquisition normale ; `decale` et
+    // `raccourci` disent si elle l'a fait.
+    const p = _mkrPlaceLegende(
+      ctx, m.name, ancre, ext, base, pxLbl,
+      valeurs.filter((v) => v.side !== m.side)
+    );
+    legendes.push({ nom: m.name, side: m.side, sommet: !!(g && m === g.B), arcDehors: !!arcDehors, ...p });
+  });
+
+  return { geo, valeurs, legendes };
+}
+
+// ─── #271-B OUTILS DE PLACEMENT ─────────────────────────────────────────────
+
+// LA VALEUR D'ANGLE SUIT LA LARGEUR D'IMAGE. Elle était à « bold 13px » FIXE,
+// donc en pixels de canevas, alors que les légendes suivent W/60 et l'arc W/24.
+// #272-A ayant fait passer la capture de 1280 à 1920, elle a perdu un tiers de
+// sa proportion sans que rien ne le signale : 13/1280 = 1,0156 % de la largeur
+// contre 13/1920 = 0,6771 %. On lui rend AU MOINS la proportion qu'elle avait
+// à 1280 — 19,5 px à 1920 — le plancher gardant les 13 px d'origine en dessous.
+const MKR_ANG_W_REF = 1280;
+const MKR_ANG_PX_REF = 13;
+
+// UNE SEULE SOURCE POUR DEUX EMPLOIS. La largeur de la bande de segment sert à
+// la dessiner (drawSegmentRect) ET à en écarter la valeur d'angle ; l'épaisseur
+// de l'arc sert à le tracer ET à calculer la place libre dans son disque. Deux
+// écritures séparées de la même grandeur finiraient par diverger, et le défaut
+// serait une valeur posée sur une bande — invisible tant que les deux nombres
+// coïncident encore.
+function _mkrSegW(W) {
+  return Math.max(8, W / 55);
+}
+const MKR_ARC_LW = 2.5;
+function _mkrFontAngle(W) {
+  return Math.max(MKR_ANG_PX_REF, (W / MKR_ANG_W_REF) * MKR_ANG_PX_REF);
+}
+
+// SEUIL DE DÉVIATION, en SINUS de l'angle de déviation : |u × v| / (|u|·|v|).
+// Sans dimension, donc indépendant de la définition de l'image et de la
+// longueur des segments — contrairement au produit vectoriel brut.
+//
+// JUSTIFIÉ PAR LES DEUX JAMBES RÉELLES du relevé #272-B : la jambe D est à
+// 0,0621 (3,56° de déviation), la jambe G à 0,00124 (0,071°). Un facteur 50
+// les sépare. Le seuil de 0,02 — soit 1,15° — laisse la première très au-dessus
+// et la seconde très en dessous, sans être calé sur ni l'une ni l'autre.
+//
+// D'OÙ VIENT 0,02 : de la précision de pose d'un marqueur, que j'estime à
+// ±2 px — c'est la seule entrée choisie de tout ce calcul. Sur un segment de
+// 200 px cela fait 0,01 radian d'incertitude angulaire ; on prend le double.
+// Une jambe G à 0,00124 est donc indiscernable d'une jambe droite : décider
+// d'un côté par le SIGNE du produit vectoriel reviendrait à décider par le
+// bruit, et un pixel sur le genou ferait sauter l'arc d'une image à l'autre.
+const MKR_SIN_DEV_MIN = 0.02;
+
+// Direction du creux, et sens de parcours de l'arc.
+//
+// AU PASSAGE DU SEUIL, IL RESTE UN SAUT, ET JE NE LE CACHE PAS. Si la jambe se
+// fléchit lentement vers l'INTÉRIEUR pendant une vidéo, le côté choisi passe de
+// « extérieur » à « concavité » au franchissement de 1,15°, et l'arc bascule une
+// fois. Ce qui a été supprimé, c'est le battement autour de zéro, là où le bruit
+// vit ; il subsiste une bascule unique et monotone, à une déviation désormais
+// signifiante. L'éliminer tout à fait demanderait de se souvenir du choix de
+// l'image précédente, ce que cette fonction ne peut pas faire : elle est sans
+// état et sert aussi aux captures uniques.
+function _mkrCreux(u, v, B, autreB) {
+  const nu = Math.hypot(u.x, u.y), nv = Math.hypot(v.x, v.y);
+  if (!nu || !nv) return null;
+  const croix = u.x * v.y - u.y * v.x;
+  const sinDev = Math.abs(croix) / (nu * nv);
+  // Normale au segment proximal : toujours bien conditionnée.
+  const n = { x: -u.y / nu, y: u.x / nu };
+  let cote;
+  if (sinDev < MKR_SIN_DEV_MIN) {
+    // Trop droit pour que le signe veuille dire quelque chose. On place du côté
+    // OPPOSÉ À L'AUTRE JAMBE : stable, et cela éloigne l'arc du membre voisin.
+    // Sans autre jambe, un côté fixe — arbitraire mais constant.
+    cote = autreB
+      ? (n.x * (B.x - autreB.x) + n.y * (B.y - autreB.y) >= 0 ? 1 : -1)
+      : 1;
+  } else {
+    cote = croix >= 0 ? 1 : -1;
+  }
+  // Le sens de parcours découle du côté : cote=+1 -> horaire (false).
+  const sens = cote < 0;
+  let bx, by;
+  const sx = u.x / nu + v.x / nv, sy = u.y / nu + v.y / nv;
+  const ns = Math.hypot(sx, sy);
+  if (sinDev < MKR_SIN_DEV_MIN || ns < 1e-9) {
+    bx = n.x * cote; by = n.y * cote;
+  } else {
+    bx = sx / ns; by = sy / ns;
+  }
+  // cos de l'angle intérieur, et sinus du DEMI-angle : c'est lui qui donne la
+  // distance d'un point de la bissectrice aux deux segments — d × sin(θ/2).
+  const cos = (u.x * v.x + u.y * v.y) / (nu * nv);
+  const sinDemi = Math.sqrt(Math.max(0, (1 - cos) / 2));
+  return { bx, by, croix, sinDev, cote, sens, cos, sinDemi, nu, nv, stable: sinDev >= MKR_SIN_DEV_MIN };
+}
+
+// Boîte englobante d'un texte, MESURÉE par measureText et jamais estimée.
+function _mkrBoite(ctx, texte, x, y, aligne, hauteur) {
+  const w = ctx.measureText(texte).width;
+  const x0 = aligne === 'right' ? x - w : aligne === 'center' ? x - w / 2 : x;
+  return { x0, y0: y - hauteur / 2, x1: x0 + w, y1: y + hauteur / 2 };
+}
+
+// ─── LA VALEUR D'ANGLE VIT DANS SON DEMI-CERCLE ─────────────────────────────
+//
+// Posée AU-DELÀ de l'arc, elle sortait du disque de son genou. Quand les deux
+// genoux pointent vers l'extérieur, les deux arcs passent à l'intérieur, entre
+// les jambes, et les deux valeurs se retrouvaient face à face au milieu.
+// MESURÉ sur la troisième capture : rotules à 245 px, arcs de 80 px de rayon,
+// 85 px libres entre eux. Les textes RÉELLEMENT DESSINÉS y sont « -1.9° » à
+// droite et « 12.7° » à gauche — le signe est porté par D, pas par G — et
+// leurs boîtes se recouvraient de 38,0 px. Placées dans leur disque, elles
+// laissent 94 px. (Un premier calcul avait donné 27,3 px : il employait
+// « 1.9° » et « 12.7° », c'est-à-dire les valeurs de l'encadré, sans le signe.)
+//
+// DEUX BORNES OPPOSÉES, toutes deux calculées :
+//   dMin — la valeur ne doit pas se poser sur la BANDE du segment. Un point de
+//     la bissectrice à distance d est à d × sin(θ/2) de chaque segment ; il
+//     faut donc d ≥ (demi-bande + demi-diagonale du texte) / sin(θ/2).
+//     La demi-bande vient de segW, LU dans drawOverlay et passé en argument :
+//     Math.max(8, W/55), soit 34,9 px à 1920, donc 17,45 de demi-bande.
+//   dMax — la boîte doit tenir ENTIÈRE dans le disque sans toucher l'arc :
+//     d ≤ rayon − épaisseur de l'arc − demi-diagonale du texte.
+//
+// On prend d = dMax : la valeur se colle à l'arc par l'intérieur, donc au plus
+// loin du sommet et des segments.
+//
+// SI LES DEUX BORNES SE CROISENT, C'EST L'ARC QUI S'AGRANDIT, JAMAIS LE TEXTE
+// QUI RAPETISSE — il garde la proportion qu'il avait à 1280, acquise plus haut.
+// Mesuré à 1920 sur la jambe G de la troisième capture : « 1.9° », « 12.7° » et
+// « -1.9° » tiennent dans 80 px ; « -12.7° », six caractères, ne tient pas et
+// porte l'arc à 87,5 px ; « -123.4° » le porte à 97,9.
+//
+// L'AGRANDISSEMENT NE FAIT PAS SE CROISER LES ARCS sur cette capture : 80 et
+// 87,5 pour 245 px d'écart, soit 77,5 px libres ; même avec « -123.4° » des deux
+// côtés, 195,8 contre 245.
+//
+// LIMITE, ET ELLE N'EST PAS TRAITÉE : sous 2 × rayon d'écart entre rotules —
+// 160 px ici — les deux disques se chevauchent, et sous environ 155 px les deux
+// valeurs peuvent de nouveau se toucher. Rien ne l'empêche alors : la garde
+// controlatérale ne déplace que les LÉGENDES, jamais les valeurs. Deux genoux
+// si proches supposent des jambes quasi superposées ; le cas n'a pas été vu.
+//
+// ─── TROIS EXIGENCES QUI NE TIENNENT PAS TOUJOURS ENSEMBLE ─────────────────
+//   la valeur exige un rayon MINIMAL pour tenir dans le disque ;
+//   l'arc ne doit pas dépasser la longueur du segment le plus court, sinon il
+//     sort au-delà des marqueurs d'extrémité ;
+//   le texte ne rapetisse jamais sous la proportion qu'il avait à 1280.
+//
+// QUAND LE MINIMAL DÉPASSE LE MAXIMAL, C'EST LE PLACEMENT QUI CÈDE, ni le
+// texte ni l'arc : l'arc garde son rayon maximal et la valeur repasse À
+// L'EXTÉRIEUR, sur la bissectrice, comme avant. Jamais de valeur qui déborde
+// silencieusement sur un segment ou sur l'arc.
+//
+// LE CAS TYPIQUE EST LE MLA, et il n'est pas marginal : l'angle d'arche tourne
+// entre 130 et 150°, donc les valeurs y ont trois chiffres — « 143.2° » y est
+// la norme, pas un pire cas. Mesuré à 1920 : l'arc s'agrandit alors à 89,0 px
+// (150°), 90,5 (140°) et 92,5 (130°). LE REPLI SE DÉCLENCHE sous une longueur
+// de segment de 98,9 / 100,5 / 102,7 px respectivement.
+//
+// NON VÉRIFIÉ, ET JE NE PEUX PAS LE VÉRIFIER ICI : je n'ai aucun relevé de
+// coordonnées MLA. La borne empêche l'arc de sortir de l'arche, mais le seuil
+// exact dépend de la longueur réelle des segments d'arche, qui reste à mesurer.
+//
+// CETTE BORNE NE LIMITE QUE L'AGRANDISSEMENT, PAS LE RAYON DE BASE — c'est ce
+// que fait Math.max, et c'est délibéré. Sur un segment plus court que le rayon
+// de base, l'arc dépasse déjà aujourd'hui le marqueur d'extrémité : défaut
+// PRÉEXISTANT, hors du périmètre de ce lot. En faire un vrai plafond
+// changerait le rendu des captures prises de loin, ce qui n'a pas été demandé.
+//
+// DES SEGMENTS PLUS COURTS QUE 80 px À 1920 signifient une caméra très
+// éloignée — la même limite que celle qui fait échouer la détection des
+// pastilles. Ce n'est pas une configuration de travail.
+//
+// 0,9 EST UN CHOIX, PAS UNE DÉRIVATION : c'est la marge qui fait que l'arc
+// agrandi s'arrête avant le marqueur d'extrémité plutôt que dessus. Rien dans
+// le code ni dans les mesures ne la fixe.
+const MKR_ARC_PART_SEGMENT = 0.9;
+function _mkrValeurDansArc(ctx, texte, px, rayonBase, lwArc, segW, sinDemi, lSegment) {
+  const w = ctx.measureText(texte).width;
+  const demiDiag = Math.hypot(w / 2, px / 2);
+  // sinDemi vaut 1 quand l'angle est PLAT (180°, demi-angle de 90°) et tend
+  // vers zéro quand l'angle se FERME, segments repliés l'un sur l'autre : la
+  // bissectrice longe alors les deux et aucune distance ne les éviterait. La
+  // borne à 0,05 protège de cet angle quasi nul — elle ne joue ni sur un genou
+  // ni sur une arche, qui sont toujours largement ouverts.
+  const dMin = (segW / 2 + demiDiag) / Math.max(sinDemi, 0.05);
+  const requis = dMin + demiDiag + lwArc;
+  const rayonMax = Math.max(rayonBase, MKR_ARC_PART_SEGMENT * lSegment);
+  if (requis <= rayonMax) {
+    const rayon = Math.max(rayonBase, requis);
+    return {
+      d: rayon - lwArc - demiDiag, rayon, demiDiag, dMin,
+      agrandi: rayon > rayonBase, dehors: false,
+    };
+  }
+  return {
+    d: rayonMax + lwArc + demiDiag, rayon: rayonMax, demiDiag, dMin,
+    agrandi: rayonMax > rayonBase, dehors: true,
+  };
+}
+
+function _mkrBoitesSeCoupent(a, b) {
+  return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+}
+
+// Boîte contre arc : on teste l'anneau COMPLET de rayon r et d'épaisseur lw,
+// sans tenir compte du secteur réellement tracé. C'est volontairement prudent —
+// au pire une légende est écartée sans nécessité, et c'est le bon sens d'erreur
+// puisque c'est l'étiquette qui cède.
+function _mkrBoiteCoupeArc(b, arc) {
+  const dx = Math.max(b.x0 - arc.x, 0, arc.x - b.x1);
+  const dy = Math.max(b.y0 - arc.y, 0, arc.y - b.y1);
+  const dMin = Math.hypot(dx, dy);
+  const dMax = Math.max(
+    Math.hypot(b.x0 - arc.x, b.y0 - arc.y), Math.hypot(b.x1 - arc.x, b.y0 - arc.y),
+    Math.hypot(b.x0 - arc.x, b.y1 - arc.y), Math.hypot(b.x1 - arc.x, b.y1 - arc.y)
+  );
+  return dMin <= arc.r + arc.lw && dMax >= arc.r - arc.lw;
+}
+
+// GARDE CONTROLATÉRALE. Ordre imposé : on DÉCALE d'abord, on ne raccourcit
+// qu'en dernier recours — et après un raccourcissement on RECOMMENCE les
+// décalages avec le texte plus court, d'où la remise à zéro du décalage.
+const MKR_LEG_PAS_MAX = 6;
+function _mkrPlaceLegende(ctx, nom, pt, dir, base, px, zones) {
+  const aligne = dir.x >= 0 ? 'left' : 'right';
+  let texte = nom, pas = 0;
+  for (;;) {
+    const x = pt.x + dir.x * (base + pas);
+    const y = pt.y + dir.y * (base + pas);
+    const boite = _mkrBoite(ctx, texte, x, y, aligne, px);
+    const heurte = zones.some(
+      (z) => _mkrBoitesSeCoupent(boite, z.boite) || _mkrBoiteCoupeArc(boite, z.arc)
+    );
+    if (!heurte) return { texte, x, y, aligne, decale: pas > 0, raccourci: texte !== nom };
+    pas += px;
+    if (pas > MKR_LEG_PAS_MAX * px) {
+      if (texte.length > 2) {
+        texte = texte.slice(0, texte.length - 2) + '…';
+        pas = 0; // on rejoue TOUS les décalages avec le texte raccourci
+        continue;
+      }
+      // Plus rien à céder : on repose la légende à sa place nominale.
+      return {
+        texte, x: pt.x + dir.x * base, y: pt.y + dir.y * base,
+        aligne, decale: false, raccourci: true,
+      };
+    }
+  }
 }
 
 // Dessiner un segment rectangulaire entre 2 points (style OPS)
 // feat-biomec-capteurs (B) — fill du segment modulé par markerOpacity ;
 // contour blanc fin reste à pleine intensité pour conserver le tracé visible
 // (le contour est l'indication de direction, indépendant du remplissage).
-function drawSegmentRect(ctx, p1, p2, w, color) {
+// #279 étape 3a — `opacite` facultatif : celle de la capture quand drawOverlay
+// redessine des points enregistrés ; sinon le réglage courant, comme avant.
+function drawSegmentRect(ctx, p1, p2, w, color, opacite) {
   const dx=p2.x-p1.x, dy=p2.y-p1.y;
   const len=Math.sqrt(dx*dx+dy*dy);
   if(len<1) return;
@@ -13351,7 +14524,7 @@ function drawSegmentRect(ctx, p1, p2, w, color) {
   ctx.lineTo(p1.x-nx,p1.y-ny);
   ctx.closePath();
   ctx.fillStyle=color;
-  ctx.globalAlpha = markerOpacity;
+  ctx.globalAlpha = opacite != null ? opacite : markerOpacity;
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
@@ -13367,7 +14540,7 @@ function updateAngleOverlay(elId, markers, view) {
     if(grp.length>=3){
       const ang=calcAngle3(grp);
       if(ang!==null){
-        const corr=computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||"");
+        const corr=computeCorrectedAngle(ang, side, view, _mkrTypeTest(TESTS[currentTestId]), grp);
         const clr=side==='D'?'blue':'';
         html+=`<span class="angle-tag ${clr}" style="${side==='G'?'border-color:#3ecf72;color:#3ecf72;':''}">${side}: ${corr.toFixed(1)}°</span>`;
       }
@@ -13378,7 +14551,7 @@ function updateAngleOverlay(elId, markers, view) {
   if(grpNone.length>=3){
     const ang=calcAngle3(grpNone);
     if(ang!==null){
-      const corr=computeCorrectedAngle(ang, '', view, TESTS[currentTestId]?.type||"");
+      const corr=computeCorrectedAngle(ang, '', view, _mkrTypeTest(TESTS[currentTestId]), grpNone);
       html+=`<span class="angle-tag">${corr.toFixed(1)}°</span>`;
     }
   }
@@ -13410,14 +14583,6 @@ function calcAngle3(pts) {
 }
 
 // Détecte si l'angle des points AP s'ouvre à droite (+) ou à gauche (-)
-// Couleur spécifique KFPPA : <20%=rouge, 20-60%=orange, 60-140%=vert, 140-180%=orange, >180%=rouge
-function clrKfppa(pct) {
-  if(pct==null||isNaN(pct)) return 'var(--mut)';
-  const p=Math.abs(pct)*100;
-  if(p<20||p>180) return 'var(--red)';
-  if(p<60||p>140) return 'var(--orange)';
-  return 'var(--green)';
-}
 
 // Détecter valgus/varus pour KFPPA
 // Vue face : genou D pointe droite = valgus(+), gauche = varus(-)
@@ -13427,6 +14592,455 @@ function kfppaLabel(ang, side) {
   const deg = Math.abs(ang).toFixed(1)+'°';
   // Convention incl : valeur positive = valgus pour les 2 côtés
   return ang>=0 ? 'Valgus +'+deg : 'Varus −'+deg;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// #275-C — KFPPA : normes, grille de U, classement de S
+// ═══════════════════════════════════════════════════════════════════
+//
+// DÉCISIONS DU PRATICIEN (Scio) :
+//   U = angle unipodal ABSOLU signé (valgus +, varus −) : c'est lui qui reçoit
+//       le verdict, par la grille ancrée sur la norme applicable.
+//   S = statique bipodal : classé Neutre / Valgus / Varus constitutionnel.
+//   Δ = U − S est affiché pour expliquer, jamais classé.
+//
+// TÂCHE À VENIR — normes réglables dans les Paramètres : lot séparé, avec sa
+// PROPRE clé app_config et une modification serveur validée à part. Elles ne
+// doivent PAS aller dans posture_thresholds : _mergeThresholds n'y relit que
+// ses cinq sections connues, et un client resté sur une version antérieure
+// effacerait une section kfppa au premier seuil postural enregistré.
+//
+// Une norme absente ou incomplète rend « norme non définie » : JAMAIS de
+// valeur par défaut substituée.
+const KFPPA_SOURCE_REPERE = 'repère clinique de travail, pas de norme 2D publiée';
+const KFPPA_SOURCE_USL =
+  'Norme de référence : réception unipodale (Herrington & Munro, 2010) — mesure à la première réception';
+const KFPPA_NORMES = {
+  'kfppa-marche': { parSexe: false, min: 3, max: 7, source: KFPPA_SOURCE_REPERE },
+  'kfppa-course': { parSexe: false, min: 5, max: 12, source: KFPPA_SOURCE_REPERE },
+  'kfppa-sldj': {
+    parSexe: true,
+    femmes: { min: 5, max: 12 },
+    hommes: { min: 1, max: 9 },
+    source: KFPPA_SOURCE_USL,
+  },
+};
+const KFPPA_MSG_CIVILITE = 'civilité non renseignée : norme non appliquée';
+const KFPPA_MSG_NORME_ND = 'norme non définie';
+
+// Sexe d'après la civilité, seules valeurs reconnues : « Mme » et « M. »
+// (les seules que produisent la fiche et l'import). Tout le reste → null.
+function kfppaSexeCivilite(civilite) {
+  if (civilite === 'Mme') return 'femmes';
+  if (civilite === 'M.') return 'hommes';
+  return null;
+}
+
+// Norme applicable à un test pour une civilité.
+//   { statut: 'ok', min, max, source, sexe }  — sexe null si la norme n'en dépend pas
+//   { statut: 'civilite' }                     — norme par sexe, civilité inconnue
+//   { statut: 'non-definie' }                  — test sans norme, ou norme incomplète
+function kfppaNormeApplicable(testId, civilite, normes = KFPPA_NORMES) {
+  const n = normes && normes[testId];
+  if (!n) return { statut: 'non-definie' };
+  let sexe = null;
+  let b = n;
+  if (n.parSexe) {
+    sexe = kfppaSexeCivilite(civilite);
+    if (!sexe) return { statut: 'civilite' };
+    b = n[sexe];
+  }
+  if (!b || !Number.isFinite(b.min) || !Number.isFinite(b.max) || b.min > b.max) {
+    return { statut: 'non-definie' };
+  }
+  return { statut: 'ok', min: b.min, max: b.max, source: n.source, sexe };
+}
+
+// Valeur telle qu'AFFICHÉE (une décimale) : le verdict doit correspondre au
+// nombre imprimé. Sans cela, −3,04° s'afficherait « −3.0° » et serait classé
+// comme en dessous de −3. Le « + 0 » supprime le zéro négatif.
+function _kfppaArrondi(v) {
+  return Number(v.toFixed(1)) + 0;
+}
+// Seuils calculés sans bruit flottant (0,3 × 8,5 ne vaut pas exactement 2,55).
+function _kfppaSeuil(v) {
+  return Math.round(v * 1e9) / 1e9;
+}
+
+// Grille de U, huit classes ancrées sur la norme : m = (min + max) / 2.
+function kfppaClasseU(U, min, max) {
+  if (U == null || !Number.isFinite(U) || !Number.isFinite(min) || !Number.isFinite(max)) {
+    return null;
+  }
+  const u = _kfppaArrondi(U);
+  const m = (min + max) / 2;
+  if (u < _kfppaSeuil(-0.6 * m)) return 'Varus excessif';
+  if (u < _kfppaSeuil(-0.3 * m)) return 'Varus modéré';
+  if (u < 0) return 'Varus faible';
+  if (u < _kfppaSeuil(min / 2)) return 'Valgus faible';
+  if (u < min) return 'Valgus modéré (insuffisant)';
+  if (u <= max) return 'Dans la norme';
+  if (u <= _kfppaSeuil(max + 0.3 * m)) return 'Valgus modéré (au-dessus de la norme)';
+  return 'Valgus excessif';
+}
+
+// Statique bipodal : ±3° autour de zéro = neutre.
+function kfppaClasseS(S) {
+  if (S == null || !Number.isFinite(S)) return null;
+  const s = _kfppaArrondi(S);
+  if (s > 3) return 'Valgus constitutionnel';
+  if (s < -3) return 'Varus constitutionnel';
+  return 'Neutre';
+}
+
+// Valeur sans kfppaSigne (capture sans points, bilan antérieur) : magnitude
+// seule, aucun classement, aucun verdict.
+function kfppaTexteNonSigne(v) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return _kfppaMagnitudeTxt(v) + ' (sens valgus/varus non enregistré)';
+}
+
+// #275-D — PARTIE NUMÉRIQUE d'une valeur non signée, source unique : la
+// phrase du genou (via kfppaTexteNonSigne), le grand chiffre U et la légende
+// de la photo passent tous par elle, donc par le même arrondi (_kfppaArrondi).
+function _kfppaMagnitudeTxt(v) {
+  return Math.abs(_kfppaArrondi(v)).toFixed(1) + '°';
+}
+// ─── #275-C — FIN ───
+
+// ═══════════════════════════════════════════════════════════════════
+// #275-D — KFPPA : textes signés, Δ, couleurs, phrases du rapport
+// ═══════════════════════════════════════════════════════════════════
+//
+// DÉCISIONS DU PRATICIEN (Scio) :
+//   - plus aucun pourcentage ; des degrés signés, le mot en clair ;
+//   - Δ = U − S n'a JAMAIS de verdict ni le mot Valgus/Varus comme état :
+//     « +5.9° (vers le valgus) », « −4.8° (vers le varus) », « 0.0° » ;
+//   - Δ et l'asymétrie sont calculés sur les valeurs AFFICHÉES (au dixième),
+//     pour que le praticien retombe sur le même nombre en faisant la
+//     soustraction lui-même ;
+//   - un statique nul s'écrit « 0.0° — Neutre », jamais « Valgus +0.0° » ;
+//   - une valeur sans kfppaSigne ne reçoit ni classe, ni verdict, ni Δ.
+//
+// Aucune de ces fonctions n'écrit quoi que ce soit : elles ne font que
+// calculer et composer du texte (garde : tests/kfppa-affichage-275d.test.mjs).
+
+// Valeur en DIXIÈMES entiers, depuis la valeur affichée : les sommes et
+// différences se font sur des entiers, donc tombent juste.
+function _kfppaDixiemes(v) {
+  return Math.round(_kfppaArrondi(v) * 10);
+}
+function _kfppaTxtDixiemes(d) {
+  if (d === 0) return '0.0°';
+  return (d > 0 ? '+' : '−') + (Math.abs(d) / 10).toFixed(1) + '°';
+}
+
+// Valeur signée telle qu'affichée : « +9.3° », « −2.4° », « 0.0° ».
+function kfppaSigneTxt(v) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return _kfppaTxtDixiemes(_kfppaDixiemes(v));
+}
+
+// Δ = U − S, sur les valeurs affichées.
+function kfppaDelta(S, U) {
+  if (S == null || U == null || !Number.isFinite(S) || !Number.isFinite(U)) return null;
+  return (_kfppaDixiemes(U) - _kfppaDixiemes(S)) / 10;
+}
+
+function kfppaTexteDelta(d) {
+  if (d == null || !Number.isFinite(d)) return '—';
+  const t = _kfppaDixiemes(d);
+  if (t === 0) return '0.0°';
+  return _kfppaTxtDixiemes(t) + (t > 0 ? ' (vers le valgus)' : ' (vers le varus)');
+}
+
+// Statique : « +3.4° — Valgus constitutionnel », « 0.0° — Neutre ».
+function kfppaTexteS(S, signe) {
+  if (S == null || !Number.isFinite(S)) return '—';
+  if (!signe) return kfppaTexteNonSigne(S);
+  return kfppaSigneTxt(S) + ' — ' + kfppaClasseS(S);
+}
+
+// Couleur d'une classe de U : 'vert' | 'orange' | 'rouge' | 'neutre'.
+// Chaque affichage la traduit dans sa propre palette.
+function kfppaCouleurClasse(classe) {
+  if (classe === 'Dans la norme') return 'vert';
+  if (classe === 'Varus excessif' || classe === 'Valgus excessif') return 'rouge';
+  if (
+    classe === 'Varus modéré' ||
+    classe === 'Varus faible' ||
+    classe === 'Valgus faible' ||
+    classe === 'Valgus modéré (insuffisant)' ||
+    classe === 'Valgus modéré (au-dessus de la norme)'
+  ) {
+    return 'orange';
+  }
+  return 'neutre';
+}
+
+// Norme d'un bilan ENREGISTRÉ : celle figée avec lui (result.kfppaNorme).
+// Absente ou incohérente → « norme non définie » ; motif civilité conservé.
+function kfppaNormeBilan(data) {
+  const n = data && data.kfppaNorme;
+  if (n && n.statut === 'civilite') return { statut: 'civilite' };
+  if (!n || !Number.isFinite(n.min) || !Number.isFinite(n.max) || n.min > n.max) {
+    return { statut: 'non-definie' };
+  }
+  return { statut: 'ok', min: n.min, max: n.max, source: n.source, sexe: n.sexe == null ? null : n.sexe };
+}
+
+// « norme 5–12°, femmes », « norme 3–7° », ou le message.
+function kfppaTexteNorme(norme) {
+  if (!norme || norme.statut === 'non-definie') return KFPPA_MSG_NORME_ND;
+  if (norme.statut === 'civilite') return KFPPA_MSG_CIVILITE;
+  return 'norme ' + norme.min + '–' + norme.max + '°' + (norme.sexe ? ', ' + norme.sexe : '');
+}
+
+// #279 étape 3f — photo NON ENVOYÉE : sa valeur reste affichée, avec ce
+// motif, mais n'entre dans AUCUN calcul dérivé (classe, verdict, Δ,
+// décomposition de l'asymétrie) tant qu'elle n'est pas recapturée.
+const KFPPA_EXCLU_BIP = 'photo bipodale non envoyée — à recapturer';
+const KFPPA_EXCLU_UNI = 'photo unipodale non envoyée — à recapturer';
+
+// #279 étape 3f — pourquoi Δ n'est pas calculé pour ce genou, ou null.
+function kfppaMotifDelta(a) {
+  if (a.sExclu && a.uExclu) return 'photos bipodale et unipodale non envoyées — à recapturer';
+  if (a.sExclu) return KFPPA_EXCLU_BIP;
+  if (a.uExclu) return KFPPA_EXCLU_UNI;
+  return null;
+}
+
+// Analyse d'un genou. Une valeur non signée garde sa magnitude mais ne porte
+// ni classe, ni verdict, ni Δ. #279 étape 3f — une valeur EXCLUE (photo non
+// envoyée) non plus : sExclu / uExclu le disent à chaque affichage.
+function kfppaAnalyseGenou(e) {
+  const ok = (v) => v != null && Number.isFinite(v);
+  const S = ok(e.S) ? e.S : null;
+  const U = ok(e.U) ? e.U : null;
+  const sSigne = S != null && !!e.sSigne;
+  const uSigne = U != null && !!e.uSigne;
+  const sExclu = S != null && !!e.sExclu;
+  const uExclu = U != null && !!e.uExclu;
+  const n0 = e.norme || { statut: 'non-definie' };
+  // VÉRIFICATION, pas promesse : un statut 'ok' sans bornes numériques
+  // cohérentes est traité comme une norme non définie, sans verdict.
+  const mn = n0.min, mx = n0.max;
+  const normeValide = n0.statut === 'ok'
+    && typeof mn === 'number' && typeof mx === 'number'
+    && Number.isFinite(mn) && Number.isFinite(mx) && mn <= mx;
+  const norme = normeValide || n0.statut === 'civilite' ? n0 : { statut: 'non-definie' };
+  const classeU = uSigne && !uExclu && normeValide ? kfppaClasseU(U, mn, mx) : null;
+  return {
+    S,
+    U,
+    sSigne,
+    uSigne,
+    sExclu,
+    uExclu,
+    norme,
+    classeS: sSigne && !sExclu ? kfppaClasseS(S) : null,
+    classeU,
+    delta: sSigne && uSigne && !sExclu && !uExclu ? kfppaDelta(S, U) : null,
+    couleur: kfppaCouleurClasse(classeU),
+  };
+}
+
+// #279 étape 3f — texte d'une valeur exclue : la valeur, puis le motif.
+function _kfppaValeurExclue(v, signe, motif) {
+  return (signe ? kfppaSigneTxt(v) : kfppaTexteNonSigne(v)) + ' — valeur exclue des calculs (' + motif + ')';
+}
+
+function _kfppaMinuscule(s) {
+  return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+// « valeur unipodale −2.4° : varus faible (norme 5–12°, femmes) », ou, sans
+// norme appliquée, « valeur unipodale −2.4° (norme non définie) ». Partie de
+// kfppaPhraseGenou, isolée pour la ligne d'un genou dont le statique manque.
+function kfppaTexteUnipodal(a) {
+  if (a.U == null) return 'valeur unipodale —';
+  if (a.uExclu) return 'valeur unipodale ' + _kfppaValeurExclue(a.U, a.uSigne, KFPPA_EXCLU_UNI); // #279 étape 3f
+  if (!a.uSigne) return 'valeur unipodale ' + kfppaTexteNonSigne(a.U);
+  if (a.classeU) {
+    return 'valeur unipodale ' + kfppaSigneTxt(a.U) + ' : ' + _kfppaMinuscule(a.classeU) + ' (' + kfppaTexteNorme(a.norme) + ')';
+  }
+  return 'valeur unipodale ' + kfppaSigneTxt(a.U) + ' (' + kfppaTexteNorme(a.norme) + ')';
+}
+
+// « Genou gauche : statique +2.4° (neutre), composante dynamique −4.8° (vers
+// le varus), valeur unipodale −2.4° : varus faible (norme 5–12°, femmes). »
+function kfppaPhraseGenou(cote, a) {
+  const nom = cote === 'D' ? 'Genou droit' : 'Genou gauche';
+  const st =
+    a.S == null
+      ? 'statique —'
+      : a.sExclu
+        ? 'statique ' + _kfppaValeurExclue(a.S, a.sSigne, KFPPA_EXCLU_BIP) // #279 étape 3f
+        : a.sSigne
+          ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
+          : 'statique ' + kfppaTexteNonSigne(a.S);
+  // #279 étape 3f — Δ non calculé à cause d'une exclusion : le motif, en clair.
+  const motif = kfppaMotifDelta(a);
+  const dyn =
+    a.delta != null
+      ? 'composante dynamique ' + kfppaTexteDelta(a.delta)
+      : motif
+        ? 'composante dynamique non calculée (' + motif + ')'
+        : 'composante dynamique —';
+  return nom + ' : ' + st + ', ' + dyn + ', ' + kfppaTexteUnipodal(a) + '.';
+}
+
+// « Asymétrie D − G : +11.7° en unipodal, dont +1.0° de statique et +10.7° de
+// dynamique. » Calculée en dixièmes sur les valeurs affichées : la somme des
+// deux parts vaut EXACTEMENT l'écart unipodal. null si une des quatre valeurs
+// manque ou n'est pas signée : pas d'asymétrie sur une magnitude.
+// #279 étape 3f — U exclu d'un côté : aucune asymétrie, le motif. S exclu :
+// l'écart unipodal (U valides), SANS décomposition statique / dynamique.
+function kfppaPhraseAsymetrie(aD, aG) {
+  if (!aD || !aG || !aD.uSigne || !aG.uSigne) return null;
+  if (aD.uExclu || aG.uExclu) return 'Asymétrie D − G non calculée (' + KFPPA_EXCLU_UNI + ').';
+  const dU = _kfppaDixiemes(aD.U) - _kfppaDixiemes(aG.U);
+  if (aD.sExclu || aG.sExclu) {
+    return (
+      'Asymétrie D − G : ' +
+      _kfppaTxtDixiemes(dU) +
+      ' en unipodal ; décomposition statique / dynamique non calculée (' +
+      KFPPA_EXCLU_BIP +
+      ').'
+    );
+  }
+  if (!aD.sSigne || !aG.sSigne) return null;
+  const dS = _kfppaDixiemes(aD.S) - _kfppaDixiemes(aG.S);
+  const dDyn = dU - dS;
+  return (
+    'Asymétrie D − G : ' +
+    _kfppaTxtDixiemes(dU) +
+    ' en unipodal, dont ' +
+    _kfppaTxtDixiemes(dS) +
+    ' de statique et ' +
+    _kfppaTxtDixiemes(dDyn) +
+    ' de dynamique.'
+  );
+}
+// ─── #275-D — FIN ───
+
+// #275-D — palettes des catégories de kfppaCouleurClasse : l'écran suit le
+// thème (variables CSS), le rapport imprimé garde les couleurs fixes de rp_*.
+const _KFPPA_COUL_ECRAN = { vert: 'var(--green)', orange: 'var(--orange)', rouge: 'var(--red)', neutre: 'var(--mut)' };
+const _KFPPA_COUL_RAPPORT = { vert: '#1a7a3e', orange: '#856404', rouge: '#b30021', neutre: '#aaa' };
+const _KFPPA_BADGE_RAPPORT = { vert: 'rp-badge-g', orange: 'rp-badge-o', rouge: 'rp-badge-r' };
+
+// #275-D — analyse d'UN genou depuis les photos : créneaux en cours de
+// capture (photoSlots) ou bilan enregistré (data.photos), même forme.
+// S = bipodal angleD/angleG (signé si la photo bipodale porte kfppaSigne),
+// U = angle du créneau unipodal du côté (signé si lui-même porte kfppaSigne).
+function _kfppaGenou(photos, side, norme) {
+  const ph = photos || [];
+  const bip = ph.find((p) => p && p.side === '');
+  const uni = ph.find((p) => p && p.side === side);
+  return kfppaAnalyseGenou({
+    S: side === 'D' ? bip?.angleD : bip?.angleG,
+    sSigne: !!bip?.kfppaSigne,
+    U: uni?.angle,
+    uSigne: !!uni?.kfppaSigne,
+    // #279 étape 3f — photo non envoyée : valeur gardée, exclue des calculs.
+    // SOURCE UNIQUE de l'exclusion pour le panneau, le rapport et les alertes.
+    sExclu: !!bip?.nonEnvoyee,
+    uExclu: !!uni?.nonEnvoyee,
+    norme,
+  });
+}
+
+// #279 étape 3f — mention d'exclusion, rouge, dans la palette de l'affichage.
+function _kfppaExcluHTML(texte, couleur) {
+  return `<span class="kfppa-exclu" style="color:${couleur};font-weight:700;">${texte}</span>`;
+}
+
+// #275-D — magnitude seule, sans mention : grand chiffre U et légende de la
+// photo d'une valeur SANS kfppaSigne. La mention « sens valgus/varus non
+// enregistré » est portée une seule fois, en petit sous le grand chiffre.
+function _kfppaMagnitude(v) {
+  return v == null || !Number.isFinite(v) ? '—' : _kfppaMagnitudeTxt(v);
+}
+
+// Texte d'une valeur unipodale : signée, ou magnitude « sens non enregistré ».
+function _kfppaTexteU(a) {
+  if (a.U == null) return '—';
+  return a.uSigne ? kfppaSigneTxt(a.U) : kfppaTexteNonSigne(a.U);
+}
+
+// Norme détaillée : « 5–12°, femmes (d'après la civilité) · <source> », ou le message.
+function _kfppaNormeDetail(norme) {
+  if (!norme || norme.statut !== 'ok') return kfppaTexteNorme(norme);
+  return `${norme.min}–${norme.max}°${norme.sexe ? `, ${norme.sexe} (d'après la civilité)` : ''} · ${norme.source}`;
+}
+
+// #275-D — clrKfppa SUIT LA CLASSE DE U (et non plus un pourcentage) : vert
+// dans la norme, orange pour les classes faibles et modérées, rouge pour les
+// deux excessifs, neutre sans classe (valeur non signée, norme non appliquée).
+function clrKfppa(classe) {
+  return _KFPPA_COUL_ECRAN[kfppaCouleurClasse(classe)];
+}
+
+// #275-C/D — bloc du panneau Résultats pour un genou : S et sa classe, U,
+// Δ = U − S (jamais de verdict), verdict de U coloré, norme appliquée.
+// Norme de la SAISIE EN COURS : KFPPA_NORMES d'après la civilité du patient.
+function _kfppaBlocGrilleHTML(testId, patient, photos, side) {
+  const norme = kfppaNormeApplicable(testId, patient?.civilite);
+  const a = _kfppaGenou(photos, side, norme);
+  // #279 étape 3f — valeur exclue : affichée, puis la mention rouge ; Δ et
+  // verdict non calculés, avec leur motif (kfppaMotifDelta, même analyse).
+  const rouge = (t) => _kfppaExcluHTML(t, 'var(--red)');
+  const motif = kfppaMotifDelta(a);
+  const verdict = a.uExclu
+    ? rouge(`non calculé (${KFPPA_EXCLU_UNI})`)
+    : a.classeU || (a.U != null && a.uSigne ? kfppaTexteNorme(a.norme) : '—');
+  const txtS = a.sExclu
+    ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
+    : kfppaTexteS(a.S, a.sSigne);
+  const txtU = _kfppaTexteU(a) + (a.uExclu ? rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_UNI})`) : '');
+  const txtD = a.delta == null && motif ? rouge(`non calculé (${motif})`) : kfppaTexteDelta(a.delta);
+  return `<div class="kfppa-grille" style="font-size:9px;color:var(--mut);margin-top:4px;line-height:1.5;">
+      <div>Statique S : <b>${txtS}</b></div>
+      <div>Unipodal U : <b>${txtU}</b></div>
+      <div>Δ = U − S : <b>${txtD}</b></div>
+      <div>Verdict (U) : <b class="kfppa-verdict" style="color:${clrKfppa(a.classeU)};">${verdict}</b></div>
+      <div>Norme : ${_kfppaNormeDetail(a.norme)}</div>
+    </div>`;
+}
+
+// #275-D — photo « Station bipodale » dans la section KFPPA du rapport, UNE
+// fois pour les deux genoux, légende « D x° · G y° ». Elle n'y figurait
+// jamais : buildPrintPhotos filtre par côté et le créneau bipodal n'en a pas.
+// Photo présente mais non rechargée (path sans dataURL) : mention rouge,
+// jamais une disparition silencieuse. Jamais prise : rien.
+function _kfppaPhotoBipodaleHTML(data, t) {
+  const bip = (data.photos || []).find((p) => p && p.side === '');
+  if (!bip) return '';
+  if (bip.dataUrl) {
+    const leg = _kfppaBipodalTexte(t, bip) || '';
+    return `<div class="kfppa-photo-bip" style="text-align:center;margin:6px 0;">
+      ${_imgRapportAvecCalque(bip, 'height:90px;width:auto;max-width:200px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:inline-block')}
+      <div style="font-size:7px;color:#666;margin-top:2px;">${bip.label || 'Station bipodale'}</div>
+      <div style="font-size:8px;font-weight:700;color:#333;">${leg}</div>
+    </div>`;
+  }
+  if (bip.nonEnvoyee) return _photoNonEnvoyeeHTML(bip.label || 'Station bipodale'); // #279 étape 3e
+  if (bip.path) return _photoNonRechargeeHTML(bip.label || 'Station bipodale');
+  return '';
+}
+
+// #275-D — norme APPLIQUÉE, figée avec le bilan : { min, max, source, sexe }.
+// Relire le bilan plus tard doit montrer la norme de ce jour-là, même si la
+// constante ou la civilité changent ensuite. Civilité inconnue pour l'USL :
+// le MOTIF est enregistré, { statut: 'civilite' }, pour que le rapport le
+// dise. Norme non définie : null, rien n'est enregistré — jamais une norme
+// par défaut.
+function _kfppaNormePourBilan(testId, patient) {
+  const n = kfppaNormeApplicable(testId, patient?.civilite);
+  if (n.statut === 'civilite') return { statut: 'civilite' };
+  if (n.statut !== 'ok') return null;
+  return { min: n.min, max: n.max, source: n.source, sexe: n.sexe };
 }
 
 // ⚠️ LE TRIPLET UTILISÉ ICI DIFFÈRE VOLONTAIREMENT DE CELUI DE calcAngle3.
@@ -13471,15 +15085,75 @@ function calcAngleSign(pts) {
   return bot.x>top.x?1:-1;
 }
 
+// #271-D — LE TYPE DE TEST PASSÉ À computeCorrectedAngle, EN UN SEUL ENDROIT.
+//
+// Il était choisi à la main, avec TROIS formules différentes :
+//   captures        markers===mla ? mla : markers===genou-bi ? kfppa : type
+//   image           markers===mla ? mla : type              (pas de kfppa)
+//   encadré direct  type                                    (ni mla ni kfppa)
+// D’où l’écart relevé par le praticien sur un MLA : l’image affichait 113,5 —
+// l’angle brut, par le retour anticipé du cas « mla » — et l’encadré 66,5,
+// soit 180 − 113,5, faute d’avoir reçu « mla ». Deux nombres, une mesure.
+//
+// L’ENCADRÉ N’ÉCRIT NULLE PART. La valeur enregistrée est celle de la capture :
+// photoSlots[].angle → result.photos[].angle → rapport. C’est donc l’encadré
+// seul qui était faux, et aucun bilan ne contient 66,5.
+//
+// CE LOT NE TOUCHE QUE L’AFFICHAGE. Cinq appels choisissent encore leur type à
+// la main, et ils RESTENT TELS QUELS parce que leurs valeurs partent dans le
+// bilan et le rapport — les changer sans vérification propre modifierait des
+// mesures cliniques :
+//   captureVidPhotoSlot / capturePhotoSlot — angleD et angleG de la
+//     Mobilité AP, et angleD/angleG du KFPPA bipodal ;
+//   captureFrame — angD et angG des frames ;
+//   calcBilateral — qui passe en outre le type À LA PLACE des points.
+// Tâches séparées, #248 pour calcBilateral.
+//
+// CE QUI CHANGE À L'ÉCRAN POUR LE KFPPA : l'image recevait « » comme type — la
+// formule de drawOverlay n'avait pas la correspondance genou-bi → kfppa — et
+// tombait donc dans la branche « vue face » qui applique un SIGNE latéral. Elle
+// recevra désormais « kfppa », dont le retour anticipé rend 180 − angle SANS
+// signe. L'image affichera donc exactement la valeur déjà enregistrée par les
+// captures et imprimée dans le rapport, là où elle en montrait jusqu'ici une
+// version signée. C'est un alignement sur la valeur du dossier, pas un
+// changement de mesure.
+function _mkrTypeTest(t) {
+  if (!t) return '';
+  if (t.markers === 'mla') return 'mla';
+  if (t.markers === 'genou-bi') return 'kfppa';
+  return t.type || '';
+}
 // Calculer l'angle corrigé selon le contexte
 // MLA: angle aigu brut (pas de correction)
-// KFPPA: 180 - angle (valgum=+, varum=-)
+// KFPPA: 180 − angle, signé valgus (+) / varus (−) en vue de face avec points,
+//   magnitude non signée sinon (#275-A).
 // Arrière-pied: angle brut avec signe (inversion=+, éversion=-)
 function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   if(rawAng===null) return null;
   if(testType==='mla') return rawAng;
   const incl = 180 - rawAng;
-  // KFPPA : utiliser incl (180-rawAng) sans correction de signe latéral
+  // #275-A — SIGNE DU KFPPA : VALGUS POSITIF, VARUS NÉGATIF (décision du
+  // praticien). Il remplace un retour anticipé qui rendait incl sans signe :
+  // un varus s'affichait comme un valgus de même amplitude.
+  //
+  // Le signe n'est calculé QUE dans cette branche : vue de face ET points
+  // fournis. Même règle que la branche face générique plus bas — genou D,
+  // rotule à droite de la ligne EIAS→tarse à l'écran = valgus ; genou G,
+  // l'inverse. Cas de référence du praticien fixé par
+  // tests/kfppa-signe-275a.test.mjs (D +14,8°, G −7,9°).
+  //
+  // Array.isArray et non la seule vérité de `pts` : calcBilateral passait une
+  // CHAÎNE à cet endroit (#248). Une chaîne non vide aurait fait lever
+  // calcAngleSign ; elle rend maintenant la magnitude non signée.
+  if(testType==='kfppa' && view==='face' && Array.isArray(pts)) {
+    const sign=calcAngleSign(pts);
+    if(side==='D') return sign*incl;
+    if(side==='G') return -sign*incl;
+    return incl;
+  }
+  // Tout autre KFPPA — sans points, ou dans une autre vue — rend la magnitude
+  // NON SIGNÉE : jamais un signe inventé. Ce retour doit précéder la branche
+  // dos, qui poserait sinon un signe inversion/éversion sur un genou.
   if(testType==='kfppa') return incl;
   // ─── Vue dos : signe inversion / éversion ───
   //
@@ -13521,6 +15195,25 @@ function computeCorrectedAngle(rawAng, side, view, testType, pts) {
   return incl;
 }
 
+// #275-A — LE SIGNE DU KFPPA A-T-IL RÉELLEMENT ÉTÉ CALCULÉ ?
+// Même condition que la branche signée de computeCorrectedAngle, plus deux
+// exigences : un côté D ou G (le côté vide y rend incl sans signe) et une
+// valeur non nulle (moins de trois points placés → aucune mesure, donc aucun
+// signe). C'est ce qui pose kfppaSigne:true sur une capture : il distingue un
+// angle signé d'une magnitude d'avant #275-A, que rien d'autre ne sépare.
+// Toute modification de la branche signée DOIT se répercuter ici.
+function _kfppaSigneCalcule(testType, view, side, pts, valeur) {
+  return testType==='kfppa' && view==='face' && Array.isArray(pts)
+    && (side==='D' || side==='G') && valeur!=null;
+}
+
+// Pose ou RETIRE le marqueur : une capture remplacée sans signe ne doit pas
+// garder celui de la capture précédente.
+function _poserKfppaSigne(slot, signe) {
+  if (signe) slot.kfppaSigne = true;
+  else delete slot.kfppaSigne;
+}
+
 function getAngleColor(ang) {
   if(ang===null) return '#FFD700';
   return '#FFD700'; // Surcharge par le résultat si besoin
@@ -13532,7 +15225,12 @@ function getAngleColor(ang) {
 function calcBilateral(markers, view, side) {
   const grp = markers.filter(m=>m.side===side&&_isPlacedPt(m));
   const ang = calcAngle3(grp);
-  return computeCorrectedAngle(ang, side, view, TESTS[currentTestId]?.type||'', TESTS[currentTestId]?.type||"");
+  // #275-A (#248) — le 5e argument recevait le type du test, une CHAÎNE, à la
+  // place des points : aucun signe ne pouvait être calculé. Et le type lui-même
+  // venait de t.type, qu'aucun test ne déclare : la mesure n'était jamais
+  // reconnue comme KFPPA. On passe le groupe mesuré et le type par
+  // _mkrTypeTest, la source unique des autres appelants (#271-D).
+  return computeCorrectedAngle(ang, side, view, _mkrTypeTest(TESTS[currentTestId]), grp);
 }
 
 function updateResults() {
@@ -13545,29 +15243,30 @@ function updateResults() {
     // KFPPA : 2 frames nécessaires
     if(t.div!==undefined) {
       const pBip=photoSlots[0], pUniG=photoSlots[1], pUniD=photoSlots[2];
-      const _ti=(v)=>v==null?null:(v>90?180-v:v);
-      const bipD=_ti(pBip?.angleD), bipG=_ti(pBip?.angleG);
-      const uniD=_ti(pUniD?.angle), uniG=_ti(pUniG?.angle);
-      const angD=(uniD!=null&&bipD!=null)?uniD-bipD:null;
-      const angG=(uniG!=null&&bipG!=null)?uniG-bipG:null;
-      // Pour KFPPA, angD>0 = valgus dynamique (genou plus incliné en dynamique)
-      const pctD=angD!=null?angD/t.div:null;
-      const pctG=angG!=null?angG/t.div:null;
-      if(angD!=null||angG!=null||pBip?.dataUrl||pUniG?.dataUrl||pUniD?.dataUrl){
+      // #275-D — PLUS AUCUN POURCENTAGE. Le bloc de la grille porte S et sa
+      // classe, U, Δ (sur les valeurs affichées, jamais de verdict), le
+      // verdict de U coloré par sa classe, et la norme appliquée.
+      // PRÉSENCE = dataUrl OU path (règle de #275-B). launchTest attend le
+      // rechargement avant updateResults, mais un rechargement ÉCHOUÉ laisse
+      // path sans dataUrl : sur dataUrl seul, le panneau d'un test déjà fait
+      // basculerait sur « Capturez 3 photos » (#276).
+      // #279 étape 3f — une photo non envoyée est présente (valeur gardée).
+      const _present=(p)=>!!(p&&(p.dataUrl||p.path||p.nonEnvoyee));
+      if(_present(pBip)||_present(pUniG)||_present(pUniD)){
         html=`<div class="res-side">
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipD,'D')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angD,'D')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
-            <div class="rs-pct" style="color:${clrKfppa(pctD)};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
+            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'D')}
+            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D')) // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D'))}</div>`
+              : ''}
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Bipodal: <b>${kfppaLabel(bipG,'G')}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Unipodal: <b>${kfppaLabel(uniG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° valgus)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Valgus dyn.: <b>${kfppaLabel(angG,'G')}</b> <span style="font-size:8px;">(N: ${t.normeMin}°–${t.normeMax}° = 60–140%)</span></div>
-            <div class="rs-pct" style="color:${clrKfppa(pctG)};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
+            ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'G')}
+            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G')) // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G'))}</div>`
+              : ''}
           </div>
         </div>`;
       } else {
@@ -13915,6 +15614,143 @@ function _serialiserMarqueurs(e) {
     : {};
 }
 
+// Sérialisation d'un créneau photo sport. Sortie telle quelle du map de
+// validateAndSave, mêmes champs dans le même ordre, pour la rendre testable.
+// #275-A — kfppaSigne est écrit CONDITIONNELLEMENT, même règle que #250 :
+// son absence dit « signe non calculé », elle ne doit jamais devenir false.
+function _serialiserPhoto(s) {
+  return {label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
+    ...(s.kfppaSigne ? { kfppaSigne: true } : {}),
+    // #279 étape 3b — écrits SEULEMENT pour une capture sans points : leur
+    // absence dit « image avec points dessinés dedans » (captures antérieures).
+    ...(s.imageBrute ? { imageBrute: true, dessin: s.dessin || null } : {}),
+    ...(s.nonEnvoyee ? { nonEnvoyee: true } : {}), // #279 étape 3e
+    ..._serialiserMarqueurs(s)};
+}
+
+// #279 étape 3e — ENVOI SUR STORAGE DÈS LA CAPTURE. L'image reste en mémoire
+// pour l'affichage ; rien n'est écrit dans le stockage local ici. Succès : path
+// posé (le filtre de persistance retirera alors la dataURL). Échec :
+// envoiEchoue, nouvel essai à la validation.
+// JETON par capture : une recapture pendant l'envoi en crée un autre ; le
+// résultat d'un envoi dépassé n'est jamais appliqué — comparer les images ne
+// suffirait pas, une recapture pouvant produire exactement la même.
+async function _envoyerCaptureStorage(slot) {
+  if (!slot || typeof slot.dataUrl !== 'string' || !slot.dataUrl.startsWith('data:')) return;
+  const jeton = {};
+  slot._jetonEnvoi = jeton;
+  const patient = currentPatient, testId = currentTestId, userId = pwaUser?.id;
+  if (!patient?.id || !testId || !userId) { slot.envoiEchoue = true; return; }
+  if (!patient.mesures) patient.mesures = {};
+  if (!patient.mesures._bilanId) patient.mesures._bilanId = crypto.randomUUID();
+  const filename = `${testId}/capture_${Date.now()}_${crypto.randomUUID()}.jpg`;
+  const path = buildPhotoPath(userId, patient.id, 'sport', patient.mesures._bilanId, filename);
+  let up;
+  try { up = await uploadPhotoBase64(slot.dataUrl, path); }
+  catch (e) { up = { ok: false, error: e?.message || String(e) }; }
+  if (slot._jetonEnvoi !== jeton) return; // recapturé entre-temps
+  if (up && up.ok) { slot.path = up.path; delete slot.envoiEchoue; }
+  else { slot.envoiEchoue = true; console.warn('[#279] envoi de la capture échoué :', up?.error); }
+}
+
+// #279 étape 3e — photo non envoyée, enregistrée sans son image à la demande
+// du praticien : mention rouge au rapport, comme les photos non rechargées.
+function _photoNonEnvoyeeHTML(label) {
+  return '<div class="rp-photo-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;">⚠️ Photo « '
+    + _escHtml(label || 'photo du test') + ' » non envoyée — à recapturer</div>';
+}
+// Version courte, pour la vignette et le mode photo.
+function _nonEnvoyeeCourtHTML() {
+  return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ photo non envoyée — à recapturer</div>';
+}
+// #279 étape 3f — photo ENVOYÉE mais non rechargée (path sans image) : même
+// forme, autre motif — elle existe sur le stockage, il faut la connexion.
+function _nonRechargeeCourtHTML() {
+  return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ photo non rechargée — connexion requise</div>';
+}
+
+// #279 étape 3b — réglages de dessin AU MOMENT de la capture : taille et
+// opacité des marqueurs, test. Les points seront redessinés avec eux, pour
+// que le rapport ne change pas d'aspect si le réglage change ensuite.
+function _dessinCapture() {
+  return { taille: markerSizeFactor, opacite: markerOpacity, testId: currentTestId };
+}
+
+// #279 étape 3b — relecture d'une capture sans points (launchTest) : rien pour
+// une capture antérieure, qui garde ses points dessinés dans l'image.
+function _relireImageBrute(p) {
+  return p && p.imageBrute ? { imageBrute: true, dessin: p.dessin || null } : {};
+}
+
+// #279 étape 3c — les points d'une capture imageBrute sont-ils redessinables ?
+// Dimensions numériques positives et au moins trois points placés (un angle
+// en exige trois). Sinon : « points non disponibles » (étape 3d), jamais une
+// photo d'aspect normal sans ses points.
+function _pointsCaptureLisibles(ph) {
+  if (!ph || !ph.imageBrute) return false;
+  const d = ph.dims;
+  if (!d || !Number.isFinite(d.w) || !Number.isFinite(d.h) || d.w <= 0 || d.h <= 0) return false;
+  const pts = Array.isArray(ph.markers) ? ph.markers.filter(_isPlacedPt) : [];
+  // #279 étape 3d — trois points placés PAR CÔTÉ MESURÉ.
+  //   Créneau D ou G : ce côté s'il a des points ; sinon les points SANS côté
+  //   (le MLA) ; sinon NON lisible — jamais les points de l'autre genou.
+  //   Créneau bipodal du KFPPA et de la mobilité : D ET G.
+  //   Autre créneau sans côté : les côtés présents.
+  const t = TESTS[ph.dessin?.testId];
+  let cotes;
+  if (ph.side === 'D' || ph.side === 'G') {
+    if (pts.some((m) => m.side === ph.side)) cotes = [ph.side];
+    else if (pts.some((m) => !m.side)) cotes = [''];
+    else return false;
+  }
+  else if (t && (t.kfppaPhotos || t.mobiliteAP)) cotes = ['D', 'G'];
+  else cotes = [...new Set(pts.map((m) => m.side || ''))];
+  if (!cotes.length) return false;
+  return cotes.every((c) => pts.filter((m) => (m.side || '') === c).length >= 3);
+}
+
+// #279 étape 3c — CALQUE des points d'une capture sans points : PNG transparent
+// aux dimensions de la capture, dessiné par drawOverlay avec les réglages DE LA
+// CAPTURE (taille, opacité, test), jamais ceux du moment. null si la capture
+// n'est pas imageBrute ou si ses points ne sont pas lisibles.
+// MÉMOIRE par capture : un même rendu peut afficher une photo deux fois (la
+// mobilité la montre dans les deux blocs de côté), et un PNG pleine résolution
+// ne se recalcule pas pour rien. Clé = tout ce qui détermine le dessin (dims,
+// points, réglages) : une capture modifiée n'est JAMAIS servie depuis la
+// mémoire. Bornée à 64 entrées, la plus ancienne sortant la première.
+const _CALQUES_CAPTURE = new Map();
+function _calqueCapture(ph) {
+  if (!_pointsCaptureLisibles(ph)) return null;
+  const des = ph.dessin || {};
+  const cle = JSON.stringify([ph.dims, ph.markers, des]);
+  const connu = _CALQUES_CAPTURE.get(cle);
+  if (connu) return connu;
+  const view = TESTS[des.testId]?.view || 'face';
+  const c = document.createElement('canvas');
+  c.width = ph.dims.w; c.height = ph.dims.h;
+  drawOverlay(c.getContext('2d'), c, ph.markers, -1, view,
+    { taille: des.taille, opacite: des.opacite, testId: des.testId });
+  const calque = c.toDataURL('image/png');
+  _CALQUES_CAPTURE.set(cle, calque);
+  if (_CALQUES_CAPTURE.size > 64) _CALQUES_CAPTURE.delete(_CALQUES_CAPTURE.keys().next().value);
+  return calque;
+}
+
+// #279 étape 3c — image d'un rapport, avec son calque s'il y en a un. Le cadre
+// épouse l'image (inline-block, line-height:0) ; le calque en reprend le style
+// en border-box avec une bordure TRANSPARENTE de même épaisseur, pour couvrir
+// exactement la même surface que l'image.
+function _imgRapportAvecCalque(ph, style) {
+  const calque = _calqueCapture(ph);
+  // #279 étape 3d — capture sans points non redessinable : l'image ET la mention.
+  if (!calque && ph.imageBrute) return `<img src="${ph.dataUrl}" style="${style}"/>` + _pointsIndisponiblesHTML();
+  if (!calque) return `<img src="${ph.dataUrl}" style="${style}"/>`;
+  return `<span class="rp-calque-cadre" style="position:relative;display:inline-block;line-height:0;">`
+    + `<img src="${ph.dataUrl}" style="${style}"/>`
+    + `<img class="rp-calque" src="${calque}" alt="" style="${style};position:absolute;left:0;top:0;width:100%;height:100%;box-sizing:border-box;border-color:transparent;background:transparent;pointer-events:none;"/>`
+    + `</span>`;
+}
+
 // Champs dérivés à la relecture. `markers` reste TOUJOURS un tableau ;
 // l'information « la géométrie est-elle connue ? » vit à côté.
 function _relireMarqueurs(brut) {
@@ -13929,11 +15765,15 @@ function _relireMarqueurs(brut) {
 // ══════════════════════════════════════════════════════
 // VALIDER & SAUVEGARDER
 // ══════════════════════════════════════════════════════
-async function validateAndSave() {
-  if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
-  const t=TESTS[currentTestId];
-  const view=t.view||'face';
-  let result={photos:[],frames:[],date:new Date().toLocaleString('fr-FR')};
+// #279 étape 2 — CONSTRUCTION du résultat d'un test, extraite de
+// validateAndSave SANS CHANGER SON COMPORTEMENT. Elle n'écrit RIEN : ni
+// currentPatient.mesures, ni stockage, ni Storage — elle lit les créneaux et
+// les frames qu'on lui passe et rend l'objet que validateAndSave enregistre.
+// C'est la brique de la sauvegarde automatique (#279 étape 4). Résultat figé
+// pour les 9 tests par tests/golden/resultats-279.json.
+function _construireResultatTest(testId, slots, frames, patient, date) {
+  const t=TESTS[testId];
+  let result={photos:[],frames:[],date};
 
   if(t.mode==='video'){
     // #250 — ÉCRITURE CONDITIONNELLE, et cette condition est le cœur du
@@ -13968,46 +15808,52 @@ async function validateAndSave() {
     // LECTURE PAR VÉRITÉ, jamais par identité : `f.markersConnus`, jamais
     // `=== true`. Sinon la normalisation à false n'aurait fait que déplacer le
     // piège — une entrée restée à undefined y échapperait en silence.
-    result.frames=capturedFrames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl,path:f.path,
+    result.frames=frames.map(f=>({time:f.time,angD:f.angD,angG:f.angG,dataUrl:f.dataUrl,path:f.path,
       ..._serialiserMarqueurs(f)}));
     // Pour les tests video avec encadrés photos (Mobilité, Verrouillage, MLA, Amorti)
-    if(t.showPhotoSlots && photoSlots.length) {
+    if(t.showPhotoSlots && slots.length) {
       // #250 — écriture CONDITIONNELLE, et lecture par vérité (jamais
       // `=== true`). Voir result.frames plus haut pour la justification
       // complète : ne jamais écrire le champ quand il n'a jamais existé, sous
       // peine de faire basculer « jamais eu de points » en « rien posé »,
       // irréversiblement.
-      result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
-        ..._serialiserMarqueurs(s)}));
+      result.photos=slots.map(_serialiserPhoto);
     }
     if(t.div!==undefined){
-      // KFPPA : calcul depuis photoSlots (unipodalD et unipodalG vs bipodale)
-      const slotsD=photoSlots.filter(s=>s.side==='D');
-      const slotsG=photoSlots.filter(s=>s.side==='G');
-      const bipodal=photoSlots.find(s=>s.side==='');
+      // #275-C — la norme appliquée part avec le bilan, écrite seulement
+      // quand une norme s'applique (voir _kfppaNormePourBilan).
+      const _normeKfppa=_kfppaNormePourBilan(testId, patient);
+      if(_normeKfppa) result.kfppaNorme=_normeKfppa;
+      // KFPPA : calcul depuis slots (unipodalD et unipodalG vs bipodale)
+      const slotsD=slots.filter(s=>s.side==='D');
+      const slotsG=slots.filter(s=>s.side==='G');
+      const bipodal=slots.find(s=>s.side==='');
       const uniD=slotsD[0]; const uniG=slotsG[0];
       // KFPPA = angle unipodal - angle bipodal
-      if(bipodal?.angle!=null && uniD?.angle!=null){
-        result.deltaD=uniD.angle-bipodal.angle;
-        result.pctD=result.deltaD/t.div;
+      // #275-B — LE BIPODAL SE LIT PAR JAMBE, PLUS PAR SON ANGLE UNIQUE.
+      // `bipodal.angle` valait un angle mesuré à cheval sur les deux jambes et
+      // vaut désormais null ; continuer à le lire rendrait Δ et pct
+      // DÉFINITIVEMENT NULS, donc un KFPPA sans résultat. On prend la valeur du
+      // côté concerné, qui était déjà calculée correctement.
+      // Les anciens bilans portent eux aussi angleD/angleG : ils restent donc
+      // calculables, sans recalcul ni migration.
+      if(bipodal?.angleD!=null && uniD?.angle!=null){
+        result.deltaD=uniD.angle-bipodal.angleD; // #275-D — plus de pctD
       }
-      if(bipodal?.angle!=null && uniG?.angle!=null){
-        result.deltaG=uniG.angle-bipodal.angle;
-        result.pctG=result.deltaG/t.div;
+      if(bipodal?.angleG!=null && uniG?.angle!=null){
+        result.deltaG=uniG.angle-bipodal.angleG; // #275-D — plus de pctG
       }
-      // Fallback sur capturedFrames
-      if(result.deltaD==null && capturedFrames.length>=2){
-        const f0=capturedFrames[0],f1=capturedFrames[1];
+      // Fallback sur frames
+      if(result.deltaD==null && frames.length>=2){
+        const f0=frames[0],f1=frames[1];
         result.deltaD=f1.angD!=null&&f0.angD!=null?f1.angD-f0.angD:null;
         result.deltaG=f1.angG!=null&&f0.angG!=null?f1.angG-f0.angG:null;
-        result.pctD=result.deltaD!=null?result.deltaD/t.div:null;
-        result.pctG=result.deltaG!=null?result.deltaG/t.div:null;
       }
     }
     if(t.normAm!==undefined){
-      // Amorti : lire depuis photoSlots (TalG,TalD,PlanG,PlanD,DigG,DigD)
-      const sD=photoSlots.filter(s=>s.side==='D');
-      const sG=photoSlots.filter(s=>s.side==='G');
+      // Amorti : lire depuis slots (TalG,TalD,PlanG,PlanD,DigG,DigD)
+      const sD=slots.filter(s=>s.side==='D');
+      const sG=slots.filter(s=>s.side==='G');
       const talD=sD[0]?.angle, planD=sD[1]?.angle, digD=sD[2]?.angle;
       const talG=sG[0]?.angle, planG=sG[1]?.angle, digG=sG[2]?.angle;
       if(talD!=null||planD!=null||digD!=null){
@@ -14024,8 +15870,9 @@ async function validateAndSave() {
   } else {
     // #250 — écriture CONDITIONNELLE, second chemin, et lecture par vérité
     // (jamais `=== true`). Voir result.frames plus haut pour la justification.
-    result.photos=photoSlots.map(s=>({label:s.label,side:s.side,dataUrl:s.dataUrl,angle:s.angle,angleD:s.angleD,angleG:s.angleG,path:s.path,
-      ..._serialiserMarqueurs(s)}));
+    // #275-A — même sérialiseur que le chemin vidéo : une copie du map
+    // aurait perdu kfppaSigne en silence.
+    result.photos=slots.map(_serialiserPhoto);
     if(t.normDiv!==undefined){
       const sD=result.photos.filter(s=>s.side==='D');
       const sG=result.photos.filter(s=>s.side==='G');
@@ -14052,17 +15899,89 @@ async function validateAndSave() {
     }
   }
 
+  return result;
+}
+
+// #279 étape 3e — entrées d'un résultat dont l'image n'est pas sur Storage.
+function _entreesNonEnvoyees(result) {
+  return [...(result.photos || []), ...(result.frames || [])]
+    .filter((e) => e && !e.path && typeof e.dataUrl === 'string' && e.dataUrl.startsWith('data:'));
+}
+// Message de validation : nomme les photos et dit ce que fait CHAQUE bouton.
+// « Annuler » ne fait JAMAIS perdre une photo : il mène aux autres choix.
+function _messageNonEnvoyees(entrees) {
+  const noms = entrees.map((e) => '« ' + (e.label || 'photo') + ' »').join(', ');
+  const un = entrees.length === 1;
+  return (un ? 'Photo ' + noms + ' non envoyée' : 'Photos ' + noms + ' non envoyées')
+    + ' — vérifiez votre connexion.\n\n'
+    + "OK = réessayer l'envoi ; Annuler = autres choix.";
+}
+// Seconde question : la conséquence en clair ; « Annuler » revient au test.
+function _messageSansPhoto(entrees) {
+  const un = entrees.length === 1;
+  return (un
+    ? 'Enregistrer le test SANS cette photo ? Son angle et ses points sont conservés, la photo devra être recapturée.'
+    : 'Enregistrer le test SANS ces photos ? Leurs angles et leurs points sont conservés, les photos devront être recapturées.')
+    + '\n\nOK = enregistrer sans ' + (un ? 'la photo' : 'les photos')
+    + ' ; Annuler = revenir au test sans rien enregistrer (' + (un ? 'la photo reste' : 'les photos restent')
+    + ' à l’écran, vous pourrez réessayer plus tard).';
+}
+
+async function validateAndSave() {
+  if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
+  const t=TESTS[currentTestId];
+  // #279 étape 2 — construction extraite, sans écriture (voir la fonction).
+  const result=_construireResultatTest(currentTestId, photoSlots, capturedFrames, currentPatient, new Date().toLocaleString('fr-FR'));
+
   if(!currentPatient.mesures) currentPatient.mesures={};
   // bilanId stable pour scoper les paths Storage (Task #53 PR B2). Lazy
   // creation : ne ré-écrit pas un _bilanId déjà présent (compat reopen).
   if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
+  // #279 étape 3e — valeur précédente gardée : si le praticien revient au test
+  // sans rien enregistrer, le bilan en mémoire doit être INCHANGÉ (sinon un
+  // prochain enregistrement y écrirait ce résultat, image comprise).
+  const _avaitPrecedent = Object.prototype.hasOwnProperty.call(currentPatient.mesures, currentTestId);
+  const _precedent = currentPatient.mesures[currentTestId];
   currentPatient.mesures[currentTestId]=result;
   // Migration Storage : upload des dataUrls neuves de result.photos[] et
   // result.frames[] vers patient-media. Le stash récupère les dataUrls
   // initiales pour les restaurer en RAM post-save (édition continue sans
   // re-fetch). Best-effort : si une migration échoue, la dataUrl reste
   // dans l'entry et sera retentée au prochain save.
-  const photoStash = await migrateSportPhotos(result, currentPatient.id, currentPatient.mesures._bilanId, currentTestId);
+  let photoStash = await migrateSportPhotos(result, currentPatient.id, currentPatient.mesures._bilanId, currentTestId);
+  // #279 étape 3e — photo TOUJOURS sans path après la migration : le praticien
+  // est prévenu et peut réessayer. S'il continue, le créneau est enregistré
+  // SANS son image (nonEnvoyee), coordonnées et angle gardés. JAMAIS de data:
+  // dans le stockage local : son image n'est pas non plus remise en mémoire
+  // dans le bilan, d'où un prochain enregistrement la réécrirait.
+  let _nonEnv = _entreesNonEnvoyees(result);
+  while (_nonEnv.length) {
+    if (confirm(_messageNonEnvoyees(_nonEnv))) {
+      photoStash = photoStash.concat(await migrateSportPhotos(result, currentPatient.id, currentPatient.mesures._bilanId, currentTestId));
+      _nonEnv = _entreesNonEnvoyees(result);
+      continue;
+    }
+    if (!confirm(_messageSansPhoto(_nonEnv))) {
+      // Revenir au test SANS RIEN ÉCRIRE : bilan en mémoire restauré, les
+      // photos restent dans leurs créneaux (photoSlots n'a pas été touché).
+      if (_avaitPrecedent) currentPatient.mesures[currentTestId] = _precedent;
+      else delete currentPatient.mesures[currentTestId];
+      return;
+    }
+    _nonEnv.forEach((e) => { delete e.dataUrl; e.nonEnvoyee = true; });
+    photoStash = photoStash.filter((x) => !x.entry.nonEnvoyee);
+    // #279 étape 3f — KFPPA : un Δ persisté calculé avec une photo désormais
+    // non envoyée est RETIRÉ (bipodale → les deux côtés ; unipodale → son
+    // côté). Aucun calcul dérivé n'est gardé tant qu'elle n'est pas recapturée.
+    if (t.div !== undefined) {
+      const _ph = result.photos || [];
+      const _bipNE = _ph.some((p) => p && p.side === '' && p.nonEnvoyee);
+      ['D', 'G'].forEach((s) => {
+        if (_bipNE || _ph.some((p) => p && p.side === s && p.nonEnvoyee)) delete result['delta' + s];
+      });
+    }
+    break;
+  }
   syncOpenedBilanToHistory();
   savePatients();
   // Restaure les dataUrls migrées en RAM (par référence) pour conserver
@@ -15233,6 +17152,9 @@ function buildTestPreview(t,data) {
 }
 
 function buildSidePreview(side,t,data) {
+  // #275-B — LOCAL À CE RENDU. Une globale resterait vraie d'un bilan au
+  // suivant et ferait apparaître le message sur un bilan correct.
+  let _kfppaMsg=null; // message éventuel, jamais partagé entre deux rendus
   let pct=null,ang=null,label=side==='D'?'Côté Droit':'Côté Gauche';
   const sideC=side==='D'?'var(--blue)':'var(--green)';
   if(t.div!==undefined){
@@ -15242,14 +17164,14 @@ function buildSidePreview(side,t,data) {
     const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
     const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
     const uniAng=_toIncl(uni?.angle);
-    console.log('KFPPA debug',side,'bipodal=',bipodal,'uni=',uni,'bipAng=',bipAng,'uniAng=',uniAng);
     if(bipAng!=null&&uniAng!=null){
       ang=uniAng-bipAng;
       pct=ang/t.div;
     } else {
-      pct=side==='D'?data.pctD:data.pctG;
-      ang=side==='D'?data.deltaD:data.deltaG;
-      if(ang!=null) ang=_toIncl(ang)<ang?_toIncl(ang):ang;
+      // #275-B — pas de repli sur les valeurs enregistrées : elles viennent de
+      // l'angle à cheval. La décision est LOCALE, d'après la seule présence de
+      // angleD/angleG pour ce bilan — aucun état partagé entre deux rendus.
+      pct=null; ang=null; _kfppaMsg=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
     }
   }
   else if(t.normDiv!==undefined||t.mlaTest){
@@ -15376,7 +17298,7 @@ function buildSidePreview(side,t,data) {
   const clr=t.div?clrGenou(pct):clrGen(pct);
   return `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:var(--rs);padding:10px;">
     <div style="font-size:11px;font-weight:700;color:${sideC};margin-bottom:6px;">${label}</div>
-    ${buildGaugeMini(pctVal,ang?ang.toFixed(1)+'°':'—',clr)}
+    ${buildGaugeMini(pctVal,_kfppaMsg?_kfppaMsg:(ang?ang.toFixed(1)+'°':'—'),clr)}
     ${buildPhotoMini(data,side,t)}
   </div>`;
 }
@@ -15398,11 +17320,19 @@ function buildPhotoMini(data,side,t) {
   const frames=(data.frames||[]);
   if(!photos.length&&!frames.length) return '';
   const items=photos.length?photos:frames.slice(0,2).map((f,i)=>({label:t.frameLabels?.[i]||'Frame '+(i+1),dataUrl:f.dataUrl,angle:side==='D'?f.angD:f.angG}));
+  // #275-B — créneau bipodal KFPPA : jamais ph.angle (le nombre à cheval sur
+  // les deux jambes, 124° sur les anciens bilans), toujours « D x° · G y° ».
+  // Seulement pour les PHOTOS : les éléments tirés des frames n'ont pas de
+  // côté et seraient pris à tort pour le créneau bipodal.
+  const _txt=(ph)=>{
+    const bip=photos.length?_kfppaBipodalTexte(t,ph):null;
+    return bip!=null?bip:(ph?.angle!=null?ph.angle.toFixed(1)+'°':ph?.label||'');
+  };
   return `<div style="display:flex;gap:4px;margin-top:6px;">${items.slice(0,2).map(ph=>`
     <div style="flex:1;text-align:center;">
       ${ph?.dataUrl?`<img src="${ph.dataUrl}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid var(--bord);"/>`
       :`<div style="aspect-ratio:4/3;background:var(--card);border:1px dashed var(--bord);border-radius:4px;"></div>`}
-      <div style="font-size:9px;color:var(--mut);margin-top:2px;">${ph?.angle!=null?ph.angle.toFixed(1)+'°':ph?.label||''}</div>
+      <div style="font-size:9px;color:var(--mut);margin-top:2px;">${_txt(ph)}</div>
     </div>`).join('')}</div>`;
 }
 
@@ -16623,17 +18553,59 @@ function sectionTitle(t) {
 //     consommé par _buildSportSyntheseHTMLForRapport (résumé en tête de la synthèse
 //     de clôture du rapport — cadrage option C : détail complet en haut + résumé
 //     condensé en bas, doublon INTENTIONNEL pour rappel synthétique en fin de page).
+// #275-D — alertes KFPPA d'un bilan, pour les deux genoux :
+//   - message bipodal (non recalculable, photo manquante) : repris tel quel ;
+//   - U signé hors « Dans la norme » : sa classe, avec la norme ENREGISTRÉE ;
+//   - U signé sans norme appliquée : le motif (civilité, norme non définie) ;
+//   - U non signé ou absent : RIEN — pas de verdict sans signe.
+// Aucune chaîne vide ; aucun pourcentage.
+function _kfppaAlertes(t, m, data, condensed) {
+  const norme = kfppaNormeBilan(data);
+  const out = [];
+  ['D', 'G'].forEach(side => {
+    const lib = `${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label}`;
+    const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+    if (msg) out.push(`${lib} — ${msg}`);
+    const a = _kfppaGenou(data.photos, side, norme);
+    // #279 étape 3f — exclusions : le motif de la MÊME analyse que le panneau
+    // et le rapport (kfppaMotifDelta), puis le verdict non calculé si U l'est.
+    const motif = kfppaMotifDelta(a);
+    if (a.delta == null && motif) out.push(`${lib} — ${motif} : composante dynamique non calculée`);
+    if (a.uExclu) { out.push(`${lib} — ${KFPPA_EXCLU_UNI} : verdict non calculé`); return; }
+    if (a.U == null || !a.uSigne) return;
+    if (!a.classeU) { out.push(`${lib} — ${kfppaTexteNorme(a.norme)}`); return; }
+    if (a.classeU === 'Dans la norme') return;
+    out.push(condensed
+      ? `${lib} — ${a.classeU}`
+      : `${lib} : U ${kfppaSigneTxt(a.U)} — ${a.classeU} (${kfppaTexteNorme(a.norme)})`);
+  });
+  return out.filter(x => typeof x === 'string' && x.trim() !== '');
+}
+
 function _collectTestAlerts(t, data, opts = {}) {
   if(!t) return [];
   const condensed = !!opts.condensed;
   const alerts = [];
   (t.measures || []).forEach(m => {
+    // #275-D — KFPPA : l'alerte vient de la CLASSE de U, jamais d'un
+    // pourcentage. Branche placée AVANT `if(!compute) return` : sans elle, le
+    // retrait de MEASURE_COMPUTERS.kfppa ferait sortir en silence, messages
+    // bipodaux compris. Seules des chaînes non vides sont poussées.
+    if (m.interpretFn === 'kfppa') {
+      _kfppaAlertes(t, m, data, condensed).forEach(a => { if (a) alerts.push(a); });
+      return;
+    }
     const compute = MEASURE_COMPUTERS[m.key];
     const interpret = m.interpretFn === 'kfppa' ? interpretKfppa : interpretGen;
     const isAbs = m.interpretFn !== 'kfppa'; // KFPPA conserve le signe (valgus/varus)
     if(!compute) return;
     ['D', 'G'].forEach(side => {
       const ratio = compute(t, data, side);
+      // #275-B — un KFPPA dont le bipodal n'a pas de valeur par jambe n'est
+      // pas recalculable. On le DIT, au lieu de laisser l'absence passer pour
+      // une mesure dans la norme. Décidé localement, sur CE bilan.
+      // La présence de la photo se teste par (dataUrl || path) : la dataURL
+      // est retirée après envoi vers le stockage, seul path subsiste.
       if(ratio == null) return;
       const ratioForInterpret = isAbs ? Math.abs(ratio) : ratio;
       const classification = interpret(ratioForInterpret);
@@ -16665,28 +18637,34 @@ function buildPrintSection(t, data, conclusions) {
       <div class="rp-side-grid">
         ${buildPrintSide('D',t,data)}
         ${buildPrintSide('G',t,data)}
-      </div>`;
+      </div>
+      ${t.div!==undefined?_kfppaPhotoBipodaleHTML(data,t):''}`;
 
     // Texte clinique
     const lines=[];
     if(t.div!==undefined){
-      // Recalculer depuis photos pour la synthèse
-      const _bip=data.photos?.find(p=>p.side==='');
-      const _uD=data.photos?.find(p=>p.side==='D');
-      const _uG=data.photos?.find(p=>p.side==='G');
-      const _toI=(v)=>v==null?null:(v>90?180-v:v);
-      const _bdD=_toI(_bip?.angleD), _bdG=_toI(_bip?.angleG);
-      const _udD=_toI(_uD?.angle), _udG=_toI(_uG?.angle);
-      const _dD=(_bdD!=null&&_udD!=null)?_udD-_bdD:_toI(data.deltaD);
-      const _dG=(_bdG!=null&&_udG!=null)?_udG-_bdG:_toI(data.deltaG);
-      const _pD=_dD!=null?_dD/t.div:null;
-      const _pG=_dG!=null?_dG/t.div:null;
-      const pD=_pD,pG=_pG;
-      const vD=pD!=null&&!isNaN(pD)?Math.round(pD*100):null,vG=pG!=null&&!isNaN(pG)?Math.round(pG*100):null;
-      const normStr=`${t.normeMin}°–${t.normeMax}°`;
-      if(vD!==null) lines.push(`<strong>Genou droit :</strong> KFPPA = ${data.deltaD?.toFixed(1)||'—'}° (${vD}%) — ${interpretKfppa(pD)}`);
-      if(vG!==null) lines.push(`<strong>Genou gauche :</strong> KFPPA = ${data.deltaG?.toFixed(1)||'—'}° (${vG}%) — ${interpretKfppa(pG)}`);
-      lines.push(`Norme physiologique : ${normStr}`);
+      // #275-D — PLUS AUCUN POURCENTAGE ni t.normeMin/normeMax. La norme est
+      // celle ENREGISTRÉE avec le bilan (data.kfppaNorme) : absente ou
+      // incohérente → « norme non définie », jamais une valeur par défaut.
+      // Chaque genou : statique et sa classe, composante dynamique Δ (sans
+      // verdict), valeur unipodale U et son verdict. Puis l'asymétrie D − G
+      // décomposée, calculée sur les valeurs affichées.
+      const _norme=kfppaNormeBilan(data);
+      const _aD=_kfppaGenou(data.photos,'D',_norme), _aG=_kfppaGenou(data.photos,'G',_norme);
+      const _ligne=(cote,a)=>{
+        const nom=cote==='D'?'Genou droit':'Genou gauche';
+        // Statique inconnu (photo bipodale manquante ou non recalculable) :
+        // le message, puis la valeur unipodale seule — ni statique ni Δ.
+        const msg=_kfppaMessageBipodal(_kfppaEtatBipodal(data.photos,cote));
+        if(msg) return `<strong>${nom} :</strong> ${msg} ; ${kfppaTexteUnipodal(a)}.`;
+        // kfppaPhraseGenou commence par « <nom> : » : le libellé passe en gras.
+        return `<strong>${nom} :</strong>${kfppaPhraseGenou(cote,a).slice(nom.length+2)}`;
+      };
+      lines.push(_ligne('D',_aD));
+      lines.push(_ligne('G',_aG));
+      const _asym=kfppaPhraseAsymetrie(_aD,_aG);
+      if(_asym) lines.push(_asym);
+      lines.push(`Norme appliquée : ${_kfppaNormeDetail(_norme)}`);
     } else if(t.normDiv!==undefined||t.mlaTest){
       const vD=(data.pctD!=null&&!isNaN(data.pctD))?Math.round(data.pctD*100):null;
       const vG=(data.pctG!=null&&!isNaN(data.pctG))?Math.round(data.pctG*100):null;
@@ -16798,28 +18776,14 @@ function buildPrintSection(t, data, conclusions) {
 }
 
 function buildPrintSide(side, t, data) {
+  // #275-D — le KFPPA a son propre bloc : plus de jauge en pourcentage ni de
+  // t.normeMin/normeMax. Voir _kfppaPrintSideHTML.
+  if(t.div!==undefined) return _kfppaPrintSideHTML(side, t, data);
   const sideC=side==='D'?'#185FA5':'#0B6B2C';
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
-  let pct=null,ang=null,_kfppaUniAng=null;
+  let pct=null,ang=null;
 
-  if(t.div!==undefined){
-    const bipodal=data.photos?.find(p=>p.side==='');
-    const uni=data.photos?.find(p=>p.side===side);
-    const _toIncl=(v)=>v==null?null:(v>90?180-v:v);
-    const bipAng=_toIncl(side==='D'?bipodal?.angleD:bipodal?.angleG);
-    const uniAng=_toIncl(uni?.angle);
-    _kfppaUniAng=uniAng;
-    if(bipAng!=null&&uniAng!=null){
-      ang=uniAng-bipAng;
-      pct=ang/t.div;
-    } else {
-      pct=side==='D'?data.pctD:data.pctG;
-      ang=side==='D'?data.deltaD:data.deltaG;
-      const _ti2=(v)=>v==null?null:(v>90?180-v:v);
-      if(ang!=null) ang=_ti2(ang);
-    }
-  }
-  else if(t.normDiv!==undefined||t.mlaTest){
+  if(t.normDiv!==undefined||t.mlaTest){
     pct=side==='D'?data.pctD:data.pctG;
     ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
     // Si pas de données calculées, recalculer depuis photos
@@ -16938,12 +18902,12 @@ function buildPrintSide(side, t, data) {
     </div>`;
   }
   const pctVal=pct!==null?Math.round(pct*100):null;
-  const isGenou=t.div!==undefined;
+  const isGenou=false; // #275-D — le KFPPA ne passe plus par ici
   const cssC=rp_cssColor(pct,isGenou);
   const r=35,circ=2*Math.PI*r,fill=circ*Math.min(100,Math.max(0,pctVal||0))/100;
   const badgeCls=rp_badgeCls(pct,isGenou);
   const badgeTxt=rp_badgeTxt(pct,isGenou);
-  const ph=buildPrintPhotos(data,side,t,_kfppaUniAng||undefined);
+  const ph=buildPrintPhotos(data,side,t);
 
   return `<div class="rp-side-block rp-side-${side}">
     <div class="rp-side-title">${sideLabel}</div>
@@ -16961,7 +18925,52 @@ function buildPrintSide(side, t, data) {
       ${ph}
     </div>
     <div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>
-    ${t.normeMin!==undefined?`<div class="rp-gauge-norm">Norme : ${t.normeMin}°–${t.normeMax}°</div>`:''}
+  </div>`;
+}
+
+// #275-D — bloc d'UN genou dans le rapport imprimé et son aperçu : valeur
+// unipodale U colorée par sa classe, verdict en badge, statique S et sa
+// classe, composante dynamique Δ (jamais de verdict), norme ENREGISTRÉE avec
+// le bilan, photo unipodale. Aucun pourcentage.
+function _kfppaPrintSideHTML(side, t, data) {
+  const norme = kfppaNormeBilan(data);
+  const a = _kfppaGenou(data.photos, side, norme);
+  const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+  const coul = _KFPPA_COUL_RAPPORT[a.couleur];
+  // Sans norme appliquée, la place du verdict reste VIDE : le motif (norme non
+  // définie, civilité non renseignée) figure une seule fois, ligne de la norme.
+  // #279 étape 3f — valeur exclue (photo non envoyée) : affichée, mention
+  // rouge ; Δ et verdict non calculés, avec le motif de la même analyse.
+  const rouge = (t) => _kfppaExcluHTML(t, '#b91c1c');
+  const motif = kfppaMotifDelta(a);
+  const verdict = a.uExclu
+    ? rouge(`verdict non calculé (${KFPPA_EXCLU_UNI})`)
+    : a.classeU
+      ? `<span class="${_KFPPA_BADGE_RAPPORT[a.couleur]}">${a.classeU}</span>`
+      : '';
+  const txtS = msg
+    || (a.sExclu
+      ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
+      : kfppaTexteS(a.S, a.sSigne));
+  const txtD = a.delta == null && motif ? rouge(`non calculé (${motif})`) : kfppaTexteDelta(a.delta);
+  const txtNorme = a.norme.statut === 'ok'
+    ? `Norme : ${a.norme.min}–${a.norme.max}°${a.norme.sexe ? `, ${a.norme.sexe}` : ''}`
+    : kfppaTexteNorme(a.norme);
+  return `<div class="rp-side-block rp-side-${side}">
+    <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
+    <div class="rp-gauge-photos">
+      <div class="rp-kfppa-u" style="text-align:center;min-width:90px;">
+        <div style="font-size:8px;color:#666;">Unipodal (U)</div>
+        <div class="rp-gauge-deg" style="font-size:15px;font-weight:700;color:${coul};">${a.U == null ? '—' : a.uSigne ? kfppaSigneTxt(a.U) : _kfppaMagnitude(a.U)}</div>
+        ${a.U != null && !a.uSigne ? '<div class="rp-kfppa-sans-signe" style="font-size:7px;color:#888;">sens valgus/varus non enregistré</div>' : ''}
+        ${a.uExclu ? `<div style="font-size:7px;">${rouge('valeur exclue des calculs')}</div>` : ''}
+      </div>
+      ${buildPrintPhotos(data, side, t)}
+    </div>
+    <div style="font-size:9px;margin-top:4px;">Statique (S) : ${txtS}</div>
+    <div style="font-size:9px;">Composante dynamique (Δ) : ${txtD}</div>
+    <div style="margin-top:4px;text-align:center;">${verdict}</div>
+    <div class="rp-gauge-norm">${txtNorme}</div>
   </div>`;
 }
 
@@ -16975,7 +18984,7 @@ function buildPrintSingleSide(t,data) {
   const phHTML=photos.slice(0,2).map((ph,i)=>`
     <div class="rp-photo-wrap">
       <div class="rp-photo-lbl">${ph.label}</div>
-      ${ph.dataUrl?`<img src="${ph.dataUrl}"/>`:'<div class="rp-photo-empty">Pas de photo</div>'}
+      ${ph.dataUrl?_imgRapportAvecCalque(ph, 'max-width:100%'):ph.nonEnvoyee?_photoNonEnvoyeeHTML(ph.label):'<div class="rp-photo-empty">Pas de photo</div>'}
       ${ph.angle!=null?`<div class="rp-photo-ang" style="color:${cssC};">${ph.angle.toFixed(1)}°</div>`:''}
     </div>`).join('');
   return `<div class="rp-section">
@@ -17025,6 +19034,23 @@ function buildPrintSingleSide(t,data) {
     </div>`;
 }
 
+// #275-D — photo de test qui EXISTE (path en stockage) mais dont la dataURL
+// n'a pas pu être rechargée avant le rendu. Même mention rouge et même palette
+// que les images non chargées du rapport sport (#150, buildBilanPrintSection :
+// #b91c1c / #fef2f2 / #fecaca) : un rapport amputé ne doit pas avoir l'air
+// normal. Le rendu n'a lieu qu'APRÈS _prefetchAllSportMesuresPhotos (attendu
+// par buildRapport et printReport) : aucun chargement n'est encore en cours.
+// #279 étape 3c/3d — capture sans points dont les points ne peuvent pas être
+// redessinés : même mention rouge que les photos non rechargées.
+function _pointsIndisponiblesHTML() {
+  return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ points non disponibles</div>';
+}
+
+function _photoNonRechargeeHTML(label) {
+  return '<div class="rp-photo-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;">⚠️ Photo « '
+    + _escHtml(label || 'photo du test') + ' » non rechargée depuis le stockage — régénérez le rapport (connexion requise) avant remise au patient.</div>';
+}
+
 function buildPrintPhotos(data,side,t,angleOverride) {
   const allPhotos=data.photos||[];
   // Filtrer par côté si side est défini, sinon prendre toutes les photos sans côté
@@ -17039,17 +19065,25 @@ function buildPrintPhotos(data,side,t,angleOverride) {
     items=frames.slice(0,3).map((f,i)=>({
       label:t.frameLabels?.[i]||'Frame '+(i+1),
       dataUrl:f.dataUrl,
+      path:f.path, // #275-D — pour distinguer « non rechargée » de « jamais prise »
+      nonEnvoyee:f.nonEnvoyee, // #279 étape 3e
       angle:side==='D'?f.angD:f.angG
     }));
   }
   if(!items.length) return '';
+  // #275-D — KFPPA : la légende reprend EXACTEMENT le grand chiffre U
+  // (« +11.2° », « −3.4° », ou magnitude seule « 4.4° » sans signe). Les
+  // autres tests gardent leur légende.
+  const _legende=(ph)=>t?.kfppaPhotos
+    ? (ph.kfppaSigne ? kfppaSigneTxt(ph.angle) : _kfppaMagnitude(ph.angle))
+    : Number(angleOverride!=null?angleOverride:ph.angle).toFixed(1)+'°';
   return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;justify-content:flex-start;">
     ${items.map(ph=>ph?.dataUrl?`
       <div style="text-align:center;flex:0 0 auto;">
-        <img src="${ph.dataUrl}" style="height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block;"/>
+        ${_imgRapportAvecCalque(ph, 'height:70px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;border:1px solid #ddd;display:block')}
         <div style="font-size:7px;color:#666;margin-top:2px;">${ph.label||''}</div>
-        ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${Number(angleOverride!=null?angleOverride:ph.angle).toFixed(1)}°</div>`:''}
-      </div>`:'').join('')}
+        ${ph?.angle!=null?`<div style="font-size:8px;font-weight:700;color:#333;">${_legende(ph)}</div>`:''}
+      </div>`:(ph?.nonEnvoyee?_photoNonEnvoyeeHTML(ph.label):ph?.path?_photoNonRechargeeHTML(ph.label):'')).join('')}
   </div>`;
 }
 

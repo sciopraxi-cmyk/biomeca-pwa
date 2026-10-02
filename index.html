@@ -651,9 +651,9 @@
       <div class="tcard-sub">Valgus dynamique genou D+G · 8 km/h</div>
     </div>
     <div class="tcard" onclick="launchTest('kfppa-sldj')">
-      <div class="tcard-icon"><svg width="70" height="72" viewBox="0 0 70 72"><ellipse cx="35" cy="7" rx="6" ry="6" fill="#4a9eff" opacity=".9"/><line x1="35" y1="13" x2="35" y2="30" stroke="#4a9eff" stroke-width="5" stroke-linecap="round"/><line x1="19" y1="19" x2="35" y2="24" stroke="#4a9eff" stroke-width="4" stroke-linecap="round"/><line x1="51" y1="18" x2="35" y2="24" stroke="#4a9eff" stroke-width="4" stroke-linecap="round"/><line x1="35" y1="30" x2="35" y2="58" stroke="#4a9eff" stroke-width="4" stroke-linecap="round"/><line x1="35" y1="30" x2="46" y2="48" stroke="#4a9eff" stroke-width="4" stroke-linecap="round" opacity=".5"/><circle cx="35" cy="46" r="4" fill="#FFD700" opacity=".9"/><rect x="23" y="60" width="24" height="3" rx="1.5" fill="#4a9eff" opacity=".35"/><text x="35" y="70" text-anchor="middle" font-size="7" fill="#8892a4" font-family="sans-serif">Chute 30cm · Bilatéral</text></svg></div>
-      <div class="tcard-title">KFPPA SLDJ</div>
-      <div class="tcard-sub">Saut unipodal D+G</div>
+      <div class="tcard-icon"><svg width="70" height="72" viewBox="0 0 70 72"><ellipse cx="35" cy="7" rx="6" ry="6" fill="#4a9eff" opacity=".9"/><line x1="35" y1="13" x2="35" y2="30" stroke="#4a9eff" stroke-width="5" stroke-linecap="round"/><line x1="19" y1="19" x2="35" y2="24" stroke="#4a9eff" stroke-width="4" stroke-linecap="round"/><line x1="51" y1="18" x2="35" y2="24" stroke="#4a9eff" stroke-width="4" stroke-linecap="round"/><line x1="35" y1="30" x2="35" y2="58" stroke="#4a9eff" stroke-width="4" stroke-linecap="round"/><line x1="35" y1="30" x2="46" y2="48" stroke="#4a9eff" stroke-width="4" stroke-linecap="round" opacity=".5"/><circle cx="35" cy="46" r="4" fill="#FFD700" opacity=".9"/><rect x="23" y="60" width="24" height="3" rx="1.5" fill="#4a9eff" opacity=".35"/><text x="35" y="70" text-anchor="middle" font-size="7" fill="#8892a4" font-family="sans-serif">Réception unipodale · 30 cm</text></svg></div>
+      <div class="tcard-title">KFPPA USL</div>
+      <div class="tcard-sub">Réception unipodale D+G</div>
     </div>
   </div>
 
@@ -3276,6 +3276,27 @@
   </div>
 </div>
 
+<!-- #273 — agrandissement d'une capture. Placée AU NIVEAU RACINE, à côté des
+     autres modales : dans une .page elle hériterait du visibility:hidden que
+     porte toute page inactive. Sa visibilité est pilotée par la classe
+     .ouverte, pas par un style en ligne — voir .vig-modal dans la feuille.
+     Le fond ferme au clic (_vigFondClic ne ferme que si la cible EST le fond,
+     donc jamais depuis l'image). -->
+<div id="modal-vignette" class="vig-modal" onclick="_vigFondClic(event)">
+  <div class="vig-modal-inner">
+    <!-- #279 étape 3c — cadre ajusté à l'image, pour y poser le calque des points. -->
+    <span class="vig-modal-cadre">
+      <img id="vig-modal-img" alt="Capture agrandie"/>
+      <img id="vig-modal-calque" class="vig-modal-calque" alt="" hidden/>
+    </span>
+    <div class="vig-modal-bar">
+      <span id="vig-modal-lbl"></span>
+      <span id="vig-modal-ang" class="vig-modal-ang"></span>
+    </div>
+  </div>
+  <button class="vig-modal-x" onclick="fermerVignette()" aria-label="Fermer">×</button>
+</div>
+
 <div class="page page-claire" id="pg-params">
   <div style="padding:16px 20px;max-width:700px;margin:0 auto;">
     <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">⚙️ Paramètres</h2>
@@ -3558,66 +3579,68 @@
 
       <!-- MODE VIDEO -->
       <div id="mode-video" style="display:none;">
-        <div class="cam-ctrls">
-          <select id="vcam-select" class="inp" style="font-size:12px;padding:4px 8px;max-width:200px;" onchange=""></select>
-          <button class="btn btn-green" id="btn-vcam" onclick="toggleVCam()">▶ Activer caméra</button>
-          <button class="btn btn-red" id="btn-vrec" onclick="toggleRec()" style="display:none;">⏺ Rec</button>
-          <button class="btn" id="btn-vauto" onclick="toggleVAutoDetect()" style="display:none;">Auto : OFF</button>
-          <button class="btn" id="btn-vsnap" onclick="snapMarkersToReflectiveBlobs()" style="display:none;">🎯 Caler les capteurs</button>
-          <button class="btn" id="btn-vzone" onclick="toggleVidZone()" style="display:none;" title="Tracez un rectangle englobant toutes les pastilles (sans chaussures ni sol) : le seuil de détection devient relatif à la zone">◱ Zone</button>
-          <button class="btn" onclick="document.getElementById('vid-file-in').click()">Importer</button>
-          <input type="file" id="vid-file-in" accept="video/*" style="display:none;" onchange="loadVidFile(this)"/>
-          <span class="badge bd" id="vcam-st">Inactive</span>
-        </div>
-        <!-- #236 — même mécanique qu'en mode photo : #vid-zoom porte la largeur
-             zoomée, le cadre défile. Les coordonnées de clic restent exactes. -->
-        <div id="vid-wrap" style="position:relative;background:#060810;border-radius:var(--r);overflow:auto;border:1px solid var(--bord);">
-          <div id="vid-zoom" style="position:relative;width:100%;">
-          <video id="vid-el" style="width:100%;display:block;opacity:.9;" playsinline></video>
-          <!-- #200 — height:100% forcé cassait le ratio intrinsèque du canvas (qui suit
-               videoWidth/videoHeight, cf. toggleVCam/loadVidFile/toggleRec) dès que la
-               caméra ne rendait pas exactement la hauteur du parent (caméra haute
-               vitesse à ratio différent → image étirée). width seul laisse le canvas
-               suivre son propre ratio, comme #ph-canvas en mode photo. -->
-          <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;cursor:crosshair;"></canvas>
-          <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
-          <div class="angle-overlay" id="vid-angles"></div>
+        <div id="vid-left">
+          <div class="cam-ctrls">
+            <select id="vcam-select" class="inp" style="font-size:12px;padding:4px 8px;max-width:200px;" onchange=""></select>
+            <button class="btn btn-green" id="btn-vcam" onclick="toggleVCam()">▶ Activer caméra</button>
+            <button class="btn btn-red" id="btn-vrec" onclick="toggleRec()" style="display:none;">⏺ Rec</button>
+            <button class="btn" id="btn-vauto" onclick="toggleVAutoDetect()" style="display:none;">Auto : OFF</button>
+            <button class="btn" id="btn-vsnap" onclick="snapMarkersToReflectiveBlobs()" style="display:none;">🎯 Caler les capteurs</button>
+            <button class="btn" id="btn-vzone" onclick="toggleVidZone()" style="display:none;" title="Tracez un rectangle englobant toutes les pastilles (sans chaussures ni sol) : le seuil de détection devient relatif à la zone">◱ Zone</button>
+            <button class="btn" onclick="document.getElementById('vid-file-in').click()">Importer</button>
+            <input type="file" id="vid-file-in" accept="video/*" style="display:none;" onchange="loadVidFile(this)"/>
+            <span class="badge bd" id="vcam-st">Inactive</span>
           </div>
-        </div>
-        <div class="vid-ctrls">
-          <button class="btn" id="btn-play" onclick="togglePlay()">▶</button>
-          <button class="btn" onclick="stepFrame(-1)">◀−1</button>
-          <button class="btn" onclick="stepFrame(1)">+1▶</button>
-          <span style="font-size:11px;color:var(--mut);font-family:var(--fm);" id="time-disp">0.00/0.00s</span>
+          <!-- #236 — même mécanique qu'en mode photo : #vid-zoom porte la largeur
+               zoomée, le cadre défile. Les coordonnées de clic restent exactes. -->
+          <div id="vid-wrap" style="position:relative;background:#060810;border-radius:var(--r);overflow:auto;border:1px solid var(--bord);">
+            <div id="vid-zoom" style="position:relative;width:100%;">
+            <video id="vid-el" style="width:100%;display:block;opacity:.9;" playsinline></video>
+            <!-- #200 — height:100% forcé cassait le ratio intrinsèque du canvas (qui suit
+                 videoWidth/videoHeight, cf. toggleVCam/loadVidFile/toggleRec) dès que la
+                 caméra ne rendait pas exactement la hauteur du parent (caméra haute
+                 vitesse à ratio différent → image étirée). width seul laisse le canvas
+                 suivre son propre ratio, comme #ph-canvas en mode photo. -->
+            <canvas id="vid-canvas" style="position:absolute;top:0;left:0;width:100%;cursor:crosshair;"></canvas>
+            <div class="cam-info" id="vid-info">Activez caméra ou importez vidéo</div>
+            <div class="angle-overlay" id="vid-angles"></div>
+            </div>
+          </div>
+          <div class="vid-ctrls">
+            <button class="btn" id="btn-play" onclick="togglePlay()">▶</button>
+            <button class="btn" onclick="stepFrame(-1)">◀−1</button>
+            <button class="btn" onclick="stepFrame(1)">+1▶</button>
+            <span style="font-size:11px;color:var(--mut);font-family:var(--fm);" id="time-disp">0.00/0.00s</span>
           
+          </div>
+          <input type="range" min="0" max="1000" value="0" id="timeline" oninput="seekVid(this.value)" style="width:100%;"/>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+            <input type="range" min="0.3" max="1.5" step="0.05" value="0.55" id="marker-size-sl-vid" class="marker-size-slider" style="flex:1;" oninput="setMarkerSizeFactor(this.value)"/>
+            <span style="font-size:10px;color:var(--mut);min-width:60px;" id="marker-size-lbl-vid" class="marker-size-label">Taille:0.55</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+            <input type="range" min="0.15" max="1.0" step="0.05" value="0.5" id="marker-opacity-sl-vid" class="marker-opacity-slider" style="flex:1;" oninput="setMarkerOpacity(this.value)"/>
+            <span style="font-size:10px;color:var(--mut);min-width:60px;" id="marker-opacity-lbl-vid" class="marker-opacity-label">Opacité:0.50</span>
+          </div>
+          <!-- #236 — aide au placement des capteurs : zoom (réel, défilable) et
+               contraste (affichage ET pixels analysés par la détection). -->
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+            <input type="range" min="1" max="4" step="0.25" value="1" id="cap-zoom-sl-vid" class="cap-zoom-slider" style="flex:1;" oninput="setCapZoom(this.value)"/>
+            <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-zoom-lbl-vid" class="cap-zoom-label">Zoom:1.00x</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+            <input type="range" min="1" max="3" step="0.1" value="1" id="cap-contrast-sl-vid" class="cap-contrast-slider" style="flex:1;" oninput="setCapContrast(this.value)"/>
+            <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-contrast-lbl-vid" class="cap-contrast-label" title="Agit aussi sur la détection automatique des pastilles">Contraste:1.0</span>
+            <button class="btn cap-view-reset" onclick="resetCapView()" style="font-size:10px;padding:3px 8px;" title="Zoom 1x et contraste normal">⟲</button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:4px;">
+            <div style="font-size:10px;color:var(--mut);">Frames (<span id="frame-count">0</span>)</div>
+            <button class="btn" onclick="resetAllFrames()" style="font-size:10px;padding:3px 8px;">Effacer tout</button>
+          </div>
+          <div class="frames-strip" id="frames-strip"></div>
         </div>
-        <input type="range" min="0" max="1000" value="0" id="timeline" oninput="seekVid(this.value)" style="width:100%;"/>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-          <input type="range" min="0.3" max="1.5" step="0.05" value="0.55" id="marker-size-sl-vid" class="marker-size-slider" style="flex:1;" oninput="setMarkerSizeFactor(this.value)"/>
-          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="marker-size-lbl-vid" class="marker-size-label">Taille:0.55</span>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-          <input type="range" min="0.15" max="1.0" step="0.05" value="0.5" id="marker-opacity-sl-vid" class="marker-opacity-slider" style="flex:1;" oninput="setMarkerOpacity(this.value)"/>
-          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="marker-opacity-lbl-vid" class="marker-opacity-label">Opacité:0.50</span>
-        </div>
-        <!-- #236 — aide au placement des capteurs : zoom (réel, défilable) et
-             contraste (affichage ET pixels analysés par la détection). -->
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-          <input type="range" min="1" max="4" step="0.25" value="1" id="cap-zoom-sl-vid" class="cap-zoom-slider" style="flex:1;" oninput="setCapZoom(this.value)"/>
-          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-zoom-lbl-vid" class="cap-zoom-label">Zoom:1.00x</span>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-          <input type="range" min="1" max="3" step="0.1" value="1" id="cap-contrast-sl-vid" class="cap-contrast-slider" style="flex:1;" oninput="setCapContrast(this.value)"/>
-          <span style="font-size:10px;color:var(--mut);min-width:60px;" id="cap-contrast-lbl-vid" class="cap-contrast-label" title="Agit aussi sur la détection automatique des pastilles">Contraste:1.0</span>
-          <button class="btn cap-view-reset" onclick="resetCapView()" style="font-size:10px;padding:3px 8px;" title="Zoom 1x et contraste normal">⟲</button>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:4px;">
-          <div style="font-size:10px;color:var(--mut);">Frames (<span id="frame-count">0</span>)</div>
-          <button class="btn" onclick="resetAllFrames()" style="font-size:10px;padding:3px 8px;">Effacer tout</button>
-        </div>
-        <div class="frames-strip" id="frames-strip"></div>
         <div id="vid-photo-slots" style="display:none;margin-top:10px;">
-          <div style="font-size:11px;font-weight:600;color:var(--mut);margin-bottom:6px;">📷 Assigner les captures aux phases :</div>
+          <div class="vig-entete">📷 Assigner les captures aux phases :</div>
           <div id="vid-photo-grid"></div>
         </div>
       </div>

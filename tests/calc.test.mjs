@@ -14,7 +14,7 @@ import {
 
 // ============================================================================
 // interpretKfppa(p) — classification factuelle d'un score KFPPA
-// Seuils cliniques (depuis js/calc.mjs, alignés sur clrKfppa) :
+// Seuils cliniques (depuis js/calc.mjs) :
 //   v = p * 100
 //   60 ≤ v ≤ 140      → 'dans la norme'
 //   20 ≤ v ≤ 180      → 'valeur limite'
@@ -56,37 +56,41 @@ describe('interpretKfppa', () => {
 });
 
 // ============================================================================
-// clrKfppa(pct) — couleur CSS selon score KFPPA
-// Seuils (depuis js/calc.mjs) :
-//   p = |pct| * 100
-//   p < 20 ou p > 180 → 'var(--red)'
-//   p < 60 ou p > 140 → 'var(--orange)'
-//   sinon             → 'var(--green)'
-//   pct null/NaN      → 'var(--mut)'
+// clrKfppa(classe) — #275-D : couleur CSS selon la CLASSE de U
+// Remplace clrKfppa(pct) : le KFPPA n'affiche plus aucun pourcentage. Les six
+// anciens tests (100 %, 130 %, 150 %, 50 %, 10 %, 190 %) ont été retirés avec
+// la fonction qu'ils couvraient, et remplacés par ceux-ci.
 // ============================================================================
-describe('clrKfppa', () => {
-  it('retourne var(--green) pour un score à 100% (zone norme)', () => {
-    expect(clrKfppa(1.0)).toBe('var(--green)');
+describe('clrKfppa (classe de U)', () => {
+  it('« Dans la norme » → var(--green)', () => {
+    expect(clrKfppa('Dans la norme')).toBe('var(--green)');
   });
 
-  it('retourne var(--green) pour un score à 130% (encore dans la norme 60–140)', () => {
-    expect(clrKfppa(1.3)).toBe('var(--green)');
+  it('les classes faibles et modérées → var(--orange)', () => {
+    for (const c of [
+      'Varus modéré',
+      'Varus faible',
+      'Valgus faible',
+      'Valgus modéré (insuffisant)',
+      'Valgus modéré (au-dessus de la norme)',
+    ]) {
+      expect(clrKfppa(c), c).toBe('var(--orange)');
+    }
   });
 
-  it('retourne var(--orange) pour un score à 150% (zone limite haute, |p|>140)', () => {
-    expect(clrKfppa(1.5)).toBe('var(--orange)');
+  it('les deux excessifs → var(--red), varus comme valgus', () => {
+    expect(clrKfppa('Varus excessif')).toBe('var(--red)');
+    expect(clrKfppa('Valgus excessif')).toBe('var(--red)');
   });
 
-  it('retourne var(--orange) pour un score à 50% (zone limite basse, |p|<60)', () => {
-    expect(clrKfppa(0.5)).toBe('var(--orange)');
+  it('sans classe (valeur non signée, norme non appliquée) → var(--mut)', () => {
+    expect(clrKfppa(null)).toBe('var(--mut)');
+    expect(clrKfppa(undefined)).toBe('var(--mut)');
+    expect(clrKfppa('norme non définie')).toBe('var(--mut)');
   });
 
-  it('retourne var(--red) pour un score à 10% (hors norme bas, |p|<20)', () => {
-    expect(clrKfppa(0.1)).toBe('var(--red)');
-  });
-
-  it('retourne var(--red) pour un score à 190% (hors norme haut, |p|>180)', () => {
-    expect(clrKfppa(1.9)).toBe('var(--red)');
+  it('un ancien appel en pourcentage ne colore plus rien : neutre, jamais vert', () => {
+    expect(clrKfppa(1.0)).toBe('var(--mut)');
   });
 });
 
@@ -204,18 +208,18 @@ describe('rp_badgeTxt (genou=true)', () => {
 });
 
 // ============================================================================
-// Cohérence inter-fonctions : les 5 fonctions KFPPA doivent classifier
+// Cohérence inter-fonctions : les 4 fonctions en pourcentage doivent classifier
 // identiquement un score donné en zone norme / limite / hors norme.
-// Couvre : interpretKfppa, clrKfppa, rp_cssColor(_, true), rp_badgeCls(_, true),
+// Couvre : interpretKfppa, rp_cssColor(_, true), rp_badgeCls(_, true),
+// (#275-D : clrKfppa retirée de cet alignement — elle suit désormais la classe de U)
 //          rp_badgeTxt(_, true).
 // ============================================================================
-describe('cohérence inter-fonctions KFPPA (5 fonctions)', () => {
+describe('cohérence inter-fonctions KFPPA (4 fonctions en pourcentage)', () => {
   describe('zone norme (60–140%)', () => {
     [60, 100, 140].forEach((pct) => {
-      it(`${pct}% : verdict aligné "norme" sur les 5 fonctions`, () => {
+      it(`${pct}% : verdict aligné "norme" sur les 4 fonctions`, () => {
         const r = pct / 100;
         expect(interpretKfppa(r)).toBe('dans la norme');
-        expect(clrKfppa(r)).toBe('var(--green)');
         expect(rp_cssColor(r, true)).toBe('#1a7a3e');
         expect(rp_badgeCls(r, true)).toBe('rp-badge-g');
         expect(rp_badgeTxt(r, true)).toBe('Normal');
@@ -225,10 +229,9 @@ describe('cohérence inter-fonctions KFPPA (5 fonctions)', () => {
 
   describe('zone limite (20–60% ou 140–180%)', () => {
     [30, 50, 150, 170].forEach((pct) => {
-      it(`${pct}% : verdict aligné "limite" sur les 5 fonctions`, () => {
+      it(`${pct}% : verdict aligné "limite" sur les 4 fonctions`, () => {
         const r = pct / 100;
         expect(interpretKfppa(r)).toBe('valeur limite');
-        expect(clrKfppa(r)).toBe('var(--orange)');
         expect(rp_cssColor(r, true)).toBe('#856404');
         expect(rp_badgeCls(r, true)).toBe('rp-badge-o');
         expect(rp_badgeTxt(r, true)).toBe('Limite');
@@ -238,10 +241,9 @@ describe('cohérence inter-fonctions KFPPA (5 fonctions)', () => {
 
   describe('zone hors norme (<20% ou >180%)', () => {
     [10, 190].forEach((pct) => {
-      it(`${pct}% : verdict aligné "hors norme" sur les 5 fonctions`, () => {
+      it(`${pct}% : verdict aligné "hors norme" sur les 4 fonctions`, () => {
         const r = pct / 100;
         expect(interpretKfppa(r)).toMatch(/hors norme/);
-        expect(clrKfppa(r)).toBe('var(--red)');
         expect(rp_cssColor(r, true)).toBe('#b30021');
         expect(rp_badgeCls(r, true)).toBe('rp-badge-r');
         expect(rp_badgeTxt(r, true)).toBe('Hors norme');
