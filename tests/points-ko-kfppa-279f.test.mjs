@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { charger, envCapture, MARQUEURS_DEMO } from './helpers/harnais-kfppa.mjs';
+import { describe, it, expect, afterEach } from 'vitest';
+import { charger as chargerBase, envCapture, MARQUEURS_DEMO } from './helpers/harnais-kfppa.mjs';
+import { surveillerNaN } from './helpers/sans-nan.mjs';
 import { patientFictif } from './helpers/resultats-279-donnees.mjs';
 import * as calc from '../js/calc.mjs';
 
@@ -21,6 +22,12 @@ import * as calc from '../js/calc.mjs';
 //
 // Et deletePhotoSlot efface aussi markers, dims et markersConnus.
 // Données synthétiques : dataURL factices, valeurs inventées.
+
+// #279 1b — aucun rendu de ce fichier ne doit contenir « NaN » (après chaque test).
+const { charger, noter, verifier, vus } = surveillerNaN(chargerBase);
+afterEach(() => {
+  expect(verifier(), 'rendu contenant « NaN »').toEqual([]);
+});
 
 const BIP = 'points non disponibles sur la photo bipodale — à recapturer';
 const UNI = 'points non disponibles sur la photo unipodale — à recapturer';
@@ -81,7 +88,7 @@ const panneau = (env, d) => {
   const res = envCapture(env, 'kfppa-sldj', d.photos);
   env.poser({ patient: { civilite: 'Mme' } });
   env.updateResults();
-  return res.innerHTML;
+  return noter(res.innerHTML);
 };
 const alertes = (env, d) => env._collectTestAlerts(env.TESTS['kfppa-sldj'], d, { condensed: true });
 
@@ -210,5 +217,14 @@ describe('#279 étape 3f — les deux copies', () => {
       norme,
     });
     expect([v.sPointsKo, v.uPointsKo, v.delta]).toEqual([false, false, 5.2]);
+  });
+});
+
+describe('#279 1a — surveillance « jamais de NaN »', () => {
+  it('ZZ. Les rendus de ce fichier ont été examinés ; la surveillance sait trouver « NaN »', () => {
+    expect(vus(), 'rendus examinés (tous les tests précédents du fichier)').toBe(6);
+    noter('<div>Amorti NaN%</div>');
+    noter('<div>valeur sans défaut</div>');
+    expect(verifier()).toEqual(['<div>Amorti NaN%</div>']);
   });
 });

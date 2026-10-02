@@ -4208,53 +4208,133 @@ function _kfppaMessageBipodalHorsPointsKo(photos, side) {
   return etat === 'pointsKo' ? null : _kfppaMessageBipodal(etat);
 }
 
+// ═══ #279 étape 1b — VALEUR AFFICHÉE MAIS EXCLUE (6 tests hors KFPPA) ═══
+// SOURCE UNIQUE des valeurs, des calculs dérivés et de leur motif pour le MLA,
+// le verrouillage, la mobilité et l'amorti : le panneau (updateResults), le
+// rapport (buildPrintSide, buildPrintSection), les alertes (MEASURE_COMPUTERS)
+// et l'enregistrement (validateAndSave) lisent ICI.
+// Une valeur dont la photo est NON ENVOYÉE reste affichée mais n'entre dans
+// AUCUN calcul (Δ, %, couleur, verdict, alerte, phases) tant qu'elle n'est pas
+// recapturée ; une capture SANS POINTS (imageBrute, valeur absente) le dit.
+// Fondé sur des champs posés à la capture (nonEnvoyee, imageBrute), jamais
+// sur une heuristique : un ancien bilan, qui n'en porte aucun, est calculé
+// comme avant. La branche « mode photo » (jamais atteinte, cf. #278) n'est
+// pas concernée.
+
+// Valeur d'une photo : affichée (v), utilisable dans un calcul (calc), ou le
+// motif qui l'en écarte.
+function _valeurPhoto(ph, champ) {
+  const v = ph ? ph[champ || 'angle'] : null;
+  const ok = v != null && Number.isFinite(v);
+  const nom = (ph && ph.label) || 'photo';
+  if (ph && ph.nonEnvoyee && ok) return { v, calc: null, motif: 'photo « ' + nom + ' » non envoyée — à recapturer' };
+  if (ph && ph.imageBrute && !ok) return { v: null, calc: null, motif: 'points non disponibles sur la photo « ' + nom + ' » — à recapturer' };
+  return { v: ok ? v : null, calc: ok ? v : null, motif: null };
+}
+// Motifs distincts des valeurs dont dépend un calcul, ou null.
+function _motifs(...etats) {
+  const m = [...new Set(etats.map((e) => e && e.motif).filter(Boolean))];
+  return m.length ? m.join(' ; ') : null;
+}
+
+// MLA : Δ = écrasement − attaque/propulsion ; % = Δ / normDiv. Valeur
+// enregistrée préférée, comme avant — sauf si une photo est écartée.
+function _mesureMla(t, data, side) {
+  const ph = (data.photos || []).filter((p) => p.side === side);
+  const prop = _valeurPhoto(ph[0]), ecr = _valeurPhoto(ph[1]);
+  const motif = _motifs(prop, ecr);
+  if (motif) return { prop, ecr, deg: null, ratio: null, motif };
+  // Valeurs enregistrées d'abord (pct et Δ, ensemble) ; recalcul depuis les
+  // photos seulement si le pourcentage enregistré manque — l'ordre d'avant.
+  const pers = side === 'D' ? data.pctD : data.pctG;
+  const persOk = pers != null && !isNaN(pers);
+  let ratio = persOk ? pers : null;
+  let deg = side === 'D' ? data.deltaD : data.deltaG;
+  if (deg === undefined) deg = null;
+  if (!persOk && prop.calc != null && ecr.calc != null) { deg = ecr.calc - prop.calc; ratio = deg / (t.normDiv || 20); }
+  return { prop, ecr, deg, ratio, motif: null };
+}
+
+// Verrouillage : RF = pointe / norme (la seule photo « Pointe ») ;
+// mollet = (pointe − statique) / norme. « Stat » seule écartée : RF conservé.
+function _mesureVerrou(t, data, side) {
+  const ph = (data.photos || []).filter((p) => p.side === side);
+  const stat = _valeurPhoto(ph[0]), pointe = _valeurPhoto(ph[1]);
+  const mRf = _motifs(pointe), mMol = _motifs(stat, pointe);
+  const rfDeg = !mRf ? pointe.calc : null;
+  const molDeg = !mMol && stat.calc != null && pointe.calc != null ? pointe.calc - stat.calc : null;
+  return {
+    stat,
+    pointe,
+    rf: { motif: mRf, deg: rfDeg, ratio: rfDeg != null ? rfDeg / t.normVerrou : null },
+    mollet: { motif: mMol, deg: molDeg, ratio: molDeg != null ? molDeg / t.normVerrou : null },
+  };
+}
+
+// Mobilité : (inversion − éversion) / norme, par pied. Photos BIPODALES : une
+// photo non envoyée écarte la valeur des DEUX pieds (le drapeau est sur la
+// photo) ; des points absents ne touchent que le pied concerné.
+function _mesureMob(t, data, side) {
+  const ph = data.photos || [];
+  const champ = side === 'D' ? 'angleD' : 'angleG';
+  const inv = _valeurPhoto(ph[0], champ), ev = _valeurPhoto(ph[1], champ);
+  const motif = _motifs(inv, ev);
+  const deg = !motif && inv.calc != null && ev.calc != null ? inv.calc - ev.calc : null;
+  return { inv, ev, deg, ratio: deg != null ? deg / t.normMob : null, motif };
+}
+
+// Amorti = |taligrade − plantigrade| / norme ; propulsion = |digitigrade −
+// plantigrade| / norme. Valeurs enregistrées préférées, comme avant — sauf si
+// une photo est écartée. Le CALCUL ne lit que les photos (comme avant) ; les
+// phases enregistrées ne servent qu'à l'AFFICHAGE, à défaut de photos.
+function _mesureAmorti(t, data, side) {
+  const ph = (data.photos || []).filter((p) => p.side === side);
+  const tal = _valeurPhoto(ph[0]), plan = _valeurPhoto(ph[1]), dig = _valeurPhoto(ph[2]);
+  const mAm = _motifs(tal, plan), mPr = _motifs(dig, plan);
+  const ecart = (a, b) => (a.calc != null && b.calc != null ? Math.abs(a.calc - b.calc) / t.normAm : null);
+  const pAm = side === 'D' ? data.amD : data.amG, pPr = side === 'D' ? data.prD : data.prG;
+  const am = mAm ? null : pAm != null && !isNaN(pAm) ? pAm : ecart(tal, plan);
+  const pr = mPr ? null : pPr != null && !isNaN(pPr) ? pPr : ecart(dig, plan);
+  // Valeurs AFFICHÉES : la règle d'avant 1b — les phases enregistrées si
+  // l'amorti enregistré est valable (ou faute de photos), sinon les photos.
+  // Une photo écartée impose les photos : sa valeur s'affiche avec sa mention.
+  const ph3 = (data.phases && data.phases[side]) || {};
+  const pAmOk = pAm != null && !isNaN(pAm);
+  const parPhases = !mAm && !mPr && !_motifs(tal, plan, dig) && (pAmOk || !ph.length);
+  const aff = (e, k) => (parPhases ? { v: ph3[k] != null ? ph3[k] : null, calc: null, motif: null } : e);
+  return {
+    tal: aff(tal, 'tal'),
+    plan: aff(plan, 'plan'),
+    dig: aff(dig, 'dig'),
+    am: { ratio: am, motif: mAm },
+    pr: { ratio: pr, motif: mPr },
+  };
+}
+
+// Affichage d'une valeur : la valeur, puis la mention rouge si elle est
+// écartée ; le motif seul si elle n'existe pas (points non disponibles).
+function _txtValeurExclue(e, fmt, couleur) {
+  if (e.motif && e.v != null) return fmt(e.v) + _kfppaExcluHTML(' — valeur exclue des calculs (' + e.motif + ')', couleur);
+  if (e.motif) return _kfppaExcluHTML(e.motif, couleur);
+  return fmt(e.v);
+}
+// Calcul dérivé écarté : « non calculé (motif) », en rouge.
+function _txtNonCalcule(motif, couleur) {
+  return _kfppaExcluHTML('non calculé (' + motif + ')', couleur);
+}
+
+// #279 étape 1b — chaque calculateur rend { ratio, motif } : la valeur
+// dérivée, ou le motif qui l'empêche (dit tel quel par les alertes).
 const MEASURE_COMPUTERS = {
   // #275-D — plus d'entrée kfppa : elle rendait Δ ÷ div, un POURCENTAGE.
   // Les alertes KFPPA viennent de la classe de U (_kfppaAlertes), par une
   // branche de _collectTestAlerts placée avant la recherche de ce calculateur.
-  // MLA : ratio persisté OU fallback recompute depuis photos (mirror du render L4470-4476)
-  mla: (t, data, side) => {
-    const persisted = side === 'D' ? data.pctD : data.pctG;
-    if (persisted != null && !isNaN(persisted)) return persisted;
-    const ph = (data.photos || []).filter(p => p.side === side);
-    const prop = ph[0]?.angle, ecr = ph[1]?.angle;
-    return (prop != null && ecr != null) ? (ecr - prop) / (t.normDiv || 20) : null;
-  },
-  // Verrouillage RF : pointe / normVerrou
-  rf: (t, data, side) => {
-    const ph = (data.photos || []).filter(p => p.side === side);
-    const pointe = ph[1]?.angle;
-    return (pointe != null) ? pointe / t.normVerrou : null;
-  },
-  // Verrouillage Mollet : (pointe - stat) / normVerrou
-  mollet: (t, data, side) => {
-    const ph = (data.photos || []).filter(p => p.side === side);
-    const stat = ph[0]?.angle, pointe = ph[1]?.angle;
-    return (stat != null && pointe != null) ? (pointe - stat) / t.normVerrou : null;
-  },
-  // Mobilité : (inv - év) / normMob (photos bilatérales side='', mirror du render L4415-4416)
-  mob: (t, data, side) => {
-    const ph = data.photos || [];
-    const inv = side === 'D' ? ph[0]?.angleD : ph[0]?.angleG;
-    const ev  = side === 'D' ? ph[1]?.angleD : ph[1]?.angleG;
-    return (inv != null && ev != null) ? (inv - ev) / t.normMob : null;
-  },
-  // Amorti : persisté OU fallback recompute depuis photos (mirror du render L4480-4485)
-  am: (t, data, side) => {
-    const persisted = side === 'D' ? data.amD : data.amG;
-    if (persisted != null && !isNaN(persisted)) return persisted;
-    const ph2 = (data.photos || []).filter(p => p.side === side);
-    const talV = ph2[0]?.angle, planV = ph2[1]?.angle;
-    return (talV != null && planV != null) ? Math.abs(talV - planV) / t.normAm : null;
-  },
-  // Propulsion : persisté OU fallback recompute depuis photos (mirror du render L4480-4486)
-  pr: (t, data, side) => {
-    const persisted = side === 'D' ? data.prD : data.prG;
-    if (persisted != null && !isNaN(persisted)) return persisted;
-    const ph2 = (data.photos || []).filter(p => p.side === side);
-    const planV = ph2[1]?.angle, digV = ph2[2]?.angle;
-    return (planV != null && digV != null) ? Math.abs(digV - planV) / t.normAm : null;
-  },
+  mla: (t, data, side) => _mesureMla(t, data, side),
+  rf: (t, data, side) => _mesureVerrou(t, data, side).rf,
+  mollet: (t, data, side) => _mesureVerrou(t, data, side).mollet,
+  mob: (t, data, side) => _mesureMob(t, data, side),
+  am: (t, data, side) => _mesureAmorti(t, data, side).am,
+  pr: (t, data, side) => _mesureAmorti(t, data, side).pr,
 };
 
 // ══════════════════════════════════════════════════════
@@ -15324,102 +15404,75 @@ function updateResults() {
   if(t.mode==='video' && t.showPhotoSlots) {
     if(t.mlaTest) {
       // MLA : angle brut (pas 180-angle)
-      const sD=photoSlots.filter(s=>s.side==='D');
-      const sG=photoSlots.filter(s=>s.side==='G');
-      const propD=sD[0]?.angle, ecrD=sD[1]?.angle;
-      const propG=sG[0]?.angle, ecrG=sG[1]?.angle;
-      const deltaD=(propD!=null&&ecrD!=null)?(ecrD-propD):null;
-      const deltaG=(propG!=null&&ecrG!=null)?(ecrG-propG):null;
-      const pctD=deltaD!=null?deltaD/t.normDiv:null;
-      const pctG=deltaG!=null?deltaG/t.normDiv:null;
+      // #279 étape 1b — valeurs, Δ, % et motifs depuis la source unique.
+      const mD=_mesureMla(t,{photos:photoSlots},'D'), mG=_mesureMla(t,{photos:photoSlots},'G');
       const propNorm=t.propNorm, ecrNorm=t.ecrNorm, normDiv=t.normDiv;
-      const hasAny=propD!=null||ecrD!=null||propG!=null||ecrG!=null;
+      const deg1=(v)=>v!=null?v.toFixed(1)+'°':'—';
+      const val=(e)=>_txtValeurExclue(e,deg1,'var(--red)');
+      const carte=(m,titre,coul)=>`<div class="res-side-card">
+            <div class="rs-title" style="color:${coul};">${titre}</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${val(m.prop)}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${val(m.ecr)}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${m.motif?_txtNonCalcule(m.motif,'var(--red)'):deg1(m.deg)}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
+            <div class="rs-pct" style="color:${m.ratio!=null?clrGen(Math.abs(m.ratio)):'var(--mut)'};">${m.ratio!=null?Math.round(Math.abs(m.ratio)*100)+'%':(m.motif?'':'—')}</div>
+          </div>`;
+      const hasAny=[mD.prop,mD.ecr,mG.prop,mG.ecr].some(e=>e.v!=null||e.motif);
       if(hasAny){
         html=`<div class="res-side">
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propD!=null?propD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrD!=null?ecrD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${deltaD!=null?deltaD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
-            <div class="rs-pct" style="color:${pctD!=null?clrGen(Math.abs(pctD)):'var(--mut)'};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
-          </div>
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propG!=null?propG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrG!=null?ecrG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${deltaG!=null?deltaG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
-            <div class="rs-pct" style="color:${pctG!=null?clrGen(Math.abs(pctG)):'var(--mut)'};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
-          </div>
+          ${carte(mD,'Pied Droit','#4a9eff')}
+          ${carte(mG,'Pied Gauche','#3ecf72')}
         </div>`;
       } else {
         html=`<div style="font-size:10px;color:var(--orange);text-align:center;padding:8px;">Capturez les 4 photos MLA</div>`;
       }
       el.innerHTML=html||el.innerHTML; return;
     } else if(t.normAm!==undefined) {
-      const sD=photoSlots.filter(s=>s.side==='D');
-      const sG=photoSlots.filter(s=>s.side==='G');
-      const talD=sD[0]?.angle,planD=sD[1]?.angle,digD=sD[2]?.angle;
-      const talG=sG[0]?.angle,planG=sG[1]?.angle,digG=sG[2]?.angle;
-      const hasAny=talD!=null||planD!=null||digD!=null||talG!=null||planG!=null||digG!=null;
+      // #279 étape 1b — valeurs, amorti, propulsion et motifs : source unique.
+      const mD=_mesureAmorti(t,{photos:photoSlots},'D'), mG=_mesureAmorti(t,{photos:photoSlots},'G');
+      const hasAny=[mD.tal,mD.plan,mD.dig,mG.tal,mG.plan,mG.dig].some(e=>e.v!=null||e.motif);
       if(hasAny){
-        const amD=talD!=null&&planD!=null?Math.abs(talD-planD)/t.normAm:null;
-        const prD=digD!=null&&planD!=null?Math.abs(digD-planD)/t.normAm:null;
-        const amG=talG!=null&&planG!=null?Math.abs(talG-planG)/t.normAm:null;
-        const prG=digG!=null&&planG!=null?Math.abs(digG-planG)/t.normAm:null;
         html=`<div class="res-side">
-          ${amProCard('D',amD,prD,t.normAm,talD,planD,digD)}
-          ${amProCard('G',amG,prG,t.normAm,talG,planG,digG)}
+          ${amProCard('D',mD,t.normAm)}
+          ${amProCard('G',mG,t.normAm)}
         </div>`;
       } else {
         html=`<div style="font-size:10px;color:var(--orange);text-align:center;padding:8px;">Capturez les 6 photos : Tal·Plan·Dig × D+G</div>`;
       }
       el.innerHTML=html||el.innerHTML; return;
     } else if(t.normVerrou!==undefined) {
-      const sD=photoSlots.filter(s=>s.side==='D'),sG=photoSlots.filter(s=>s.side==='G');
-      const statD=sD[0]?.angle,pointeD=sD[1]?.angle,statG=sG[0]?.angle,pointeG=sG[1]?.angle;
+      // #279 étape 1b — RF (« Pointe » seule) et mollet (statique et pointe),
+      // valeurs et motifs : source unique (_mesureVerrou).
+      const mD=_mesureVerrou(t,{photos:photoSlots},'D'), mG=_mesureVerrou(t,{photos:photoSlots},'G');
       const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-      if(statD!=null||pointeD!=null||statG!=null||pointeG!=null){
-        const rfD=pointeD!=null?pointeD/t.normVerrou:null;
-        const molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/t.normVerrou:null;
-        const rfG=pointeG!=null?pointeG/t.normVerrou:null;
-        const molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/t.normVerrou:null;
-        const rfDdeg3=pointeD!=null?Math.abs(pointeD).toFixed(1)+'°':'—';
-        const rfGdeg3=pointeG!=null?Math.abs(pointeG).toFixed(1)+'°':'—';
-        const molDdeg3=(pointeD!=null&&statD!=null)?Math.abs(pointeD-statD).toFixed(1)+'°':'—';
-        const molGdeg3=(pointeG!=null&&statG!=null)?Math.abs(pointeG-statG).toFixed(1)+'°':'—';
+      const val=(e)=>_txtValeurExclue(e,apV,'var(--red)');
+      const der=(r)=>r.motif?_txtNonCalcule(r.motif,'var(--red)'):(r.deg!=null?Math.abs(r.deg).toFixed(1)+'°':'—');
+      const pct=(r)=>`<div class="rs-pct" style="color:${r.ratio!=null?clrGen(Math.abs(r.ratio)):'var(--mut)'};">  ${r.ratio!=null?Math.round(Math.abs(r.ratio)*100)+'%':(r.motif?'':'—')}</div>`;
+      const carte=(m,titre,coul)=>`<div class="res-side-card">
+            <div class="rs-title" style="color:${coul};">${titre}</div>
+            <div style="font-size:9px;color:var(--mut);">Statique: <b>${val(m.stat)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Pointe: <b>${val(m.pointe)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${der(m.rf)}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+            ${pct(m.rf)}
+            <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${der(m.mollet)}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+            ${pct(m.mollet)}
+          </div>`;
+      if([mD.stat,mD.pointe,mG.stat,mG.pointe].some(e=>e.v!=null||e.motif)){
         html=`<div class="res-side">
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-            <div style="font-size:9px;color:var(--mut);">Statique: <b>${apV(statD)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apV(pointeD)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfDdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${rfD!=null?clrGen(Math.abs(rfD)):'var(--mut)'};">  ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'}</div>
-            <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molDdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${molD!=null?clrGen(Math.abs(molD)):'var(--mut)'};">  ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'}</div>
-          </div>
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-            <div style="font-size:9px;color:var(--mut);">Statique: <b>${apV(statG)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apV(pointeG)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfGdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${rfG!=null?clrGen(Math.abs(rfG)):'var(--mut)'};">  ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'}</div>
-            <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molGdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${molG!=null?clrGen(Math.abs(molG)):'var(--mut)'};">  ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'}</div>
-          </div>
+          ${carte(mD,'Pied Droit','#4a9eff')}
+          ${carte(mG,'Pied Gauche','#3ecf72')}
         </div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 4 photos</div>`;
     } else if(t.mobiliteAP) {
-      const p0=photoSlots[0],p1=photoSlots[1];
-      const invD=p0?.angleD,evD=p1?.angleD,invG=p0?.angleG,evG=p1?.angleG;
-      if(invD!=null||evD!=null||invG!=null||evG!=null){
+      // #279 étape 1b — mobilité par pied, valeurs et motifs : source unique
+      // (_mesureMob). Une photo bipodale non envoyée écarte les DEUX pieds.
+      const mD=_mesureMob(t,{photos:photoSlots},'D'), mG=_mesureMob(t,{photos:photoSlots},'G');
+      if([mD.inv,mD.ev,mG.inv,mG.ev].some(e=>e.v!=null||e.motif)){
         // Mobilité = (Inversion - Éversion) / norme
         // Inv=+ Ev=- donc (Inv - Ev) = Inv + |Ev| si Ev<0, ou Inv - Ev si Ev>0 (pas d'éversion)
-        const mobD=(invD!=null&&evD!=null)?(invD-evD)/t.normMob:null;
-        const mobG=(invG!=null&&evG!=null)?(invG-evG)/t.normMob:null;
-        const mobDdeg2=mobD!=null?(invD-evD).toFixed(1)+'°':'—';
-        const mobGdeg2=mobG!=null?(invG-evG).toFixed(1)+'°':'—';
         const apV3=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-        html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${apV3(invD)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV3(evD)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobDdeg2}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${mobD!=null?clrGen(Math.abs(mobD)):'var(--mut)'};">${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'—'}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${apV3(invG)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV3(evG)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobGdeg2}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${mobG!=null?clrGen(Math.abs(mobG)):'var(--mut)'};">${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'—'}</div></div></div>`;
+        const val=(e)=>_txtValeurExclue(e,apV3,'var(--red)');
+        const carte=(m,titre,coul)=>`<div class="res-side-card"><div class="rs-title" style="color:${coul};">${titre}</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${val(m.inv)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${val(m.ev)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${m.motif?_txtNonCalcule(m.motif,'var(--red)'):(m.deg!=null?m.deg.toFixed(1)+'°':'—')}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${m.ratio!=null?clrGen(Math.abs(m.ratio)):'var(--mut)'};">${m.ratio!=null?Math.round(Math.abs(m.ratio)*100)+'%':(m.motif?'':'—')}</div></div>`;
+        html=`<div class="res-side">${carte(mD,'Pied Droit','#4a9eff')}${carte(mG,'Pied Gauche','#3ecf72')}</div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos</div>`;
     }
     el.innerHTML=html||el.innerHTML;
@@ -15589,28 +15642,32 @@ function quickAngleCard(side, ang) {
   </div>`;
 }
 
-function amProCard(side, am, pr, norm, a0, a1, a2) {
+function amProCard(side, m, norm) {
+  // #279 étape 1b — m = _mesureAmorti (source unique) : valeurs affichées,
+  // amorti et propulsion, et le motif qui écarte un calcul.
+  const am=m.am.ratio, pr=m.pr.ratio;
   const cl=side==='D'?'#4a9eff':'#3ecf72';
-  const cAm=am!==null?clrGen(Math.abs(am)):'var(--mut)';
-  const cPr=pr!==null?clrGen(Math.abs(pr)):'var(--mut)';
+  const cAm=am!=null?clrGen(Math.abs(am)):'var(--mut)';
+  const cPr=pr!=null?clrGen(Math.abs(pr)):'var(--mut)';
   const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+  const val=(e)=>_txtValeurExclue(e,apV,'var(--red)');
   const isMarche=norm===8;
   const nTal=isMarche?'Norme: Inv +2°':'Norme: Inv +4°';
   const nPlan=isMarche?'Norme: Év −6°':'Norme: Év −8°';
   const nDig=isMarche?'Norme: Inv +2°':'Norme: Inv +4°';
   const nAm=isMarche?'Norme: 8° = 100%':'Norme: 12° = 100%';
   const nPr=isMarche?'Norme: 8° = 100%':'Norme: 12° = 100%';
-  const amDeg=am!==null?(am*norm).toFixed(1)+'°':'—';
-  const prDeg=pr!==null?(pr*norm).toFixed(1)+'°':'—';
+  const amDeg=m.am.motif?_txtNonCalcule(m.am.motif,'var(--red)'):(am!=null?(am*norm).toFixed(1)+'°':'—');
+  const prDeg=m.pr.motif?_txtNonCalcule(m.pr.motif,'var(--red)'):(pr!=null?(pr*norm).toFixed(1)+'°':'—');
   return `<div class="res-side-card">
     <div class="rs-title" style="color:${cl};">Pied ${side}</div>
-    <div style="font-size:9px;color:var(--mut);margin-top:4px;">🦶 Taligrade: <b>${apV(a0)}</b> <span style="color:var(--mut);font-size:8px;">(${nTal})</span></div>
-    <div style="font-size:9px;color:var(--mut);">🦶 Plantigrade: <b>${apV(a1)}</b> <span style="color:var(--mut);font-size:8px;">(${nPlan})</span></div>
-    <div style="font-size:9px;color:var(--mut);">🦶 Digitigrade: <b>${apV(a2)}</b> <span style="color:var(--mut);font-size:8px;">(${nDig})</span></div>
+    <div style="font-size:9px;color:var(--mut);margin-top:4px;">🦶 Taligrade: <b>${val(m.tal)}</b> <span style="color:var(--mut);font-size:8px;">(${nTal})</span></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Plantigrade: <b>${val(m.plan)}</b> <span style="color:var(--mut);font-size:8px;">(${nPlan})</span></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Digitigrade: <b>${val(m.dig)}</b> <span style="color:var(--mut);font-size:8px;">(${nDig})</span></div>
     <div style="font-size:10px;color:var(--mut);margin-top:6px;">Amorti: <b>${amDeg}</b> <span style="font-size:8px;">(${nAm})</span></div>
-    <div class="rs-pct" style="color:${cAm};">${am!==null?Math.round(Math.abs(am)*100)+'%':'—'}</div>
+    <div class="rs-pct" style="color:${cAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':(m.am.motif?'':'—')}</div>
     <div style="font-size:10px;color:var(--mut);margin-top:3px;">Propulsion: <b>${prDeg}</b> <span style="font-size:8px;">(${nPr})</span></div>
-    <div class="rs-pct" style="color:${cPr};">${pr!==null?Math.round(Math.abs(pr)*100)+'%':'—'}</div>
+    <div class="rs-pct" style="color:${cPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':(m.pr.motif?'':'—')}</div>
   </div>`;
 }
 
@@ -16017,6 +16074,17 @@ async function validateAndSave() {
       const _bipNE = _ph.some((p) => p && p.side === '' && p.nonEnvoyee);
       ['D', 'G'].forEach((s) => {
         if (_bipNE || _ph.some((p) => p && p.side === s && p.nonEnvoyee)) delete result['delta' + s];
+      });
+    }
+    // #279 étape 1b — amorti : les valeurs dérivées ENREGISTRÉES qui dépendent
+    // d'une photo écartée sont retirées (amorti, propulsion, phases du pied).
+    // Même source que l'affichage (_mesureAmorti) ; mode photo non concerné.
+    if (t.mode === 'video' && t.normAm !== undefined) {
+      ['D', 'G'].forEach((s) => {
+        const m = _mesureAmorti(t, { photos: result.photos }, s);
+        if (m.am.motif) delete result['am' + s];
+        if (m.pr.motif) delete result['pr' + s];
+        if ((m.tal.motif || m.plan.motif || m.dig.motif) && result.phases) delete result.phases[s];
       });
     }
     break;
@@ -18642,7 +18710,14 @@ function _collectTestAlerts(t, data, opts = {}) {
     const isAbs = m.interpretFn !== 'kfppa'; // KFPPA conserve le signe (valgus/varus)
     if(!compute) return;
     ['D', 'G'].forEach(side => {
-      const ratio = compute(t, data, side);
+      // #279 étape 1b — { ratio, motif } : un calcul écarté le DIT (motif puis
+      // conséquence), au lieu de se taire ou de compter une valeur exclue.
+      const res = compute(t, data, side) || {};
+      if (res.motif) {
+        alerts.push(`${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label} — ${res.motif} : non calculé`);
+        return;
+      }
+      const ratio = res.ratio;
       // #275-B — un KFPPA dont le bipodal n'a pas de valeur par jambe n'est
       // pas recalculable. On le DIT, au lieu de laisser l'absence passer pour
       // une mesure dans la norme. Décidé localement, sur CE bilan.
@@ -18720,8 +18795,23 @@ function buildPrintSection(t, data, conclusions) {
       const prD=data.prD!==null?Math.round(data.prD*100):null;
       const prG=data.prG!==null?Math.round(data.prG*100):null;
       lines.push(`<em style="color:#888;">Norme amorti/propulsion: ${t.normAm}°=100% · Tal: Inv+${t.normAm===8?2:4}° · Plan: Év-${t.normAm===8?6:8}° · Dig: Inv+${t.normAm===8?2:4}°</em>`);
-      if(amD!==null) lines.push(`<strong>Pied droit :</strong> Amorti ${amD}% · Propulsion ${prD||'—'}%`);
-      if(amG!==null) lines.push(`<strong>Pied gauche :</strong> Amorti ${amG}% · Propulsion ${prG||'—'}%`);
+      // #279 étape 1b — calcul écarté (photo non envoyée, points absents) :
+      // la ligne le dit, depuis la source unique ; sinon la ligne d'avant.
+      const _ligneAm=(side)=>{
+        const m=_mesureAmorti(t,data,side);
+        if(!m.am.motif&&!m.pr.motif) return null;
+        const p=(r)=>r.motif?_txtNonCalcule(r.motif,'#b91c1c'):(r.ratio!=null?Math.round(Math.abs(r.ratio)*100)+'%':'—');
+        return `<strong>Pied ${side==='D'?'droit':'gauche'} :</strong> Amorti ${p(m.am)} · Propulsion ${p(m.pr)}`;
+      };
+      // #279 étape 1b — valeur absente (null, ou NaN quand le pied n'a pas de
+      // photo) : « — », sans « % » ; une valeur nulle reste « 0% ». Jamais de
+      // « || », qui confondait 0 et l'absence (« —% »).
+      const _pctLigne=(v)=>v==null||Number.isNaN(v)?'—':v+'%';
+      const _lAmD=_ligneAm('D'), _lAmG=_ligneAm('G');
+      if(_lAmD) lines.push(_lAmD);
+      else if(amD!==null) lines.push(`<strong>Pied droit :</strong> Amorti ${_pctLigne(amD)} · Propulsion ${_pctLigne(prD)}`);
+      if(_lAmG) lines.push(_lAmG);
+      else if(amG!==null) lines.push(`<strong>Pied gauche :</strong> Amorti ${_pctLigne(amG)} · Propulsion ${_pctLigne(prG)}`);
     }
 
     if(lines.length) written=`<div class="rp-written">${lines.join('<br>')}</div>`;
@@ -18824,27 +18914,21 @@ function buildPrintSide(side, t, data) {
   const sideC=side==='D'?'#185FA5':'#0B6B2C';
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
   let pct=null,ang=null;
+  let motifDerive=null; // #279 étape 1b — calcul écarté : dit à la place du badge
 
   if(t.normDiv!==undefined||t.mlaTest){
-    pct=side==='D'?data.pctD:data.pctG;
-    ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
-    // Si pas de données calculées, recalculer depuis photos
-    if((pct==null||isNaN(pct)) && data.photos?.length) {
-      const ph=data.photos.filter(p=>p.side===side);
-      const prop=ph[0]?.angle, ecr=ph[1]?.angle;
-      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||20);}
-    }
+    // #279 étape 1b — source unique (_mesureMla) : valeur enregistrée, sinon
+    // recalcul depuis les photos (delta = écr - prop), ou le motif.
+    const _m=_mesureMla(t,data,side);
+    pct=_m.ratio; ang=_m.deg; motifDerive=_m.motif;
   }
   else if(t.normAm!==undefined){
-    let am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
-    let talV=data.phases?.[side]?.tal, planV=data.phases?.[side]?.plan, digV=data.phases?.[side]?.dig;
-    if((am==null||isNaN(am)) && data.photos?.length) {
-      const ph2=data.photos.filter(p=>p.side===side);
-      talV=ph2[0]?.angle; planV=ph2[1]?.angle; digV=ph2[2]?.angle;
-      if(talV!=null&&planV!=null) am=Math.abs(talV-planV)/t.normAm;
-      if(digV!=null&&planV!=null) pr=Math.abs(digV-planV)/t.normAm;
-    }
+    // #279 étape 1b — source unique (_mesureAmorti) : valeurs enregistrées,
+    // sinon recalcul depuis les photos ; motif si une photo est écartée.
+    const _m=_mesureAmorti(t,data,side);
+    const am=_m.am.ratio, pr=_m.pr.ratio;
     const _apVa=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _valA=(e)=>_txtValeurExclue(e,_apVa,'#b91c1c');
     const _cssAm=rp_cssColor(am,false), _cssPr=rp_cssColor(pr,false);
     const _r2=35,_circ=2*Math.PI*_r2;
     const _fillAm=am!=null?_circ*Math.min(100,Math.max(0,Math.abs(am)*100))/100:0;
@@ -18852,7 +18936,7 @@ function buildPrintSide(side, t, data) {
     const _ph=buildPrintPhotos(data,side,t);
     return `<div class="rp-side-block rp-side-${side}">
       <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
-      <div style="font-size:9px;color:#888;margin-bottom:4px;">Taligrade: ${_apVa(talV)} · Plantigrade: ${_apVa(planV)} · Digitigrade: ${_apVa(digV)}</div>
+      <div style="font-size:9px;color:#888;margin-bottom:4px;">Taligrade: ${_valA(_m.tal)} · Plantigrade: ${_valA(_m.plan)} · Digitigrade: ${_valA(_m.dig)}</div>
       <div class="rp-gauge-photos">
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div class="rp-gauge" style="width:80px;height:80px;">
@@ -18878,18 +18962,19 @@ function buildPrintSide(side, t, data) {
         </div>
         ${_ph}
       </div>
-      <div style="font-size:9px;margin-top:4px;">Amorti: <b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b> · Propulsion: <b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b> (N:${t.normAm}°=100%)</div>
+      <div style="font-size:9px;margin-top:4px;">Amorti: ${_m.am.motif?_txtNonCalcule(_m.am.motif,'#b91c1c'):`<b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b>`} · Propulsion: ${_m.pr.motif?_txtNonCalcule(_m.pr.motif,'#b91c1c'):`<b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b>`} (N:${t.normAm}°=100%)</div>
     </div>`;
   }
 
   // Verrouillage AP
   if(t.normVerrou!==undefined){
-    const photos=data.photos||[];
-    const ph=photos.filter(p=>p.side===side);
-    const stat=ph[0]?.angle, pointe=ph[1]?.angle;
-    ang=pointe; pct=pointe!=null?pointe/t.normVerrou:null;
-    const mol=(pointe!=null&&stat!=null)?(pointe-stat)/t.normVerrou:null;
+    // #279 étape 1b — source unique (_mesureVerrou) : RF (« Pointe » seule),
+    // mollet (statique et pointe), et le motif qui écarte l'un ou l'autre.
+    const _m=_mesureVerrou(t,data,side);
+    ang=_m.rf.deg; pct=_m.rf.ratio;
+    const mol=_m.mollet.ratio;
     const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _valV=(e)=>_txtValeurExclue(e,apVv,'#b91c1c');
     const cssVv=rp_cssColor(pct,false);
     const r2v=35,cv=2*Math.PI*r2v,fv=pct!=null?cv*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
     return `<div class="rp-side-block rp-side-${side}">
@@ -18904,8 +18989,8 @@ function buildPrintSide(side, t, data) {
         </div></div>
         ${buildPrintPhotos(data,side,t)}
       </div>
-      <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
-      <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
+      <div style="font-size:9px;margin-top:4px;">Stat: ${_valV(_m.stat)} (N:0°) · Pointe: ${_valV(_m.pointe)} (N:Inv+10°)</div>
+      <div style="font-size:9px;">RF: ${_m.rf.motif?_txtNonCalcule(_m.rf.motif,'#b91c1c'):(pct!=null?Math.round(Math.abs(pct)*100)+'%':'—')} · Mollet: ${_m.mollet.motif?_txtNonCalcule(_m.mollet.motif,'#b91c1c'):(mol!=null?Math.round(Math.abs(mol)*100)+'%':'—')} (N:10°=100%)</div>
       <div style="text-align:center;margin-top:4px;">
         ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
         <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Statique 0° · Pointe Inv+10° · RF 10°=100%</div>
@@ -18914,13 +18999,12 @@ function buildPrintSide(side, t, data) {
   }
   // Mobilité AP
   if(t.normMob!==undefined){
-    const photos=data.photos||[];
-    const p0=photos[0], p1=photos[1];
-    const invA=side==='D'?p0?.angleD:p0?.angleG;
-    const evA=side==='D'?p1?.angleD:p1?.angleG;
-    ang=(invA!=null&&evA!=null)?invA-evA:null;
-    pct=ang!=null?ang/t.normMob:null;
+    // #279 étape 1b — source unique (_mesureMob) : une photo bipodale non
+    // envoyée écarte la mobilité des DEUX pieds.
+    const _m=_mesureMob(t,data,side);
+    ang=_m.deg; pct=_m.ratio;
     const apVm=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _valM=(e)=>_txtValeurExclue(e,apVm,'#b91c1c');
     const cssM=rp_cssColor(pct,false);
     const r2m=35,cm=2*Math.PI*r2m,fm=pct!=null?cm*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
     return `<div class="rp-side-block rp-side-${side}">
@@ -18935,8 +19019,8 @@ function buildPrintSide(side, t, data) {
         </div></div>
         ${buildPrintPhotos(data,'',t)}
       </div>
-      <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
-      <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
+      <div style="font-size:9px;margin-top:4px;">Inv: ${_valM(_m.inv)} (N:+20°) · Év: ${_valM(_m.ev)} (N:−10°)</div>
+      <div style="font-size:9px;">Mobilité: ${_m.motif?_txtNonCalcule(_m.motif,'#b91c1c'):`${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}`} (N:30°=100%)</div>
       <div style="text-align:center;margin-top:4px;">
         ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
         <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</div>
@@ -18966,7 +19050,7 @@ function buildPrintSide(side, t, data) {
       </div>
       ${ph}
     </div>
-    <div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>
+    ${motifDerive?`<div style="font-size:9px;margin-top:4px;">${_txtNonCalcule(motifDerive,'#b91c1c')}</div>`:`<div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>`}
   </div>`;
 }
 

@@ -86,6 +86,17 @@ export const FONCTIONS = [
   '_relireMarqueurs',
   'photoSlotHTML',
   'getAngleColor',
+  'amProCard', // #279 1b — panneau de l'amorti
+  'mlaCard', // #279 1b — panneau MLA du mode photo (non-régression)
+  'badgeGen', // #279 1b — appelé par mlaCard
+  '_valeurPhoto', // #279 1b
+  '_motifs', // #279 1b
+  '_mesureMla', // #279 1b
+  '_mesureVerrou', // #279 1b
+  '_mesureMob', // #279 1b
+  '_mesureAmorti', // #279 1b
+  '_txtValeurExclue', // #279 1b
+  '_txtNonCalcule', // #279 1b
   '_pointsCaptureLisibles',
   '_calqueCapture',
   '_imgRapportAvecCalque',
@@ -241,7 +252,7 @@ export function charger(opts = {}) {
     ${noms.map(fonction).join('\n')}
     ${opts.envoiReel ? ['migrateSportPhotos', 'restoreSportPhotosStash'].map(fonction).join('\n') : 'async function migrateSportPhotos() { return []; }\n    function restoreSportPhotosStash() {}'}
     return {
-      TESTS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
+      TESTS, MEASURE_COMPUTERS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
       kfppaSexeCivilite, kfppaNormeApplicable, kfppaClasseU, kfppaClasseS, kfppaTexteNonSigne,
       kfppaSigneTxt, kfppaDelta, kfppaTexteDelta, kfppaTexteS, kfppaCouleurClasse,
       kfppaNormeBilan, kfppaTexteNorme, kfppaAnalyseGenou, kfppaPhraseGenou, kfppaPhraseAsymetrie,
