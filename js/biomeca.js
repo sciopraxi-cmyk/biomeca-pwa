@@ -18915,12 +18915,21 @@ function buildPrintSide(side, t, data) {
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
   let pct=null,ang=null;
   let motifDerive=null; // #279 étape 1b — calcul écarté : dit à la place du badge
+  let lignesValeurs=''; // #279 1b — valeurs des photos d'un côté écarté (MLA)
 
   if(t.normDiv!==undefined||t.mlaTest){
     // #279 étape 1b — source unique (_mesureMla) : valeur enregistrée, sinon
     // recalcul depuis les photos (delta = écr - prop), ou le motif.
     const _m=_mesureMla(t,data,side);
     pct=_m.ratio; ang=_m.deg; motifDerive=_m.motif;
+    // #279 1b — côté écarté : la valeur de chaque photo reste lisible, sous la
+    // mention de la photo, l'écartée avec « valeur exclue des calculs ».
+    if(motifDerive){
+      const _ph=(data.photos||[]).filter(p=>p.side===side);
+      const _deg=(v)=>v!=null?v.toFixed(1)+'°':'—';
+      lignesValeurs=[[_ph[0],_m.prop],[_ph[1],_m.ecr]].map(([p,e])=>
+        `\n    <div style="font-size:9px;margin-top:4px;">${_escHtml(p?.label||'')} : ${_txtValeurExclue(e,_deg,'#b91c1c')}</div>`).join('');
+    }
   }
   else if(t.normAm!==undefined){
     // #279 étape 1b — source unique (_mesureAmorti) : valeurs enregistrées,
@@ -19049,8 +19058,8 @@ function buildPrintSide(side, t, data) {
         </div>
       </div>
       ${ph}
-    </div>
-    ${motifDerive?`<div style="font-size:9px;margin-top:4px;">${_txtNonCalcule(motifDerive,'#b91c1c')}</div>`:`<div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>`}
+    </div>${lignesValeurs}
+    ${motifDerive?`<div style="font-size:9px;margin-top:4px;">${_txtNonCalcule(motifDerive,'#b91c1c')}</div>`:pct!=null?`<div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>`:'' /* #279 1b — sans ratio, aucun badge : « — » ressemblait à un verdict */}
   </div>`;
 }
 

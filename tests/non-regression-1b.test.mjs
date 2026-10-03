@@ -26,6 +26,9 @@ import { cas, CLES, produire } from './helpers/non-regression-1b-donnees.mjs';
 //         d'un côté MLA sans ses deux photos (pctD jamais enregistré en vidéo).
 //         Attendu : le HTML de HEAD avec l'arc vide retiré et « NaN% » → « — »,
 //         identique à l'octet près ;
+//       • 'mla-badge-vide' (27, mêmes clés que 'mla-nan') : défaut de HEAD, un
+//         badge rose « — » sous la jauge d'un côté MLA sans ratio, qui
+//         ressemblait à un verdict. Attendu : le badge retiré, rien d'autre ;
 //       • 'amorti-nan' (14) : défaut de HEAD, « Amorti NaN% » dans les lignes
 //         de la section amorti (amD absent : pied sans photo). Attendu : le
 //         HTML de HEAD avec « Amorti NaN% » → « Amorti — », à l'octet près ;
@@ -50,6 +53,9 @@ const DONNEES = Object.fromEntries(cas(charger().TESTS).map((c) => [c.nom, c.dat
 const ARC_VIDE =
   '<circle cx="40" cy="40" r="35" fill="none" stroke="#aaa" stroke-width="8" stroke-dasharray="0 219.9114857512855" stroke-linecap="round" transform="rotate(-90,40,40)"/>';
 const corrigerNaN = (h) => h.split(ARC_VIDE).join('').split('>NaN%</div>').join('>—</div>');
+// #279 1b (finitions) — badge « — » sans ratio, retiré : il ressemblait à un verdict.
+const BADGE_VIDE =
+  '<div style="margin-top:4px;text-align:center;"><span class="rp-badge-r">—</span></div>';
 // Rendu de la propulsion (jauge « Propuls. » et ligne « Propulsion: … »).
 const JAUGE_PR =
   /<div class="rp-gauge" style="width:80px;height:80px;">(?:(?!<div class="rp-gauge")[\s\S])*?Propuls\.<\/div>/g;
@@ -92,12 +98,18 @@ function corrigerLignes(h, data) {
 // Vérifie une exception ; rend la violation, ou null.
 function regle(e, actuel, calc, h, data) {
   const fams = new Set(e.familles);
-  if (fams.has('mla-nan')) {
-    if (fams.size !== 1) return 'famille mla-nan combinée';
-    if (!e.head.includes('NaN%')) return 'exception MLA sans « NaN% » dans HEAD';
-    return corrigerNaN(e.head) === actuel
-      ? null
-      : 'HTML ≠ HEAD corrigé (arc vide retiré, NaN% → —)';
+  if (fams.has('mla-nan') || fams.has('mla-badge-vide')) {
+    if ([...fams].some((f) => !f.startsWith('mla-'))) return 'familles MLA combinées à d’autres';
+    let t = e.head;
+    if (fams.has('mla-nan')) {
+      if (!t.includes('NaN%')) return 'exception MLA sans « NaN% » dans HEAD';
+      t = corrigerNaN(t);
+    }
+    if (fams.has('mla-badge-vide')) {
+      if (!t.includes(BADGE_VIDE)) return 'exception MLA sans badge vide dans HEAD';
+      t = t.split(BADGE_VIDE).join('');
+    }
+    return t === actuel ? null : 'HTML ≠ HEAD corrigé (MLA : arc vide, NaN% → —, badge vide)';
   }
   const { t, appliquees } = corrigerLignes(e.head, data);
   const lignesAttendues = [...fams].filter((f) => f !== 'amorti-propulsion').sort();
@@ -178,12 +190,13 @@ describe('#279 1b — non-régression : calculs, alertes et affichage d’avant 
       [
         Object.keys(EXC).length,
         fam('mla-nan'),
+        fam('mla-badge-vide'),
         fam('amorti-nan'),
         fam('amorti-propulsion-format'),
         fam('amorti-propulsion'),
       ],
       'exceptions (une clé peut relever de plusieurs familles)'
-    ).toEqual([57, 27, 16, 20, 12]);
+    ).toEqual([57, 27, 27, 16, 20, 12]);
     expect(ecarts(REF, prod)).toEqual([]);
   }, 60000);
 
@@ -236,6 +249,13 @@ describe('#279 1b — non-régression : calculs, alertes et affichage d’avant 
         'mla-marche#vide',
         'D',
         (t) => t.replace('rp-side-title', 'rp-side-titre'),
+        'HTML ≠ HEAD corrigé',
+      ],
+      // Badge vide réintroduit : hors transformation.
+      [
+        'mla-marche#vide',
+        'G',
+        (t) => t.replace(/\n {4}\n {2}<\/div>$/, '\n    ' + BADGE_VIDE + '\n  </div>'),
         'HTML ≠ HEAD corrigé',
       ],
       [

@@ -377,9 +377,43 @@ describe('#279 1b — lignes de la section amorti : 0 n’est pas une absence', 
   });
 });
 
+describe('#279 1b — finitions MLA du rapport', () => {
+  const valeursMla = (env, v, transf) =>
+    photos(env, 'mla-marche', (i) => ({ angle: v[i] })).map((p, i) =>
+      transf[i] ? transf[i](p) : p
+    );
+
+  it('Q16. Côté exclu : les valeurs des deux photos sont affichées, l’écartée avec sa mention', () => {
+    const env = charger();
+    const t = env.TESTS['mla-marche'];
+    const M = NE('Attaque/Propulsion pied D');
+    const d = env.buildPrintSide('D', t, {
+      photos: valeursMla(env, [120, 135, 118, 140], { 0: neEnv }),
+    });
+    expect(d).toContain(`Attaque/Propulsion pied D : 120.0°${R_R(EXCLUE(M))}`);
+    expect(d).toContain('Écrasement pied D : 135.0°');
+    const K = KO('Écrasement pied G');
+    const g = env.buildPrintSide('G', t, {
+      photos: valeursMla(env, [120, 135, 118, null], { 3: sansPoints }),
+    });
+    expect(g).toContain('Attaque/Propulsion pied G : 118.0°');
+    expect(g).toContain(`Écrasement pied G : ${R_R(K)}`);
+  });
+
+  it('Q17. Côté sans ratio (photo jamais prise) : aucun badge ; côté calculé : son badge', () => {
+    const env = charger();
+    const t = env.TESTS['mla-marche'];
+    const data = { photos: valeursMla(env, [120, null, 118, 140], {}) };
+    const d = env.buildPrintSide('D', t, data);
+    expect(d, 'badge vide').not.toContain('rp-badge');
+    expect(d).toContain('<div class="rp-gauge-pct" style="color:#aaa;">—</div>');
+    expect(env.buildPrintSide('G', t, data)).toContain('<span class="rp-badge-g">Normal</span>');
+  });
+});
+
 describe('#279 1b — surveillance « jamais de NaN »', () => {
   it('ZZ. Les rendus de ce fichier ont été examinés ; la surveillance sait trouver « NaN »', () => {
-    expect(vus(), 'rendus examinés (tous les tests précédents du fichier)').toBe(34);
+    expect(vus(), 'rendus examinés (tous les tests précédents du fichier)').toBe(38);
     noter('<div>Amorti NaN%</div>');
     noter('<div>valeur sans défaut</div>');
     expect(verifier()).toEqual(['<div>Amorti NaN%</div>']);
