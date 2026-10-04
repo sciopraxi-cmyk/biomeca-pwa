@@ -832,7 +832,10 @@ async function loadSupabaseData() {
     praticiens = kPraticiens ? JSON.parse(localStorage.getItem(kPraticiens) || '[]') : [];
     // Migration #39 sur le fallback aussi
     if (kPatients && migrateBilanFlags(patients)) {
-      try { localStorage.setItem(kPatients, JSON.stringify(patients)); } catch(_) {}
+      // fix/269 — même filtre que savePatients : jamais de dataURL (avec path
+      // jumeau) réécrite dans le stockage local ; mémoire restaurée ensuite.
+      const _stash = _stripDataURLsForPersist(patients);
+      try { localStorage.setItem(kPatients, JSON.stringify(patients)); } catch(_) {} finally { _restoreDataURLsAfterPersist(_stash); }
     }
     _dataLoaded = true;  // Task #64 — fallback considéré comme valide, saves autorisés
     _loadedFromFallback = true; // #114-1a — mémoire issue du cache local non confirmée.
@@ -922,7 +925,13 @@ async function saveToSupabase() {
       // d'écraser une clé globale mal attribuée.
       const kP = _scopedKey('bm4-patients');
       const kPr = _scopedKey('bm4-praticiens');
-      if (kP) localStorage.setItem(kP, JSON.stringify(patients));
+      if (kP) {
+        // fix/269 — APRÈS les await, la mémoire a ses dataURLs restaurées
+        // (finally de savePatients, stash des photos) : même filtre que
+        // savePatients, puis mémoire restaurée.
+        const _stash = _stripDataURLsForPersist(patients);
+        try { localStorage.setItem(kP, JSON.stringify(patients)); } finally { _restoreDataURLsAfterPersist(_stash); }
+      }
       if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
       console.error('[#38] saveToSupabase failed', {
         event: 'sync_failed_response_not_ok',
@@ -955,7 +964,11 @@ async function saveToSupabase() {
     // on n'écrit RIEN plutôt que d'écraser une clé globale mal attribuée.
     const kP = _scopedKey('bm4-patients');
     const kPr = _scopedKey('bm4-praticiens');
-    if (kP) localStorage.setItem(kP, JSON.stringify(patients));
+    if (kP) {
+      // fix/269 — idem chemin « non OK » : filtre, écriture, mémoire restaurée.
+      const _stash = _stripDataURLsForPersist(patients);
+      try { localStorage.setItem(kP, JSON.stringify(patients)); } finally { _restoreDataURLsAfterPersist(_stash); }
+    }
     if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
     console.error('[#38] saveToSupabase exception', {
       event: 'sync_failed_exception',
