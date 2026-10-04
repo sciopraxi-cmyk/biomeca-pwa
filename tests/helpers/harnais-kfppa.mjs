@@ -169,6 +169,11 @@ export const FONCTIONS_OPTIONNELLES = [
   '_fermerEdition',
   '_afficherEdition',
   '_remplirVignette',
+  // #272-C — verrou des points posés à la main
+  'relacherPoint',
+  '_pointVerrouille',
+  '_rayonVerrou',
+  '_calerCoteVerrouille',
 ];
 // Appels DIRECTS du vrai nav, bouchonnés (option navReelle).
 const BOUCHONS_NAV = [
@@ -340,7 +345,9 @@ export function charger(opts = {}) {
         },
       }),
     };
-    function alert(m) { if (_persist) { _enregistrements.push('alert'); return; } throw new Error('alert inattendue : ' + m); }
+    // #272-C — le TEXTE des alertes est noté aussi (bilan du calage).
+    const _alertes = [];
+    function alert(m) { if (_persist) { _enregistrements.push('alert'); _alertes.push(String(m)); return; } throw new Error('alert inattendue : ' + m); }
     let _nbDessins = 0; // #279 étape 3c — nombre d'appels au dessin des points
     function drawOverlay(_ctx, canvas, markers, _sel, view, opts) {
       _nbDessins++;
@@ -352,7 +359,7 @@ export function charger(opts = {}) {
     let camStream = null;
     // #279 étape 3b — de quoi exécuter le vrai launchTest (réouverture d'un test).
     let testMode = null, selectedMkrIdx = -1, isDragging = false, selectedVidMkrIdx = -1, isVidDragging = false;
-    function renderMkrList() {}
+    ${opts.listeReelle ? fonction('renderMkrList') : 'function renderMkrList() {}'} // #272-C — vraie liste en option
     function renderFrameStrip() {}
     ${
       opts.zoomReel
@@ -401,6 +408,7 @@ export function charger(opts = {}) {
       ${FONCTIONS_OPTIONNELLES.join(', ')},
       ${opts.navReelle ? 'nav,' : ''}
       ${opts.zoomReel ? 'setCapZoom,' : ''}
+      ${opts.listeReelle ? 'renderMkrList,' : ''}
       poser(o) {
         if ('test' in o) currentTestId = o.test;
         if ('slots' in o) photoSlots = o.slots;
@@ -433,6 +441,7 @@ export function charger(opts = {}) {
       ecrits: () => _ecrits.slice(),
       envois: () => _envois.slice(),
       questions: () => _questions.slice(),
+      alertes: () => _alertes.slice(), // #272-C
       nbDessins: () => _nbDessins,
       enregistrements: () => _enregistrements.slice(),
       patient: () => currentPatient,
