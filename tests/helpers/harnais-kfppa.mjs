@@ -133,6 +133,8 @@ export const FONCTIONS = [
   '_kfppaNormePourBilan',
   '_lockSession', // #279 étape 4 — écriture immédiate au verrouillage
   '_buildSportRapportContentHTML', // #279 étape 4 — mentions des brouillons au rapport
+  'fermerVignette', // #280 — fermer l'agrandissement annule la modification
+  '_vigFondClic', // #280
 ];
 
 // #279 étape 4 — fonctions NOUVELLES de la sauvegarde automatique : extraites
@@ -155,6 +157,18 @@ export const FONCTIONS_OPTIONNELLES = [
   '_majBoutonAbandon',
   '_envoyerPuisPlanifier',
   '_rafraichirBadgesTests',
+  // #280 — modification des points d'une capture
+  '_mesurerCapture',
+  'ouvrirEditionPoints',
+  'validerEditionPoints',
+  'annulerEditionPoints',
+  'confirmerPointEdition',
+  '_motifEditionImpossible',
+  '_dessinerEdition',
+  '_brancherEdition',
+  '_fermerEdition',
+  '_afficherEdition',
+  '_remplirVignette',
 ];
 // Appels DIRECTS du vrai nav, bouchonnés (option navReelle).
 const BOUCHONS_NAV = [
@@ -223,6 +237,10 @@ export function charger(opts = {}) {
     // #279 étape 4 — état de la sauvegarde automatique (déclaré au niveau du
     // script dans biomeca.js, donc non extrait).
     let _brouillonAttente = null, _sessionCapture = null, _ecritureBrouillonEnCours = false, _sauvegardeTestsInstallee = false;
+    // #280 — modification des points : état de l'éditeur (niveau script) et
+    // chargement d'image BOUCHONNÉ (taille fixée par le test : poser({ tailleImage })).
+    let _edition = null, _tailleImage = null, _vigIdx = -1;
+    async function _chargerImage() { return _tailleImage ? { img: {}, w: _tailleImage.w, h: _tailleImage.h } : null; }
     // #275-D — ESPIONS D'ÉCRITURE. Chacun se note PUIS lève : un rapport ou
     // un panneau ne doit jamais sauvegarder (CLAUDE.md, incident du 25/07).
     const _espions = [];
@@ -336,7 +354,15 @@ export function charger(opts = {}) {
     let testMode = null, selectedMkrIdx = -1, isDragging = false, selectedVidMkrIdx = -1, isVidDragging = false;
     function renderMkrList() {}
     function renderFrameStrip() {}
-    function _applyCapView() {}
+    ${
+      opts.zoomReel
+        ? // #280 — vrai mécanisme de zoom (#236/#237), ses appels annexes bouchonnés.
+          ['_applyCapView', 'setCapZoom', '_capKeepAnchor'].map(fonction).join('\n') +
+          ligneConst('CAP_ZOOM_KEY') +
+          ligneConst('CAP_ZOOM_MIN') +
+          'let capZoom = 1;\nfunction _capWheelZoom() {}\nfunction _capWheelStep() {}\nfunction _majVidLayout() {}'
+        : 'function _applyCapView() {}'
+    }
     function enumerateCameras() {}
     async function prefetchSportPhotos() {}
     let liveMarkers = [];
@@ -366,7 +392,7 @@ export function charger(opts = {}) {
     ${optionnelles}
     ${opts.envoiReel ? ['migrateSportPhotos', 'restoreSportPhotosStash'].map(fonction).join('\n') : 'async function migrateSportPhotos() { return []; }\n    function restoreSportPhotosStash() {}'}
     return {
-      TESTS, MEASURE_COMPUTERS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
+      TESTS, MEASURE_COMPUTERS, KFPPA_NON_RECALC, _CALQUES_CAPTURE, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
       kfppaSexeCivilite, kfppaNormeApplicable, kfppaClasseU, kfppaClasseS, kfppaTexteNonSigne,
       kfppaSigneTxt, kfppaDelta, kfppaTexteDelta, kfppaTexteS, kfppaCouleurClasse,
       kfppaNormeBilan, kfppaTexteNorme, kfppaAnalyseGenou, kfppaPhraseGenou, kfppaPhraseAsymetrie,
@@ -374,6 +400,7 @@ export function charger(opts = {}) {
       ${noms.join(', ')},
       ${FONCTIONS_OPTIONNELLES.join(', ')},
       ${opts.navReelle ? 'nav,' : ''}
+      ${opts.zoomReel ? 'setCapZoom,' : ''}
       poser(o) {
         if ('test' in o) currentTestId = o.test;
         if ('slots' in o) photoSlots = o.slots;
@@ -391,9 +418,10 @@ export function charger(opts = {}) {
         if ('pageActive' in o) _pageActive = o.pageActive;
         if ('octetsStockage' in o) _octetsStockage = o.octetsStockage;
         if ('visibilite' in o) _visibilite = o.visibilite;
+        if ('tailleImage' in o) _tailleImage = o.tailleImage; // #280
       },
       // #279 étape 4 — déclenche les écouteurs notés d'un type d'événement.
-      declencher(type) { _ecouteurs.filter((e) => e.type === type).forEach((e) => e.f({ type })); },
+      declencher(type, champs = {}) { _ecouteurs.filter((e) => e.type === type).forEach((e) => e.f({ type, ...champs })); },
       ecouteurs: () => _ecouteurs.map((e) => e.cible + ':' + e.type),
       patientsListe: () => patients,
       slots: () => photoSlots,

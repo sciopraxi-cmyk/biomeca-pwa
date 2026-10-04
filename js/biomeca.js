@@ -8566,9 +8566,13 @@ function vidPhotoSlotHTML(slot, idx) {
 // Ni zoom ni déplacement : la résolution stockée est 1920, l'afficher en
 // entier suffit à juger. Ce sera un ajout séparé si Scio le demande.
 let _vigEchap = null;
+let _vigIdx = -1; // #280 — créneau affiché, pour « Modifier les points »
 function ouvrirVignette(idx) {
   const slot = photoSlots[idx];
   if (!slot || !slot.dataUrl) return;
+  if (_edition) _fermerEdition(); // #280 — jamais l'éditeur d'une autre capture
+  const peMsg = document.getElementById('pe-message'); // #280 — aucun ancien refus affiché
+  if (peMsg) peMsg.textContent = '';
   // PAS DE RETOUR SILENCIEUX SUR UN ÉLÉMENT MANQUANT. Un identifiant renommé
   // un jour rendrait le clic inopérant sans message ni trace : une fonction
   // morte qui a l'air normale. On nomme celui qui manque.
@@ -8581,7 +8585,23 @@ function ouvrirVignette(idx) {
     console.error('#273 ouvrirVignette : balisage de la modale introuvable —', manquants.join(', '));
     return;
   }
-  const [m, img, lbl, ang] = els;
+  const m = els[0];
+  _vigIdx = idx;
+  _remplirVignette(slot);
+  // classList, jamais style.display : display:flex vit dans .vig-modal.ouverte.
+  m.classList.add('ouverte');
+  // L'écouteur n'existe QUE pendant l'ouverture : pas de touche Échap captée
+  // en permanence au détriment du reste de l'application.
+  _vigEchap = (e) => { if (e.key === 'Escape') fermerVignette(); };
+  document.addEventListener('keydown', _vigEchap);
+}
+// #280 — contenu de l'agrandissement (image, calque, libellé, angle), extrait
+// d'ouvrirVignette pour être rafraîchi après une modification des points.
+function _remplirVignette(slot) {
+  const img = document.getElementById('vig-modal-img');
+  const lbl = document.getElementById('vig-modal-lbl');
+  const ang = document.getElementById('vig-modal-ang');
+  if (!img || !lbl || !ang) return;
   img.src = slot.dataUrl;
   // #279 étape 3c — calque des points d'une capture sans points ; retiré sinon,
   // pour ne jamais laisser celui d'une vignette ouverte avant.
@@ -8604,14 +8624,9 @@ function ouvrirVignette(idx) {
     : (slot.angle !== null && slot.angle !== undefined) ? slot.angle.toFixed(1) + '°' : '';
   ang.textContent = a;
   ang.style.display = a ? '' : 'none';
-  // classList, jamais style.display : display:flex vit dans .vig-modal.ouverte.
-  m.classList.add('ouverte');
-  // L'écouteur n'existe QUE pendant l'ouverture : pas de touche Échap captée
-  // en permanence au détriment du reste de l'application.
-  _vigEchap = (e) => { if (e.key === 'Escape') fermerVignette(); };
-  document.addEventListener('keydown', _vigEchap);
 }
 function fermerVignette() {
+  if (_edition) annulerEditionPoints(); // #280 — fermer = annuler, rien d'écrit
   const m = document.getElementById('modal-vignette');
   if (m) m.classList.remove('ouverte');
   const img = document.getElementById('vig-modal-img');
@@ -8627,7 +8642,202 @@ function fermerVignette() {
 // ou sur l'angle a une autre cible et ne ferme rien. Sans cette égalité, la
 // modale se refermerait sous le doigt dès qu'on approche un marqueur.
 function _vigFondClic(e) {
+  // #280 — un point glissé puis relâché HORS de l'image produit un clic sur le
+  // fond : ce n'est pas une demande de fermeture, la modification est gardée.
+  if (_edition && _edition.appui) return;
   if (e.target === e.currentTarget) fermerVignette();
+}
+
+// ══════════════════════════════════════════════════════
+// #280 — MODIFIER LES POINTS D'UNE CAPTURE
+// ══════════════════════════════════════════════════════
+// Depuis l'agrandissement : une COPIE des points est modifiée (déplacement à
+// la souris ou au doigt, « Confirmer ce point » point par point), avec aperçu
+// de la valeur. « Valider la modification » l'applique au créneau EN MÉMOIRE,
+// recalcule par _mesurerCapture (le calcul de la capture, jamais un second) et
+// passe par le brouillon (#279 étape 4) : mesures n'est écrit qu'à la
+// validation du test, rien n'est envoyé à Storage (l'image ne change pas).
+// « Annuler », Échap, le fond ou la fermeture abandonnent la copie.
+// Un point déplacé ou confirmé passe à origine 'main' ; une simple sélection
+// ne change rien (S2c). Jamais à l'aveugle : sans image, capture antérieure
+// (points dessinés dans l'image), points illisibles ou image d'une autre
+// taille que dims → refus avec un message.
+let _edition = null; // { idx, slot, t, img, pts, sel, glisse, appui }
+
+// Pourquoi une capture ne peut pas être modifiée, ou null.
+function _motifEditionImpossible(slot) {
+  if (!slot) return 'aucune capture à modifier';
+  if (!slot.dataUrl && slot.nonEnvoyee) return 'photo non envoyée — modification impossible sans l’image, à recapturer';
+  if (!slot.dataUrl && slot.path) return 'photo non rechargée — connexion requise pour modifier les points';
+  if (!slot.dataUrl) return 'aucune image — à capturer';
+  if (!slot.imageBrute) return 'capture antérieure — points dessinés dans l’image, modification impossible, à recapturer';
+  if (!_pointsCaptureLisibles(slot)) return 'points non disponibles — à recapturer';
+  return null;
+}
+
+// Image décodée et sa taille réelle (null si elle ne se décode pas).
+function _chargerImage(src) {
+  return new Promise((ok) => {
+    const img = new Image();
+    img.onload = () => ok({ img, w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => ok(null);
+    img.src = src;
+  });
+}
+
+// Appelée depuis index.html (onclick) — avertissement ESLint no-unused-vars attendu, dette #278.
+async function ouvrirEditionPoints(idx) {
+  if (idx === undefined || idx === null) idx = _vigIdx;
+  const slot = photoSlots[idx];
+  const msg = document.getElementById('pe-message');
+  const refuser = (motif) => {
+    if (msg) msg.textContent = '⚠️ ' + motif;
+    return { ok: false, motif };
+  };
+  const motif = _motifEditionImpossible(slot);
+  if (motif) return refuser(motif);
+  const im = await _chargerImage(slot.dataUrl);
+  // Repère des points = dims. Une image d'une autre taille les placerait faux.
+  if (!im || im.w !== slot.dims?.w || im.h !== slot.dims?.h) {
+    return refuser('taille de l’image différente du repère des points — modification impossible, à recapturer');
+  }
+  if (photoSlots[idx] !== slot) return refuser('capture remplacée entre-temps — rouvrez-la');
+  const t = TESTS[currentTestId];
+  _edition = { idx, slot, t, img: im.img, pts: JSON.parse(JSON.stringify(slot.markers)), sel: -1, glisse: false, appui: false };
+  if (msg) msg.textContent = '';
+  const c = document.getElementById('pe-canvas');
+  if (c) {
+    c.width = slot.dims.w;
+    c.height = slot.dims.h;
+    _brancherEdition(c);
+  }
+  const wrap = document.getElementById('pe-wrap');
+  if (wrap) wrap.style.width = 'min(94vw, calc(74vh * ' + (slot.dims.w / slot.dims.h).toFixed(4) + '))';
+  _afficherEdition(true);
+  _applyCapView(); // zoom de la capture (#236), appliqué aussi au cadre de l'éditeur
+  _dessinerEdition();
+  return { ok: true };
+}
+
+function _afficherEdition(oui) {
+  const zone = document.getElementById('pe-zone');
+  const cadre = document.querySelector('#modal-vignette .vig-modal-cadre');
+  const barre = document.getElementById('vig-modal-barre-lecture');
+  if (zone) zone.hidden = !oui;
+  if (cadre) cadre.hidden = oui;
+  if (barre) barre.hidden = oui;
+}
+
+// Souris et doigt. Le doigt n'empêche le défilement QUE sur un point : ailleurs,
+// il fait défiler l'image agrandie. Coordonnées par canvasXY, dans le repère
+// dims quel que soit le zoom.
+function _brancherEdition(canvas) {
+  // Appui commun souris / doigt : sélection du point touché.
+  const appuyer = (e) => {
+    const ed = _edition;
+    if (!ed) return false;
+    const { x, y } = canvasXY(e, canvas);
+    ed.sel = findMarkerAt(x, y, ed.pts, canvas.width);
+    ed.glisse = ed.sel >= 0;
+    ed.appui = ed.glisse;
+    _dessinerEdition();
+    return ed.glisse;
+  };
+  canvas.onmousedown = (e) => {
+    // SOURIS seulement : relâchée hors de l'image, le clic qui suit tombe sur
+    // le fond ; l'appui retombe juste après lui. Le doigt n'a pas ce clic
+    // (ontouchend, qui suit le doigt hors de l'image, relâche l'appui).
+    if (appuyer(e)) document.addEventListener('mouseup', () => setTimeout(() => { if (_edition) _edition.appui = false; }, 0), { once: true });
+  };
+  canvas.onmousemove = (e) => {
+    const ed = _edition;
+    if (!ed || !ed.glisse || ed.sel < 0) return;
+    const { x, y } = canvasXY(e, canvas);
+    const p = ed.pts[ed.sel];
+    p.x = x;
+    p.y = y;
+    p.origine = 'main'; // déplacé à la main
+    _dessinerEdition();
+  };
+  canvas.onmouseup = () => {
+    if (!_edition) return;
+    _edition.glisse = false;
+    _edition.appui = false;
+  };
+  canvas.ontouchstart = (e) => {
+    const t = e.touches[0];
+    if (appuyer({ clientX: t.clientX, clientY: t.clientY })) e.preventDefault();
+  };
+  canvas.ontouchmove = (e) => {
+    if (!_edition || !_edition.glisse) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    canvas.onmousemove({ clientX: t.clientX, clientY: t.clientY });
+  };
+  canvas.ontouchend = () => canvas.onmouseup();
+}
+
+// Image, points de la copie (réglages de dessin DE LA CAPTURE) et aperçu de la
+// valeur, calculée par _mesurerCapture.
+function _dessinerEdition() {
+  const ed = _edition;
+  if (!ed) return;
+  const c = document.getElementById('pe-canvas');
+  if (c) {
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(ed.img, 0, 0, c.width, c.height);
+    // Même vue et mêmes réglages que le calque de la capture (_calqueCapture).
+    const des = ed.slot.dessin || {};
+    const view = TESTS[des.testId]?.view || 'face';
+    drawOverlay(ctx, c, ed.pts, ed.sel, view, { taille: des.taille, opacite: des.opacite, testId: des.testId });
+  }
+  const ang = document.getElementById('pe-ang');
+  if (ang) {
+    const apercu = { ...ed.slot, ..._mesurerCapture(ed.t, ed.slot, ed.pts), markers: ed.pts };
+    const bip = _kfppaBipodalTexte(ed.t, apercu);
+    const v = bip != null ? bip : apercu.angle != null ? apercu.angle.toFixed(1) + '°' : '—';
+    ang.textContent = v + (_pointsNonAjustes(apercu, null) ? ' · points non ajustés' : '');
+  }
+}
+
+// « Confirmer ce point » : le point SÉLECTIONNÉ seul, sans le déplacer.
+// Appelée depuis index.html (onclick) — avertissement ESLint no-unused-vars attendu, dette #278.
+function confirmerPointEdition() {
+  const ed = _edition;
+  if (!ed || ed.sel < 0 || !ed.pts[ed.sel]) return;
+  ed.pts[ed.sel].origine = 'main';
+  _dessinerEdition();
+}
+
+function _fermerEdition() {
+  _edition = null;
+  _afficherEdition(false);
+  const msg = document.getElementById('pe-message');
+  if (msg) msg.textContent = '';
+}
+
+function annulerEditionPoints() {
+  _fermerEdition();
+}
+
+// Appelée depuis index.html (onclick) — avertissement ESLint no-unused-vars attendu, dette #278.
+function validerEditionPoints() {
+  const ed = _edition;
+  if (!ed) return;
+  _fermerEdition();
+  const slot = photoSlots[ed.idx];
+  if (slot !== ed.slot) return; // créneau remplacé entre-temps : rien n'est appliqué
+  if (JSON.stringify(ed.pts) === JSON.stringify(slot.markers)) return; // rien de modifié
+  slot.markers = ed.pts;
+  const m = _mesurerCapture(ed.t, slot, ed.pts);
+  slot.angle = m.angle;
+  if ('angleD' in m) { slot.angleD = m.angleD; slot.angleG = m.angleG; }
+  _poserKfppaSigne(slot, m.kfppaSigne);
+  renderVidPhotoGrid();
+  updateResults();
+  _remplirVignette(slot);
+  _planifierBrouillon(); // #279 étape 4 — mesures n'est touché qu'à la validation du test
 }
 
 // #279 étape 3f — garde capture : JAMAIS de capture sans image vidéo. Caméra
@@ -8640,13 +8850,72 @@ function _fluxVideoPret() {
   return !!(p && c && p.readyState >= 2 && p.videoWidth > 0 && c.width > 0);
 }
 
+// #280 — VALEURS D'UNE CAPTURE À PARTIR DE SES POINTS. Le calcul de
+// captureVidPhotoSlot, EXTRAIT SANS AUCUN CHANGEMENT (mêmes fonctions, mêmes
+// arguments), pour la capture ET la modification des points : jamais un
+// second calcul. `pts` : les points du créneau (son côté, ou tous) ; `tous` :
+// l'ensemble d'où se lisent les côtés D et G (mobilité, bipodal KFPPA) — à la
+// capture vidMarkers, à la modification les points du créneau, identiques pour
+// ces créneaux sans côté. calcAngle3 et calcAngleSign ne lisent que les points
+// placés : les points enregistrés (placés seulement) redonnent les mêmes valeurs.
+// Rend { angle, kfppaSigne } et, pour la mobilité et le bipodal KFPPA,
+// { angleD, angleG } — clés absentes sinon, comme les champs de la capture.
+function _mesurerCapture(t, slot, pts = slot?.markers || [], tous = pts) {
+  const view = t?.view || 'dos';
+  const side = slot?.side || '';
+  // Calculer l'angle selon le côté
+  const rawAng = calcAngle3(pts);
+  // MLA : angle brut (pas de correction)
+  // KFPPA : incl (180-rawAng) signé valgus+/varus− en vue de face (#275-A)
+  const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
+  const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, pts);
+  const r = { angle: corrAng };
+  // Mobilité AP : stocker angles D et G séparément
+  if(t?.mobiliteAP) {
+    const mkrD = tous.filter(m=>m.side==='D');
+    const mkrG = tous.filter(m=>m.side==='G');
+    // Signe anatomique réel : Inv=+ Ev=- selon direction du calca
+    // Pied D: pointe droite=Inv(+), pointe gauche=Ev(-)
+    // Pied G: pointe gauche=Inv(+), pointe droite=Ev(-)
+    r.angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'',mkrD);
+    r.angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'',mkrG);
+  }
+  // KFPPA photo bipodale : calculer angleD et angleG séparément
+  if(t?.kfppaPhotos && !side) {
+    const mkrD = tous.filter(m=>m.side==='D');
+    const mkrG = tous.filter(m=>m.side==='G');
+    r.angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,'kfppa',mkrD);
+    r.angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,'kfppa',mkrG);
+    // #275-B — LE CRÉNEAU BIPODAL NE PORTE PLUS D'ANGLE UNIQUE.
+    //
+    // Ce créneau n'a pas de côté, donc `pts` vaut tous les marqueurs — les
+    // six, D et G confondus. calcAngle3 applique alors sa règle des gabarits à
+    // quatre points et mesure sur [1], [2], [3] : un sommet À CHEVAL SUR LES
+    // DEUX JAMBES. Le nombre obtenu n'a aucun sens géométrique, et il partait
+    // dans le rapport du patient — relevé par le praticien : 124,0° sur une
+    // station bipodale jambes droites.
+    //
+    // Les deux vraies mesures viennent d'être calculées juste au-dessus, par
+    // jambe. On efface donc l'angle unique plutôt que de le laisser cohabiter
+    // avec elles : une valeur fausse qui reste lisible finit par être lue.
+    r.angle = null;
+  }
+  // #275-A — kfppaSigne. Créneau bipodal : le signe porte sur angleD/angleG,
+  // calculés par jambe ci-dessus ; créneau unipodal : sur l'angle du créneau.
+  r.kfppaSigne = (t?.kfppaPhotos && !side)
+    ? (_kfppaSigneCalcule('kfppa', view, 'D', tous.filter(m=>m.side==='D'), r.angleD)
+      || _kfppaSigneCalcule('kfppa', view, 'G', tous.filter(m=>m.side==='G'), r.angleG))
+    : _kfppaSigneCalcule(mlaType, view, side, pts, corrAng);
+  return r;
+}
+
 function captureVidPhotoSlot(slotIdx) {
   const player = document.getElementById('vid-el');
   const vcanvas = document.getElementById('vid-canvas');
   // #279 étape 3f — refus AVANT toute écriture : le créneau reste inchangé.
   if(!_fluxVideoPret()) { alert('Activez la caméra ou importez une vidéo.'); return; }
   const t = TESTS[currentTestId];
-  const view = t?.view || 'dos';
+  // #280 — `view` (t?.view || 'dos') est désormais lu par _mesurerCapture.
   const slot = photoSlots[slotIdx];
   const side = slot?.side || '';
   // #279 étape 3f — une capture repart sans le statut d'envoi de l'ancienne :
@@ -8668,14 +8937,11 @@ function captureVidPhotoSlot(slotIdx) {
   // redessinés à l'affichage d'après les coordonnées (étape 3c, puis #280).
   const dataUrl = tmp.toDataURL('image/jpeg', 0.88);
 
-  // Calculer l'angle selon le côté
-  const rawAng = calcAngle3(markersForPhoto);
-  // MLA : angle brut (pas de correction)
-  // KFPPA : incl (180-rawAng) signé valgus+/varus− en vue de face (#275-A)
-  const mlaType = _mkrTypeTest(t); // #271-D — MÊME formule, une seule source
-  const corrAng = computeCorrectedAngle(rawAng, side, view, mlaType, markersForPhoto);
+  // #280 — valeurs calculées par _mesurerCapture : le calcul qui vivait ici,
+  // EXTRAIT sans changement, partagé avec la modification des points.
+  const _m = _mesurerCapture(t, slot, markersForPhoto, vidMarkers);
   photoSlots[slotIdx].dataUrl = dataUrl;
-  photoSlots[slotIdx].angle = corrAng;
+  photoSlots[slotIdx].angle = _m.angle;
   photoSlots[slotIdx].path = null; // remplacement → migration ré-uploadera (B2)
   // #250 — les points sont enregistrés avec l'image, pour rendre la mesure
   // recalculable. `markersConnus` marque une capture dont la géométrie EST
@@ -8690,47 +8956,9 @@ function captureVidPhotoSlot(slotIdx) {
   photoSlots[slotIdx].markersConnus = true;
   photoSlots[slotIdx].imageBrute = true; // #279 étape 3b
   photoSlots[slotIdx].dessin = _dessinCapture();
-
-  // Mobilité AP : stocker angles D et G séparément
-  if(t?.mobiliteAP) {
-    const mkrD = vidMarkers.filter(m=>m.side==='D');
-    const mkrG = vidMarkers.filter(m=>m.side==='G');
-    // Signe anatomique réel : Inv=+ Ev=- selon direction du calca
-    // Pied D: pointe droite=Inv(+), pointe gauche=Ev(-)
-    // Pied G: pointe gauche=Inv(+), pointe droite=Ev(-)
-    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,t?.type||'',mkrD);
-    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,t?.type||'',mkrG);
-  }
-
-  // KFPPA photo bipodale : calculer angleD et angleG séparément
-  if(t?.kfppaPhotos && !side) {
-    // Bipodal KFPPA : stocker angle brut (rawAng) côté D et G
-    const mkrD = vidMarkers.filter(m=>m.side==='D');
-    const mkrG = vidMarkers.filter(m=>m.side==='G');
-    photoSlots[slotIdx].angleD = computeCorrectedAngle(calcAngle3(mkrD),'D',view,'kfppa',mkrD);
-    photoSlots[slotIdx].angleG = computeCorrectedAngle(calcAngle3(mkrG),'G',view,'kfppa',mkrG);
-    // #275-B — LE CRÉNEAU BIPODAL NE PORTE PLUS D'ANGLE UNIQUE.
-    //
-    // Ce créneau n'a pas de côté, donc `markersForPhoto` vaut tous les
-    // marqueurs — les six, D et G confondus. calcAngle3 applique alors sa règle
-    // des gabarits à quatre points et mesure sur [1], [2], [3] : un sommet À
-    // CHEVAL SUR LES DEUX JAMBES. Le nombre obtenu n'a aucun sens
-    // géométrique, et il partait dans le rapport du patient — relevé par le
-    // praticien : 124,0° sur une station bipodale jambes droites.
-    //
-    // Les deux vraies mesures viennent d'être calculées juste au-dessus, par
-    // jambe. On efface donc l'angle unique plutôt que de le laisser cohabiter
-    // avec elles : une valeur fausse qui reste lisible finit par être lue.
-    photoSlots[slotIdx].angle = null;
-  }
-
-  // #275-A — kfppaSigne. Créneau bipodal : le signe porte sur angleD/angleG,
-  // calculés par jambe ci-dessus ; créneau unipodal : sur l'angle du créneau.
-  const _sl = photoSlots[slotIdx];
-  _poserKfppaSigne(_sl, (t?.kfppaPhotos && !side)
-    ? (_kfppaSigneCalcule('kfppa', view, 'D', vidMarkers.filter(m=>m.side==='D'), _sl.angleD)
-      || _kfppaSigneCalcule('kfppa', view, 'G', vidMarkers.filter(m=>m.side==='G'), _sl.angleG))
-    : _kfppaSigneCalcule(mlaType, view, side, markersForPhoto, corrAng));
+  // Mobilité AP et bipodal KFPPA : angles D et G séparés (voir _mesurerCapture).
+  if ('angleD' in _m) { photoSlots[slotIdx].angleD = _m.angleD; photoSlots[slotIdx].angleG = _m.angleG; }
+  _poserKfppaSigne(photoSlots[slotIdx], _m.kfppaSigne); // #275-A
 
   renderVidPhotoGrid();
   updateResults();
@@ -13112,7 +13340,7 @@ let capContrast = _loadCapPref(CAP_CONTRAST_KEY, CAP_CONTRAST_MIN, CAP_CONTRAST_
 // peut avoir été re-layouté).
 function _applyCapView() {
   const pct = (capZoom * 100).toFixed(2) + '%';
-  ['ph-zoom', 'vid-zoom'].forEach((id) => {
+  ['ph-zoom', 'vid-zoom', 'pe-zoom'].forEach((id) => { // #280 — pe-zoom : éditeur des points
     const el = document.getElementById(id);
     if (el) el.style.width = pct;
   });
@@ -13142,7 +13370,7 @@ function _applyCapView() {
     el.textContent = 'Contraste:' + capContrast.toFixed(1);
   });
   // #237 — Ctrl/⌘ + molette sur les cadres (branché une seule fois, garde _wheelBound).
-  ['ph-wrap', 'vid-wrap'].forEach((id) => {
+  ['ph-wrap', 'vid-wrap', 'pe-wrap'].forEach((id) => { // #280
     const el = document.getElementById(id);
     if (el && !el._wheelBound) {
       el.addEventListener('wheel', _capWheelZoom, { passive: false });
@@ -13476,6 +13704,7 @@ function setCapZoom(val, anchor) {
   if (ratio !== 1) {
     _capKeepAnchor(document.getElementById('ph-wrap'), ratio, anchor);
     _capKeepAnchor(document.getElementById('vid-wrap'), ratio, anchor);
+    _capKeepAnchor(document.getElementById('pe-wrap'), ratio, anchor); // #280
   }
 }
 
