@@ -89,7 +89,22 @@ export const FONCTIONS = [
   'amProCard', // #279 1b — panneau de l'amorti
   'mlaCard', // #279 1b — panneau MLA du mode photo (non-régression)
   'badgeGen', // #279 1b — appelé par mlaCard
+  'detectMarkersAuto', // #279 1c
+  '_getMarkerPriorPositions', // #279 1c
+  '_detectReflectiveBlobs', // #279 1c
+  '_capContrastPixels', // #279 1c
+  '_blobSizeMaxFor', // #279 1c
+  'snapMarkersToReflectiveBlobs', // #279 1c
+  'setupVidCanvas', // #279 1c
+  'setupPhotoCanvas', // #279 1c
+  'findMarkerAt', // #279 1c
+  'clearMkr', // #279 1c
+  'resetAllMarkers', // #279 1c
+  'canvasXY', // #279 1c
   '_valeurPhoto', // #279 1b
+  '_pointsNonAjustes', // #279 1c
+  '_pointsNonAjustesHTML', // #279 1c
+  '_retirerDerivesEcartes', // #279 1c
   '_motifs', // #279 1b
   '_mesureMla', // #279 1b
   '_mesureVerrou', // #279 1b
@@ -100,6 +115,7 @@ export const FONCTIONS = [
   '_pointsCaptureLisibles',
   '_calqueCapture',
   '_imgRapportAvecCalque',
+  '_imgRapportAvecCalqueSeule', // #279 1c
   '_vigCalqueHTML',
   '_pointsIndisponiblesHTML',
   '_envoyerCaptureStorage',
@@ -206,7 +222,8 @@ export function charger(opts = {}) {
       // (drawOverlay ci-dessous) : sa dataURL le dit, BRUTE ou AVECPOINTS.
       createElement: () => ({
         width: 0, height: 0, _points: false,
-        getContext: () => ({ drawImage() {} }),
+        // #279 1c — image synthétique fournie par le test (calage sur pastilles).
+        getContext: () => ({ drawImage() {}, getImageData: (_x, _y, w, h) => ({ data: _image ? Uint8ClampedArray.from(_image.data) : new Uint8ClampedArray(w * h * 4) }) }),
         toDataURL(type) {
           // Calque (PNG) : encode ce que drawOverlay a reçu — vue, points, options.
           if (type === 'image/png') return 'data:image/png;base64,CALQUE' + encodeURIComponent(JSON.stringify(this._trace || null));
@@ -232,6 +249,11 @@ export function charger(opts = {}) {
     function enumerateCameras() {}
     async function prefetchSportPhotos() {}
     let liveMarkers = [];
+    // #279 1c — état lu par le placement à la main et le calage sur pastilles.
+    let _image = null, sensThr = 200, capContrast = 1, vidSnapZone = null, vidZoneMode = false, _vidZoneDrag = null, vAutoDetect = true, autoLive = false;
+    function updateAngleOverlay() {}
+    function _drawSnapZoneRect() {}
+    function _setVidZoneMode() {}
     function renderVidPhotoGrid() {}
     function quickAngleCard(side) { return '<carte-rapide ' + side + '>'; }
     ${objet('TESTS')}
@@ -269,8 +291,12 @@ export function charger(opts = {}) {
         if ('camera' in o) camStream = o.camera;
         if ('taille' in o) markerSizeFactor = o.taille;
         if ('opacite' in o) markerOpacity = o.opacite;
+        if ('image' in o) _image = o.image; // #279 1c
       },
       slots: () => photoSlots,
+      vid: () => vidMarkers, // #279 1c
+      live: () => liveMarkers, // #279 1c
+      poserMode(m) { testMode = m; }, // #279 1c
       frames: () => capturedFrames, // #279 étape 3f
       espions: () => _espions.slice(),
       ecrits: () => _ecrits.slice(),

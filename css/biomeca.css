@@ -1406,6 +1406,12 @@ body.printing #rpt-print{display:block!important;}
   position: absolute; left: 4px; right: 4px; top: 50%;
   transform: translateY(-50%); z-index: 2; margin: 0;
 }
+/* #279 1c — « points non ajustés » : au-dessus de l'image, en BAS, au-dessus
+   du libellé, pour laisser voir les points creux qu'elle désigne. */
+.vig .rp-points-na,
+.photo-slot .rp-points-na{
+  position: absolute; left: 4px; right: 4px; bottom: 18px; z-index: 2; margin: 0;
+}
 /* #279 étape 3c — calque des points dans l'agrandissement : le cadre épouse
    l'image ; le calque en couvre exactement la surface, fond TRANSPARENT (la
    règle .vig-modal-inner img lui donnerait sinon le fond noir de l'image). */
