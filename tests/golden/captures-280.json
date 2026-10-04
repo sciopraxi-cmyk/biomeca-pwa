@@ -1,0 +1,230 @@
+{
+  "kfppa-marche": [
+    {
+      "angle": null,
+      "angleD": 14.807758703675859,
+      "angleG": -7.879224053243007,
+      "kfppaSigne": true
+    },
+    {
+      "angle": -7.879224053243007,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": true
+    },
+    {
+      "angle": 14.807758703675859,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": true
+    }
+  ],
+  "kfppa-course": [
+    {
+      "angle": null,
+      "angleD": 14.807758703675859,
+      "angleG": -7.879224053243007,
+      "kfppaSigne": true
+    },
+    {
+      "angle": -7.879224053243007,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": true
+    },
+    {
+      "angle": 14.807758703675859,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": true
+    }
+  ],
+  "kfppa-sldj": [
+    {
+      "angle": null,
+      "angleD": 14.807758703675859,
+      "angleG": -7.879224053243007,
+      "kfppaSigne": true
+    },
+    {
+      "angle": -7.879224053243007,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": true
+    },
+    {
+      "angle": 14.807758703675859,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": true
+    }
+  ],
+  "verrou": [
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    }
+  ],
+  "mobilite": [
+    {
+      "angle": 14.241358747447748,
+      "angleD": -14.241358747447748,
+      "angleG": 10.888671580665033,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 14.241358747447748,
+      "angleD": -14.241358747447748,
+      "angleG": 10.888671580665033,
+      "kfppaSigne": false
+    }
+  ],
+  "mla-marche": [
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    }
+  ],
+  "mla-course": [
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 99.35297925009326,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    }
+  ],
+  "amorti-marche": [
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    }
+  ],
+  "amorti-course": [
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": 10.888671580665033,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    },
+    {
+      "angle": -14.241358747447748,
+      "angleD": null,
+      "angleG": null,
+      "kfppaSigne": false
+    }
+  ]
+}

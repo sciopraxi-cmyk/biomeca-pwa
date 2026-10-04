@@ -3289,9 +3289,29 @@
       <img id="vig-modal-img" alt="Capture agrandie"/>
       <img id="vig-modal-calque" class="vig-modal-calque" alt="" hidden/>
     </span>
-    <div class="vig-modal-bar">
+    <div class="vig-modal-bar" id="vig-modal-barre-lecture">
       <span id="vig-modal-lbl"></span>
       <span id="vig-modal-ang" class="vig-modal-ang"></span>
+      <!-- #280 — modifier les points de cette capture (refus expliqué sinon) -->
+      <button class="btn pe-btn" onclick="ouvrirEditionPoints()">Modifier les points</button>
+    </div>
+    <span id="pe-message" class="pe-message"></span>
+    <!-- #280 — éditeur des points : copie modifiée, validée ou annulée. Le zoom
+         est celui de la capture (#236) : pe-zoom porte la largeur, pe-wrap défile. -->
+    <div id="pe-zone" class="pe-zone" hidden>
+      <div id="pe-wrap" class="pe-wrap">
+        <div id="pe-zoom" class="pe-zoom">
+          <canvas id="pe-canvas" class="pe-canvas"></canvas>
+        </div>
+      </div>
+      <div class="vig-modal-bar pe-bar">
+        <span id="pe-ang" class="vig-modal-ang"></span>
+        <button class="btn pe-btn" onclick="confirmerPointEdition()">Confirmer ce point</button>
+        <input type="range" class="cap-zoom-slider" min="1" max="4" step="0.25" value="1" oninput="setCapZoom(this.value)" aria-label="Zoom"/>
+        <span class="cap-zoom-label">Zoom:1.00x</span>
+        <button class="btn btn-blue pe-btn" onclick="validerEditionPoints()">Valider la modification</button>
+        <button class="btn pe-btn" onclick="annulerEditionPoints()">Annuler</button>
+      </div>
     </div>
   </div>
   <button class="vig-modal-x" onclick="fermerVignette()" aria-label="Fermer">×</button>
