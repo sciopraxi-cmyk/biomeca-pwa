@@ -4185,64 +4185,169 @@ function _kfppaEtatBipodal(photos, side) {
   const present = (p) => !!(p && (p.dataUrl || p.path || p.nonEnvoyee));
   const bip = ph.find((p) => p && p.side === '');
   if (present(bip)) {
-    return (side === 'D' ? bip.angleD : bip.angleG) == null ? 'nonRecalc' : 'ok';
+    // #279 étape 3f — valeur absente sur une capture NEUVE (imageBrute, posé
+    // seulement par la capture) : points non disponibles, pas un bilan antérieur.
+    if ((side === 'D' ? bip.angleD : bip.angleG) != null) return 'ok';
+    return bip.imageBrute ? 'pointsKo' : 'nonRecalc';
   }
   return ph.some(present) ? 'manquante' : 'vide';
 }
 // Message à afficher pour cet état, ou null.
 function _kfppaMessageBipodal(etat) {
   if (etat === 'nonRecalc') return KFPPA_NON_RECALC;
+  if (etat === 'pointsKo') return KFPPA_POINTS_KO_BIP; // #279 étape 3f
   if (etat === 'manquante') return KFPPA_BIP_MANQUANTE;
   return null;
 }
 
+// #279 étape 3f — message À PART des valeurs (sous le bloc du panneau, ligne S
+// du bloc genou, alertes) : 'pointsKo' y est déjà dit par l'analyse du genou
+// (sPointsKo), en rouge ou avec sa conséquence — jamais deux fois.
+function _kfppaMessageBipodalHorsPointsKo(photos, side) {
+  const etat = _kfppaEtatBipodal(photos, side);
+  return etat === 'pointsKo' ? null : _kfppaMessageBipodal(etat);
+}
+
+// ═══ #279 étape 1b — VALEUR AFFICHÉE MAIS EXCLUE (6 tests hors KFPPA) ═══
+// SOURCE UNIQUE des valeurs, des calculs dérivés et de leur motif pour le MLA,
+// le verrouillage, la mobilité et l'amorti : le panneau (updateResults), le
+// rapport (buildPrintSide, buildPrintSection), les alertes (MEASURE_COMPUTERS)
+// et l'enregistrement (validateAndSave) lisent ICI.
+// Une valeur dont la photo est NON ENVOYÉE reste affichée mais n'entre dans
+// AUCUN calcul (Δ, %, couleur, verdict, alerte, phases) tant qu'elle n'est pas
+// recapturée ; une capture SANS POINTS (imageBrute, valeur absente) le dit.
+// Fondé sur des champs posés à la capture (nonEnvoyee, imageBrute), jamais
+// sur une heuristique : un ancien bilan, qui n'en porte aucun, est calculé
+// comme avant. La branche « mode photo » (jamais atteinte, cf. #278) n'est
+// pas concernée.
+
+// Valeur d'une photo : affichée (v), utilisable dans un calcul (calc), ou le
+// motif qui l'en écarte.
+// #279 1c — UN point posé PAR DÉFAUT parmi ceux du côté mesuré (règle a) :
+// la valeur n'est pas une mesure. Côté : celui du champ (angleD / angleG
+// d'une photo bipodale), sinon tous les points de la photo (photo d'un côté,
+// déjà filtrée à la capture ; MLA, sans côté). Sans origine : jamais.
+function _pointsNonAjustes(ph, cote) {
+  const pts = ph && Array.isArray(ph.markers) ? ph.markers.filter(_isPlacedPt) : [];
+  return (cote ? pts.filter((m) => m.side === cote) : pts).some((m) => m.origine === 'defaut');
+}
+
+function _valeurPhoto(ph, champ) {
+  const v = ph ? ph[champ || 'angle'] : null;
+  const ok = v != null && Number.isFinite(v);
+  const nom = (ph && ph.label) || 'photo';
+  const cote = champ === 'angleD' ? 'D' : champ === 'angleG' ? 'G' : null;
+  const motifs = [];
+  if (ph && ph.nonEnvoyee && ok) motifs.push('photo « ' + nom + ' » non envoyée — à recapturer');
+  if (ok && _pointsNonAjustes(ph, cote)) motifs.push('points non ajustés sur la photo « ' + nom + ' » — à recapturer'); // #279 1c
+  if (motifs.length) return { v, calc: null, motif: motifs.join(' ; ') };
+  if (ph && ph.imageBrute && !ok) return { v: null, calc: null, motif: 'points non disponibles sur la photo « ' + nom + ' » — à recapturer' };
+  return { v: ok ? v : null, calc: ok ? v : null, motif: null };
+}
+// Motifs distincts des valeurs dont dépend un calcul, ou null.
+function _motifs(...etats) {
+  const m = [...new Set(etats.map((e) => e && e.motif).filter(Boolean))];
+  return m.length ? m.join(' ; ') : null;
+}
+
+// MLA : Δ = écrasement − attaque/propulsion ; % = Δ / normDiv. Valeur
+// enregistrée préférée, comme avant — sauf si une photo est écartée.
+function _mesureMla(t, data, side) {
+  const ph = (data.photos || []).filter((p) => p.side === side);
+  const prop = _valeurPhoto(ph[0]), ecr = _valeurPhoto(ph[1]);
+  const motif = _motifs(prop, ecr);
+  if (motif) return { prop, ecr, deg: null, ratio: null, motif };
+  // Valeurs enregistrées d'abord (pct et Δ, ensemble) ; recalcul depuis les
+  // photos seulement si le pourcentage enregistré manque — l'ordre d'avant.
+  const pers = side === 'D' ? data.pctD : data.pctG;
+  const persOk = pers != null && !isNaN(pers);
+  let ratio = persOk ? pers : null;
+  let deg = side === 'D' ? data.deltaD : data.deltaG;
+  if (deg === undefined) deg = null;
+  if (!persOk && prop.calc != null && ecr.calc != null) { deg = ecr.calc - prop.calc; ratio = deg / (t.normDiv || 20); }
+  return { prop, ecr, deg, ratio, motif: null };
+}
+
+// Verrouillage : RF = pointe / norme (la seule photo « Pointe ») ;
+// mollet = (pointe − statique) / norme. « Stat » seule écartée : RF conservé.
+function _mesureVerrou(t, data, side) {
+  const ph = (data.photos || []).filter((p) => p.side === side);
+  const stat = _valeurPhoto(ph[0]), pointe = _valeurPhoto(ph[1]);
+  const mRf = _motifs(pointe), mMol = _motifs(stat, pointe);
+  const rfDeg = !mRf ? pointe.calc : null;
+  const molDeg = !mMol && stat.calc != null && pointe.calc != null ? pointe.calc - stat.calc : null;
+  return {
+    stat,
+    pointe,
+    rf: { motif: mRf, deg: rfDeg, ratio: rfDeg != null ? rfDeg / t.normVerrou : null },
+    mollet: { motif: mMol, deg: molDeg, ratio: molDeg != null ? molDeg / t.normVerrou : null },
+  };
+}
+
+// Mobilité : (inversion − éversion) / norme, par pied. Photos BIPODALES : une
+// photo non envoyée écarte la valeur des DEUX pieds (le drapeau est sur la
+// photo) ; des points absents ne touchent que le pied concerné.
+function _mesureMob(t, data, side) {
+  const ph = data.photos || [];
+  const champ = side === 'D' ? 'angleD' : 'angleG';
+  const inv = _valeurPhoto(ph[0], champ), ev = _valeurPhoto(ph[1], champ);
+  const motif = _motifs(inv, ev);
+  const deg = !motif && inv.calc != null && ev.calc != null ? inv.calc - ev.calc : null;
+  return { inv, ev, deg, ratio: deg != null ? deg / t.normMob : null, motif };
+}
+
+// Amorti = |taligrade − plantigrade| / norme ; propulsion = |digitigrade −
+// plantigrade| / norme. Valeurs enregistrées préférées, comme avant — sauf si
+// une photo est écartée. Le CALCUL ne lit que les photos (comme avant) ; les
+// phases enregistrées ne servent qu'à l'AFFICHAGE, à défaut de photos.
+function _mesureAmorti(t, data, side) {
+  const ph = (data.photos || []).filter((p) => p.side === side);
+  const tal = _valeurPhoto(ph[0]), plan = _valeurPhoto(ph[1]), dig = _valeurPhoto(ph[2]);
+  const mAm = _motifs(tal, plan), mPr = _motifs(dig, plan);
+  const ecart = (a, b) => (a.calc != null && b.calc != null ? Math.abs(a.calc - b.calc) / t.normAm : null);
+  const pAm = side === 'D' ? data.amD : data.amG, pPr = side === 'D' ? data.prD : data.prG;
+  const am = mAm ? null : pAm != null && !isNaN(pAm) ? pAm : ecart(tal, plan);
+  const pr = mPr ? null : pPr != null && !isNaN(pPr) ? pPr : ecart(dig, plan);
+  // Valeurs AFFICHÉES : la règle d'avant 1b — les phases enregistrées si
+  // l'amorti enregistré est valable (ou faute de photos), sinon les photos.
+  // Une photo écartée impose les photos : sa valeur s'affiche avec sa mention.
+  const ph3 = (data.phases && data.phases[side]) || {};
+  const pAmOk = pAm != null && !isNaN(pAm);
+  const parPhases = !mAm && !mPr && !_motifs(tal, plan, dig) && (pAmOk || !ph.length);
+  const aff = (e, k) => (parPhases ? { v: ph3[k] != null ? ph3[k] : null, calc: null, motif: null } : e);
+  return {
+    tal: aff(tal, 'tal'),
+    plan: aff(plan, 'plan'),
+    dig: aff(dig, 'dig'),
+    am: { ratio: am, motif: mAm },
+    pr: { ratio: pr, motif: mPr },
+  };
+}
+
+// Affichage d'une valeur : la valeur, puis la mention rouge si elle est
+// écartée ; le motif seul si elle n'existe pas (points non disponibles).
+function _txtValeurExclue(e, fmt, couleur) {
+  if (e.motif && e.v != null) return fmt(e.v) + _kfppaExcluHTML(' — valeur exclue des calculs (' + e.motif + ')', couleur);
+  if (e.motif) return _kfppaExcluHTML(e.motif, couleur);
+  return fmt(e.v);
+}
+// Calcul dérivé écarté : « non calculé (motif) », en rouge.
+function _txtNonCalcule(motif, couleur) {
+  return _kfppaExcluHTML('non calculé (' + motif + ')', couleur);
+}
+
+// #279 étape 1b — chaque calculateur rend { ratio, motif } : la valeur
+// dérivée, ou le motif qui l'empêche (dit tel quel par les alertes).
 const MEASURE_COMPUTERS = {
   // #275-D — plus d'entrée kfppa : elle rendait Δ ÷ div, un POURCENTAGE.
   // Les alertes KFPPA viennent de la classe de U (_kfppaAlertes), par une
   // branche de _collectTestAlerts placée avant la recherche de ce calculateur.
-  // MLA : ratio persisté OU fallback recompute depuis photos (mirror du render L4470-4476)
-  mla: (t, data, side) => {
-    const persisted = side === 'D' ? data.pctD : data.pctG;
-    if (persisted != null && !isNaN(persisted)) return persisted;
-    const ph = (data.photos || []).filter(p => p.side === side);
-    const prop = ph[0]?.angle, ecr = ph[1]?.angle;
-    return (prop != null && ecr != null) ? (ecr - prop) / (t.normDiv || 20) : null;
-  },
-  // Verrouillage RF : pointe / normVerrou
-  rf: (t, data, side) => {
-    const ph = (data.photos || []).filter(p => p.side === side);
-    const pointe = ph[1]?.angle;
-    return (pointe != null) ? pointe / t.normVerrou : null;
-  },
-  // Verrouillage Mollet : (pointe - stat) / normVerrou
-  mollet: (t, data, side) => {
-    const ph = (data.photos || []).filter(p => p.side === side);
-    const stat = ph[0]?.angle, pointe = ph[1]?.angle;
-    return (stat != null && pointe != null) ? (pointe - stat) / t.normVerrou : null;
-  },
-  // Mobilité : (inv - év) / normMob (photos bilatérales side='', mirror du render L4415-4416)
-  mob: (t, data, side) => {
-    const ph = data.photos || [];
-    const inv = side === 'D' ? ph[0]?.angleD : ph[0]?.angleG;
-    const ev  = side === 'D' ? ph[1]?.angleD : ph[1]?.angleG;
-    return (inv != null && ev != null) ? (inv - ev) / t.normMob : null;
-  },
-  // Amorti : persisté OU fallback recompute depuis photos (mirror du render L4480-4485)
-  am: (t, data, side) => {
-    const persisted = side === 'D' ? data.amD : data.amG;
-    if (persisted != null && !isNaN(persisted)) return persisted;
-    const ph2 = (data.photos || []).filter(p => p.side === side);
-    const talV = ph2[0]?.angle, planV = ph2[1]?.angle;
-    return (talV != null && planV != null) ? Math.abs(talV - planV) / t.normAm : null;
-  },
-  // Propulsion : persisté OU fallback recompute depuis photos (mirror du render L4480-4486)
-  pr: (t, data, side) => {
-    const persisted = side === 'D' ? data.prD : data.prG;
-    if (persisted != null && !isNaN(persisted)) return persisted;
-    const ph2 = (data.photos || []).filter(p => p.side === side);
-    const planV = ph2[1]?.angle, digV = ph2[2]?.angle;
-    return (planV != null && digV != null) ? Math.abs(digV - planV) / t.normAm : null;
-  },
+  mla: (t, data, side) => _mesureMla(t, data, side),
+  rf: (t, data, side) => _mesureVerrou(t, data, side).rf,
+  mollet: (t, data, side) => _mesureVerrou(t, data, side).mollet,
+  mob: (t, data, side) => _mesureMob(t, data, side),
+  am: (t, data, side) => _mesureAmorti(t, data, side).am,
+  pr: (t, data, side) => _mesureAmorti(t, data, side).pr,
 };
 
 // ══════════════════════════════════════════════════════
@@ -8246,8 +8351,9 @@ function selectMkr(i) {
   renderMkrList();
 }
 function clearMkr(i) {
-  if (testMode==='video') { vidMarkers[i].x=null; vidMarkers[i].y=null; }
-  else { liveMarkers[i].x=null; liveMarkers[i].y=null; }
+  // #279 1c — point retiré : plus de provenance non plus.
+  if (testMode==='video') { vidMarkers[i].x=null; vidMarkers[i].y=null; delete vidMarkers[i].origine; }
+  else { liveMarkers[i].x=null; liveMarkers[i].y=null; delete liveMarkers[i].origine; }
   renderMkrList(); updateResults();
 }
 function resetAllMarkers() {
@@ -8366,10 +8472,13 @@ function _kfppaBipodalTexte(t, slot) {
 // boîte et même object-fit, au même rapport largeur/hauteur (dims).
 function _vigCalqueHTML(slot) {
   const calque = _calqueCapture(slot);
-  if (calque) return '<img class="vig-img vig-calque" src="'+calque+'" alt="" style="pointer-events:none;"/>';
+  // #279 1c — points restés à leur position par défaut : dit dès la capture,
+  // calque ou non.
+  const na = _pointsNonAjustes(slot, null) ? _pointsNonAjustesHTML() : '';
+  if (calque) return '<img class="vig-img vig-calque" src="'+calque+'" alt="" style="pointer-events:none;"/>' + na;
   // #279 étape 3d — capture sans points non redessinable : jamais une vignette
   // d'aspect normal.
-  return slot && slot.imageBrute ? _pointsIndisponiblesHTML() : '';
+  return (slot && slot.imageBrute ? _pointsIndisponiblesHTML() : '') + na;
 }
 
 function vidPhotoSlotHTML(slot, idx) {
@@ -8451,7 +8560,8 @@ function ouvrirVignette(idx) {
   // Une capture sans points qui s'affiche SANS son calque (élément absent,
   // coordonnées illisibles) le dit : jamais une photo d'aspect normal sans points.
   lbl.innerHTML = _escHtml(slot.label || '')
-    + (slot.imageBrute && !calqueAffiche ? _pointsIndisponiblesHTML() : '');
+    + (slot.imageBrute && !calqueAffiche ? _pointsIndisponiblesHTML() : '')
+    + (_pointsNonAjustes(slot, null) ? _pointsNonAjustesHTML() : ''); // #279 1c
   // #275-B — même règle que la vignette : le créneau bipodal KFPPA affiche
   // « D x° · G y° », jamais slot.angle.
   const bip = _kfppaBipodalTexte(TESTS[currentTestId], slot);
@@ -8631,7 +8741,7 @@ function photoSlotHTML(slot, idx) {
     const clrAng = slot.angle!==null ? getAngleColor(slot.angle) : '#FFD700';
     const calque = _calqueCapture(slot); // #279 étape 3c — même boîte (.photo-slot img)
     return `<div class="photo-slot has-photo">
-      <img src="${slot.dataUrl}"/>${calque ? `<img class="ph-calque" src="${calque}" alt="" style="pointer-events:none;"/>` : (slot.imageBrute ? _pointsIndisponiblesHTML() : '') /* #279 étape 3d */}
+      <img src="${slot.dataUrl}"/>${calque ? `<img class="ph-calque" src="${calque}" alt="" style="pointer-events:none;"/>` : (slot.imageBrute ? _pointsIndisponiblesHTML() : '') /* #279 étape 3d */}${_pointsNonAjustes(slot, null) ? _pointsNonAjustesHTML() : '' /* #279 1c */}
       <button class="ph-del" onclick="deletePhotoSlot(${idx})">✕</button>
       ${slot.angle!==null?`<span class="ph-angle" style="color:${clrAng};border-color:${clrAng};">${slot.angle.toFixed(1)}°</span>`:''}
       <span class="ph-label">${slot.label}</span>
@@ -8653,6 +8763,9 @@ function deletePhotoSlot(i) {
   delete photoSlots[i].kfppaSigne; // #275-A — plus de capture, plus de signe
   delete photoSlots[i].imageBrute; delete photoSlots[i].dessin; // #279 étape 3b
   delete photoSlots[i].nonEnvoyee; delete photoSlots[i].envoiEchoue; delete photoSlots[i]._jetonEnvoi; // #279 étape 3e
+  // #279 étape 3f — les points de l'ancienne capture partent aussi : sans
+  // cela, un créneau supprimé puis enregistré gardait ses coordonnées.
+  delete photoSlots[i].markers; delete photoSlots[i].dims; photoSlots[i].markersConnus = false;
   renderPhotoGrid(); updateResults();
 }
 
@@ -8775,7 +8888,7 @@ function setupPhotoCanvas(vid, canvas) {
     // Placer le marqueur sélectionné ou le suivant libre
     const idx = selectedMkrIdx>=0 ? selectedMkrIdx : liveMarkers.findIndex(m=>m.x===null);
     if (idx>=0 && idx<liveMarkers.length) {
-      liveMarkers[idx].x=x; liveMarkers[idx].y=y;
+      liveMarkers[idx].x=x; liveMarkers[idx].y=y; liveMarkers[idx].origine='main'; // #279 1c — posé à la main
       const next = liveMarkers.findIndex((m,i)=>i>idx&&m.x===null);
       selectedMkrIdx = next>=0?next:-1;
       renderMkrList(); updateResults();
@@ -8784,7 +8897,7 @@ function setupPhotoCanvas(vid, canvas) {
   canvas.onmousemove = e => {
     if (!isDragging || selectedMkrIdx<0) return;
     const {x,y}=canvasXY(e,canvas);
-    liveMarkers[selectedMkrIdx].x=x; liveMarkers[selectedMkrIdx].y=y;
+    liveMarkers[selectedMkrIdx].x=x; liveMarkers[selectedMkrIdx].y=y; liveMarkers[selectedMkrIdx].origine='main'; // #279 1c — glissé
     renderMkrList(); updateResults();
   };
   canvas.onmouseup = () => isDragging=false;
@@ -8817,7 +8930,7 @@ function toggleAutoLive() {
 
 function redetectMarkers() {
   // Réinitialiser les positions et relancer la détection blob sur tous les marqueurs
-  liveMarkers.forEach(m => { m.x=null; m.y=null; });
+  liveMarkers.forEach(m => { m.x=null; m.y=null; delete m.origine; }); // #279 1c
   const canvas = document.getElementById('ph-canvas');
   if(!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -12613,7 +12726,7 @@ function setupVidCanvas(player, vcanvas) {
     }
     const idx=selectedVidMkrIdx>=0?selectedVidMkrIdx:vidMarkers.findIndex(m=>m.x===null);
     if(idx>=0&&idx<vidMarkers.length){
-      vidMarkers[idx].x=x; vidMarkers[idx].y=y;
+      vidMarkers[idx].x=x; vidMarkers[idx].y=y; vidMarkers[idx].origine='main'; // #279 1c — posé à la main
       const next=vidMarkers.findIndex((m,i)=>i>idx&&m.x===null);
       selectedVidMkrIdx=next>=0?next:-1;
       renderMkrList(); updateResults();
@@ -12637,7 +12750,7 @@ function setupVidCanvas(player, vcanvas) {
     }
     if(!isVidDragging||selectedVidMkrIdx<0)return;
     const{x,y}=canvasXY(e,vcanvas);
-    vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y;
+    vidMarkers[selectedVidMkrIdx].x=x; vidMarkers[selectedVidMkrIdx].y=y; vidMarkers[selectedVidMkrIdx].origine='main'; // #279 1c — glissé
     renderMkrList(); updateResults();
     // Redessiner immédiatement (important en pause)
     const ctx2=vcanvas.getContext('2d');
@@ -13596,7 +13709,9 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
       const j = idxBySide[m.side] !== undefined ? idxBySide[m.side]++ : 0;
       if (m.x === null) {
         const p = priorFn(m, j);
-        if (p) { m.x = p.x; m.y = p.y; }
+        // #279 1c — position PAR DÉFAUT : le dire, pour qu'elle ne passe
+        // jamais pour une mesure (« points non ajustés »).
+        if (p) { m.x = p.x; m.y = p.y; m.origine = 'defaut'; }
       }
     });
     if (cb) cb(); return;
@@ -13620,12 +13735,13 @@ function detectMarkersAuto(ctx, canvas, markers, view, cb) {
     const blobsG = view==='dos' ? blobsLeft  : blobsRight;
     const unplacedD=markers.filter(m=>m.side==='D'&&m.x===null);
     const unplacedG=markers.filter(m=>m.side==='G'&&m.x===null);
-    blobsD.slice(0,unplacedD.length).forEach((b,i)=>{if(unplacedD[i]){unplacedD[i].x=b.x;unplacedD[i].y=b.y;}});
-    blobsG.slice(0,unplacedG.length).forEach((b,i)=>{if(unplacedG[i]){unplacedG[i].x=b.x;unplacedG[i].y=b.y;}});
+    // #279 1c — posés sur une pastille détectée.
+    blobsD.slice(0,unplacedD.length).forEach((b,i)=>{if(unplacedD[i]){unplacedD[i].x=b.x;unplacedD[i].y=b.y;unplacedD[i].origine='pastille';}});
+    blobsG.slice(0,unplacedG.length).forEach((b,i)=>{if(unplacedG[i]){unplacedG[i].x=b.x;unplacedG[i].y=b.y;unplacedG[i].origine='pastille';}});
   } else {
     blobs.sort((a,b)=>a.y-b.y);
     const unplaced=markers.filter(m=>m.x===null);
-    blobs.slice(0,unplaced.length).forEach((b,i)=>{if(unplaced[i]){unplaced[i].x=b.x;unplaced[i].y=b.y;}});
+    blobs.slice(0,unplaced.length).forEach((b,i)=>{if(unplaced[i]){unplaced[i].x=b.x;unplaced[i].y=b.y;unplaced[i].origine='pastille';}}); // #279 1c
   }
   if(cb) cb();
 }
@@ -13854,6 +13970,7 @@ function snapMarkersToReflectiveBlobs() {
       sideBlobs.forEach((b, k) => {
         vidMarkers[mkrIdx[k]].x = b.x;
         vidMarkers[mkrIdx[k]].y = b.y;
+        vidMarkers[mkrIdx[k]].origine = 'pastille'; // #279 1c — réellement calé
         assigned++;
       });
     } else {
@@ -13877,6 +13994,7 @@ function snapMarkersToReflectiveBlobs() {
         if (usedM.has(p.mi) || usedB.has(p.bi)) return;
         vidMarkers[p.mi].x = sideBlobs[p.bi].x;
         vidMarkers[p.mi].y = sideBlobs[p.bi].y;
+        vidMarkers[p.mi].origine = 'pastille'; // #279 1c — calé ; un point sans pastille à portée garde sa provenance
         usedM.add(p.mi);
         usedB.add(p.bi);
         assigned++;
@@ -14048,12 +14166,20 @@ function drawOverlay(ctx, canvas, markers, selIdx, view, opts) {
     // feat-biomec-capteurs (B) — remplissage coloré du point modulé par
     // markerOpacity (voir la pastille au travers) ; contour + label restent
     // pleine intensité pour conserver le repère exact du centre.
+    // #279 1c — point PAR DÉFAUT (jamais placé, ni calé) : CREUX et en
+    // POINTILLÉ, dans sa couleur, pour voir avant de capturer ce qui n'a pas
+    // été ajusté. Les autres points : dessin inchangé.
+    const _defaut = m.origine === 'defaut';
     ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 2 * Math.PI);
-    ctx.fillStyle=m.color;
-    ctx.globalAlpha = _opacite;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle=isSel?MKR_TRAIT_COUL_SEL:MKR_TRAIT_COUL; ctx.lineWidth=trait; ctx.stroke();
+    if (!_defaut) {
+      ctx.fillStyle=m.color;
+      ctx.globalAlpha = _opacite;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle=isSel?MKR_TRAIT_COUL_SEL:_defaut?m.color:MKR_TRAIT_COUL; ctx.lineWidth=trait;
+    if (_defaut) ctx.setLineDash([Math.max(2, r * 0.8), Math.max(2, r * 0.6)]);
+    ctx.stroke();
     ctx.restore();
   });
 
@@ -14801,13 +14927,29 @@ function kfppaTexteNorme(norme) {
 // décomposition de l'asymétrie) tant qu'elle n'est pas recapturée.
 const KFPPA_EXCLU_BIP = 'photo bipodale non envoyée — à recapturer';
 const KFPPA_EXCLU_UNI = 'photo unipodale non envoyée — à recapturer';
+// #279 étape 3f — capture NEUVE sans points (imageBrute, angle null) : jamais
+// « bilan antérieur » ni « — », qui disent autre chose.
+const KFPPA_POINTS_KO_BIP = 'points non disponibles sur la photo bipodale — à recapturer';
+const KFPPA_POINTS_KO_UNI = 'points non disponibles sur la photo unipodale — à recapturer';
+// #279 1c — valeur mesurée sur des points restés à leur position PAR DÉFAUT.
+const KFPPA_NON_AJUSTE_BIP = 'points non ajustés sur la photo bipodale — à recapturer';
+const KFPPA_NON_AJUSTE_UNI = 'points non ajustés sur la photo unipodale — à recapturer';
 
-// #279 étape 3f — pourquoi Δ n'est pas calculé pour ce genou, ou null.
+// #279 étape 3f — pourquoi Δ n'est pas calculé pour ce genou, ou null. Source
+// UNIQUE du motif : panneau, rapport et alertes le disent dans les mêmes mots.
 function kfppaMotifDelta(a) {
-  if (a.sExclu && a.uExclu) return 'photos bipodale et unipodale non envoyées — à recapturer';
-  if (a.sExclu) return KFPPA_EXCLU_BIP;
-  if (a.uExclu) return KFPPA_EXCLU_UNI;
-  return null;
+  // #279 1c — le motif d'une exclusion est porté par l'analyse (sMotifExclu,
+  // uMotifExclu) : photo non envoyée, points non ajustés, ou les deux.
+  const mS = a.sExclu ? a.sMotifExclu || KFPPA_EXCLU_BIP : null;
+  const mU = a.uExclu ? a.uMotifExclu || KFPPA_EXCLU_UNI : null;
+  if (mS === KFPPA_EXCLU_BIP && mU === KFPPA_EXCLU_UNI) return 'photos bipodale et unipodale non envoyées — à recapturer';
+  if (a.sPointsKo && a.uPointsKo) return 'points non disponibles sur les photos bipodale et unipodale — à recapturer';
+  const m = [];
+  if (mS) m.push(mS);
+  else if (a.sPointsKo) m.push(KFPPA_POINTS_KO_BIP);
+  if (mU) m.push(mU);
+  else if (a.uPointsKo) m.push(KFPPA_POINTS_KO_UNI);
+  return m.length ? m.join(' ; ') : null;
 }
 
 // Analyse d'un genou. Une valeur non signée garde sa magnitude mais ne porte
@@ -14819,8 +14961,15 @@ function kfppaAnalyseGenou(e) {
   const U = ok(e.U) ? e.U : null;
   const sSigne = S != null && !!e.sSigne;
   const uSigne = U != null && !!e.uSigne;
-  const sExclu = S != null && !!e.sExclu;
-  const uExclu = U != null && !!e.uExclu;
+  // #279 1c — motifs d'exclusion : photo non envoyée (3f), points non
+  // ajustés (1c). La valeur reste affichée ; aucun calcul ne la reprend.
+  const sMotifs = [e.sExclu && KFPPA_EXCLU_BIP, e.sNonAjuste && KFPPA_NON_AJUSTE_BIP].filter(Boolean);
+  const uMotifs = [e.uExclu && KFPPA_EXCLU_UNI, e.uNonAjuste && KFPPA_NON_AJUSTE_UNI].filter(Boolean);
+  const sExclu = S != null && sMotifs.length > 0;
+  const uExclu = U != null && uMotifs.length > 0;
+  // #279 étape 3f — valeur ABSENTE d'une capture neuve sans points.
+  const sPointsKo = S == null && !!e.sPointsKo;
+  const uPointsKo = U == null && !!e.uPointsKo;
   const n0 = e.norme || { statut: 'non-definie' };
   // VÉRIFICATION, pas promesse : un statut 'ok' sans bornes numériques
   // cohérentes est traité comme une norme non définie, sans verdict.
@@ -14837,6 +14986,10 @@ function kfppaAnalyseGenou(e) {
     uSigne,
     sExclu,
     uExclu,
+    sMotifExclu: sExclu ? sMotifs.join(' ; ') : null,
+    uMotifExclu: uExclu ? uMotifs.join(' ; ') : null,
+    sPointsKo,
+    uPointsKo,
     norme,
     classeS: sSigne && !sExclu ? kfppaClasseS(S) : null,
     classeU,
@@ -14858,8 +15011,8 @@ function _kfppaMinuscule(s) {
 // norme appliquée, « valeur unipodale −2.4° (norme non définie) ». Partie de
 // kfppaPhraseGenou, isolée pour la ligne d'un genou dont le statique manque.
 function kfppaTexteUnipodal(a) {
-  if (a.U == null) return 'valeur unipodale —';
-  if (a.uExclu) return 'valeur unipodale ' + _kfppaValeurExclue(a.U, a.uSigne, KFPPA_EXCLU_UNI); // #279 étape 3f
+  if (a.U == null) return a.uPointsKo ? 'valeur unipodale : ' + KFPPA_POINTS_KO_UNI : 'valeur unipodale —'; // #279 étape 3f
+  if (a.uExclu) return 'valeur unipodale ' + _kfppaValeurExclue(a.U, a.uSigne, a.uMotifExclu || KFPPA_EXCLU_UNI); // #279 étape 3f, 1c
   if (!a.uSigne) return 'valeur unipodale ' + kfppaTexteNonSigne(a.U);
   if (a.classeU) {
     return 'valeur unipodale ' + kfppaSigneTxt(a.U) + ' : ' + _kfppaMinuscule(a.classeU) + ' (' + kfppaTexteNorme(a.norme) + ')';
@@ -14873,9 +15026,9 @@ function kfppaPhraseGenou(cote, a) {
   const nom = cote === 'D' ? 'Genou droit' : 'Genou gauche';
   const st =
     a.S == null
-      ? 'statique —'
+      ? (a.sPointsKo ? 'statique : ' + KFPPA_POINTS_KO_BIP : 'statique —') // #279 étape 3f
       : a.sExclu
-        ? 'statique ' + _kfppaValeurExclue(a.S, a.sSigne, KFPPA_EXCLU_BIP) // #279 étape 3f
+        ? 'statique ' + _kfppaValeurExclue(a.S, a.sSigne, a.sMotifExclu || KFPPA_EXCLU_BIP) // #279 étape 3f, 1c
         : a.sSigne
           ? 'statique ' + kfppaSigneTxt(a.S) + ' (' + _kfppaMinuscule(a.classeS) + ')'
           : 'statique ' + kfppaTexteNonSigne(a.S);
@@ -14898,14 +15051,17 @@ function kfppaPhraseGenou(cote, a) {
 // l'écart unipodal (U valides), SANS décomposition statique / dynamique.
 function kfppaPhraseAsymetrie(aD, aG) {
   if (!aD || !aG || !aD.uSigne || !aG.uSigne) return null;
-  if (aD.uExclu || aG.uExclu) return 'Asymétrie D − G non calculée (' + KFPPA_EXCLU_UNI + ').';
+  // #279 1c — motifs distincts des deux genoux (un seul s'ils sont identiques).
+  const motifs = (exclu, motif, def) =>
+    [...new Set([aD, aG].filter((a) => a[exclu]).map((a) => a[motif] || def))].join(' ; ');
+  if (aD.uExclu || aG.uExclu) return 'Asymétrie D − G non calculée (' + motifs('uExclu', 'uMotifExclu', KFPPA_EXCLU_UNI) + ').';
   const dU = _kfppaDixiemes(aD.U) - _kfppaDixiemes(aG.U);
   if (aD.sExclu || aG.sExclu) {
     return (
       'Asymétrie D − G : ' +
       _kfppaTxtDixiemes(dU) +
       ' en unipodal ; décomposition statique / dynamique non calculée (' +
-      KFPPA_EXCLU_BIP +
+      motifs('sExclu', 'sMotifExclu', KFPPA_EXCLU_BIP) +
       ').'
     );
   }
@@ -14947,6 +15103,14 @@ function _kfppaGenou(photos, side, norme) {
     // SOURCE UNIQUE de l'exclusion pour le panneau, le rapport et les alertes.
     sExclu: !!bip?.nonEnvoyee,
     uExclu: !!uni?.nonEnvoyee,
+    // #279 1c — un point PAR DÉFAUT parmi ceux de la jambe mesurée (bipodale :
+    // les points de ce côté ; unipodale : tous ses points).
+    sNonAjuste: _pointsNonAjustes(bip, side),
+    uNonAjuste: _pointsNonAjustes(uni, null),
+    // #279 étape 3f — capture neuve sans points : imageBrute, posé seulement
+    // par la capture (l'analyse ne le retient que si la valeur est absente).
+    sPointsKo: !!bip?.imageBrute,
+    uPointsKo: !!uni?.imageBrute,
     norme,
   });
 }
@@ -14992,13 +15156,19 @@ function _kfppaBlocGrilleHTML(testId, patient, photos, side) {
   // verdict non calculés, avec leur motif (kfppaMotifDelta, même analyse).
   const rouge = (t) => _kfppaExcluHTML(t, 'var(--red)');
   const motif = kfppaMotifDelta(a);
-  const verdict = a.uExclu
-    ? rouge(`non calculé (${KFPPA_EXCLU_UNI})`)
+  // #279 étape 3f — U non jugé : photo non envoyée, ou points non disponibles.
+  const motifU = a.uExclu ? a.uMotifExclu : a.uPointsKo ? KFPPA_POINTS_KO_UNI : null;
+  const verdict = motifU
+    ? rouge(`non calculé (${motifU})`)
     : a.classeU || (a.U != null && a.uSigne ? kfppaTexteNorme(a.norme) : '—');
-  const txtS = a.sExclu
-    ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
-    : kfppaTexteS(a.S, a.sSigne);
-  const txtU = _kfppaTexteU(a) + (a.uExclu ? rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_UNI})`) : '');
+  const txtS = a.sPointsKo
+    ? rouge(KFPPA_POINTS_KO_BIP)
+    : a.sExclu
+      ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${a.sMotifExclu})`)
+      : kfppaTexteS(a.S, a.sSigne);
+  const txtU = a.uPointsKo
+    ? rouge(KFPPA_POINTS_KO_UNI)
+    : _kfppaTexteU(a) + (a.uExclu ? rouge(` — valeur exclue des calculs (${a.uMotifExclu})`) : '');
   const txtD = a.delta == null && motif ? rouge(`non calculé (${motif})`) : kfppaTexteDelta(a.delta);
   return `<div class="kfppa-grille" style="font-size:9px;color:var(--mut);margin-top:4px;line-height:1.5;">
       <div>Statique S : <b>${txtS}</b></div>
@@ -15257,15 +15427,15 @@ function updateResults() {
           <div class="res-side-card">
             <div class="rs-title" style="color:#4a9eff;">Genou Droit</div>
             ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'D')}
-            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D')) // #275-B — état partagé des cinq sites
-              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'D'))}</div>`
+            ${_kfppaMessageBipodalHorsPointsKo(photoSlots,'D') // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodalHorsPointsKo(photoSlots,'D')}</div>`
               : ''}
           </div>
           <div class="res-side-card">
             <div class="rs-title" style="color:#3ecf72;">Genou Gauche</div>
             ${_kfppaBlocGrilleHTML(currentTestId, currentPatient, photoSlots, 'G')}
-            ${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G')) // #275-B — état partagé des cinq sites
-              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodal(_kfppaEtatBipodal(photoSlots,'G'))}</div>`
+            ${_kfppaMessageBipodalHorsPointsKo(photoSlots,'G') // #275-B — état partagé des cinq sites
+              ? `<div style="font-size:10px;color:var(--orange);margin-top:4px;">${_kfppaMessageBipodalHorsPointsKo(photoSlots,'G')}</div>`
               : ''}
           </div>
         </div>`;
@@ -15285,102 +15455,75 @@ function updateResults() {
   if(t.mode==='video' && t.showPhotoSlots) {
     if(t.mlaTest) {
       // MLA : angle brut (pas 180-angle)
-      const sD=photoSlots.filter(s=>s.side==='D');
-      const sG=photoSlots.filter(s=>s.side==='G');
-      const propD=sD[0]?.angle, ecrD=sD[1]?.angle;
-      const propG=sG[0]?.angle, ecrG=sG[1]?.angle;
-      const deltaD=(propD!=null&&ecrD!=null)?(ecrD-propD):null;
-      const deltaG=(propG!=null&&ecrG!=null)?(ecrG-propG):null;
-      const pctD=deltaD!=null?deltaD/t.normDiv:null;
-      const pctG=deltaG!=null?deltaG/t.normDiv:null;
+      // #279 étape 1b — valeurs, Δ, % et motifs depuis la source unique.
+      const mD=_mesureMla(t,{photos:photoSlots},'D'), mG=_mesureMla(t,{photos:photoSlots},'G');
       const propNorm=t.propNorm, ecrNorm=t.ecrNorm, normDiv=t.normDiv;
-      const hasAny=propD!=null||ecrD!=null||propG!=null||ecrG!=null;
+      const deg1=(v)=>v!=null?v.toFixed(1)+'°':'—';
+      const val=(e)=>_txtValeurExclue(e,deg1,'var(--red)');
+      const carte=(m,titre,coul)=>`<div class="res-side-card">
+            <div class="rs-title" style="color:${coul};">${titre}</div>
+            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${val(m.prop)}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${val(m.ecr)}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${m.motif?_txtNonCalcule(m.motif,'var(--red)'):deg1(m.deg)}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
+            <div class="rs-pct" style="color:${m.ratio!=null?clrGen(Math.abs(m.ratio)):'var(--mut)'};">${m.ratio!=null?Math.round(Math.abs(m.ratio)*100)+'%':(m.motif?'':'—')}</div>
+          </div>`;
+      const hasAny=[mD.prop,mD.ecr,mG.prop,mG.ecr].some(e=>e.v!=null||e.motif);
       if(hasAny){
         html=`<div class="res-side">
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propD!=null?propD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrD!=null?ecrD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${deltaD!=null?deltaD.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
-            <div class="rs-pct" style="color:${pctD!=null?clrGen(Math.abs(pctD)):'var(--mut)'};">${pctD!=null?Math.round(Math.abs(pctD)*100)+'%':'—'}</div>
-          </div>
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-            <div style="font-size:9px;color:var(--mut);margin-top:4px;">Att/Prop: <b>${propG!=null?propG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${propNorm}°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Écrasement: <b>${ecrG!=null?ecrG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${ecrNorm}°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Fonction amortisseur MLA: <b>${deltaG!=null?deltaG.toFixed(1)+'°':'—'}</b> <span style="font-size:8px;">(Norme: ${normDiv}°=100%)</span></div>
-            <div class="rs-pct" style="color:${pctG!=null?clrGen(Math.abs(pctG)):'var(--mut)'};">${pctG!=null?Math.round(Math.abs(pctG)*100)+'%':'—'}</div>
-          </div>
+          ${carte(mD,'Pied Droit','#4a9eff')}
+          ${carte(mG,'Pied Gauche','#3ecf72')}
         </div>`;
       } else {
         html=`<div style="font-size:10px;color:var(--orange);text-align:center;padding:8px;">Capturez les 4 photos MLA</div>`;
       }
       el.innerHTML=html||el.innerHTML; return;
     } else if(t.normAm!==undefined) {
-      const sD=photoSlots.filter(s=>s.side==='D');
-      const sG=photoSlots.filter(s=>s.side==='G');
-      const talD=sD[0]?.angle,planD=sD[1]?.angle,digD=sD[2]?.angle;
-      const talG=sG[0]?.angle,planG=sG[1]?.angle,digG=sG[2]?.angle;
-      const hasAny=talD!=null||planD!=null||digD!=null||talG!=null||planG!=null||digG!=null;
+      // #279 étape 1b — valeurs, amorti, propulsion et motifs : source unique.
+      const mD=_mesureAmorti(t,{photos:photoSlots},'D'), mG=_mesureAmorti(t,{photos:photoSlots},'G');
+      const hasAny=[mD.tal,mD.plan,mD.dig,mG.tal,mG.plan,mG.dig].some(e=>e.v!=null||e.motif);
       if(hasAny){
-        const amD=talD!=null&&planD!=null?Math.abs(talD-planD)/t.normAm:null;
-        const prD=digD!=null&&planD!=null?Math.abs(digD-planD)/t.normAm:null;
-        const amG=talG!=null&&planG!=null?Math.abs(talG-planG)/t.normAm:null;
-        const prG=digG!=null&&planG!=null?Math.abs(digG-planG)/t.normAm:null;
         html=`<div class="res-side">
-          ${amProCard('D',amD,prD,t.normAm,talD,planD,digD)}
-          ${amProCard('G',amG,prG,t.normAm,talG,planG,digG)}
+          ${amProCard('D',mD,t.normAm)}
+          ${amProCard('G',mG,t.normAm)}
         </div>`;
       } else {
         html=`<div style="font-size:10px;color:var(--orange);text-align:center;padding:8px;">Capturez les 6 photos : Tal·Plan·Dig × D+G</div>`;
       }
       el.innerHTML=html||el.innerHTML; return;
     } else if(t.normVerrou!==undefined) {
-      const sD=photoSlots.filter(s=>s.side==='D'),sG=photoSlots.filter(s=>s.side==='G');
-      const statD=sD[0]?.angle,pointeD=sD[1]?.angle,statG=sG[0]?.angle,pointeG=sG[1]?.angle;
+      // #279 étape 1b — RF (« Pointe » seule) et mollet (statique et pointe),
+      // valeurs et motifs : source unique (_mesureVerrou).
+      const mD=_mesureVerrou(t,{photos:photoSlots},'D'), mG=_mesureVerrou(t,{photos:photoSlots},'G');
       const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-      if(statD!=null||pointeD!=null||statG!=null||pointeG!=null){
-        const rfD=pointeD!=null?pointeD/t.normVerrou:null;
-        const molD=(pointeD!=null&&statD!=null)?(pointeD-statD)/t.normVerrou:null;
-        const rfG=pointeG!=null?pointeG/t.normVerrou:null;
-        const molG=(pointeG!=null&&statG!=null)?(pointeG-statG)/t.normVerrou:null;
-        const rfDdeg3=pointeD!=null?Math.abs(pointeD).toFixed(1)+'°':'—';
-        const rfGdeg3=pointeG!=null?Math.abs(pointeG).toFixed(1)+'°':'—';
-        const molDdeg3=(pointeD!=null&&statD!=null)?Math.abs(pointeD-statD).toFixed(1)+'°':'—';
-        const molGdeg3=(pointeG!=null&&statG!=null)?Math.abs(pointeG-statG).toFixed(1)+'°':'—';
+      const val=(e)=>_txtValeurExclue(e,apV,'var(--red)');
+      const der=(r)=>r.motif?_txtNonCalcule(r.motif,'var(--red)'):(r.deg!=null?Math.abs(r.deg).toFixed(1)+'°':'—');
+      const pct=(r)=>`<div class="rs-pct" style="color:${r.ratio!=null?clrGen(Math.abs(r.ratio)):'var(--mut)'};">  ${r.ratio!=null?Math.round(Math.abs(r.ratio)*100)+'%':(r.motif?'':'—')}</div>`;
+      const carte=(m,titre,coul)=>`<div class="res-side-card">
+            <div class="rs-title" style="color:${coul};">${titre}</div>
+            <div style="font-size:9px;color:var(--mut);">Statique: <b>${val(m.stat)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
+            <div style="font-size:9px;color:var(--mut);">Pointe: <b>${val(m.pointe)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${der(m.rf)}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+            ${pct(m.rf)}
+            <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${der(m.mollet)}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
+            ${pct(m.mollet)}
+          </div>`;
+      if([mD.stat,mD.pointe,mG.stat,mG.pointe].some(e=>e.v!=null||e.motif)){
         html=`<div class="res-side">
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#4a9eff;">Pied Droit</div>
-            <div style="font-size:9px;color:var(--mut);">Statique: <b>${apV(statD)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apV(pointeD)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfDdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${rfD!=null?clrGen(Math.abs(rfD)):'var(--mut)'};">  ${rfD!=null?Math.round(Math.abs(rfD)*100)+'%':'—'}</div>
-            <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molDdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${molD!=null?clrGen(Math.abs(molD)):'var(--mut)'};">  ${molD!=null?Math.round(Math.abs(molD)*100)+'%':'—'}</div>
-          </div>
-          <div class="res-side-card">
-            <div class="rs-title" style="color:#3ecf72;">Pied Gauche</div>
-            <div style="font-size:9px;color:var(--mut);">Statique: <b>${apV(statG)}</b> <span style="font-size:8px;">(Norme: 0°)</span></div>
-            <div style="font-size:9px;color:var(--mut);">Pointe: <b>${apV(pointeG)}</b> <span style="font-size:8px;">(Norme: Inv +10°)</span></div>
-            <div style="font-size:10px;color:var(--mut);margin-top:4px;">Verrouillage RF: <b>${rfGdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${rfG!=null?clrGen(Math.abs(rfG)):'var(--mut)'};">  ${rfG!=null?Math.round(Math.abs(rfG)*100)+'%':'—'}</div>
-            <div style="font-size:10px;color:var(--mut);">Force mollet: <b>${molGdeg3}</b> <span style="font-size:8px;">(Norme: 10°=100%)</span></div>
-            <div class="rs-pct" style="color:${molG!=null?clrGen(Math.abs(molG)):'var(--mut)'};">  ${molG!=null?Math.round(Math.abs(molG)*100)+'%':'—'}</div>
-          </div>
+          ${carte(mD,'Pied Droit','#4a9eff')}
+          ${carte(mG,'Pied Gauche','#3ecf72')}
         </div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 4 photos</div>`;
     } else if(t.mobiliteAP) {
-      const p0=photoSlots[0],p1=photoSlots[1];
-      const invD=p0?.angleD,evD=p1?.angleD,invG=p0?.angleG,evG=p1?.angleG;
-      if(invD!=null||evD!=null||invG!=null||evG!=null){
+      // #279 étape 1b — mobilité par pied, valeurs et motifs : source unique
+      // (_mesureMob). Une photo bipodale non envoyée écarte les DEUX pieds.
+      const mD=_mesureMob(t,{photos:photoSlots},'D'), mG=_mesureMob(t,{photos:photoSlots},'G');
+      if([mD.inv,mD.ev,mG.inv,mG.ev].some(e=>e.v!=null||e.motif)){
         // Mobilité = (Inversion - Éversion) / norme
         // Inv=+ Ev=- donc (Inv - Ev) = Inv + |Ev| si Ev<0, ou Inv - Ev si Ev>0 (pas d'éversion)
-        const mobD=(invD!=null&&evD!=null)?(invD-evD)/t.normMob:null;
-        const mobG=(invG!=null&&evG!=null)?(invG-evG)/t.normMob:null;
-        const mobDdeg2=mobD!=null?(invD-evD).toFixed(1)+'°':'—';
-        const mobGdeg2=mobG!=null?(invG-evG).toFixed(1)+'°':'—';
         const apV3=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
-        html=`<div class="res-side"><div class="res-side-card"><div class="rs-title" style="color:#4a9eff;">Pied Droit</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${apV3(invD)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV3(evD)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobDdeg2}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${mobD!=null?clrGen(Math.abs(mobD)):'var(--mut)'};">${mobD!=null?Math.round(Math.abs(mobD)*100)+'%':'—'}</div></div><div class="res-side-card"><div class="rs-title" style="color:#3ecf72;">Pied Gauche</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${apV3(invG)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${apV3(evG)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${mobGdeg2}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${mobG!=null?clrGen(Math.abs(mobG)):'var(--mut)'};">${mobG!=null?Math.round(Math.abs(mobG)*100)+'%':'—'}</div></div></div>`;
+        const val=(e)=>_txtValeurExclue(e,apV3,'var(--red)');
+        const carte=(m,titre,coul)=>`<div class="res-side-card"><div class="rs-title" style="color:${coul};">${titre}</div><div style="font-size:9px;color:var(--mut);">Inversion: <b>${val(m.inv)}</b> <span style="font-size:8px;">(Norme: Inv +20°)</span></div><div style="font-size:9px;color:var(--mut);">Éversion: <b>${val(m.ev)}</b> <span style="font-size:8px;">(Norme: Év −10°)</span></div><div style="font-size:10px;color:var(--mut);margin-top:4px;">Mobilité: <b>${m.motif?_txtNonCalcule(m.motif,'var(--red)'):(m.deg!=null?m.deg.toFixed(1)+'°':'—')}</b> <span style="font-size:8px;">(Norme: 30°=100%)</span></div><div class="rs-pct" style="color:${m.ratio!=null?clrGen(Math.abs(m.ratio)):'var(--mut)'};">${m.ratio!=null?Math.round(Math.abs(m.ratio)*100)+'%':(m.motif?'':'—')}</div></div>`;
+        html=`<div class="res-side">${carte(mD,'Pied Droit','#4a9eff')}${carte(mG,'Pied Gauche','#3ecf72')}</div>`;
       } else html=`<div style="font-size:10px;color:var(--mut);text-align:center;padding:8px;">Capturez les 2 photos</div>`;
     }
     el.innerHTML=html||el.innerHTML;
@@ -15550,28 +15693,32 @@ function quickAngleCard(side, ang) {
   </div>`;
 }
 
-function amProCard(side, am, pr, norm, a0, a1, a2) {
+function amProCard(side, m, norm) {
+  // #279 étape 1b — m = _mesureAmorti (source unique) : valeurs affichées,
+  // amorti et propulsion, et le motif qui écarte un calcul.
+  const am=m.am.ratio, pr=m.pr.ratio;
   const cl=side==='D'?'#4a9eff':'#3ecf72';
-  const cAm=am!==null?clrGen(Math.abs(am)):'var(--mut)';
-  const cPr=pr!==null?clrGen(Math.abs(pr)):'var(--mut)';
+  const cAm=am!=null?clrGen(Math.abs(am)):'var(--mut)';
+  const cPr=pr!=null?clrGen(Math.abs(pr)):'var(--mut)';
   const apV=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+  const val=(e)=>_txtValeurExclue(e,apV,'var(--red)');
   const isMarche=norm===8;
   const nTal=isMarche?'Norme: Inv +2°':'Norme: Inv +4°';
   const nPlan=isMarche?'Norme: Év −6°':'Norme: Év −8°';
   const nDig=isMarche?'Norme: Inv +2°':'Norme: Inv +4°';
   const nAm=isMarche?'Norme: 8° = 100%':'Norme: 12° = 100%';
   const nPr=isMarche?'Norme: 8° = 100%':'Norme: 12° = 100%';
-  const amDeg=am!==null?(am*norm).toFixed(1)+'°':'—';
-  const prDeg=pr!==null?(pr*norm).toFixed(1)+'°':'—';
+  const amDeg=m.am.motif?_txtNonCalcule(m.am.motif,'var(--red)'):(am!=null?(am*norm).toFixed(1)+'°':'—');
+  const prDeg=m.pr.motif?_txtNonCalcule(m.pr.motif,'var(--red)'):(pr!=null?(pr*norm).toFixed(1)+'°':'—');
   return `<div class="res-side-card">
     <div class="rs-title" style="color:${cl};">Pied ${side}</div>
-    <div style="font-size:9px;color:var(--mut);margin-top:4px;">🦶 Taligrade: <b>${apV(a0)}</b> <span style="color:var(--mut);font-size:8px;">(${nTal})</span></div>
-    <div style="font-size:9px;color:var(--mut);">🦶 Plantigrade: <b>${apV(a1)}</b> <span style="color:var(--mut);font-size:8px;">(${nPlan})</span></div>
-    <div style="font-size:9px;color:var(--mut);">🦶 Digitigrade: <b>${apV(a2)}</b> <span style="color:var(--mut);font-size:8px;">(${nDig})</span></div>
+    <div style="font-size:9px;color:var(--mut);margin-top:4px;">🦶 Taligrade: <b>${val(m.tal)}</b> <span style="color:var(--mut);font-size:8px;">(${nTal})</span></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Plantigrade: <b>${val(m.plan)}</b> <span style="color:var(--mut);font-size:8px;">(${nPlan})</span></div>
+    <div style="font-size:9px;color:var(--mut);">🦶 Digitigrade: <b>${val(m.dig)}</b> <span style="color:var(--mut);font-size:8px;">(${nDig})</span></div>
     <div style="font-size:10px;color:var(--mut);margin-top:6px;">Amorti: <b>${amDeg}</b> <span style="font-size:8px;">(${nAm})</span></div>
-    <div class="rs-pct" style="color:${cAm};">${am!==null?Math.round(Math.abs(am)*100)+'%':'—'}</div>
+    <div class="rs-pct" style="color:${cAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':(m.am.motif?'':'—')}</div>
     <div style="font-size:10px;color:var(--mut);margin-top:3px;">Propulsion: <b>${prDeg}</b> <span style="font-size:8px;">(${nPr})</span></div>
-    <div class="rs-pct" style="color:${cPr};">${pr!==null?Math.round(Math.abs(pr)*100)+'%':'—'}</div>
+    <div class="rs-pct" style="color:${cPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':(m.pr.motif?'':'—')}</div>
   </div>`;
 }
 
@@ -15741,6 +15888,11 @@ function _calqueCapture(ph) {
 // en border-box avec une bordure TRANSPARENTE de même épaisseur, pour couvrir
 // exactement la même surface que l'image.
 function _imgRapportAvecCalque(ph, style) {
+  // #279 1c — mention « points non ajustés » après l'image, calque ou non.
+  const na = _pointsNonAjustes(ph, null) ? _pointsNonAjustesHTML() : '';
+  return _imgRapportAvecCalqueSeule(ph, style) + na;
+}
+function _imgRapportAvecCalqueSeule(ph, style) {
   const calque = _calqueCapture(ph);
   // #279 étape 3d — capture sans points non redessinable : l'image ET la mention.
   if (!calque && ph.imageBrute) return `<img src="${ph.dataUrl}" style="${style}"/>` + _pointsIndisponiblesHTML();
@@ -15927,11 +16079,39 @@ function _messageSansPhoto(entrees) {
     + ' à l’écran, vous pourrez réessayer plus tard).';
 }
 
+// #279 3f, 1b, 1c — valeurs dérivées ENREGISTRÉES qui dépendent d'une valeur
+// écartée (photo non envoyée, points non ajustés) : RETIRÉES. Aucun calcul
+// dérivé n'est gardé tant que la photo n'est pas recapturée. Même source que
+// l'affichage (_kfppaGenou, _mesureAmorti). Mode photo non concerné.
+function _retirerDerivesEcartes(t, result) {
+  const ph = result.photos || [];
+  if (t.div !== undefined) {
+    // KFPPA : Δ du côté. Photo non envoyée (3f) : bipodale → les deux côtés,
+    // unipodale → son côté ; points non ajustés (1c) : selon l'analyse du genou.
+    const bipNE = ph.some((p) => p && p.side === '' && p.nonEnvoyee);
+    ['D', 'G'].forEach((s) => {
+      const a = _kfppaGenou(ph, s, null);
+      const uniNE = ph.some((p) => p && p.side === s && p.nonEnvoyee);
+      if (bipNE || uniNE || a.sExclu || a.uExclu) delete result['delta' + s];
+    });
+  }
+  if (t.mode === 'video' && t.normAm !== undefined) {
+    // Amorti : amorti, propulsion et phases du pied qui dépendent d'une photo écartée.
+    ['D', 'G'].forEach((s) => {
+      const m = _mesureAmorti(t, { photos: ph }, s);
+      if (m.am.motif) delete result['am' + s];
+      if (m.pr.motif) delete result['pr' + s];
+      if ((m.tal.motif || m.plan.motif || m.dig.motif) && result.phases) delete result.phases[s];
+    });
+  }
+}
+
 async function validateAndSave() {
   if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
   const t=TESTS[currentTestId];
   // #279 étape 2 — construction extraite, sans écriture (voir la fonction).
   const result=_construireResultatTest(currentTestId, photoSlots, capturedFrames, currentPatient, new Date().toLocaleString('fr-FR'));
+  _retirerDerivesEcartes(t, result); // #279 1c — points non ajustés, connus dès la capture
 
   if(!currentPatient.mesures) currentPatient.mesures={};
   // bilanId stable pour scoper les paths Storage (Task #53 PR B2). Lazy
@@ -15970,16 +16150,7 @@ async function validateAndSave() {
     }
     _nonEnv.forEach((e) => { delete e.dataUrl; e.nonEnvoyee = true; });
     photoStash = photoStash.filter((x) => !x.entry.nonEnvoyee);
-    // #279 étape 3f — KFPPA : un Δ persisté calculé avec une photo désormais
-    // non envoyée est RETIRÉ (bipodale → les deux côtés ; unipodale → son
-    // côté). Aucun calcul dérivé n'est gardé tant qu'elle n'est pas recapturée.
-    if (t.div !== undefined) {
-      const _ph = result.photos || [];
-      const _bipNE = _ph.some((p) => p && p.side === '' && p.nonEnvoyee);
-      ['D', 'G'].forEach((s) => {
-        if (_bipNE || _ph.some((p) => p && p.side === s && p.nonEnvoyee)) delete result['delta' + s];
-      });
-    }
+    _retirerDerivesEcartes(t, result); // #279 3f, 1b — photos désormais non envoyées
     break;
   }
   syncOpenedBilanToHistory();
@@ -18564,14 +18735,17 @@ function _kfppaAlertes(t, m, data, condensed) {
   const out = [];
   ['D', 'G'].forEach(side => {
     const lib = `${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label}`;
-    const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+    // #279 étape 3f — « points non disponibles » est dit par le motif du Δ.
+    const msg = _kfppaMessageBipodalHorsPointsKo(data.photos, side);
     if (msg) out.push(`${lib} — ${msg}`);
     const a = _kfppaGenou(data.photos, side, norme);
     // #279 étape 3f — exclusions : le motif de la MÊME analyse que le panneau
     // et le rapport (kfppaMotifDelta), puis le verdict non calculé si U l'est.
     const motif = kfppaMotifDelta(a);
     if (a.delta == null && motif) out.push(`${lib} — ${motif} : composante dynamique non calculée`);
-    if (a.uExclu) { out.push(`${lib} — ${KFPPA_EXCLU_UNI} : verdict non calculé`); return; }
+    // #279 étape 3f — même format pour « points non disponibles » sur U.
+    const motifU = a.uExclu ? a.uMotifExclu : a.uPointsKo ? KFPPA_POINTS_KO_UNI : null;
+    if (motifU) { out.push(`${lib} — ${motifU} : verdict non calculé`); return; }
     if (a.U == null || !a.uSigne) return;
     if (!a.classeU) { out.push(`${lib} — ${kfppaTexteNorme(a.norme)}`); return; }
     if (a.classeU === 'Dans la norme') return;
@@ -18600,7 +18774,14 @@ function _collectTestAlerts(t, data, opts = {}) {
     const isAbs = m.interpretFn !== 'kfppa'; // KFPPA conserve le signe (valgus/varus)
     if(!compute) return;
     ['D', 'G'].forEach(side => {
-      const ratio = compute(t, data, side);
+      // #279 étape 1b — { ratio, motif } : un calcul écarté le DIT (motif puis
+      // conséquence), au lieu de se taire ou de compter une valeur exclue.
+      const res = compute(t, data, side) || {};
+      if (res.motif) {
+        alerts.push(`${t.target} ${side === 'D' ? 'droit' : 'gauche'} · ${m.label} — ${res.motif} : non calculé`);
+        return;
+      }
+      const ratio = res.ratio;
       // #275-B — un KFPPA dont le bipodal n'a pas de valeur par jambe n'est
       // pas recalculable. On le DIT, au lieu de laisser l'absence passer pour
       // une mesure dans la norme. Décidé localement, sur CE bilan.
@@ -18678,8 +18859,23 @@ function buildPrintSection(t, data, conclusions) {
       const prD=data.prD!==null?Math.round(data.prD*100):null;
       const prG=data.prG!==null?Math.round(data.prG*100):null;
       lines.push(`<em style="color:#888;">Norme amorti/propulsion: ${t.normAm}°=100% · Tal: Inv+${t.normAm===8?2:4}° · Plan: Év-${t.normAm===8?6:8}° · Dig: Inv+${t.normAm===8?2:4}°</em>`);
-      if(amD!==null) lines.push(`<strong>Pied droit :</strong> Amorti ${amD}% · Propulsion ${prD||'—'}%`);
-      if(amG!==null) lines.push(`<strong>Pied gauche :</strong> Amorti ${amG}% · Propulsion ${prG||'—'}%`);
+      // #279 étape 1b — calcul écarté (photo non envoyée, points absents) :
+      // la ligne le dit, depuis la source unique ; sinon la ligne d'avant.
+      const _ligneAm=(side)=>{
+        const m=_mesureAmorti(t,data,side);
+        if(!m.am.motif&&!m.pr.motif) return null;
+        const p=(r)=>r.motif?_txtNonCalcule(r.motif,'#b91c1c'):(r.ratio!=null?Math.round(Math.abs(r.ratio)*100)+'%':'—');
+        return `<strong>Pied ${side==='D'?'droit':'gauche'} :</strong> Amorti ${p(m.am)} · Propulsion ${p(m.pr)}`;
+      };
+      // #279 étape 1b — valeur absente (null, ou NaN quand le pied n'a pas de
+      // photo) : « — », sans « % » ; une valeur nulle reste « 0% ». Jamais de
+      // « || », qui confondait 0 et l'absence (« —% »).
+      const _pctLigne=(v)=>v==null||Number.isNaN(v)?'—':v+'%';
+      const _lAmD=_ligneAm('D'), _lAmG=_ligneAm('G');
+      if(_lAmD) lines.push(_lAmD);
+      else if(amD!==null) lines.push(`<strong>Pied droit :</strong> Amorti ${_pctLigne(amD)} · Propulsion ${_pctLigne(prD)}`);
+      if(_lAmG) lines.push(_lAmG);
+      else if(amG!==null) lines.push(`<strong>Pied gauche :</strong> Amorti ${_pctLigne(amG)} · Propulsion ${_pctLigne(prG)}`);
     }
 
     if(lines.length) written=`<div class="rp-written">${lines.join('<br>')}</div>`;
@@ -18782,27 +18978,30 @@ function buildPrintSide(side, t, data) {
   const sideC=side==='D'?'#185FA5':'#0B6B2C';
   const sideLabel=side==='D'?'Côté Droit':'Côté Gauche';
   let pct=null,ang=null;
+  let motifDerive=null; // #279 étape 1b — calcul écarté : dit à la place du badge
+  let lignesValeurs=''; // #279 1b — valeurs des photos d'un côté écarté (MLA)
 
   if(t.normDiv!==undefined||t.mlaTest){
-    pct=side==='D'?data.pctD:data.pctG;
-    ang=side==='D'?data.deltaD:data.deltaG; // delta = écr - prop
-    // Si pas de données calculées, recalculer depuis photos
-    if((pct==null||isNaN(pct)) && data.photos?.length) {
-      const ph=data.photos.filter(p=>p.side===side);
-      const prop=ph[0]?.angle, ecr=ph[1]?.angle;
-      if(prop!=null&&ecr!=null){ang=ecr-prop;pct=ang/(t.normDiv||20);}
+    // #279 étape 1b — source unique (_mesureMla) : valeur enregistrée, sinon
+    // recalcul depuis les photos (delta = écr - prop), ou le motif.
+    const _m=_mesureMla(t,data,side);
+    pct=_m.ratio; ang=_m.deg; motifDerive=_m.motif;
+    // #279 1b — côté écarté : la valeur de chaque photo reste lisible, sous la
+    // mention de la photo, l'écartée avec « valeur exclue des calculs ».
+    if(motifDerive){
+      const _ph=(data.photos||[]).filter(p=>p.side===side);
+      const _deg=(v)=>v!=null?v.toFixed(1)+'°':'—';
+      lignesValeurs=[[_ph[0],_m.prop],[_ph[1],_m.ecr]].map(([p,e])=>
+        `\n    <div style="font-size:9px;margin-top:4px;">${_escHtml(p?.label||'')} : ${_txtValeurExclue(e,_deg,'#b91c1c')}</div>`).join('');
     }
   }
   else if(t.normAm!==undefined){
-    let am=side==='D'?data.amD:data.amG, pr=side==='D'?data.prD:data.prG;
-    let talV=data.phases?.[side]?.tal, planV=data.phases?.[side]?.plan, digV=data.phases?.[side]?.dig;
-    if((am==null||isNaN(am)) && data.photos?.length) {
-      const ph2=data.photos.filter(p=>p.side===side);
-      talV=ph2[0]?.angle; planV=ph2[1]?.angle; digV=ph2[2]?.angle;
-      if(talV!=null&&planV!=null) am=Math.abs(talV-planV)/t.normAm;
-      if(digV!=null&&planV!=null) pr=Math.abs(digV-planV)/t.normAm;
-    }
+    // #279 étape 1b — source unique (_mesureAmorti) : valeurs enregistrées,
+    // sinon recalcul depuis les photos ; motif si une photo est écartée.
+    const _m=_mesureAmorti(t,data,side);
+    const am=_m.am.ratio, pr=_m.pr.ratio;
     const _apVa=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _valA=(e)=>_txtValeurExclue(e,_apVa,'#b91c1c');
     const _cssAm=rp_cssColor(am,false), _cssPr=rp_cssColor(pr,false);
     const _r2=35,_circ=2*Math.PI*_r2;
     const _fillAm=am!=null?_circ*Math.min(100,Math.max(0,Math.abs(am)*100))/100:0;
@@ -18810,7 +19009,7 @@ function buildPrintSide(side, t, data) {
     const _ph=buildPrintPhotos(data,side,t);
     return `<div class="rp-side-block rp-side-${side}">
       <div class="rp-side-title">${side==='D'?'Côté Droit':'Côté Gauche'}</div>
-      <div style="font-size:9px;color:#888;margin-bottom:4px;">Taligrade: ${_apVa(talV)} · Plantigrade: ${_apVa(planV)} · Digitigrade: ${_apVa(digV)}</div>
+      <div style="font-size:9px;color:#888;margin-bottom:4px;">Taligrade: ${_valA(_m.tal)} · Plantigrade: ${_valA(_m.plan)} · Digitigrade: ${_valA(_m.dig)}</div>
       <div class="rp-gauge-photos">
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div class="rp-gauge" style="width:80px;height:80px;">
@@ -18836,18 +19035,19 @@ function buildPrintSide(side, t, data) {
         </div>
         ${_ph}
       </div>
-      <div style="font-size:9px;margin-top:4px;">Amorti: <b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b> · Propulsion: <b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b> (N:${t.normAm}°=100%)</div>
+      <div style="font-size:9px;margin-top:4px;">Amorti: ${_m.am.motif?_txtNonCalcule(_m.am.motif,'#b91c1c'):`<b style="color:${_cssAm};">${am!=null?Math.round(Math.abs(am)*100)+'%':'—'}</b>`} · Propulsion: ${_m.pr.motif?_txtNonCalcule(_m.pr.motif,'#b91c1c'):`<b style="color:${_cssPr};">${pr!=null?Math.round(Math.abs(pr)*100)+'%':'—'}</b>`} (N:${t.normAm}°=100%)</div>
     </div>`;
   }
 
   // Verrouillage AP
   if(t.normVerrou!==undefined){
-    const photos=data.photos||[];
-    const ph=photos.filter(p=>p.side===side);
-    const stat=ph[0]?.angle, pointe=ph[1]?.angle;
-    ang=pointe; pct=pointe!=null?pointe/t.normVerrou:null;
-    const mol=(pointe!=null&&stat!=null)?(pointe-stat)/t.normVerrou:null;
+    // #279 étape 1b — source unique (_mesureVerrou) : RF (« Pointe » seule),
+    // mollet (statique et pointe), et le motif qui écarte l'un ou l'autre.
+    const _m=_mesureVerrou(t,data,side);
+    ang=_m.rf.deg; pct=_m.rf.ratio;
+    const mol=_m.mollet.ratio;
     const apVv=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _valV=(e)=>_txtValeurExclue(e,apVv,'#b91c1c');
     const cssVv=rp_cssColor(pct,false);
     const r2v=35,cv=2*Math.PI*r2v,fv=pct!=null?cv*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
     return `<div class="rp-side-block rp-side-${side}">
@@ -18862,8 +19062,8 @@ function buildPrintSide(side, t, data) {
         </div></div>
         ${buildPrintPhotos(data,side,t)}
       </div>
-      <div style="font-size:9px;margin-top:4px;">Stat: ${apVv(stat)} (N:0°) · Pointe: ${apVv(pointe)} (N:Inv+10°)</div>
-      <div style="font-size:9px;">RF: ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} · Mollet: ${mol!=null?Math.round(Math.abs(mol)*100)+'%':'—'} (N:10°=100%)</div>
+      <div style="font-size:9px;margin-top:4px;">Stat: ${_valV(_m.stat)} (N:0°) · Pointe: ${_valV(_m.pointe)} (N:Inv+10°)</div>
+      <div style="font-size:9px;">RF: ${_m.rf.motif?_txtNonCalcule(_m.rf.motif,'#b91c1c'):(pct!=null?Math.round(Math.abs(pct)*100)+'%':'—')} · Mollet: ${_m.mollet.motif?_txtNonCalcule(_m.mollet.motif,'#b91c1c'):(mol!=null?Math.round(Math.abs(mol)*100)+'%':'—')} (N:10°=100%)</div>
       <div style="text-align:center;margin-top:4px;">
         ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
         <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Statique 0° · Pointe Inv+10° · RF 10°=100%</div>
@@ -18872,13 +19072,12 @@ function buildPrintSide(side, t, data) {
   }
   // Mobilité AP
   if(t.normMob!==undefined){
-    const photos=data.photos||[];
-    const p0=photos[0], p1=photos[1];
-    const invA=side==='D'?p0?.angleD:p0?.angleG;
-    const evA=side==='D'?p1?.angleD:p1?.angleG;
-    ang=(invA!=null&&evA!=null)?invA-evA:null;
-    pct=ang!=null?ang/t.normMob:null;
+    // #279 étape 1b — source unique (_mesureMob) : une photo bipodale non
+    // envoyée écarte la mobilité des DEUX pieds.
+    const _m=_mesureMob(t,data,side);
+    ang=_m.deg; pct=_m.ratio;
     const apVm=(v)=>v==null?'—':(v>0?'Inv (+)':'Év (−)')+' '+Math.abs(v).toFixed(1)+'°';
+    const _valM=(e)=>_txtValeurExclue(e,apVm,'#b91c1c');
     const cssM=rp_cssColor(pct,false);
     const r2m=35,cm=2*Math.PI*r2m,fm=pct!=null?cm*Math.min(100,Math.max(0,Math.abs(pct)*100))/100:0;
     return `<div class="rp-side-block rp-side-${side}">
@@ -18893,8 +19092,8 @@ function buildPrintSide(side, t, data) {
         </div></div>
         ${buildPrintPhotos(data,'',t)}
       </div>
-      <div style="font-size:9px;margin-top:4px;">Inv: ${apVm(invA)} (N:+20°) · Év: ${apVm(evA)} (N:−10°)</div>
-      <div style="font-size:9px;">Mobilité: ${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'} (N:30°=100%)</div>
+      <div style="font-size:9px;margin-top:4px;">Inv: ${_valM(_m.inv)} (N:+20°) · Év: ${_valM(_m.ev)} (N:−10°)</div>
+      <div style="font-size:9px;">Mobilité: ${_m.motif?_txtNonCalcule(_m.motif,'#b91c1c'):`${ang!=null?ang.toFixed(1)+'°':'—'} — ${pct!=null?Math.round(Math.abs(pct)*100)+'%':'—'}`} (N:30°=100%)</div>
       <div style="text-align:center;margin-top:4px;">
         ${pct!=null?`<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${Math.abs(pct)*100>=66?'#d4edda':Math.abs(pct)*100>=33?'#fff3cd':'#f8d7da'};color:${Math.abs(pct)*100>=66?'#155724':Math.abs(pct)*100>=33?'#856404':'#721c24'};">${Math.abs(pct)*100>=66?'Normal':Math.abs(pct)*100>=33?'Limite':'Hors norme'}</span>`:''}
         <div style="font-size:8px;color:#888;margin-top:3px;">Norme : Inv +20° · Év −10° · Mobilité 30°=100%</div>
@@ -18923,8 +19122,8 @@ function buildPrintSide(side, t, data) {
         </div>
       </div>
       ${ph}
-    </div>
-    <div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>
+    </div>${lignesValeurs}
+    ${motifDerive?`<div style="font-size:9px;margin-top:4px;">${_txtNonCalcule(motifDerive,'#b91c1c')}</div>`:pct!=null?`<div style="margin-top:4px;text-align:center;"><span class="${badgeCls}">${badgeTxt}</span></div>`:'' /* #279 1b — sans ratio, aucun badge : « — » ressemblait à un verdict */}
   </div>`;
 }
 
@@ -18935,7 +19134,7 @@ function buildPrintSide(side, t, data) {
 function _kfppaPrintSideHTML(side, t, data) {
   const norme = kfppaNormeBilan(data);
   const a = _kfppaGenou(data.photos, side, norme);
-  const msg = _kfppaMessageBipodal(_kfppaEtatBipodal(data.photos, side));
+  const msg = _kfppaMessageBipodalHorsPointsKo(data.photos, side); // #279 étape 3f
   const coul = _KFPPA_COUL_RAPPORT[a.couleur];
   // Sans norme appliquée, la place du verdict reste VIDE : le motif (norme non
   // définie, civilité non renseignée) figure une seule fois, ligne de la norme.
@@ -18943,14 +19142,16 @@ function _kfppaPrintSideHTML(side, t, data) {
   // rouge ; Δ et verdict non calculés, avec le motif de la même analyse.
   const rouge = (t) => _kfppaExcluHTML(t, '#b91c1c');
   const motif = kfppaMotifDelta(a);
-  const verdict = a.uExclu
-    ? rouge(`verdict non calculé (${KFPPA_EXCLU_UNI})`)
+  const motifU = a.uExclu ? a.uMotifExclu : a.uPointsKo ? KFPPA_POINTS_KO_UNI : null; // #279 étape 3f
+  const verdict = motifU
+    ? rouge(`verdict non calculé (${motifU})`)
     : a.classeU
       ? `<span class="${_KFPPA_BADGE_RAPPORT[a.couleur]}">${a.classeU}</span>`
       : '';
   const txtS = msg
+    || (a.sPointsKo ? rouge(KFPPA_POINTS_KO_BIP) : null) // #279 étape 3f
     || (a.sExclu
-      ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${KFPPA_EXCLU_BIP})`)
+      ? (a.sSigne ? kfppaSigneTxt(a.S) : kfppaTexteNonSigne(a.S)) + rouge(` — valeur exclue des calculs (${a.sMotifExclu})`)
       : kfppaTexteS(a.S, a.sSigne));
   const txtD = a.delta == null && motif ? rouge(`non calculé (${motif})`) : kfppaTexteDelta(a.delta);
   const txtNorme = a.norme.statut === 'ok'
@@ -18961,9 +19162,10 @@ function _kfppaPrintSideHTML(side, t, data) {
     <div class="rp-gauge-photos">
       <div class="rp-kfppa-u" style="text-align:center;min-width:90px;">
         <div style="font-size:8px;color:#666;">Unipodal (U)</div>
-        <div class="rp-gauge-deg" style="font-size:15px;font-weight:700;color:${coul};">${a.U == null ? '—' : a.uSigne ? kfppaSigneTxt(a.U) : _kfppaMagnitude(a.U)}</div>
+        <div class="rp-gauge-deg" style="font-size:15px;font-weight:700;color:${coul};">${a.U == null ? (a.uPointsKo ? '' : '—') : a.uSigne ? kfppaSigneTxt(a.U) : _kfppaMagnitude(a.U)}</div>
         ${a.U != null && !a.uSigne ? '<div class="rp-kfppa-sans-signe" style="font-size:7px;color:#888;">sens valgus/varus non enregistré</div>' : ''}
         ${a.uExclu ? `<div style="font-size:7px;">${rouge('valeur exclue des calculs')}</div>` : ''}
+        ${a.uPointsKo ? `<div style="font-size:7px;">${rouge(KFPPA_POINTS_KO_UNI)}</div>` : '' /* #279 étape 3f */}
       </div>
       ${buildPrintPhotos(data, side, t)}
     </div>
@@ -19042,6 +19244,11 @@ function buildPrintSingleSide(t,data) {
 // par buildRapport et printReport) : aucun chargement n'est encore en cours.
 // #279 étape 3c/3d — capture sans points dont les points ne peuvent pas être
 // redessinés : même mention rouge que les photos non rechargées.
+// #279 1c — capture dont au moins un point est resté à sa position PAR DÉFAUT :
+// sa valeur n'est pas une mesure. Même palette que les autres mentions.
+function _pointsNonAjustesHTML() {
+  return '<div class="rp-points-na" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ points non ajustés</div>';
+}
 function _pointsIndisponiblesHTML() {
   return '<div class="rp-points-ko" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;line-height:1.3;">⚠️ points non disponibles</div>';
 }

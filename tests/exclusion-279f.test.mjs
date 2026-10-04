@@ -344,11 +344,12 @@ describe('#279 étape 3f — enregistrement', () => {
     expect(r.deltaG).toBeCloseTo(7.6, 9);
   });
 
-  it('K9. Hors KFPPA, le retrait du Δ ne touche à rien (amorti réel, MLA en mode photo)', async () => {
-    // Comportement ACTUEL hors KFPPA, pas une règle voulue : à revoir avec la
-    // décision sur les 6 autres tests (3g). Ce test devra être modifié si la
-    // règle d'exclusion de 3f est étendue à ces tests.
-    // Critère du retrait : t.div !== undefined, porté par les 3 KFPPA seuls.
+  it('K9. Hors KFPPA : retrait du Δ KFPPA sans effet ; amorti retiré selon 1b ; mode photo intact', async () => {
+    // #279 1b — la règle de 3f est ÉTENDUE aux 6 autres tests : pour l'amorti,
+    // les valeurs dérivées enregistrées qui dépendent d'une photo non envoyée
+    // sont retirées (amorti, propulsion, phases du pied). La variante MLA en
+    // MODE PHOTO, jamais atteinte, n'est pas touchée (cf. #278).
+    // Critère du retrait du Δ KFPPA : t.div !== undefined, les 3 KFPPA seuls.
     const env0 = charger();
     expect(Object.keys(env0.TESTS).filter((k) => env0.TESTS[k].div !== undefined)).toEqual([
       'kfppa-marche',
@@ -397,7 +398,15 @@ describe('#279 étape 3f — enregistrement', () => {
       for (const c of champs) expect(temoin[c], `${id} : ${c} enregistré`).not.toBeUndefined();
       const ne = await enregistrer(id, 0);
       expect(ne.photos[0].nonEnvoyee, `${id} : photo non envoyée`).toBe(true);
-      expect(derives(ne), id).toEqual(derives(temoin));
+      const attendu = JSON.parse(JSON.stringify(derives(temoin)));
+      if (id === 'amorti-marche') {
+        // Photo 0 = « Attaque taligrade G » : amorti G et phases G retirés ;
+        // propulsion G (digitigrade − plantigrade) et pied D conservés.
+        expect(ne.photos[0].label).toBe('Attaque taligrade G');
+        delete attendu.amG;
+        delete attendu.phases.G;
+      }
+      expect(derives(ne), id).toEqual(attendu);
     }
   });
 });

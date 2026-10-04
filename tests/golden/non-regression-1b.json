@@ -1,0 +1,1772 @@
+{
+ "mla-marche#complet": {
+  "calc": {
+   "mla": {
+    "D": 0.7749999999999992,
+    "G": 0.42000000000000026
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "5189b28a40de6deb1355326f9bf42cfa8b28ac8a837ce6d4cd1584aee1baacd4",
+   "D": "b1259c7855e708e20f099fda11e8f09c535defc5b499dae67a3059abfd7dd008",
+   "G": "cc22c8ea66046a5be1b4873954b86b38d5a05d97438bd86507571ea4d88847ad",
+   "section": "7ee3b5c9af1091838066e66fa8aca5f6330783ab33e1a5ee29b7aa9681f38153"
+  }
+ },
+ "mla-marche#complet+enregistre": {
+  "calc": {
+   "mla": {
+    "D": 0.7749999999999992,
+    "G": 0.42000000000000026
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "5189b28a40de6deb1355326f9bf42cfa8b28ac8a837ce6d4cd1584aee1baacd4",
+   "D": "b1259c7855e708e20f099fda11e8f09c535defc5b499dae67a3059abfd7dd008",
+   "G": "cc22c8ea66046a5be1b4873954b86b38d5a05d97438bd86507571ea4d88847ad",
+   "section": "834febebd4111b0bbb684df84c5d24790f982d5fa51ba8f3b51a3c9681a1c79b"
+  }
+ },
+ "mla-marche#manquantes": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": 1.189999999999999
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "2dacf3fd359ed99cde1aa8d6899ca15973e965a204df268c431aecc03712b363",
+   "D": "0a0b423b4794e32994c4a79be2cdae0b986e0ce9e6e534a1db3097012dd4513e",
+   "G": "6fa9df4c97ab4fcea08788d7742a343ad4347e6bf18637252217f7a9ebcef3df",
+   "section": "42dc8c3581c492a07d1327efec94563e2f888bab2cb1ff514ba2c11c6a1b0faa"
+  }
+ },
+ "mla-marche#manquantes+enregistre": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": 1.189999999999999
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "2dacf3fd359ed99cde1aa8d6899ca15973e965a204df268c431aecc03712b363",
+   "D": "0a0b423b4794e32994c4a79be2cdae0b986e0ce9e6e534a1db3097012dd4513e",
+   "G": "6fa9df4c97ab4fcea08788d7742a343ad4347e6bf18637252217f7a9ebcef3df",
+   "section": "7901780fb6e3ea54c1faac264f7d89ac3eab4aa090a9c119b53ed733ca58d046"
+  }
+ },
+ "mla-marche#plat": {
+  "calc": {
+   "mla": {
+    "D": 0,
+    "G": 0
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Marche (ressort médio-pied) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "c8b1c596bf326bf6d036b95735581bc4f4294b3a35b59075575907d8e23bf618",
+   "D": "ce3d3fe106cf369f3405a46ec7c095152a85e27adaf138c027a9d3d50c7fa731",
+   "G": "8639fe05fc7961c3a81c7aac2ecf430484e1171e52af05acfca22fb4c936acbf",
+   "section": "30925baa87eb4b6ee698e5ed7d391c7ac1011675f41f10c721514756460be75f"
+  }
+ },
+ "mla-marche#plat+enregistre": {
+  "calc": {
+   "mla": {
+    "D": 0,
+    "G": 0
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Marche (ressort médio-pied) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "c8b1c596bf326bf6d036b95735581bc4f4294b3a35b59075575907d8e23bf618",
+   "D": "ce3d3fe106cf369f3405a46ec7c095152a85e27adaf138c027a9d3d50c7fa731",
+   "G": "8639fe05fc7961c3a81c7aac2ecf430484e1171e52af05acfca22fb4c936acbf",
+   "section": "02b192ec05b0128cc3f33b335c4c03999b0632efa58d1bbdc082b2961ba64967"
+  }
+ },
+ "mla-marche#enregistre-sans-photos": {
+  "calc": {
+   "mla": {
+    "D": 0.725,
+    "G": -0.15
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 15 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "044e405cd0ef9079a0f95b68527fa9877fe3c062523daba7b56008786c424c2e",
+   "D": "91c868d8381430d8e6b6080c5eabb908d5f451d7d43c12292b7f62bd4b272992",
+   "G": "2e165907f0631b16824c4840da544c03f965bff874b7713b8e62629b9c635de1",
+   "section": "c3ab2accbff7ca395e370a91d85e538177e20b8cd7a2ee3a766f74c212fbffd2"
+  }
+ },
+ "mla-marche#vide": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "044e405cd0ef9079a0f95b68527fa9877fe3c062523daba7b56008786c424c2e",
+   "D": "3edfa4fc76a7025c76ee8d72b371ced7e17c67fd9adcddd25bfbe7e189c24c94",
+   "G": "9ddfe30b3d8506a1c98cd4c7bd5b9f9985988c5d631547c4b1083755712ab098",
+   "section": "8e08e337bc221d8305195be406d6287cee03a3f76f587c8562a06406921d1212"
+  }
+ },
+ "mla-course#complet": {
+  "calc": {
+   "mla": {
+    "D": 0.5166666666666662,
+    "G": 0.2800000000000002
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Course (ressort médio-pied) : 52 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · MLA Course (ressort médio-pied) : 28 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Course (ressort médio-pied) — valeur limite",
+    "Pied gauche · MLA Course (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "f6503e9c443458663ed2715bb63d703c30e054182b96e0d5c5d7ac626159c717",
+   "D": "b975f1e7ba232b7cb924d82494fd794b6b728ec0cd62a48e85e2681ce7e66dea",
+   "G": "16d8d58b1dc9e8b474e378dd38272816a875bfef1b6d0d188c1b71f46963c99e",
+   "section": "52b2b2e40301fe1bf5f01b16eb080c48e9c21a8197c09c9d30ec35548b48ec60"
+  }
+ },
+ "mla-course#complet+enregistre": {
+  "calc": {
+   "mla": {
+    "D": 0.5166666666666662,
+    "G": 0.2800000000000002
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Course (ressort médio-pied) : 52 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · MLA Course (ressort médio-pied) : 28 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Course (ressort médio-pied) — valeur limite",
+    "Pied gauche · MLA Course (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "f6503e9c443458663ed2715bb63d703c30e054182b96e0d5c5d7ac626159c717",
+   "D": "b975f1e7ba232b7cb924d82494fd794b6b728ec0cd62a48e85e2681ce7e66dea",
+   "G": "16d8d58b1dc9e8b474e378dd38272816a875bfef1b6d0d188c1b71f46963c99e",
+   "section": "80aed4ddbe01603b7819775c2640f326ca04b51fa4efb959fcfab989f31f4032"
+  }
+ },
+ "mla-course#manquantes": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": 0.7933333333333328
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "78552c8a4c359e65a88c861e73188f5ad00f34cb746233bbfea6be19ca5b0cc4",
+   "D": "0a0b423b4794e32994c4a79be2cdae0b986e0ce9e6e534a1db3097012dd4513e",
+   "G": "56a754519315145ca970746567b1755ede98831dfe2fc8ad5bf7f3671f736087",
+   "section": "3e36647e72499885d7affa66bee8119842a53f7505a8998fafc1031acb59e1ce"
+  }
+ },
+ "mla-course#manquantes+enregistre": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": 0.7933333333333328
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "78552c8a4c359e65a88c861e73188f5ad00f34cb746233bbfea6be19ca5b0cc4",
+   "D": "0a0b423b4794e32994c4a79be2cdae0b986e0ce9e6e534a1db3097012dd4513e",
+   "G": "56a754519315145ca970746567b1755ede98831dfe2fc8ad5bf7f3671f736087",
+   "section": "f33daeed68a4c74dde78d287e96b6a1f7d106be132714bae8d7cf9bdda3ac7a6"
+  }
+ },
+ "mla-course#plat": {
+  "calc": {
+   "mla": {
+    "D": 0,
+    "G": 0
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Course (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · MLA Course (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Course (ressort médio-pied) — hors norme",
+    "Pied gauche · MLA Course (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "101581a9be988e5f17e9b05c8445238a5ba6106dfe565756b1d97c20302add3f",
+   "D": "ce3d3fe106cf369f3405a46ec7c095152a85e27adaf138c027a9d3d50c7fa731",
+   "G": "8639fe05fc7961c3a81c7aac2ecf430484e1171e52af05acfca22fb4c936acbf",
+   "section": "7ed909652536b38fc754e861693c009dca3d58aa91aa3b6f12ded7d46557ca19"
+  }
+ },
+ "mla-course#plat+enregistre": {
+  "calc": {
+   "mla": {
+    "D": 0,
+    "G": 0
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Course (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · MLA Course (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Course (ressort médio-pied) — hors norme",
+    "Pied gauche · MLA Course (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "101581a9be988e5f17e9b05c8445238a5ba6106dfe565756b1d97c20302add3f",
+   "D": "ce3d3fe106cf369f3405a46ec7c095152a85e27adaf138c027a9d3d50c7fa731",
+   "G": "8639fe05fc7961c3a81c7aac2ecf430484e1171e52af05acfca22fb4c936acbf",
+   "section": "eaa592f0aacfd5a681c2d943a2b938e4b134d9abe05ae43f2a9886743cb0c272"
+  }
+ },
+ "mla-course#enregistre-sans-photos": {
+  "calc": {
+   "mla": {
+    "D": 0.48333333333333334,
+    "G": -0.1
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Course (ressort médio-pied) : 48 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · MLA Course (ressort médio-pied) : 10 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Course (ressort médio-pied) — valeur limite",
+    "Pied gauche · MLA Course (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "044e405cd0ef9079a0f95b68527fa9877fe3c062523daba7b56008786c424c2e",
+   "D": "78eb934ed06611a7a71573e4b268394324a63dfe9a7b884e1fe6bc56973891ff",
+   "G": "d09acc6c43aa33cee8fee136699b347c8f8381860e4461b59b7a5d76b5734dd0",
+   "section": "6e1c73508ce517d39969a0a8287ccf89c73026393865499b9a3c414d303ea20d"
+  }
+ },
+ "mla-course#vide": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "044e405cd0ef9079a0f95b68527fa9877fe3c062523daba7b56008786c424c2e",
+   "D": "3edfa4fc76a7025c76ee8d72b371ced7e17c67fd9adcddd25bfbe7e189c24c94",
+   "G": "9ddfe30b3d8506a1c98cd4c7bd5b9f9985988c5d631547c4b1083755712ab098",
+   "section": "a8f336fbed1d2577b6f6ed286831d05f1c5f6e4118013e7bddc227f13bec71c2"
+  }
+ },
+ "mla-photo-synthetique#complet": {
+  "calc": {
+   "mla": {
+    "D": 0.7749999999999992,
+    "G": 0.42000000000000026
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "bc06eb78c2c6d9da274ecf3c65dd8f43cfa70035151f384ad1b316214aef79ed",
+   "D": "b1259c7855e708e20f099fda11e8f09c535defc5b499dae67a3059abfd7dd008",
+   "G": "cc22c8ea66046a5be1b4873954b86b38d5a05d97438bd86507571ea4d88847ad",
+   "section": "7ee3b5c9af1091838066e66fa8aca5f6330783ab33e1a5ee29b7aa9681f38153"
+  }
+ },
+ "mla-photo-synthetique#complet+enregistre": {
+  "calc": {
+   "mla": {
+    "D": 0.7749999999999992,
+    "G": 0.42000000000000026
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "bc06eb78c2c6d9da274ecf3c65dd8f43cfa70035151f384ad1b316214aef79ed",
+   "D": "b1259c7855e708e20f099fda11e8f09c535defc5b499dae67a3059abfd7dd008",
+   "G": "cc22c8ea66046a5be1b4873954b86b38d5a05d97438bd86507571ea4d88847ad",
+   "section": "834febebd4111b0bbb684df84c5d24790f982d5fa51ba8f3b51a3c9681a1c79b"
+  }
+ },
+ "mla-photo-synthetique#manquantes": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": 1.189999999999999
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "5c0f2db5011947b5575d8fccc70c623ce262022532ec43b3c6a81a73572d9487",
+   "D": "0a0b423b4794e32994c4a79be2cdae0b986e0ce9e6e534a1db3097012dd4513e",
+   "G": "6fa9df4c97ab4fcea08788d7742a343ad4347e6bf18637252217f7a9ebcef3df",
+   "section": "42dc8c3581c492a07d1327efec94563e2f888bab2cb1ff514ba2c11c6a1b0faa"
+  }
+ },
+ "mla-photo-synthetique#manquantes+enregistre": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": 1.189999999999999
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "5c0f2db5011947b5575d8fccc70c623ce262022532ec43b3c6a81a73572d9487",
+   "D": "0a0b423b4794e32994c4a79be2cdae0b986e0ce9e6e534a1db3097012dd4513e",
+   "G": "6fa9df4c97ab4fcea08788d7742a343ad4347e6bf18637252217f7a9ebcef3df",
+   "section": "7901780fb6e3ea54c1faac264f7d89ac3eab4aa090a9c119b53ed733ca58d046"
+  }
+ },
+ "mla-photo-synthetique#plat": {
+  "calc": {
+   "mla": {
+    "D": 0,
+    "G": 0
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Marche (ressort médio-pied) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "0fe8e9c3385db4f12983456a9aa0aa54229898e91a569616f09acc90d7818dc6",
+   "D": "ce3d3fe106cf369f3405a46ec7c095152a85e27adaf138c027a9d3d50c7fa731",
+   "G": "8639fe05fc7961c3a81c7aac2ecf430484e1171e52af05acfca22fb4c936acbf",
+   "section": "30925baa87eb4b6ee698e5ed7d391c7ac1011675f41f10c721514756460be75f"
+  }
+ },
+ "mla-photo-synthetique#plat+enregistre": {
+  "calc": {
+   "mla": {
+    "D": 0,
+    "G": 0
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) : 0 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · MLA Marche (ressort médio-pied) — hors norme",
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "0fe8e9c3385db4f12983456a9aa0aa54229898e91a569616f09acc90d7818dc6",
+   "D": "ce3d3fe106cf369f3405a46ec7c095152a85e27adaf138c027a9d3d50c7fa731",
+   "G": "8639fe05fc7961c3a81c7aac2ecf430484e1171e52af05acfca22fb4c936acbf",
+   "section": "02b192ec05b0128cc3f33b335c4c03999b0632efa58d1bbdc082b2961ba64967"
+  }
+ },
+ "mla-photo-synthetique#enregistre-sans-photos": {
+  "calc": {
+   "mla": {
+    "D": 0.725,
+    "G": -0.15
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 15 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "103fccdca7ff77a1c05ef88fa1b2eecbcb97906b7b4ddc93e7b75562398bf827",
+   "D": "91c868d8381430d8e6b6080c5eabb908d5f451d7d43c12292b7f62bd4b272992",
+   "G": "2e165907f0631b16824c4840da544c03f965bff874b7713b8e62629b9c635de1",
+   "section": "c3ab2accbff7ca395e370a91d85e538177e20b8cd7a2ee3a766f74c212fbffd2"
+  }
+ },
+ "mla-photo-synthetique#vide": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "103fccdca7ff77a1c05ef88fa1b2eecbcb97906b7b4ddc93e7b75562398bf827",
+   "D": "3edfa4fc76a7025c76ee8d72b371ced7e17c67fd9adcddd25bfbe7e189c24c94",
+   "G": "9ddfe30b3d8506a1c98cd4c7bd5b9f9985988c5d631547c4b1083755712ab098",
+   "section": "8e08e337bc221d8305195be406d6287cee03a3f76f587c8562a06406921d1212"
+  }
+ },
+ "verrou#complet": {
+  "calc": {
+   "rf": {
+    "D": -0.36,
+    "G": 0.9800000000000001
+   },
+   "mollet": {
+    "D": -1.6,
+    "G": -0.5299999999999999
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Capacité de verrouillage de l'arrière-pied : 36 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Force du mollet : 53 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Capacité de verrouillage de l'arrière-pied — valeur limite",
+    "Pied gauche · Force du mollet — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "344b4b8a202bb11c3175ee1c7bca76e3b8117bbba31dd995cc78f7e403c85ccc",
+   "D": "d1a7273e57b9080105d31616db6b97077eed702656135942b4984ead3cb0e57e",
+   "G": "76c410a11bad0029815f98ee97407098050cbf860bd0e90eed6a4f4d7cab6bd7",
+   "section": "bc0f2bdfd50eddd2558dc8d09851d6edca3905e56b22d8f9363b3b3c9aad642a"
+  }
+ },
+ "verrou#negatifs": {
+  "calc": {
+   "rf": {
+    "D": 0.13,
+    "G": -0.04
+   },
+   "mollet": {
+    "D": 0.35,
+    "G": 0.85
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Capacité de verrouillage de l'arrière-pied : 13 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Capacité de verrouillage de l'arrière-pied : 4 % (norme : ≥ 66 %) — hors norme",
+    "Pied droit · Force du mollet : 35 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Capacité de verrouillage de l'arrière-pied — hors norme",
+    "Pied gauche · Capacité de verrouillage de l'arrière-pied — hors norme",
+    "Pied droit · Force du mollet — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "3702f9cb43d8e6d02118d04929ccd0fc224fad526779c93862c31815329115f6",
+   "D": "b99c9cfd304131ce27b4bccb56df678e5a7b378fb85631546056320160cacd2d",
+   "G": "ed8243f03bf5d862ec92c131b2219609381d2499ec636a47bda8843137928db7",
+   "section": "71a975c071d2751c93479d2160b956410ee5e6991380e473a8b54e271d43fd07"
+  }
+ },
+ "verrou#manquantes": {
+  "calc": {
+   "rf": {
+    "D": null,
+    "G": 1.16
+   },
+   "mollet": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "fb863d8995c3e6d426cdec2c7a016368b5a2e947a1b191649314f7a62d6356ae",
+   "D": "5064414669e5536a115137f97b87aa1118166f286f2d33eaccbd06d46e1bfff6",
+   "G": "2b4d6ebf3505a7fda5ecfd3fa20eb0ff6c14fc7fed2881085b9d6849dcfb209e",
+   "section": "667bcb7cde2fa05ca5066f4d9e4432954fe0bb34d04c5a2929e496b31a4450dd"
+  }
+ },
+ "verrou#zero": {
+  "calc": {
+   "rf": {
+    "D": 0.5,
+    "G": 0.5
+   },
+   "mollet": {
+    "D": 0.5,
+    "G": 0.5
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Capacité de verrouillage de l'arrière-pied : 50 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Capacité de verrouillage de l'arrière-pied : 50 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Force du mollet : 50 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Force du mollet : 50 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Capacité de verrouillage de l'arrière-pied — valeur limite",
+    "Pied gauche · Capacité de verrouillage de l'arrière-pied — valeur limite",
+    "Pied droit · Force du mollet — valeur limite",
+    "Pied gauche · Force du mollet — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "69362a460b2987d22137983cb991099e24f47a87c5f30ad6cceca1a6ec66cfb3",
+   "D": "d3dfa798a2c28b12890c506d144a1df9f2ac9bd08885dd3df35e899000774f88",
+   "G": "1094648e619d3f5867fdf30db9528e893e89d210ea14aec66eb2601f79f5c3eb",
+   "section": "4a7b027a67c18fea00975b04feb6fbbf53a1beaf8e20c874bcced44bbea7a491"
+  }
+ },
+ "verrou#pointeSeule": {
+  "calc": {
+   "rf": {
+    "D": 0.9400000000000001,
+    "G": -0.21000000000000002
+   },
+   "mollet": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Capacité de verrouillage de l'arrière-pied : 21 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · Capacité de verrouillage de l'arrière-pied — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "36bbc53b599864f2afda9cb0ec728294546b03e8331304feca9d0e8bf90b7ff8",
+   "D": "da1defc854b3f81636f6219401b55df264b0255c4da02b28923c24ff9ca6cf6a",
+   "G": "9b349d3e82dc8b7e448b9a8509485b8e475dc8bec2013995835d83b70d1e4260",
+   "section": "964b7c685e0058016e59eae9d72ea5f665df52716ce7cc27896d069811c3daec"
+  }
+ },
+ "verrou#vide": {
+  "calc": {
+   "rf": {
+    "D": null,
+    "G": null
+   },
+   "mollet": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "4cc5458e7c10122220e719bacd06469285ec3ccd5774bf94a11a275be3bab504",
+   "D": "f3dc664b24e03e1ff1a9106eaa7eead04289f9533ac414efbe79105538029f73",
+   "G": "bfa356f00a5bbda012cc911b18760d76c6049c184dca4950ac044646e2893070",
+   "section": "5e3a81fc1fd2582ef518e0d115e9a04ddda4c80565f3d0a9ca4be6da5d96f23d"
+  }
+ },
+ "mobilite#complet": {
+  "calc": {
+   "mob": {
+    "D": 0.9166666666666666,
+    "G": 0.9166666666666666
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "adbd6217e469363961e4437e76e8f3320a88bfc348f4622800e82b87a31cfb5b",
+   "D": "ff788864f0252968fe491c7610f33a79cd0bdba5d2362e8fffb35051230b8ede",
+   "G": "69e94495e4af03ca4c051f2788c8b5fc67993201f98479007ad1273c5768da5d",
+   "section": "fd566583c9c5966de7ae40ff818fbf56d4341ec7c2ffff8f4ae608ad3b21d968"
+  }
+ },
+ "mobilite#inverses": {
+  "calc": {
+   "mob": {
+    "D": -0.31666666666666665,
+    "G": 0.13333333333333333
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Mobilité AP (mobilité arrière-pied) : 32 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Mobilité AP (mobilité arrière-pied) : 13 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · Mobilité AP (mobilité arrière-pied) — hors norme",
+    "Pied gauche · Mobilité AP (mobilité arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "9baca95fef4c08901561c1d65172fbe93560d00c64aff79f58665b073b51ea55",
+   "D": "e4b6ecdd74d58e6f2d32ed1219311734d11b05644e6036b78c51bad9d74f3c43",
+   "G": "681bb2e843061357a73fc330fd41f2d1f4eaa454458dea045ec8eb92f4294223",
+   "section": "0c8d6bceeb453e1ca65ad9289c5eb7e5744bc68cc78fb46dcd9465c30f7c1ba7"
+  }
+ },
+ "mobilite#manquantes": {
+  "calc": {
+   "mob": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "8b6c1dcf09a1ac28306a72f77cb6b154868ff31158fd82d18551ce5758041d7f",
+   "D": "46819bd998d4fb126b8468f88a87dd319c33b004d86b3f823af6cda6de8132b1",
+   "G": "d2e7e7ef4eacf006cc2346676926e3734adb3cdfddec76ff18bc3bf73d98b32c",
+   "section": "e5f6f68ad00e3a602255e2cddbe19bddbb61e10224540890a7212b63973b139b"
+  }
+ },
+ "mobilite#anciennes-sans-angleDG": {
+  "calc": {
+   "mob": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "f487ebea5127a124f2af651dc48f6d37c021d1ab4b8c4d67762719cd08b12839",
+   "D": "43c6b40208219bb2db03c0745458acdd9efcd19f86dd1ce4757b8e2cf220fa2e",
+   "G": "6618a8e86384d38e326654231751e75c0abe12bed5314c486a8a8e8c1ef5599b",
+   "section": "5af70b2ef883c3b60d7baae6df2c99ed22a24506c84372e621c58615d92bca7c"
+  }
+ },
+ "mobilite#vide": {
+  "calc": {
+   "mob": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "f487ebea5127a124f2af651dc48f6d37c021d1ab4b8c4d67762719cd08b12839",
+   "D": "89bfb93bbf3cf7e610d4ade0bc3ae36e2ef161f815879aa72bba2b15ceb4baf6",
+   "G": "5daf42d3cef47a559971a81e33dd81f49a69cf71b9b60218f3569c4526315bed",
+   "section": "58de401bbcc9022955e0d52c9aa08b2822a9c1dd01080f5082c294733ac17de9"
+  }
+ },
+ "amorti-marche#complet": {
+  "calc": {
+   "am": {
+    "D": 0.6624999999999999,
+    "G": 2
+   },
+   "pr": {
+    "D": 2.0625,
+    "G": 0.9750000000000001
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "09df637467569584a074e8f02da8c179049f1d880223e73537fd3801b5d062ff",
+   "D": "f71d80d5f5d1f489c5828aa55eb3a8b3428e78fac635d467cad1c2876e997f66",
+   "G": "51d4934a43789183465c424fbade0c61beece949534e2197b1f122ddc0ce3caa",
+   "section": "d79674da47679a0e3962149b0e1de3d19e7787ad40193aec4e6101756477e241"
+  }
+ },
+ "amorti-marche#complet+enregistre": {
+  "calc": {
+   "am": {
+    "D": 0.6624999999999999,
+    "G": 2
+   },
+   "pr": {
+    "D": 2.0625,
+    "G": 0.9750000000000001
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "09df637467569584a074e8f02da8c179049f1d880223e73537fd3801b5d062ff",
+   "D": "f71d80d5f5d1f489c5828aa55eb3a8b3428e78fac635d467cad1c2876e997f66",
+   "G": "51d4934a43789183465c424fbade0c61beece949534e2197b1f122ddc0ce3caa",
+   "section": "4f85037f49664d297e5b30dda4b42c7b9ba434aad49574340b2213133ef2e51e"
+  }
+ },
+ "amorti-marche#negatifs": {
+  "calc": {
+   "am": {
+    "D": 1.0625,
+    "G": 0.4375
+   },
+   "pr": {
+    "D": 0.46249999999999997,
+    "G": 0.85
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) : 44 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) : 46 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "ff2e5e3034df9d5200dc945ad67f160f0b25dbda1b7494e3ea4b41cd7f664e14",
+   "D": "762975aed0c886678b3e573bf79e74da3e3be414b152661920cdebe2535c7b4e",
+   "G": "ffc5e0d64268ae62761450ddfbdf9cac203820882fc81ce116b104a6938ecc3e",
+   "section": "9b313020d5a1b19d67d9d8a6facc0790747c7a4572430550f6be2388825875ca"
+  }
+ },
+ "amorti-marche#negatifs+enregistre": {
+  "calc": {
+   "am": {
+    "D": 1.0625,
+    "G": 0.4375
+   },
+   "pr": {
+    "D": 0.46249999999999997,
+    "G": 0.85
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) : 44 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) : 46 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "ff2e5e3034df9d5200dc945ad67f160f0b25dbda1b7494e3ea4b41cd7f664e14",
+   "D": "762975aed0c886678b3e573bf79e74da3e3be414b152661920cdebe2535c7b4e",
+   "G": "ffc5e0d64268ae62761450ddfbdf9cac203820882fc81ce116b104a6938ecc3e",
+   "section": "920ca7f538ba9d7f269ee8841c90a16e45a2f582267510adf18f3f318fd8d603"
+  }
+ },
+ "amorti-marche#manquantes": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": null
+   },
+   "pr": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "ec563b2ede36c7a8305ff6d332d31b0e44547da92d1149502e6b036c6a676c7c",
+   "D": "bffb6d570877a1f266c77488414cb8315f085faed2ac6b86c415dbbef0ab40fb",
+   "G": "4b1015637b5226f587062714ac3e8e1fffe56e643a187cc81ce9ad0166d1943f",
+   "section": "f2d9030841fe9ea59856f615d23fe6d8eaf9bb3ade4e305e31c543e938f4d02f"
+  }
+ },
+ "amorti-marche#manquantes+enregistre": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": null
+   },
+   "pr": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "ec563b2ede36c7a8305ff6d332d31b0e44547da92d1149502e6b036c6a676c7c",
+   "D": "bffb6d570877a1f266c77488414cb8315f085faed2ac6b86c415dbbef0ab40fb",
+   "G": "4b1015637b5226f587062714ac3e8e1fffe56e643a187cc81ce9ad0166d1943f",
+   "section": "6165b39c496c25b62c7235807afd66319b05c463ab99416914ecbfc5520b1d64"
+  }
+ },
+ "amorti-marche#zero": {
+  "calc": {
+   "am": {
+    "D": 0.625,
+    "G": 0.625
+   },
+   "pr": {
+    "D": 0,
+    "G": 0.625
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la marche (cinétique arrière-pied) : 63 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) : 63 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Propulsion à la marche (cinétique arrière-pied) : 63 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la marche (cinétique arrière-pied) — valeur limite",
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) — hors norme",
+    "Pied gauche · Propulsion à la marche (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "a386885f393234478c300a0ab1350733ab61f270d1dde23b6eeed3c7975d1557",
+   "D": "e007b5b868a37c9d81e5552c59494a9c523c988f34dc74b85ccfdd9a4c5599ce",
+   "G": "7fb6c530f775cce9b12a0efaed514b616a5d0967138b02981be68a7bdce329ad",
+   "section": "fd090565bd118b608cfccb71f27e7790e208f9465492ddccb3405dbac2a2af86"
+  }
+ },
+ "amorti-marche#zero+enregistre": {
+  "calc": {
+   "am": {
+    "D": 0.625,
+    "G": 0.625
+   },
+   "pr": {
+    "D": 0,
+    "G": 0.625
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la marche (cinétique arrière-pied) : 63 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) : 63 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Propulsion à la marche (cinétique arrière-pied) : 63 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la marche (cinétique arrière-pied) — valeur limite",
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) — valeur limite",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) — hors norme",
+    "Pied gauche · Propulsion à la marche (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "a386885f393234478c300a0ab1350733ab61f270d1dde23b6eeed3c7975d1557",
+   "D": "e007b5b868a37c9d81e5552c59494a9c523c988f34dc74b85ccfdd9a4c5599ce",
+   "G": "7fb6c530f775cce9b12a0efaed514b616a5d0967138b02981be68a7bdce329ad",
+   "section": "d8fbc79e0de891b791338dae10fe2a18cb0c97112df0dc3e9bb29d9fe0fe6f2f"
+  }
+ },
+ "amorti-marche#unCote": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": 1.075
+   },
+   "pr": {
+    "D": null,
+    "G": 1.25
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "b869b87f13c9486d138ee68c99a35994dd40f757ab0d77d1e4d4711f8eb088bb",
+   "D": "90a3e1cb5815409c916d1dd9724bb44de08eacf2ef4587a8951d0573d0dd8c94",
+   "G": "2087cae80e843f89dddf42f0c80d3b906c40857d40331baba31c7573b1e483a4",
+   "section": "e8dc1d669665acc6dea330d88e1327c6609d1c1916510751620f6c4376d2dc51"
+  }
+ },
+ "amorti-marche#unCote+enregistre": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": 1.075
+   },
+   "pr": {
+    "D": null,
+    "G": 1.25
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "b869b87f13c9486d138ee68c99a35994dd40f757ab0d77d1e4d4711f8eb088bb",
+   "D": "90a3e1cb5815409c916d1dd9724bb44de08eacf2ef4587a8951d0573d0dd8c94",
+   "G": "2087cae80e843f89dddf42f0c80d3b906c40857d40331baba31c7573b1e483a4",
+   "section": "2cb55e26b56781b100e20153abf4cb13df9e0b1fb5550031d53fe33cf29803ff"
+  }
+ },
+ "amorti-marche#enregistre-sans-photos": {
+  "calc": {
+   "am": {
+    "D": 0.5,
+    "G": 0.875
+   },
+   "pr": {
+    "D": 1.25,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la marche (cinétique arrière-pied) : 50 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la marche (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "ef24eb1a9ea08309660fef82c2228b5485ab2bb2ded399f2aa14694b02cab670",
+   "D": "ff2bea888e2f80e132467374540bb42767179f440fcd76ba3ce5ab1145956b0b",
+   "G": "1a90cb6a2252806480ba8b15255bd329024ee6114a9c12299a29229284146e39",
+   "section": "10b9df947a8d0b25b769a0577bf7f1aae2521c5ed30cc66a27ba4b5b7c4b71dc"
+  }
+ },
+ "amorti-marche#vide": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": null
+   },
+   "pr": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "ef24eb1a9ea08309660fef82c2228b5485ab2bb2ded399f2aa14694b02cab670",
+   "D": "6ea07818d0324c5db532b3c1ed4d809bb497c8e08dbce3a52ae8fed2709813d4",
+   "G": "590a6a5d629f8cd7af6bd0c1ac35a470e90761d9f8edeb59b888bdf4fef96cd1",
+   "section": "567e8c7f5d844851045195d716cf327e0876c6c7235b53c0273b37d24d5dd330"
+  }
+ },
+ "amorti-course#complet": {
+  "calc": {
+   "am": {
+    "D": 0.4416666666666666,
+    "G": 1.3333333333333333
+   },
+   "pr": {
+    "D": 1.375,
+    "G": 0.65
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) : 44 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) : 65 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) — valeur limite",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "e5d8b345002fcf8b829c01b235f94f04383adc6cb3b6f6ba89badbe5bfc85414",
+   "D": "a2d36d776b6f6259a62864b74e3683b7d2167baa4dbd4c49cdf1ecafa993f5b6",
+   "G": "c74300fed1e447cbbd89d36d38d3ae01805404c181d910a0f5119e8ea97d018c",
+   "section": "5211181bf8eb3f348a04b09937ec67d07a4c6610a3852f6ef83db846bfb5e5c4"
+  }
+ },
+ "amorti-course#complet+enregistre": {
+  "calc": {
+   "am": {
+    "D": 0.4416666666666666,
+    "G": 1.3333333333333333
+   },
+   "pr": {
+    "D": 1.375,
+    "G": 0.65
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) : 44 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) : 65 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) — valeur limite",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "e5d8b345002fcf8b829c01b235f94f04383adc6cb3b6f6ba89badbe5bfc85414",
+   "D": "a2d36d776b6f6259a62864b74e3683b7d2167baa4dbd4c49cdf1ecafa993f5b6",
+   "G": "c74300fed1e447cbbd89d36d38d3ae01805404c181d910a0f5119e8ea97d018c",
+   "section": "d10d6bf8d7d75d3f20ed7bd09ec246c36e6dd874fc81989fd6910494b919409c"
+  }
+ },
+ "amorti-course#negatifs": {
+  "calc": {
+   "am": {
+    "D": 0.7083333333333334,
+    "G": 0.2916666666666667
+   },
+   "pr": {
+    "D": 0.3083333333333333,
+    "G": 0.5666666666666667
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) : 29 % (norme : ≥ 66 %) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) : 31 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) : 57 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "f1c91e9989d2c6b40d484b55fb2b8591512dd311166c1cc2559d187d8a8d7ecc",
+   "D": "61ae8aac4179a0ce9858e6115f5e2dbf0bf2ed1a20da2cae5cc951a9eef9fee4",
+   "G": "fd92c2e712756f1951bcd5109c4d12c56798121fbe0a698f78526dc63154d213",
+   "section": "69bace56eac1f9abdc32ba3f192058c81d42279a10d62ee8560770ab76b8361d"
+  }
+ },
+ "amorti-course#negatifs+enregistre": {
+  "calc": {
+   "am": {
+    "D": 0.7083333333333334,
+    "G": 0.2916666666666667
+   },
+   "pr": {
+    "D": 0.3083333333333333,
+    "G": 0.5666666666666667
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) : 29 % (norme : ≥ 66 %) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) : 31 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) : 57 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "f1c91e9989d2c6b40d484b55fb2b8591512dd311166c1cc2559d187d8a8d7ecc",
+   "D": "61ae8aac4179a0ce9858e6115f5e2dbf0bf2ed1a20da2cae5cc951a9eef9fee4",
+   "G": "fd92c2e712756f1951bcd5109c4d12c56798121fbe0a698f78526dc63154d213",
+   "section": "f8347aeb5c6a4bab4bddd48eb67511c7d8831200f7ea11252f92e7158c3ed7b6"
+  }
+ },
+ "amorti-course#manquantes": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": null
+   },
+   "pr": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "6a5d2ca15e4f15f7e6afe500428c4db421768fad160a47bd671ab9be6bd47a92",
+   "D": "1bd12a3a984bbeac35876f4cc8d1a5fb083d4b27790dd77fbe80c152c1047457",
+   "G": "49ad7df681e604001766170a03a8648893876f8392ff55dc9d154019644841d4",
+   "section": "dd31540ff9911c2eb17df30e26a5e3f559371eda4ab23d0a66bc955c32b62514"
+  }
+ },
+ "amorti-course#manquantes+enregistre": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": null
+   },
+   "pr": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "6a5d2ca15e4f15f7e6afe500428c4db421768fad160a47bd671ab9be6bd47a92",
+   "D": "1bd12a3a984bbeac35876f4cc8d1a5fb083d4b27790dd77fbe80c152c1047457",
+   "G": "49ad7df681e604001766170a03a8648893876f8392ff55dc9d154019644841d4",
+   "section": "f6deb8cb6d1f2467fd85b81280fa4611b940ca5e1f1e2fd7e3284a1d35475f51"
+  }
+ },
+ "amorti-course#zero": {
+  "calc": {
+   "am": {
+    "D": 0.4166666666666667,
+    "G": 0.4166666666666667
+   },
+   "pr": {
+    "D": 0,
+    "G": 0.4166666666666667
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) : 42 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) : 42 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) — valeur limite",
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) — valeur limite",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "e287dc3113a20e35d9153ec2281e39bf80ef6cb79841e3f3be26cc78daa1f721",
+   "D": "dc3c232a83d49e9bbf15cdebdfd733386bc973c93ccccc9506d14f2fde026d4a",
+   "G": "5b2a727170c63880073e90ec7d3d399f6a3e8a68640d8c64f46c5c7ef53ccc8e",
+   "section": "8c0062f35f2b8b14baa8d94d177539ce09e215c6fb55e36231e94d8eb24285a3"
+  }
+ },
+ "amorti-course#zero+enregistre": {
+  "calc": {
+   "am": {
+    "D": 0.4166666666666667,
+    "G": 0.4166666666666667
+   },
+   "pr": {
+    "D": 0,
+    "G": 0.4166666666666667
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) : 42 % (norme : ≥ 66 %) — valeur limite",
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) : 42 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) : 0 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) — valeur limite",
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) — valeur limite",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "e287dc3113a20e35d9153ec2281e39bf80ef6cb79841e3f3be26cc78daa1f721",
+   "D": "dc3c232a83d49e9bbf15cdebdfd733386bc973c93ccccc9506d14f2fde026d4a",
+   "G": "5b2a727170c63880073e90ec7d3d399f6a3e8a68640d8c64f46c5c7ef53ccc8e",
+   "section": "931a0e39e9ce123b070439ca11e95430283356f3c4dba99aef8592a2a32f00ac"
+  }
+ },
+ "amorti-course#unCote": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": 0.7166666666666667
+   },
+   "pr": {
+    "D": null,
+    "G": 0.8333333333333334
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "b71645c3fa6ec3f67a0ab90a9f1408756355bd7d18138f03ae3be37f047729ca",
+   "D": "e915d334f30c8e842ee728a2c1c0e7e252170be1c6781d1a2c2fe5315145e310",
+   "G": "9aeb062d1160a5d5db6de0a556dece83e04b10484a3f9db3937dc1e9fdd35ece",
+   "section": "39dd6ef28f6466febb330a52c8568ef7ca3a5c256d258a8c14263e20b29c569f"
+  }
+ },
+ "amorti-course#unCote+enregistre": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": 0.7166666666666667
+   },
+   "pr": {
+    "D": null,
+    "G": 0.8333333333333334
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "b71645c3fa6ec3f67a0ab90a9f1408756355bd7d18138f03ae3be37f047729ca",
+   "D": "e915d334f30c8e842ee728a2c1c0e7e252170be1c6781d1a2c2fe5315145e310",
+   "G": "9aeb062d1160a5d5db6de0a556dece83e04b10484a3f9db3937dc1e9fdd35ece",
+   "section": "2a19b46366fb78dcd6bc59db0c24a2fa38345edd767f9ae43e13538398a88dc7"
+  }
+ },
+ "amorti-course#enregistre-sans-photos": {
+  "calc": {
+   "am": {
+    "D": 0.5,
+    "G": 0.875
+   },
+   "pr": {
+    "D": 1.25,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) : 50 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "ef24eb1a9ea08309660fef82c2228b5485ab2bb2ded399f2aa14694b02cab670",
+   "D": "2f035e17e722dc6366a65e7e227fad2c7400405c5272d889554302175a5a9fc9",
+   "G": "1878e3a44eb99a1ee3ecf0b057edaee8ab8651c3b45999a71138e533b886ee22",
+   "section": "cca4269abdb4217103d7f0504a157cabe0702191bbcdee0d75b07f7e0ca61ad5"
+  }
+ },
+ "amorti-course#vide": {
+  "calc": {
+   "am": {
+    "D": null,
+    "G": null
+   },
+   "pr": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "ef24eb1a9ea08309660fef82c2228b5485ab2bb2ded399f2aa14694b02cab670",
+   "D": "5e470b84738646b8bbe13063e6baa3bdbdf590bc46f6e28e1ca04553dced0f50",
+   "G": "20248be80ab81444cebc1f17c53fd98d14ddbdd43dcd0f9493babe3e43c79fd2",
+   "section": "564ddef5f98bb54609e53ac9a928eeb4983ece4a4592d8a34b7cfae057c1c586"
+  }
+ },
+ "mla-marche#incoherent-pct-et-delta": {
+  "calc": {
+   "mla": {
+    "D": 2.5,
+    "G": 0.1
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 10 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "5189b28a40de6deb1355326f9bf42cfa8b28ac8a837ce6d4cd1584aee1baacd4",
+   "D": "f2d5a03b0c46e4a3ca835ef325d861e9f23c4f3d024c7440902c7f61570a027b",
+   "G": "ced916d128862f102cfd69cad0a6b0cd10c33e6fbe4148819f33f9bbe890c9ee",
+   "section": "158edf2b4d0a872a18cb66c3a335a0bd8739cc792000d338646b665b8a5f9ef9"
+  }
+ },
+ "mla-marche#incoherent-pct-seul": {
+  "calc": {
+   "mla": {
+    "D": 2.5,
+    "G": 0.1
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 10 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "5189b28a40de6deb1355326f9bf42cfa8b28ac8a837ce6d4cd1584aee1baacd4",
+   "D": "5e6d0745ce84be5ced3cd994126a321642bb865179258e89948244e7fef48745",
+   "G": "2065e5fe3714f7766d260edb9f86ddd62635da03add94cc4a63d28bd59ffd698",
+   "section": "b47041573327f4433fa30a51f8c6a55b29dc906a10072d62076b38e6980052d2"
+  }
+ },
+ "mla-marche#incoherent-delta-seul": {
+  "calc": {
+   "mla": {
+    "D": 0.7749999999999992,
+    "G": 0.42000000000000026
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "5189b28a40de6deb1355326f9bf42cfa8b28ac8a837ce6d4cd1584aee1baacd4",
+   "D": "b1259c7855e708e20f099fda11e8f09c535defc5b499dae67a3059abfd7dd008",
+   "G": "cc22c8ea66046a5be1b4873954b86b38d5a05d97438bd86507571ea4d88847ad",
+   "section": "7ee3b5c9af1091838066e66fa8aca5f6330783ab33e1a5ee29b7aa9681f38153"
+  }
+ },
+ "mla-marche#incoherent-delta-photos-incompletes": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "7a6ef822e83d234fd3b488d97fcf2a6be517be5c62c449260c51bbd32219a6f8",
+   "D": "a1ae1108e7e97802511bc10b5e773588fcbd87d1ab2fbf1b06c0fff9ca7aed0c",
+   "G": "b696b61db01d6fdf300aaaa585bd31cfdec6d48a8ce1a994b8099518096e236a",
+   "section": "a3e7ab01902bd16e5b25bb29fda5be33041fbc0ebf373b0194201193ad8e13e1"
+  }
+ },
+ "mla-photo-synthetique#incoherent-pct-et-delta": {
+  "calc": {
+   "mla": {
+    "D": 2.5,
+    "G": 0.1
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 10 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "bc06eb78c2c6d9da274ecf3c65dd8f43cfa70035151f384ad1b316214aef79ed",
+   "D": "f2d5a03b0c46e4a3ca835ef325d861e9f23c4f3d024c7440902c7f61570a027b",
+   "G": "ced916d128862f102cfd69cad0a6b0cd10c33e6fbe4148819f33f9bbe890c9ee",
+   "section": "158edf2b4d0a872a18cb66c3a335a0bd8739cc792000d338646b665b8a5f9ef9"
+  }
+ },
+ "mla-photo-synthetique#incoherent-pct-seul": {
+  "calc": {
+   "mla": {
+    "D": 2.5,
+    "G": 0.1
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 10 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "bc06eb78c2c6d9da274ecf3c65dd8f43cfa70035151f384ad1b316214aef79ed",
+   "D": "5e6d0745ce84be5ced3cd994126a321642bb865179258e89948244e7fef48745",
+   "G": "2065e5fe3714f7766d260edb9f86ddd62635da03add94cc4a63d28bd59ffd698",
+   "section": "b47041573327f4433fa30a51f8c6a55b29dc906a10072d62076b38e6980052d2"
+  }
+ },
+ "mla-photo-synthetique#incoherent-delta-seul": {
+  "calc": {
+   "mla": {
+    "D": 0.7749999999999992,
+    "G": 0.42000000000000026
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · MLA Marche (ressort médio-pied) : 42 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · MLA Marche (ressort médio-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "bc06eb78c2c6d9da274ecf3c65dd8f43cfa70035151f384ad1b316214aef79ed",
+   "D": "b1259c7855e708e20f099fda11e8f09c535defc5b499dae67a3059abfd7dd008",
+   "G": "cc22c8ea66046a5be1b4873954b86b38d5a05d97438bd86507571ea4d88847ad",
+   "section": "7ee3b5c9af1091838066e66fa8aca5f6330783ab33e1a5ee29b7aa9681f38153"
+  }
+ },
+ "mla-photo-synthetique#incoherent-delta-photos-incompletes": {
+  "calc": {
+   "mla": {
+    "D": null,
+    "G": null
+   }
+  },
+  "alertes": {
+   "det": [],
+   "cond": []
+  },
+  "html": {
+   "panneau": "e515d3deb56b1cffcaa8a02243d4ea122dfea662b6b8bbbf1ff6baca2d6d36f2",
+   "D": "a1ae1108e7e97802511bc10b5e773588fcbd87d1ab2fbf1b06c0fff9ca7aed0c",
+   "G": "b696b61db01d6fdf300aaaa585bd31cfdec6d48a8ce1a994b8099518096e236a",
+   "section": "a3e7ab01902bd16e5b25bb29fda5be33041fbc0ebf373b0194201193ad8e13e1"
+  }
+ },
+ "amorti-marche#incoherent-tout": {
+  "calc": {
+   "am": {
+    "D": 3.3,
+    "G": 0.2
+   },
+   "pr": {
+    "D": 0.05,
+    "G": 2.75
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) : 20 % (norme : ≥ 66 %) — hors norme",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) : 5 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) — hors norme",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "09df637467569584a074e8f02da8c179049f1d880223e73537fd3801b5d062ff",
+   "D": "a73c60d4d883e615ea28ec1959a3f899fdb734ad56319bcdeea4574a65cb9301",
+   "G": "24f3e71dd754051fd54dafec007633beb2c7f2c5cbd6691593316eec2d6f1a0b",
+   "section": "78775c3c67b4cd8f69d91399a590790cce46ad4140d7cd80087e54fc4d4f5a14"
+  }
+ },
+ "amorti-marche#incoherent-am-absent": {
+  "calc": {
+   "am": {
+    "D": 0.6624999999999999,
+    "G": 2
+   },
+   "pr": {
+    "D": 0.05,
+    "G": 2.75
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) : 5 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "09df637467569584a074e8f02da8c179049f1d880223e73537fd3801b5d062ff",
+   "D": "f71d80d5f5d1f489c5828aa55eb3a8b3428e78fac635d467cad1c2876e997f66",
+   "G": "51d4934a43789183465c424fbade0c61beece949534e2197b1f122ddc0ce3caa",
+   "section": "0abd7589e15575bd0e46998cee7d281e75924bdd5599e97e8eac575c21596e0c"
+  }
+ },
+ "amorti-marche#incoherent-pr-absent": {
+  "calc": {
+   "am": {
+    "D": 3.3,
+    "G": 0.2
+   },
+   "pr": {
+    "D": 2.0625,
+    "G": 0.9750000000000001
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) : 20 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "09df637467569584a074e8f02da8c179049f1d880223e73537fd3801b5d062ff",
+   "D": "55fc1c0168a131dad145101747e1b7587df252467061beab38b1e49103621a95",
+   "G": "9c8a10d8730ccbbfd54a442da8704ff75f50da7d214ab61305bbc9a3b3373339",
+   "section": "0d67ba6ec952a8f7b6cf876cb30915de85db9566e2e190e7d1cbf28926b7063b"
+  }
+ },
+ "amorti-marche#incoherent-sans-phases": {
+  "calc": {
+   "am": {
+    "D": 3.3,
+    "G": 0.2
+   },
+   "pr": {
+    "D": 0.05,
+    "G": 2.75
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) : 20 % (norme : ≥ 66 %) — hors norme",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) : 5 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la marche (cinétique arrière-pied) — hors norme",
+    "Pied droit · Propulsion à la marche (cinétique arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "09df637467569584a074e8f02da8c179049f1d880223e73537fd3801b5d062ff",
+   "D": "c9200a6608acd651c19bae5a0714c0ce5f0117b31d6a6dae520ca0d7b0a1eabb",
+   "G": "edb53df33dc69ee76f766b13aa68868ad8513a4cad13e7e30933333cde58cdde",
+   "section": "60f39c89e716e697e637e4e9521995c078cf689bfb09a8575e51599e431fdfc9"
+  }
+ },
+ "amorti-course#incoherent-tout": {
+  "calc": {
+   "am": {
+    "D": 3.3,
+    "G": 0.2
+   },
+   "pr": {
+    "D": 0.05,
+    "G": 2.75
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) : 20 % (norme : ≥ 66 %) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) : 5 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "e5d8b345002fcf8b829c01b235f94f04383adc6cb3b6f6ba89badbe5bfc85414",
+   "D": "481aa3a7ad2fe72fe2df9655f057b6f8c731bda0216cbeecbfeca4c087d92dfc",
+   "G": "0ba710701e22867694f810dca08bbcdec83d1f0ab441f04ed98c2563cc5d5ce0",
+   "section": "023755042859706b64288715c888c84e3614df03a8d62cbcfb941fcde1671584"
+  }
+ },
+ "amorti-course#incoherent-am-absent": {
+  "calc": {
+   "am": {
+    "D": 0.4416666666666666,
+    "G": 1.3333333333333333
+   },
+   "pr": {
+    "D": 0.05,
+    "G": 2.75
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) : 44 % (norme : ≥ 66 %) — valeur limite",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) : 5 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied droit · Amorti à la course (cinétique arrière-pied) — valeur limite",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "e5d8b345002fcf8b829c01b235f94f04383adc6cb3b6f6ba89badbe5bfc85414",
+   "D": "a2d36d776b6f6259a62864b74e3683b7d2167baa4dbd4c49cdf1ecafa993f5b6",
+   "G": "c74300fed1e447cbbd89d36d38d3ae01805404c181d910a0f5119e8ea97d018c",
+   "section": "b027822a8bd216c6014bc7f29ccc39cdd7506263f1851cacf47d9892b78a4ddd"
+  }
+ },
+ "amorti-course#incoherent-pr-absent": {
+  "calc": {
+   "am": {
+    "D": 3.3,
+    "G": 0.2
+   },
+   "pr": {
+    "D": 1.375,
+    "G": 0.65
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) : 20 % (norme : ≥ 66 %) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) : 65 % (norme : ≥ 66 %) — valeur limite"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) — hors norme",
+    "Pied gauche · Propulsion à la course (cinétique arrière-pied) — valeur limite"
+   ]
+  },
+  "html": {
+   "panneau": "e5d8b345002fcf8b829c01b235f94f04383adc6cb3b6f6ba89badbe5bfc85414",
+   "D": "c09073636252da8a044d19bbb23ad5464479b4e9c524a04638bd0b0f9ae4a96a",
+   "G": "0ffb293422157f3d8ec86febdf41fedde690e6277a23d5e34425d42738d5b88c",
+   "section": "8573812e44ac0557a9ad62c8c9d4e16d340ba38f0ced5b530279009b89afb3ef"
+  }
+ },
+ "amorti-course#incoherent-sans-phases": {
+  "calc": {
+   "am": {
+    "D": 3.3,
+    "G": 0.2
+   },
+   "pr": {
+    "D": 0.05,
+    "G": 2.75
+   }
+  },
+  "alertes": {
+   "det": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) : 20 % (norme : ≥ 66 %) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) : 5 % (norme : ≥ 66 %) — hors norme"
+   ],
+   "cond": [
+    "Pied gauche · Amorti à la course (cinétique arrière-pied) — hors norme",
+    "Pied droit · Propulsion à la course (cinétique arrière-pied) — hors norme"
+   ]
+  },
+  "html": {
+   "panneau": "e5d8b345002fcf8b829c01b235f94f04383adc6cb3b6f6ba89badbe5bfc85414",
+   "D": "18eb40decaa8f8180babfb6d7107fe7980b7948ba65fce3085ee3d4983c39ff6",
+   "G": "7c07b3600e54814e2e7a4249713f1b80a43f72d6edf649119419de1b4ea06eaf",
+   "section": "9ff6d86cc34fe90d52940382ca1752e11bedec57b9f0ada52f86a9c808c39e8b"
+  }
+ }
+}
