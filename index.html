@@ -3524,6 +3524,12 @@
         <span class="badge bd" id="cap-pt-badge">—</span>
       </div>
       <div class="note" id="cap-note">—</div>
+      <!-- #279 étape 4 — test repris depuis son brouillon, abandon explicite, sauvegarde suspendue -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <span class="badge bo" id="cap-brouillon" style="display:none;"></span>
+        <button class="btn btn-red" id="cap-brouillon-abandon" style="display:none;" onclick="abandonnerCaptureEnCours()">Abandonner la capture en cours</button>
+        <span class="badge br" id="sauvegarde-auto-etat" style="display:none;"></span>
+      </div>
       <div id="mode-switch-row" style="display:none;gap:6px;margin-bottom:8px;">
         <button class="btn" id="sw-photo" onclick="switchCaptureMode('photo')" style="flex:1;">📷 Photo direct</button>
         <button class="btn btn-blue" id="sw-video" onclick="switchCaptureMode('video')" style="flex:1;">🎬 Vidéo + curseur</button>
