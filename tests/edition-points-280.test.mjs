@@ -485,6 +485,66 @@ describe('#280 — jamais à l’aveugle', () => {
   });
 });
 
+describe('#280 — capture d’avant l’étape 3b (v157), rechargée', () => {
+  // Ancien format : image AVEC ses points dessinés, aucun champ imageBrute ni
+  // dessin ; points et dims présents (#250). Rechargée depuis mesures, puis
+  // depuis le brouillon : l'éditeur doit toujours refuser.
+  const ancienne = () => ({
+    label: 'Station bipodale',
+    side: '',
+    angle: null,
+    angleD: 14.8,
+    angleG: -7.9,
+    dataUrl: IMG,
+    path: 'u/ancienne.jpg',
+    markers: MARQUEURS_DEMO.map((m) => ({ ...m })),
+    dims: DIMS,
+  });
+
+  it('E11. Rechargée depuis mesures, puis depuis le brouillon : imageBrute reste absent, refus « capture antérieure »', async () => {
+    const A = patient('A', {
+      mesures: {
+        _bilanId: 'bilan-A',
+        [T]: {
+          date: 'v',
+          photos: [
+            ancienne(),
+            { label: 'Valgum dynamique unipodal G', side: 'G', angle: null, path: null },
+            { label: 'Valgum dynamique unipodal D', side: 'D', angle: null, path: null },
+          ],
+          frames: [],
+        },
+      },
+    });
+    const o = await ouvrir({ patients: [A] });
+    estFonction(o.env, 'ouvrirEditionPoints');
+    // 1. Depuis mesures (launchTest → _relireImageBrute).
+    const s1 = o.env.slots()[0];
+    expect('imageBrute' in s1, 'mesures : imageBrute absent après relecture').toBe(false);
+    const r1 = await o.env.ouvrirEditionPoints(0);
+    expect([r1.ok, (r1.motif || '').includes('capture antérieure')], 'mesures : refus').toEqual([
+      false,
+      true,
+    ]);
+    // 2. Brouillon écrit depuis ce créneau, puis repris.
+    o.env._planifierBrouillon();
+    vi.advanceTimersByTime(DELAI);
+    const ph = A.brouillonsTests?.[T]?.photos?.[0];
+    expect(ph, 'brouillon écrit').toBeTruthy();
+    expect('imageBrute' in ph, 'brouillon : imageBrute absent').toBe(false);
+    await o.env.launchTest(T);
+    const s2 = o.env.slots()[0];
+    expect(s2.path, 'repris depuis le brouillon').toBe('u/ancienne.jpg');
+    expect('imageBrute' in s2, 'brouillon repris : imageBrute absent').toBe(false);
+    s2.dataUrl = IMG; // réhydratation de l'image (prefetchSportPhotos, bouchonné ici)
+    const r2 = await o.env.ouvrirEditionPoints(0);
+    expect([r2.ok, (r2.motif || '').includes('capture antérieure')], 'brouillon : refus').toEqual([
+      false,
+      true,
+    ]);
+  });
+});
+
 describe('#280 — test déjà validé : brouillon, mesures intact, rapport', () => {
   const valide = () => ({
     date: 'v',
