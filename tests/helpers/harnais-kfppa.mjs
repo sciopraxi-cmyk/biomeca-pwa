@@ -7,7 +7,7 @@
 // globales qu'elles lisent (currentTestId, photoSlots, vidMarkers) et un DOM
 // réduit à des bouchons minimaux.
 
-import { fonction, objet, ligneConst, tableau, bloc } from './extraire-biomeca.mjs';
+import { fonction, objet, ligneConst, tableau, bloc, SRC_BIOMECA } from './extraire-biomeca.mjs';
 
 // #275-C — bloc des normes et de la grille, extrait entre ses marqueurs
 // (usage « rendre testable » ; son miroir est js/calc.mjs, comparé par
@@ -131,6 +131,55 @@ export const FONCTIONS = [
   '_construireResultatTest',
   '_escHtml',
   '_kfppaNormePourBilan',
+  '_lockSession', // #279 étape 4 — écriture immédiate au verrouillage
+  '_buildSportRapportContentHTML', // #279 étape 4 — mentions des brouillons au rapport
+];
+
+// #279 étape 4 — fonctions NOUVELLES de la sauvegarde automatique : extraites
+// SEULEMENT si elles existent dans la version lue. Leur absence (code d'avant)
+// donne `undefined`, et chaque test vérifie d'abord `typeof … === 'function'` :
+// une absence reste un échec d'ASSERTION, jamais une erreur de harnais.
+export const FONCTIONS_OPTIONNELLES = [
+  '_installerSauvegardeTests',
+  'abandonnerCaptureEnCours',
+  '_badgeBrouillonTest',
+  '_planifierBrouillon',
+  '_ecrireBrouillonMaintenant',
+  '_construireBrouillon',
+  '_appliquerBrouillon',
+  '_lignesBrouillonsRapport',
+  '_stockageAutoSuspendu',
+  '_entreeBrouillon',
+  '_brouillonApplicable',
+  '_majEtatSauvegardeAuto',
+  '_majBoutonAbandon',
+  '_envoyerPuisPlanifier',
+  '_rafraichirBadgesTests',
+];
+// Appels DIRECTS du vrai nav, bouchonnés (option navReelle).
+const BOUCHONS_NAV = [
+  '_appliquerTheme',
+  '_drawMorphoCanvasesFromSource',
+  '_fichePrefillApply',
+  '_renderPostureThresholdsPanel',
+  '_runBackfillDryRun',
+  'buildRapport',
+  'clearBilanFields',
+  'drawPiedsTemplate',
+  'initAgendaPage',
+  'initMorphoCanvas',
+  'injectBilanPosturoPage',
+  'loadBilan',
+  'populatePratSelect',
+  'renderParamsPratList',
+  'renderPatientList',
+  'renderPratList',
+  'savePedicurieBilan',
+  'savePodopediatrieBilan',
+  'savePosturoBilan',
+  'showPedicurieSection',
+  'showPodopediatrieSection',
+  'showPosturoSection',
 ];
 
 // Chaque chargement rend un environnement NEUF : aucun état ne passe d'un
@@ -151,6 +200,12 @@ export function charger(opts = {}) {
   }
   const exclusEnv = (process.env.BIOMECA_EXCLURE || '').split(',').filter(Boolean);
   const noms = FONCTIONS.filter((n) => !(opts.exclure || []).includes(n) && !exclusEnv.includes(n));
+  const presente = (n) =>
+    SRC_BIOMECA.includes('\nfunction ' + n + '(') ||
+    SRC_BIOMECA.includes('\nasync function ' + n + '(');
+  const optionnelles = FONCTIONS_OPTIONNELLES.map((n) =>
+    presente(n) ? fonction(n) : `const ${n} = undefined;`
+  ).join('\n');
   const code = `
     const _persist = !!(opts && opts.persistance);
     let currentTestId = null;
@@ -161,6 +216,13 @@ export function charger(opts = {}) {
     let _elements = {};
     let _vigEchap = null;
     let currentPatient = null;
+    let patients = []; // #279 étape 4 — le brouillon va au patient retrouvé PAR SON ID
+    // #279 étape 4 — page active (nav, _lockSession), écouteurs, stockage simulé.
+    let _pageActive = null, _octetsStockage = 0, _visibilite = 'visible';
+    const _ecouteurs = [];
+    // #279 étape 4 — état de la sauvegarde automatique (déclaré au niveau du
+    // script dans biomeca.js, donc non extrait).
+    let _brouillonAttente = null, _sessionCapture = null, _ecritureBrouillonEnCours = false, _sauvegardeTestsInstallee = false;
     // #275-D — ESPIONS D'ÉCRITURE. Chacun se note PUIS lève : un rapport ou
     // un panneau ne doit jamais sauvegarder (CLAUDE.md, incident du 25/07).
     const _espions = [];
@@ -175,9 +237,14 @@ export function charger(opts = {}) {
     const savePatients = _persist
       ? () => {
           _enregistrements.push('savePatients');
+          // #279 étape 4 — MODÈLE du vrai savePatients en stockage critique :
+          // alerte puis refus. Sans lui, « aucune alerte » ne prouverait rien.
+          if (_octetsStockage / STORAGE_QUOTA_BYTES >= STORAGE_CRITICAL_THRESHOLD) { alert('ESPACE DE STOCKAGE CRITIQUE'); return false; }
           if (opts.envoiReel) {
-            const stash = _stripDataURLsForPersist([currentPatient]);
-            try { _ecrits.push(JSON.stringify(currentPatient)); }
+            // #279 étape 4 — tous les patients s'ils sont posés, sinon le courant.
+            const cibles = patients.length ? patients : [currentPatient];
+            const stash = _stripDataURLsForPersist(cibles);
+            try { _ecrits.push(JSON.stringify(patients.length ? patients : currentPatient)); }
             finally { stash.forEach(({ obj, key, dataUrl }) => { obj[key] = dataUrl; }); }
           }
           return true;
@@ -205,10 +272,30 @@ export function charger(opts = {}) {
       return _reponsesConfirm.shift();
     }
     function syncOpenedBilanToHistory() {}
-    function nav(id) { _enregistrements.push('nav:' + id); }
+    ${opts.navReelle ? fonction('nav') + BOUCHONS_NAV.map((n) => `function ${n}() { _enregistrements.push('${n}'); }`).join('\n') : "function nav(id) { _enregistrements.push('nav:' + id); }"}
+    function _stopIdleLock() {}
+    // #279 étape 4 — suppressions Storage (js/storage.js) NOTÉES : l'abandon
+    // d'une capture ne doit jamais en appeler aucune.
+    async function deletePhotos() { _enregistrements.push('deletePhotos'); }
+    async function _deleteFolderRecursive() { _enregistrements.push('_deleteFolderRecursive'); }
+    async function deletePatientFolder() { _enregistrements.push('deletePatientFolder'); }
+    async function deleteSportBilanFolder() { _enregistrements.push('deleteSportBilanFolder'); }
+    async function pwaLogout() { _enregistrements.push('pwaLogout'); }
+    function buildBilanPrintSection() { return ''; }
+    function _buildFichesFailHTML() { return ''; }
+    function getBioMecaStorageBytes() { return _octetsStockage; }
+    ${ligneConst('STORAGE_QUOTA_BYTES')}
+    ${ligneConst('STORAGE_CRITICAL_THRESHOLD')}
+    const window = {
+      scrollTo() {},
+      addEventListener: (type, f) => { _ecouteurs.push({ cible: 'window', type, f }); },
+      removeEventListener() {},
+    };
     const _stockage = (nom) => ({
       getItem: () => null,
-      setItem: _espion(nom + '.setItem'),
+      // #279 étape 4 — persistance : _lockSession pose ses drapeaux de session
+      // (noté, sans lever) ; le localStorage reste un espion qui lève.
+      setItem: _persist && nom === 'sessionStorage' ? (k) => { _enregistrements.push('sessionStorage.setItem:' + k); } : _espion(nom + '.setItem'),
       removeItem: _espion(nom + '.removeItem'),
       clear: _espion(nom + '.clear'),
     });
@@ -216,8 +303,12 @@ export function charger(opts = {}) {
     const sessionStorage = _stockage('sessionStorage');
     const document = {
       getElementById: (id) => _elements[id] || null,
-      addEventListener() {},
+      // #279 étape 4 — écouteurs NOTÉS (visibilitychange…), page active simulée.
+      addEventListener: (type, f) => { _ecouteurs.push({ cible: 'document', type, f }); },
       removeEventListener() {},
+      get visibilityState() { return _visibilite; },
+      querySelector: (sel) => (sel === '.page.active' && _pageActive ? { id: _pageActive } : null),
+      querySelectorAll: () => [],
       // #279 étape 3b — le faux canevas NOTE si des points y ont été dessinés
       // (drawOverlay ci-dessous) : sa dataURL le dit, BRUTE ou AVECPOINTS.
       createElement: () => ({
@@ -272,6 +363,7 @@ export function charger(opts = {}) {
     ${BLOC_275C}
     ${BLOC_275D}
     ${noms.map(fonction).join('\n')}
+    ${optionnelles}
     ${opts.envoiReel ? ['migrateSportPhotos', 'restoreSportPhotosStash'].map(fonction).join('\n') : 'async function migrateSportPhotos() { return []; }\n    function restoreSportPhotosStash() {}'}
     return {
       TESTS, MEASURE_COMPUTERS, KFPPA_NON_RECALC, KFPPA_BIP_MANQUANTE, KFPPA_NORMES, KFPPA_MSG_CIVILITE, KFPPA_MSG_NORME_ND,
@@ -280,6 +372,8 @@ export function charger(opts = {}) {
       kfppaNormeBilan, kfppaTexteNorme, kfppaAnalyseGenou, kfppaPhraseGenou, kfppaPhraseAsymetrie,
       kfppaTexteUnipodal, kfppaMotifDelta,
       ${noms.join(', ')},
+      ${FONCTIONS_OPTIONNELLES.join(', ')},
+      ${opts.navReelle ? 'nav,' : ''}
       poser(o) {
         if ('test' in o) currentTestId = o.test;
         if ('slots' in o) photoSlots = o.slots;
@@ -292,7 +386,16 @@ export function charger(opts = {}) {
         if ('taille' in o) markerSizeFactor = o.taille;
         if ('opacite' in o) markerOpacity = o.opacite;
         if ('image' in o) _image = o.image; // #279 1c
+        // #279 étape 4
+        if ('patients' in o) patients = o.patients;
+        if ('pageActive' in o) _pageActive = o.pageActive;
+        if ('octetsStockage' in o) _octetsStockage = o.octetsStockage;
+        if ('visibilite' in o) _visibilite = o.visibilite;
       },
+      // #279 étape 4 — déclenche les écouteurs notés d'un type d'événement.
+      declencher(type) { _ecouteurs.filter((e) => e.type === type).forEach((e) => e.f({ type })); },
+      ecouteurs: () => _ecouteurs.map((e) => e.cible + ':' + e.type),
+      patientsListe: () => patients,
       slots: () => photoSlots,
       vid: () => vidMarkers, // #279 1c
       live: () => liveMarkers, // #279 1c

@@ -791,7 +791,7 @@ async function loadSupabaseData() {
       // `Object.keys(p.mesures).length > 0` truthy dès la 1re saisie clinique,
       // déclenchant la migration au prochain reload PWA → doublon « Sportif
       // Initial » après Finaliser.
-      if(p.mesures && Object.keys(p.mesures).length > 0 && !p.currentBilanSportSousType) {
+      if(_nbTestsMesures(p.mesures) > 0 && !p.currentBilanSportSousType) { // #279 étape 4 — _bilanId seul ne compte pas
         if(!p.bilansSport) p.bilansSport = [];
         const hasInitial = p.bilansSport.some(b => b.type === 'initial');
         if(!hasInitial) {
@@ -3747,6 +3747,8 @@ async function _lockSession() {
   _stopIdleLock();  // stop d'abord pour éviter les re-entrées
   var activePage = document.querySelector('.page.active');
   var activeId = activePage ? activePage.id : null;
+  // #279 étape 4 — test en cours écrit avant la déconnexion, quelle que soit la page.
+  try { _ecrireBrouillonMaintenant(); } catch (_e) { /* priorité verrouillage */ }
   try {
     if (activeId === 'pg-bilan' && typeof saveBilanSilent === 'function') saveBilanSilent();
     else if (activeId === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
@@ -4571,6 +4573,9 @@ function nav(id) {
     else if (_leavingId === 'pg-pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
     // #140 Phase 0 — miroir podopédiatrie (savePodopediatrieBilan non async).
     else if (_leavingId === 'pg-podopediatrie' && typeof savePodopediatrieBilan === 'function') savePodopediatrieBilan(true);
+    // #279 étape 4 — quitter la capture écrit le test en cours SANS attendre,
+    // y compris vers le rapport : le déclencheur est la navigation.
+    else if (_leavingId === 'pg-capture') _ecrireBrouillonMaintenant();
   }
   // Déplacer toutes les pages orphelines dans .main
   const mainEl = document.querySelector('.main');
@@ -4611,6 +4616,7 @@ function nav(id) {
     if (typeof _renderPostureThresholdsPanel === 'function') _renderPostureThresholdsPanel();
   }
   if(id === 'pg-sport') {
+    _rafraichirBadgesTests(); // #279 étape 4 — « en cours — non validé »
     // Mettre à jour le sous-titre avec le patient courant
     const sub = document.getElementById('sport-sub');
     if(sub && currentPatient) sub.textContent = 'Patient : '+currentPatient.prenom+' '+currentPatient.nom+' · '+(currentPatient.sport||'—');
@@ -4912,6 +4918,9 @@ function switchCaptureMode(mode) {
 async function launchTest(testId) {
   if (!currentPatient) { alert('Sélectionnez d\'abord un patient.'); nav('pg-patients'); return; }
   const t = TESTS[testId]; if (!t) return;
+  // #279 étape 4 — le test quitté est écrit AVANT que ses captures soient remplacées.
+  _ecrireBrouillonMaintenant();
+  _sessionCapture = {};
   currentTestId = testId;
   testMode = t.mode;
 
@@ -4922,7 +4931,10 @@ async function launchTest(testId) {
   selectedVidMkrIdx = -1; isVidDragging = false;
 
   // Init photos - charger les données sauvegardées si elles existent
-  const savedData = currentPatient?.mesures?.[testId];
+  // #279 étape 4 — un brouillon du bilan EN COURS prime sur la version validée
+  // (que rien ne modifie avant une nouvelle validation).
+  const _brouillon = _brouillonApplicable(currentPatient, testId);
+  const savedData = _brouillon || currentPatient?.mesures?.[testId];
   if(savedData && savedData.photos && savedData.photos.length) {
     photoSlots = savedData.photos.map((p,i) => ({
       label: p.label || (t.photoLabels[i]||'Photo '+(i+1)),
@@ -4982,6 +4994,7 @@ async function launchTest(testId) {
     capturedFrames = [];
   }
   selectedFrameIdx = -1;
+  _appliquerBrouillon(_brouillon); // #279 étape 4 — bandeau et points en direct
 
   // Prefetch Storage paths → populate dataUrls en RAM (Task #53 PR B2).
   // Mutate photoSlots/capturedFrames entries en place AVANT les renders
@@ -5719,6 +5732,15 @@ async function deletePatient(i) {
   renderPatientList();
 }
 
+// #279 étape 4 — nombre de TESTS d'un objet mesures : les clés « _ » sont des
+// métadonnées (_bilanId), jamais un test. Un _bilanId seul — créé par
+// saveBilan(Silent), la capture (3e) ou le brouillon — ne fait apparaître ni
+// « test(s) saisi(s) » ni un bilan à archiver. La synchronisation (nb_tests,
+// ligne in_progress) n'utilise PAS encore cette règle : ticket #271.
+function _nbTestsMesures(m) {
+  return m && typeof m === 'object' ? Object.keys(m).filter((k) => !k.startsWith('_')).length : 0;
+}
+
 // Détermine si bilanData contient au moins une valeur non vide.
 // bilanData peut avoir beaucoup de clés avec des chaînes vides (champs initialisés mais non remplis).
 function hasBilanDataContent(d) {
@@ -5799,7 +5821,7 @@ function renderPatientList() {
     // Carte "Bilan en cours" — affichée dès qu'un bilan est démarré
     // (currentBilanSportSousType non null), même si aucune donnée n'a encore été saisie.
     // Permet au praticien de visualiser qu'un bilan est en cours et d'y retourner ou de l'abandonner.
-    const nbTestsEnCours = p.mesures ? Object.keys(p.mesures).length : 0;
+    const nbTestsEnCours = _nbTestsMesures(p.mesures); // #279 étape 4 — clés « _ » exclues
     const hasMesures = nbTestsEnCours > 0;
     const hasBilanData = hasBilanDataContent(p.bilanData);
     const hasBilanEnCours = p.currentBilanSportSousType != null;
@@ -6250,11 +6272,11 @@ function loadBilanFromHistory(patIdx, bilanIdx) {
 function abandonnerBilanSport(patIdx) {
   const p = patients[patIdx];
   if (!p) return;
-  const hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
+  const hasMesures = _nbTestsMesures(p.mesures) > 0; // #279 étape 4
   const hasBilanData = hasBilanDataContent(p.bilanData);
   let confirmMsg;
   if (hasMesures || hasBilanData) {
-    const nbTests = hasMesures ? Object.keys(p.mesures).length : 0;
+    const nbTests = _nbTestsMesures(p.mesures);
     const parts = [];
     if (nbTests > 0) parts.push(nbTests + ' test(s) saisi(s)');
     if (hasBilanData) parts.push('saisie clinique');
@@ -6286,7 +6308,7 @@ function abandonnerBilanSport(patIdx) {
 function finalizeBilanSport(patIdx) {
   const p = patients[patIdx];
   if (!p) return;
-  const hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
+  const hasMesures = _nbTestsMesures(p.mesures) > 0; // #279 étape 4
   const hasBilanData = hasBilanDataContent(p.bilanData);
   if (!hasMesures && !hasBilanData) {
     alert('Aucun test ni saisie clinique n\'a été effectué dans le bilan en cours.');
@@ -6396,11 +6418,11 @@ function creerBilanSport(patIdx, type) {
   // posture / des dessins / de la saisie clinique (sans aucun test mesuré) doit
   // aussi être archivé. Sans ce fix, créer un Contrôle écrasait silencieusement
   // les données cliniques du bilan en cours qui n'avait pas de mesures.
-  const _hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
+  const _hasMesures = _nbTestsMesures(p.mesures) > 0; // #279 étape 4
   const _hasBilanData = hasBilanDataContent(p.bilanData);
   if(p.currentBilanSportSousType && (_hasMesures || _hasBilanData)) {
     const _parts = [];
-    if (_hasMesures) _parts.push(Object.keys(p.mesures).length + ' test(s) saisi(s)');
+    if (_hasMesures) _parts.push(_nbTestsMesures(p.mesures) + ' test(s) saisi(s)');
     if (_hasBilanData) _parts.push('saisie clinique / posture');
     const _desc = _parts.join(' + ');
     const confirmMsg = 'Vous avez un bilan en cours avec ' + _desc + '.\n\n' +
@@ -6468,7 +6490,7 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   // DOM via clearBilanFields/loadBilan). On utilise p.* (pas currentPatient.*)
   // pour ne pas dépendre du timing pre/post-selectPatient. Le warning ne
   // s'affiche QUE si l'écrasement causerait une perte réelle (data-driven).
-  const hasMesures = p.mesures && Object.keys(p.mesures).length > 0;
+  const hasMesures = _nbTestsMesures(p.mesures) > 0; // #279 étape 4
   const hasBilanData = hasBilanDataContent(p.bilanData);
   // Task [#70] — check sousType en plus de mesures/bilanData : sinon le résidu
   // d'une archive précédemment ouverte (mesures écrasées par ouvrirBilanSport,
@@ -8712,7 +8734,7 @@ function captureVidPhotoSlot(slotIdx) {
 
   renderVidPhotoGrid();
   updateResults();
-  return _envoyerCaptureStorage(photoSlots[slotIdx]); // #279 étape 3e
+  return _envoyerPuisPlanifier(photoSlots[slotIdx]); // #279 étape 3e, étape 4
 }
 
 function renderPhotoGrid() {
@@ -8780,6 +8802,7 @@ function deletePhotoSlot(i) {
   // cela, un créneau supprimé puis enregistré gardait ses coordonnées.
   delete photoSlots[i].markers; delete photoSlots[i].dims; photoSlots[i].markersConnus = false;
   renderPhotoGrid(); updateResults();
+  _planifierBrouillon(); // #279 étape 4
 }
 
 function resetPhotoSlots() {
@@ -8837,7 +8860,7 @@ function capturePhotoSlot(slotIdx) {
   // de créneau bipodal KFPPA : seul l'angle du créneau compte.
   _poserKfppaSigne(photoSlots[slotIdx], _kfppaSigneCalcule(mlaType, view, side, markersForPhoto, corrAng));
   renderPhotoGrid(); updateResults();
-  return _envoyerCaptureStorage(photoSlots[slotIdx]); // #279 étape 3e
+  return _envoyerPuisPlanifier(photoSlots[slotIdx]); // #279 étape 3e, étape 4
 }
 
 // ══════════════════════════════════════════════════════
@@ -8905,6 +8928,7 @@ function setupPhotoCanvas(vid, canvas) {
       const next = liveMarkers.findIndex((m,i)=>i>idx&&m.x===null);
       selectedMkrIdx = next>=0?next:-1;
       renderMkrList(); updateResults();
+      _planifierBrouillon(); // #279 étape 4 — point posé
     }
   };
   canvas.onmousemove = e => {
@@ -8913,7 +8937,7 @@ function setupPhotoCanvas(vid, canvas) {
     liveMarkers[selectedMkrIdx].x=x; liveMarkers[selectedMkrIdx].y=y; liveMarkers[selectedMkrIdx].origine='main'; // #279 1c — glissé
     renderMkrList(); updateResults();
   };
-  canvas.onmouseup = () => isDragging=false;
+  canvas.onmouseup = () => { if (isDragging) _planifierBrouillon(); isDragging=false; }; // #279 étape 4 — point glissé
   canvas.ontouchstart = e=>{e.preventDefault();const t=e.touches[0];canvas.onmousedown({clientX:t.clientX,clientY:t.clientY});};
   canvas.ontouchmove = e=>{e.preventDefault();const t=e.touches[0];canvas.onmousemove({clientX:t.clientX,clientY:t.clientY});};
   canvas.ontouchend = ()=>canvas.onmouseup();
@@ -12743,6 +12767,7 @@ function setupVidCanvas(player, vcanvas) {
       const next=vidMarkers.findIndex((m,i)=>i>idx&&m.x===null);
       selectedVidMkrIdx=next>=0?next:-1;
       renderMkrList(); updateResults();
+      _planifierBrouillon(); // #279 étape 4 — point posé
     }
   };
   vcanvas.onmousemove=e=>{
@@ -12793,6 +12818,7 @@ function setupVidCanvas(player, vcanvas) {
       }
       return;
     }
+    if(isVidDragging) _planifierBrouillon(); // #279 étape 4 — point glissé
     isVidDragging=false;
   };
   vcanvas.ontouchstart=e=>{e.preventDefault();const t=e.touches[0];vcanvas.onmousedown({clientX:t.clientX,clientY:t.clientY});};
@@ -12944,12 +12970,14 @@ function captureFrame() {
     markersConnus:true
   });
   renderFrameStrip(); updateResults();
+  _planifierBrouillon(); // #279 étape 4
 }
 
 function deleteFrame(i) {
   capturedFrames.splice(i,1);
   if(selectedFrameIdx>=capturedFrames.length) selectedFrameIdx=capturedFrames.length-1;
   renderFrameStrip(); updateResults();
+  _planifierBrouillon(); // #279 étape 4
 }
 function resetAllFrames() {
   if(!confirm('Effacer toutes les frames ?')) return;
@@ -16119,6 +16147,206 @@ function _retirerDerivesEcartes(t, result) {
   }
 }
 
+// ══════════════════════════════════════════════════════
+// #279 étape 4 — SAUVEGARDE AUTOMATIQUE DU TEST EN COURS
+// ══════════════════════════════════════════════════════
+// Un test capturé mais non validé est écrit dans un BROUILLON séparé :
+//   patient.brouillonsTests[testId] = { bilanId, date, photos, frames, marqueursEnCours }
+// JAMAIS dans mesures, que le bilan, le rapport et la synchronisation lisent
+// comme des tests VALIDÉS.
+//  - écriture 2 s après la dernière capture ou correction de point ; écriture
+//    IMMÉDIATE en quittant pg-capture (rapport compris), au verrouillage, page
+//    masquée, pagehide, et avant que launchTest remplace les captures ;
+//  - instantané FIGÉ au déclenchement, écrit dans le patient retrouvé PAR SON
+//    ID dans patients, jamais dans le currentPatient du moment (#251) ;
+//  - aucune dataURL : une entrée sans path est écrite SANS image, nonEnvoyee,
+//    dans le brouillon seulement ; le créneau en mémoire garde son image ;
+//  - stockage critique : rien n'est écrit, bandeau non bloquant, aucune boîte
+//    de dialogue (savePatients en ouvrirait une à chaque écriture) ;
+//  - reprise par launchTest si le bilanId du brouillon est celui du bilan ;
+//    sinon ignoré, JAMAIS purgé ;
+//  - générer un rapport n'écrit JAMAIS de brouillon : le déclencheur est la
+//    navigation, jamais la construction du rapport (#277 hors périmètre).
+// Les brouillons partent avec user_data (saveToSupabase) ; les tables #102 ne
+// les transportent pas (accepté, à reprendre à la bascule du chargement).
+let _brouillonAttente = null; // { patientId, testId, brouillon, minuteur }
+let _sessionCapture = null; // jeton du test ouvert ; null après validation
+let _ecritureBrouillonEnCours = false;
+let _sauvegardeTestsInstallee = false;
+
+// Entrée de brouillon : jamais d'image. Sans path, l'image n'existe qu'en
+// mémoire : l'entrée est marquée nonEnvoyee (règle de 3f à la reprise).
+function _entreeBrouillon(e) {
+  const { dataUrl, ...reste } = e;
+  if (!reste.path && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) reste.nonEnvoyee = true;
+  return reste;
+}
+
+// Instantané du test ouvert, FIGÉ (copie profonde) : une capture ou un point
+// déplacé ensuite ne le modifie pas.
+function _construireBrouillon(patient) {
+  return JSON.parse(JSON.stringify({
+    bilanId: patient?.mesures?._bilanId || null,
+    date: new Date().toISOString(),
+    photos: photoSlots.map((s) => _entreeBrouillon(_serialiserPhoto(s))),
+    frames: capturedFrames.map((f) => _entreeBrouillon({ time: f.time, angD: f.angD, angG: f.angG, dataUrl: f.dataUrl, path: f.path, ..._serialiserMarqueurs(f) })),
+    marqueursEnCours: testMode === 'photo' ? liveMarkers : vidMarkers,
+  }));
+}
+
+// Brouillon repris seulement s'il appartient au bilan EN COURS.
+function _brouillonApplicable(p, testId) {
+  const b = p?.brouillonsTests?.[testId];
+  const bilanId = p?.mesures?._bilanId;
+  return b && bilanId && b.bilanId === bilanId ? b : null;
+}
+
+function _stockageAutoSuspendu() {
+  try { return getBioMecaStorageBytes() / STORAGE_QUOTA_BYTES >= STORAGE_CRITICAL_THRESHOLD; }
+  catch (_e) { return false; }
+}
+
+function _majEtatSauvegardeAuto(suspendu) {
+  const el = document.getElementById('sauvegarde-auto-etat');
+  if (!el) return;
+  el.textContent = suspendu ? '⚠️ Sauvegarde automatique suspendue — stockage plein. Validez le test ou libérez de l’espace.' : '';
+  el.style.display = suspendu ? '' : 'none';
+}
+
+function _majBoutonAbandon(visible) {
+  const b = document.getElementById('cap-brouillon-abandon');
+  if (b) b.style.display = visible ? '' : 'none';
+}
+
+// Après chaque capture ou correction de point : instantané, écriture 2 s après
+// le DERNIER déclenchement. Un instantané d'un autre patient ou d'un autre test
+// encore en attente est écrit d'abord, jamais remplacé.
+function _planifierBrouillon() {
+  if (!_sessionCapture || !currentPatient?.id || !TESTS[currentTestId]) return;
+  const p = currentPatient;
+  const a = _brouillonAttente;
+  if (a && (a.patientId !== p.id || a.testId !== currentTestId)) _ecrireBrouillonMaintenant();
+  if (_brouillonAttente) clearTimeout(_brouillonAttente.minuteur);
+  if (!p.mesures) p.mesures = {};
+  if (!p.mesures._bilanId) p.mesures._bilanId = crypto.randomUUID();
+  _brouillonAttente = { patientId: p.id, testId: currentTestId, brouillon: _construireBrouillon(p), minuteur: null };
+  _brouillonAttente.minuteur = setTimeout(_ecrireBrouillonMaintenant, 2000);
+  _majBoutonAbandon(true);
+}
+
+// Écrit l'instantané en attente, s'il y en a un. Stockage critique : rien
+// n'est écrit, l'instantané reste en attente pour le prochain déclencheur.
+function _ecrireBrouillonMaintenant() {
+  const a = _brouillonAttente;
+  if (!a || _ecritureBrouillonEnCours) return false;
+  clearTimeout(a.minuteur);
+  a.minuteur = null;
+  if (_stockageAutoSuspendu()) { _majEtatSauvegardeAuto(true); return false; }
+  _ecritureBrouillonEnCours = true;
+  try {
+    _brouillonAttente = null;
+    const p = (Array.isArray(patients) ? patients : []).find((x) => x && x.id === a.patientId);
+    if (!p) return false;
+    if (!p.brouillonsTests) p.brouillonsTests = {};
+    p.brouillonsTests[a.testId] = a.brouillon;
+    _majEtatSauvegardeAuto(false);
+    return savePatients() !== false;
+  } catch (e) {
+    console.warn('[#279 étape 4] sauvegarde automatique échouée :', e?.message || e);
+    return false;
+  } finally {
+    _ecritureBrouillonEnCours = false;
+  }
+}
+
+// Capture : instantané tout de suite (l'image peut ne jamais partir), puis de
+// nouveau à la fin de l'envoi, pour écrire le path — sauf si le test a été
+// validé ou rouvert entre-temps.
+function _envoyerPuisPlanifier(slot) {
+  _planifierBrouillon();
+  const session = _sessionCapture;
+  return _envoyerCaptureStorage(slot).then(() => { if (session && session === _sessionCapture) _planifierBrouillon(); });
+}
+
+// Reprise (launchTest) : bandeau, bouton d'abandon, points en direct.
+function _appliquerBrouillon(br) {
+  const el = document.getElementById('cap-brouillon');
+  if (el) {
+    el.textContent = br ? '⚠️ Test en cours, non validé — repris' : '';
+    el.style.display = br ? '' : 'none';
+  }
+  _majBoutonAbandon(!!br);
+  if (!br || !Array.isArray(br.marqueursEnCours)) return;
+  const cible = testMode === 'photo' ? liveMarkers : vidMarkers;
+  br.marqueursEnCours.forEach((m, i) => {
+    const c = cible[i];
+    if (c && m && c.name === m.name && _isPlacedPt(m)) {
+      c.x = m.x; c.y = m.y;
+      if (m.origine) c.origine = m.origine;
+    }
+  });
+}
+
+// Carte du test : '' sans brouillon du bilan en cours.
+function _badgeBrouillonTest(p, testId) {
+  if (!_brouillonApplicable(p, testId)) return '';
+  return p.mesures?.[testId] ? 'modification en cours, non validée' : 'en cours — non validé';
+}
+
+function _rafraichirBadgesTests() {
+  document.querySelectorAll('#pg-sport .tcard').forEach((c) => {
+    const m = /launchTest\('([^']+)'\)/.exec(c.getAttribute('onclick') || '');
+    if (!m) return;
+    const txt = currentPatient ? _badgeBrouillonTest(currentPatient, m[1]) : '';
+    let b = c.querySelector('.tcard-brouillon');
+    if (!txt) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('span'); b.className = 'badge bo tcard-brouillon'; c.appendChild(b); }
+    b.textContent = txt;
+  });
+}
+
+// Rapport : LECTURE SEULE. Ligne rouge par brouillon du bilan en cours ; aucune
+// valeur du brouillon n'est reprise.
+function _lignesBrouillonsRapport(p) {
+  const lignes = {};
+  Object.keys(p?.brouillonsTests || {}).forEach((testId) => {
+    const t = TESTS[testId];
+    if (!t || !_brouillonApplicable(p, testId)) return;
+    const txt = p.mesures?.[testId]
+      ? t.name + ' : nouvelle capture en cours, non validée'
+      : 'Test ' + t.name + ' : capture en cours, non validée — non incluse';
+    lignes[testId] = '<div class="rp-brouillon" style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin:4px 0;break-inside:avoid;">⚠️ '
+      + _escHtml(txt) + '</div>';
+  });
+  return lignes;
+}
+
+// Écouteurs page masquée / pagehide, posés une seule fois.
+function _installerSauvegardeTests() {
+  if (_sauvegardeTestsInstallee) return;
+  _sauvegardeTestsInstallee = true;
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _ecrireBrouillonMaintenant(); });
+  window.addEventListener('pagehide', () => { _ecrireBrouillonMaintenant(); });
+}
+
+// Réponse (b) : action EXPLICITE, confirmée. Retire le brouillon du test
+// ouvert ; le test validé reste intact. Les photos déjà envoyées deviennent
+// orphelines (#135) : jamais supprimées ici.
+// Appelée depuis index.html (onclick) — avertissement ESLint no-unused-vars attendu, dette #278.
+async function abandonnerCaptureEnCours() {
+  const p = currentPatient, testId = currentTestId, t = TESTS[testId];
+  if (!p || !t) return;
+  const a = _brouillonAttente;
+  const enAttente = !!(a && a.patientId === p.id && a.testId === testId);
+  if (!enAttente && !_brouillonApplicable(p, testId)) return;
+  if (!confirm('Abandonner la capture en cours de « ' + t.name + ' » ?\n\n'
+    + 'Les captures non validées sont retirées. '
+    + (p.mesures?.[testId] ? 'Le test déjà validé reste inchangé.' : 'Aucun résultat validé n’existe pour ce test.'))) return;
+  if (enAttente) { clearTimeout(a.minuteur); _brouillonAttente = null; }
+  if (_brouillonApplicable(p, testId)) { delete p.brouillonsTests[testId]; savePatients(); }
+  await launchTest(testId);
+}
+
 async function validateAndSave() {
   if(!currentPatient||!currentTestId){alert('Patient ou test manquant.');return;}
   const t=TESTS[currentTestId];
@@ -16166,6 +16394,12 @@ async function validateAndSave() {
     _retirerDerivesEcartes(t, result); // #279 3f, 1b — photos désormais non envoyées
     break;
   }
+  // #279 étape 4 — test validé : SON brouillon est retiré (lui seul, et
+  // seulement celui du bilan en cours), l'écriture en attente annulée.
+  const _att = _brouillonAttente;
+  if (_att && _att.patientId === currentPatient.id && _att.testId === currentTestId) { clearTimeout(_att.minuteur); _brouillonAttente = null; }
+  if (_brouillonApplicable(currentPatient, currentTestId)) delete currentPatient.brouillonsTests[currentTestId];
+  _sessionCapture = null;
   syncOpenedBilanToHistory();
   savePatients();
   // Restaure les dataUrls migrées en RAM (par référence) pour conserver
@@ -17900,9 +18134,15 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
     if(iB === -1) return -1;
     return iA - iB;
   });
+  // #279 étape 4 — brouillons du bilan en cours, en LECTURE SEULE : mention
+  // rouge sous la version validée, ou seule si le test n'a jamais été validé.
+  const _brouillons = _lignesBrouillonsRapport(p);
   mesuresRapport.forEach(([testId, data]) => {
     const t = TESTS[testId]; if(!t) return;
-    sectionsHTML += buildPrintSection(t, data, conclusions);
+    sectionsHTML += buildPrintSection(t, data, conclusions) + (_brouillons[testId] || '');
+  });
+  ordreRapport.concat(Object.keys(_brouillons)).filter((id, i, a) => a.indexOf(id) === i).forEach((testId) => {
+    if (_brouillons[testId] && !mesures[testId]) sectionsHTML += _brouillons[testId];
   });
 
   // Bloc « Mesures à signaler » détaillé (mode complet : valeurs + normes)
@@ -29124,6 +29364,7 @@ function populateSportSysOptions() {
   });
 }
 document.addEventListener('DOMContentLoaded', populateSportSysOptions);
+document.addEventListener('DOMContentLoaded', _installerSauvegardeTests); // #279 étape 4
 
 // feat-biomec-capteurs (A) — synchroniser les sliders « Taille points » avec
 // markerSizeFactor chargé depuis localStorage au boot (les value="" du HTML
