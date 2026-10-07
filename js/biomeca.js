@@ -8377,8 +8377,106 @@ function renderMkrList() {
       <span style="flex:1;font-size:11px;font-weight:500;">${_escHtml(m.name)}</span>
       <span style="font-size:9px;color:var(--dim);font-family:var(--fm);">${m.x!==null?`${Math.round(m.x)},${Math.round(m.y)}`:'—'}</span>
       <span>${m.x!==null?'<span class="badge bg">✓</span>':'<span class="badge bd">—</span>'}</span>
+      ${_pointVerrouille(m)?`<span class="badge bo" title="Posé à la main : aucun calage automatique ne le déplace">🔒</span><button class="btn mkr-relacher" onclick="event.stopPropagation();relacherPoint(${i})" style="font-size:9px;padding:1px 5px;" title="Rendre ce point au calage automatique">Relâcher</button>`:'' /* #272-C */}
       ${m.x!==null?`<button class="mkr-del" onclick="event.stopPropagation();clearMkr(${i})" style="border:none;background:none;cursor:pointer;font-size:11px;">✕</button>`:''}
     </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// #272-C — VERROU DES POINTS POSÉS À LA MAIN
+// ══════════════════════════════════════════════════════
+// Un point d'origine 'main' (posé, glissé, ou confirmé dans l'éditeur #280)
+// est VERROUILLÉ : aucune automatisation ne le déplace ni ne le réétiquette
+// (mémoire du 21/09/2026 — une détection qui défait silencieusement la
+// correction de son utilisateur est pire qu'aucune détection). Aucun champ
+// nouveau : un ancien point 'main' est verrouillé d'office, sans migration.
+function _pointVerrouille(m) {
+  return !!m && m.origine === 'main';
+}
+
+// Une tache est « sous » un point verrouillé dans le rayon de saisie du point
+// (même règle que findMarkerAt) : elle lui appartient, aucun autre ne la prend.
+function _rayonVerrou(W) {
+  return Math.max(12, (W / 40) * markerSizeFactor);
+}
+
+// « Relâcher » : rend le point au calage automatique. Position INCHANGÉE,
+// origine 'defaut' : le praticien retire sa garantie, la valeur n'est plus une
+// mesure (règle 1c) jusqu'à un recalage sur pastille ou un nouveau placement.
+// Appelée depuis la liste des points (onclick) — avertissement ESLint no-unused-vars attendu, dette #278.
+function relacherPoint(i) {
+  const arr = testMode === 'video' ? vidMarkers : liveMarkers;
+  const m = arr[i];
+  if (!_pointVerrouille(m)) return;
+  m.origine = 'defaut';
+  renderMkrList();
+  updateResults();
+  const vEl = document.getElementById('vid-el');
+  const vC = document.getElementById('vid-canvas');
+  if (testMode === 'video' && vEl && vC && vC.width > 0 && vEl.readyState >= 2) {
+    const ctx = vC.getContext('2d');
+    ctx.drawImage(vEl, 0, 0, vC.width, vC.height);
+    drawOverlay(ctx, vC, vidMarkers, selectedVidMkrIdx, TESTS[currentTestId]?.view || 'face');
+  }
+  _planifierBrouillon(); // #279 étape 4 — points en direct modifiés
+}
+
+// Calage d'un CÔTÉ (D ou G) qui contient au moins un point verrouillé. Les
+// points libres sont groupés entre les points verrouillés, dans l'ordre du
+// gabarit (haut → bas) ; chaque groupe ne reçoit que les taches situées ENTRE
+// ses bornes verticales. Décision du praticien :
+//   - UN groupe avec PLUS de taches que de points (ambigu, parasite probable)
+//     → refus du côté ENTIER, aucun point déplacé ;
+//   - sinon, chaque groupe EXACT est calé dans l'ordre vertical ;
+//   - un groupe avec MOINS de taches que de points reste inchangé, et le bilan
+//     le dit.
+// Jamais une attribution haut → bas qui ignorerait le point verrouillé. Les
+// taches sous un point verrouillé lui appartiennent et sont retirées d'abord.
+function _calerCoteVerrouille(side, mkrIdx, blobs, W) {
+  const r = _rayonVerrou(W);
+  const verr = mkrIdx.filter((i) => _pointVerrouille(vidMarkers[i]));
+  const libresB = blobs
+    .filter((b) => !verr.some((i) => Math.hypot(b.x - vidMarkers[i].x, b.y - vidMarkers[i].y) <= r))
+    .sort((b1, b2) => b1.y - b2.y);
+  const groupes = [];
+  let courant = { pts: [], haut: null };
+  mkrIdx.forEach((i) => {
+    if (_pointVerrouille(vidMarkers[i])) {
+      groupes.push({ ...courant, bas: i });
+      courant = { pts: [], haut: i };
+    } else {
+      courant.pts.push(i);
+    }
+  });
+  groupes.push({ ...courant, bas: null });
+  const decrits = groupes
+    .filter((g) => g.pts.length)
+    .map((g) => {
+      const yMin = g.haut !== null ? vidMarkers[g.haut].y : -Infinity;
+      const yMax = g.bas !== null ? vidMarkers[g.bas].y : Infinity;
+      const autour = [g.haut, g.bas].filter((i) => i !== null).map((i) => vidMarkers[i].name).join(' et ');
+      const ou = g.haut === null ? 'au-dessus de' : g.bas === null ? 'au-dessous de' : 'entre';
+      return { ...g, cand: libresB.filter((b) => b.y > yMin && b.y < yMax), lieu: ou + ' ' + autour + ' (verrouillé)' };
+    });
+  const ambigu = decrits.find((g) => g.cand.length > g.pts.length);
+  if (ambigu) {
+    return { attribues: 0, manques: [], refus: 'Côté ' + side + ' : calage refusé — plusieurs taches possibles ' + ambigu.lieu };
+  }
+  let attribues = 0;
+  const manques = [];
+  decrits.forEach((g) => {
+    if (g.cand.length < g.pts.length) {
+      manques.push('Côté ' + side + ' : ' + g.pts.map((i) => vidMarkers[i].name).join(', ') + ' non calé — ' + g.cand.length + ' tache(s) pour ' + g.pts.length + ' point(s) ' + g.lieu);
+      return;
+    }
+    g.pts.forEach((i, k) => {
+      vidMarkers[i].x = g.cand[k].x;
+      vidMarkers[i].y = g.cand[k].y;
+      vidMarkers[i].origine = 'pastille';
+      attribues++;
+    });
+  });
+  return { attribues, manques, refus: null };
 }
 
 function selectMkr(i) {
@@ -14228,13 +14326,31 @@ function snapMarkersToReflectiveBlobs() {
   const priorFn = _getMarkerPriorPositions(currentTestId, W, H);
   let assigned = 0;
   const bilanCotes = [];
+  // #272-C — points verrouillés (origine 'main') : jamais déplacés ni
+  // réétiquetés ; refus de côté et liste rendus dans le bilan.
+  const refusVerrou = [];
+  const verrouilles = vidMarkers.filter(_pointVerrouille).map((m) => m.name);
   ['D', 'G', ''].forEach((side) => {
-    const mkrIdx = [];
+    const tousIdx = [];
     vidMarkers.forEach((m, i) => {
-      if (m.side === side) mkrIdx.push(i);
+      if (m.side === side) tousIdx.push(i);
     });
-    if (mkrIdx.length === 0) return;
-    const sideBlobs = best[side];
+    if (tousIdx.length === 0) return;
+    const aVerrou = tousIdx.some((i) => _pointVerrouille(vidMarkers[i]));
+    if (aVerrou && side !== '') {
+      const res = _calerCoteVerrouille(side, tousIdx, best[side], W);
+      assigned += res.attribues;
+      if (res.refus) refusVerrou.push(res.refus);
+      refusVerrou.push(...res.manques);
+      return;
+    }
+    // Sans point verrouillé : inchangé. Côté sans latéralité (MLA) : les
+    // points verrouillés et les taches sous eux sont retirés de la proximité.
+    const rV = _rayonVerrou(W);
+    const mkrIdx = tousIdx.filter((i) => !_pointVerrouille(vidMarkers[i]));
+    const sideBlobs = aVerrou
+      ? best[side].filter((b) => !tousIdx.some((i) => _pointVerrouille(vidMarkers[i]) && Math.hypot(b.x - vidMarkers[i].x, b.y - vidMarkers[i].y) <= rV))
+      : best[side];
     if (side !== '' && sideBlobs.length === mkrIdx.length && spacingOk(sideBlobs)) {
       // Compte exact + répartition plausible : calage direct dans l'ordre.
       sideBlobs.forEach((b, k) => {
@@ -14292,7 +14408,16 @@ function snapMarkersToReflectiveBlobs() {
   updateAngleOverlay('vid-angles', vidMarkers, view);
   renderMkrList();
   updateResults();
-  if (bilanCotes.length > 0) {
+  if (verrouilles.length) {
+    // #272-C — le calage dit ce qu'il n'a pas fait, et pourquoi.
+    alert(
+      (assigned === 0 ? 'Aucun capteur calé.' : 'Calage : ' + assigned + ' capteur(s) calé(s).') +
+        (bilanCotes.length ? '\n' + bilanCotes.join('\n') : '') +
+        (refusVerrou.length ? '\n' + refusVerrou.join('\n') : '') +
+        '\n' + verrouilles.length + ' point(s) verrouillé(s) — posé(s) à la main — laissé(s) tel(s) quel(s) : ' + verrouilles.join(', ') +
+        '.\nRelâchez un point dans la liste des marqueurs pour le rendre au calage.'
+    );
+  } else if (bilanCotes.length > 0) {
     alert(
       'Calage partiel : ' +
         assigned +
