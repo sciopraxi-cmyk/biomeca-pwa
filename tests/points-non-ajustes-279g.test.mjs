@@ -68,9 +68,16 @@ describe('#279 1c — provenance posée à la source', () => {
     }
   });
 
-  it('S1b. Calage sur pastilles : point RÉELLEMENT calé → « pastille » ; sans pastille trouvée → reste « defaut »', () => {
+  it('S1b. Calage sur pastilles : point RÉELLEMENT calé → « pastille » ; côté sans compte exact → refusé, « defaut » (U0)', () => {
+    // Intention d'origine (1c) : un point réellement calé devient « pastille »,
+    // un point sans pastille trouvée reste « defaut ». La version d'avant U0
+    // exigeait aussi que la SEULE pastille du côté G cale la rotule G par
+    // proximité : c'est exactement le repli refusé par U0 (substitution
+    // d'identité possible, cas C). Côté G désormais refusé, positions
+    // inchangées ; la proximité « pastille » est vérifiée sur le MLA, qui la
+    // garde.
     // Image synthétique 640×360 : trois pastilles blanches côté D (calage
-    // direct), une seule côté G près de la rotule (affinage par proximité).
+    // direct), une seule côté G près de la rotule (refus du côté G).
     const W = 640,
       H = 360;
     const data = new Uint8ClampedArray(W * H * 4);
@@ -105,10 +112,46 @@ describe('#279 1c — provenance posée à la source', () => {
         .filter((m) => m.side === side)
         .map((m) => m.origine);
     expect(o('D'), 'calage direct').toEqual(['pastille', 'pastille', 'pastille']);
-    expect(o('G'), 'une pastille près de la rotule G').toEqual(['defaut', 'pastille', 'defaut']);
+    expect(o('G'), 'côté G refusé : « defaut »').toEqual(['defaut', 'defaut', 'defaut']);
     const g = env.vid().filter((m) => m.side === 'G');
-    expect([Math.round(g[1].x), Math.round(g[1].y)], 'calé sur la pastille').toEqual([482, 182]);
-    expect([g[0].x, g[2].x], 'non calés : positions par défaut').toEqual([W * 0.75, W * 0.75]);
+    expect(
+      g.map((m) => [m.x, m.y]),
+      'côté G : positions par défaut inchangées'
+    ).toEqual([
+      [W * 0.75, H * 0.2],
+      [W * 0.75, H * 0.5],
+      [W * 0.75, H * 0.8],
+    ]);
+    expect(env.alertes().join('\n'), 'raison au bilan').toContain(
+      'Côté G : 1 tache(s) pour 3 point(s) — calage refusé (identité incertaine)'
+    );
+    // MLA (sans latéralité) : la proximité cale toujours, et pose « pastille ».
+    const env2 = charger({ persistance: true });
+    env2.poser({ test: 'mla-marche' });
+    const t2 = env2.TESTS['mla-marche'];
+    const mk2 = env2.cloneMarkers(t2.markers);
+    env2.detectMarkersAuto(null, CANEVAS(W, H), mk2, t2.view, null);
+    const data2 = new Uint8ClampedArray(W * H * 4);
+    for (let i = 3; i < data2.length; i += 4) data2[i] = 255;
+    for (const [cx, cy] of [
+      [140, 230],
+      [322, 110],
+      [500, 236],
+    ])
+      for (let y = cy - 5; y <= cy + 5; y++)
+        for (let x = cx - 5; x <= cx + 5; x++)
+          if ((x - cx) ** 2 + (y - cy) ** 2 <= 25)
+            data2.fill(255, (y * W + x) * 4, (y * W + x) * 4 + 3);
+    env2.poser({
+      marqueurs: mk2,
+      image: { data: data2 },
+      elements: { 'vid-el': { readyState: 4 }, 'vid-canvas': CANEVAS(W, H) },
+    });
+    env2.snapMarkersToReflectiveBlobs();
+    expect(
+      env2.vid().map((m) => m.origine),
+      'MLA : calé par proximité → « pastille »'
+    ).toEqual(['pastille', 'pastille', 'pastille']);
   });
 
   it('S2. Posé ou glissé à la main (vidéo et photo) : origine « main » ; une sélection seule ne change rien', () => {

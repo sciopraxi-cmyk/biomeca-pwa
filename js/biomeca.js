@@ -8421,6 +8421,22 @@ function relacherPoint(i) {
   _planifierBrouillon(); // #279 étape 4 — points en direct modifiés
 }
 
+// U0 / H5 — côté REFUSÉ : ses points « pastille » ne sont pas vérifiés sur
+// cette image. Position INCHANGÉE, origine « defaut » (valeur exclue, règle
+// 1c) ; « main » intact (verrou) ; « defaut » tel quel. Rend la mention du
+// bilan (vide si aucun point n'est concerné).
+function _remettreNonAjustes(idx) {
+  const remis = [];
+  idx.forEach((i) => {
+    const m = vidMarkers[i];
+    if (m && m.origine === 'pastille') {
+      m.origine = 'defaut';
+      remis.push(m.name);
+    }
+  });
+  return remis.length ? ' ; points remis en non ajustés : ' + remis.join(', ') : '';
+}
+
 // Calage d'un CÔTÉ (D ou G) qui contient au moins un point verrouillé. Les
 // points libres sont groupés entre les points verrouillés, dans l'ordre du
 // gabarit (haut → bas) ; chaque groupe ne reçoit que les taches situées ENTRE
@@ -14340,7 +14356,7 @@ function snapMarkersToReflectiveBlobs() {
     if (aVerrou && side !== '') {
       const res = _calerCoteVerrouille(side, tousIdx, best[side], W);
       assigned += res.attribues;
-      if (res.refus) refusVerrou.push(res.refus);
+      if (res.refus) refusVerrou.push(res.refus + _remettreNonAjustes(tousIdx));
       refusVerrou.push(...res.manques);
       return;
     }
@@ -14359,9 +14375,23 @@ function snapMarkersToReflectiveBlobs() {
         vidMarkers[mkrIdx[k]].origine = 'pastille'; // #279 1c — réellement calé
         assigned++;
       });
+    } else if (side !== '') {
+      // U0 — PLUS DE REPLI PAR PROXIMITÉ POUR LES CÔTÉS D ET G. Attribuer
+      // chaque tache au point le plus proche, sans contrôle d'ordre ni
+      // d'identité, a posé l'EIAS G sur la pastille de la rotule G (essai réel,
+      // cas C) : une valeur fausse marquée « pastille », donc comptée. Sans
+      // compte exact et répartition plausible, le côté est REFUSÉ en entier :
+      // aucun point déplacé ; ses points « pastille » repassent à « defaut »
+      // (H5 : non vérifiés sur cette image) ; « main » intact (verrou).
+      bilanCotes.push(
+        'Côté ' + side + ' : ' + sideBlobs.length + ' tache(s) pour ' + mkrIdx.length +
+          ' point(s) — calage refusé (identité incertaine' +
+          (sideBlobs.length === mkrIdx.length ? ', répartition verticale non plausible' : '') + ')' +
+          _remettreNonAjustes(tousIdx)
+      );
     } else {
-      // Détection non concluante (ou marqueurs sans côté, ex. MLA profil dont
-      // l'ordre n'est pas vertical) : affinage par proximité uniquement.
+      // Marqueurs sans côté (MLA profil, ordre non vertical) : affinage par
+      // proximité, inchangé.
       const tol = Math.max(60, W / 16);
       const pairs = [];
       mkrIdx.forEach((mi, k) => {
@@ -14385,18 +14415,6 @@ function snapMarkersToReflectiveBlobs() {
         usedB.add(p.bi);
         assigned++;
       });
-      if (side !== '') {
-        bilanCotes.push(
-          'Côté ' +
-            side +
-            ' : ' +
-            sideBlobs.length +
-            ' pastille(s) fiable(s) pour ' +
-            mkrIdx.length +
-            ' capteur(s)' +
-            (sideBlobs.length === mkrIdx.length ? ' (répartition verticale incohérente)' : '')
-        );
-      }
     }
   });
 
@@ -14418,12 +14436,13 @@ function snapMarkersToReflectiveBlobs() {
         '.\nRelâchez un point dans la liste des marqueurs pour le rendre au calage.'
     );
   } else if (bilanCotes.length > 0) {
+    // U0 — refus d'identité : la cause n'est pas le contraste.
     alert(
       'Calage partiel : ' +
         assigned +
         ' capteur(s) calé(s).\n' +
         bilanCotes.join('\n') +
-        "\nPastilles peu contrastées (chaussures claires ?) ou reflets parasites : ajustez l'éclairage, choisissez une frame stable, ou déplacez les capteurs à la main."
+        "\nUn côté n'est calé que si ses pastilles sont toutes trouvées, dans l'ordre et à des écarts plausibles. Vérifiez que chaque jambe est de son côté de la ligne de séparation (milieu de l'image ou de la zone), ou placez les points à la main."
     );
   } else if (assigned === 0) {
     alert("Aucun capteur n'a pu être calé. Ajustez l'éclairage ou déplacez les capteurs à la main.");

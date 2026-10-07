@@ -174,6 +174,7 @@ export const FONCTIONS_OPTIONNELLES = [
   '_pointVerrouille',
   '_rayonVerrou',
   '_calerCoteVerrouille',
+  '_remettreNonAjustes', // U0 — H5
 ];
 // Appels DIRECTS du vrai nav, bouchonnés (option navReelle).
 const BOUCHONS_NAV = [

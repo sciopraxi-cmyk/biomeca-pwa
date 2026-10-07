@@ -239,13 +239,19 @@ describe('#272-C — témoins (verts sur main)', () => {
     }
   });
 
-  it('V7. Sans point verrouillé : calage identique à 1c S1b (non-régression)', () => {
-    const { apres } = caler('kfppa-marche', [...D3, [482, 182]]);
+  it('V7. Sans point verrouillé : calage identique à 1c S1b (non-régression, règle U0)', () => {
+    // Intention d'origine (#272-C) : sans point verrouillé, le calage se
+    // comporte exactement comme 1c S1b. Depuis U0, S1b exige le refus du côté
+    // G (une seule pastille pour trois points, plus de repli par proximité) :
+    // ce témoin suit S1b.
+    const { avant, apres, bilan } = caler('kfppa-marche', [...D3, [482, 182]]);
     const o = (s) => apres.filter((m) => m.side === s).map((m) => m.origine);
     expect(o('D')).toEqual(['pastille', 'pastille', 'pastille']);
-    expect(o('G')).toEqual(['defaut', 'pastille', 'defaut']);
-    const g = apres.filter((m) => m.side === 'G');
-    expect([Math.round(g[1].x), Math.round(g[1].y)]).toEqual([482, 182]);
+    expect(o('G')).toEqual(['defaut', 'defaut', 'defaut']);
+    expect(JSON.stringify(apres.slice(3)), 'côté G inchangé').toBe(JSON.stringify(avant.slice(3)));
+    expect(bilan).toContain(
+      'Côté G : 1 tache(s) pour 3 point(s) — calage refusé (identité incertaine)'
+    );
   });
 
   it('V13. Glissé en direct et « Confirmer ce point » (#280) : les deux aboutissent à origine « main », donc verrouillé', async () => {
