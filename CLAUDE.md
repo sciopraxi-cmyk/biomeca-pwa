@@ -48,6 +48,27 @@ Forme correcte :
     rtk proxy npm test > /tmp/test.txt 2>&1; EX=$?
     tail -5 /tmp/test.txt
 
+Même piège avec `cut`, `grep` ou tout autre filtre placé après le `|`.
+
+### Un fichier vide ne prouve rien
+
+**Incident du 10/10/2026** : `rtk proxy git diff main...HEAD -- index.html js css > fichier`
+a produit un fichier VIDE alors que le diff existait (479 lignes avec
+`/usr/bin/git`). Le diff complet passé par le proxy, lui, était correct.
+Un contrôle Stripe a failli conclure « 0 occurrence » sur ce fichier vide.
+
+Pour tout diff ou extraction qui fait preuve et qui est redirigé vers un
+fichier : `/usr/bin/git`, taille vérifiée (`/usr/bin/wc -c`), et un **témoin** —
+un motif qu'on sait présent dans le même fichier. Un « 0 » sur un fichier vide
+ne prouve rien.
+
+    /usr/bin/git diff main...HEAD -- index.html > /tmp/d.txt; EX=$?
+    /usr/bin/wc -c < /tmp/d.txt
+    /usr/bin/grep -c 'motif-temoin' /tmp/d.txt
+
+Sous zsh, une variable qui contient plusieurs chemins n'est pas découpée :
+`prettier --check $F` reçoit UN seul argument. Écrire `${=F}`.
+
 ## Filets avant toute PR
 
 Une seule commande, chaque code de retour capturé juste après sa commande,
