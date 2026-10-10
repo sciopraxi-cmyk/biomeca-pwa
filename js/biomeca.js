@@ -29722,7 +29722,9 @@ document.addEventListener('DOMContentLoaded', function() {
   floatBtn.innerHTML = '&#128172; Assistant'; // 💬 — convention des chats de support
   floatBtn.title = "Assistant d'aide Verticy";
   floatBtn.onclick = function() { showHelp(); toggleHelpChat(true); };
-  floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;height:44px;padding:0 18px;border-radius:22px;background:#0e1f38;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;gap:7px;';
+  // #268 — fond --verticy-bleu quand body.theme-clair est posé (#help-float
+  // est dans la règle de portée claire), repli #0e1f38 sur les pages sombres.
+  floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;height:44px;padding:0 18px;border-radius:22px;background:var(--verticy-bleu, #0e1f38);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;gap:7px;';
   document.body.appendChild(floatBtn);
   setTimeout(_injectMicButtons, 800);
 });

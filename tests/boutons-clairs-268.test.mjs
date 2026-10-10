@@ -33,6 +33,7 @@ import {
   FENETRES_A,
   racineFenetre,
   HTML_ENTIER,
+  SRC_BIOMECA,
 } from './helpers/fenetres-claires.mjs';
 
 const SEUIL = 4.5;
@@ -134,5 +135,45 @@ describe('#268 boutons — Paramètres : plus de bleu nuit en dur', () => {
     };
     visiter(page);
     expect(restes).toEqual([]);
+  });
+});
+
+// ─── Bouton flottant « 💬 Assistant » (#help-float) ──────────────────
+//
+// Créé par le script au chargement, attaché au body : il n'est dans AUCUNE
+// .page-claire. Arbitrage du 10/10/2026 : son sélecteur rejoint la règle de
+// portée claire (comme .topbar), et son fond en ligne lit --verticy-bleu
+// avec repli sur sa valeur d'origine #0e1f38 — pas de valeur nouvelle. Sur
+// une page claire, body.theme-clair est posé et la variable existe ; sur une
+// page sombre, elle n'existe pas et le repli s'applique.
+// Le style étant EN LIGNE, une règle CSS seule ne pourrait pas le battre :
+// c'est le style lui-même qui doit lire la variable.
+
+describe('#268 boutons — bouton flottant « Assistant »', () => {
+  const ligne = SRC_BIOMECA.match(/floatBtn\.style\.cssText = '([^']+)';/g) || [];
+  const style = ligne.length === 1 ? declarations(ligne[0].match(/'([^']+)'/)[1]) : {};
+  // Variables vues par le bouton quand body.theme-clair est posé : :root,
+  // puis les règles dont un sélecteur vise #help-float.
+  const varsClaires = { ...SOMBRE };
+  for (const r of REGLES)
+    if (r.selecteurs.includes('body.theme-clair #help-float'))
+      for (const [k, v] of Object.entries(r.decl)) if (k.startsWith('--')) varsClaires[k] = v;
+
+  it('A1. Le fond en ligne lit --verticy-bleu, repli #0e1f38', () => {
+    expect(ligne, 'style du bouton introuvable ou multiple').toHaveLength(1);
+    expect(style.background).toBe('var(--verticy-bleu, #0e1f38)');
+    expect(style.color).toBe('#fff');
+  });
+
+  it('A2. En clair : fond résolu #2563EB, texte blanc à 4,5:1 au moins', () => {
+    expect(varsClaires['--verticy-bleu'], '#help-float absent de la portée claire').toBe('#2563EB');
+    const fond = resoudre(style.background, varsClaires);
+    expect(fond).toBe('#2563eb');
+    expect(contraste('#ffffff', fond)).toBeGreaterThanOrEqual(SEUIL);
+  });
+
+  it('A3. Témoin sombre (hors body.theme-clair) : repli #0e1f38', () => {
+    expect(SOMBRE['--verticy-bleu']).toBeUndefined();
+    expect(resoudre(style.background, SOMBRE)).toBe('#0e1f38');
   });
 });
