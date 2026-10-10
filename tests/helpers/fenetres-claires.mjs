@@ -17,8 +17,8 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { contraste, composer } from './contraste.mjs';
-import { fonction, tableau, SRC_BIOMECA } from './extraire-biomeca.mjs';
+import { contraste, composer, verdictDegrade, arretsDeDegrade } from './contraste.mjs';
+import { fonction, tableau, objet, ligneConst, SRC_BIOMECA } from './extraire-biomeca.mjs';
 import { RACINE } from './mirror-diff.mjs';
 
 export const CSS_ENTIER = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
@@ -212,11 +212,69 @@ export function translucide(expr, vals, prof = 0) {
 
 // ─── Mesure d'une fenêtre ───
 
-// Propriétés de fond et de texte d'un élément : règles de ses classes, puis
-// style en ligne (qui l'emporte).
-function proprietes(n, claire) {
+// ─── #268 bilan Posturo — quatre règles CIBLÉES, sans moteur de sélecteurs ───
+//
+// La mesure ne lit que les sélecteurs de classe simples. Quatre règles à
+// sélecteur composé visent la page du bilan Posturo ; chacune est décrite
+// ici par un PRÉDICAT écrit à la main (testé, avec témoins), et ses
+// déclarations sont LUES dans la feuille par le texte exact du sélecteur —
+// une règle modifiée ou retirée dans la feuille change donc la mesure.
+// La troisième est en !important : elle écrase les fonds EN LIGNE des
+// en-têtes de section (dégradé vert d'eau).
+const aClasse = (n, c) => (n.attrs.class || '').split(/\s+/).includes(c);
+const dansPosturo = (anc) => anc.some((a) => a.attrs.id === 'pg-bilan-posturo');
+export const REGLES_CIBLEES = [
+  {
+    selecteur: '#pg-bilan-posturo .posturo-tab',
+    predicat: (n, anc) => aClasse(n, 'posturo-tab') && dansPosturo(anc),
+  },
+  {
+    selecteur: '#pg-bilan-posturo .posturo-tab.act',
+    predicat: (n, anc) => aClasse(n, 'posturo-tab') && aClasse(n, 'act') && dansPosturo(anc),
+  },
+  {
+    selecteur: '#pg-bilan-posturo .posturo-section div[style*="border-left:4px solid"]',
+    predicat: (n, anc) =>
+      n.tag === 'div' &&
+      (n.attrs.style || '').includes('border-left:4px solid') &&
+      anc.some((a) => aClasse(a, 'posturo-section')) &&
+      dansPosturo(anc),
+  },
+  {
+    selecteur: '.posturo-draw-toolbar .btn:not(.btn-red):not(.btn-blue):not(.btn-green)',
+    predicat: (n, anc) =>
+      aClasse(n, 'btn') &&
+      !['btn-red', 'btn-blue', 'btn-green'].some((c) => aClasse(n, c)) &&
+      anc.some((a) => aClasse(a, 'posturo-draw-toolbar')),
+  },
+];
+
+/** Déclarations de la règle de la feuille portant EXACTEMENT ce sélecteur ({} si absente). */
+export function declarationsCiblees(selecteur, liste = REGLES) {
+  const r = liste.find((x) => x.selecteurs.includes(selecteur));
+  return r ? r.decl : {};
+}
+
+// Propriétés de fond et de texte d'un élément. Ordre de la cascade :
+// règles de classe, règles ciblées normales, style en ligne, puis règles
+// ciblées en !important (qui battent le style en ligne).
+function proprietes(n, claire, ancetres = []) {
   const classes = (n.attrs.class || '').split(/\s+/).filter(Boolean);
-  const d = { ...declarationsDeClasses(classes, claire), ...declarations(n.attrs.style) };
+  const normales = {};
+  const importantes = {};
+  for (const r of REGLES_CIBLEES) {
+    if (!r.predicat(n, ancetres)) continue;
+    for (const [k, v] of Object.entries(declarationsCiblees(r.selecteur))) {
+      if (/!important\s*$/.test(v)) importantes[k] = v.replace(/\s*!important\s*$/, '');
+      else normales[k] = v;
+    }
+  }
+  const d = {
+    ...declarationsDeClasses(classes, claire),
+    ...normales,
+    ...declarations(n.attrs.style),
+    ...importantes,
+  };
   const fond = d['background-color'] ?? d.background;
   return { fond: fond === undefined ? undefined : premiereCouleur(fond), couleur: d.color };
 }
@@ -225,7 +283,10 @@ function proprietes(n, claire) {
 // entier, sinon le premier mot. Un dégradé rend null (indéterminé).
 function premiereCouleur(v) {
   const t = v.trim();
-  if (/gradient\(/.test(t)) return null;
+  // #268 bilan Posturo — un dégradé n'est plus « indéterminé » d'office :
+  // il est rendu tel quel et mesuré arrêt par arrêt (verdictDegrade, pire
+  // arrêt retenu). Un arrêt illisible le rend indéterminé, jamais conforme.
+  if (/gradient\(/.test(t)) return t;
   const m = t.match(/^(var|rgba?)\(/);
   if (!m) return t.split(/\s+/)[0];
   let prof = 0;
@@ -245,8 +306,9 @@ const CONTROLES = { button: '#efefef', input: '#ffffff', select: '#ffffff', text
 // couleur compte comme celle d'un texte.
 // mc-licence-status et mc-pwd-msg n'y sont pas : le script y pose AUSSI la
 // couleur, vérifiée sur le texte des fonctions (tests L1-JS).
+// bilan-header-posturo : texte posé par _updateBilanHeaders (#268 bilan Posturo).
 const PORTEURS_JS =
-  /^(mc-(avatar|nom|email|titre|formule|formule-desc|engagement|renouvellement|cabinet|resilier-msg)|podopediatrie-age-info)$/;
+  /^(mc-(avatar|nom|email|titre|formule|formule-desc|engagement|renouvellement|cabinet|resilier-msg)|podopediatrie-age-info|bilan-header-posturo)$/;
 
 /**
  * Mesure chaque élément porteur de texte de la fenêtre. La portée claire
@@ -260,44 +322,77 @@ export function mesurerFenetre(racine, seuil = 4.5) {
   const vals = claire ? valeursClaires() : valeursRacine();
   const couleurDefaut = claire ? 'var(--txt)' : valeursRacine()['--txt'];
   const mesures = [];
-  const parcourir = (n, couleurHeritee, fondHerite, chemin) => {
-    const p = proprietes(n, claire);
+  const resolveur = (x) => {
+    const y = resoudre(x, vals);
+    return typeof y === 'string' && y.startsWith('#') ? y : null;
+  };
+  const parcourir = (n, couleurHeritee, fondHerite, chemin, ancetres = []) => {
+    const p = proprietes(n, claire, ancetres);
     const controle = CONTROLES[n.tag];
     let couleur = controle ? '#000000' : couleurHeritee;
     if (p.couleur !== undefined) couleur = p.couleur;
     let fond = controle || fondHerite;
     if (p.fond !== undefined) {
-      const r = p.fond === null ? null : resoudre(p.fond, vals);
-      if (r === 'translucide') {
+      const r =
+        p.fond === null ? null : /gradient\(/.test(p.fond) ? 'degrade' : resoudre(p.fond, vals);
+      if (r === 'degrade') {
+        fond = { degrade: p.fond };
+      } else if (r === 'translucide') {
         // Voile ou teinte : composé sur le fond de l'ANCÊTRE (celui qu'on
         // voit au travers), jamais ignoré — l'ignorer mesurait le rouge
         // d'erreur sur du blanc pur au lieu de sa teinte rosée.
         const c = translucide(p.fond, vals);
-        fond =
-          c && /^#[0-9a-f]{6}$/.test(fondHerite || '')
-            ? composer(c.slice(0, 3), c[3], fondHerite)
-            : null;
+        if (c && fondHerite && fondHerite.degrade) {
+          // #268 bilan Posturo — teinte posée sur un DÉGRADÉ : composée sur
+          // chacun de ses arrêts ; un arrêt illisible rend le fond indéterminé.
+          const { resolus, inconnus } = arretsDeDegrade(fondHerite.degrade, {
+            resoudre: resolveur,
+          });
+          fond =
+            inconnus.length || !resolus.length
+              ? null
+              : {
+                  degrade: `linear-gradient(${resolus.map((a) => composer(c.slice(0, 3), c[3], a)).join(',')})`,
+                };
+        } else
+          fond =
+            c && /^#[0-9a-f]{6}$/.test(fondHerite || '')
+              ? composer(c.slice(0, 3), c[3], fondHerite)
+              : null;
       } else if (r === 'aucune') {
         fond = fondHerite; // transparent : on voit l'ancêtre
       } else fond = r; // couleur résolue, ou null = indéterminé
     }
     const texte = (n.texte || '').replace(/\s+/g, ' ').trim();
+    // #268 bilan Posturo — une case à cocher, un bouton radio ou un curseur ne
+    // porte aucun texte : les compter noierait la mesure (458 champs dans le
+    // bilan, presque tous de ce type).
+    const sansTexte =
+      n.tag === 'input' && /^(checkbox|radio|range|color|file|hidden)$/i.test(n.attrs.type || '');
     const porteur =
       texte ||
-      ['input', 'textarea', 'select', 'button', 'a'].includes(n.tag) ||
+      (['input', 'textarea', 'select', 'button', 'a'].includes(n.tag) && !sansTexte) ||
       PORTEURS_JS.test(n.attrs.id || '');
     if (porteur && n.tag !== 'option') {
       const cr = resoudre(couleur, vals);
       const ok = cr && cr !== 'aucune' && cr !== 'translucide' && fond && fond !== 'aucune';
+      let ratio = null;
+      let fondLu = fond;
+      if (ok && fond.degrade) {
+        const v = verdictDegrade(fond.degrade, cr, { resoudre: resolveur });
+        ratio = v.etat === 'INDÉTERMINÉ' ? null : v.pire;
+        fondLu = `dégradé (pire arrêt ${v.pireArret || '?'})`;
+      } else if (ok) ratio = contraste(cr, fond);
       mesures.push({
         chemin: chemin + '/' + n.tag + (n.attrs.id ? '#' + n.attrs.id : ''),
         texte: texte.slice(0, 40) || n.attrs.id || n.tag,
         couleur: cr,
-        fond,
-        ratio: ok ? contraste(cr, fond) : null,
+        fond: fondLu,
+        degrade: fond && fond.degrade ? fond.degrade : null,
+        ratio,
       });
     }
-    for (const e of n.enfants) parcourir(e, couleur, fond, chemin + '/' + n.tag);
+    for (const e of n.enfants) parcourir(e, couleur, fond, chemin + '/' + n.tag, [...ancetres, n]);
   };
   // Fond de départ : celui de la page claire, ou du body sombre.
   parcourir(racine, couleurDefaut, resoudre(vals['--bg'], vals), '');
@@ -403,11 +498,14 @@ const BOUCHON = new Proxy(function () {}, {
  */
 export function executerFenetre(nom, args = '', prelude = '') {
   const attaches = [];
+  // #268 bilan Posturo — une PAGE créée à l'exécution s'attache à .main, pas
+  // au body : le même recueil capte les deux.
+  const main = { appendChild: (e) => (attaches.push(e), e) };
   const document = {
     getElementById: () => null,
     createElement: elementFactice,
     body: { appendChild: (e) => (attaches.push(e), e) },
-    querySelector: () => null,
+    querySelector: (sel) => (sel === '.main' ? main : null),
     querySelectorAll: () => [],
   };
   const connus = {
@@ -512,6 +610,49 @@ export const FENETRES_A = [
       `var _adminUsersCache = [{ email: 'utilisateur@exemple.invalid', licence_payee: true, formule: 'formule_1', engagement: 'mensuel' }];\n${echapper()}`,
   },
 ];
+
+// #268 bilan Posturo — la page du bilan est RECRÉÉE à chaque ouverture par
+// injectBilanPosturoPage (nav('pg-bilan-posturo')) : absente d'index.html,
+// elle échappe aux gardes du balisage. On l'exécute avec le gabarit et les
+// constantes réels du dépôt ; le gabarit ne lit aucune donnée patient.
+export const PAGE_BILAN_POSTURO = {
+  cle: 'bilan-posturo',
+  nom: 'Bilan Posturo (pg-bilan-posturo)',
+  fn: 'injectBilanPosturoPage',
+  args: '',
+  prelude: () =>
+    [
+      objet('FICHES_SYSTEMES'),
+      ligneConst('POSTURE_CAPTURE_ASPECT'),
+      tableau('POSTURE_VIEWS'),
+      fonction('_genSysOptionsHTML'),
+      fonction('_buildPostureCaptureBlockHTML'),
+      fonction('getBilanPosturoHTML'),
+    ].join('\n'),
+};
+
+/**
+ * #268 bilan Posturo — inventaire des couleurs LITTÉRALES des styles en
+ * ligne d'un arbre : { valeur (minuscules, sans espaces) : occurrences }.
+ * Propriétés de texte, fond, trait, ombre et contour.
+ */
+export function inventaireCouleurs(racine) {
+  const LIT = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/gi;
+  const inv = {};
+  const pile = [racine];
+  while (pile.length) {
+    const n = pile.pop();
+    pile.push(...n.enfants);
+    for (const [p, v] of Object.entries(declarations(n.attrs.style))) {
+      if (!/color|background|border|shadow|outline/.test(p)) continue;
+      for (const c of v.match(LIT) || []) {
+        const k = c.toLowerCase().replace(/\s+/g, '');
+        inv[k] = (inv[k] || 0) + 1;
+      }
+    }
+  }
+  return inv;
+}
 
 /** Racine (arbre) d'une fenêtre du registre, depuis le code courant. */
 export function racineFenetre(f, html = HTML_ENTIER) {

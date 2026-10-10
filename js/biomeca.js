@@ -24544,7 +24544,10 @@ function injectBilanPosturoPage() {
   const main = document.querySelector('.main');
   if(!main) return;
   const div = document.createElement('div');
-  div.className = 'page';
+  // #268 — page-claire : sans elle, _appliquerTheme (dernier geste de nav)
+  // retirait body.theme-clair et le bilan entier, barre du haut comprise,
+  // s'affichait en sombre.
+  div.className = 'page page-claire';
   div.id = 'pg-bilan-posturo';
   div.innerHTML = getBilanPosturoHTML();
   main.appendChild(div);
@@ -24552,10 +24555,10 @@ function injectBilanPosturoPage() {
 
 function getBilanPosturoHTML() {
   return `<div style="padding:0 0 40px 0;max-width:860px;margin:0 auto;">
-  <div id="bilan-header-posturo" style="font-size:15px;font-weight:700;color:#fff;background:rgba(45,212,191,0.3);border:1px solid rgba(45,212,191,0.55);padding:8px 14px;border-radius:8px;margin:10px 20px 10px;"></div>
+  <div id="bilan-header-posturo" style="font-size:15px;font-weight:700;color:var(--posturo-encre);background:var(--posturo-fond);border:1px solid var(--posturo-trait);padding:8px 14px;border-radius:8px;margin:10px 20px 10px;"></div>
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--bord);margin-bottom:16px;background:var(--bg);">
     <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;">← Patients</button>
-    <div style="font-size:15px;font-weight:700;color:#2dd4bf;">🧍 Bilan Global de la Posture</div>
+    <div style="font-size:15px;font-weight:700;color:var(--posturo-encre);">🧍 Bilan Global de la Posture</div>
     <div style="display:flex;gap:6px;">
       <button class="btn" onclick="savePosturoBilan()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>
       <button class="btn" onclick="buildRapportPosturo()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">📄 Rapport</button>
@@ -24696,7 +24699,7 @@ function getBilanPosturoHTML() {
             </div>
           </div>
           <div style="flex:1;text-align:center;">
-            <div style="font-size:10px;color:#8892a4;margin-bottom:6px;font-weight:500;">Profil G</div>
+            <div style="font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:500;">Profil G</div>
             <div style="background:#fff;border:1px solid #eee;border-radius:4px;padding:8px;min-height:200px;display:flex;align-items:center;justify-content:center;">
               <img src="assets/morpho-profil-droit.png" style="max-width:100%;max-height:200px;object-fit:contain;display:block;margin:0 auto;"/>
             </div>
@@ -24729,14 +24732,14 @@ function getBilanPosturoHTML() {
 
     <!-- Compensations -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;color:#b7740a;font-size:13px;margin-bottom:8px;">⚖️ Compensations</div>
+      <div style="font-weight:700;color:var(--encours-encre);font-size:13px;margin-bottom:8px;">⚖️ Compensations</div>
       <div style="display:flex;flex-direction:column;gap:6px;">
         <input class="inp" id="po-comp1" placeholder="Compensation 1..." style="background:#fff;color:#222;"/>
         <input class="inp" id="po-comp2" placeholder="Compensation 2..." style="background:#fff;color:#222;"/>
         <input class="inp" id="po-comp3" placeholder="Compensation 3..." style="background:#fff;color:#222;"/>
       </div>
       <div style="margin-top:8px;">
-        <div style="font-size:10px;color:#b7740a;font-weight:600;margin-bottom:3px;">📍 Point compensation critique</div>
+        <div style="font-size:10px;color:var(--encours-encre);font-weight:600;margin-bottom:3px;">📍 Point compensation critique</div>
         <input class="inp" id="po-comp-critique" placeholder="..." style="background:#fff;color:#222;"/>
       </div>
     </div>
@@ -24762,7 +24765,7 @@ function getBilanPosturoHTML() {
           </label>
           <div>
             <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;margin-bottom:6px;">
-              <input type="checkbox" id="po-romberg-lat" onchange="toggleRomberg('lat',this.checked)"/> Latéralisé <span style="font-size:10px;color:#888;">(vestibulaire)</span>
+              <input type="checkbox" id="po-romberg-lat" onchange="toggleRomberg('lat',this.checked)"/> Latéralisé <span style="font-size:10px;color:var(--mut);">(vestibulaire)</span>
             </label>
             <div id="po-romberg-lat-opts" style="display:none;gap:8px;margin-left:16px;">
               <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#eaf4ff;border:2px solid #3498db;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;"><input type="radio" name="po-romberg-lat-dir" value="gauche"/> 👈 Gauche</label>
@@ -24770,7 +24773,7 @@ function getBilanPosturoHTML() {
             </div>
           </div>
           <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
-            <input type="checkbox" id="po-romberg-post"/> Postériorisé <span style="font-size:10px;color:#888;">(émotionnel)</span>
+            <input type="checkbox" id="po-romberg-post"/> Postériorisé <span style="font-size:10px;color:var(--mut);">(émotionnel)</span>
           </label>
           <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
             <input type="checkbox" id="po-romberg-oculaire"/> Adaptation oculaire
@@ -24803,12 +24806,12 @@ function getBilanPosturoHTML() {
       <div style="display:flex;flex-direction:column;gap:10px;">
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">🏃 Examen de la course <em style="font-weight:400;color:#888;">(si douleur à l'effort)</em></div>
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:4px;">🏃 Examen de la course <em style="font-weight:400;color:var(--mut);">(si douleur à l'effort)</em></div>
           <input class="inp" id="po-course" placeholder="Observations..." style="background:#f9f9f9;color:#222;"/>
         </div>
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:8px;">💪 Test de force extenseurs du poignet <span style="color:#e74c3c;">(Déficit)</span></div>
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:8px;">💪 Test de force extenseurs du poignet <span style="color:var(--red);">(Déficit)</span></div>
           ${[['Poignet droit','po-poignet-d'],['Poignet gauche','po-poignet-g']].map(([label,name]) => `
           <div style="margin-bottom:6px;">
             <div style="font-size:10px;color:#555;font-weight:500;margin-bottom:4px;">${label}</div>
@@ -24843,7 +24846,7 @@ function getBilanPosturoHTML() {
         </div>
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🧍 Test de flexion Debout <span style="color:#888;font-weight:400;">(Iliaque/pubis)</span></div>
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🧍 Test de flexion Debout <span style="color:var(--mut);font-weight:400;">(Iliaque/pubis)</span></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
               <input type="radio" name="po-flex-debout" value="droite"/> Droite
@@ -24858,7 +24861,7 @@ function getBilanPosturoHTML() {
         </div>
 
         <div style="background:#fff;border:1px solid #f5b7b1;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🪑 Test de flexion Assis <span style="color:#888;font-weight:400;">(Sacrum)</span></div>
+          <div style="font-size:10px;color:#c0392b;font-weight:600;margin-bottom:6px;">🪑 Test de flexion Assis <span style="color:var(--mut);font-weight:400;">(Sacrum)</span></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
               <input type="radio" name="po-flex-assis" value="droite"/> Droite
@@ -24876,11 +24879,11 @@ function getBilanPosturoHTML() {
 
     <!-- Examen en décharge -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;color:#b7740a;font-size:14px;margin-bottom:10px;">🦵 Examen en décharge — Tests mobilité <span style="color:#e74c3c;">(dysfonction)</span></div>
+      <div style="font-weight:700;color:var(--encours-encre);font-size:14px;margin-bottom:10px;">🦵 Examen en décharge — Tests mobilité <span style="color:var(--red);">(dysfonction)</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         ${[['🦴 Hanche','po-mob-hanche'],['🦵 Genou','po-mob-genou'],['🦶 Pied','po-mob-pied'],['🫁 Bassin','po-mob-bassin']].map(([label,name]) => `
         <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:8px 12px;">
-          <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">${label}</div>
+          <div style="font-size:11px;color:var(--encours-encre);font-weight:600;margin-bottom:6px;">${label}</div>
           <div style="display:flex;gap:8px;">
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;">
               <input type="radio" name="${name}" value="oui"/> Oui
@@ -24899,7 +24902,7 @@ function getBilanPosturoHTML() {
       <div class="g2">
         <!-- Tibia/fémur -->
         <div style="background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;grid-column:1/-1;">
-          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">🦴 Observation tibia/fémur <span style="color:#888;font-weight:400;">(ILMI anatomique)</span></div>
+          <div style="font-size:10px;color:#6c3483;font-weight:600;margin-bottom:6px;">🦴 Observation tibia/fémur <span style="color:var(--mut);font-weight:400;">(ILMI anatomique)</span></div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;">
             ${[['D','d'],['G','g']].map(([label,side]) => `
             <div style="background:#f9f0ff;border:1px solid #d7bde2;border-radius:8px;padding:6px 10px;">
@@ -25137,15 +25140,15 @@ function getBilanPosturoHTML() {
 
     <!-- HYPOTHÈSE -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:14px;">
-      <div style="font-weight:700;color:#b7740a;margin-bottom:8px;">🎯 HYPOTHÈSE</div>
+      <div style="font-weight:700;color:var(--encours-encre);margin-bottom:8px;">🎯 HYPOTHÈSE</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:6px 16px;">
           <input type="checkbox" id="po-hypo-tronc" onchange="setPosturoNeuro('po-hypo-tronc',this.checked)" style="width:14px;height:14px;"/>
-          <span style="color:#e74c3c;font-weight:700;">🔴 TRONC CÉRÉBRAL</span>
+          <span style="color:var(--red);font-weight:700;">🔴 TRONC CÉRÉBRAL</span>
         </label>
         <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:6px 16px;">
           <input type="checkbox" id="po-hypo-cervelet" onchange="setPosturoNeuro('po-hypo-cervelet',this.checked)" style="width:14px;height:14px;"/>
-          <span style="color:#3498db;font-weight:700;">🔵 CERVELET</span>
+          <span style="color:var(--blue);font-weight:700;">🔵 CERVELET</span>
         </label>
       </div>
     </div>
@@ -25155,7 +25158,7 @@ function getBilanPosturoHTML() {
 
       <!-- COLONNE TRONC CÉRÉBRAL (rouge) -->
       <div style="border:2px solid #e74c3c;border-radius:10px;overflow:hidden;">
-        <div style="background:#e74c3c;color:#fff;text-align:center;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">🔴 TRONC CÉRÉBRAL</div>
+        <div style="background:var(--red);color:#fff;text-align:center;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">🔴 TRONC CÉRÉBRAL</div>
         <table style="width:100%;border-collapse:collapse;font-size:10px;">
           <tr>
             <td colspan="2" style="background:#f8d7da;color:#222;font-weight:700;padding:3px 4px;border:1px solid #e74c3c;">NERFS CRÂNIENS</td>
@@ -25222,7 +25225,7 @@ function getBilanPosturoHTML() {
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-d" onchange="setPosturoNeuro('${id}-d',this.checked)"/></td>
             <td style="text-align:center;border:1px solid #ccc;"><input type="checkbox" id="${id}-n" onchange="setPosturoNeuro('${id}-n',this.checked)"/></td>
           </tr>`).join('')}
-          <tr><td colspan="4" style="background:#d4edda;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#27ae60;">PROPRIOCEPTION</td></tr>
+          <tr><td colspan="4" style="background:var(--posturo-fond);color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:var(--green);">PROPRIOCEPTION</td></tr>
           <tr>
             <td style="background:#d4edda;color:#222;font-weight:700;padding:3px 4px;border:1px solid #ccc;">PRIORITAIRES</td>
             <td style="background:#d4edda;color:#222;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;">G</td>
@@ -25252,7 +25255,7 @@ function getBilanPosturoHTML() {
 
       <!-- COLONNE CERVELET (bleu) -->
       <div style="border:2px solid #3498db;border-radius:10px;overflow:hidden;">
-        <div style="background:#3498db;color:#fff;text-align:center;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">🔵 CERVELET</div>
+        <div style="background:var(--blue);color:#fff;text-align:center;font-weight:700;padding:8px;font-size:12px;border-radius:4px 4px 0 0;letter-spacing:1px;">🔵 CERVELET</div>
         <table style="width:100%;border-collapse:collapse;font-size:10px;">
           <tr>
             <td style="background:#d6eaf8;color:#222;font-weight:700;padding:3px 4px;border:1px solid #3498db;">VERMIS</td>
@@ -25343,7 +25346,7 @@ function getBilanPosturoHTML() {
 
       <!-- RÉCEPTEURS TACTILES -->
       <table style="border-collapse:collapse;font-size:10px;width:100%;border-radius:10px;overflow:hidden;">
-        <tr><td colspan="4" style="background:#f0a500;color:#fff;font-weight:700;text-align:center;padding:8px;border:1px solid #f0a500;font-size:12px;letter-spacing:1px;">🟠 RÉCEPTEURS TACTILES</td></tr>
+        <tr><td colspan="4" style="background:var(--encours-encre);color:#fff;font-weight:700;text-align:center;padding:8px;border:1px solid #f0a500;font-size:12px;letter-spacing:1px;">🟠 RÉCEPTEURS TACTILES</td></tr>
         <tr>
           <td style="background:#ddd;font-weight:700;padding:3px 4px;border:1px solid #ccc;color:#222;">PRIORITAIRES</td>
           <td style="background:#ddd;font-weight:700;text-align:center;padding:3px;border:1px solid #ccc;color:#222;">G</td>
@@ -25378,11 +25381,11 @@ function getBilanPosturoHTML() {
 
     <!-- Épines irritatives -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
-      <div style="font-weight:600;margin-bottom:8px;color:#b7740a;">🌵 Présences épines irritatives d'appui plantaire</div>
+      <div style="font-weight:600;margin-bottom:8px;color:var(--encours-encre);">🌵 Présences épines irritatives d'appui plantaire</div>
       <div style="display:flex;gap:12px;margin-bottom:8px;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:4px 14px;color:#222;">
           <input type="radio" name="po-epines" id="po-epines-oui" value="oui"/>
-          <span style="font-weight:600;color:#b7740a;">Oui</span>
+          <span style="font-weight:600;color:var(--encours-encre);">Oui</span>
         </label>
         <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #ccc;border-radius:20px;padding:4px 14px;color:#222;">
           <input type="radio" name="po-epines" id="po-epines-non" value="non"/>
@@ -25486,7 +25489,7 @@ function getBilanPosturoHTML() {
 
     <!-- Recherche parasites -->
     <div style="background:linear-gradient(135deg,#f0fff4,#e0f8e8);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
-      <div style="font-weight:600;margin-bottom:8px;color:#1e8449;">🔍 Recherche parasite(s) / entrée(s)</div>
+      <div style="font-weight:600;margin-bottom:8px;color:var(--green);">🔍 Recherche parasite(s) / entrée(s)</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:7px 10px;color:#222;">
           <input type="checkbox" id="po-para-plantaire"/> 🦶 Plantaire
@@ -25511,7 +25514,7 @@ function getBilanPosturoHTML() {
 
     <!-- Test stabilité monopodal -->
     <div style="background:linear-gradient(135deg,#fffaf0,#fff5e0);border-left:4px solid #f39c12;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
-      <div style="font-weight:600;margin-bottom:8px;color:#d68910;">🧍 Test de stabilité monopodal <span style="color:#e74c3c;">(déficit)</span></div>
+      <div style="font-weight:600;margin-bottom:8px;color:var(--encours-encre);">🧍 Test de stabilité monopodal <span style="color:var(--red);">(déficit)</span></div>
       <table style="border-collapse:collapse;font-size:13px;width:auto;">
         <tr>
           <th style="padding:6px 20px;border:1px solid #f0c070;background:#fdebd0;color:#222;"></th>
@@ -25538,8 +25541,8 @@ function getBilanPosturoHTML() {
 
     <!-- Épreuve alignement -->
     <div style="background:linear-gradient(135deg,#f5eeff,#ede0ff);border-left:4px solid #8e44ad;border-radius:8px;padding:12px;margin-bottom:12px;color:#222;">
-      <div style="font-weight:600;margin-bottom:4px;color:#6c3483;">🎯 Épreuve de l'alignement articulaire sous contrainte en 3 temps <span style="color:#e74c3c;">(déficit)</span></div>
-      <div style="font-size:10px;font-style:italic;color:#888;margin-bottom:8px;">(réalisé si antécédent traumatique / si perte stabilité monopodal en charge) (exclusion : stratégie équilibration autour de la hanche ou mixte avancée)</div>
+      <div style="font-weight:600;margin-bottom:4px;color:#6c3483;">🎯 Épreuve de l'alignement articulaire sous contrainte en 3 temps <span style="color:var(--red);">(déficit)</span></div>
+      <div style="font-size:10px;font-style:italic;color:var(--mut);margin-bottom:8px;">(réalisé si antécédent traumatique / si perte stabilité monopodal en charge) (exclusion : stratégie équilibration autour de la hanche ou mixte avancée)</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d7bde2;border-radius:8px;padding:8px 12px;color:#222;">
           <input type="checkbox" id="po-align-axe"/> ✅ Axe articulaire en place dans schéma corporel
@@ -25558,7 +25561,7 @@ function getBilanPosturoHTML() {
   <div class="posturo-section" id="psec-5" style="padding:0 20px;display:none;">
   <div class="card" style="margin-bottom:16px;">
     <div class="stitle" style="color:#2a7a4e;margin-bottom:4px;">👂 Investigation du système vestibulaire</div>
-    <div style="font-size:11px;font-style:italic;color:#888;margin-bottom:16px;">(si retrouvé prioritaire sur test tonique ou Romberg)</div>
+    <div style="font-size:11px;font-style:italic;color:var(--mut);margin-bottom:16px;">(si retrouvé prioritaire sur test tonique ou Romberg)</div>
 
     <!-- Latéralisation -->
     <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
@@ -25583,7 +25586,7 @@ function getBilanPosturoHTML() {
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:4px 12px;color:#222;">
             <input type="radio" name="po-later-type" id="po-later-global" value="global"/> Global
           </label>
-          <span style="color:#ccc;font-weight:300;">|</span>
+          <span style="color:var(--mut);font-weight:300;">|</span>
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #e74c3c;border-radius:20px;padding:4px 12px;color:#222;">
             <input type="checkbox" id="po-later-d"/> D
           </label>
@@ -25636,7 +25639,7 @@ function getBilanPosturoHTML() {
 
     <!-- Tests stato-kinétiques -->
     <div style="background:linear-gradient(135deg,#f0fff4,#e0f8e8);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:600;color:#1e8449;margin-bottom:8px;">🚶 Tests stato-kinétiques</div>
+      <div style="font-weight:600;color:var(--green);margin-bottom:8px;">🚶 Tests stato-kinétiques</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         <div style="background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;">
           <div style="font-weight:500;color:#222;margin-bottom:6px;">- Étoile de Babinski-Weil →</div>
@@ -25657,7 +25660,7 @@ function getBilanPosturoHTML() {
 
     <!-- Vertiges / VPPB -->
     <div style="background:linear-gradient(135deg,#fffaf0,#fff5e0);border-left:4px solid #f39c12;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:600;color:#d68910;margin-bottom:8px;">💫 Vertiges & VPPB</div>
+      <div style="font-weight:600;color:var(--encours-encre);margin-bottom:8px;">💫 Vertiges & VPPB</div>
       <!-- Vertiges -->
       <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #f0c070;border-radius:8px;padding:8px 12px;margin-bottom:8px;">
         <span style="font-weight:500;color:#222;">Présence de vertiges / nystagmus</span>
@@ -25750,7 +25753,7 @@ function getBilanPosturoHTML() {
   <div class="posturo-section" id="psec-6" style="padding:0 20px;display:none;">
   <div class="card" style="margin-bottom:16px;">
     <div class="stitle" style="color:#2a7a4e;margin-bottom:4px;">🦷 Investigation entrée buccale</div>
-    <div style="font-size:11px;font-style:italic;color:#888;margin-bottom:16px;">(si retrouvé prioritaire sur test tonique ou Romberg)</div>
+    <div style="font-size:11px;font-style:italic;color:var(--mut);margin-bottom:16px;">(si retrouvé prioritaire sur test tonique ou Romberg)</div>
 
     <!-- MCP -->
     <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
@@ -25758,7 +25761,7 @@ function getBilanPosturoHTML() {
 
       <!-- Test 1: Amélioration ouverture bouche -->
       <div style="background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:600;color:#2a7a4e;margin-bottom:6px;">Amélioration ouverture de bouche <span style="color:#888;font-weight:400;">(ATM secondaire)</span></div>
+        <div style="font-size:11px;font-weight:600;color:#2a7a4e;margin-bottom:6px;">Amélioration ouverture de bouche <span style="color:var(--mut);font-weight:400;">(ATM secondaire)</span></div>
         <div style="display:flex;gap:8px;">
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #2a7a4e;border-radius:20px;padding:4px 14px;color:#222;">
             <input type="radio" name="po-mcp-ouv" value="oui"/> Oui
@@ -25803,7 +25806,7 @@ function getBilanPosturoHTML() {
 
     <!-- ATM origine -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;color:#b7740a;font-size:13px;margin-bottom:8px;">🦴 ATM* — Articulation Temporo-Mandibulaire : origine</div>
+      <div style="font-weight:700;color:var(--encours-encre);font-size:13px;margin-bottom:8px;">🦴 ATM* — Articulation Temporo-Mandibulaire : origine</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 16px;color:#222;">
           <input type="radio" name="po-atm-origine" value="musculaire"/> 💪 Musculaire
@@ -25880,7 +25883,7 @@ function getBilanPosturoHTML() {
 
     <!-- ENTRÉE VISUELLE -->
     <div style="font-weight:700;color:#2a7a4e;font-size:14px;margin-bottom:4px;">👁️ Investigation entrée visuelle</div>
-    <div style="font-size:11px;font-style:italic;color:#888;margin-bottom:12px;">(si retrouvé prioritaire sur test tonique ou Romberg)</div>
+    <div style="font-size:11px;font-style:italic;color:var(--mut);margin-bottom:12px;">(si retrouvé prioritaire sur test tonique ou Romberg)</div>
 
     <!-- Latéralisation -->
     <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
@@ -25925,7 +25928,7 @@ function getBilanPosturoHTML() {
 
     <!-- Entrée visuelle primaire/secondaire -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;color:#b7740a;font-size:13px;margin-bottom:8px;">👁️ Entrée visuelle</div>
+      <div style="font-weight:700;color:var(--encours-encre);font-size:13px;margin-bottom:8px;">👁️ Entrée visuelle</div>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:5px 16px;color:#222;">
           <input type="radio" name="po-vis-entree" value="primaire"/> Primaire
@@ -25937,7 +25940,7 @@ function getBilanPosturoHTML() {
 
       <!-- Réfraction -->
       <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:10px;margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:600;color:#b7740a;margin-bottom:6px;">- Réfraction :</div>
+        <div style="font-size:11px;font-weight:600;color:var(--encours-encre);margin-bottom:6px;">- Réfraction :</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${[['Myopie','po-myopie'],['Hypermétropie','po-hypermetropie'],['Presbyte','po-presbyte'],['Astigmate','po-astigmate']].map(([label,id]) => `
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff9e6;border:2px solid #f0a500;border-radius:20px;padding:4px 12px;color:#222;font-size:12px;">
@@ -25949,14 +25952,14 @@ function getBilanPosturoHTML() {
       <!-- Œil directeur / dominant -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:10px;">
-          <div style="font-size:11px;font-weight:600;color:#b7740a;margin-bottom:6px;">👁️ Œil directeur</div>
+          <div style="font-size:11px;font-weight:600;color:var(--encours-encre);margin-bottom:6px;">👁️ Œil directeur</div>
           <div style="display:flex;gap:8px;">
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-oeil-direct" value="droit"/> Droit</label>
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-oeil-direct" value="gauche"/> Gauche</label>
           </div>
         </div>
         <div style="background:#fff;border:1px solid #f0d090;border-radius:8px;padding:10px;">
-          <div style="font-size:11px;font-weight:600;color:#b7740a;margin-bottom:6px;">👁️ Œil dominant</div>
+          <div style="font-size:11px;font-weight:600;color:var(--encours-encre);margin-bottom:6px;">👁️ Œil dominant</div>
           <div style="display:flex;gap:8px;">
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-oeil-domin" value="droit"/> Droit</label>
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:12px;"><input type="radio" name="po-oeil-domin" value="gauche"/> Gauche</label>
@@ -26059,7 +26062,7 @@ function getBilanPosturoHTML() {
 
     <!-- 1. Postural -->
     <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">1 – <span style="color:#3498db;">P</span>ostural</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">1 – <span style="color:var(--blue);">P</span>ostural</div>
 
       <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture :</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
@@ -26087,7 +26090,7 @@ function getBilanPosturoHTML() {
 
     <!-- 2. Neuro-musculaire -->
     <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">2 – <span style="color:#f0a500;">N</span>euro-musculaire / <span style="color:#f0a500;">P</span>ropioceptif / <span style="color:#f0a500;">C</span>hainiste</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">2 – <span style="color:var(--encours-encre);">N</span>euro-musculaire / <span style="color:var(--encours-encre);">P</span>ropioceptif / <span style="color:var(--encours-encre);">C</span>hainiste</div>
 
       <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture en excès :</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
@@ -26107,7 +26110,7 @@ function getBilanPosturoHTML() {
 
     <!-- 3. Biomécanique -->
     <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">3 – <span style="color:#2a7a4e;">B</span>iomécanique / <span style="color:#f0a500;">A</span>rticulaire</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">3 – <span style="color:#2a7a4e;">B</span>iomécanique / <span style="color:var(--encours-encre);">A</span>rticulaire</div>
       <textarea class="inp" id="po-biomec-articulaire" rows="4" placeholder="Observations biomécanique et articulaire..." style="background:#fff;color:#222;"></textarea>
     </div>
 
@@ -26165,7 +26168,7 @@ function getBilanPosturoHTML() {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
         <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:10px;">
-          <div style="font-size:11px;color:#b7740a;font-weight:600;margin-bottom:6px;">🧱 Matériaux</div>
+          <div style="font-size:11px;color:var(--encours-encre);font-weight:600;margin-bottom:6px;">🧱 Matériaux</div>
           <div style="display:flex;flex-direction:column;gap:6px;">
             ${['EVA','PE','Résine','Mouse','Autre'].map(v => `
             <label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff;border:2px solid #f0a500;border-radius:20px;padding:3px 12px;color:#222;font-size:11px;">
@@ -26236,11 +26239,11 @@ function getBilanPosturoHTML() {
           </div>
           <!-- Circuit 2 -->
           <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border:2px solid #3498db;border-radius:10px;overflow:hidden;">
-            <div style="background:#3498db;color:#fff;text-align:center;padding:8px;font-size:12px;font-weight:700;">⚡ CIRCUIT EXPRESS 2 (demi Tabata) — 2 min</div>
+            <div style="background:var(--blue);color:#fff;text-align:center;padding:8px;font-size:12px;font-weight:700;">⚡ CIRCUIT EXPRESS 2 (demi Tabata) — 2 min</div>
             <div style="padding:10px;display:flex;flex-direction:column;gap:6px;">
               <div style="display:flex;flex-direction:column;gap:6px;">
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
-                  <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 1</span>
+                  <span style="font-size:10px;color:var(--blue);font-weight:700;">30s (20/10) — Exercice 1</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
@@ -26249,7 +26252,7 @@ function getBilanPosturoHTML() {
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
-                  <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 2</span>
+                  <span style="font-size:10px;color:var(--blue);font-weight:700;">30s (20/10) — Exercice 2</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
@@ -26258,7 +26261,7 @@ function getBilanPosturoHTML() {
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
-                  <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 3</span>
+                  <span style="font-size:10px;color:var(--blue);font-weight:700;">30s (20/10) — Exercice 3</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
@@ -26267,7 +26270,7 @@ function getBilanPosturoHTML() {
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #aed6f1;border-radius:8px;padding:6px 8px;">
-                  <span style="font-size:10px;color:#3498db;font-weight:700;">30s (20/10) — Exercice 4</span>
+                  <span style="font-size:10px;color:var(--blue);font-weight:700;">30s (20/10) — Exercice 4</span>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
                     <select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">${_genSysOptionsHTML('posturo')}</select>
@@ -26283,7 +26286,7 @@ function getBilanPosturoHTML() {
     </div>
     <div class="card" style="margin-bottom:16px;">
       <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
-        <div style="font-weight:700;color:#1e8449;font-size:14px;">✅ Tests avant/après</div>
+        <div style="font-weight:700;color:var(--green);font-size:14px;">✅ Tests avant/après</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:8px 12px;"><span style="font-size:12px;color:#222;font-weight:500;">Test de Rotation nucale amélioré</span><div style="display:flex;gap:8px;"><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#f0faf4;border:2px solid #27ae60;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t1" value="oui"/> ✅ Oui</label><label style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#fff5f5;border:2px solid #e74c3c;border-radius:20px;padding:4px 14px;color:#222;font-size:12px;font-weight:600;"><input type="radio" name="po-t1" value="non"/> ❌ Non</label></div></div>
