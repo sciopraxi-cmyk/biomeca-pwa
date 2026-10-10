@@ -138,7 +138,12 @@ body.theme-clair{ background:#F6F7F9; }
 body.theme-clair .topbar,
 body.theme-clair .page-claire{
   --bg:#F6F7F9; --surf:#FFFFFF; --card:#FFFFFF; --bord:#E4E8EE;
-  --txt:#0B1220; --mut:#6B7A90; --dim:#9AA5B5;
+  --txt:#0B1220; --mut:#5E6B7F; --dim:#9AA5B5;
+  /* #268 — --mut était #6B7A90 : 4,36:1 sur blanc, 4,07:1 sur --bg, sous le
+     seuil AA de 4,5:1 sur les deux fonds de la portée. #5E6B7F (choix B,
+     comparé à l'œil) : 5,40:1 et 5,04:1. --dim (2,49:1) ne sert plus qu'aux
+     boutons DÉSACTIVÉS, que le contraste n'oblige pas ; ses deux usages de
+     texte à lire sont passés sur --mut. */
   --verticy-bleu:#2563EB; --verticy-bleu-trait:#BBD0F7;
   --verticy-bleu-fond:#EEF4FF;
 }
