@@ -310,6 +310,20 @@ body.theme-clair .bb{ color:#FFFFFF; }
 body.theme-clair .btn-green:hover,
 body.theme-clair .btn-blue:hover{ color:#FFFFFF; }
 
+/* #268 — fond de .btn-blue en clair. Il restait --blue-d (#0d4a32, vert-bleu
+   très sombre), jamais redéfini en clair. On change la RÈGLE et non la
+   variable : --blue-d sert aussi .bb et les puces d'agenda, où le texte
+   --blue tomberait à 1,25:1 sur --verticy-bleu.
+   Portée .page-claire et non body.theme-clair : --verticy-bleu n'existe que
+   dans la portée claire ; un .btn-blue hors de toute .page-claire (fenêtre
+   « Choisir une formule ») recevrait une variable indéfinie, donc un fond
+   transparent. Texte blanc sur #2563EB : 5,17:1.
+   Le survol est écrit EXPLICITEMENT : à [0,3,1], la règle de base battrait
+   .btn-blue:hover [0,2,0] et le survol serait mort. Blanc sur --blue
+   (#175FA8 en clair) : 6,48:1. */
+body.theme-clair .page-claire .btn-blue{ background:var(--verticy-bleu); border-color:var(--verticy-bleu); }
+body.theme-clair .page-claire .btn-blue:hover{ background:var(--blue); border-color:var(--blue); }
+
 /* #266 — la ligne de marqueur SÉLECTIONNÉE, dans la liste de pg-capture.
    Famille de défaut DIFFÉRENTE des boutons ci-dessus, et c'est ce qui l'avait
    fait manquer : .mkr-item.sel pose un fond (--orange-d, brun #3d2a08) et

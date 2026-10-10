@@ -135,15 +135,24 @@ export function valeursClaires(liste = REGLES) {
  * Les autres sélecteurs (descendants, pseudo-classes) sont ignorés : aucun ne
  * vise les éléments des trois fenêtres — test F9 le vérifie.
  */
-export function declarationsDeClasses(classes, claire, liste = REGLES) {
+//
+// #268 boutons — troisième forme, « body.theme-clair .page-claire .a » : ne
+// s'applique qu'aux éléments DANS une portée claire (dansPage). Un élément
+// sous body.theme-clair mais hors de toute .page-claire (fenêtre du groupe
+// B) ne la reçoit pas : dansPage = false avec claire = true.
+export function declarationsDeClasses(classes, claire, liste = REGLES, dansPage = claire) {
   const retenues = [];
   for (const r of liste)
     for (const sel of r.selecteurs) {
-      const m = sel.match(/^(body\.theme-clair )?((?:\.[a-zA-Z0-9_-]+)+)$/);
-      if (!m || (m[1] && !claire)) continue;
-      const cl = m[2].slice(1).split('.');
+      const m = sel.match(/^(body\.theme-clair )?(\.page-claire )?((?:\.[a-zA-Z0-9_-]+)+)$/);
+      if (!m || (m[1] && !claire) || (m[2] && !(m[1] && dansPage))) continue;
+      const cl = m[3].slice(1).split('.');
       if (!cl.every((c) => classes.includes(c))) continue;
-      retenues.push({ spec: cl.length + (m[1] ? 1.01 : 0), pos: r.pos, decl: r.decl });
+      retenues.push({
+        spec: cl.length + (m[1] ? 1.01 : 0) + (m[2] ? 1 : 0),
+        pos: r.pos,
+        decl: r.decl,
+      });
     }
   retenues.sort((a, b) => a.spec - b.spec || a.pos - b.pos);
   return Object.assign({}, ...retenues.map((r) => r.decl));
