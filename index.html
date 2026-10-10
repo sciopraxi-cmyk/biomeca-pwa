@@ -433,7 +433,7 @@
 <script src="js/landing.js"></script>
 </div>
 
-<div id="modal-mon-compte" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:none;align-items:center;justify-content:center;">
+<div id="modal-mon-compte" class="page-claire" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:none;align-items:center;justify-content:center;">
   <div style="background:var(--card);border-radius:16px;padding:28px;width:90%;max-width:420px;max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
       <div style="font-size:16px;font-weight:700;color:var(--blue);">👤 Mon compte</div>
@@ -443,13 +443,13 @@
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
       <div id="mc-avatar" style="width:52px;height:52px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0;"></div>
       <div>
-        <div id="mc-nom" style="font-size:15px;font-weight:700;color:var(--fg);"></div>
+        <div id="mc-nom" style="font-size:15px;font-weight:700;color:var(--txt);"></div>
         <div id="mc-email" style="font-size:12px;color:var(--mut);"></div>
         <div id="mc-titre" style="font-size:12px;color:var(--mut);margin-top:2px;"></div>
       </div>
     </div>
     <!-- Abonnement -->
-    <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:16px;">
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:16px;">
       <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Mon abonnement</div>
       <div id="mc-formule" style="font-size:14px;font-weight:600;color:var(--blue);"></div>
       <div id="mc-formule-desc" style="font-size:12px;color:var(--mut);margin-top:4px;"></div>
@@ -458,22 +458,22 @@
       <div id="mc-renouvellement" style="margin-top:4px;font-size:12px;color:var(--mut);"></div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
         <button onclick="gererAbonnement()" style="flex:1;background:var(--blue);color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">⚙️ Gérer l'abonnement</button>
-        <button onclick="changerFormule()" style="flex:1;background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:8px;border-radius:8px;font-size:12px;cursor:pointer;">🔄 Changer de formule</button>
+        <button onclick="changerFormule()" style="flex:1;background:var(--bg);border:1px solid var(--bord);color:var(--txt);padding:8px;border-radius:8px;font-size:12px;cursor:pointer;">🔄 Changer de formule</button>
       </div>
       <div id="mc-resilier-wrap" style="margin-top:8px;display:none;">
-        <button onclick="resilierAbonnement()" style="width:100%;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:8px;border-radius:8px;font-size:12px;cursor:pointer;">❌ Résilier l'abonnement</button>
+        <button onclick="resilierAbonnement()" style="width:100%;background:none;border:1px solid var(--red);color:var(--red);padding:8px;border-radius:8px;font-size:12px;cursor:pointer;">❌ Résilier l'abonnement</button>
         <div id="mc-resilier-msg" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center;"></div>
       </div>
     </div>
     <!-- Infos cabinet -->
     <div style="margin-bottom:16px;">
       <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Informations cabinet</div>
-      <div id="mc-cabinet" style="font-size:13px;color:var(--fg);"></div>
+      <div id="mc-cabinet" style="font-size:13px;color:var(--txt);"></div>
     </div>
     <!-- #229-A — Support technique (mailto, pas de dépendance backend) -->
     <div style="margin-bottom:16px;">
       <div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Assistance</div>
-      <a href="mailto:contact@verticy.fr?subject=Support%20Verticy" style="display:block;text-align:center;background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:9px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;">✉️ Contacter le support</a>
+      <a href="mailto:contact@verticy.fr?subject=Support%20Verticy" style="display:block;text-align:center;background:var(--bg);border:1px solid var(--bord);color:var(--txt);padding:9px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;">✉️ Contacter le support</a>
     </div>
     <!-- Actions -->
     <!-- Changer mot de passe -->
@@ -484,8 +484,8 @@
       <div id="mc-pwd-msg" style="display:none;margin-top:6px;font-size:12px;text-align:center;"></div>
     </div>
     <div style="display:flex;gap:10px;">
-      <button onclick="closeMonCompte()" style="flex:1;background:var(--bg2);border:1px solid var(--bord);padding:10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--fg);">Fermer</button>
-      <button onclick="closeMonCompte();pwaLogout();" style="flex:1;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Se déconnecter</button>
+      <button onclick="closeMonCompte()" style="flex:1;background:var(--bg);border:1px solid var(--bord);padding:10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--txt);">Fermer</button>
+      <button onclick="closeMonCompte();pwaLogout();" style="flex:1;background:none;border:1px solid var(--red);color:var(--red);padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Se déconnecter</button>
     </div>
   </div>
 </div>
@@ -588,10 +588,10 @@
   <span id="trial-banner-text"></span>
   &nbsp;·&nbsp;<span onclick="showSubscribeModal()" style="cursor:pointer;text-decoration:underline;">Choisir une formule</span>
 </div>
-<div id="trial-expired-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9998;align-items:center;justify-content:center;">
+<div id="trial-expired-overlay" class="page-claire" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9998;align-items:center;justify-content:center;">
   <div style="background:var(--card);border-radius:16px;padding:32px;max-width:400px;text-align:center;margin:auto;">
     <div style="font-size:36px;margin-bottom:14px;">⏰</div>
-    <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:8px;">Essai gratuit terminé</div>
+    <div style="font-size:17px;font-weight:700;color:var(--txt);margin-bottom:8px;">Essai gratuit terminé</div>
     <div style="font-size:13px;color:var(--mut);margin-bottom:20px;">Choisissez une formule pour continuer.</div>
     <button onclick="showSubscribeModal()" style="background:var(--blue);color:#fff;border:none;padding:12px 28px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">Voir les formules</button>
   </div>
@@ -3242,36 +3242,36 @@
 <!-- #140 Phase 0 — Modale d'âge présentée AVANT la création d'un bilan podopédiatrie.
      Auto-sélectionne la période à partir de la date de naissance (ou fallback
      saisie manuelle si ddn absente). L'utilisateur peut override via les 3 boutons. -->
-<div id="modal-podopediatrie-age" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;">
+<div id="modal-podopediatrie-age" class="page-claire" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;">
   <div style="background:var(--card);border-radius:16px;padding:24px;width:90%;max-width:460px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div style="font-size:16px;font-weight:700;color:#e11d48;">👶 Bilan Podopédiatrie</div>
+      <div style="font-size:16px;font-weight:700;color:var(--podo-encre);">👶 Bilan Podopédiatrie</div>
       <button onclick="_closePodopediatrieAgeModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">×</button>
     </div>
-    <div id="podopediatrie-age-info" style="font-size:13px;color:var(--fg);margin-bottom:16px;line-height:1.55;"></div>
-    <div id="podopediatrie-age-fallback" style="display:none;margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+    <div id="podopediatrie-age-info" style="font-size:13px;color:var(--txt);margin-bottom:16px;line-height:1.55;"></div>
+    <div id="podopediatrie-age-fallback" style="display:none;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <input id="podopediatrie-age-years" type="number" min="0" max="99" class="inp" style="width:80px;" placeholder="0"/>
         <span style="font-size:12px;color:var(--mut);">an(s)</span>
         <input id="podopediatrie-age-months" type="number" min="0" max="11" class="inp" style="width:80px;" placeholder="0"/>
         <span style="font-size:12px;color:var(--mut);">mois</span>
-        <button onclick="_updatePodopediatriePeriodeFromInput()" class="btn" style="margin-left:auto;background:#e11d48;color:#fff;font-size:11px;padding:6px 14px;">Calculer</button>
+        <button onclick="_updatePodopediatriePeriodeFromInput()" class="btn" style="margin-left:auto;background:var(--podo-encre);color:#fff;font-size:11px;padding:6px 14px;">Calculer</button>
       </div>
     </div>
     <div id="podopediatrie-periode-choice" style="display:none;margin-bottom:16px;">
       <div style="font-size:11px;color:var(--mut);margin-bottom:6px;">Période retenue (modifiable) :</div>
       <div style="display:flex;gap:8px;">
-        <button class="podo-periode-btn" data-periode="II"  onclick="_selectPodopediatriePeriode('II')"  style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:8px;cursor:pointer;">Période II<br><span style="font-size:9px;font-weight:400;">14 mois – 6 ans</span></button>
-        <button class="podo-periode-btn" data-periode="III" onclick="_selectPodopediatriePeriode('III')" style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:8px;cursor:pointer;">Période III<br><span style="font-size:9px;font-weight:400;">6 – 9 ans</span></button>
-        <button class="podo-periode-btn" data-periode="IV"  onclick="_selectPodopediatriePeriode('IV')"  style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:8px;cursor:pointer;">Période IV<br><span style="font-size:9px;font-weight:400;">≥ 9 ans</span></button>
+        <button class="podo-periode-btn" data-periode="II"  onclick="_selectPodopediatriePeriode('II')"  style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:8px;cursor:pointer;">Période II<br><span style="font-size:9px;font-weight:400;">14 mois – 6 ans</span></button>
+        <button class="podo-periode-btn" data-periode="III" onclick="_selectPodopediatriePeriode('III')" style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:8px;cursor:pointer;">Période III<br><span style="font-size:9px;font-weight:400;">6 – 9 ans</span></button>
+        <button class="podo-periode-btn" data-periode="IV"  onclick="_selectPodopediatriePeriode('IV')"  style="flex:1;padding:10px 6px;font-size:12px;font-weight:700;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:8px;cursor:pointer;">Période IV<br><span style="font-size:9px;font-weight:400;">≥ 9 ans</span></button>
       </div>
     </div>
-    <div id="podopediatrie-too-young" style="display:none;margin-bottom:16px;background:rgba(217,119,6,0.15);border:1px solid rgba(217,119,6,0.35);border-radius:8px;padding:12px;font-size:12px;color:#f9c874;line-height:1.5;">
+    <div id="podopediatrie-too-young" style="display:none;margin-bottom:16px;background:var(--encours-fond);border:1px solid var(--encours-trait);border-radius:8px;padding:12px;font-size:12px;color:var(--encours-encre);line-height:1.5;">
       ⚠️ Pas de bilan podopédiatrie avant 14 mois — stade 1 (la structure du pied est encore en cours de formation).
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button onclick="_closePodopediatrieAgeModal()" class="btn" style="background:transparent;color:var(--mut);border:1px solid rgba(255,255,255,0.15);padding:8px 14px;font-size:12px;">Annuler</button>
-      <button id="podopediatrie-age-confirm-btn" onclick="_confirmPodopediatrieOuvrir()" class="btn" style="background:#e11d48;color:#fff;padding:8px 16px;font-size:12px;font-weight:700;">Ouvrir le bilan</button>
+      <button onclick="_closePodopediatrieAgeModal()" class="btn" style="background:transparent;color:var(--mut);border:1px solid var(--bord);padding:8px 14px;font-size:12px;">Annuler</button>
+      <button id="podopediatrie-age-confirm-btn" onclick="_confirmPodopediatrieOuvrir()" class="btn" style="background:var(--podo-encre);color:#fff;padding:8px 16px;font-size:12px;font-weight:700;">Ouvrir le bilan</button>
     </div>
   </div>
 </div>
@@ -3353,7 +3353,7 @@
       <div id="backfill-count-display" style="font-size:14px;font-weight:600;color:var(--mut);margin-bottom:4px;">Cliquez « Compter à blanc » pour évaluer.</div>
       <div id="backfill-details" style="margin-bottom:12px;"></div>
       <button onclick="_runBackfillDryRun()" class="btn" style="background:#666;color:#fff;font-size:12px;padding:6px 14px;margin-right:8px;">📊 Compter à blanc</button>
-      <button onclick="_runBackfillExecution()" class="btn" style="background:#0e1f38;color:#fff;font-size:12px;padding:6px 14px;">🚀 Lancer la migration</button>
+      <button onclick="_runBackfillExecution()" class="btn" style="background:var(--verticy-bleu);color:#fff;font-size:12px;padding:6px 14px;">🚀 Lancer la migration</button>
     </div>
 
     <!-- #114-export — Export JSON complet (sauvegarde manuelle) -->
@@ -3362,7 +3362,7 @@
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
         Téléchargez une copie complète de tous vos patients et bilans (texte clinique, points posturaux, références photos). Conservez-la en lieu sûr et refaites-la régulièrement — c'est votre sauvegarde de secours.
       </p>
-      <button onclick="exportAllDataJSON()" class="btn" style="background:#0e1f38;color:#fff;font-size:12px;padding:6px 14px;">💾 Exporter toutes mes données</button>
+      <button onclick="exportAllDataJSON()" class="btn" style="background:var(--verticy-bleu);color:#fff;font-size:12px;padding:6px 14px;">💾 Exporter toutes mes données</button>
     </div>
 
     <!-- Modal lock UI pendant la migration (couvre l'écran, empêche tout clic) -->
@@ -3380,7 +3380,7 @@
       <div style="font-size:12px;color:var(--mut);margin-bottom:16px;">Créer, inviter ou révoquer l'accès à l'application.</div>
 
       <!-- Créer un accès -->
-      <div style="background:var(--bg2);border-radius:10px;padding:16px;margin-bottom:16px;">
+      <div style="background:var(--bg);border-radius:10px;padding:16px;margin-bottom:16px;">
         <div style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:12px;">Créer un accès</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
           <div><div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Prénom</div>
@@ -3678,7 +3678,7 @@
         <div class="stitle" style="margin:0;" id="cap-mkr-title">Marqueurs</div>
         <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="resetAllMarkers()">Réinitialiser</button>
       </div>
-      <div style="font-size:10px;color:var(--dim);margin-bottom:6px;">Cliquez pour sélectionner · Glissez pour déplacer</div>
+      <div style="font-size:10px;color:var(--mut);margin-bottom:6px;">Cliquez pour sélectionner · Glissez pour déplacer</div>
       <div id="cap-mkr-list"></div>
       <div class="sep"></div>
       <div class="stitle">Résultats</div>

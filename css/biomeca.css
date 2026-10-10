@@ -134,11 +134,21 @@ body.theme-clair{ background:#F6F7F9; }
    règle partagée avec .topbar : il est donc REMPLACÉ ici, pas supprimé
    ailleurs puis recréé. Le compte de règles de la feuille est inchangé pour
    une raison plus forte que la compensation — rien n'est ajouté ni retiré.
-   .topbar reste : ce n'est pas une page. */
+   .topbar reste : ce n'est pas une page.
+   #268 — #help-float (bouton flottant « Assistant ») non plus : attaché au
+   body, il n'est dans aucune page. Son fond en ligne lit
+   var(--verticy-bleu, #0e1f38) : la variable n'existe ici qu'en clair, le
+   repli garde sa couleur d'origine sur les pages sombres. */
 body.theme-clair .topbar,
-body.theme-clair .page-claire{
+body.theme-clair .page-claire,
+body.theme-clair #help-float{
   --bg:#F6F7F9; --surf:#FFFFFF; --card:#FFFFFF; --bord:#E4E8EE;
-  --txt:#0B1220; --mut:#6B7A90; --dim:#9AA5B5;
+  --txt:#0B1220; --mut:#5E6B7F; --dim:#9AA5B5;
+  /* #268 — --mut était #6B7A90 : 4,36:1 sur blanc, 4,07:1 sur --bg, sous le
+     seuil AA de 4,5:1 sur les deux fonds de la portée. #5E6B7F (choix B,
+     comparé à l'œil) : 5,40:1 et 5,04:1. --dim (2,49:1) ne sert plus qu'aux
+     boutons DÉSACTIVÉS, que le contraste n'oblige pas ; ses deux usages de
+     texte à lire sont passés sur --mut. */
   --verticy-bleu:#2563EB; --verticy-bleu-trait:#BBD0F7;
   --verticy-bleu-fond:#EEF4FF;
 }
@@ -304,6 +314,20 @@ body.theme-clair .bg,
 body.theme-clair .bb{ color:#FFFFFF; }
 body.theme-clair .btn-green:hover,
 body.theme-clair .btn-blue:hover{ color:#FFFFFF; }
+
+/* #268 — fond de .btn-blue en clair. Il restait --blue-d (#0d4a32, vert-bleu
+   très sombre), jamais redéfini en clair. On change la RÈGLE et non la
+   variable : --blue-d sert aussi .bb et les puces d'agenda, où le texte
+   --blue tomberait à 1,25:1 sur --verticy-bleu.
+   Portée .page-claire et non body.theme-clair : --verticy-bleu n'existe que
+   dans la portée claire ; un .btn-blue hors de toute .page-claire (fenêtre
+   « Choisir une formule ») recevrait une variable indéfinie, donc un fond
+   transparent. Texte blanc sur #2563EB : 5,17:1.
+   Le survol est écrit EXPLICITEMENT : à [0,3,1], la règle de base battrait
+   .btn-blue:hover [0,2,0] et le survol serait mort. Blanc sur --blue
+   (#175FA8 en clair) : 6,48:1. */
+body.theme-clair .page-claire .btn-blue{ background:var(--verticy-bleu); border-color:var(--verticy-bleu); }
+body.theme-clair .page-claire .btn-blue:hover{ background:var(--blue); border-color:var(--blue); }
 
 /* #266 — la ligne de marqueur SÉLECTIONNÉE, dans la liste de pg-capture.
    Famille de défaut DIFFÉRENTE des boutons ci-dessus, et c'est ce qui l'avait

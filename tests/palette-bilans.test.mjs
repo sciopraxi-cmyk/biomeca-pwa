@@ -490,7 +490,7 @@ const HTML = readFileSync(join(RACINE, 'index.html'), 'utf8');
 const CSS_ENTIER = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
 const JS_ENTIER = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
 
-// Les sept pages qui doivent porter la classe. pg-patients y est inclus :
+// Les onze pages qui doivent porter la classe. pg-patients y est inclus :
 // #258 l'avait scopée par identifiant, ce lot la migre vers le même
 // mécanisme que les six autres.
 const PAGES_CLAIRES = [
@@ -547,6 +547,13 @@ const PAGES_CLAIRES = [
 // page n'a aucune incidence sur leur lisibilité.
 const PAGES_SOMBRES = ['pg-pedicurie', 'pg-podopediatrie'];
 
+// #268-L1 — les fenêtres d'index.html passées en clair (racine page-claire).
+const FENETRES_CLAIRES_HTML = [
+  'modal-mon-compte',
+  'trial-expired-overlay',
+  'modal-podopediatrie-age',
+];
+
 // Extrait la valeur de class="…" de la balise portant cet identifiant.
 function classesDe(id) {
   const m = HTML.match(new RegExp(`<div class="([^"]*)" id="${id}"`));
@@ -554,7 +561,7 @@ function classesDe(id) {
 }
 
 describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
-  it('10. Les sept pages du lot portent page-claire', () => {
+  it('10. Les onze pages du lot portent page-claire', () => {
     let executes = 0;
     for (const id of PAGES_CLAIRES) {
       const cl = classesDe(id);
@@ -578,11 +585,31 @@ describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
     expect(executes).toBe(PAGES_SOMBRES.length);
   });
 
-  it('10c. Exactement sept balises portent la classe', () => {
-    // Compte d'occurrences, pas de lignes : une huitième page ajoutée
+  it('10c. Exactement les PAGES de la liste portent la classe (onze)', () => {
+    // Compte d'occurrences, pas de lignes : une page supplémentaire ajoutée
     // ailleurs dans le fichier échapperait aux deux listes ci-dessus.
-    const n = (HTML.match(/class="[^"]*\bpage-claire\b/g) || []).length;
-    expect(n).toBe(PAGES_CLAIRES.length);
+    // #268-L1 — le compte porte sur les PAGES (balises de classe « page ») :
+    // depuis ce lot, des FENÊTRES portent aussi page-claire, comptées à part
+    // par 10d. Compter toutes les balises mêlerait les deux et rendrait ce
+    // test aveugle à une page ajoutée compensée par une fenêtre retirée.
+    // Classes lues comme une LISTE : pg-patients porte aussi « active ».
+    const n = [...HTML.matchAll(/class="([^"]*)"/g)]
+      .map((m) => m[1].split(/\s+/))
+      .filter((cl) => cl.includes('page') && cl.includes('page-claire')).length;
+    expect(n, 'pages (classe « page ») portant page-claire').toBe(PAGES_CLAIRES.length);
+    const toutes = (HTML.match(/class="[^"]*\bpage-claire\b/g) || []).length;
+    expect(
+      toutes,
+      `balises portant page-claire = ${PAGES_CLAIRES.length} pages + ${FENETRES_CLAIRES_HTML.length} fenêtres`
+    ).toBe(PAGES_CLAIRES.length + FENETRES_CLAIRES_HTML.length);
+  });
+
+  it('10d. Les fenêtres d’index.html qui portent la classe, et seulement elles', () => {
+    // #268-L1 — groupe A arbitré le 10/10/2026. Trois fenêtres vivent dans
+    // index.html ; les sept autres sont construites par le script et vérifiées
+    // dans tests/fenetres-claires-268.test.mjs.
+    const ids = [...HTML.matchAll(/<div id="([^"]+)" class="page-claire"/g)].map((m) => m[1]);
+    expect(ids.sort()).toEqual([...FENETRES_CLAIRES_HTML].sort());
   });
 });
 

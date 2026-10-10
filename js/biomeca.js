@@ -1587,7 +1587,7 @@ async function changePassword() {
   const msg = document.getElementById('mc-pwd-msg');
   if(!pwd || pwd.length < 8) {
     msg.textContent = 'Minimum 8 caractères.';
-    msg.style.color = '#e74c3c';
+    msg.style.color = 'var(--red)';
     msg.style.display = 'block'; return;
   }
   try {
@@ -1599,16 +1599,16 @@ async function changePassword() {
     const d = await r.json();
     if(d.id) {
       msg.textContent = '✓ Mot de passe modifié avec succès.';
-      msg.style.color = '#2ecc71';
+      msg.style.color = 'var(--green)';
       document.getElementById('mc-new-pwd').value = '';
     } else {
       msg.textContent = d.msg || 'Erreur lors de la modification.';
-      msg.style.color = '#e74c3c';
+      msg.style.color = 'var(--red)';
     }
     msg.style.display = 'block';
   } catch(e) {
     msg.textContent = 'Erreur réseau.';
-    msg.style.color = '#e74c3c';
+    msg.style.color = 'var(--red)';
     msg.style.display = 'block';
   }
 }
@@ -2547,7 +2547,7 @@ function openAgendaEventModal(eventId, prefillLocal) {
   if (existing && existing.source === 'apple') {
     agCal.editingId = null;
     const overlay = document.createElement('div');
-    overlay.className = 'cal-event-modal-backdrop';
+    overlay.className = 'cal-event-modal-backdrop page-claire'; // #268-L1 — portée claire
     overlay.id = 'agenda-event-modal-backdrop';
     overlay.onclick = function (ev) {
       if (ev.target === overlay) closeAgendaEventModal();
@@ -2586,7 +2586,7 @@ function openAgendaEventModal(eventId, prefillLocal) {
   }
 
   const overlay = document.createElement('div');
-  overlay.className = 'cal-event-modal-backdrop';
+  overlay.className = 'cal-event-modal-backdrop page-claire'; // #268-L1 — portée claire
   overlay.id = 'agenda-event-modal-backdrop';
   overlay.onclick = function (ev) {
     if (ev.target === overlay) closeAgendaEventModal();
@@ -3116,6 +3116,7 @@ function showAccessRestrictedModal(reason) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'modal-access-restricted';
+    modal.className = 'page-claire'; // #268-L1 — portée claire sur la racine
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10001;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
     document.body.appendChild(modal);
     // Clic sur le backdrop = fermeture (cohérent avec les autres modales du code).
@@ -3128,7 +3129,7 @@ function showAccessRestrictedModal(reason) {
   modal.innerHTML = `
     <div style="background:var(--card);border-radius:14px;padding:28px;max-width:440px;width:100%;text-align:center;">
       <div style="font-size:38px;margin-bottom:14px;">🔒</div>
-      <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:8px;">
+      <div style="font-size:17px;font-weight:700;color:var(--txt);margin-bottom:8px;">
         Fonctionnalité réservée aux abonnés actifs
       </div>
       <div style="font-size:13px;color:var(--mut);margin-bottom:22px;line-height:1.5;">
@@ -4777,6 +4778,7 @@ function openEditUserModal(idx) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'modal-edit-user';
+    modal.className = 'page-claire'; // #268-L1 — portée claire sur la racine
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) closeEditUserModal(); });
@@ -4829,7 +4831,7 @@ function openEditUserModal(idx) {
         <div style="font-size:10px;color:var(--mut);margin-top:6px;">Override admin — pas de contrôle de cohérence avec la formule (responsabilité humaine).</div>
       </div>
 
-      <div id="eu-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:12px;padding:8px 10px;background:rgba(231,76,60,0.1);border-radius:6px;"></div>
+      <div id="eu-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:12px;padding:8px 10px;background:var(--red-d);border-radius:6px;"></div>
 
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button onclick="closeEditUserModal()" class="btn" style="font-size:12px;">Annuler</button>
@@ -5383,51 +5385,52 @@ function editPatient(idx) {
   if(modal) modal.remove();
   modal = document.createElement('div');
   modal.id = 'edit-patient-modal';
+  modal.className = 'page-claire'; // #268-L1 — portée claire sur la racine
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
   modal.innerHTML = `
-    <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
-      <div style="font-weight:700;font-size:16px;color:#2a7a4e;margin-bottom:16px;">✏️ Modifier le patient</div>
+    <div style="background:var(--card);border-radius:12px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
+      <div style="font-weight:700;font-size:16px;color:var(--green);margin-bottom:16px;">✏️ Modifier le patient</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <!-- #223-C — ordre calé sur l'export Doctolib, champs propres à
              Verticy à la fin. Le motif a été retiré : il vit dans chaque
              bilan (p.motif existant conservé, plus éditable ici). -->
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Civilité</div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Civilité</div>
           <select class="inp" id="ep-civilite">
             <option value="" ${!p.civilite?'selected':''}></option>
             <option ${p.civilite==='M.'?'selected':''}>M.</option>
             <option ${p.civilite==='Mme'?'selected':''}>Mme</option>
           </select></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Nom *</div><input class="inp" id="ep-nom" value="${_escHtml(p.nom||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Prénom *</div><input class="inp" id="ep-prenom" value="${_escHtml(p.prenom||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Date de naissance</div><input class="inp" type="date" id="ep-ddn" value="${_escHtml(p.ddn||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${_escHtml(p.email||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${_escHtml(p.tel||'')}"/></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Adresse</div><input class="inp" id="ep-adresse" value="${_escHtml(p.adresse||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Code postal</div><input class="inp" id="ep-cp" value="${_escHtml(p.cp||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Ville</div><input class="inp" id="ep-ville" value="${_escHtml(p.ville||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Type d'assurance</div><input class="inp" id="ep-assurance" value="${_escHtml(p.assurance||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${_escHtml(p.metier||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Médecin traitant</div><input class="inp" id="ep-medtraitant" value="${_escHtml(p.medecinTraitant||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Provenance</div><input class="inp" id="ep-provenance" value="${_escHtml(p.provenance||'')}"/></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Antécédents (traumatiques, médicaux, familiaux)</div><textarea class="inp" id="ep-antecedents" rows="2">${_escHtml(p.antecedents||'')}</textarea></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Examens réalisés</div><textarea class="inp" id="ep-examens" rows="2">${_escHtml(p.examens||'')}</textarea></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${_escHtml(p.sport||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Latéralité</div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom *</div><input class="inp" id="ep-nom" value="${_escHtml(p.nom||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prénom *</div><input class="inp" id="ep-prenom" value="${_escHtml(p.prenom||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance</div><input class="inp" type="date" id="ep-ddn" value="${_escHtml(p.ddn||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Email</div><input class="inp" id="ep-email" value="${_escHtml(p.email||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Téléphone</div><input class="inp" id="ep-tel" value="${_escHtml(p.tel||'')}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Adresse</div><input class="inp" id="ep-adresse" value="${_escHtml(p.adresse||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Code postal</div><input class="inp" id="ep-cp" value="${_escHtml(p.cp||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Ville</div><input class="inp" id="ep-ville" value="${_escHtml(p.ville||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Type d'assurance</div><input class="inp" id="ep-assurance" value="${_escHtml(p.assurance||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Métier</div><input class="inp" id="ep-metier" value="${_escHtml(p.metier||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin traitant</div><input class="inp" id="ep-medtraitant" value="${_escHtml(p.medecinTraitant||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Provenance</div><input class="inp" id="ep-provenance" value="${_escHtml(p.provenance||'')}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Antécédents (traumatiques, médicaux, familiaux)</div><textarea class="inp" id="ep-antecedents" rows="2">${_escHtml(p.antecedents||'')}</textarea></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Examens réalisés</div><textarea class="inp" id="ep-examens" rows="2">${_escHtml(p.examens||'')}</textarea></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Sport/Activité</div><input class="inp" id="ep-sport" value="${_escHtml(p.sport||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Latéralité</div>
           <select class="inp" id="ep-lat">
             <option ${(p.lat||'Droitier')==='Droitier'?'selected':''}>Droitier</option>
             <option ${p.lat==='Gaucher'?'selected':''}>Gaucher</option>
             <option ${p.lat==='Ambidextre'?'selected':''}>Ambidextre</option>
           </select></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Poids (kg)</div><input class="inp" id="ep-poids" value="${_escHtml(p.poids||'')}"/></div>
-        <div><div style="font-size:10px;color:#888;margin-bottom:3px;">Taille (cm)</div><input class="inp" id="ep-taille" value="${_escHtml(p.taille||'')}"/></div>
-        <div style="grid-column:1/-1;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Praticien</div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Poids (kg)</div><input class="inp" id="ep-poids" value="${_escHtml(p.poids||'')}"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Taille (cm)</div><input class="inp" id="ep-taille" value="${_escHtml(p.taille||'')}"/></div>
+        <div style="grid-column:1/-1;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien</div>
           <select class="inp" id="ep-prat">
             ${praticiens.map(pr => `<option value="${pr.id}" ${p.pratId===pr.id?'selected':''}>${_escHtml(pr.nom||'')} ${_escHtml(pr.prenom||'')} — ${_escHtml(pr.titre||'')}</option>`).join('')}
           </select></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px;">
-        <button class="btn" style="flex:1;background:#2a7a4e;" onclick="saveEditPatient(${idx})">💾 Sauvegarder</button>
-        <button class="btn" style="flex:1;background:#888;" onclick="document.getElementById('edit-patient-modal').remove()">Annuler</button>
+        <button class="btn" style="flex:1;background:var(--green);color:#fff;" onclick="saveEditPatient(${idx})">💾 Sauvegarder</button>
+        <button class="btn" style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);" onclick="document.getElementById('edit-patient-modal').remove()">Annuler</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -5473,6 +5476,7 @@ function openNewPatientModal() {
   if(!modal) {
     modal = document.createElement('div');
     modal.id = 'modal-new-patient';
+    modal.className = 'page-claire'; // #268-L1 — portée claire sur la racine
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
     modal.innerHTML = `
       <div style="background:var(--card);border-radius:14px;padding:24px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;">
@@ -6917,8 +6921,8 @@ function _renderPodopediatrieAgeModal() {
   // Peindre l'état actif du bouton période sélectionné.
   document.querySelectorAll('.podo-periode-btn').forEach(function (btn) {
     const active = (btn.dataset.periode === _pendingPodopediatriePeriode);
-    btn.style.background = active ? '#e11d48' : 'transparent';
-    btn.style.color = active ? '#fff' : '#e11d48';
+    btn.style.background = active ? 'var(--podo-encre)' : 'transparent';
+    btn.style.color = active ? '#fff' : 'var(--podo-encre)';
   });
 }
 
@@ -8375,7 +8379,7 @@ function renderMkrList() {
       <div class="mkr-dot" style="background:${m.color};"></div>
       ${m.side?`<span class="mkr-side ${m.side}">${m.side}</span>`:''}
       <span style="flex:1;font-size:11px;font-weight:500;">${_escHtml(m.name)}</span>
-      <span style="font-size:9px;color:var(--dim);font-family:var(--fm);">${m.x!==null?`${Math.round(m.x)},${Math.round(m.y)}`:'—'}</span>
+      <span style="font-size:9px;color:var(--mut);font-family:var(--fm);">${m.x!==null?`${Math.round(m.x)},${Math.round(m.y)}`:'—'}</span>
       <span>${m.x!==null?'<span class="badge bg">✓</span>':'<span class="badge bd">—</span>'}</span>
       ${_pointVerrouille(m)?`<span class="badge bo" title="Posé à la main : aucun calage automatique ne le déplace">🔒</span><button class="btn mkr-relacher" onclick="event.stopPropagation();relacherPoint(${i})" style="font-size:9px;padding:1px 5px;" title="Rendre ce point au calage automatique">Relâcher</button>`:'' /* #272-C */}
       ${m.x!==null?`<button class="mkr-del" onclick="event.stopPropagation();clearMkr(${i})" style="border:none;background:none;cursor:pointer;font-size:11px;">✕</button>`:''}
@@ -29718,7 +29722,9 @@ document.addEventListener('DOMContentLoaded', function() {
   floatBtn.innerHTML = '&#128172; Assistant'; // 💬 — convention des chats de support
   floatBtn.title = "Assistant d'aide Verticy";
   floatBtn.onclick = function() { showHelp(); toggleHelpChat(true); };
-  floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;height:44px;padding:0 18px;border-radius:22px;background:#0e1f38;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;gap:7px;';
+  // #268 — fond --verticy-bleu quand body.theme-clair est posé (#help-float
+  // est dans la règle de portée claire), repli #0e1f38 sur les pages sombres.
+  floatBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;height:44px;padding:0 18px;border-radius:22px;background:var(--verticy-bleu, #0e1f38);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;gap:7px;';
   document.body.appendChild(floatBtn);
   setTimeout(_injectMicButtons, 800);
 });
@@ -29924,9 +29930,9 @@ async function loadAbonnementInfo() {
       // « Mon compte » annonçait « ✅ Licence activée » au praticien pendant
       // que l'application lui refusait l'accès.
       if(userRecord.licence_payee === true) {
-        licenceEl.innerHTML = '<span style="color:#2a7a4e;font-weight:600;">✅ Licence activée</span>';
+        licenceEl.innerHTML = '<span style="color:var(--green);font-weight:600;">✅ Licence activée</span>';
       } else {
-        licenceEl.innerHTML = '<span style="color:#e74c3c;">⚠️ Licence non activée</span>';
+        licenceEl.innerHTML = '<span style="color:var(--red);">⚠️ Licence non activée</span>';
       }
     }
 
@@ -30327,9 +30333,9 @@ function _renderHelpList(filter) {
     if (!items.length) return;
     html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:14px 0 6px;">' + grp.theme + '</div>';
     items.forEach((it) => {
-      html += '<details style="background:var(--bg2);border:1px solid var(--bord);border-radius:8px;margin-bottom:6px;"' + (f ? ' open' : '') + '>';
-      html += '<summary style="padding:10px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--fg);">' + it.q + '</summary>';
-      html += '<div style="padding:0 12px 10px;font-size:12.5px;line-height:1.55;color:var(--fg);opacity:.9;">' + it.a + '</div>';
+      html += '<details style="background:var(--bg);border:1px solid var(--bord);border-radius:8px;margin-bottom:6px;"' + (f ? ' open' : '') + '>';
+      html += '<summary style="padding:10px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--txt);">' + it.q + '</summary>';
+      html += '<div style="padding:0 12px 10px;font-size:12.5px;line-height:1.55;color:var(--txt);opacity:.9;">' + it.a + '</div>';
       html += '</details>';
     });
   });
@@ -30344,16 +30350,17 @@ function showHelp() {
   closeHelp();
   const modal = document.createElement('div');
   modal.id = 'modal-help';
+  modal.className = 'page-claire'; // #268-L1 — portée claire sur la racine
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
   modal.innerHTML = `
     <div style="background:var(--card);border-radius:14px;padding:20px 22px;width:100%;max-width:620px;max-height:88vh;display:flex;flex-direction:column;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <div style="font-size:16px;font-weight:700;color:var(--fg);">❓ Aide Verticy</div>
+        <div style="font-size:16px;font-weight:700;color:var(--txt);">❓ Aide Verticy</div>
         <button onclick="closeHelp()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mut);">✕</button>
       </div>
       <input id="help-search" class="inp" placeholder="🔍 Rechercher (ex : import, rapport, logo, mot de passe...)" style="width:100%;margin-bottom:4px;font-size:13px;" oninput="document.getElementById('help-list').innerHTML=_renderHelpList(this.value)"/>
-      <button id="help-chat-toggle" onclick="toggleHelpChat()" style="background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:8px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:6px;">🤖 Poser une question à l'assistant</button>
-      <div id="help-chat" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px;border:1px solid var(--bord);border-radius:8px;padding:8px;background:var(--bg2);">
+      <button id="help-chat-toggle" onclick="toggleHelpChat()" style="background:var(--bg);border:1px solid var(--bord);color:var(--txt);padding:8px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:6px;">🤖 Poser une question à l'assistant</button>
+      <div id="help-chat" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px;border:1px solid var(--bord);border-radius:8px;padding:8px;background:var(--bg);">
         <div id="help-chat-msgs" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
         <div style="display:flex;gap:6px;">
           <input id="help-chat-input" class="inp" placeholder="Votre question sur le logiciel..." style="flex:1;font-size:12.5px;" onkeydown="if(event.key==='Enter'){event.preventDefault();sendHelpChat();}"/>
@@ -30362,7 +30369,7 @@ function showHelp() {
         <div style="font-size:10.5px;color:var(--mut);">Assistant limité à l'utilisation du logiciel — n'indiquez aucune donnée patient (nom, date de naissance, éléments médicaux…).</div>
       </div>
       <div id="help-list" style="overflow-y:auto;flex:1;padding-right:4px;">${_renderHelpList('')}</div>
-      <a href="mailto:contact@verticy.fr?subject=Support%20Verticy" style="display:block;text-align:center;background:var(--bg2);border:1px solid var(--bord);color:var(--fg);padding:9px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;margin-top:12px;">✉️ Question sans réponse ? Contacter le support</a>
+      <a href="mailto:contact@verticy.fr?subject=Support%20Verticy" style="display:block;text-align:center;background:var(--bg);border:1px solid var(--bord);color:var(--txt);padding:9px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;margin-top:12px;">✉️ Question sans réponse ? Contacter le support</a>
     </div>`;
   modal.addEventListener('click', (e) => { if (e.target === modal) closeHelp(); });
   document.body.appendChild(modal);
@@ -30398,7 +30405,7 @@ function _helpChatRender(typing) {
     const user = m.role === 'user';
     const style = user
       ? 'align-self:flex-end;background:var(--blue);color:#fff;'
-      : 'align-self:flex-start;background:var(--card);color:var(--fg);border:1px solid var(--bord);';
+      : 'align-self:flex-start;background:var(--card);color:var(--txt);border:1px solid var(--bord);';
     return '<div style="' + style + 'max-width:85%;padding:7px 10px;border-radius:10px;font-size:12.5px;line-height:1.45;white-space:pre-wrap;">' + _escHtml(m.content) + '</div>';
   };
   box.innerHTML = _helpChatMsgs.map(bubble).join('') + (typing ? '<div style="align-self:flex-start;color:var(--mut);font-size:12.5px;padding:4px 10px;">…</div>' : '');
