@@ -859,9 +859,11 @@ body.printing #rpt-print{display:block!important;}
 #pg-bilan .sport-tab{ background:transparent; color:#1f6fb0; border:1px solid #378ADD; }
 #pg-bilan .sport-tab.act{ background:#378ADD; color:#fff; border-color:#378ADD; }
 
-/* POSTURO = turquoise #2dd4bf (onglets : aujourd'hui non stylés) */
+/* POSTURO = turquoise #2dd4bf (onglets : aujourd'hui non stylés)
+   #268 — texte des onglets sur --posturo-encre : #0d9488 donnait 3,49:1 sur
+   le fond clair, l'encre 5,11:1. Bordure et onglet actif inchangés. */
 #pg-bilan-posturo .posturo-tab{
-  background:transparent; color:#0d9488; border:1px solid #2dd4bf;
+  background:transparent; color:var(--posturo-encre); border:1px solid #2dd4bf;
   border-radius:var(--rs); font-size:11px; padding:4px 10px; cursor:pointer;
   transition:background .12s,color .12s,border-color .12s;
 }
