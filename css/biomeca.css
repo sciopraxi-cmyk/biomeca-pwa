@@ -329,6 +329,20 @@ body.theme-clair .btn-blue:hover{ color:#FFFFFF; }
 body.theme-clair .page-claire .btn-blue{ background:var(--verticy-bleu); border-color:var(--verticy-bleu); }
 body.theme-clair .page-claire .btn-blue:hover{ background:var(--blue); border-color:var(--blue); }
 
+/* #268 — comparaison de bilans (pg-compare). Deux textes dont la couleur
+   doit différer selon le thème, sans valeur nouvelle : la valeur sombre
+   d'origine reste la règle de base, la portée claire la remplace.
+   - .cmp-alerte : « ⚠️ image(s) non rechargée(s) » — mention rouge clinique
+     (« existe mais rechargement échoué »). Sombre #fca5a5 (7,51:1 sur la
+     carte) ; clair --red (6,47:1). --red seul tomberait à 3,81:1 en sombre.
+   - .cmp-attenue : « — » d'image absente, consigne « Lignes surlignées… »,
+     messages d'attente. Sombre rgba(255,255,255,0.6) (6,06:1) ; clair --mut
+     (5,40:1). --mut seul tomberait à 3,50:1 en sombre. */
+.cmp-alerte{ color:#fca5a5; }
+.cmp-attenue{ color:rgba(255,255,255,0.6); }
+body.theme-clair .page-claire .cmp-alerte{ color:var(--red); }
+body.theme-clair .page-claire .cmp-attenue{ color:var(--mut); }
+
 /* #266 — la ligne de marqueur SÉLECTIONNÉE, dans la liste de pg-capture.
    Famille de défaut DIFFÉRENTE des boutons ci-dessus, et c'est ce qui l'avait
    fait manquer : .mkr-item.sel pose un fond (--orange-d, brun #3d2a08) et

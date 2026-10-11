@@ -68,6 +68,10 @@ ne prouve rien.
 
 Sous zsh, une variable qui contient plusieurs chemins n'est pas découpée :
 `prettier --check $F` reçoit UN seul argument. Écrire `${=F}`.
+Même chose pour `set -- $n` : écrire `set -- ${=n}`.
+
+Sous macOS, `cat` est `/bin/cat` (pas `/usr/bin/cat`, qui n'existe pas) :
+un témoin à 0 l'a révélé, le fichier assemblé n'avait inclus que le diff.
 
 ## Filets avant toute PR
 
@@ -81,7 +85,7 @@ tableau récapitulatif à la fin :
     rtk proxy node --check js/biomeca.js > /tmp/f5.txt 2>&1; EX5=$?
 
 Attendu : 0 erreur ESLint (les avertissements sont une dette connue),
-896 tests au vert, `tsc` muet.
+920 tests au vert, `tsc` muet.
 
 **La CI GitHub est la référence, pas la sortie locale.** Elle exécute les mêmes
 filets sur des runners neufs, hors de portée du proxy.
