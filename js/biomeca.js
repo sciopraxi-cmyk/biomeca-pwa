@@ -28097,7 +28097,7 @@ function renderCompare() {
   const content = document.getElementById('compare-content');
   if (!content) return;
   if (!currentPatient) {
-    content.innerHTML = '<div style="color:#888;font-style:italic;padding:8px 0;">Aucun patient sélectionné.</div>';
+    content.innerHTML = '<div class="cmp-attenue" style="font-style:italic;padding:8px 0;">Aucun patient sélectionné.</div>';
     return;
   }
   const selA = document.getElementById('compare-sel-a');
@@ -28106,7 +28106,7 @@ function renderCompare() {
   const a = _resolveCompareBilan(currentPatient, selA.value, _compareType);
   const b = _resolveCompareBilan(currentPatient, selB.value, _compareType);
   if (!a || !b) {
-    content.innerHTML = '<div style="color:#888;font-style:italic;padding:8px 0;">Sélectionnez 2 bilans à comparer.</div>';
+    content.innerHTML = '<div class="cmp-attenue" style="font-style:italic;padding:8px 0;">Sélectionnez 2 bilans à comparer.</div>';
     return;
   }
   // #117-podo/pédicurie — extracteur par type. podo/pédicurie passent par les
@@ -28171,7 +28171,7 @@ function renderCompare() {
     return mm ? parseFloat(mm[0].replace(',', '.')) : null;
   };
   const displayValue = (v) => v == null ? '—' : (v === '' ? '✓' : v);
-  let html = '<div style="font-size:11px;color:#888;margin-bottom:10px;font-style:italic;">Lignes surlignées = différences entre les deux bilans.</div>';
+  let html = '<div class="cmp-attenue" style="font-size:11px;margin-bottom:10px;font-style:italic;">Lignes surlignées = différences entre les deux bilans.</div>';
   // #199 — table-layout:fixed + largeurs explicites 30/35/35 : sans ça, les
   // colonnes A/B s'auto-dimensionnent sur leur contenu le plus large toutes
   // lignes confondues, et la colonne B (souvent des « — » courts) se retrouve
@@ -28179,13 +28179,13 @@ function renderCompare() {
   // border-left sur la colonne B = séparation visuelle réelle gauche/droite,
   // pas juste l'espacement des cellules (sport ET posturo, moteur commun).
   html += '<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;">';
-  html += '<thead><tr style="background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);text-align:left;">';
-  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);width:30%;">Champ</th>';
-  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);width:35%;word-wrap:break-word;">' + a.label + '</th>';
-  html += '<th style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.1);border-left:2px solid rgba(255,255,255,0.18);width:35%;word-wrap:break-word;">' + b.label + '</th>';
+  html += '<thead><tr style="background:var(--bg);color:var(--txt);text-align:left;">';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid var(--bord);width:30%;">Champ</th>';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid var(--bord);width:35%;word-wrap:break-word;">' + a.label + '</th>';
+  html += '<th style="padding:8px 10px;border-bottom:1px solid var(--bord);border-left:2px solid var(--bord);width:35%;word-wrap:break-word;">' + b.label + '</th>';
   html += '</tr></thead><tbody>';
   allTitles.forEach(titre => {
-    html += '<tr><td colspan="3" style="padding:10px 10px 6px;font-weight:700;color:#2a7a4e;background:rgba(45,212,191,0.06);border-top:1px solid rgba(255,255,255,0.08);">' + titre + '</td></tr>';
+    html += '<tr><td colspan="3" style="padding:10px 10px 6px;font-weight:700;color:var(--green);background:rgba(45,212,191,0.06);border-top:1px solid var(--bord);">' + titre + '</td></tr>';
     // Sections « ⚠️ … » : items = alertes complètes (noSplit), comparées en
     // présence/absence (✓ / —) plutôt qu'en clé-valeur.
     const noSplit = titre.indexOf('⚠') !== -1;
@@ -28216,23 +28216,23 @@ function renderCompare() {
         }
       }
       const rowStyle = different
-        ? 'background:#fff7ed;color:#1f2937;'
-        : 'color:rgba(255,255,255,0.85);';
+        ? 'background:#fff7ed;color:#1f2937;border-left:3px solid #9a3412;'
+        : 'color:var(--txt);';
       // Séparateur A/B teinté selon le fond de la ligne (blanc translucide sur
       // fond sombre par défaut, ambre foncé sur fond clair #fff7ed des lignes
       // différentes) — sinon invisible sur l'un des deux fonds.
-      const sepColor = different ? 'rgba(154,52,18,0.35)' : 'rgba(255,255,255,0.18)';
+      const sepColor = different ? 'rgba(154,52,18,0.35)' : 'var(--bord)';
       html += '<tr style="' + rowStyle + '">';
-      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);word-wrap:break-word;">' + label + '</td>';
-      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);word-wrap:break-word;">' + displayValue(valA) + '</td>';
-      html += '<td style="padding:6px 10px;border-top:1px solid rgba(255,255,255,0.05);border-left:2px solid ' + sepColor + ';word-wrap:break-word;">' + displayValue(valB) + deltaHtml + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid var(--bord);word-wrap:break-word;">' + label + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid var(--bord);word-wrap:break-word;">' + displayValue(valA) + '</td>';
+      html += '<td style="padding:6px 10px;border-top:1px solid var(--bord);border-left:2px solid ' + sepColor + ';word-wrap:break-word;">' + displayValue(valB) + deltaHtml + '</td>';
       html += '</tr>';
     });
   });
   html += '</tbody></table>';
   // #117-B — Section visuels (async : prefetch Storage + compositing). Rendu
   // différé sous le tableau, jeton anti-race sur changement de sélection.
-  html += '<div id="compare-visuals"><div style="color:rgba(255,255,255,0.4);font-style:italic;padding:12px 10px;">⏳ Chargement des visuels…</div></div>';
+  html += '<div id="compare-visuals"><div class="cmp-attenue" style="font-style:italic;padding:12px 10px;">⏳ Chargement des visuels…</div></div>';
   content.innerHTML = html;
   const token = ++_compareVisualsToken;
   _renderCompareVisuals(a, b, _compareType, token).catch((e) => {
@@ -28406,11 +28406,11 @@ async function _renderCompareVisuals(a, b, type, token) {
   if (!titles.length) { host.innerHTML = ''; return; }
   const cell = (cat) => {
     if (!cat || (!cat.imgs.length && !cat.ko)) {
-      return '<div style="color:rgba(255,255,255,0.4);font-style:italic;padding:8px 0;">—</div>';
+      return '<div class="cmp-attenue" style="font-style:italic;padding:8px 0;">—</div>';
     }
     let h = '';
     if (cat.ko > 0) {
-      h += '<div style="font-size:11px;font-weight:600;color:#fca5a5;margin-bottom:6px;">⚠️ ' + cat.ko + ' image(s) non rechargée(s) depuis le stockage</div>';
+      h += '<div class="cmp-alerte" style="font-size:11px;font-weight:600;margin-bottom:6px;">⚠️ ' + cat.ko + ' image(s) non rechargée(s) depuis le stockage</div>';
     }
     if (cat.imgs.length) {
       h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">' +
@@ -28419,15 +28419,15 @@ async function _renderCompareVisuals(a, b, type, token) {
     }
     return h;
   };
-  let html = '<div style="margin-top:18px;font-weight:700;color:#2a7a4e;padding:10px;background:rgba(45,212,191,0.06);border-top:1px solid rgba(255,255,255,0.08);">📷 Visuels</div>';
+  let html = '<div style="margin-top:18px;font-weight:700;color:var(--green);padding:10px;background:rgba(45,212,191,0.06);border-top:1px solid var(--bord);">📷 Visuels</div>';
   html += '<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;">';
   titles.forEach((t) => {
     const ca = va.find((c) => c.title === t);
     const cb = vb.find((c) => c.title === t);
-    html += '<tr><td colspan="2" style="padding:8px 10px 4px;color:rgba(255,255,255,0.6);font-size:12px;font-weight:600;">' + t + '</td></tr>';
+    html += '<tr><td colspan="2" style="padding:8px 10px 4px;color:var(--txt);font-size:12px;font-weight:600;">' + t + '</td></tr>';
     html += '<tr>';
     html += '<td style="width:50%;padding:4px 10px 12px;vertical-align:top;">' + cell(ca) + '</td>';
-    html += '<td style="width:50%;padding:4px 10px 12px;vertical-align:top;border-left:2px solid rgba(255,255,255,0.18);">' + cell(cb) + '</td>';
+    html += '<td style="width:50%;padding:4px 10px 12px;vertical-align:top;border-left:2px solid var(--bord);">' + cell(cb) + '</td>';
     html += '</tr>';
   });
   html += '</table>';

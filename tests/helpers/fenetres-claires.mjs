@@ -374,7 +374,14 @@ export function mesurerFenetre(racine, seuil = 4.5) {
       (['input', 'textarea', 'select', 'button', 'a'].includes(n.tag) && !sansTexte) ||
       PORTEURS_JS.test(n.attrs.id || '');
     if (porteur && n.tag !== 'option') {
-      const cr = resoudre(couleur, vals);
+      let cr = resoudre(couleur, vals);
+      // #268 comparaison — un TEXTE translucide (blanc à 0,85 du thème sombre)
+      // se lit composé sur son fond : sur blanc, il disparaît. On rend sa
+      // couleur effective au lieu de « indéterminé ».
+      if (cr === 'translucide' && /^#[0-9a-f]{6}$/.test(fond || '')) {
+        const c = translucide(couleur, vals);
+        if (c) cr = composer(c.slice(0, 3), c[3], fond);
+      }
       const ok = cr && cr !== 'aucune' && cr !== 'translucide' && fond && fond !== 'aucune';
       let ratio = null;
       let fondLu = fond;
@@ -390,6 +397,7 @@ export function mesurerFenetre(racine, seuil = 4.5) {
         fond: fondLu,
         degrade: fond && fond.degrade ? fond.degrade : null,
         ratio,
+        noeud: n, // #268 comparaison — l'élément mesuré, pour les tests ciblés
       });
     }
     for (const e of n.enfants) parcourir(e, couleur, fond, chemin + '/' + n.tag, [...ancetres, n]);
@@ -402,7 +410,9 @@ export function mesurerFenetre(racine, seuil = 4.5) {
 
 // ─── Structure, hors style et classes de thème ───
 
-const CLASSES_THEME = new Set(['page-claire']);
+// #268 comparaison — cmp-alerte et cmp-attenue portent la COULEUR selon le
+// thème (règles de la feuille) : classes de thème, ignorées comme page-claire.
+const CLASSES_THEME = new Set(['page-claire', 'cmp-alerte', 'cmp-attenue']);
 
 /** Liste à plat [balise, attributs triés hors style/thème, texte] pour comparer. */
 export function structure(racine) {
@@ -652,6 +662,142 @@ export function inventaireCouleurs(racine) {
     }
   }
   return inv;
+}
+
+// ─── #268 comparaison de bilans (pg-compare) ───
+//
+// La page est dans index.html (page-claire depuis #263) ; son contenu est
+// écrit par renderCompare puis, de façon asynchrone, par
+// _renderCompareVisuals. On exécute les VRAIES fonctions de rendu et de
+// résolution sur un patient FICTIF ; seules l'extraction des sections et la
+// collecte des images sont remplacées par des données synthétiques, qui
+// fixent les cas à mesurer : ligne identique, ligne différente (avec
+// delta), ligne absente d'un côté, image des deux côtés, image d'un seul
+// côté, image non rechargée.
+const SECTIONS_FICTIVES = {
+  sport: {
+    a: [
+      {
+        titre: 'Morphostatique',
+        items: ['Crête iliaque : G (plus bas)', 'Valgus genou : 4°', 'Hallux valgus : présent'],
+      },
+    ],
+    b: [{ titre: 'Morphostatique', items: ['Crête iliaque : G (plus bas)', 'Valgus genou : 7°'] }],
+  },
+  posturo: {
+    a: [
+      {
+        titre: '— Vestibulaire',
+        items: [
+          ['Romberg', 'latéralisé droite'],
+          ['Fukuda', 'rotation 30°'],
+        ],
+      },
+      {
+        titre: 'Buccal',
+        items: [
+          ['ATM', 'claquement'],
+          ['Serrage de dent', 'oui'],
+        ],
+      },
+    ],
+    b: [
+      {
+        titre: '— Vestibulaire',
+        items: [
+          ['Romberg', 'latéralisé droite'],
+          ['Fukuda', 'rotation 45°'],
+        ],
+      },
+      { titre: 'Buccal', items: [['ATM', 'claquement']] },
+    ],
+  },
+};
+const IMG = 'data:image/png;base64,AAAA';
+const VISUELS_FICTIFS = {
+  a: [
+    { title: 'Silhouettes morphostatiques', imgs: [IMG], ko: 0 },
+    { title: 'Empreinte plantaire', imgs: [IMG], ko: 0 },
+    { title: 'Plan de semelles', imgs: [], ko: 1 },
+  ],
+  b: [{ title: 'Silhouettes morphostatiques', imgs: [IMG], ko: 0 }],
+};
+
+/** Arbre de pg-compare rempli par renderCompare et _renderCompareVisuals (type 'sport' ou 'posturo'). */
+export async function rendreComparaison(type, html = HTML_ENTIER) {
+  const els = {};
+  const parId = (id) =>
+    els[id] || (els[id] = Object.assign(elementFactice('div'), { id, value: '' }));
+  parId('compare-sel-a').value = 'archive:0';
+  parId('compare-sel-b').value = 'current';
+  const document = {
+    getElementById: parId,
+    createElement: elementFactice,
+    body: { appendChild: (e) => e },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  const connus = {
+    document,
+    Math,
+    JSON,
+    Date,
+    String,
+    Number,
+    Array,
+    Object,
+    Promise,
+    console,
+    parseInt,
+    parseFloat,
+    isNaN,
+    setTimeout: () => 0,
+  };
+  const env = new Proxy(connus, {
+    has: () => true,
+    get: (t, k) => (k in t ? t[k] : k === Symbol.unscopables ? undefined : BOUCHON),
+  });
+  const cle =
+    type === 'posturo'
+      ? { arr: 'bilansPosturo', key: 'bilanDataPosturo' }
+      : { arr: 'bilansSport', key: 'bilanData' };
+  const donnees = (cote) => ({
+    __sections: SECTIONS_FICTIVES[type][cote],
+    __visuels: VISUELS_FICTIFS[cote],
+  });
+  const patient = {
+    nom: 'Fictif',
+    prenom: 'Prénom',
+    [cle.key]: donnees('b'),
+    [cle.arr]: [{ label: 'Bilan initial', date: '2026-01-01', [cle.key]: donnees('a') }],
+  };
+  const code = `
+    var currentPatient = ${JSON.stringify(patient)};
+    let _compareType = ${JSON.stringify(type)};
+    let _compareVisualsToken = 0;
+    function _extractSportSections(bd) { return bd.__sections; }
+    function _extractPosturoSections(bd) { return bd.__sections; }
+    async function _collectCompareVisuals(_t, bd) { return bd.__visuels; }
+    ${fonction('_resolveCompareBilan')}
+    ${fonction('_renderCompareVisuals')}
+    ${fonction('renderCompare')}
+    renderCompare();`;
+  // eslint-disable-next-line no-new-func
+  const f = new Function(
+    'env',
+    'tick',
+    `return (async () => { with (env) { ${code} } for (let i = 0; i < 6; i++) await tick(); })();`
+  );
+  await f(env, () => new Promise((r) => setImmediate(r)));
+  const visuels = els['compare-visuals'] ? els['compare-visuals'].innerHTML : '';
+  const contenu = els['compare-content'].innerHTML.replace(
+    /<div id="compare-visuals">[\s\S]*$/,
+    `<div id="compare-visuals">${visuels}</div>`
+  );
+  const page = sousArbreParId(analyser(html), 'pg-compare');
+  const hote = sousArbreParId(page, 'compare-content');
+  hote.enfants = analyser(contenu).enfants;
+  return page;
 }
 
 /** Racine (arbre) d'une fenêtre du registre, depuis le code courant. */
