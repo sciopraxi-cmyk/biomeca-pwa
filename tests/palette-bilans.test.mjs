@@ -490,7 +490,7 @@ const HTML = readFileSync(join(RACINE, 'index.html'), 'utf8');
 const CSS_ENTIER = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
 const JS_ENTIER = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
 
-// Les onze pages qui doivent porter la classe. pg-patients y est inclus :
+// Les treize pages qui doivent porter la classe. pg-patients y est inclus :
 // #258 l'avait scopée par identifiant, ce lot la migre vers le même
 // mécanisme que les six autres.
 const PAGES_CLAIRES = [
@@ -525,6 +525,10 @@ const PAGES_CLAIRES = [
   // vient de traiter sur le bouton de synthèse.
   'pg-rapport',
   'pg-rapport-posturo',
+  // #268 L3 — les deux derniers bilans. Leurs cartes colorées (orange,
+  // rose) restent telles quelles ; seule l'arrière-page passe en clair.
+  'pg-pedicurie',
+  'pg-podopediatrie',
 ];
 
 // Et celles qui ne doivent PAS l'avoir : les deux bilans du lot 3C.
@@ -545,7 +549,10 @@ const PAGES_CLAIRES = [
 // SUR le média, qui a son propre fond, et la surface de rendu (.canvas-wrap,
 // background:#060810) est un littéral que le thème n'atteint pas. Le fond de
 // page n'a aucune incidence sur leur lisibilité.
-const PAGES_SOMBRES = ['pg-pedicurie', 'pg-podopediatrie'];
+// #268 L3 — plus aucune page sombre : Pédicurie et Podopédiatrie, les deux
+// dernières, sont passées en clair. Le test 10b vérifie désormais que TOUTE
+// balise de classe « page » d'index.html porte page-claire.
+const PAGES_SOMBRES = [];
 
 // #268-L1 — les fenêtres d'index.html passées en clair (racine page-claire).
 const FENETRES_CLAIRES_HTML = [
@@ -561,7 +568,7 @@ function classesDe(id) {
 }
 
 describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
-  it('10. Les onze pages du lot portent page-claire', () => {
+  it('10. Les treize pages du lot portent page-claire', () => {
     let executes = 0;
     for (const id of PAGES_CLAIRES) {
       const cl = classesDe(id);
@@ -573,19 +580,21 @@ describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
     expect(executes).toBe(PAGES_CLAIRES.length);
   });
 
-  it('10b. Les pages hors périmètre ne l’ont PAS', () => {
-    // Sans cette moitié, poser la classe partout passerait le test 10.
-    let executes = 0;
-    for (const id of PAGES_SOMBRES) {
-      const cl = classesDe(id);
-      expect(cl, `${id} : balise introuvable`).not.toBeNull();
-      expect(cl, `${id} ne doit PAS porter page-claire`).not.toContain('page-claire');
-      executes++;
+  it('10b. Plus aucune page sombre dans index.html', () => {
+    // #268 L3 — la liste des pages sombres est vide : chaque balise de
+    // classe « page » porte page-claire, et aucune n'est hors de la liste.
+    expect(PAGES_SOMBRES).toEqual([]);
+    const pages = [...HTML.matchAll(/<div class="([^"]*)" id="(pg-[a-z0-9-]+)"/g)].filter((m) =>
+      m[1].split(/\s+/).includes('page')
+    );
+    expect(pages.length).toBe(PAGES_CLAIRES.length);
+    for (const [, cl, id] of pages) {
+      expect(PAGES_CLAIRES, `${id} hors de la liste`).toContain(id);
+      expect(cl.split(/\s+/), `${id} sans page-claire`).toContain('page-claire');
     }
-    expect(executes).toBe(PAGES_SOMBRES.length);
   });
 
-  it('10c. Exactement les PAGES de la liste portent la classe (onze)', () => {
+  it('10c. Exactement les PAGES de la liste portent la classe (treize)', () => {
     // Compte d'occurrences, pas de lignes : une page supplémentaire ajoutée
     // ailleurs dans le fichier échapperait aux deux listes ci-dessus.
     // #268-L1 — le compte porte sur les PAGES (balises de classe « page ») :
