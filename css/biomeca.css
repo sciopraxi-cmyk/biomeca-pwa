@@ -841,6 +841,11 @@ body.printing #rpt-print{display:block!important;}
 .sport-block-title.c-orange { color: #b7740a; }
 .sport-block-title.c-violet { color: #6c3483; }
 .sport-block-title.c-bleu   { color: #2471a3; }
+/* #268 L3 — titres de bloc de Pédicurie en encre de la famille. La classe
+   c-orange est PARTAGÉE avec Sport (pg-bilan, où une règle !important impose
+   déjà son bleu) : la règle globale ci-dessus ne change pas, celle-ci est
+   limitée à la page. #b7740a donnait 3,47:1 sur la carte orange. */
+#pg-pedicurie .sport-block-title.c-orange { color:var(--pedicurie-encre); }
 
 /* ───────── Pleine-card colorée façon posturo (Phase 1 #73-Socle) ───────── */
 /* Îlot thème clair scopé : redéfinit les tokens neutres sur les cards
@@ -958,7 +963,12 @@ body.printing #rpt-print{display:block!important;}
   font-size:12px; color:#222; cursor:pointer;
 }
 
-/* Ligne de boutons-radios. */
+/* Ligne de boutons-radios.
+   #268 L3 — boutons-radios et visages EVA : texte, contour et état
+   sélectionné en --podo-encre (#BE123C) ; #e11d48 donnait 3,92:1 au repos
+   sur la carte rose. Sélection pleine (blanc 6,29:1), repos en contour : les
+   deux états restent distincts. Une seule couleur d'identité, aucun code
+   par niveau de douleur. */
 .podo-radio-row {
   display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;
 }
@@ -968,8 +978,8 @@ body.printing #rpt-print{display:block!important;}
   position:relative;
   display:inline-flex; align-items:center; justify-content:center;
   padding:7px 14px;
-  border:1px solid #e11d48; border-radius:8px;
-  font-size:12px; font-weight:600; color:#e11d48; background:transparent;
+  border:1px solid var(--podo-encre); border-radius:8px;
+  font-size:12px; font-weight:600; color:var(--podo-encre); background:transparent;
   cursor:pointer; user-select:none; text-align:center; line-height:1.3;
   transition:background .12s, color .12s;
 }
@@ -977,7 +987,7 @@ body.printing #rpt-print{display:block!important;}
   position:absolute; opacity:0; pointer-events:none; margin:0;
   width:0; height:0;
 }
-.podo-radio-btn:has(input[type=radio]:checked) { background:#e11d48; color:#fff; }
+.podo-radio-btn:has(input[type=radio]:checked) { background:var(--podo-encre); color:#fff; }
 .podo-radio-btn:hover { background:rgba(225,29,72,0.08); }
 .podo-radio-btn:has(input[type=radio]:checked):hover { background:#c01640; }
 
@@ -986,8 +996,8 @@ body.printing #rpt-print{display:block!important;}
   position:relative;
   display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
   min-width:82px; padding:8px 4px;
-  border:1px solid #e11d48; border-radius:8px;
-  color:#e11d48; background:transparent;
+  border:1px solid var(--podo-encre); border-radius:8px;
+  color:var(--podo-encre); background:transparent;
   cursor:pointer; user-select:none; line-height:1.2;
   transition:background .12s, color .12s;
 }
@@ -997,7 +1007,7 @@ body.printing #rpt-print{display:block!important;}
 }
 .podo-eva-face .val  { font-size:16px; font-weight:700; }
 .podo-eva-face .lbl  { font-size:10px; margin-top:2px; }
-.podo-eva-face:has(input[type=radio]:checked) { background:#e11d48; color:#fff; }
+.podo-eva-face:has(input[type=radio]:checked) { background:var(--podo-encre); color:#fff; }
 .podo-eva-face:hover { background:rgba(225,29,72,0.08); }
 
 /* Bloc conditionnel (Localisation/horaire de la douleur si EVA > 0). */

@@ -247,6 +247,34 @@ export const REGLES_CIBLEES = [
       !['btn-red', 'btn-blue', 'btn-green'].some((c) => aClasse(n, c)) &&
       anc.some((a) => aClasse(a, 'posturo-draw-toolbar')),
   },
+  // #268 L3 — cartes colorées des bilans Pédicurie (et Sport) : sélecteur
+  // d'ATTRIBUT, avec texte et VARIABLES LOCALES (--txt, --mut, --surf, --bord).
+  {
+    selecteur: '.card[class*="sport-card-"]',
+    predicat: (n) => aClasse(n, 'card') && /(^|\s)sport-card-/.test(n.attrs.class || ''),
+  },
+  // #268 L3 — cartes roses de Podopédiatrie : fond en !important, texte et
+  // --mut LOCAL.
+  {
+    selecteur: '#pg-podopediatrie .card',
+    predicat: (n, anc) => aClasse(n, 'card') && anc.some((a) => a.attrs.id === 'pg-podopediatrie'),
+  }, // #268 L3 — titres de bloc : la règle de Sport (!important) et la règle
+  // limitée à la page Pédicurie. La classe c-orange est partagée par les deux
+  // pages ; seule la seconde règle touche Pédicurie.
+  {
+    selecteur: '#pg-bilan .sport-block-title[class*="c-"]',
+    predicat: (n, anc) =>
+      aClasse(n, 'sport-block-title') &&
+      /(^|\s)c-/.test(n.attrs.class || '') &&
+      anc.some((a) => a.attrs.id === 'pg-bilan'),
+  },
+  {
+    selecteur: '#pg-pedicurie .sport-block-title.c-orange',
+    predicat: (n, anc) =>
+      aClasse(n, 'sport-block-title') &&
+      aClasse(n, 'c-orange') &&
+      anc.some((a) => a.attrs.id === 'pg-pedicurie'),
+  },
 ];
 
 /** Déclarations de la règle de la feuille portant EXACTEMENT ce sélecteur ({} si absente). */
@@ -276,7 +304,10 @@ function proprietes(n, claire, ancetres = []) {
     ...importantes,
   };
   const fond = d['background-color'] ?? d.background;
-  return { fond: fond === undefined ? undefined : premiereCouleur(fond), couleur: d.color };
+  // #268 L3 — variables déclarées SUR l'élément (règles et style) : elles
+  // valent pour lui et toute sa descendance.
+  const vars = Object.fromEntries(Object.entries(d).filter(([k]) => k.startsWith('--')));
+  return { fond: fond === undefined ? undefined : premiereCouleur(fond), couleur: d.color, vars };
 }
 
 // Couleur portée par un raccourci « background » : var(...) ou rgb(...)
@@ -322,37 +353,45 @@ export function mesurerFenetre(racine, seuil = 4.5) {
   const vals = claire ? valeursClaires() : valeursRacine();
   const couleurDefaut = claire ? 'var(--txt)' : valeursRacine()['--txt'];
   const mesures = [];
-  const resolveur = (x) => {
-    const y = resoudre(x, vals);
-    return typeof y === 'string' && y.startsWith('#') ? y : null;
-  };
-  const parcourir = (n, couleurHeritee, fondHerite, chemin, ancetres = []) => {
+  // #268 L3 — en CSS, un enfant hérite de la couleur CALCULÉE chez son
+  // parent, pas de l'expression var(...) : la couleur est donc capturée avec
+  // les variables de l'élément qui la DÉCLARE ({ expr, vals }).
+  const parcourir = (n, couleurHeritee, fondHerite, chemin, ancetres = [], valsParent = vals) => {
     const p = proprietes(n, claire, ancetres);
+    const valsLocal = Object.keys(p.vars).length ? { ...valsParent, ...p.vars } : valsParent;
     const controle = CONTROLES[n.tag];
-    let couleur = controle ? '#000000' : couleurHeritee;
-    if (p.couleur !== undefined) couleur = p.couleur;
+    let couleur = controle ? { expr: '#000000', vals: valsLocal } : couleurHeritee;
+    if (p.couleur !== undefined) couleur = { expr: p.couleur, vals: valsLocal };
     let fond = controle || fondHerite;
     if (p.fond !== undefined) {
       const r =
-        p.fond === null ? null : /gradient\(/.test(p.fond) ? 'degrade' : resoudre(p.fond, vals);
+        p.fond === null
+          ? null
+          : /gradient\(/.test(p.fond)
+            ? 'degrade'
+            : resoudre(p.fond, valsLocal);
       if (r === 'degrade') {
-        fond = { degrade: p.fond };
+        fond = { degrade: p.fond, vals: valsLocal };
       } else if (r === 'translucide') {
         // Voile ou teinte : composé sur le fond de l'ANCÊTRE (celui qu'on
         // voit au travers), jamais ignoré — l'ignorer mesurait le rouge
         // d'erreur sur du blanc pur au lieu de sa teinte rosée.
-        const c = translucide(p.fond, vals);
+        const c = translucide(p.fond, valsLocal);
         if (c && fondHerite && fondHerite.degrade) {
           // #268 bilan Posturo — teinte posée sur un DÉGRADÉ : composée sur
           // chacun de ses arrêts ; un arrêt illisible rend le fond indéterminé.
           const { resolus, inconnus } = arretsDeDegrade(fondHerite.degrade, {
-            resoudre: resolveur,
+            resoudre: (x) => {
+              const y = resoudre(x, fondHerite.vals || vals);
+              return typeof y === 'string' && y.startsWith('#') ? y : null;
+            },
           });
           fond =
             inconnus.length || !resolus.length
               ? null
               : {
                   degrade: `linear-gradient(${resolus.map((a) => composer(c.slice(0, 3), c[3], a)).join(',')})`,
+                  vals: valsLocal,
                 };
         } else
           fond =
@@ -374,19 +413,24 @@ export function mesurerFenetre(racine, seuil = 4.5) {
       (['input', 'textarea', 'select', 'button', 'a'].includes(n.tag) && !sansTexte) ||
       PORTEURS_JS.test(n.attrs.id || '');
     if (porteur && n.tag !== 'option') {
-      let cr = resoudre(couleur, vals);
+      let cr = resoudre(couleur.expr, couleur.vals);
       // #268 comparaison — un TEXTE translucide (blanc à 0,85 du thème sombre)
       // se lit composé sur son fond : sur blanc, il disparaît. On rend sa
       // couleur effective au lieu de « indéterminé ».
       if (cr === 'translucide' && /^#[0-9a-f]{6}$/.test(fond || '')) {
-        const c = translucide(couleur, vals);
+        const c = translucide(couleur.expr, couleur.vals);
         if (c) cr = composer(c.slice(0, 3), c[3], fond);
       }
       const ok = cr && cr !== 'aucune' && cr !== 'translucide' && fond && fond !== 'aucune';
       let ratio = null;
       let fondLu = fond;
       if (ok && fond.degrade) {
-        const v = verdictDegrade(fond.degrade, cr, { resoudre: resolveur });
+        const v = verdictDegrade(fond.degrade, cr, {
+          resoudre: (x) => {
+            const y = resoudre(x, fond.vals || vals);
+            return typeof y === 'string' && y.startsWith('#') ? y : null;
+          },
+        });
         ratio = v.etat === 'INDÉTERMINÉ' ? null : v.pire;
         fondLu = `dégradé (pire arrêt ${v.pireArret || '?'})`;
       } else if (ok) ratio = contraste(cr, fond);
@@ -400,10 +444,11 @@ export function mesurerFenetre(racine, seuil = 4.5) {
         noeud: n, // #268 comparaison — l'élément mesuré, pour les tests ciblés
       });
     }
-    for (const e of n.enfants) parcourir(e, couleur, fond, chemin + '/' + n.tag, [...ancetres, n]);
+    for (const e of n.enfants)
+      parcourir(e, couleur, fond, chemin + '/' + n.tag, [...ancetres, n], valsLocal);
   };
   // Fond de départ : celui de la page claire, ou du body sombre.
-  parcourir(racine, couleurDefaut, resoudre(vals['--bg'], vals), '');
+  parcourir(racine, { expr: couleurDefaut, vals }, resoudre(vals['--bg'], vals), '');
   const defauts = mesures.filter((m) => m.ratio === null || m.ratio < seuil);
   return { claire, mesures, defauts };
 }
@@ -798,6 +843,265 @@ export async function rendreComparaison(type, html = HTML_ENTIER) {
   const hote = sousArbreParId(page, 'compare-content');
   hote.enfants = analyser(contenu).enfants;
   return page;
+}
+
+// ─── #268 L3 — documents de RAPPORT Pédicurie et Podopédiatrie ───
+//
+// Le document est construit par buildPedicurieRapportHTML /
+// buildPodopediatrieRapportHTML et rendu dans un iframe srcdoc : le thème de
+// l'application ne l'atteint pas. On fige son HTML (référence générée depuis
+// main) pour prouver qu'un lot de thème ne le modifie pas.
+// Données FICTIVES (patient et praticien) ; HORLOGE FIXE (date du jour et âge
+// lus par les constructeurs) ; aucune sauvegarde — les constructeurs n'en
+// appellent pas, et toute fonction absente du prélude est un bouchon neutre.
+const INSTANT_FIXE = Date.parse('2026-01-15T10:00:00Z');
+class DateFixe extends Date {
+  constructor(...a) {
+    super(...(a.length ? a : [INSTANT_FIXE]));
+  }
+  static now() {
+    return INSTANT_FIXE;
+  }
+}
+const PRATICIEN_FICTIF = {
+  id: 'prat-fictif',
+  nom: 'Praticien',
+  prenom: 'Fictif',
+  titre: 'Pédicure-podologue',
+  cabinet: 'Cabinet fictif',
+  adresse: '1 rue Fictive',
+  tel: '00 00 00 00 00',
+  email: 'praticien@exemple.invalid',
+};
+const patientFictif = (cle, donnees) => ({
+  nom: 'Fictif',
+  prenom: 'Prénom',
+  ddn: '2016-05-10',
+  pratId: 'prat-fictif',
+  sport: 'Football',
+  metier: 'Écolier',
+  lat: 'Droitier',
+  [cle]: donnees,
+});
+// Visuels synthétiques couvrant les trois états : 'ok', 'ko' (rechargement
+// échoué, mention rouge), 'nu' (jamais dessiné, silencieux).
+const IMG_FICTIVE = 'data:image/png;base64,AAAA';
+const VISUELS_PODO_FICTIFS = {
+  morpho: [
+    { key: 'face', label: 'Face', status: 'ok', dataUrl: IMG_FICTIVE },
+    { key: 'profilG', label: 'Profil G', status: 'ko', dataUrl: IMG_FICTIVE },
+    { key: 'profilD', label: 'Profil D', status: 'nu', dataUrl: IMG_FICTIVE },
+  ],
+  pieds: { status: 'ko', dataUrl: IMG_FICTIVE },
+  annotatedViews: [],
+};
+
+// Sections FICTIVES au format exact des collecteurs (seule la COLLECTE est
+// simulée) : vrais titres, plusieurs items, au moins une alerte.
+//   Pédicurie : kv() « <strong>Libellé</strong> : valeur », alerte sous la
+//   forme de chk(), grade retenu sous la forme du collecteur.
+//   Podopédiatrie : mêmes clés, drapeaux isAlerts / isMarche / isMorpho /
+//   isTraitement, alertes en <span> rouge du collecteur.
+const kvF = (l, v) => `<strong>${l}</strong> : ${v}`;
+const alertePed = (t) => `<span style="color:#c0392b;font-weight:600;">${t}</span>`;
+const alertePodo = (t) => `<span style="color:#b91c1c;font-weight:600;">${t}</span>`;
+export const SECTIONS_PEDICURIE_FICTIVES = [
+  {
+    titre: '📋 Anamnèse',
+    items: [
+      kvF('Motif', 'Douleur plantaire fictive'),
+      kvF('Profession', 'Profession fictive'),
+      alertePed('Diabète ⚠'),
+    ],
+  },
+  {
+    titre: '🔬 Examen dermatologique',
+    items: [kvF('Peau', 'Sèche'), kvF('Hyperkératose', 'Talon droit')],
+  },
+  {
+    titre: '🦶 Examen unguéal',
+    items: [kvF('Ongles', 'Épaissis'), kvF('Orteil', 'Hallux gauche')],
+  },
+  {
+    titre: '🩸 Dépistage vasculaire',
+    items: [
+      kvF('Pouls pédieux D', 'Perçu'),
+      kvF('Pouls pédieux G', 'Aboli'),
+      alertePed('Pouls aboli ⚠'),
+    ],
+  },
+  {
+    titre: '🧠 Dépistage neurologique',
+    items: [kvF('Monofilament D', 'Perçu'), kvF('Monofilament G', 'Non perçu')],
+  },
+  {
+    titre: '📊 Gradation du risque (HAS)',
+    items: [
+      alertePed('Neuropathie ⚠'),
+      '<span style="display:inline-block;background:rgba(217,119,6,0.12);border-left:4px solid #d97706;border-radius:4px;padding:3px 8px;font-weight:700;color:#1f2937;">Grade retenu : 2 — Grade fictif</span>',
+    ],
+  },
+  {
+    titre: '🦴 Morphostatique & chaussage',
+    items: [kvF('Déformations', 'Hallux valgus'), kvF('Chaussage', 'Inadapté')],
+  },
+  {
+    titre: '💊 Soins & projet thérapeutique',
+    items: [kvF('Soins réalisés', 'Soin fictif'), kvF('Conseils', 'Conseil fictif')],
+  },
+];
+export const SECTIONS_PODO_FICTIVES = [
+  {
+    titre: '📋 Interrogatoire',
+    items: [kvF('Motif', 'Motif fictif'), kvF('Douleur (EVA)', '4 — Légère')],
+  },
+  {
+    titre: '🧠 Réflexes archaïques',
+    items: [kvF('Réflexe de Babinski', 'Présent'), kvF('Grasping', 'Absent')],
+  },
+  { titre: '🚶 Marche', items: [kvF('Marche', 'Fluide'), kvF('Pas', 'Réguliers')], isMarche: true },
+  {
+    titre: '🦴 Morphostatique',
+    items: [kvF('Genu', 'Valgum'), kvF('Lombaire', 'Hyperlordose')],
+    isMorpho: true,
+  },
+  { titre: '👣 FPI', items: [kvF('FPI droit', '+6'), kvF('FPI gauche', '+4')] },
+  {
+    titre: '⚖️ Charge / Stabilité',
+    items: [kvF('Appui unipodal', 'Instable'), kvF('Trendelenburg', 'Négatif')],
+  },
+  {
+    titre: '🛌 Décharge',
+    items: [kvF('Antétorsion fémorale', '20°'), kvF('Torsion tibiale', '15°')],
+  },
+  { titre: '👟 Chaussure', items: [kvF('Chaussure', 'Adaptée'), kvF('Usure', 'Talon externe')] },
+  {
+    titre: '💊 Traitement',
+    items: [kvF('Semelles', 'Prescrites'), kvF('Conseils', 'Conseil fictif')],
+    isTraitement: true,
+  },
+  {
+    titre: '⚠️ Éléments à signaler',
+    items: [alertePodo('FPI hors norme'), alertePodo('Genu valgum marqué')],
+    isAlerts: true,
+  },
+  { titre: '📄 Conclusion', items: [kvF('Conclusion', 'Conclusion fictive')] },
+];
+
+async function executerRapport(code) {
+  const synthese = { innerHTML: '' };
+  const document = {
+    getElementById: (id) =>
+      id === 'pedicurie-synthese-result' ? synthese : id === 'pg-pedicurie' ? { id } : null,
+    createElement: elementFactice,
+    body: { appendChild: (e) => e },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  const connus = {
+    document,
+    Math,
+    JSON,
+    Date: DateFixe,
+    String,
+    Number,
+    Array,
+    Object,
+    Promise,
+    console,
+    isNaN,
+    parseInt,
+    parseFloat,
+    setTimeout: () => 0,
+  };
+  const env = new Proxy(connus, {
+    has: () => true,
+    get: (t, k) => (k in t ? t[k] : k === Symbol.unscopables ? undefined : BOUCHON),
+  });
+  // eslint-disable-next-line no-new-func
+  const f = new Function('env', `return (async () => { with (env) { ${code} } })();`);
+  return f(env);
+}
+
+/** HTML du document de rapport Pédicurie (données fictives, horloge fixe). */
+export async function rapportPedicurie() {
+  return executerRapport(`
+    var currentPatient = ${JSON.stringify(patientFictif('bilanDataPedicurie', {}))};
+    var praticiens = [${JSON.stringify(PRATICIEN_FICTIF)}];
+    function _collectPedicurieSections() { return ${JSON.stringify(SECTIONS_PEDICURIE_FICTIVES)}; }
+    ${fonction('_pedEscapeHtml')}
+    ${fonction('genererSynthesePedicurie')}
+    ${fonction('_pedInjectGalleryBlocks')}
+    ${fonction('_pratLogoBlockHTML')}
+    ${fonction('buildPedicurieRapportHTML')}
+    genererSynthesePedicurie();
+    return buildPedicurieRapportHTML();`);
+}
+
+/** HTML du document de rapport Podopédiatrie (données fictives, horloge fixe). */
+export async function rapportPodopediatrie() {
+  const donnees = { periode: 'III' };
+  return executerRapport(`
+    var currentPatient = ${JSON.stringify(patientFictif('bilanDataPodopediatrie', donnees))};
+    var praticiens = [${JSON.stringify(PRATICIEN_FICTIF)}];
+    ${fonction('_escHtml')}
+    ${fonction('_pratLogoBlockHTML')}
+    ${fonction('_formatAgeFromMonths')}
+    function _collectPodopediatrieSyntheseSections() { return ${JSON.stringify(SECTIONS_PODO_FICTIVES)}; }
+    ${fonction('_buildGalleryReportHTML')}
+    ${fonction('_renderPodoMorphoBlock')}
+    ${fonction('_renderPodoPostureBlock')}
+    ${fonction('_renderPodoPiedsBlock')}
+    async function _resolvePodoRapportImages() { return ${JSON.stringify(VISUELS_PODO_FICTIFS)}; }
+    ${fonction('buildPodopediatrieRapportHTML')}
+    return await buildPodopediatrieRapportHTML();`);
+}
+
+// ─── #268 L2 — vignette de capture posturale (_renderPostureSlot) ───
+// Une seule ligne source sert trois bilans : préfixes 'sp' (Sport), 'pp'
+// (Podopédiatrie), 'po' (Posturo). Rendu réel, image fictive.
+export function rendreSlotPosture(prefixe, vue = 'face') {
+  const slot = elementFactice('div');
+  slot.id = `${prefixe}-pc-slot-${vue}`;
+  const document = {
+    getElementById: (id) => (id === slot.id ? slot : null),
+    createElement: elementFactice,
+    body: { appendChild: (e) => e },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  const connus = {
+    document,
+    Math,
+    JSON,
+    Date,
+    String,
+    Number,
+    Array,
+    Object,
+    Promise,
+    console,
+    setTimeout: () => 0,
+  };
+  const env = new Proxy(connus, {
+    has: () => true,
+    get: (t, k) => (k in t ? t[k] : k === Symbol.unscopables ? undefined : BOUCHON),
+  });
+  const cle = '_posture' + vue.charAt(0).toUpperCase() + vue.slice(1);
+  // eslint-disable-next-line no-new-func
+  const f = new Function(
+    'env',
+    `with (env) {
+      ${tableau('POSTURE_VIEWS')}
+      function _getPostureBilanData() { return { ${JSON.stringify(cle)}: 'data:image/png;base64,AAAA' }; }
+      function _posturePointsTotal() { return 14; }
+      function _countPostureMarkers() { return 0; }
+      ${fonction('_renderPostureSlot')}
+      _renderPostureSlot(${JSON.stringify(prefixe)}, ${JSON.stringify(vue)});
+    }`
+  );
+  f(env);
+  return analyser(`<div class="pc-slot" id="${slot.id}">${slot.innerHTML}</div>`).enfants[0];
 }
 
 /** Racine (arbre) d'une fenêtre du registre, depuis le code courant. */

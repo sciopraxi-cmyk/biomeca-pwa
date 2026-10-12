@@ -9856,10 +9856,12 @@ function _renderPostureSlot(prefix, viewKey) {
   // matche image/heic|heif mais certains pickers se basent sur l'extension.
   const importInput = `<input type="file" accept="image/*,.heic,.heif" id="${importInputId}" onchange="importPostureView('${prefix}','${viewKey}',this)" style="display:none;">`;
   if (dataUrl) {
+    // #268 L2 — ↻ : var(--verticy-bleu, #0e1f38), bleu en portée claire,
+    // repli sur le bleu nuit d'origine. Vignette commune à sp, pp et po.
     slot.innerHTML = `<div style="font-size:10px;color:#666;margin-bottom:4px;font-weight:600;">${view.label}</div>
       <img src="${dataUrl}" style="max-width:100%;max-height:90px;border-radius:4px;display:block;margin:0 auto 4px;"/>
       <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
-        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" title="Re-capturer depuis la caméra" style="font-size:9px;padding:2px 6px;background:#0e1f38;color:#fff;">↻</button>
+        <button class="btn" onclick="capturePostureView('${prefix}','${viewKey}')" title="Re-capturer depuis la caméra" style="font-size:9px;padding:2px 6px;background:var(--verticy-bleu, #0e1f38);color:#fff;">↻</button>
         <label for="${importInputId}" title="Importer une image" style="font-size:9px;padding:2px 6px;background:#0e7490;color:#fff;border-radius:3px;cursor:pointer;display:inline-block;line-height:1.4;">⬆</label>
         ${placementBtn}
         <button class="btn" onclick="deletePostureView('${prefix}','${viewKey}')" title="Supprimer" style="font-size:9px;padding:2px 6px;background:#c0392b;color:#fff;">✕</button>
@@ -22248,9 +22250,10 @@ function showPodopediatrieSection(idx) {
   document.querySelectorAll('#pg-podopediatrie .podopediatrie-tab').forEach((t, i) => {
     if (!_isPodopediatrieSectionVisibleForPeriode(t, periode)) return; // laisse le display:none posé plus haut
     const active = (i === target);
-    t.style.background  = active ? '#e11d48' : 'transparent';
-    t.style.color       = active ? '#fff'    : '#e11d48';
-    t.style.borderColor = '#e11d48';
+    // #268 L3 — onglets en encre de la famille (--podo-encre), comme le balisage.
+    t.style.background  = active ? 'var(--podo-encre)' : 'transparent';
+    t.style.color       = active ? '#fff'    : 'var(--podo-encre)';
+    t.style.borderColor = 'var(--podo-encre)';
   });
   // #140 Phase 2a fix — Onglet Morphostatique : rafraîchit la suspicion
   // d'Achille court. podo_marche_talons peut avoir été modifié dans l'onglet
@@ -22346,9 +22349,11 @@ function showPedicurieSection(idx) {
   ['ped-dermato', 'ped-ongles', 'ped-chaussage'].forEach((g) => stopGalleryCamera(g));
   document.querySelectorAll('#pg-pedicurie .pedicurie-tab').forEach((t, i) => {
     const active = (i === idx);
-    t.style.background  = active ? '#d97706' : 'transparent';
-    t.style.color       = active ? '#fff'    : '#d97706';
-    t.style.borderColor = '#d97706';
+    // #268 L3 — onglet actif plein (--pedicurie-btn), les autres en contour
+    // (--pedicurie-encre), comme le balisage.
+    t.style.background  = active ? 'var(--pedicurie-btn)' : 'transparent';
+    t.style.color       = active ? '#fff'    : 'var(--pedicurie-encre)';
+    t.style.borderColor = active ? 'var(--pedicurie-btn)' : 'var(--pedicurie-encre)';
   });
   // #121 Phase 2b — Recalcule la suggestion à chaque bascule pour refléter
   // immédiatement les saisies des sections précédentes. Robuste si le bandeau

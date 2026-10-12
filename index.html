@@ -738,30 +738,30 @@
 </div>
 
 <!-- ══ PÉDICURIE (#121 Phase 1a — Anamnèse) ══ -->
-<div class="page" id="pg-pedicurie">
+<div class="page page-claire" id="pg-pedicurie">
   <div style="padding:16px 20px;max-width:900px;margin:0 auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
-      <h2 style="margin:0;font-size:18px;color:#d97706;flex:1;">✂️ Bilan Pédicurie</h2>
-      <button onclick="savePedicurieBilan()" class="btn" style="background:#d97706;color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
+      <h2 style="margin:0;font-size:18px;color:var(--pedicurie-encre);flex:1;">✂️ Bilan Pédicurie</h2>
+      <button onclick="savePedicurieBilan()" class="btn" style="background:var(--pedicurie-btn);color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
     </div>
-    <div id="pedicurie-patient-info" style="background:rgba(251,146,60,0.85);border:1px solid rgba(251,146,60,0.95);color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
+    <div id="pedicurie-patient-info" style="background:var(--pedicurie-btn);border:1px solid var(--pedicurie-btn);color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
       Aucun patient sélectionné
     </div>
 
     <!-- #121 Phase 1b — Barre d'onglets sections (sticky), miroir du bilan posturo en palette ambre.
          Tabs : style initial inactif (contour ambre) ; l'état actif est appliqué par showPedicurieSection. -->
     <div id="pedicurie-tabs" style="display:flex;gap:6px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0;margin-bottom:12px;z-index:5;border-bottom:1px solid rgba(217,119,6,0.18);">
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(0)" id="pdtab-0" style="font-size:11px;padding:5px 12px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📋 Anamnèse</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(1)" id="pdtab-1" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔬 Examen dermatologique</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(2)" id="pdtab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🦶 Ongles</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(3)" id="pdtab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🩸 Vasculaire</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(4)" id="pdtab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🧠 Neuro</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(5)" id="pdtab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📊 Gradation</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(6)" id="pdtab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🦴 Morpho/Chaussage</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(7)" id="pdtab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">💊 Soins</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(8)" id="pdtab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📄 Synthèse</button>
-      <button class="btn pedicurie-tab" onclick="showPedicurieSection(9)" id="pdtab-9" style="font-size:11px;padding:5px 12px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">📄 Rapport</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(0)" id="pdtab-0" style="font-size:11px;padding:5px 12px;background:var(--pedicurie-btn);color:#fff;border:1px solid var(--pedicurie-btn);border-radius:6px;cursor:pointer;">📋 Anamnèse</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(1)" id="pdtab-1" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">🔬 Examen dermatologique</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(2)" id="pdtab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">🦶 Ongles</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(3)" id="pdtab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">🩸 Vasculaire</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(4)" id="pdtab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">🧠 Neuro</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(5)" id="pdtab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">📊 Gradation</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(6)" id="pdtab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">🦴 Morpho/Chaussage</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(7)" id="pdtab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">💊 Soins</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(8)" id="pdtab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">📄 Synthèse</button>
+      <button class="btn pedicurie-tab" onclick="showPedicurieSection(9)" id="pdtab-9" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">📄 Rapport</button>
     </div>
 
     <!-- Section 1 — Anamnèse -->
@@ -771,13 +771,13 @@
 
         <!-- #226-B — date de consultation (auto-remplie à la date du jour
              par _fichePrefillApply, modifiable). -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Date de consultation</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Date de consultation</div>
         <div style="margin-bottom:12px;">
           <input type="date" class="inp pedicurie-field" data-field="ped_date_consult" style="max-width:220px;"/>
         </div>
 
         <!-- Sous-section : Motif de consultation -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Motif de consultation</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Motif de consultation</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 12px;margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_entretien"/> Entretien régulier</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_motif_douleur"/> Douleur</label>
@@ -796,7 +796,7 @@
         </div>
 
         <!-- Sous-section : Antécédents médicaux -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Antécédents médicaux</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Antécédents médicaux</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_diabete"/> Diabète</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcd_aomi"/> AOMI / artériopathie</label>
@@ -809,7 +809,7 @@
         </div>
         <!-- Précisions diabète (toujours visibles ; le sweep ne lit que les checked) -->
         <div style="background:rgba(217,119,6,0.06);border-left:3px solid #d97706;border-radius:6px;padding:8px 12px;margin-bottom:14px;">
-          <div style="font-size:11px;font-weight:600;color:#b7740a;margin-bottom:6px;">Si diabète — précisions :</div>
+          <div style="font-size:11px;font-weight:600;color:var(--pedicurie-encre);margin-bottom:6px;">Si diabète — précisions :</div>
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
             <span class="field-lbl" style="white-space:nowrap;color:#222;">Type :</span>
             <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_diabete_type" value="1"/> Type 1</label>
@@ -828,7 +828,7 @@
         </div>
 
         <!-- Sous-section : Antécédents podologiques -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Antécédents podologiques</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Antécédents podologiques</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_plaie"/> Antécédent de plaie</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_atcdp_plaie_4sem"/> Plaie &gt; 4 semaines</label>
@@ -839,7 +839,7 @@
         </div>
 
         <!-- Sous-section : Autonomie & habitudes -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Autonomie &amp; habitudes</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Autonomie &amp; habitudes</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
           <span class="field-lbl" style="white-space:nowrap;color:#222;">Autonomie soin des pieds :</span>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_autonomie" value="oui"/> Oui</label>
@@ -889,7 +889,7 @@
         </div>
 
         <!-- Sous-section : Traitements en cours (cases + autre texte) -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Traitements en cours</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Traitements en cours</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_anticoag"/> Anticoagulants</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_ttt_antiagregant"/> Antiagrégants</label>
@@ -904,7 +904,7 @@
         </div>
         <!-- #226-B — allergies : donnée de sécurité avant tout soin
              (latex, iode/antiseptiques, pansements...). -->
-        <div class="field-lbl" style="margin-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Allergies</div>
+        <div class="field-lbl" style="margin-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Allergies</div>
         <div>
           <input class="inp pedicurie-field" data-field="ped_allergies_txt" placeholder="Latex, iode, pansements, antiseptiques... (ou « aucune connue »)"/>
         </div>
@@ -934,7 +934,7 @@
         </div>
 
         <!-- Sous-section : Hyperkératoses -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Hyperkératoses</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Hyperkératoses</div>
 <div style="margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_durillon"/> Durillon (tylome)</label>
         </div>
@@ -961,7 +961,7 @@
         </div>
 
         <!-- Sous-section : Fissures & état cutané -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Fissures &amp; état cutané</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Fissures &amp; état cutané</div>
         <div style="margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;margin-bottom:4px;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_fissure"/> Fissures / crevasses</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;margin-left:22px;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_fissure_saignement"/> Profonde / saignement</label>
@@ -976,7 +976,7 @@
         </div>
 
         <!-- Sous-section : Espaces interdigitaux -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Espaces interdigitaux</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Espaces interdigitaux</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_intertrigo"/> Intertrigo</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_interdig_mycose"/> Mycose</label>
@@ -992,7 +992,7 @@
         </div>
 
         <!-- Sous-section : Lésions particulières -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Lésions particulières</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Lésions particulières</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_verrue"/> Verrue plantaire</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_derm_phlyctene"/> Phlyctène / bulle</label>
@@ -1003,7 +1003,7 @@
         </div>
 
         <!-- #121 Phase 1b — Trophicité en radios + cb dermite ocre -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Trophicité</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Trophicité</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
           <span class="field-lbl" style="white-space:nowrap;color:#222;">Coloration :</span>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_derm_trophicite" value="normale"/> Normale</label>
@@ -1050,7 +1050,7 @@
         <!-- #121 Phase 1c — Légende visible des abréviations. Référence principale ;
              les attributs title sur les <th> restent en bonus desktop (survol). -->
         <div style="font-size:10px;color:#666;line-height:1.55;margin-bottom:10px;padding:6px 10px;background:rgba(217,119,6,0.04);border-radius:6px;">
-          <strong style="color:#b7740a;">Légende :</strong>
+          <strong style="color:var(--pedicurie-encre);">Légende :</strong>
           <strong>Myc.</strong> = Onychomycose ·
           <strong>Épais.</strong> = Onychauxis / onychogryphose ·
           <strong>Décoll.</strong> = Onycholyse ·
@@ -1062,19 +1062,19 @@
         </div>
 
         <!-- Pied Droit -->
-        <div style="font-weight:700;color:#b7740a;margin:8px 0 4px;font-size:13px;">Pied Droit</div>
+        <div style="font-weight:700;color:var(--pedicurie-encre);margin:8px 0 4px;font-size:13px;">Pied Droit</div>
         <div style="overflow-x:auto;margin-bottom:6px;">
           <table style="width:100%;border-collapse:collapse;font-size:11px;color:#222;">
             <thead>
               <tr style="border-bottom:1px solid rgba(217,119,6,0.35);background:rgba(217,119,6,0.05);">
-                <th style="text-align:left;padding:5px 6px;font-weight:700;color:#b7740a;">Orteil</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onychomycose">Myc.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onychauxis / onychogryphose">Épais.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onycholyse">Décoll.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onychocryptose / ongle incarné">Incar.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Hématome sous-unguéal">Hémat.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Hypercourbure / ongle blessant">Courb.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Périonyxis">Périon.</th>
+                <th style="text-align:left;padding:5px 6px;font-weight:700;color:var(--pedicurie-encre);">Orteil</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onychomycose">Myc.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onychauxis / onychogryphose">Épais.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onycholyse">Décoll.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onychocryptose / ongle incarné">Incar.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Hématome sous-unguéal">Hémat.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Hypercourbure / ongle blessant">Courb.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Périonyxis">Périon.</th>
                 <th style="padding:5px 4px;font-weight:700;text-align:center;color:#c0392b;background:#ffeaea;" title="Lésion suspecte / mélanonychie">⚠</th>
               </tr>
             </thead>
@@ -1142,19 +1142,19 @@
         </div>
 
         <!-- Pied Gauche -->
-        <div style="font-weight:700;color:#b7740a;margin:8px 0 4px;font-size:13px;">Pied Gauche</div>
+        <div style="font-weight:700;color:var(--pedicurie-encre);margin:8px 0 4px;font-size:13px;">Pied Gauche</div>
         <div style="overflow-x:auto;margin-bottom:6px;">
           <table style="width:100%;border-collapse:collapse;font-size:11px;color:#222;">
             <thead>
               <tr style="border-bottom:1px solid rgba(217,119,6,0.35);background:rgba(217,119,6,0.05);">
-                <th style="text-align:left;padding:5px 6px;font-weight:700;color:#b7740a;">Orteil</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onychomycose">Myc.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onychauxis / onychogryphose">Épais.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onycholyse">Décoll.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Onychocryptose / ongle incarné">Incar.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Hématome sous-unguéal">Hémat.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Hypercourbure / ongle blessant">Courb.</th>
-                <th style="padding:5px 4px;font-weight:600;text-align:center;color:#b7740a;" title="Périonyxis">Périon.</th>
+                <th style="text-align:left;padding:5px 6px;font-weight:700;color:var(--pedicurie-encre);">Orteil</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onychomycose">Myc.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onychauxis / onychogryphose">Épais.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onycholyse">Décoll.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Onychocryptose / ongle incarné">Incar.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Hématome sous-unguéal">Hémat.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Hypercourbure / ongle blessant">Courb.</th>
+                <th style="padding:5px 4px;font-weight:600;text-align:center;color:var(--pedicurie-encre);" title="Périonyxis">Périon.</th>
                 <th style="padding:5px 4px;font-weight:700;text-align:center;color:#c0392b;background:#ffeaea;" title="Lésion suspecte / mélanonychie">⚠</th>
               </tr>
             </thead>
@@ -1229,7 +1229,7 @@
         <div class="sport-block-title c-orange">🩸 Dépistage vasculaire</div>
 
         <!-- Sous-section : Pouls -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Pouls périphériques</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Pouls périphériques</div>
         <div style="font-weight:600;color:#222;font-size:12px;margin-bottom:4px;">Pouls pédieux</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
           <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied D :</span>
@@ -1258,7 +1258,7 @@
         </div>
 
         <!-- Sous-section : Autres signes -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Autres signes</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Autres signes</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
           <span class="field-lbl" style="white-space:nowrap;color:#222;">TRC (temps de recoloration) :</span>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_trc" value="normal"/> Normal (&lt; 3 s)</label>
@@ -1276,7 +1276,7 @@
         </div>
 
         <!-- Sous-section : Conclusion vasculaire -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Conclusion vasculaire</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Conclusion vasculaire</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_conclusion" value="normale"/> Normale</label>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_vasc_conclusion" value="suspicion_aomi"/> Suspicion AOMI</label>
@@ -1291,7 +1291,7 @@
         <div class="sport-block-title c-orange">🧠 Dépistage neurologique</div>
 
         <!-- Sous-section : Monofilament 10 g -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Monofilament 10 g (Semmes-Weinstein)</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Monofilament 10 g (Semmes-Weinstein)</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
           <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied D :</span>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_mono_d" value="normal"/> Perçu partout</label>
@@ -1304,7 +1304,7 @@
         </div>
 
         <!-- Sous-section : Sensibilité vibratoire -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Sensibilité vibratoire (diapason 128 Hz)</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Sensibilité vibratoire (diapason 128 Hz)</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
           <span class="field-lbl" style="white-space:nowrap;color:#222;">Pied D :</span>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_vibra_d" value="normale"/> Normale</label>
@@ -1319,7 +1319,7 @@
         </div>
 
         <!-- Sous-section : Conclusion neurologique (alimentera la gradation HAS — Phase 2b) -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Conclusion neurologique</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Conclusion neurologique</div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_conclusion" value="absente"/> Pas de neuropathie</label>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_neuro_conclusion" value="presente"/> Neuropathie sensitive</label>
@@ -1333,7 +1333,7 @@
         <div class="sport-block-title c-orange">📊 Gradation du risque podologique (HAS)</div>
 
         <!-- Sous-section : Critère complémentaire -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Critère complémentaire</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Critère complémentaire</div>
         <div style="margin-bottom:10px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_grade_deformation"/> Déformation significative du pied (hallux valgus, griffes d'orteils, pied de Charcot…)</label>
         </div>
@@ -1343,12 +1343,12 @@
 
         <!-- Actions -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-          <button onclick="computePedicurieGrade()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;">↻ Recalculer</button>
-          <button onclick="applyPedicurieGradeSuggestion()" class="btn" style="font-size:12px;padding:6px 14px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">✓ Appliquer le grade suggéré</button>
+          <button onclick="computePedicurieGrade()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;">↻ Recalculer</button>
+          <button onclick="applyPedicurieGradeSuggestion()" class="btn" style="font-size:12px;padding:6px 14px;background:var(--pedicurie-btn);color:#fff;border:1px solid var(--pedicurie-btn);border-radius:6px;cursor:pointer;">✓ Appliquer le grade suggéré</button>
         </div>
 
         <!-- Sous-section : Grade retenu -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Grade retenu</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Grade retenu</div>
         <div style="display:flex;flex-direction:column;gap:5px;">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="0"/> <strong>0</strong> — population générale (pas de neuropathie, pas d'artériopathie)</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:#222;"><input type="radio" name="ped_grade_value" value="1"/> <strong>1</strong> — neuropathie OU artériopathie isolée</label>
@@ -1381,7 +1381,7 @@
         </div>
 
         <!-- Sous-section : Déformations -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Déformations</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Déformations</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_hallux_valgus"/> Hallux valgus</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_griffes"/> Griffes / marteaux d'orteils</label>
@@ -1392,7 +1392,7 @@
         </div>
 
         <!-- Sous-section : Zones d'hyperappui -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Zones d'hyperappui</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Zones d'hyperappui</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_appui_avant"/> Avant-pied</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_morpho_appui_medio"/> Médio-pied</label>
@@ -1401,7 +1401,7 @@
         </div>
 
         <!-- Sous-section : Examen du chaussage -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Examen du chaussage</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Examen du chaussage</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_usure_asym"/> Usure asymétrique</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_chaussex_usure_anormale"/> Usure anormale</label>
@@ -1422,7 +1422,7 @@
         <div class="sport-block-title c-orange">💊 Soins &amp; projet thérapeutique</div>
 
         <!-- Sous-section : Soins réalisés -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Soins réalisés</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Soins réalisés</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_abrasion"/> Abrasion hyperkératoses</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_soin_enucleation"/> Énucléation de cor</label>
@@ -1434,7 +1434,7 @@
         </div>
 
         <!-- Sous-section : Appareillages -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Appareillages</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Appareillages</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_appar_orthonyxie"/> Orthonyxie</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_appar_orthoplastie"/> Orthoplastie</label>
@@ -1443,7 +1443,7 @@
         </div>
 
         <!-- Sous-section : Conseils -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Conseils</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Conseils</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:14px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_hygiene"/> Hygiène</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_conseil_hydratation"/> Hydratation / émollients</label>
@@ -1454,7 +1454,7 @@
         </div>
 
         <!-- Sous-section : Suivi -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Suivi</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Suivi</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
           <div>
             <div class="field-lbl">Fréquence de suivi</div>
@@ -1474,7 +1474,7 @@
         </div>
 
         <!-- Sous-section : Adressage -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Adressage</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Adressage</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:6px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_adress_medecin"/> Médecin traitant</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_adress_diabeto"/> Diabétologue</label>
@@ -1486,7 +1486,7 @@
         </div>
 
         <!-- Sous-section : Consentement -->
-        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:#b7740a;">Consentement</div>
+        <div class="field-lbl" style="margin-top:6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Consentement</div>
         <div style="margin-bottom:14px;">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:#222;"><input type="checkbox" class="pedicurie-field" data-field="ped_consentement"/> Consentement du patient au projet thérapeutique</label>
         </div>
@@ -1504,7 +1504,7 @@
       <div class="card sport-card-orange">
         <div class="sport-block-title c-orange">📄 Synthèse</div>
         <div style="font-size:11px;color:#666;margin-bottom:10px;font-style:italic;">Compte-rendu généré à partir des champs renseignés. Seuls les éléments saisis sont repris.</div>
-        <div style="margin-bottom:12px;"><button onclick="genererSynthesePedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:#d97706;color:#fff;border:1px solid #d97706;border-radius:6px;cursor:pointer;">🔄 Générer la synthèse</button><button onclick="printRapportPedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;margin-left:6px;">🖨️ Imprimer / PDF</button><button onclick="envoyerRapportMail()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:#d97706;border:1px solid #d97706;border-radius:6px;cursor:pointer;margin-left:6px;">✉️ Envoyer par mail</button></div>
+        <div style="margin-bottom:12px;"><button onclick="genererSynthesePedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:var(--pedicurie-btn);color:#fff;border:1px solid var(--pedicurie-btn);border-radius:6px;cursor:pointer;">🔄 Générer la synthèse</button><button onclick="printRapportPedicurie()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;margin-left:6px;">🖨️ Imprimer / PDF</button><button onclick="envoyerRapportMail()" class="btn" style="font-size:12px;padding:6px 14px;background:transparent;color:var(--pedicurie-encre);border:1px solid var(--pedicurie-encre);border-radius:6px;cursor:pointer;margin-left:6px;">✉️ Envoyer par mail</button></div>
         <div id="pedicurie-synthese-result"></div>
       </div>
     </div>
@@ -1516,8 +1516,8 @@
     <div class="sport-section pedicurie-section" id="pdsec-10">
       <div class="card">
         <div style="padding:12px 16px;border-bottom:1px solid rgba(217,119,6,0.18);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <button onclick="envoyerRapportMail()" class="btn" style="background:#b7740a;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">✉️ Envoyer par mail</button>
-          <button id="ped-btn-print" onclick="printRapportPedicurie()" class="btn" style="background:#d97706;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
+          <button onclick="envoyerRapportMail()" class="btn" style="background:var(--pedicurie-encre);color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">✉️ Envoyer par mail</button>
+          <button id="ped-btn-print" onclick="printRapportPedicurie()" class="btn" style="background:var(--pedicurie-btn);color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
         </div>
         <!-- Fond BLANC : l'aperçu doit refléter le rendu PDF (le document
              rapport suppose body blanc, ses textes sombres seraient illisibles
@@ -1537,14 +1537,14 @@
 <!-- #140 Phase 0 — Bilan Podopédiatrie. Palette rose (identité #122).
      Coquille à onglets, sections vides — le contenu clinique arrive en phases
      suivantes. Le masquage périodique (data-periodes) est posé dès Phase 0. -->
-<div class="page" id="pg-podopediatrie">
+<div class="page page-claire" id="pg-podopediatrie">
   <div style="padding:16px 20px;max-width:900px;margin:0 auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
-      <h2 style="margin:0;font-size:18px;color:#e11d48;flex:1;">👶 Bilan Podopédiatrie</h2>
-      <button onclick="savePodopediatrieBilan()" class="btn" style="background:#e11d48;color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
+      <h2 style="margin:0;font-size:18px;color:var(--podo-encre);flex:1;">👶 Bilan Podopédiatrie</h2>
+      <button onclick="savePodopediatrieBilan()" class="btn" style="background:var(--podo-encre);color:#fff;font-size:13px;padding:6px 14px;">💾 Sauvegarder</button>
     </div>
-    <div id="podopediatrie-patient-info" style="background:rgba(225,29,72,0.85);border:1px solid rgba(225,29,72,0.95);color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
+    <div id="podopediatrie-patient-info" style="background:var(--podo-encre);border:1px solid var(--podo-encre);color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:15px;">
       Aucun patient sélectionné
     </div>
 
@@ -1556,18 +1556,18 @@
          sous-blocs [data-periodes] (ex. Romberg = « III IV », Maddox = « IV »)
          dans les phases de contenu à venir. -->
     <div id="podopediatrie-tabs" style="display:flex;gap:6px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0;margin-bottom:12px;z-index:5;border-bottom:1px solid rgba(225,29,72,0.18);">
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(0)" id="pdptab-0" style="font-size:11px;padding:5px 12px;background:#e11d48;color:#fff;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📋 Interrogatoire</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(1)" id="pdptab-1" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🧠 Réflexes</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(2)" id="pdptab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🚶 Marche</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(3)" id="pdptab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🦴 Morphostatique</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(4)" id="pdptab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">👣 FPI</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(5)" id="pdptab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">⚖️ Charge / Stabilité</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(6)" id="pdptab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">🛌 Décharge</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(7)" id="pdptab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">👟 Chaussure</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(8)" id="pdptab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">💊 Traitement</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(9)" id="pdptab-9" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📊 Synthèse</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(10)" id="pdptab-10" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📄 Conclusion</button>
-      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(11)" id="pdptab-11" style="font-size:11px;padding:5px 12px;background:transparent;color:#e11d48;border:1px solid #e11d48;border-radius:6px;cursor:pointer;">📄 Rapport</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(0)" id="pdptab-0" style="font-size:11px;padding:5px 12px;background:var(--podo-encre);color:#fff;border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">📋 Interrogatoire</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(1)" id="pdptab-1" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">🧠 Réflexes</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(2)" id="pdptab-2" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">🚶 Marche</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(3)" id="pdptab-3" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">🦴 Morphostatique</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(4)" id="pdptab-4" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">👣 FPI</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(5)" id="pdptab-5" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">⚖️ Charge / Stabilité</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(6)" id="pdptab-6" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">🛌 Décharge</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(7)" id="pdptab-7" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">👟 Chaussure</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(8)" id="pdptab-8" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">💊 Traitement</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(9)" id="pdptab-9" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">📊 Synthèse</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(10)" id="pdptab-10" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">📄 Conclusion</button>
+      <button class="btn podopediatrie-tab" data-periodes="II III IV" onclick="showPodopediatrieSection(11)" id="pdptab-11" style="font-size:11px;padding:5px 12px;background:transparent;color:var(--podo-encre);border:1px solid var(--podo-encre);border-radius:6px;cursor:pointer;">📄 Rapport</button>
     </div>
 
     <!-- Sections (vides en Phase 0). Chaque section porte les mêmes data-periodes
@@ -3224,7 +3224,7 @@
       <div class="card">
         <div style="padding:12px 16px;border-bottom:1px solid rgba(225,29,72,0.15);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <button onclick="envoyerRapportMail()" class="btn" style="background:#9f1239;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">✉️ Envoyer par mail</button>
-          <button id="podo-btn-print" onclick="printRapportPodopediatrie()" class="btn" style="background:#e11d48;color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
+          <button id="podo-btn-print" onclick="printRapportPodopediatrie()" class="btn" style="background:var(--podo-encre);color:#fff;font-size:12px;padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨 Imprimer / PDF</button>
         </div>
         <!-- Fond BLANC : aperçu fidèle au rendu PDF (miroir fix pédicurie). -->
         <div id="podopediatrie-rapport-body" style="padding:16px;font-size:13px;color:#333;background:#fff;border-radius:0 0 10px 10px;">
