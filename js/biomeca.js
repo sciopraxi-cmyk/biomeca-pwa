@@ -3754,6 +3754,9 @@ async function _lockSession() {
     if (activeId === 'pg-bilan' && typeof saveBilanSilent === 'function') saveBilanSilent();
     else if (activeId === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
     else if (activeId === 'pg-pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
+    // #277 — la Podopédiatrie manquait : un verrouillage sur son bilan ne
+    // sauvegardait rien de la saisie en cours.
+    else if (activeId === 'pg-podopediatrie' && typeof savePodopediatrieBilan === 'function') savePodopediatrieBilan(true);
   } catch (e) { /* priorité verrouillage — on ne bloque pas sur un save qui casse */ }
   sessionStorage.setItem('locked_by_idle', '1');
   sessionStorage.setItem('skip_logout_confirm', '1');
@@ -4567,7 +4570,14 @@ function nav(id) {
   const _leavingPage = document.querySelector('.page.active');
   const _leavingId = _leavingPage ? _leavingPage.id : null;
   if (_leavingId && _leavingId !== id) {
-    if (_leavingId === 'pg-bilan' && typeof saveBilanSilent === 'function') saveBilanSilent();
+    // #277 — vers la page d'un rapport : capture EN MÉMOIRE seulement. Générer
+    // un rapport ne déclenche JAMAIS de sauvegarde (CLAUDE.md) ; la saisie et le
+    // dessin restent persistés par l'autosave qu'ils ont programmé. Toute autre
+    // destination garde capture + sauvegarde (#116).
+    const _versRapport = id === 'pg-rapport' || id === 'pg-rapport-posturo';
+    if (_versRapport && _leavingId === 'pg-bilan') _capturerBilanSportEnMemoire();
+    else if (_versRapport && _leavingId === 'pg-bilan-posturo') _capturerBilanPosturoEnMemoire();
+    else if (_leavingId === 'pg-bilan' && typeof saveBilanSilent === 'function') saveBilanSilent();
     else if (_leavingId === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
     // #121 Phase 0 — capture-avant-quitter pédicurie (savePedicurieBilan non
     // async, silent — pas de migration Storage en Phase 0).
@@ -17353,7 +17363,10 @@ function _extractPosturoSections(d) {
 async function buildRapportPosturo() {
   const p = currentPatient;
   if(!p) return;
-  const d = p.bilanDataPosturo || {};
+  // #277 — copie de l'état COURANT prise une fois au départ : balayage du
+  // DOM si le bilan est affiché, attente d'une sauvegarde en cours. Le rapport
+  // ne lit plus l'objet vivant, qu'un autosave peut amputer de ses images.
+  const d = (await _capturerBilanPosturoEnMemoire()) || {};
   const prat = praticiens.find(pr => pr.id == p.pratId) || {};
   const logo = document.getElementById('imgjs-logo-sciopraxi')?.src || '';
 
@@ -17724,7 +17737,8 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = [], fichesFai
   if(age) bodyHtml += '<div class="metric"><div class="metric-val">'+age+'</div><div class="metric-lbl">ans</div></div>';
   if(p.poids) bodyHtml += '<div class="metric"><div class="metric-val">'+_escHtml(p.poids)+'</div><div class="metric-lbl">kg</div></div>';
   if(p.taille) bodyHtml += '<div class="metric"><div class="metric-val">'+_escHtml(p.taille)+'</div><div class="metric-lbl">cm</div></div>';
-  bodyHtml += '</div></div>';
+  // #277 — mention rouge si des images étaient encore en cours d'envoi.
+  bodyHtml += '</div></div>' + _mentionEnvoiEnCoursHTML('posturo');
 
   // SECTIONS
   sections.forEach(function(s, sidx) {
@@ -17864,17 +17878,15 @@ async function buildRapport() {
     document.getElementById('rpt-body').innerHTML='<div style="color:var(--mut);text-align:center;padding:20px;">Aucun patient sélectionné.</div>';
     return;
   }
-  // Fix rapport-sport-test-photos — AWAIT le cycle save complet AVANT de
-  // résoudre / rendre. Sans await, saveBilanSilent (async, async migrate +
-  // savePatients strip-restore) pouvait s'exécuter EN PARALLÈLE avec
-  // _resolveSportRapportImages (devenu async au #106), causant une race où le
-  // strip de p.mesures dataURLs pouvait coïncider avec leur lecture HTML.
-  // L'await garantit l'ordre : strip → persist → restore COMPLET avant lecture.
+  // #277 — Générer un rapport ne déclenche JAMAIS de sauvegarde (CLAUDE.md,
+  // incident du 25/07/2026) : l'état courant est lu par une capture EN
+  // MÉMOIRE (balayage du DOM, sans migration ni savePatients), qui attend la
+  // fin d'une sauvegarde déjà en cours (course d80c6c8, cf. _sauvegardesEnCours).
   // Puis prefetch Path-aware des photos de tests pour couvrir le cas où les
   // tests n'ont pas été ouverts dans la session (pas de prefetch déclenché par
   // launchTest L2302) → buildPrintPhotos voit les dataURLs et rend les images.
   try {
-    await saveBilanSilent();
+    await _capturerBilanSportEnMemoire();
     await _prefetchAllSportMesuresPhotos(currentPatient.mesures);
   } catch (e) {
     console.warn('[fix rapport-sport] save/prefetch a échoué :', e?.message);
@@ -18552,7 +18564,8 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   // #109-A4 — Les vues posturales annotées sont désormais injectées DANS la
   // sous-section Bilan Morphostatique (cf. buildBilanPrintSection ci-dessus),
   // juste après les silhouettes. Plus de bloc séparé entre bilanSection et annexes.
-  const bodyHTML = sectionsHTML + concluHTML + bilanSection + annexesHTML;
+  // #277 — mention rouge si des images étaient encore en cours d'envoi.
+  const bodyHTML = _mentionEnvoiEnCoursHTML('sport') + sectionsHTML + concluHTML + bilanSection + annexesHTML;
   return { pratHTML, patientHTML, bodyHTML };
 }
 
@@ -18563,13 +18576,11 @@ async function printReport() {
     return;
   }
   if(!currentPatient){alert('Aucun patient sélectionné.');return;}
-  // Fix rapport-sport-test-photos — AWAIT save complet + prefetch test photos
-  // avant rendu + window.print(). Sans cela, race possible entre saveBilanSilent
-  // async (strip-restore p.mesures) et _resolveSportRapportImages async (#106),
-  // plus PWA cold flow où launchTest n'a pas pré-rempli les dataURLs.
-  // L'await garantit que les dataURLs sont en RAM au moment de buildPrintPhotos.
+  // #277 — capture EN MÉMOIRE (jamais de sauvegarde pour imprimer), qui attend
+  // la fin d'une sauvegarde déjà en cours (course d80c6c8) ; puis prefetch des
+  // photos de tests (PWA cold flow où launchTest n'a pas pré-rempli les dataURLs).
   try {
-    await saveBilanSilent();
+    await _capturerBilanSportEnMemoire();
     await _prefetchAllSportMesuresPhotos(currentPatient.mesures);
   } catch (e) {
     console.warn('[fix rapport-sport] save/prefetch a échoué :', e?.message);
@@ -23807,29 +23818,36 @@ async function saveBilan() {
   // si saveBilan est appelé avant qu'une mesure ait été sauvegardée.
   if(!currentPatient.mesures) currentPatient.mesures = {};
   if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
-  const _postureStash = await migrateSportBilanDataPhotos(
-    bilanData, currentPatient.id, currentPatient.mesures._bilanId
-  );
+  // #277 — fenêtre de migration ouverte jusqu'à la restauration : une capture
+  // de rapport attend sa fin (cf. _sauvegardesEnCours).
+  const _fermerFenetre = _ouvrirFenetreSauvegarde('sport');
+  try {
+    const _postureStash = await migrateSportBilanDataPhotos(
+      bilanData, currentPatient.id, currentPatient.mesures._bilanId
+    );
 
-  currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
-  syncOpenedBilanToHistory();
-  savePatients();
-  // Restaure les dataUrls RAM pour preserve display sans re-fetch Storage
-  // (miroir restoreSportPhotosStash L3285 pour le flow mesures).
-  restoreSportBilanDataPhotosStash(bilanData, _postureStash);
-  // Fix #150 — Symétrise le restore sur currentPatient.bilanData. Le clone
-  // ci-dessus (post-migrate, pré-savePatients) capture les dataURLs strippées :
-  // sans ce second restore, currentPatient.bilanData conservait uniquement les
-  // Paths et le rapport devait re-fetcher Storage à chaque génération (hors
-  // ligne ou jeton expiré → rapport amputé). Placement strictement APRÈS
-  // savePatients() pour respecter la règle « on persiste la version allégée,
-  // puis on réhydrate en mémoire » (pattern podo/posturo).
-  // Sûr : _stripDataURLsForPersist (L2951, appelé en tête de savePatients avec
-  // try/finally L3069) strippe DÉFINITIVEMENT toute clé où Path ET dataURL
-  // coexistent — donc si un futur savePatients tourne avec ces dataURLs en RAM,
-  // elles sont enlevées AVANT sérialisation et restaurées après. Pas de leak
-  // possible dans localStorage, quel que soit le call-site.
-  restoreSportBilanDataPhotosStash(currentPatient.bilanData, _postureStash);
+    currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
+    syncOpenedBilanToHistory();
+    savePatients();
+    // Restaure les dataUrls RAM pour preserve display sans re-fetch Storage
+    // (miroir restoreSportPhotosStash L3285 pour le flow mesures).
+    restoreSportBilanDataPhotosStash(bilanData, _postureStash);
+    // Fix #150 — Symétrise le restore sur currentPatient.bilanData. Le clone
+    // ci-dessus (post-migrate, pré-savePatients) capture les dataURLs strippées :
+    // sans ce second restore, currentPatient.bilanData conservait uniquement les
+    // Paths et le rapport devait re-fetcher Storage à chaque génération (hors
+    // ligne ou jeton expiré → rapport amputé). Placement strictement APRÈS
+    // savePatients() pour respecter la règle « on persiste la version allégée,
+    // puis on réhydrate en mémoire » (pattern podo/posturo).
+    // Sûr : _stripDataURLsForPersist (L2951, appelé en tête de savePatients avec
+    // try/finally L3069) strippe DÉFINITIVEMENT toute clé où Path ET dataURL
+    // coexistent — donc si un futur savePatients tourne avec ces dataURLs en RAM,
+    // elles sont enlevées AVANT sérialisation et restaurées après. Pas de leak
+    // possible dans localStorage, quel que soit le call-site.
+    restoreSportBilanDataPhotosStash(currentPatient.bilanData, _postureStash);
+  } finally {
+    _fermerFenetre();
+  }
   alert('✓ Bilan clinique sauvegardé');
 }
 
@@ -24182,31 +24200,108 @@ function toggleDictaphone() {
 function printBilan() {
   // Gating task #57 — bloque l'impression si pas full access.
   // (printReport a aussi un early-return en double sécurité, mais on stop ici
-  // pour éviter saveBilanSilent inutile et le delay de 200ms.)
+  // pour éviter la capture inutile et le delay de 200ms.)
   if (window._accessLevel && window._accessLevel !== 'full') {
     showAccessRestrictedModal('export_pdf');
     return;
   }
-  // Sauvegarder d'abord tous les champs
-  saveBilanSilent();
+  // #277 — capture EN MÉMOIRE de tous les champs (jamais de sauvegarde
+  // pour imprimer) ; printReport capture à nouveau avant le rendu.
+  _capturerBilanSportEnMemoire();
   // Puis lancer l'impression du rapport complet
   setTimeout(() => printReport(), 200);
 }
 
-async function saveBilanSilent() {
-  // Même que saveBilan mais sans alert.
-  // #85 Phase 1 — async pour migrer les captures _postureXxx vers Storage AVANT
-  // savePatients (sinon dataURLs JPEG 1080p écrites en localStorage par les
-  // call-sites buildRapport/printReport/genererSyntheseSport → régression #35).
-  // Le sweep DOM → bilanData reste SYNCHRONE en début de fonction : les call-sites
-  // (qui n'awaitent pas) lisent bilanData RAM cohérent avec l'UI courante. La
-  // migration + savePatients s'exécutent en background (fire-and-forget côté caller),
-  // mais l'ordre interne sweep → migrate → savePatients → restore est strict.
-  if(!currentPatient) return;
-  if(!bilanData) bilanData = {};
-  // INVARIANT (fix #154) — cf. saveBilan pour la justification complète. En
-  // résumé : miroir strict de loadBilan ; range skippé si !_userDirty ; ajouter
-  // un champ nécessite de mettre à jour loadBilan en même temps.
+// ─── #277 — Un rapport lit l'état COURANT, sans jamais sauvegarder ───
+// Générer un rapport ne doit JAMAIS déclencher une sauvegarde (CLAUDE.md,
+// incident du 25/07/2026). Rapports, impressions et synthèses Sport/Posturo
+// lisent l'écran par une capture EN MÉMOIRE : même balayage du DOM que la
+// sauvegarde, sans migration Storage, sans savePatients, sans remettre
+// _userDirty à faux — l'autosave programmé par la frappe ou le tracé
+// sérialisera encore le dessin.
+//
+// Fenêtre de migration (course d80c6c8) : pendant une sauvegarde,
+// migratePhotoEntry retire de l'objet en mémoire chaque dataURL déjà envoyée
+// (Path posé), jusqu'à la restauration qui suit savePatients. Une capture
+// faite dans cette fenêtre lirait un bilan amputé de ses images : elle
+// ATTEND la fin des sauvegardes en cours — sans jamais en déclencher une.
+const _sauvegardesEnCours = { sport: new Set(), posturo: new Set() };
+// Attente BORNÉE : ni uploadPhotoBase64 ni authFetch n'ont de délai
+// d'expiration (fetch nu). Au-delà, le rapport est construit avec ce qui
+// est disponible, sous une mention ROUGE (cf. _mentionEnvoiEnCoursHTML).
+const DELAI_MAX_ATTENTE_SAUVEGARDE_MS = 15000;
+// Vrai quand la dernière capture a dû renoncer à attendre : lu par le rendu.
+const _captureExpiree = { sport: false, posturo: false };
+
+// Ouvre la fenêtre d'une sauvegarde ; la fonction rendue la referme.
+function _ouvrirFenetreSauvegarde(type) {
+  let fermer;
+  const fenetre = new Promise((ok) => { fermer = ok; });
+  _sauvegardesEnCours[type].add(fenetre);
+  return () => { _sauvegardesEnCours[type].delete(fenetre); fermer(); };
+}
+
+// Rend true quand toutes les fenêtres sont refermées, false si le délai expire.
+async function _attendreSauvegardesEnCours(type) {
+  if (!_sauvegardesEnCours[type].size) return true;
+  let minuteur;
+  const expiration = new Promise((ok) => {
+    minuteur = setTimeout(() => ok(false), DELAI_MAX_ATTENTE_SAUVEGARDE_MS);
+  });
+  const fin = (async () => {
+    while (_sauvegardesEnCours[type].size) await Promise.all([..._sauvegardesEnCours[type]]);
+    return true;
+  })();
+  const complet = await Promise.race([fin, expiration]);
+  clearTimeout(minuteur);
+  return complet;
+}
+
+// #277 — Mention ROUGE en tête de rapport quand la capture n'a pas pu attendre
+// la fin d'un envoi d'images : un rapport amputé ne doit jamais avoir l'air
+// normal (CLAUDE.md, distinction clinique).
+function _mentionEnvoiEnCoursHTML(type) {
+  if (!_captureExpiree[type]) return '';
+  return (
+    '<div style="page-break-inside:avoid;border:2px solid #c0392b;background:#fdecea;color:#7f1d1d;padding:10px 14px;margin:14px 24px;font-size:11px;border-radius:4px;">' +
+    '<b style="color:#c0392b;">⚠ Images en cours d\'envoi</b> — une sauvegarde envoyait encore des images de ce bilan au moment de la génération : certaines peuvent manquer à ce rapport. ' +
+    '<span style="font-weight:600;">Régénérez le rapport une fois l\'envoi terminé, avant remise au patient.</span></div>'
+  );
+}
+
+// Sport : balayage IMMÉDIAT (la saisie est lue avant que la page soit
+// masquée), puis clone dans currentPatient.bilanData une fois les fenêtres
+// de migration refermées.
+async function _capturerBilanSportEnMemoire() {
+  if (!currentPatient) return;
+  if (!bilanData) bilanData = {};
+  _balayerBilanSport();
+  const p = currentPatient;
+  _captureExpiree.sport = !(await _attendreSauvegardesEnCours('sport'));
+  if (currentPatient !== p) return; // patient changé pendant l'attente
+  p.bilanData = JSON.parse(JSON.stringify(bilanData));
+}
+
+// Posturo : balayage seulement si le bilan AFFICHÉ est pg-bilan-posturo (son
+// DOM est celui du patient ouvert) ; régénéré depuis la page du rapport, le
+// rapport lit la mémoire seule. Rend une COPIE prise après les fenêtres de
+// migration : le rapport ne lit plus l'objet vivant.
+async function _capturerBilanPosturoEnMemoire() {
+  const p = currentPatient;
+  if (!p) return null;
+  if (!p.bilanDataPosturo) p.bilanDataPosturo = {};
+  const actif = document.querySelector('.page.active');
+  if (actif && actif.id === 'pg-bilan-posturo') _balayerBilanPosturo(p.bilanDataPosturo);
+  _captureExpiree.posturo = !(await _attendreSauvegardesEnCours('posturo'));
+  return JSON.parse(JSON.stringify(p.bilanDataPosturo));
+}
+
+// #277 — Balayage DOM → bilanData du bilan Sport, SANS effet hors mémoire.
+// Partagé par la sauvegarde (saveBilanSilent) et la capture d'un rapport.
+// INVARIANT (fix #154) — cf. saveBilan pour la justification complète. En
+// résumé : miroir strict de loadBilan ; range skippé si !_userDirty ; ajouter
+// un champ nécessite de mettre à jour loadBilan en même temps.
+function _balayerBilanSport() {
   document.querySelectorAll('.bilan-field').forEach(el => {
     const field = el.dataset.field;
     if (!field) return;
@@ -24250,6 +24345,20 @@ async function saveBilanSilent() {
       delete bilanData._piedsPath;
     }
   }
+}
+
+async function saveBilanSilent() {
+  // Même que saveBilan mais sans alert.
+  // #85 Phase 1 — async pour migrer les captures _postureXxx vers Storage AVANT
+  // savePatients (sinon dataURLs JPEG 1080p écrites en localStorage par ses
+  // call-sites → régression #35).
+  // Le sweep DOM → bilanData reste SYNCHRONE en début de fonction : les call-sites
+  // (qui n'awaitent pas) lisent bilanData RAM cohérent avec l'UI courante. La
+  // migration + savePatients s'exécutent en background (fire-and-forget côté caller),
+  // mais l'ordre interne sweep → migrate → savePatients → restore est strict.
+  if(!currentPatient) return;
+  if(!bilanData) bilanData = {};
+  _balayerBilanSport();
   // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
   ['morpho-face','morpho-face2','morpho-profilG','morpho-profilD','pieds-canvas'].forEach(id => {
     const c = document.getElementById(id);
@@ -24258,19 +24367,26 @@ async function saveBilanSilent() {
   // #85 Phase 1 — migration Storage AVANT persistance (cf header de la fonction).
   if(!currentPatient.mesures) currentPatient.mesures = {};
   if(!currentPatient.mesures._bilanId) currentPatient.mesures._bilanId = crypto.randomUUID();
-  const _postureStash = await migrateSportBilanDataPhotos(
-    bilanData, currentPatient.id, currentPatient.mesures._bilanId
-  );
-  currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
-  syncOpenedBilanToHistory();
-  savePatients();
-  restoreSportBilanDataPhotosStash(bilanData, _postureStash);
-  // Fix #150 — cf saveBilan pour la justification complète. En résumé : clone
-  // appauvri capturé par currentPatient.bilanData → rapport doit re-fetcher
-  // Storage. Restore post-savePatients() safe grâce à _stripDataURLsForPersist
-  // (L2951, try/finally L3069) qui strippe toute clé Path+dataURL avant
-  // sérialisation.
-  restoreSportBilanDataPhotosStash(currentPatient.bilanData, _postureStash);
+  // #277 — fenêtre de migration ouverte jusqu'à la restauration : une capture
+  // de rapport attend sa fin (cf. _sauvegardesEnCours).
+  const _fermerFenetre = _ouvrirFenetreSauvegarde('sport');
+  try {
+    const _postureStash = await migrateSportBilanDataPhotos(
+      bilanData, currentPatient.id, currentPatient.mesures._bilanId
+    );
+    currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData));
+    syncOpenedBilanToHistory();
+    savePatients();
+    restoreSportBilanDataPhotosStash(bilanData, _postureStash);
+    // Fix #150 — cf saveBilan pour la justification complète. En résumé : clone
+    // appauvri capturé par currentPatient.bilanData → rapport doit re-fetcher
+    // Storage. Restore post-savePatients() safe grâce à _stripDataURLsForPersist
+    // (L2951, try/finally L3069) qui strippe toute clé Path+dataURL avant
+    // sérialisation.
+    restoreSportBilanDataPhotosStash(currentPatient.bilanData, _postureStash);
+  } finally {
+    _fermerFenetre();
+  }
 }
 
 // #147 — Reset MINIMAL sur le canvas pieds sport (motif clearPodoPieds).
@@ -26405,7 +26521,8 @@ function togglePostureLater(checked) {
 }
 
 async function genererSynthese() {
-  await savePosturoBilan(true);
+  // #277 — capture EN MÉMOIRE : une synthèse n'écrit jamais.
+  await _capturerBilanPosturoEnMemoire();
   const d = currentPatient?.bilanDataPosturo || {};
   const sections = [];
 
@@ -27843,7 +27960,8 @@ function _renderSportSyntheseHTML(sections) {
 // HTMLForRapport avec readers bd-based + SANS unshift Mesures (cf bloc autonome
 // printReport L5757, conservé pour le rapport).
 function genererSyntheseSport() {
-  saveBilanSilent();
+  // #277 — capture EN MÉMOIRE (balayage synchrone) : une synthèse n'écrit jamais.
+  _capturerBilanSportEnMemoire();
   const d = bilanData || {};
   const readersDOM = {
     rad: name => document.querySelector('input[name="' + name + '"]:checked')?.value,
@@ -28987,10 +29105,10 @@ function setPosturoRadio(name, val) {
 function getPoVal(id) { const e=document.getElementById(id); return e?e.value:''; }
 function setPoVal(id, v) { const e=document.getElementById(id); if(e) e.value=v||''; }
 
-async function savePosturoBilan(silent = false) {
-  if(!currentPatient) { alert('Sélectionnez un patient'); return; }
-  if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
-  const d = currentPatient.bilanDataPosturo;
+// #277 — Balayage DOM → d (bilanDataPosturo) du bilan Posturo, SANS effet
+// hors mémoire. Partagé par la sauvegarde (savePosturoBilan) et la capture
+// d'un rapport ou d'une synthèse.
+function _balayerBilanPosturo(d) {
   // bilanId stable pour scoper les paths Storage. Ne ré-écrit pas un id legacy
   // (timestamp ou autre) déjà présent — garantit la compat avec l'existant.
   if (!d.id) d.id = crypto.randomUUID();
@@ -29270,6 +29388,15 @@ async function savePosturoBilan(silent = false) {
     }
   }
   // Sinon (fc absent OU _userDirty=false) : aucune écriture, aucune suppression.
+}
+
+async function savePosturoBilan(silent = false) {
+  // #277 — silencieux (autosave, nav, verrouillage) : jamais d'alerte, même
+  // sans patient ; seul le bouton prévient.
+  if(!currentPatient) { if(!silent) alert('Sélectionnez un patient'); return; }
+  if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
+  const d = currentPatient.bilanDataPosturo;
+  _balayerBilanPosturo(d);
   // #99 + Bug édition perdue — reset _userDirty pour body/feet posturo APRÈS sweep.
   // Prépare le prochain cycle d'édition (un nouveau mouseup re-marquera dirty).
   ['posturo-body-canvas','posturo-feet-canvas'].forEach(id => {
@@ -29281,17 +29408,24 @@ async function savePosturoBilan(silent = false) {
   // en RAM post-save (édition continue sans re-fetch). Best-effort : si
   // une migration échoue, la dataUrl reste dans `d` et sera retentée au
   // prochain save.
-  const photoStash = await migratePosturoPhotos(d, currentPatient.id, d.id);
-  // Si on édite un bilan archivé (ouvert via ouvrirBilanPosturo), synchroniser
-  // ses modifications vers son entrée dans bilansPosturo[]. Mirror sport.
-  // Sinon (bilan en cours, pas encore archivé), ne rien écrire dans bilansPosturo[]
-  // — la sauvegarde se fait dans currentPatient.bilanDataPosturo (déjà à jour via `d`).
-  syncOpenedBilanPosturoToHistory();
-  savePatients();
-  // Restaurer les dataUrls migrées en RAM pour conserver l'affichage actuel
-  // (img.src / canvas) sans nouveau fetch. Les clés non migrées (ex. échec
-  // upload) ne sont pas écrasées car d[k] est déjà présent.
-  Object.assign(d, photoStash);
+  // #277 — fenêtre de migration ouverte jusqu'à la restauration : une capture
+  // de rapport attend sa fin (cf. _sauvegardesEnCours).
+  const _fermerFenetre = _ouvrirFenetreSauvegarde('posturo');
+  try {
+    const photoStash = await migratePosturoPhotos(d, currentPatient.id, d.id);
+    // Si on édite un bilan archivé (ouvert via ouvrirBilanPosturo), synchroniser
+    // ses modifications vers son entrée dans bilansPosturo[]. Mirror sport.
+    // Sinon (bilan en cours, pas encore archivé), ne rien écrire dans bilansPosturo[]
+    // — la sauvegarde se fait dans currentPatient.bilanDataPosturo (déjà à jour via `d`).
+    syncOpenedBilanPosturoToHistory();
+    savePatients();
+    // Restaurer les dataUrls migrées en RAM pour conserver l'affichage actuel
+    // (img.src / canvas) sans nouveau fetch. Les clés non migrées (ex. échec
+    // upload) ne sont pas écrasées car d[k] est déjà présent.
+    Object.assign(d, photoStash);
+  } finally {
+    _fermerFenetre();
+  }
   if(!silent) alert('✓ Bilan posturologique sauvegardé');
 }
 
