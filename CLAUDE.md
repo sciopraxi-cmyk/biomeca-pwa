@@ -260,6 +260,45 @@ filets sur des runners neufs, hors de portée du proxy.
   toute couleur d'onglet se change aussi dans le script, pas seulement dans le
   balisage.
 
+## Modules 3D à venir (mannequin postural, plan de semelle)
+
+Deux modules remplaceront des outils de dessin existants : le **mannequin postural 3D**
+(curseurs cliniques au lieu des silhouettes dessinées) et le **plan de semelle 3D** avec
+export STL (au lieu du plan de semelle dessiné). Leurs spécifications sont **locales**,
+exclues via `.git/info/exclude` :
+ne jamais les commiter, les déplacer ni les citer dans un fichier tracké.
+
+- **Isolement** : rien dans `index.html` ni dans `js/biomeca.js`. Un dossier par module
+  (`js/semelle3d/`, `js/mannequin3d/`), modules séparés, **import dynamique** à l'ouverture.
+  Le chargement des autres bilans ne doit pas changer.
+- **Dépendances** (`three`, `OrbitControls`, `STLExporter`, `GLTFLoader`, `three-mesh-bvh`,
+  `meshoptimizer`, `manifold-3d`…) : chacune est un ajout soumis à **accord explicite**
+  (version exacte, licence, taille). Auto-hébergées sous `assets/vendor/` comme pdf.js
+  (CSP : aucun CDN), chargées à la demande, **jamais** dans `PRECACHE_URLS` par défaut.
+- **Calcul lourd en Web Worker** (carte de hauteur, maillage, rasterisation) : le fil
+  principal ne bloque jamais, même sur un scan dense.
+- **Fonctions de calcul pures et testées** ; un STL produit est **relu par un test**
+  (maillage fermé, aucune arête libre, normales cohérentes), pas jugé à l'œil.
+- **Reprise des bilans existants** : les anciens dessins (silhouettes, plans de semelle)
+  restent lisibles et affichés tels quels. Aucune conversion ni purge automatique.
+- **Côtés** : convention déclarée une seule fois — la droite du patient est à gauche de
+  l'écran en vue de face. Piège des profils inversés : corriger par les libellés.
+- **Rendus pour les rapports et les comparateurs** : vues figées en **projection
+  orthographique**, même échelle pour toutes les vues (la perspective fabrique de fausses
+  asymétries). Les valeurs des curseurs sont enregistrées comme **données**, pas comme image.
+- **Valeurs proposées, jamais imposées** : compensations automatiques et réglages issus de
+  la dictée s'affichent en suggestion et exigent la validation du praticien. Rien n'entre
+  silencieusement dans un bilan.
+- **Fichiers de modélisation** (`.mhm`, `.blend`, scans bruts) : hors du dépôt. Seul l'asset
+  exporté (glTF) entre dans `assets/`, avec sa licence vérifiée (CC0 pour les corps
+  MakeHuman/MPFB). **Ne jamais copier de code MPFB (GPL)** dans Verticy.
+- **Scans importés** : formats ouverts (STL, OBJ, PLY), lecture indépendante de la marque du
+  scanner ; **contrôle d'échelle obligatoire** à l'import (un scanner grand public n'est pas
+  un dispositif médical). Un scan pèse 20 à 80 Mo : rétention et compression décidées avant
+  le stockage, chiffrement HDS compris.
+- **PDF** : Verticy n'a pas de génération PDF côté serveur ; les sorties passent par
+  l'impression navigateur comme les autres rapports.
+
 ## Conventions de code
 
 - Préfixe `_` pour tout symbole volontairement inutilisé — arguments, variables
