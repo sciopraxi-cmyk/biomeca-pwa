@@ -175,6 +175,9 @@ export const FONCTIONS_OPTIONNELLES = [
   '_rayonVerrou',
   '_calerCoteVerrouille',
   '_remettreNonAjustes', // U0 — H5
+  // #277 — mention rouge « images en cours d'envoi », appelée par
+  // _buildSportRapportContentHTML (sa constante est ajoutée ci-dessous).
+  '_mentionEnvoiEnCoursHTML',
 ];
 // Appels DIRECTS du vrai nav, bouchonnés (option navReelle).
 const BOUCHONS_NAV = [
@@ -307,6 +310,7 @@ export function charger(opts = {}) {
     async function pwaLogout() { _enregistrements.push('pwaLogout'); }
     function buildBilanPrintSection() { return ''; }
     function _buildFichesFailHTML() { return ''; }
+    ${SRC_BIOMECA.includes('\nconst _captureExpiree = ') ? ligneConst('_captureExpiree') : ''}
     function getBioMecaStorageBytes() { return _octetsStockage; }
     ${ligneConst('STORAGE_QUOTA_BYTES')}
     ${ligneConst('STORAGE_CRITICAL_THRESHOLD')}
