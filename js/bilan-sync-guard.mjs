@@ -44,3 +44,25 @@ export function detectIdCollision(rows) {
   });
   return Array.from(collisions);
 }
+
+// #245 — miroir de _retirerCollisionsId (js/biomeca.js, bloc « #245 GARDE »),
+// appelée avant l'envoi du lot. Pour chaque id dupliqué : la ligne 'archived'
+// l'emporte, sinon la dernière ; l'ordre des lignes conservées est préservé.
+export function retirerCollisionsId(rows) {
+  const liste = rows || [];
+  const gagnant = new Map();
+  const doublons = new Set();
+  liste.forEach((r, i) => {
+    const id = r && r.id;
+    if (id == null) return;
+    if (!gagnant.has(id)) {
+      gagnant.set(id, i);
+      return;
+    }
+    doublons.add(id);
+    const courant = liste[gagnant.get(id)];
+    if (!(courant.status === 'archived' && r.status !== 'archived')) gagnant.set(id, i);
+  });
+  const gardees = liste.filter((r, i) => !(r && r.id != null) || gagnant.get(r.id) === i);
+  return { rows: gardees, collisions: Array.from(doublons) };
+}

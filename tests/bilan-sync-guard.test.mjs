@@ -88,3 +88,66 @@ describe('detectIdCollision — #102 hotfix 2 (Postgres 21000)', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// #245 — la garde d'id est BRANCHÉE sur l'envoi réel (elle n'était appelée que
+// par ce test) : comparaison différentielle runtime / miroir + câblage.
+// ═══════════════════════════════════════════════════════════════════
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { retirerCollisionsId } from '../js/bilan-sync-guard.mjs';
+import { extraireBloc, fabriquer, RACINE } from './helpers/mirror-diff.mjs';
+
+describe('#245 retirerCollisionsId', () => {
+  const bloc = extraireBloc('js/biomeca.js', '#245 GARDE — DÉBUT', '#245 GARDE — FIN');
+  const runtime = fabriquer(bloc, ['_retirerCollisionsId'])._retirerCollisionsId;
+  const A = { id: 'a', status: 'archived' };
+  const P = { id: 'a', status: 'in_progress' };
+  const CAS = [
+    ['aucune collision', [A, { id: 'b', status: 'in_progress' }]],
+    ['vide', []],
+    ['null', null],
+    ['archive puis en cours', [A, P]],
+    ['en cours puis archive', [P, A]],
+    [
+      'deux en cours : la dernière',
+      [
+        { ...P, n: 1 },
+        { ...P, n: 2 },
+      ],
+    ],
+    ['id absent conservé', [{ status: 'x' }, { status: 'y' }, A, P]],
+    ['triple', [P, A, { ...P, n: 3 }]],
+  ];
+  let compte = 0;
+  for (const [nom, rows] of CAS) {
+    it(`runtime = miroir : ${nom}`, () => {
+      compte++;
+      expect(runtime(rows)).toEqual(retirerCollisionsId(rows));
+    });
+  }
+  it('garde toujours l’archive et rend la collision', () => {
+    expect(retirerCollisionsId([P, A]).rows).toEqual([A]);
+    expect(retirerCollisionsId([A, P]).rows).toEqual([A]);
+    expect(retirerCollisionsId([A, P]).collisions).toEqual(['a']);
+    expect(detectIdCollision(retirerCollisionsId([P, A, P]).rows)).toEqual([]);
+  });
+  it('deux en cours : la dernière gagne', () => {
+    expect(
+      retirerCollisionsId([
+        { ...P, n: 1 },
+        { ...P, n: 2 },
+      ]).rows
+    ).toEqual([{ ...P, n: 2 }]);
+  });
+  it('est appelée avant le POST des bilans (câblage)', () => {
+    const src = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
+    const iAppel = src.indexOf('_retirerCollisionsId(bilanRows)');
+    const iPost = src.indexOf("'/rest/v1/bilans?on_conflict=id'");
+    expect(iAppel).toBeGreaterThan(-1);
+    expect(iPost).toBeGreaterThan(iAppel);
+  });
+  it('témoin : tous les cas ont été comparés', () => {
+    expect(compte).toBe(CAS.length);
+  });
+});
