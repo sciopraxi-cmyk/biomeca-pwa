@@ -334,19 +334,28 @@ Aucun n'est commencé ; chacun exige un plan en lecture seule et l'accord du pra
 
 - **Portail client / patient** : devis, factures, rapports ; accès par code envoyé par
   e-mail ; exercices vidéo avec chronomètre et validation quotidienne ; retour d'évolution
-  au praticien ; messagerie patient ↔ praticien. Donnée de santé exposée à un tiers :
-  RLS côté patient, consentement, journal d'accès et hébergement HDS d'abord.
-- **Facturation des actes** de pédicurie et de podologie (détail des prestations
-  remboursées en clé POD), **sans TVA** (exonération des podologues, mention à valider).
-  Numérotation continue sans trou ; nomenclature citée de source officielle, jamais devinée.
-- **Accès cabinet** : un titulaire détient le compte et peut créer un accès pour **un**
-  collaborateur ou assistant (à l'année) et un accès restreint pour un remplaçant. Les
-  droits exacts restent à définir ; aujourd'hui toutes les données sont filtrées par
-  `user_id` (pas de notion de cabinet en base).
+  au praticien ; messagerie patient ↔ praticien. L'hébergement HDS est acquis (accord
+  avec l'hébergeur) : le portail se construit avec des **patients fictifs** ; aucune donnée
+  réelle avant la bascule HDS effective. RLS côté patient (un patient ne voit que son
+  dossier), consentement et journal d'accès d'abord.
+- **Facturation des actes** de pédicurie et de podologie : prestations remboursées (lettre-clé
+  POD, AMP, orthèses plantaires) avec leurs modes de remboursement, **actes personnalisés**
+  (titre et montant choisis), **sans TVA** (exonération, mention à valider). Les tarifs et
+  cotations sont des **données datées, sourcées et modifiables** (ils changent par avenant à
+  la convention), **jamais codés en dur ni devinés** : source officielle citée.
+  Numérotation continue sans trou.
+- **Accès cabinet** (tâche #120, spec validée) : un abonnement = un cabinet = une patientèle
+  partagée ; un seul titulaire ; un siège assistant (permanent) et un siège remplaçant
+  (quota de 12 semaines par an, année glissante) ; accès ouvert/fermé par interrupteur, sans
+  supprimer de compte ; message d'accès fermé distinct de « mot de passe incorrect » ;
+  l'existence d'une adresse sur un autre cabinet n'est jamais révélée au titulaire. Prérequis :
+  chargement cloud (#102), journal des accès (#136), hébergement HDS. Aujourd'hui tout est
+  filtré par `user_id` (pas de notion de cabinet en base).
 - **Mannequin 3D** (coches de dysfonction qui déforment le mannequin ; rapport avec les
   4 vues face, dos, profil D, profil G) et **scan 3D du pied au téléphone + conception de
   semelles** (types, éléments STL avec matériau, épaisseur, dureté Shore, export STL unique,
-  axe de Henke) : règles techniques dans « Modules 3D à venir ». Un scan fait au téléphone
+  axe de Henke) : règles techniques dans « Modules 3D à venir ». Le scan au téléphone est
+  faisable (autres acteurs le proposent) mais sa technique est à valider par un essai ; il
   n'est pas un dispositif médical : contrôle d'échelle obligatoire.
 
 ## Conventions de code
