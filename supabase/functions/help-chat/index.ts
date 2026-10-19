@@ -104,20 +104,17 @@ Deno.serve(async (req) => {
   }
 
   // ─── Plafond journalier (avant tout appel payant) ──────────────────
+  // Incrément ATOMIQUE en base (migration help-chat-usage-atomique.sql) :
+  // NULL = limite atteinte. Plus de lecture→écriture contournable en parallèle.
   const day = new Date().toISOString().slice(0, 10);
-  const { data: usage, error: usageErr } = await supaAdmin
-    .from('help_chat_usage')
-    .select('count')
-    .eq('user_id', userId)
-    .eq('day', day)
-    .maybeSingle();
-  if (usageErr) return json({ error: 'usage read: ' + usageErr.message }, 500);
-  const count = usage?.count ?? 0;
-  if (count >= DAILY_LIMIT) return json({ error: 'daily_limit', limit: DAILY_LIMIT }, 429);
-  const { error: upsertErr } = await supaAdmin
-    .from('help_chat_usage')
-    .upsert({ user_id: userId, day, count: count + 1 }, { onConflict: 'user_id,day' });
-  if (upsertErr) return json({ error: 'usage write: ' + upsertErr.message }, 500);
+  const { data: newCount, error: usageErr } = await supaAdmin.rpc('help_chat_incrementer', {
+    p_user: userId,
+    p_day: day,
+    p_limit: DAILY_LIMIT,
+  });
+  if (usageErr) return json({ error: 'usage: ' + usageErr.message }, 500);
+  if (newCount === null) return json({ error: 'daily_limit', limit: DAILY_LIMIT }, 429);
+  const count = (newCount as number) - 1;
 
   // ─── Appel Anthropic ───────────────────────────────────────────────
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
