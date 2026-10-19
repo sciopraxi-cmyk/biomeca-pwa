@@ -17,6 +17,7 @@
 // Supabase rejeter automatiquement les requêtes sans Authorization).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { lireToutesLesPages } from '../_shared/pagination.ts';
 
 // #229-C — bascule sciopraxi@gmail.com → contact@verticy.fr (validée par
 // Scio le 10/08/2026). DOIT rester aligné avec VERTICY_ADMIN_EMAIL côté
@@ -123,14 +124,37 @@ Deno.serve(async (req) => {
 // Actions
 // ──────────────────────────────────────────────────────────────────────
 
-async function handleList(): Promise<Response> {
-  const { data: usersData, error: usersErr } = await supaAdmin.auth.admin.listUsers();
-  if (usersErr) return json({ error: 'listUsers: ' + usersErr.message }, 500);
+// Toutes les pages de comptes (listUsers sans argument = 1 seule page de 50).
+function listerTousLesComptes(stop?: (u: { email?: string }) => boolean) {
+  return lireToutesLesPages(
+    async (page, parPage) => {
+      const { data, error } = await supaAdmin.auth.admin.listUsers({ page, perPage: parPage });
+      return { items: data?.users ?? [], error };
+    },
+    { stop }
+  );
+}
 
-  const { data: rows, error: rowsErr } = await supaAdmin
-    .from('user_data')
-    .select('email, licence_payee, formule, engagement, date_debut_abonnement, stripe_customer_id');
-  if (rowsErr) return json({ error: 'user_data: ' + rowsErr.message }, 500);
+async function handleList(): Promise<Response> {
+  let allUsers;
+  let rows: Record<string, unknown>[];
+  try {
+    allUsers = await listerTousLesComptes();
+    // user_data : PostgREST plafonne à max_rows (1000) → lecture par tranches.
+    rows = await lireToutesLesPages<Record<string, unknown>>(async (page, parPage) => {
+      const { data, error } = await supaAdmin
+        .from('user_data')
+        .select(
+          'email, licence_payee, formule, engagement, date_debut_abonnement, stripe_customer_id'
+        )
+        .order('user_id')
+        .range((page - 1) * parPage, page * parPage - 1);
+      return { items: data ?? [], error };
+    });
+  } catch (e) {
+    return json({ error: 'list: ' + (e instanceof Error ? e.message : String(e)) }, 500);
+  }
+  const usersData = { users: allUsers };
 
   const byEmail = new Map<string, Record<string, unknown>>();
   for (const r of rows ?? []) {
@@ -176,9 +200,13 @@ async function handleList(): Promise<Response> {
 // de dupliquer les 3 branches d'erreur.
 async function resolveUserIdByEmail(email: string): Promise<Response | { userId: string }> {
   if (!email || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
-  const { data: usersData, error: listErr } = await supaAdmin.auth.admin.listUsers();
-  if (listErr) return json({ error: 'listUsers: ' + listErr.message }, 500);
-  const found = (usersData.users ?? []).find((u) => (u.email ?? '').toLowerCase() === email);
+  let comptes;
+  try {
+    comptes = await listerTousLesComptes((u) => (u.email ?? '').toLowerCase() === email);
+  } catch (e) {
+    return json({ error: 'listUsers: ' + (e instanceof Error ? e.message : String(e)) }, 500);
+  }
+  const found = comptes.find((u) => (u.email ?? '').toLowerCase() === email);
   if (!found) return json({ error: 'User not found' }, 404);
   return { userId: found.id };
 }
