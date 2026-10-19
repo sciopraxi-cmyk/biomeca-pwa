@@ -299,6 +299,56 @@ ne jamais les commiter, les déplacer ni les citer dans un fichier tracké.
 - **PDF** : Verticy n'a pas de génération PDF côté serveur ; les sorties passent par
   l'impression navigateur comme les autres rapports.
 
+## Fin de tâche : mise à jour de la documentation
+
+À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
+pièges appris) **et la roadmap locale** (§0 : fait, en cours, à faire, dettes). Consigne
+du praticien. CLAUDE.md passe par une PR dédiée, sans donnée personnelle ni citation des
+documents locaux ; la roadmap reste locale (`.git/info/exclude`).
+
+## Supabase — acquis de l'audit du 19/10/2026
+
+- **Jamais `auth.admin.listUsers()` sans pagination** : une seule page de 50 comptes. Utiliser
+  `lireToutesLesPages` (`supabase/functions/_shared/pagination.ts`), qui lève une erreur au
+  lieu de rendre une liste tronquée. Même règle pour toute lecture PostgREST (plafond 1000).
+- **Champs d'abonnement de `user_data`** (`licence_payee`, `formule`, `engagement`,
+  `date_debut_abonnement`, `stripe_customer_id`) : protégés par un trigger UPDATE **et** un
+  trigger INSERT ; le praticien n'a pas de policy DELETE sur sa ligne. Un trigger qui ne
+  couvre qu'une opération laisse la porte ouverte par les autres (DELETE puis INSERT).
+  Toute fonction `SECURITY DEFINER` fixe son `search_path`.
+- **Supprimer un patient** supprime aussi sa ligne cloud `patients` (par `_cloudId`, les
+  bilans suivent en cascade). Aucune purge automatique des lignes déjà orphelines.
+- **Fonctions Edge** : `stripe-webhook` est en `verify_jwt = false` (Stripe n'envoie aucun
+  jeton Supabase ; la signature est vérifiée dans la fonction). Conserver le `verify_jwt`
+  existant des autres fonctions au redéploiement. Le plafond du chat d'aide est un
+  incrément SQL atomique (`help_chat_incrementer`), jamais lecture puis écriture.
+- **Migrations SQL** : un fichier de `supabase/migrations/` n'agit pas à la fusion ; il est
+  appliqué à la main sur la base, puis **revérifié par un test réel** (tentative de
+  l'attaque, pas seulement la lecture du fichier).
+- **Validation de la fiche patient** : `validerFichePatient` (date de naissance non future,
+  poids 1–400 kg, taille 20–260 cm, e-mail) à la création **et** à la modification.
+
+## Chantiers produit à venir (hors modules 3D)
+
+Aucun n'est commencé ; chacun exige un plan en lecture seule et l'accord du praticien.
+
+- **Portail client / patient** : devis, factures, rapports ; accès par code envoyé par
+  e-mail ; exercices vidéo avec chronomètre et validation quotidienne ; retour d'évolution
+  au praticien ; messagerie patient ↔ praticien. Donnée de santé exposée à un tiers :
+  RLS côté patient, consentement, journal d'accès et hébergement HDS d'abord.
+- **Facturation des actes** de pédicurie et de podologie (détail des prestations
+  remboursées en clé POD), **sans TVA** (exonération des podologues, mention à valider).
+  Numérotation continue sans trou ; nomenclature citée de source officielle, jamais devinée.
+- **Accès cabinet** : un titulaire détient le compte et peut créer un accès pour **un**
+  collaborateur ou assistant (à l'année) et un accès restreint pour un remplaçant. Les
+  droits exacts restent à définir ; aujourd'hui toutes les données sont filtrées par
+  `user_id` (pas de notion de cabinet en base).
+- **Mannequin 3D** (coches de dysfonction qui déforment le mannequin ; rapport avec les
+  4 vues face, dos, profil D, profil G) et **scan 3D du pied au téléphone + conception de
+  semelles** (types, éléments STL avec matériau, épaisseur, dureté Shore, export STL unique,
+  axe de Henke) : règles techniques dans « Modules 3D à venir ». Un scan fait au téléphone
+  n'est pas un dispositif médical : contrôle d'échelle obligatoire.
+
 ## Conventions de code
 
 - Préfixe `_` pour tout symbole volontairement inutilisé — arguments, variables
