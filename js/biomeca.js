@@ -5788,6 +5788,19 @@ async function deletePatient(i) {
   _intentionalReduction = true;
   try { savePatients(); } finally { _intentionalReduction = false; }
   renderPatientList();
+  // Audit 19/10 — la ligne de la table normalisée `patients` (identité, ddn,
+  // antécédents…) n'était JAMAIS supprimée : la donnée de santé restait en base
+  // après « Supprimer ce patient ». Les bilans partent avec elle (ON DELETE
+  // CASCADE). Suppression VOLONTAIRE et ciblée (id de cette fiche), aucune purge
+  // automatique d'autres lignes. Échec → simple warning (le blob est déjà à jour).
+  if(patient._cloudId) {
+    try {
+      const rr = await authFetch(SUPA_URL + '/rest/v1/patients?id=eq.' + encodeURIComponent(patient._cloudId), { method: 'DELETE' });
+      if(!rr.ok) console.warn('[deletePatient] suppression ligne patients échouée:', rr.status);
+    } catch(e) {
+      console.warn('[deletePatient] suppression ligne patients échouée:', e?.message);
+    }
+  }
 }
 
 // #279 étape 4 — nombre de TESTS d'un objet mesures : les clés « _ » sont des
