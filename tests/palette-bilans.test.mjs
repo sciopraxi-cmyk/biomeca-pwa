@@ -69,13 +69,15 @@ const HEX_RED = '#f04060';
 // var(--red) a DISPARU de la zone : le ✕ de suppression patient passe
 // désormais par la classe .bl-x, qui le laisse neutre au repos et ne le rougit
 // qu'au survol. Sa présence ici serait donc une régression, pas un oubli.
+// #259 : les boutons Continuer/Finaliser des 4 bandeaux « en cours » prennent la
+// couleur de leur bilan (déplacement de 6 var() entre familles, total inchangé : 45).
 const COMPTES_ATTENDUS = {
-  '--posturo-*': 14,
-  '--sport-*': 13,
+  '--posturo-*': 12,
+  '--sport-*': 11,
   '--mut': 12,
   '--txt': 9,
-  '--pedicurie-*': 9,
-  '--podo-*': 9,
+  '--pedicurie-*': 11,
+  '--podo-*': 11,
   '--card': 7,
   '--bord': 6,
   '--encours-*': 4,
