@@ -171,6 +171,13 @@ export const ENGAGEMENT_DUREE_MOIS = 12;
 // compare donc `now` à la date d'échéance réelle ; les mois ne sont qu'un
 // affichage, arrondi au supérieur pour ne jamais annoncer « 0 mois restants »
 // sur un compte encore bloqué.
+// #242 — 'admin_gratuit' et 'partenaire_podaxia' n'ont aucun abonnement Stripe
+// (ni prélèvement, ni renouvellement, ni portail). Miroir de
+// _engagementHorsStripe dans js/biomeca.js.
+export function engagementHorsStripe(engagement) {
+  return engagement === 'admin_gratuit' || engagement === 'partenaire_podaxia';
+}
+
 export function describeEngagement(engagement, dateDebut, now = new Date()) {
   // Champ absent : compte sans abonnement (ou remis à zéro par l'admin,
   // admin-users/index.ts:414 écrit engagement=null). Rien à bloquer.

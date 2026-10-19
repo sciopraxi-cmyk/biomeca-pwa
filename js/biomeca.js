@@ -30062,6 +30062,13 @@ var _ENGAGEMENT_LABELS = {
 };
 var _ENGAGEMENT_DUREE_MOIS = 12;
 
+// #242 — 'admin_gratuit' et 'partenaire_podaxia' n'ont AUCUN abonnement Stripe :
+// ni prélèvement, ni renouvellement, ni portail à ouvrir. DUPLIQUÉ de
+// js/subscription.mjs (engagementHorsStripe), même règle de miroir.
+function _engagementHorsStripe(engagement) {
+  return engagement === 'admin_gratuit' || engagement === 'partenaire_podaxia';
+}
+
 function _describeEngagement(engagement, dateDebut, now) {
   now = now || new Date();
 
@@ -30114,12 +30121,19 @@ async function loadAbonnementInfo() {
     // #261 — getUserRecord rend un état { ok, row }. Comportement conservé :
     // on renonce aussi bien sur échec que sur absence de ligne, comme avant.
     //
-    // #262 — à revoir : avec { ok } désormais disponible, un échec de lecture
-    // pourrait afficher un message au lieu d'un abandon muet. Ce return nu
-    // devient un CHOIX et non plus une fatalité. Conservé tel quel ici pour
-    // ne pas mêler un changement d'UX à une correction de contrôle d'accès.
+    // #262 — un échec de lecture (ou l'absence de ligne) est DIT à l'écran,
+    // au lieu d'un abandon muet qui laissait « Mon compte » vide.
     var _rec = await supa.getUserRecord(pwaUser.id);
-    if(!_rec.ok || !_rec.row) return;
+    if(!_rec.ok || !_rec.row) {
+      var _licErr = document.getElementById('mc-licence-status');
+      var _msgErr = !_rec.ok
+        ? '⚠️ Impossible de lire votre abonnement pour le moment (connexion ?). Fermez puis rouvrez « Mon compte », ou contactez le support.'
+        : '⚠️ Aucune information d\'abonnement trouvée pour ce compte. Contactez le support.';
+      if(_licErr) _licErr.innerHTML = '<span style="color:var(--red);">' + _msgErr + '</span>';
+      var _formErr = document.getElementById('mc-formule');
+      if(_formErr) _formErr.textContent = '—';
+      return;
+    }
     var userRecord = _rec.row;
 
     // Licence
@@ -30159,23 +30173,32 @@ async function loadAbonnementInfo() {
       if(userRecord.date_debut_abonnement) {
         var maintenant = new Date();
 
-        if(resilierWrap) resilierWrap.style.display = 'block';
-        if(resilierMsg) {
-          resilierMsg.textContent = eng.peutResilier
-            ? 'Résiliation effective à la prochaine date anniversaire'
-            : '⚠️ Résiliation impossible avant le ' + eng.finEngagement.toLocaleDateString('fr-FR');
-        }
+        if(_engagementHorsStripe(userRecord.engagement)) {
+          // #242 — pas d'abonnement Stripe : ni résiliation, ni renouvellement.
+          if(resilierWrap) resilierWrap.style.display = 'none';
+          if(renouvEl) renouvEl.textContent = 'Aucun prélèvement : il n\'y a rien à résilier ni à renouveler.';
+        } else {
+          if(resilierWrap) resilierWrap.style.display = 'block';
+          if(resilierMsg) {
+            resilierMsg.textContent = eng.peutResilier
+              ? 'Résiliation effective à la prochaine date anniversaire'
+              : '⚠️ Résiliation impossible avant le ' + eng.finEngagement.toLocaleDateString('fr-FR');
+          }
 
-        // Prochain renouvellement
-        var prochainRenouv = new Date(userRecord.date_debut_abonnement);
-        while(prochainRenouv <= maintenant) {
-          prochainRenouv.setMonth(prochainRenouv.getMonth() + 1);
+          // Prochain renouvellement
+          var prochainRenouv = new Date(userRecord.date_debut_abonnement);
+          while(prochainRenouv <= maintenant) {
+            prochainRenouv.setMonth(prochainRenouv.getMonth() + 1);
+          }
+          if(renouvEl) renouvEl.textContent = '🔄 Prochain renouvellement : ' + prochainRenouv.toLocaleDateString('fr-FR');
         }
-        if(renouvEl) renouvEl.textContent = '🔄 Prochain renouvellement : ' + prochainRenouv.toLocaleDateString('fr-FR');
       }
     }
   } catch(e) {
     console.log('Erreur chargement abonnement:', e);
+    // #262 — l'échec est visible, pas seulement dans la console.
+    var _licCatch = document.getElementById('mc-licence-status');
+    if(_licCatch) _licCatch.innerHTML = '<span style="color:var(--red);">⚠️ Impossible de lire votre abonnement pour le moment. Contactez le support si cela persiste.</span>';
   }
 }
 
@@ -30195,20 +30218,30 @@ function changerFormule() {
 }
 
 async function resilierAbonnement() {
-  if(!pwaUser || !pwaUser.token) return;
+  if(!pwaUser || !pwaUser.token) {
+    // #262 — jamais de bouton muet : session absente = on le dit.
+    alert('Votre session a expiré. Reconnectez-vous puis recommencez. Aucune résiliation n\'a été faite.');
+    return;
+  }
   try {
     // #261 — getUserRecord rend un état { ok, row }. Comportement conservé.
     //
-    // #262 — à revoir : avec { ok } désormais disponible, un échec de lecture
-    // pourrait afficher un message au lieu d'un abandon muet. Ici le risque
-    // est SUPÉRIEUR à celui de « Mon compte » : un écran vide se voit et
-    // invite à recharger, tandis qu'un bouton « Résilier » qui ne fait rien
-    // laisse le praticien croire qu'il a résilié — il le découvrira au
-    // prélèvement suivant. Conservé tel quel pour ne pas mêler un changement
-    // d'UX à une correction d'accès.
+    // #262 — un bouton « Résilier » qui ne fait rien laisserait croire à une
+    // résiliation faite : l'échec de lecture est DIT, avec la mention
+    // explicite qu'aucune résiliation n'a eu lieu.
     var _rec = await supa.getUserRecord(pwaUser.id);
-    if(!_rec.ok || !_rec.row) return;
+    if(!_rec.ok || !_rec.row) {
+      alert('Impossible de vérifier votre abonnement pour le moment (connexion ?). Aucune résiliation n\'a été faite : réessayez dans un instant ou contactez le support.');
+      return;
+    }
     var userRecord = _rec.row;
+
+    // #242 — licence offerte / accès partenaire : aucun abonnement Stripe,
+    // donc rien à résilier (et surtout pas de portail de facturation).
+    if(_engagementHorsStripe(userRecord.engagement)) {
+      alert('Votre accès n\'est pas un abonnement payant (' + _describeEngagement(userRecord.engagement, userRecord.date_debut_abonnement).label + ') : il n\'y a rien à résilier ici.\n\nPour mettre fin à cet accès, contactez le support.');
+      return;
+    }
 
     // #241 — blocage de résiliation anticipée. Ne s'applique QU'à '1_an' :
     // le descripteur renvoie peutResilier=true pour 'sans', 'admin_gratuit',
@@ -30223,7 +30256,7 @@ async function resilierAbonnement() {
       window.open(_stripePortalUrl, '_blank');
     }
   } catch(e) {
-    alert('Erreur. Veuillez contacter le support.');
+    alert('Erreur. Aucune résiliation n\'a été faite. Veuillez contacter le support.');
   }
 }
 
