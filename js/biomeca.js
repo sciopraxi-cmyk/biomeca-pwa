@@ -5914,7 +5914,7 @@ function renderPatientList() {
         <div class="bl-ligne bl-encours" style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;margin-bottom:5px;">
           <div style="width:7px;height:7px;border-radius:50%;background:var(--encours);flex-shrink:0;"></div>
           <span style="font-size:12px;color:var(--txt);flex:1;">Bilan ${typeEnCoursLabel} · ${sousLibelle}</span>
-          <button onclick="ouvrirBilanSport(${i},null)" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-encre);color:#fff;">📝 Continuer</button>
+          <button onclick="ouvrirBilanSport(${i},null)" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-encre);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanSport(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--danger-actif);color:#fff;">🗑️ Abandonner</button>
           <button onclick="finalizeBilanSport(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-encre);color:#fff;">✓ Finaliser</button>
         </div>
@@ -5933,7 +5933,7 @@ function renderPatientList() {
           <span style="font-size:12px;color:var(--txt);flex:1;">Bilan ${typePosturoLabel} · ${sousLibellePosturo}</span>
           <button onclick="ouvrirBilanPosturo(${i},null)" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-encre);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanPosturo(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--danger-actif);color:#fff;">🗑️ Abandonner</button>
-          <button onclick="finalizeBilanPosturo(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-encre);color:#fff;">✓ Finaliser</button>
+          <button onclick="finalizeBilanPosturo(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-encre);color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
@@ -5949,9 +5949,9 @@ function renderPatientList() {
         <div class="bl-ligne bl-encours" style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;margin-bottom:5px;">
           <div style="width:7px;height:7px;border-radius:50%;background:var(--encours);flex-shrink:0;"></div>
           <span style="font-size:12px;color:var(--txt);flex:1;">Bilan ${typePodopediatrieLabel}${periodePodopediatrieLabel} · ${sousLibellePodopediatrie}</span>
-          <button onclick="ouvrirBilanPodopediatrie(${i},null)" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-encre);color:#fff;">📝 Continuer</button>
+          <button onclick="ouvrirBilanPodopediatrie(${i},null)" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--podo-encre);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanPodopediatrie(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--danger-actif);color:#fff;">🗑️ Abandonner</button>
-          <button onclick="finalizeBilanPodopediatrie(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-encre);color:#fff;">✓ Finaliser</button>
+          <button onclick="finalizeBilanPodopediatrie(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--podo-encre);color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
@@ -5966,9 +5966,9 @@ function renderPatientList() {
         <div class="bl-ligne bl-encours" style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;margin-bottom:5px;">
           <div style="width:7px;height:7px;border-radius:50%;background:var(--encours);flex-shrink:0;"></div>
           <span style="font-size:12px;color:var(--txt);flex:1;">Bilan ${typePedicurieLabel} · ${sousLibellePedicurie}</span>
-          <button onclick="ouvrirBilanPedicurie(${i},null)" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--posturo-encre);color:#fff;">📝 Continuer</button>
+          <button onclick="ouvrirBilanPedicurie(${i},null)" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--pedicurie-encre);color:#fff;">📝 Continuer</button>
           <button onclick="abandonnerBilanPedicurie(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--danger-actif);color:#fff;">🗑️ Abandonner</button>
-          <button onclick="finalizeBilanPedicurie(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--sport-encre);color:#fff;">✓ Finaliser</button>
+          <button onclick="finalizeBilanPedicurie(${i})" style="border:none;padding:6px 11px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--pedicurie-encre);color:#fff;">✓ Finaliser</button>
         </div>
       </div>` : '';
 
