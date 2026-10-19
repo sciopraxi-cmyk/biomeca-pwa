@@ -227,6 +227,17 @@ filets sur des runners neufs, hors de portée du proxy.
 
 ## Pièges connus
 
+- **Comptes de `var()` de `palette-bilans.test.mjs`** : changer la couleur d'un
+  bouton de la zone `#257 ZONE` déplace des `var()` entre familles et fait
+  tomber le test 3. Si le déplacement est voulu, ajuster `COMPTES_ATTENDUS`
+  en commentant le lot (total inchangé), jamais le contourner.
+- **Miroirs de la synchro et du hit-test** : `_retirerCollisionsId` (bloc
+  `#245 GARDE`) et `findMarkerAt` (bloc `#244 HITTEST`) de `js/biomeca.js` ont un
+  miroir dans `js/bilan-sync-guard.mjs` / `js/calc.mjs`, comparé par test
+  différentiel. Modifier `js/biomeca.js` d'abord.
+- **Comptes sans abonnement Stripe** : `admin_gratuit` et `partenaire_podaxia`
+  n'ont ni résiliation ni renouvellement (`_engagementHorsStripe`) ; ne jamais
+  leur ouvrir le portail de facturation.
 - **Profils inversés** : `assets/morpho-profil-gauche.png` est en réalité un
   profil DROIT. Corriger par les **libellés**, jamais par les images ni les clés.
 - **Service worker tenace** : désinscrire un SW ne prend effet qu'une fois tous
