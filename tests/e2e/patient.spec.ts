@@ -8,6 +8,8 @@ async function createPatient(page: Page, lastName: string) {
   await expect(page.locator('#modal-new-patient')).toBeVisible();
   await page.fill('#np-nom', lastName);
   await page.fill('#np-prenom', PATIENT_FIRST_NAME);
+  // Date de naissance obligatoire depuis #229-E / #233.
+  await page.fill('#np-ddn', '1985-06-15');
   await page.click('button:has-text("Créer le dossier")');
   // Le modal se ferme et nav('pg-patients') est appele.
   await expect(page.locator('#modal-new-patient')).toBeHidden({ timeout: 10_000 });
