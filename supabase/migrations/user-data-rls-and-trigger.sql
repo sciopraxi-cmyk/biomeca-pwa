@@ -12,6 +12,10 @@
 -- Idempotent malgré tout (DROP POLICY / DROP TRIGGER / CREATE OR REPLACE).
 --
 -- Idempotent : DROP POLICY IF EXISTS avant chaque CREATE.
+--
+-- ⚠️ Ce fichier est l'état du 16/07. Il est COMPLÉTÉ par
+-- user-data-insert-delete-hardening.sql (19/10/2026) : trigger INSERT,
+-- suppression de la policy delete_own, search_path. Rejouer les deux, dans l'ordre.
 
 ALTER TABLE public.user_data ENABLE ROW LEVEL SECURITY;
 
