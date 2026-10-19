@@ -407,7 +407,11 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.stripe-webhook]
 enabled = true
-verify_jwt = true
+# Stripe n'envoie AUCUN jeton Supabase (seulement l'en-tête stripe-signature, vérifié
+# par HMAC dans index.ts via constructEventAsync). verify_jwt = true faisait
+# rejeter tout appel de Stripe par la passerelle (401 UNAUTHORIZED_NO_AUTH_HEADER,
+# constaté en production le 19/10/2026).
+verify_jwt = false
 import_map = "./functions/stripe-webhook/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
