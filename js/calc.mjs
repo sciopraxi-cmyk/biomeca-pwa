@@ -126,20 +126,25 @@ export function normaliser(p) {
 
 /**
  * Trouve l'index du marqueur le plus proche du point (x, y) dans une liste.
- * Le rayon de capture est adapté à la largeur du canvas (min 14 px, sinon cw/40).
+ * Le rayon de capture est adapté à la largeur du canvas (min 12 px, sinon cw/40 × facteur de taille).
  * Parcourt la liste à l'envers pour favoriser les marqueurs ajoutés en dernier.
  *
  * @param {number} x  Abscisse du clic en coordonnées canvas.
  * @param {number} y  Ordonnée du clic en coordonnées canvas.
  * @param {Marker[]} markers  Liste de marqueurs ; ceux non placés (x ou y null) sont ignorés.
  * @param {number} cw  Largeur du canvas en pixels (sert au calcul du rayon).
+ * @param {number} [markerSizeFactor=1]  Facteur de taille des marqueurs (réglage praticien).
  * @returns {number}  Index du marqueur trouvé, ou −1 si aucun.
  *
  * @example
  *   findMarkerAt(120, 200, [{x:118,y:198},{x:50,y:50}], 800) // → 0
  */
-export function findMarkerAt(x, y, markers, cw) {
-  const r = Math.max(14, cw / 40);
+export function findMarkerAt(x, y, markers, cw, markerSizeFactor = 1) {
+  // #244 — miroir du runtime (js/biomeca.js, bloc #244 HITTEST) : plancher 12 px
+  // « confortable au toucher » et rayon scalé par markerSizeFactor (globale du
+  // runtime, ici paramètre, 1 par défaut). L'ancien miroir figeait 14 px sans
+  // facteur : il ne testait plus le code réel.
+  const r = Math.max(12, (cw / 40) * markerSizeFactor);
   for (let i = markers.length - 1; i >= 0; i--) {
     const m = markers[i];
     if (!isPlaced(m)) continue;

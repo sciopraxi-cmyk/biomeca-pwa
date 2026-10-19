@@ -450,3 +450,47 @@ describe('#243 findMarkerAt — filtre complet', () => {
     expect(findMarkerAt(120, 200, [{ x: '118', y: '198' }], 800)).toBe(0);
   });
 });
+
+// #244 — le miroir findMarkerAt de calc.mjs reproduit le runtime (plancher 12 px,
+// facteur de taille). Test différentiel #132 : le bloc runtime est extrait et exécuté.
+import { extraireBloc, fabriquerAvecDependances } from './helpers/mirror-diff.mjs';
+
+describe('#244 findMarkerAt — miroir = runtime', () => {
+  const coord = extraireBloc('js/biomeca.js', '#243 COORD — DÉBUT', '#243 COORD — FIN');
+  const hit = extraireBloc('js/biomeca.js', '#244 HITTEST — DÉBUT', '#244 HITTEST — FIN');
+  const runtime = (facteur) =>
+    fabriquerAvecDependances([`let markerSizeFactor = ${facteur};`, coord, hit], ['findMarkerAt'])
+      .findMarkerAt;
+  const marqueurs = [
+    { x: 100, y: 100 },
+    { x: null, y: 5 },
+    { x: 300, y: 300 },
+  ];
+  let compte = 0;
+  for (const facteur of [0.3, 0.5, 1, 2]) {
+    for (const cw of [200, 480, 800, 1920]) {
+      for (const [x, y] of [
+        [100, 100],
+        [108, 100],
+        [112, 100],
+        [113, 100],
+        [118, 100],
+        [130, 100],
+        [300, 313],
+        [0, 0],
+      ]) {
+        it(`facteur ${facteur}, canvas ${cw}, point ${x},${y}`, () => {
+          compte++;
+          expect(findMarkerAt(x, y, marqueurs, cw, facteur)).toBe(
+            runtime(facteur)(x, y, marqueurs, cw)
+          );
+        });
+      }
+    }
+  }
+  it('témoin : 128 comparaisons exécutées, et le facteur change bien le verdict', () => {
+    expect(compte).toBe(128);
+    expect(findMarkerAt(113, 100, marqueurs, 200, 0.3)).toBe(-1);
+    expect(findMarkerAt(111, 100, marqueurs, 200, 0.3)).toBe(0);
+  });
+});
