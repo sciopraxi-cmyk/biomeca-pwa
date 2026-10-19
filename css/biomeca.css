@@ -607,7 +607,9 @@ body.printing #rpt-print{display:block!important;}
 @media (max-width: 900px) {
   .btn { min-height: 38px; padding: 7px 12px; font-size: 13px; }
   .inp { min-height: 38px; font-size: 14px; padding: 8px 10px; }
-  .topbar { padding: 8px 12px; flex-wrap: wrap; gap: 6px; }
+  /* Audit 19/10 — la barre a height:56px (desktop) : une fois ses boutons passés
+     à la ligne, le contenu débordait sur les titres de page. Hauteur libre en mobile. */
+  .topbar { padding: 8px 12px; flex-wrap: wrap; gap: 6px; height: auto; min-height: 56px; }
   .tnav { gap: 2px; flex-wrap: wrap; }
   .tnav button { font-size: 11px; padding: 6px 8px; }
   .main { padding-bottom: 20px; }
@@ -630,6 +632,17 @@ body.printing #rpt-print{display:block!important;}
   .tnav button span { display: none; } /* Masquer texte, garder icônes */
   .logo-img { height: 26px; }
   .logo-wrap > div > div:last-child { display: none; } /* Masquer sous-titre */
+}
+
+/* Audit 19/10 — mobile : barre d'actions patients sur plusieurs lignes (Import/Export
+   CSV coupés, recherche écrasée), bouton « ← Patients » dans le flux (il
+   chevauchait le titre), assistant flottant réduit à une pastille. */
+@media (max-width: 600px) {
+  .pt-toolbar { flex-wrap: wrap; }
+  .pt-toolbar #pt-search { flex: 1 1 100% !important; min-width: 0; }
+  .home-hdr > button[style*="position:absolute"] { position: static !important; display: block; margin-bottom: 4px; }
+  #help-float { width: 44px; padding: 0 !important; font-size: 0 !important; bottom: 16px !important; right: 12px !important; }
+  #help-float::before { content: "\1F4AC"; font-size: 20px; line-height: 44px; display: block; }
 }
 
 /* Safe area iPhone (notch) */

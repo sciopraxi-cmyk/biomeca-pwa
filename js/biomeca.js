@@ -4735,6 +4735,11 @@ function _escHtml(s) {
 async function renderParamsPratList() {
   const el = document.getElementById('params-prat-list');
   if (!el) return;
+  // Audit 19/10 — réservé à l'admin : un non-admin (accès forcé à la page) ne
+  // voit ni le lien Supabase ni la liste, et aucun appel admin-users n'est émis.
+  const _blocsAdmin = ['params-bloc-acces', 'params-bloc-users'].map(i => document.getElementById(i));
+  _blocsAdmin.forEach(b => { if (b) b.style.display = pwaUser?.isAdmin ? '' : 'none'; });
+  if (!pwaUser?.isAdmin) return;
   el.innerHTML = '<div style="font-size:12px;color:var(--mut);padding:8px 0;">Chargement des utilisateurs…</div>';
   const res = await adminListUsers();
   if (!res || res.ok === false) {
@@ -5452,6 +5457,13 @@ function saveEditPatient(idx) {
   const nom = document.getElementById('ep-nom').value.trim();
   const prenom = document.getElementById('ep-prenom').value.trim();
   if(!nom||!prenom){alert('Nom et prénom obligatoires.');return;}
+  const _errFicheEdit = validerFichePatient({
+    ddn: document.getElementById('ep-ddn').value,
+    poids: document.getElementById('ep-poids').value,
+    taille: document.getElementById('ep-taille').value,
+    email: document.getElementById('ep-email')?.value
+  });
+  if (_errFicheEdit) { alert(_errFicheEdit); return; }
   p.nom = nom; p.prenom = prenom;
   p.ddn = document.getElementById('ep-ddn').value;
   p.sport = document.getElementById('ep-sport').value;
@@ -5537,6 +5549,29 @@ function closeNewPatientModal() {
   if(modal) modal.style.display = 'none';
 }
 
+// ─── #audit-19/10 — validation de la fiche patient ───
+// Renvoie un message d'erreur (chaîne) ou '' si tout est cohérent. Champs
+// facultatifs vides = acceptés. Bornes larges (aucun refus d'un cas clinique réel).
+function validerFichePatient(v, now) {
+  const today = new Date(now || Date.now());
+  if (v.ddn) {
+    const d = new Date(v.ddn + 'T00:00:00');
+    if (isNaN(d.getTime())) return '⚠ Date de naissance invalide.';
+    if (d > today) return '⚠ La date de naissance ne peut pas être dans le futur.';
+    if (today.getFullYear() - d.getFullYear() > 120) return '⚠ Date de naissance invraisemblable (plus de 120 ans).';
+  }
+  if (v.poids !== '' && v.poids != null) {
+    const n = Number(v.poids);
+    if (!isFinite(n) || n < 1 || n > 400) return '⚠ Poids invraisemblable (entre 1 et 400 kg).';
+  }
+  if (v.taille !== '' && v.taille != null) {
+    const n = Number(v.taille);
+    if (!isFinite(n) || n < 20 || n > 260) return '⚠ Taille invraisemblable (entre 20 et 260 cm).';
+  }
+  if (v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v.email).trim())) return '⚠ Adresse e-mail invalide.';
+  return '';
+}
+
 function createPatient() {
   // Gating task #57 — bloque la création si pas full access.
   if (window._accessLevel && window._accessLevel !== 'full') {
@@ -5552,10 +5587,19 @@ function createPatient() {
   // création d'un doublon au premier import. Les fiches existantes ne sont
   // pas bloquées (pas d'exigence à l'édition).
   if (!document.getElementById('np-ddn').value) { errEl.textContent='⚠ Date de naissance obligatoire (elle évite les doublons lors des imports CSV).'; errEl.style.display='block'; return; }
+  const _errFiche = validerFichePatient({
+    ddn: document.getElementById('np-ddn').value,
+    poids: document.getElementById('np-poids').value,
+    taille: document.getElementById('np-taille').value,
+    email: document.getElementById('np-email')?.value
+  });
+  if (_errFiche) { errEl.textContent = _errFiche; errEl.style.display='block'; return; }
   errEl.style.display = 'none';
   const pratId = document.getElementById('np-prat').value;
+  let _idPatient = Date.now();
+  while (patients.some(x => x.id === _idPatient)) _idPatient++;
   const p = {
-    id:Date.now(), nom, prenom,
+    id:_idPatient, nom, prenom,
     ddn:document.getElementById('np-ddn').value,
     sport:document.getElementById('np-sport').value,
     metier:document.getElementById('np-metier')?.value||'',
@@ -24677,8 +24721,8 @@ function injectBilanPosturoPage() {
 function getBilanPosturoHTML() {
   return `<div style="padding:0 0 40px 0;max-width:860px;margin:0 auto;">
   <div id="bilan-header-posturo" style="font-size:15px;font-weight:700;color:var(--posturo-encre);background:var(--posturo-fond);border:1px solid var(--posturo-trait);padding:8px 14px;border-radius:8px;margin:10px 20px 10px;"></div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--bord);margin-bottom:16px;background:var(--bg);">
-    <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;">← Patients</button>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:12px 20px;border-bottom:1px solid var(--bord);margin-bottom:16px;background:var(--bg);">
+    <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;white-space:nowrap;">← Patients</button>
     <div style="font-size:15px;font-weight:700;color:var(--posturo-encre);">🧍 Bilan Global de la Posture</div>
     <div style="display:flex;gap:6px;">
       <button class="btn" onclick="savePosturoBilan()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>

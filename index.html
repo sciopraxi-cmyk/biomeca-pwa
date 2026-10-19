@@ -3322,14 +3322,14 @@
     <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">⚙️ Paramètres</h2>
 
     <!-- Lien Supabase -->
-    <div class="card" style="margin-bottom:16px;">
+    <div class="card" id="params-bloc-acces" style="margin-bottom:16px;">
       <div class="stitle">Gestion des accès</div>
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">Créer ou modifier des comptes utilisateurs dans Supabase.</p>
       <a href="https://supabase.com/dashboard/project/tzivizoacdyopwfzerrb/auth/users" target="_blank" rel="noopener noreferrer" class="btn" style="background:var(--blue);color:#fff;padding:8px 16px;font-size:13px;text-decoration:none;display:inline-block;">🔗 Ouvrir Supabase Users</a>
     </div>
 
     <!-- Liste praticiens avec droits -->
-    <div class="card">
+    <div class="card" id="params-bloc-users">
       <div class="stitle">Utilisateurs autorisés</div>
       <div id="params-prat-list" style="margin-top:8px;"></div>
     </div>
@@ -3418,7 +3418,7 @@
   <div class="section">
     <div class="stitle">Dossiers patients</div>
     <div class="card">
-  <div style="display:flex;gap:8px;margin-bottom:10px;">
+  <div class="pt-toolbar" style="display:flex;gap:8px;margin-bottom:10px;">
     <!-- #263 bis — var(--txt) : champ de recherche de pg-patients, page claire.
          Son fond est du blanc à 6 %, donc blanc sur blanc en thème clair —
          1,00:1, le texte saisi était invisible. -->
