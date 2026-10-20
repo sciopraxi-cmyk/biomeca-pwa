@@ -94,6 +94,7 @@ function monterStockage(o = {}) {
     {
       localStorage,
       document: { getElementById: el },
+      _etatSauvegarde() {}, // A2 PR 3 : l'indicateur d'état est testé à part (a2-indicateur-etat)
       pwaUser: { id: 'u-fictif' },
       patients: [{ id: 'p', nom: 'Fictif' }],
       currentPatient: null,
