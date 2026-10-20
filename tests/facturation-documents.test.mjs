@@ -47,6 +47,8 @@ const NOMS = [
   'modifierTotalFixeDocument',
   'revenirALaSommeDocument',
   '_htmlPartsLigne',
+  '_ecartTotalDocument',
+  '_eurSigne',
   '_majResumeDocument',
   'modifierChampDocument',
   '_preparerDocument',
@@ -59,6 +61,8 @@ const NOMS = [
   '_htmlCorpsDocument',
   '_htmlDocumentEmis',
   '_htmlApercuDocument',
+  '_htmlPageImpressionDocument',
+  'imprimerDocument',
   'visualiserBrouillonDocument',
   'fermerApercuDocument',
   '_htmlListeDocuments',
@@ -147,9 +151,32 @@ function monter(o = {}) {
     const r = o.reponse ? o.reponse(appel) : { status: 200, json: [] };
     return { ok: r.status < 400, status: r.status, json: async () => r.json };
   };
+  const ecrit = [];
+  const imprime = [];
+  const iframes = [];
   const document = {
     getElementById: (id) => (id in champs ? champs[id] : null),
-    querySelectorAll: () => [],
+    querySelectorAll: (sel) =>
+      sel === 'iframe.doc-impression' ? iframes.filter((f) => !f.retire) : [],
+    createElement: () => {
+      const f = {
+        style: {},
+        setAttribute() {},
+        remove() {
+          f.retire = true;
+        },
+        contentWindow: {
+          focus() {},
+          print() {
+            imprime.push(f);
+          },
+        },
+      };
+      f.contentDocument = { open() {}, write: (h) => ecrit.push(h), close() {} };
+      iframes.push(f);
+      return f;
+    },
+    body: { appendChild() {} },
   };
   const corps = [
     'const SUPA_URL = "https://x.supabase.co";',
@@ -157,6 +184,7 @@ function monter(o = {}) {
     'let _actesCache = __actes, _docListe = __liste, _docEdition = null, _docVue = null, _docApercu = false;',
     'let currentPatient = __patient; const praticiens = __prats;',
     'const _escHtml = (s) => String(s ?? "").replace(/[&<>"\']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;", "\'": "&#39;" }[c]));',
+    'const window = { _accessLevel: __acces }; const _accessPermetImpression = () => { const l = window._accessLevel; return !l || l === "full" || l === "readonly"; }; const showAccessRestrictedModal = (r) => __modales.push(r);',
     'const nav = () => {}; const selectPatient = (p) => { currentPatient = p; };',
     'const patients = [__patient]; async function renderDocumentsPage() { __rendus.push(1); } async function chargerActes() { return _actesCache; }',
     constBloc('REGIMES_REMBOURSEMENT'),
@@ -177,6 +205,7 @@ function monter(o = {}) {
       setEdition: (v) => { _docEdition = v; }, setListe: (v) => { _docListe = v; } };`,
   ].join('\n');
   const rendus = [];
+  const modales = [];
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   const f = new Function(
     'authFetch',
@@ -188,6 +217,8 @@ function monter(o = {}) {
     '__patient',
     '__prats',
     '__rendus',
+    '__acces',
+    '__modales',
     corps
   )(
     authFetch,
@@ -198,9 +229,11 @@ function monter(o = {}) {
     o.liste || [],
     PATIENT,
     o.prats || [PRAT],
-    rendus
+    rendus,
+    o.acces,
+    modales
   );
-  return { f, appels, alertes, rendus };
+  return { f, appels, alertes, rendus, ecrit, imprime, iframes, modales };
 }
 
 const HARNAIS = monter();
@@ -873,8 +906,9 @@ describe('affichage', () => {
     expect(h).toContain('FACTURE F-2026-0001');
     expect(h).toContain('20/10/2026');
     expect(h).toContain('TVA non applicable, article 261-4-1° du CGI');
-    expect(h).toContain('Somme des actes');
-    expect(h).toContain('total fixé par le praticien');
+    // lignes 35,10 + 150,00 = 185,10 € vendues 160 € : une ligne « Remise » de − 25,10 €
+    expect(h).toContain('Remise (prix de l&#39;ensemble fixé par le praticien)');
+    expect(h).toContain('− 25,10');
     expect(h).toContain('Tarif de convention 35,10');
     expect(h).toMatch(/Sécu 21,06[^<]*mutuelle 14,04/);
     expect(h).toContain('Non remboursé par la Sécurité sociale'.slice(0, 0));
@@ -923,6 +957,181 @@ describe('affichage', () => {
     expect(h).toContain('(brouillon)');
     expect(h).toContain('Voir');
     expect(h).toContain('Modifier');
+  });
+});
+
+describe("écart entre le prix de l'ensemble et la somme des tarifs : une ligne explicite", () => {
+  const f = () => HARNAIS.f;
+  const lignesSemelles = () => [
+    {
+      ...L(acte('a-lpp')),
+      prix_cents: 2886,
+      base_remboursable_cents: 2886,
+      libelle: 'Semelles > 37',
+    },
+    { ...L(acte('a-perso')), prix_cents: 9000, libelle: 'Bilan postural' },
+  ];
+  it('exemple du praticien : 28,86 + 90,00 = 118,86 € vendus 160 € → ligne « complément » de + 41,14 €, les lignes font 160 €', () => {
+    const lignes = lignesSemelles();
+    const e = f()._ecartTotalDocument(lignes, 16000, true);
+    expect(e.cents).toBe(4114);
+    expect(e.libelle).toMatch(/Complément d'honoraires/);
+    const somme = f()._calculerDocument(lignes, 'standard', null).sousTotalCents;
+    expect(somme + e.cents).toBe(16000);
+  });
+  it('total inférieur à la somme : ligne « Remise » négative ; total égal ou non fixé : aucune ligne', () => {
+    const lignes = lignesSemelles();
+    const r = f()._ecartTotalDocument(lignes, 10000, true);
+    expect(r.cents).toBe(-1886);
+    expect(r.libelle).toMatch(/^Remise/);
+    expect(f()._ecartTotalDocument(lignes, 11886, true)).toBeNull();
+    expect(f()._ecartTotalDocument(lignes, 16000, false)).toBeNull();
+  });
+  it('signe affiché : + 41,14 € / − 18,86 €', () => {
+    expect(f()._eurSigne(4114)).toBe('+ 41,14\u00a0€');
+    expect(f()._eurSigne(-1886)).toBe('− 18,86\u00a0€');
+  });
+  it('le document (émis et aperçu) montre la ligne de complément dans le tableau, au même format que les actes', () => {
+    const d = {
+      id: 'i',
+      type: 'facture',
+      statut: 'emis',
+      numero: 'F-1',
+      date_document: '2026-10-20',
+      emetteur: { nom: 'x' },
+      patient: { nom: 'y' },
+      regime: 'standard',
+      lignes: lignesSemelles(),
+      total_fixe: true,
+      total_cents: 16000,
+      tiers_payant: true,
+      part_secu_cents: 1632,
+      mention_tva: 'm',
+    };
+    for (const h of [f()._htmlDocumentEmis(d), f()._htmlCorpsDocument(d, true)]) {
+      expect(h).toContain(
+        'Complément d&#39;honoraires (prix de l&#39;ensemble fixé par le praticien)'
+      );
+      expect(h).toContain('+ 41,14');
+      expect(h).toContain('Total des actes : 160,00');
+      expect(h).not.toContain('Somme des actes');
+    }
+    const sans = f()._htmlDocumentEmis({
+      ...d,
+      total_fixe: false,
+      total_cents: 11886,
+      tiers_payant: false,
+      part_secu_cents: 0,
+    });
+    expect(sans).not.toContain('Complément d&#39;honoraires');
+  });
+  it("l'éditeur annonce la ligne de complément dès que le total est fixé", () => {
+    const resume = { innerHTML: '' };
+    const e = monter({ champs: { 'doc-resume': resume, 'doc-total-somme': { style: {} } } });
+    e.f.nouveauDocument('facture');
+    e.f.basculerActeDocument('a-lpp', true);
+    e.f.basculerActeDocument('a-perso', true);
+    e.f.modifierTotalFixeDocument('160');
+    expect(resume.innerHTML).toContain('Complément d&#39;honoraires');
+    expect(resume.innerHTML).toMatch(/il figurera sur une ligne du document/);
+    e.f.revenirALaSommeDocument();
+    expect(resume.innerHTML).not.toContain('Complément d&#39;honoraires');
+  });
+});
+
+describe("impression d'un document émis (facture ou devis)", () => {
+  const emis = (o = {}) => ({
+    id: 'e1',
+    type: 'facture',
+    statut: 'emis',
+    numero: 'F-2026-0007',
+    date_document: '2026-10-20',
+    emetteur: { nom: 'Dr <b>Fictif</b>', siret: '12345678900012', rpps: '10001234567' },
+    patient: { nom: 'Martin', prenom: 'Paul' },
+    regime: 'standard',
+    lignes: [L(acte('a-lpp')), { ...L(acte('a-perso')), prix_cents: 9000 }],
+    total_fixe: true,
+    total_cents: 16000,
+    tiers_payant: true,
+    part_secu_cents: 1632,
+    mention_tva: 'TVA non applicable, article 261-4-1° du CGI',
+    ...o,
+  });
+  it('le bouton « 🖨 Imprimer » est sur la facture émise ET sur le devis émis, avec le bon identifiant', () => {
+    for (const d of [emis(), emis({ id: 'd9', type: 'devis', numero: 'D-2026-0002' })]) {
+      const h = f0()._htmlDocumentEmis(d);
+      expect(h).toContain("imprimerDocument('" + d.id + "')");
+      expect(h).toContain('🖨 Imprimer');
+    }
+  });
+  it("ni l'éditeur ni l'aperçu d'un brouillon n'ont de bouton imprimer (rien n'est émis)", () => {
+    const e = monter();
+    e.f.nouveauDocument('facture');
+    e.f.basculerActeDocument('a-pod1', true);
+    expect(e.f._htmlEditeurDocument()).not.toContain('imprimerDocument');
+    e.f.visualiserBrouillonDocument();
+    expect(e.f._htmlApercuDocument()).not.toContain('imprimerDocument');
+  });
+  it("page imprimée : même contenu que l'écran, fond blanc, A4, titre = nom du fichier PDF, sans bouton ni formulaire de règlement", () => {
+    const d = emis();
+    const h = f0()._htmlPageImpressionDocument(d);
+    expect(h).toContain('<title>Facture F-2026-0007</title>');
+    expect(h).toContain('@page{size:A4');
+    expect(h).toContain('background:#fff');
+    expect(h).toContain('FACTURE F-2026-0007');
+    expect(h).toContain('Net à payer par le patient');
+    expect(h).toContain('Complément d&#39;honoraires');
+    expect(h).toContain('TVA non applicable');
+    expect(h).toContain('SIRET 12345678900012');
+    expect(h).not.toMatch(/<button|<select|doc-reglement|Retour à la liste|APERÇU/);
+    expect(h).not.toContain('<b>Fictif</b>');
+    // variables du thème redéfinies : l'iframe n'hérite de rien
+    for (const v of ['--bord', '--mut', '--txt']) expect(h).toContain(v + ':');
+    // une seule carte, bien fermée
+    expect((h.match(/<div/g) || []).length).toBe((h.match(/<\/div>/g) || []).length);
+  });
+  it('titre du devis ; titre échappé', () => {
+    expect(
+      f0()._htmlPageImpressionDocument(emis({ type: 'devis', numero: 'D-2026-0002' }))
+    ).toContain('<title>Devis D-2026-0002</title>');
+    expect(f0()._htmlPageImpressionDocument(emis({ numero: 'F<x>' }))).toContain(
+      '<title>Facture F&lt;x&gt;</title>'
+    );
+  });
+  it("imprimerDocument : écrit la page dans un iframe caché puis lance l'impression", async () => {
+    const e = monter({ liste: [emis()] });
+    e.f.imprimerDocument('e1');
+    await new Promise((r) => setTimeout(r, 400));
+    expect(e.ecrit).toHaveLength(1);
+    expect(e.ecrit[0]).toContain('FACTURE F-2026-0007');
+    expect(e.imprime).toHaveLength(1);
+    expect(e.iframes[0].style.cssText).toMatch(/width:0;height:0/);
+  });
+  it("un second clic remplace l'iframe précédent (pas d'accumulation)", async () => {
+    const e = monter({ liste: [emis()] });
+    e.f.imprimerDocument('e1');
+    e.f.imprimerDocument('e1');
+    await new Promise((r) => setTimeout(r, 400));
+    expect(e.iframes.filter((f) => !f.retire)).toHaveLength(1);
+  });
+  it("brouillon, identifiant inconnu : rien n'est imprimé", async () => {
+    const e = monter({ liste: [emis({ id: 'b1', statut: 'brouillon', numero: null })] });
+    e.f.imprimerDocument('b1');
+    e.f.imprimerDocument('inconnu');
+    await new Promise((r) => setTimeout(r, 400));
+    expect(e.ecrit).toHaveLength(0);
+    expect(e.imprime).toHaveLength(0);
+  });
+  it("accès bloqué (abonnement) : fenêtre d'accès restreint, aucune impression ; accès en lecture seule : impression permise", async () => {
+    const bloque = monter({ liste: [emis()], acces: 'blocked' });
+    bloque.f.imprimerDocument('e1');
+    await new Promise((r) => setTimeout(r, 400));
+    expect(bloque.modales).toEqual(['export_pdf']);
+    expect(bloque.imprime).toHaveLength(0);
+    const lecture = monter({ liste: [emis()], acces: 'readonly' });
+    lecture.f.imprimerDocument('e1');
+    await new Promise((r) => setTimeout(r, 400));
+    expect(lecture.imprime).toHaveLength(1);
   });
 });
 

@@ -31018,6 +31018,19 @@ const _eur = (c) => _escHtml(_centimesVersEuros(c));
 const _CSS_BTN = 'font-size:12px;padding:5px 12px;';
 // Document ÉMIS en lecture seule (aperçu à l'écran ; le PDF viendra à l'étape 2b-2).
 // Sous l'intitulé d'une ligne : tarif de convention, part Sécu et part mutuelle (indicatives).
+// Écart entre le prix fixé par le praticien pour l'ENSEMBLE et la somme des tarifs des actes :
+// affiché comme une ligne du document pour que les lignes s'additionnent exactement au total.
+function _ecartTotalDocument(lignes, totalCents, fixe) {
+  if (!fixe) return null;
+  const somme = _calculerDocument(lignes, 'standard', null).sousTotalCents;
+  const ecart = totalCents - somme;
+  if (!ecart) return null;
+  return {
+    cents: ecart,
+    libelle: ecart > 0 ? "Complément d'honoraires (prix de l'ensemble fixé par le praticien)" : 'Remise (prix de l\'ensemble fixé par le praticien)',
+  };
+}
+function _eurSigne(c) { return (c < 0 ? '− ' : '+ ') + _centimesVersEuros(Math.abs(c)); }
 function _htmlPartsLigne(l, regime) {
   const p = _partsRemboursement(l.base_remboursable_cents, regime);
   const txt = p
@@ -31040,6 +31053,13 @@ function _htmlCorpsDocument(d, apercu) {
     '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.prix_cents) + '</td>' +
     '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.qte * l.prix_cents) + '</td></tr>'
   ).join('');
+  const ecart = _ecartTotalDocument(d.lignes, d.total_cents, d.total_fixe);
+  const ligneEcart = ecart
+    ? '<tr><td style="padding:6px 8px;border-bottom:1px solid var(--bord);">' + _escHtml(ecart.libelle) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;">1</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _escHtml(_eurSigne(ecart.cents)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _escHtml(_eurSigne(ecart.cents)) + '</td></tr>'
+    : '';
   const bloc = (t, v) => v ? '<div>' + t + _escHtml(v) + '</div>' : '';
   const numeroHtml = apercu
     ? '<span style="font-size:12px;font-weight:600;color:var(--mut);">(numéro attribué à l\'émission)</span>'
@@ -31059,8 +31079,7 @@ function _htmlCorpsDocument(d, apercu) {
     '<div style="font-size:12px;margin-bottom:12px;"><b>Patient</b><div>' + _escHtml((p.civilite ? p.civilite + ' ' : '') + (p.prenom || '') + ' ' + (p.nom || '')) + '</div>' +
       bloc('', p.adresse) + (p.cp || p.ville ? '<div>' + _escHtml((p.cp || '') + ' ' + (p.ville || '')) + '</div>' : '') + '</div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:var(--mut);font-size:11px;">' +
-      '<th style="padding:6px 8px;">Acte</th><th style="padding:6px 8px;text-align:right;">Qté</th><th style="padding:6px 8px;text-align:right;">Tarif</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>' + lignes + '</tbody></table>' +
-    (d.total_fixe ? '<div style="text-align:right;font-size:12px;color:var(--mut);margin-top:6px;">Somme des actes : ' + _eur(c.sousTotalCents) + ' — total fixé par le praticien</div>' : '') +
+      '<th style="padding:6px 8px;">Acte</th><th style="padding:6px 8px;text-align:right;">Qté</th><th style="padding:6px 8px;text-align:right;">Tarif</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>' + lignes + ligneEcart + '</tbody></table>' +
     (d.tiers_payant
       ? '<div style="text-align:right;font-size:13px;margin-top:6px;">Total des actes : ' + _eur(d.total_cents) + '</div>' +
         '<div style="text-align:right;font-size:13px;">Part payée directement par la Sécurité sociale (tiers payant) : − ' + _eur(d.part_secu_cents) + '</div>' +
@@ -31091,7 +31110,9 @@ function _htmlDocumentEmis(d) {
   } else {
     h += '<div style="margin-top:12px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="creerFactureDepuisDevis(\'' + _escHtml(d.id) + '\')">🧾 Créer la facture depuis ce devis</button></div>';
   }
-  return h + '<div style="margin-top:10px;"><button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">← Retour à la liste</button></div></div>';
+  return h + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="imprimerDocument(\'' + _escHtml(d.id) + '\')">🖨 Imprimer</button>' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">← Retour à la liste</button></div></div>';
 }
 // Aperçu du brouillon : ce que le patient recevra, avec ce qui manque encore pour émettre.
 function _htmlApercuDocument() {
@@ -31113,6 +31134,36 @@ function visualiserBrouillonDocument() {
   renderDocumentsPage();
 }
 function fermerApercuDocument() { _docApercu = false; renderDocumentsPage(); }
+// Page d'impression d'un document ÉMIS : le MÊME corps que l'écran, sur fond blanc, avec ses
+// propres couleurs (l'iframe d'impression n'hérite pas des variables du thème). Le titre sert
+// de nom de fichier lors d'un « Enregistrer en PDF ».
+function _htmlPageImpressionDocument(d) {
+  const titre = (d.type === 'devis' ? 'Devis ' : 'Facture ') + (d.numero || '');
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + _escHtml(titre) + '</title><style>' +
+    ':root{--bord:#d1d5db;--mut:#4b5563;--txt:#111827;--dim:#6b7280;--red:#b91c1c;--green:#15803d;--blue:#175FA8}' +
+    '@page{size:A4;margin:14mm}' +
+    'html,body{background:#fff;color:#111827;margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}' +
+    '.card{border:none;background:#fff;padding:0!important;max-width:182mm;margin:0 auto}' +
+    'table{border-collapse:collapse;width:100%}tr{page-break-inside:avoid}' +
+    '</style></head><body>' + _htmlCorpsDocument(d, false) + '</div></body></html>';
+}
+function imprimerDocument(id) {
+  const d = _docListe.find((x) => x.id === id && x.statut === 'emis');
+  if (!d) return;
+  if (!_accessPermetImpression()) { showAccessRestrictedModal('export_pdf'); return; }
+  document.querySelectorAll('iframe.doc-impression').forEach((f) => f.remove());
+  const iframe = document.createElement('iframe');
+  iframe.className = 'doc-impression';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open(); idoc.write(_htmlPageImpressionDocument(d)); idoc.close();
+  setTimeout(function() {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch (_e) { alert('Impression impossible. Réessayez ou utilisez Cmd/Ctrl+P.'); }
+  }, 300);
+}
 function _htmlListeDocuments() {
   if (!_docListe.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun document pour ce patient.</div>';
   return _docListe.map((d) => {
@@ -31201,6 +31252,7 @@ function _majResumeDocument() {
     (e.totalIllisible ? '<div style="color:var(--red);">Total illisible : écrivez par exemple 160 ou 160,50.</div>' : '') +
     (lignesIllisibles ? '<div style="color:var(--red);">Une quantité est illisible (1 à 99).</div>' : '') +
     '<div>Somme des actes (tarifs de convention) : ' + _eur(c.sousTotalCents) + '</div>' +
+    (function () { const x = _ecartTotalDocument(e.lignes, c.totalCents, Number.isInteger(e.totalFixeCents)); return x ? '<div>' + _escHtml(x.libelle) + ' : <b>' + _escHtml(_eurSigne(x.cents)) + '</b> — il figurera sur une ligne du document.</div>' : ''; })() +
     (e.tiersPayant ? '<div>Payé directement par la Sécurité sociale (tiers payant) : <b>− ' + _eur(Math.min(c.secuNette, c.totalCents)) + '</b></div>' +
       '<div style="font-size:14px;color:var(--txt);">Montant à payer par le patient : <b>' + _eur(c.totalCents - Math.min(c.secuNette, c.totalCents)) + '</b></div>' : '') +
     '<div>Remboursement Sécurité sociale estimé : <b>' + _eur(c.secuNette) + '</b>' + (c.franchise ? ' (franchise de ' + _eur(c.franchise) + ' déduite)' : '') +
