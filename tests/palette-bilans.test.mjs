@@ -71,15 +71,17 @@ const HEX_RED = '#f04060';
 // qu'au survol. Sa présence ici serait donc une régression, pas un oubli.
 // #259 : les boutons Continuer/Finaliser des 4 bandeaux « en cours » prennent la
 // couleur de leur bilan (déplacement de 6 var() entre familles, total inchangé : 45).
+// Facturation 2b-1 : le bouton « 🧾 Devis et factures » de l'en-tête patient reprend le style
+// exact du bouton ✏️ voisin (+1 --mut, +1 --card, +1 --bord : total 45 → 48).
 const COMPTES_ATTENDUS = {
   '--posturo-*': 12,
   '--sport-*': 11,
-  '--mut': 12,
+  '--mut': 13,
   '--txt': 9,
   '--pedicurie-*': 11,
   '--podo-*': 11,
-  '--card': 7,
-  '--bord': 6,
+  '--card': 8,
+  '--bord': 7,
   '--encours-*': 4,
   '--encours': 4,
   '--danger-*': 4,
@@ -492,7 +494,7 @@ const HTML = readFileSync(join(RACINE, 'index.html'), 'utf8');
 const CSS_ENTIER = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
 const JS_ENTIER = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
 
-// Les quatorze pages qui doivent porter la classe. pg-patients y est inclus :
+// Les quinze pages qui doivent porter la classe. pg-patients y est inclus :
 // #258 l'avait scopée par identifiant, ce lot la migre vers le même
 // mécanisme que les six autres.
 const PAGES_CLAIRES = [
@@ -503,6 +505,7 @@ const PAGES_CLAIRES = [
   'pg-compare',
   'pg-praticiens',
   'pg-actes', // facturation, étape 1 : page ajoutée en clair d'emblée
+  'pg-documents', // facturation, étape 2b-1 : idem
   'pg-agenda',
   // #265 lot 3B — le bilan clinique sportif. La bascule y AMÉLIORE la
   // lisibilité, mesuré : 147 éléments porteurs de texte sous 4,5:1 en sombre,
@@ -571,7 +574,7 @@ function classesDe(id) {
 }
 
 describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
-  it('10. Les quatorze pages du lot portent page-claire', () => {
+  it('10. Les quinze pages du lot portent page-claire', () => {
     let executes = 0;
     for (const id of PAGES_CLAIRES) {
       const cl = classesDe(id);
@@ -597,7 +600,7 @@ describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
     }
   });
 
-  it('10c. Exactement les PAGES de la liste portent la classe (quatorze)', () => {
+  it('10c. Exactement les PAGES de la liste portent la classe (quinze)', () => {
     // Compte d'occurrences, pas de lignes : une page supplémentaire ajoutée
     // ailleurs dans le fichier échapperait aux deux listes ci-dessus.
     // #268-L1 — le compte porte sur les PAGES (balises de classe « page ») :

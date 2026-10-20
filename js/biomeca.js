@@ -4790,7 +4790,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
@@ -4799,6 +4799,7 @@ function nav(id) {
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
   if(id === 'pg-actes') renderActesPage();
+  if(id === 'pg-documents') renderDocumentsPage();
   if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
@@ -6436,6 +6437,7 @@ function renderPatientList() {
           <div style="font-size:14px;font-weight:700;color:var(--txt);">${_escHtml(p.prenom)} ${_escHtml(p.nom)}</div>
           <div style="font-size:11px;color:var(--mut);margin-top:2px;">${age} · ${_escHtml(p.sport||'—')}${prat?' · '+_escHtml(prat.nom):''}</div>
         </div>
+        <button onclick="ouvrirDocumentsPatient(${i})" title="Devis et factures" aria-label="Devis et factures" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧾</button>
         <button onclick="editPatient(${i})" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
         <button onclick="deletePatient(${i})" class="bl-x" style="width:32px;height:32px;font-size:13px;">✕</button>
       </div>
@@ -6573,10 +6575,11 @@ function createPraticien() {
     tel:document.getElementById('pr-tel').value,
     adresse:document.getElementById('pr-adresse').value,
     email:document.getElementById('pr-email').value,
+    siret:document.getElementById('pr-siret').value.trim(), rpps:document.getElementById('pr-rpps').value.trim(), mentionTva:document.getElementById('pr-mention-tva').value.trim(), // facturation
     logo:_pratLogoDataUrl, // #229-B
   };
   praticiens.push(pr); savePraticiens();
-  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id=>{document.getElementById(id).value='';});
+  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-mention-tva'].forEach(id=>{document.getElementById(id).value='';});
   removePraticienLogo(); // #229-B — reset du formulaire
   renderPratList(); populatePratSelect();
   alert(`✓ Praticien enregistré : ${pr.nom}`);
@@ -8712,6 +8715,9 @@ function editPraticien(i) {
   document.getElementById('pr-tel').value = pr.tel || '';
   document.getElementById('pr-adresse').value = pr.adresse || '';
   document.getElementById('pr-email').value = pr.email || '';
+  document.getElementById('pr-siret').value = pr.siret || '';
+  document.getElementById('pr-rpps').value = pr.rpps || '';
+  document.getElementById('pr-mention-tva').value = pr.mentionTva || '';
   // #229-B — charger le logo existant dans l'état + l'aperçu du formulaire.
   _pratLogoDataUrl = pr.logo || '';
   _setPratLogoPreview(_pratLogoDataUrl);
@@ -8736,13 +8742,16 @@ function saveEditPraticien(i) {
   pr.tel = document.getElementById('pr-tel').value.trim();
   pr.adresse = document.getElementById('pr-adresse').value.trim();
   pr.email = document.getElementById('pr-email').value.trim();
+  pr.siret = document.getElementById('pr-siret').value.trim();
+  pr.rpps = document.getElementById('pr-rpps').value.trim();
+  pr.mentionTva = document.getElementById('pr-mention-tva').value.trim();
   pr.logo = _pratLogoDataUrl; // #229-B — '' si retiré via le bouton ✕
   savePatients();
   renderPratList();
   // Remettre le bouton en mode création
   const btn = document.querySelector('#pg-praticiens button[onclick*="saveEditPraticien"]');
   if(btn) { btn.textContent = '✓ Enregistrer le praticien'; btn.onclick = createPraticien; }
-  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id => {
+  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-mention-tva'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   removePraticienLogo(); // #229-B — reset du formulaire
@@ -30692,6 +30701,446 @@ async function renderActesPage() {
         '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="basculerActeActif(\'' + _escHtml(a.id) + '\')">' + (a.actif ? 'Désactiver' : 'Réactiver') + '</button>' +
       '</div></div>'
   ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Facturation, étape 2b-1 — devis et factures par patient
+// (tables documents_facturation + documents_numerotation, RPC emettre_document)
+// ═══════════════════════════════════════════════════════════════════
+// Brouillon librement modifiable ; ÉMIS = numéro D-/F-AAAA-NNNN attribué par la base,
+// document figé (seul le règlement d'une facture s'enregistre). Lignes, patient et
+// émetteur sont des instantanés. Montants en centimes, sans TVA.
+const MENTION_TVA_DEFAUT = 'TVA non applicable, article 261-4-1° du CGI';
+const MODES_PAIEMENT = { especes: 'Espèces', cheque: 'Chèque', carte: 'Carte bancaire', virement: 'Virement' };
+const FRANCHISE_ACTE_CENTS = 100;
+const FRANCHISE_JOUR_MAX_CENTS = 400;
+const DOC_LIGNES_MAX = 50;
+
+// Totaux et remboursement INDICATIF d'un document. Le prix est celui du praticien
+// (ligne par ligne, ou total fixé) ; la part Sécu se calcule sur la BASE remboursable
+// de l'acte (jamais sur le prix) ; la franchise de 1 € par acte (4 € par jour au plus)
+// se déduit de la part Sécu ; la part mutuelle réelle dépend du contrat (non calculée).
+function _calculerDocument(lignes, regime, totalFixeCents) {
+  let sousTotal = 0, baseTotal = 0, secuTotal = 0, tmTotal = 0, nbFranchise = 0;
+  (lignes || []).forEach((l) => {
+    const q = Number.isInteger(l.qte) ? l.qte : 0;
+    sousTotal += q * (Number.isInteger(l.prix_cents) ? l.prix_cents : 0);
+    const p = _partsRemboursement(l.base_remboursable_cents, regime);
+    if (!p) return;
+    baseTotal += q * p.base; secuTotal += q * p.secu; tmTotal += q * p.resteTM;
+    if (l.franchise !== false) nbFranchise += q;
+  });
+  const total = Number.isInteger(totalFixeCents) ? totalFixeCents : sousTotal;
+  const franchise = Math.min(nbFranchise * FRANCHISE_ACTE_CENTS, FRANCHISE_JOUR_MAX_CENTS, secuTotal);
+  const secuNette = secuTotal - franchise;
+  return {
+    sousTotalCents: sousTotal, totalCents: total, baseTotal, secuTotal, franchise, secuNette,
+    tmTotal, horsBase: Math.max(0, total - baseTotal), resteApresSecu: Math.max(0, total - secuNette),
+  };
+}
+function _ligneDepuisActe(a) {
+  return {
+    acte_id: a.id, code: a.code || null, libelle: a.libelle, cotation: a.cotation || null,
+    qte: 1, prix_cents: a.montant_cents,
+    base_remboursable_cents: Number.isInteger(a.base_remboursable_cents) ? a.base_remboursable_cents : null,
+    franchise: a.franchise !== false,
+  };
+}
+const _chiffresSeuls = (s) => String(s ?? '').replace(/[\s.\-]/g, '');
+function _mentionTva(pr) { return String(pr?.mentionTva ?? '').trim() || MENTION_TVA_DEFAUT; }
+function _emetteurDepuisPraticien(pr) {
+  const t = (v, n) => String(v ?? '').trim().slice(0, n);
+  return {
+    nom: t(pr?.nom, 120), titre: t(pr?.titre, 120), cabinet: t(pr?.cabinet, 120),
+    adresse: t(pr?.adresse, 300), tel: t(pr?.tel, 40), email: t(pr?.email, 120),
+    siret: _chiffresSeuls(pr?.siret), rpps: _chiffresSeuls(pr?.rpps),
+  };
+}
+function _patientInstantane(p) {
+  const t = (v, n) => String(v ?? '').trim().slice(0, n);
+  return {
+    civilite: t(p?.civilite, 20), nom: t(p?.nom, 120), prenom: t(p?.prenom, 120),
+    adresse: t(p?.adresse, 300), cp: t(p?.cp, 12), ville: t(p?.ville, 120),
+  };
+}
+// Contrôle d'un document avant enregistrement ; `pourEmission` ajoute les mentions
+// obligatoires de l'émetteur (SIRET 14 chiffres, RPPS 11 ou ADELI 9 chiffres).
+function _validerDocument(d, pourEmission) {
+  const ko = (erreur) => ({ ok: false, erreur });
+  if (!d || (d.type !== 'devis' && d.type !== 'facture')) return ko('Type de document invalide.');
+  if (!d.patient_ref) return ko('Aucun patient sélectionné.');
+  if (!REGIMES_REMBOURSEMENT[d.regime]) return ko('Régime de remboursement invalide.');
+  if (!Array.isArray(d.lignes) || d.lignes.length < 1) return ko('Cochez au moins un acte.');
+  if (d.lignes.length > DOC_LIGNES_MAX) return ko('Au plus ' + DOC_LIGNES_MAX + ' lignes par document.');
+  for (const l of d.lignes) {
+    const nom = String(l.libelle ?? '').trim();
+    if (!nom || nom.length > 120) return ko('Une ligne n\'a pas de titre valide.');
+    if (!Number.isInteger(l.qte) || l.qte < 1 || l.qte > 99) return ko('Quantité invalide pour « ' + nom + ' » (1 à 99).');
+    if (!Number.isInteger(l.prix_cents) || l.prix_cents < 0 || l.prix_cents > ACTE_MONTANT_MAX_CENTS) {
+      return ko('Prix invalide pour « ' + nom + ' » (exemple : 30 ou 30,50).');
+    }
+  }
+  if (d.totalFixeCents != null &&
+      !(Number.isInteger(d.totalFixeCents) && d.totalFixeCents >= 0 && d.totalFixeCents <= ACTE_MONTANT_MAX_CENTS)) {
+    return ko('Total fixé invalide (exemple : 150 ou 150,00).');
+  }
+  const calc = _calculerDocument(d.lignes, d.regime, d.totalFixeCents);
+  if (calc.totalCents > ACTE_MONTANT_MAX_CENTS) return ko('Le total dépasse 100 000 €.');
+  if (!String(d.emetteur?.nom ?? '').trim()) return ko('Choisissez le praticien émetteur.');
+  if (pourEmission) {
+    const e = d.emetteur;
+    if (!/^\d{14}$/.test(e.siret)) return ko('SIRET manquant ou invalide (14 chiffres) : complétez la fiche du praticien (onglet Praticiens).');
+    if (!/^(\d{9}|\d{11})$/.test(e.rpps)) return ko('N° RPPS (11 chiffres) ou ADELI (9 chiffres) manquant ou invalide : complétez la fiche du praticien.');
+  }
+  return { ok: true };
+}
+function _dateFr(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : '—';
+}
+// Ligne de base de données (brouillon) construite depuis l'état de l'éditeur.
+function _ligneBaseDocument(etat, patient, praticien) {
+  const emetteur = _emetteurDepuisPraticien(praticien);
+  const lignes = (etat.lignes || []).map((l) => ({
+    acte_id: l.acte_id || null, code: l.code || null, libelle: String(l.libelle ?? '').trim(),
+    cotation: l.cotation || null, qte: l.qte, prix_cents: l.prix_cents,
+    base_remboursable_cents: Number.isInteger(l.base_remboursable_cents) ? l.base_remboursable_cents : null,
+    franchise: l.franchise !== false,
+  }));
+  const calc = _calculerDocument(lignes, etat.regime, etat.totalFixeCents);
+  return {
+    type: etat.type, patient_ref: String(patient?.id ?? ''), patient: _patientInstantane(patient),
+    emetteur, regime: etat.regime, lignes, total_fixe: Number.isInteger(etat.totalFixeCents),
+    total_cents: calc.totalCents, mention_tva: _mentionTva(praticien),
+    note: String(etat.note ?? '').trim().slice(0, 1000) || null, devis_numero: etat.devisNumero || null,
+  };
+}
+
+let _docListe = [];
+let _docEdition = null;
+let _docVue = null;
+async function _docRequete(chemin, options) {
+  const res = await authFetch(SUPA_URL + '/rest/v1/' + chemin, options);
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { const j = await res.json(); if (j && j.message) msg = j.message; } catch (_e) { /* corps absent */ }
+    throw new Error(msg);
+  }
+  return res;
+}
+const _ENTETES_JSON = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+function _praticienParDefaut(patient) {
+  return praticiens.find((p) => p.id == patient?.pratId) || praticiens[0] || null;
+}
+function _praticienDuDocument(etat) {
+  return praticiens.find((p) => p.id == etat.pratId) || null;
+}
+async function chargerDocuments(patient) {
+  const res = await _docRequete('documents_facturation?select=*&order=created_at.desc&patient_ref=eq.' +
+    encodeURIComponent(String(patient?.id ?? '')));
+  _docListe = await res.json();
+  return _docListe;
+}
+function ouvrirDocumentsPatient(idx) {
+  const p = patients[idx];
+  if (!p) return;
+  selectPatient(p);
+  _docEdition = null; _docVue = null;
+  nav('pg-documents');
+}
+function nouveauDocument(type) {
+  _docVue = null;
+  _docEdition = {
+    id: null, type, pratId: _praticienParDefaut(currentPatient)?.id ?? null, regime: 'standard',
+    lignes: [], forfait: false, totalFixeCents: null, note: '', devisNumero: null,
+  };
+  renderDocumentsPage();
+}
+function ouvrirDocument(id) {
+  const d = _docListe.find((x) => x.id === id);
+  if (!d) return;
+  if (d.statut === 'emis') { _docEdition = null; _docVue = id; renderDocumentsPage(); return; }
+  _docVue = null;
+  const pr = praticiens.find((p) => p.nom === d.emetteur?.nom) || _praticienParDefaut(currentPatient);
+  _docEdition = {
+    id: d.id, type: d.type, pratId: pr?.id ?? null, regime: d.regime,
+    lignes: d.lignes.map((l) => Object.assign({}, l)),
+    forfait: !!d.total_fixe, totalFixeCents: d.total_fixe ? d.total_cents : null, note: d.note || '', devisNumero: d.devis_numero || null,
+  };
+  renderDocumentsPage();
+}
+function fermerDocument() { _docEdition = null; _docVue = null; renderDocumentsPage(); }
+function basculerActeDocument(acteId, coche) {
+  if (!_docEdition) return;
+  const i = _docEdition.lignes.findIndex((l) => l.acte_id === acteId);
+  if (coche && i < 0) {
+    const a = _actesCache.find((x) => x.id === acteId);
+    if (a) _docEdition.lignes.push(_ligneDepuisActe(a));
+  } else if (!coche && i >= 0) {
+    _docEdition.lignes.splice(i, 1);
+  }
+  _rendreLignesDocument();
+}
+function retirerLigneDocument(i) {
+  if (!_docEdition) return;
+  _docEdition.lignes.splice(i, 1);
+  renderDocumentsPage();
+}
+function modifierLigneDocument(i, champ, saisie) {
+  const l = _docEdition?.lignes[i];
+  if (!l) return;
+  if (champ === 'qte') { const n = parseInt(saisie, 10); l.qte = /^\d{1,2}$/.test(String(saisie).trim()) && n >= 1 ? n : null; }
+  if (champ === 'prix') l.prix_cents = _eurosVersCentimes(saisie);
+  _majTotauxDocument();
+}
+function modifierTotalFixeDocument(saisie) {
+  if (!_docEdition) return;
+  _docEdition.totalFixeCents = _eurosVersCentimes(saisie); // null si vide ou illisible
+  _majTotauxDocument();
+}
+function basculerTotalFixeDocument(actif) {
+  if (!_docEdition) return;
+  _docEdition.forfait = !!actif;
+  _docEdition.totalFixeCents = actif ? _calculerDocument(_docEdition.lignes, _docEdition.regime, null).totalCents : null;
+  renderDocumentsPage();
+}
+function modifierChampDocument(champ, valeur) {
+  if (!_docEdition) return;
+  if (champ === 'regime' && REGIMES_REMBOURSEMENT[valeur]) _docEdition.regime = valeur;
+  if (champ === 'note') _docEdition.note = valeur;
+  if (champ === 'prat') _docEdition.pratId = valeur;
+  _majTotauxDocument();
+}
+// État de l'éditeur → { base: ligne de base de données, controle: document à valider }.
+// Prix ou quantité illisibles sont null (refusés par la validation) ; un forfait coché
+// dont le total est illisible est refusé aussi, jamais ignoré en silence.
+function _preparerDocument(pourEmission) {
+  const e = _docEdition;
+  const pr = _praticienDuDocument(e);
+  const totalFixe = e.forfait ? e.totalFixeCents : null;
+  const base = _ligneBaseDocument(Object.assign({}, e, { totalFixeCents: totalFixe }), currentPatient, pr);
+  const controle = Object.assign({}, base, { totalFixeCents: totalFixe });
+  let v = _validerDocument(controle, pourEmission);
+  if (v.ok && e.forfait && !Number.isInteger(e.totalFixeCents)) v = { ok: false, erreur: 'Total fixé invalide (exemple : 150 ou 150,00).' };
+  return { base, v };
+}
+async function enregistrerBrouillonDocument(silencieux) {
+  if (!_docEdition || !currentPatient) return null;
+  const { base, v } = _preparerDocument(false);
+  if (!v.ok) { alert(v.erreur); return null; }
+  try {
+    const res = _docEdition.id
+      ? await _docRequete('documents_facturation?id=eq.' + encodeURIComponent(_docEdition.id) + '&statut=eq.brouillon',
+          { method: 'PATCH', headers: _ENTETES_JSON, body: JSON.stringify(base) })
+      : await _docRequete('documents_facturation', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify(base) });
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('document introuvable ou déjà émis');
+    _docEdition.id = row.id;
+    if (!silencieux) await renderDocumentsPage();
+    return row;
+  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.'); return null; }
+}
+async function emettreDocumentCourant() {
+  if (!_docEdition || !currentPatient) return;
+  const { v } = _preparerDocument(true);
+  if (!v.ok) { alert(v.erreur); return; }
+  const nom = _docEdition.type === 'devis' ? 'ce devis' : 'cette facture';
+  if (!confirm('Émettre ' + nom + ' ?\n\nUn numéro lui sera attribué et il ne pourra plus être modifié ni supprimé.')) return;
+  const row = await enregistrerBrouillonDocument(true);
+  if (!row) return;
+  try {
+    const res = await _docRequete('rpc/emettre_document', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify({ p_id: row.id }) });
+    const emis = await res.json();
+    _docEdition = null; _docVue = emis.id;
+    await renderDocumentsPage();
+  } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
+}
+async function supprimerBrouillonDocument() {
+  const id = _docEdition?.id;
+  if (!id) { _docEdition = null; await renderDocumentsPage(); return; }
+  if (!confirm('Supprimer ce brouillon ?')) return;
+  try {
+    await _docRequete('documents_facturation?id=eq.' + encodeURIComponent(id) + '&statut=eq.brouillon', { method: 'DELETE' });
+    _docEdition = null;
+    await renderDocumentsPage();
+  } catch (e) { alert('Suppression impossible (' + e.message + ').'); }
+}
+async function enregistrerReglementDocument(id) {
+  const mode = document.getElementById('doc-reglement-mode')?.value;
+  const date = document.getElementById('doc-reglement-date')?.value;
+  if (!MODES_PAIEMENT[mode]) { alert('Choisissez le mode de règlement.'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || Number.isNaN(Date.parse(date))) { alert('Date de règlement invalide.'); return; }
+  try {
+    await _docRequete('documents_facturation?id=eq.' + encodeURIComponent(id) + '&type=eq.facture&statut=eq.emis',
+      { method: 'PATCH', headers: _ENTETES_JSON, body: JSON.stringify({ paiement_mode: mode, paiement_date: date }) });
+    await renderDocumentsPage();
+  } catch (e) { alert('Règlement non enregistré (' + e.message + ').'); }
+}
+async function creerFactureDepuisDevis(id) {
+  const d = _docListe.find((x) => x.id === id && x.type === 'devis' && x.statut === 'emis');
+  if (!d || !currentPatient) return;
+  const pr = praticiens.find((p) => p.nom === d.emetteur?.nom) || _praticienParDefaut(currentPatient);
+  _docEdition = {
+    id: null, type: 'facture', pratId: pr?.id ?? null, regime: d.regime,
+    lignes: d.lignes.map((l) => Object.assign({}, l)),
+    forfait: !!d.total_fixe, totalFixeCents: d.total_fixe ? d.total_cents : null, note: d.note || '', devisNumero: d.numero,
+  };
+  _docVue = null;
+  const row = await enregistrerBrouillonDocument(true);
+  if (row) await renderDocumentsPage();
+}
+
+const _eur = (c) => _escHtml(_centimesVersEuros(c));
+const _CSS_BTN = 'font-size:12px;padding:5px 12px;';
+// Document ÉMIS en lecture seule (aperçu à l'écran ; le PDF viendra à l'étape 2b-2).
+function _htmlDocumentEmis(d) {
+  const e = d.emetteur || {}, p = d.patient || {};
+  const c = _calculerDocument(d.lignes, d.regime, d.total_fixe ? d.total_cents : null);
+  const titre = d.type === 'devis' ? 'DEVIS' : 'FACTURE';
+  const lignes = d.lignes.map((l) =>
+    '<tr><td style="padding:6px 8px;border-bottom:1px solid var(--bord);">' + _escHtml(l.libelle) +
+    (l.cotation ? ' <span style="color:var(--mut);">(' + _escHtml(l.cotation) + ')</span>' : '') + '</td>' +
+    '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;">' + _escHtml(l.qte) + '</td>' +
+    '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.prix_cents) + '</td>' +
+    '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.qte * l.prix_cents) + '</td></tr>'
+  ).join('');
+  const bloc = (t, v) => v ? '<div>' + t + _escHtml(v) + '</div>' : '';
+  let h = '<div class="card" id="doc-vue" style="padding:16px;">' +
+    '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">' +
+      '<div style="font-size:12px;"><div style="font-weight:700;font-size:14px;">' + _escHtml(e.nom) + '</div>' +
+        bloc('', e.titre) + bloc('', e.cabinet) + bloc('', e.adresse) + bloc('Tél. ', e.tel) + bloc('', e.email) +
+        bloc('SIRET ', e.siret) + bloc('RPPS / ADELI ', e.rpps) + '</div>' +
+      '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;">' + titre + ' ' + _escHtml(d.numero) + '</div>' +
+        '<div style="font-size:12px;">Date : ' + _escHtml(_dateFr(d.date_document)) + '</div>' +
+        (d.type === 'devis' ? '<div style="font-size:12px;">Valable jusqu\'au ' + _escHtml(_dateFr(d.valide_jusqu_au)) + '</div>' : '') +
+        (d.devis_numero ? '<div style="font-size:12px;">Selon devis ' + _escHtml(d.devis_numero) + '</div>' : '') + '</div></div>' +
+    '<div style="font-size:12px;margin-bottom:12px;"><b>Patient</b><div>' + _escHtml((p.civilite ? p.civilite + ' ' : '') + (p.prenom || '') + ' ' + (p.nom || '')) + '</div>' +
+      bloc('', p.adresse) + (p.cp || p.ville ? '<div>' + _escHtml((p.cp || '') + ' ' + (p.ville || '')) + '</div>' : '') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:var(--mut);font-size:11px;">' +
+      '<th style="padding:6px 8px;">Acte</th><th style="padding:6px 8px;text-align:right;">Qté</th><th style="padding:6px 8px;text-align:right;">Prix unitaire</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>' + lignes + '</tbody></table>' +
+    (d.total_fixe ? '<div style="text-align:right;font-size:12px;color:var(--mut);margin-top:6px;">Total des lignes : ' + _eur(c.sousTotalCents) + '</div>' : '') +
+    '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:6px;">Total à payer : ' + _eur(d.total_cents) + '</div>' +
+    '<div style="font-size:12px;color:var(--mut);margin-top:8px;">' + _escHtml(d.mention_tva) + '</div>' +
+    (d.note ? '<div style="font-size:12px;margin-top:8px;white-space:pre-wrap;">' + _escHtml(d.note) + '</div>' : '') +
+    '<div style="font-size:12px;margin-top:12px;padding:10px;border:1px dashed var(--bord);border-radius:8px;">' +
+      '<b>Remboursement estimé (indicatif)</b> — ' + _escHtml(REGIMES_REMBOURSEMENT[d.regime]?.libelle || '') +
+      '<div>Base de remboursement : ' + _eur(c.baseTotal) + ' · part Sécurité sociale : ' + _eur(c.secuTotal) +
+        (c.franchise ? ' − franchise ' + _eur(c.franchise) : '') + ' = ' + _eur(c.secuNette) + '</div>' +
+      '<div>Ticket modérateur (part complémentaire selon votre contrat) : ' + _eur(c.tmTotal) +
+        ' · part hors base (prix libre) : ' + _eur(c.horsBase) + '</div>' +
+      '<div>Reste à votre charge avant complémentaire : ' + _eur(c.resteApresSecu) + '</div></div>';
+  if (d.type === 'facture') {
+    const modeOpts = Object.keys(MODES_PAIEMENT).map((k) =>
+      '<option value="' + k + '"' + (d.paiement_mode === k ? ' selected' : '') + '>' + _escHtml(MODES_PAIEMENT[k]) + '</option>').join('');
+    h += '<div style="margin-top:12px;font-size:13px;">' +
+      (d.paiement_mode ? '<b style="color:var(--green,#15803d);">Acquittée le ' + _escHtml(_dateFr(d.paiement_date)) + ' — ' + _escHtml(MODES_PAIEMENT[d.paiement_mode]) + '</b>' : '<b>Facture non réglée</b>') +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">' +
+        '<select class="inp" id="doc-reglement-mode" style="width:auto;"><option value="">— Mode de règlement —</option>' + modeOpts + '</select>' +
+        '<input class="inp" type="date" id="doc-reglement-date" style="width:auto;" value="' + _escHtml(d.paiement_date || '') + '"/>' +
+        '<button class="btn" style="' + _CSS_BTN + '" onclick="enregistrerReglementDocument(\'' + _escHtml(d.id) + '\')">' + (d.paiement_mode ? 'Modifier le règlement' : 'Enregistrer le règlement') + '</button></div></div>';
+  } else {
+    h += '<div style="margin-top:12px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="creerFactureDepuisDevis(\'' + _escHtml(d.id) + '\')">🧾 Créer la facture depuis ce devis</button></div>';
+  }
+  return h + '<div style="margin-top:10px;"><button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">← Retour à la liste</button></div></div>';
+}
+function _htmlListeDocuments() {
+  if (!_docListe.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun document pour ce patient.</div>';
+  return _docListe.map((d) => {
+    const regl = d.type !== 'facture' || d.statut !== 'emis' ? '' : (d.paiement_mode ? ' · réglée' : ' · non réglée');
+    return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+      '<div style="font-size:13px;"><b>' + (d.type === 'devis' ? 'Devis' : 'Facture') + ' ' + _escHtml(d.numero || '(brouillon)') + '</b>' +
+        '<span style="color:var(--mut);"> · ' + _escHtml(_dateFr(d.date_document || d.created_at)) + regl + '</span></div>' +
+      '<div style="white-space:nowrap;"><b>' + _eur(d.total_cents) + '</b> ' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="ouvrirDocument(\'' + _escHtml(d.id) + '\')">' + (d.statut === 'emis' ? 'Voir' : 'Modifier') + '</button></div></div>';
+  }).join('');
+}
+function _htmlEditeurDocument() {
+  const e = _docEdition;
+  const regOpts = Object.keys(REGIMES_REMBOURSEMENT).map((k) =>
+    '<option value="' + k + '"' + (e.regime === k ? ' selected' : '') + '>' + _escHtml(REGIMES_REMBOURSEMENT[k].libelle) + '</option>').join('');
+  const pratOpts = praticiens.map((p) =>
+    '<option value="' + _escHtml(p.id) + '"' + (p.id == e.pratId ? ' selected' : '') + '>' + _escHtml(p.nom) + '</option>').join('');
+  const actes = _actesCache.filter((a) => a.actif).map((a) =>
+    '<label class="doc-acte" style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:12px;" data-texte="' + _escHtml((a.libelle + ' ' + (a.cotation || '')).toLowerCase()) + '">' +
+    '<input type="checkbox"' + (e.lignes.some((l) => l.acte_id === a.id) ? ' checked' : '') + ' onchange="basculerActeDocument(\'' + _escHtml(a.id) + '\', this.checked)"/>' +
+    '<span style="flex:1;">' + _escHtml(a.libelle) + (a.cotation ? ' <span style="color:var(--mut);">· ' + _escHtml(a.cotation) + '</span>' : '') + '</span>' +
+    '<span style="white-space:nowrap;">' + _eur(a.montant_cents) + '</span></label>').join('');
+  return '<div class="card" id="doc-editeur" style="padding:16px;">' +
+    '<div class="stitle">' + (e.type === 'devis' ? 'Devis' : 'Facture') + (e.id ? ' (brouillon)' : ' (nouveau)') + (e.devisNumero ? ' — selon devis ' + _escHtml(e.devisNumero) : '') + '</div>' +
+    '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien émetteur</div><select class="inp" onchange="modifierChampDocument(\'prat\', this.value)"><option value="">— Choisir —</option>' + pratOpts + '</select></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Remboursement</div><select class="inp" onchange="modifierChampDocument(\'regime\', this.value)">' + regOpts + '</select></div></div>' +
+    (praticiens.length ? '' : '<div style="font-size:12px;color:var(--red);margin-top:6px;">Aucun praticien : créez-en un dans l\'onglet Praticiens (avec SIRET et RPPS/ADELI).</div>') +
+    '<div class="stitle" style="margin-top:12px;">Actes</div>' +
+    '<input class="inp" id="doc-actes-recherche" placeholder="Rechercher un acte…" oninput="filtrerActesDocument(this.value)"/>' +
+    '<div id="doc-actes-liste" style="max-height:240px;overflow:auto;border:1px solid var(--bord);border-radius:8px;padding:4px 10px;margin-top:6px;">' + (actes || '<div style="font-size:12px;color:var(--mut);padding:6px 0;">Catalogue vide : importez le référentiel dans « Paramètres facturation ».</div>') + '</div>' +
+    '<div id="doc-lignes" style="margin-top:10px;"></div>' +
+    '<div id="doc-totaux" style="margin-top:10px;"></div>' +
+    '<div style="margin-top:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Note (facultatif)</div><textarea class="inp" rows="2" maxlength="1000" oninput="modifierChampDocument(\'note\', this.value)">' + _escHtml(e.note) + '</textarea></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="enregistrerBrouillonDocument()">💾 Enregistrer le brouillon</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="emettreDocumentCourant()">✓ Émettre</button>' +
+      '<button class="btn" style="' + _CSS_BTN + 'color:var(--red);" onclick="supprimerBrouillonDocument()">Supprimer le brouillon</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">Fermer</button></div></div>';
+}
+function filtrerActesDocument(texte) {
+  const t = String(texte ?? '').toLowerCase().trim();
+  document.querySelectorAll('#doc-actes-liste .doc-acte').forEach((el) => {
+    el.style.display = !t || (el.dataset.texte || '').includes(t) ? 'flex' : 'none';
+  });
+}
+function _rendreLignesDocument() {
+  const el = document.getElementById('doc-lignes');
+  if (!el || !_docEdition) return;
+  const ls = _docEdition.lignes;
+  el.innerHTML = ls.length ? ls.map((l, i) =>
+    '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--bord);font-size:12px;">' +
+    '<span style="flex:1;">' + _escHtml(l.libelle) + '</span>' +
+    '<input class="inp" style="width:56px;" inputmode="numeric" value="' + _escHtml(l.qte ?? '') + '" oninput="modifierLigneDocument(' + i + ', \'qte\', this.value)" aria-label="Quantité"/>' +
+    '<span>×</span><input class="inp" style="width:90px;" inputmode="decimal" value="' + _escHtml(l.prix_cents == null ? '' : (l.prix_cents / 100).toFixed(2).replace('.', ',')) + '" oninput="modifierLigneDocument(' + i + ', \'prix\', this.value)" aria-label="Prix unitaire en euros"/><span>€</span>' +
+    '<button class="btn" style="font-size:11px;padding:2px 8px;" onclick="retirerLigneDocument(' + i + ')" aria-label="Retirer la ligne">✕</button></div>').join('')
+    : '<div style="font-size:12px;color:var(--mut);">Cochez les actes à facturer.</div>';
+  _majTotauxDocument();
+}
+function _majTotauxDocument() {
+  const el = document.getElementById('doc-totaux');
+  if (!el || !_docEdition) return;
+  const e = _docEdition;
+  const lignesIllisibles = e.lignes.some((l) => !Number.isInteger(l.qte) || !Number.isInteger(l.prix_cents));
+  const totalIllisible = e.forfait && !Number.isInteger(e.totalFixeCents);
+  const c = _calculerDocument(e.lignes, e.regime, e.forfait && Number.isInteger(e.totalFixeCents) ? e.totalFixeCents : null);
+  const valFixe = Number.isInteger(e.totalFixeCents) ? (e.totalFixeCents / 100).toFixed(2).replace('.', ',') : '';
+  el.innerHTML = '<div style="font-size:12px;padding:10px;border:1px solid var(--bord);border-radius:8px;">' +
+    '<div>Total des lignes : <b>' + _eur(c.sousTotalCents) + '</b></div>' +
+    '<label style="display:flex;gap:6px;align-items:center;margin:6px 0;"><input type="checkbox"' + (e.forfait ? ' checked' : '') + ' onchange="basculerTotalFixeDocument(this.checked)"/> Fixer un total (forfait) — le détail des lignes reste affiché</label>' +
+    (e.forfait ? '<div><input class="inp" style="width:120px;" inputmode="decimal" value="' + _escHtml(valFixe) + '" oninput="modifierTotalFixeDocument(this.value)" aria-label="Total fixé en euros"/> €</div>' : '') +
+    '<div style="margin-top:6px;font-size:14px;">Total à payer : <b>' + (lignesIllisibles || totalIllisible ? '—' : _eur(c.totalCents)) + '</b> <span style="color:var(--mut);font-size:11px;">(sans TVA)</span></div>' +
+    (lignesIllisibles || totalIllisible ? '<div style="color:var(--red);">Une quantité, un prix ou le total fixé est illisible : corrigez-le avant d\'enregistrer.</div>' : '') +
+    '<div style="margin-top:6px;color:var(--mut);">Remboursement estimé (indicatif) : Sécurité sociale <b>' + _eur(c.secuNette) + '</b>' + (c.franchise ? ' (franchise ' + _eur(c.franchise) + ' déduite)' : '') +
+    ' · ticket modérateur ' + _eur(c.tmTotal) + ' · part hors base ' + _eur(c.horsBase) + ' · reste après Sécu ' + _eur(c.resteApresSecu) + '</div></div>';
+}
+async function renderDocumentsPage() {
+  const el = document.getElementById('documents-contenu');
+  if (!el) return;
+  const sub = document.getElementById('documents-patient');
+  if (!currentPatient) {
+    if (sub) sub.textContent = '';
+    el.innerHTML = '<div style="font-size:13px;color:var(--mut);">Sélectionnez un patient depuis la liste (bouton « 🧾 Facturer »).</div>';
+    return;
+  }
+  if (sub) sub.textContent = 'Patient : ' + (currentPatient.prenom || '') + ' ' + (currentPatient.nom || '');
+  try { await Promise.all([chargerDocuments(currentPatient), chargerActes()]); } catch (err) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--red);">Documents indisponibles (' + _escHtml(err.message) + '). Rien n\'a été modifié.</div>';
+    return;
+  }
+  if (_docEdition) { el.innerHTML = _htmlEditeurDocument(); _rendreLignesDocument(); return; }
+  const vue = _docVue && _docListe.find((x) => x.id === _docVue && x.statut === 'emis');
+  if (vue) { el.innerHTML = _htmlDocumentEmis(vue); return; }
+  _docVue = null;
+  el.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+    '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'devis\')">+ Nouveau devis</button>' +
+    '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'facture\')">+ Nouvelle facture</button></div>' +
+    '<div class="card" style="padding:12px 16px;">' + _htmlListeDocuments() + '</div>';
 }
 
 // ===== STRIPE + MODULES =====
