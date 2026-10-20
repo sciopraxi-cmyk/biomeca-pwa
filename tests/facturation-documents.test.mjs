@@ -32,6 +32,7 @@ const NOMS = [
   '_patientInstantane',
   '_validerDocument',
   '_dateFr',
+  '_netDocument',
   '_ligneBaseDocument',
   '_docRequete',
   '_praticienParDefaut',
@@ -412,6 +413,138 @@ describe('instantanés et mentions', () => {
   });
 });
 
+describe("tiers payant : le document n'indique que le montant dû par le patient", () => {
+  const f = () => HARNAIS.f;
+  const etat = (o = {}) => ({
+    type: 'facture',
+    regime: 'standard',
+    lignes: [L(acte('a-pod117')), L(acte('a-lpp'))],
+    totalFixeCents: 16000,
+    ...o,
+  });
+  it('exemple : bilan + semelles, total 160 € : la Sécu paie 36,88 € (franchise déduite), le patient 123,12 €', () => {
+    const row = f()._ligneBaseDocument(etat({ tiersPayant: true }), PATIENT, PRAT);
+    expect(row).toMatchObject({ tiers_payant: true, part_secu_cents: 3688, total_cents: 16000 });
+    expect(f()._netDocument(row)).toBe(12312);
+  });
+  it('sans tiers payant : part Sécu nulle, le patient paie le total', () => {
+    for (const tp of [false, undefined]) {
+      const row = f()._ligneBaseDocument(etat({ tiersPayant: tp }), PATIENT, PRAT);
+      expect(row).toMatchObject({ tiers_payant: false, part_secu_cents: 0 });
+      expect(f()._netDocument(row)).toBe(16000);
+    }
+  });
+  it('ALD : seule la franchise de 1 € reste due par le patient', () => {
+    const row = f()._ligneBaseDocument(
+      etat({
+        tiersPayant: true,
+        regime: 'ald',
+        lignes: [L(acte('a-pod117'))],
+        totalFixeCents: null,
+      }),
+      PATIENT,
+      PRAT
+    );
+    expect(row.part_secu_cents).toBe(3410);
+    expect(f()._netDocument(row)).toBe(100);
+  });
+  it('total fixé inférieur à la part Sécu : la part est plafonnée au total, net jamais négatif', () => {
+    const row = f()._ligneBaseDocument(
+      etat({
+        tiersPayant: true,
+        regime: 'ald',
+        lignes: [L(acte('a-pod117'))],
+        totalFixeCents: 1000,
+      }),
+      PATIENT,
+      PRAT
+    );
+    expect(row.part_secu_cents).toBe(1000);
+    expect(f()._netDocument(row)).toBe(0);
+  });
+  it('acte non remboursable (consultation libre) : tiers payant sans effet, le patient paie tout', () => {
+    const row = f()._ligneBaseDocument(
+      etat({ tiersPayant: true, lignes: [L(acte('a-perso'))], totalFixeCents: null }),
+      PATIENT,
+      PRAT
+    );
+    expect(row.part_secu_cents).toBe(0);
+    expect(f()._netDocument(row)).toBe(4550);
+  });
+  it("la case se coche dans l'éditeur, est enregistrée et reprise par le devis → facture", async () => {
+    const reponse = (a) =>
+      a.methode === 'POST' ? { status: 201, json: [{ id: 'd1' }] } : { status: 200, json: [] };
+    const e = monter({ reponse });
+    e.f.nouveauDocument('devis');
+    e.f.basculerActeDocument('a-pod1', true);
+    e.f.modifierChampDocument('tiers', true);
+    expect(e.f.etat().edition.tiersPayant).toBe(true);
+    await e.f.enregistrerBrouillonDocument();
+    expect(e.appels[0].corps).toMatchObject({ tiers_payant: true, part_secu_cents: 1700 });
+    const devis = {
+      id: 'dv',
+      type: 'devis',
+      statut: 'emis',
+      numero: 'D-1',
+      regime: 'standard',
+      lignes: [L(acte('a-pod1'))],
+      total_fixe: false,
+      total_cents: 3000,
+      tiers_payant: true,
+      part_secu_cents: 1700,
+      emetteur: { nom: 'Dr Fictif' },
+    };
+    const e2 = monter({ reponse, liste: [devis] });
+    await e2.f.creerFactureDepuisDevis('dv');
+    expect(e2.appels[0].corps).toMatchObject({ type: 'facture', tiers_payant: true });
+  });
+  it('document émis en tiers payant : total des actes, part Sécu déduite, NET à payer par le patient', () => {
+    const d = {
+      id: 'i',
+      type: 'facture',
+      statut: 'emis',
+      numero: 'F-2026-0007',
+      date_document: '2026-10-20',
+      emetteur: { nom: 'Dr Fictif' },
+      patient: { nom: 'Martin' },
+      regime: 'standard',
+      lignes: [L(acte('a-pod117')), { ...L(acte('a-lpp')) }],
+      total_fixe: true,
+      total_cents: 16000,
+      tiers_payant: true,
+      part_secu_cents: 3688,
+      mention_tva: 'TVA non applicable',
+    };
+    const h = f()._htmlDocumentEmis(d);
+    expect(h).toContain('Total des actes : 160,00');
+    expect(h).toContain('(tiers payant) : − 36,88');
+    expect(h).toContain('Net à payer par le patient : 123,12');
+    expect(h).not.toContain('Total à payer :');
+    const sans = f()._htmlDocumentEmis({ ...d, tiers_payant: false, part_secu_cents: 0 });
+    expect(sans).toContain('Total à payer : 160,00');
+    expect(sans).not.toContain('Net à payer');
+  });
+  it('liste : le montant affiché est celui du patient, avec la mention « tiers payant »', () => {
+    const e = monter({
+      liste: [
+        {
+          id: 'z',
+          type: 'facture',
+          statut: 'emis',
+          numero: 'F-1',
+          date_document: '2026-10-20',
+          total_cents: 16000,
+          part_secu_cents: 3688,
+          tiers_payant: true,
+        },
+      ],
+    });
+    const h = e.f._htmlListeDocuments();
+    expect(h).toContain('123,12');
+    expect(h).toContain('tiers payant');
+  });
+});
+
 describe('édition : cases à cocher, quantité, total à payer', () => {
   it('cocher ajoute la ligne au tarif du catalogue ; décocher la retire ; doublon impossible', () => {
     const e = monter();
@@ -463,7 +596,7 @@ describe('édition : cases à cocher, quantité, total à payer', () => {
     e.f.basculerActeDocument('a-pod1', true);
     e.f.modifierTotalFixeDocument('abc');
     await e.f.enregistrerBrouillonDocument();
-    expect(e.alertes[0]).toMatch(/Total à payer invalide/);
+    expect(e.alertes[0]).toMatch(/Total des actes invalide/);
     expect(e.appels).toHaveLength(0);
   });
   it('total égal à la somme des actes : pas de « total fixé » ; différent : total_fixe', () => {
@@ -786,6 +919,30 @@ describe('affichage', () => {
     expect(h).toContain('(brouillon)');
     expect(h).toContain('Voir');
     expect(h).toContain('Modifier');
+  });
+});
+
+describe('migration SQL du tiers payant', () => {
+  const sql = readFileSync(
+    join(RACINE, 'supabase/migrations/facturation-tiers-payant.sql'),
+    'utf8'
+  );
+  it('colonnes, contrainte de cohérence, net calculé par la base, idempotente', () => {
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS tiers_payant boolean NOT NULL DEFAULT false/);
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS part_secu_cents integer NOT NULL DEFAULT 0/);
+    expect(sql).toMatch(
+      /part_secu_cents <= total_cents AND \(tiers_payant OR part_secu_cents = 0\)/
+    );
+    expect(sql).toMatch(
+      /net_cents integer GENERATED ALWAYS AS \(total_cents - part_secu_cents\) STORED/
+    );
+    expect(sql).toMatch(/DROP CONSTRAINT IF EXISTS documents_tiers_payant_coherent/);
+  });
+  it("tiers payant et part Sécu rejoignent les champs figés d'un document émis", () => {
+    expect(sql).toMatch(/NEW\.tiers_payant <> OLD\.tiers_payant/);
+    expect(sql).toMatch(/NEW\.part_secu_cents <> OLD\.part_secu_cents/);
+    expect(sql).toContain("current_setting('verticy.emission', true)");
+    expect(sql).toContain('seul le règlement peut être modifié');
   });
 });
 

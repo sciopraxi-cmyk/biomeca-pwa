@@ -429,6 +429,27 @@ describe('complétion des actes importés avant l’ajout de la base remboursabl
     );
     expect(r).toEqual([{ id: 'a', champs: { base_remboursable_cents: 3000, franchise: true } }]);
   });
+  it("montant d'une version antérieure du référentiel (20,00 → 20,10 ; 35,00 → 35,10) corrigé ; montant choisi par le praticien jamais changé", () => {
+    const r = f._actesACompleter(
+      [
+        { id: 'a', code: 'POD-0,67', montant_cents: 2000, base_remboursable_cents: 2010 },
+        {
+          id: 'b',
+          code: 'POD-1,17',
+          montant_cents: 3500,
+          base_remboursable_cents: 3510,
+          libelle: 'Mon titre',
+        },
+        { id: 'c', code: 'POD-0,67', montant_cents: 2500, base_remboursable_cents: 2010 },
+        { id: 'd', code: 'POD-1', montant_cents: 3000, base_remboursable_cents: 3000 },
+      ],
+      ref
+    );
+    expect(r).toEqual([
+      { id: 'a', champs: { montant_cents: 2010 } },
+      { id: 'b', champs: { montant_cents: 3510 } },
+    ]);
+  });
   it('semelle : franchise false ; déjà renseigné, personnalisé, frais ou inconnu : ignorés', () => {
     expect(f._actesACompleter([{ id: 'l', code: 'LPP-2122121' }], ref)[0].champs).toEqual({
       base_remboursable_cents: 2804,

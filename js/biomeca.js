@@ -30415,14 +30415,14 @@ const REFERENTIEL_ACTES_POD = {
   source: 'Référentiel du praticien « POD et AMP podologue » (20/10/2026), d\'après ameli (07/03/2024) et LPP (07/07/2023)',
   actes: [
     // ── Pied diabétique (lettre POD, sans prescription) ──
-    { code: 'POD-0,67', cotation: 'POD 0,67', montant_cents: 2010, base_remboursable_cents: 2010,
+    { code: 'POD-0,67', cotation: 'POD 0,67', montant_cents: 2010, montants_precedents: [2000], base_remboursable_cents: 2010,
       libelle: 'Bilan de gradation du risque (grade 0 ou 1, 1 fois par an)',
       remboursement: 'Sécu 60 % : 12,06 € · 100 % en ALD : 20,10 €' },
     { code: 'POD-1', cotation: 'POD 1', montant_cents: 3000, base_remboursable_cents: 3000,
       libelle: 'Séance de soins de prévention (grade 2 ou 3)',
       remboursement: 'Sécu 60 % : 18,00 € · 100 % en ALD : 30,00 €',
       note: 'Forfait annuel : 5 séances en grade 2, 6 en grade 3, 8 en grade 3 avec plaie en cours de cicatrisation. Pas deux séances POD le même jour, ni avec un acte AMP.' },
-    { code: 'POD-1,17', cotation: 'POD 1,17', montant_cents: 3510, base_remboursable_cents: 3510,
+    { code: 'POD-1,17', cotation: 'POD 1,17', montant_cents: 3510, montants_precedents: [3500], base_remboursable_cents: 3510,
       libelle: 'Séance bilan et soins (grade 2 ou 3, environ 45 min, au moins 30 min)',
       remboursement: 'Sécu 60 % : 21,06 € · 100 % en ALD : 35,10 €',
       note: 'Compte dans le forfait annuel de séances. Pas deux séances POD le même jour, ni avec un acte AMP.' },
@@ -30566,16 +30566,26 @@ function _partsRemboursement(baseCents, regime) {
   const secu = Math.floor((baseCents * r.taux + 50) / 100);
   return { base: baseCents, taux: r.taux, secu, resteTM: baseCents - secu };
 }
-// Actes DÉJÀ au catalogue dont la base remboursable n'a jamais été renseignée (importés
-// avant l'ajout du champ) : on ne complète QUE ces deux champs, jamais montant ni titre.
+// Actes DÉJÀ au catalogue à compléter, sans jamais toucher au titre :
+//  - base remboursable et franchise, s'ils n'ont jamais été renseignés (import antérieur) ;
+//  - montant, UNIQUEMENT s'il vaut exactement un montant d'une version antérieure du
+//    référentiel (montants_precedents : ex. 20,00 € devenu 20,10 €). Un montant que le
+//    praticien a lui-même choisi, donc différent, n'est jamais changé.
 function _actesACompleter(existants, referentiel) {
   const parCode = new Map(referentiel.actes.map((a) => [a.code, a]));
   const out = [];
   (existants || []).forEach((e) => {
     const ref = e.code && parCode.get(e.code);
-    if (!ref || e.perso || e.base_remboursable_cents != null) return;
-    if (!Number.isInteger(ref.base_remboursable_cents)) return;
-    out.push({ id: e.id, champs: { base_remboursable_cents: ref.base_remboursable_cents, franchise: ref.franchise !== false } });
+    if (!ref || e.perso) return;
+    const champs = {};
+    if (e.base_remboursable_cents == null && Number.isInteger(ref.base_remboursable_cents)) {
+      champs.base_remboursable_cents = ref.base_remboursable_cents;
+      champs.franchise = ref.franchise !== false;
+    }
+    if ((ref.montants_precedents || []).includes(e.montant_cents) && e.montant_cents !== ref.montant_cents) {
+      champs.montant_cents = ref.montant_cents;
+    }
+    if (Object.keys(champs).length) out.push({ id: e.id, champs });
   });
   return out;
 }
@@ -30799,6 +30809,9 @@ function _dateFr(iso) {
   return m ? m[3] + '/' + m[2] + '/' + m[1] : '—';
 }
 // Ligne de base de données (brouillon) construite depuis l'état de l'éditeur.
+// Montant réellement dû par le patient : total des actes − part payée directement par la
+// Sécurité sociale (tiers payant). Sans tiers payant, c'est le total.
+function _netDocument(d) { return (d.total_cents ?? 0) - (d.part_secu_cents || 0); }
 function _ligneBaseDocument(etat, patient, praticien) {
   const emetteur = _emetteurDepuisPraticien(praticien);
   const lignes = (etat.lignes || []).map((l) => ({
@@ -30808,7 +30821,11 @@ function _ligneBaseDocument(etat, patient, praticien) {
     franchise: l.franchise !== false,
   }));
   const calc = _calculerDocument(lignes, etat.regime, etat.totalFixeCents);
+  // Tiers payant : la Sécurité sociale paie directement au praticien sa part (franchise déduite,
+  // donc due par le patient) ; la part est figée dans le document à l'enregistrement.
+  const tiers = etat.tiersPayant === true;
   return {
+    tiers_payant: tiers, part_secu_cents: tiers ? Math.min(calc.secuNette, calc.totalCents) : 0,
     type: etat.type, patient_ref: String(patient?.id ?? ''), patient: _patientInstantane(patient),
     emetteur, regime: etat.regime, lignes, total_fixe: Number.isInteger(etat.totalFixeCents) && etat.totalFixeCents !== calc.sousTotalCents,
     total_cents: calc.totalCents, mention_tva: _mentionTva(praticien),
@@ -30852,7 +30869,7 @@ function nouveauDocument(type) {
   _docVue = null;
   _docEdition = {
     id: null, type, pratId: _praticienParDefaut(currentPatient)?.id ?? null, regime: 'standard',
-    lignes: [], totalFixeCents: null, totalIllisible: false, note: '', devisNumero: null,
+    lignes: [], tiersPayant: false, totalFixeCents: null, totalIllisible: false, note: '', devisNumero: null,
   };
   renderDocumentsPage();
 }
@@ -30865,7 +30882,7 @@ function ouvrirDocument(id) {
   _docEdition = {
     id: d.id, type: d.type, pratId: pr?.id ?? null, regime: d.regime,
     lignes: d.lignes.map((l) => Object.assign({}, l)),
-    totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.devis_numero || null,
+    tiersPayant: !!d.tiers_payant, totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.devis_numero || null,
   };
   renderDocumentsPage();
 }
@@ -30892,7 +30909,7 @@ function modifierLigneDocument(i, champ, saisie) {
   if (champ === 'qte') { const n = parseInt(saisie, 10); l.qte = /^\d{1,2}$/.test(String(saisie).trim()) && n >= 1 ? n : null; }
   _majTotauxDocument();
 }
-// « Total à payer » : vide = somme des actes ; sinon le montant fixé par le praticien.
+// « Total des actes » : vide = somme des actes ; sinon le montant fixé par le praticien.
 function modifierTotalFixeDocument(saisie) {
   if (!_docEdition) return;
   const t = String(saisie ?? '').trim();
@@ -30912,6 +30929,7 @@ function revenirALaSommeDocument() {
 function modifierChampDocument(champ, valeur) {
   if (!_docEdition) return;
   if (champ === 'regime' && REGIMES_REMBOURSEMENT[valeur]) { _docEdition.regime = valeur; _rendreLignesDocument(); }
+  if (champ === 'tiers') { _docEdition.tiersPayant = valeur === true; _majResumeDocument(); }
   if (champ === 'note') _docEdition.note = valeur;
   if (champ === 'prat') _docEdition.pratId = valeur;
 }
@@ -30924,7 +30942,7 @@ function _preparerDocument(pourEmission) {
   const base = _ligneBaseDocument(e, currentPatient, pr);
   const controle = Object.assign({}, base, { totalFixeCents: e.totalFixeCents });
   let v = _validerDocument(controle, pourEmission);
-  if (v.ok && e.totalIllisible) v = { ok: false, erreur: 'Total à payer invalide (exemple : 160 ou 160,50).' };
+  if (v.ok && e.totalIllisible) v = { ok: false, erreur: 'Total des actes invalide (exemple : 160 ou 160,50).' };
   return { base, v };
 }
 async function enregistrerBrouillonDocument(silencieux) {
@@ -30987,7 +31005,7 @@ async function creerFactureDepuisDevis(id) {
   _docEdition = {
     id: null, type: 'facture', pratId: pr?.id ?? null, regime: d.regime,
     lignes: d.lignes.map((l) => Object.assign({}, l)),
-    totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.numero,
+    tiersPayant: !!d.tiers_payant, totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.numero,
   };
   _docVue = null;
   const row = await enregistrerBrouillonDocument(true);
@@ -31032,11 +31050,15 @@ function _htmlDocumentEmis(d) {
     '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:var(--mut);font-size:11px;">' +
       '<th style="padding:6px 8px;">Acte</th><th style="padding:6px 8px;text-align:right;">Qté</th><th style="padding:6px 8px;text-align:right;">Tarif</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>' + lignes + '</tbody></table>' +
     (d.total_fixe ? '<div style="text-align:right;font-size:12px;color:var(--mut);margin-top:6px;">Somme des actes : ' + _eur(c.sousTotalCents) + ' — total fixé par le praticien</div>' : '') +
-    '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:6px;">Total à payer : ' + _eur(d.total_cents) + '</div>' +
+    (d.tiers_payant
+      ? '<div style="text-align:right;font-size:13px;margin-top:6px;">Total des actes : ' + _eur(d.total_cents) + '</div>' +
+        '<div style="text-align:right;font-size:13px;">Part payée directement par la Sécurité sociale (tiers payant) : − ' + _eur(d.part_secu_cents) + '</div>' +
+        '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:4px;">Net à payer par le patient : ' + _eur(_netDocument(d)) + '</div>'
+      : '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:6px;">Total à payer : ' + _eur(d.total_cents) + '</div>') +
     '<div style="font-size:12px;color:var(--mut);margin-top:8px;">' + _escHtml(d.mention_tva) + '</div>' +
     (d.note ? '<div style="font-size:12px;margin-top:8px;white-space:pre-wrap;">' + _escHtml(d.note) + '</div>' : '') +
     '<div style="font-size:12px;margin-top:12px;padding:10px;border:1px dashed var(--bord);border-radius:8px;">' +
-      '<b>Remboursement estimé (indicatif)</b> — ' + _escHtml(REGIMES_REMBOURSEMENT[d.regime]?.libelle || '') +
+      '<b>' + (d.tiers_payant ? 'Prise en charge Sécurité sociale (tiers payant, estimée)' : 'Remboursement estimé (indicatif)') + '</b> — ' + _escHtml(REGIMES_REMBOURSEMENT[d.regime]?.libelle || '') +
       '<div>Base de remboursement : ' + _eur(c.baseTotal) + ' · part Sécurité sociale : ' + _eur(c.secuTotal) +
         (c.franchise ? ' − franchise ' + _eur(c.franchise) : '') + ' = ' + _eur(c.secuNette) + '</div>' +
       '<div>Ticket modérateur (part complémentaire selon votre contrat) : ' + _eur(c.tmTotal) +
@@ -31063,7 +31085,7 @@ function _htmlListeDocuments() {
     return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
       '<div style="font-size:13px;"><b>' + (d.type === 'devis' ? 'Devis' : 'Facture') + ' ' + _escHtml(d.numero || '(brouillon)') + '</b>' +
         '<span style="color:var(--mut);"> · ' + _escHtml(_dateFr(d.date_document || d.created_at)) + regl + '</span></div>' +
-      '<div style="white-space:nowrap;"><b>' + _eur(d.total_cents) + '</b> ' +
+      '<div style="white-space:nowrap;"><b>' + _eur(_netDocument(d)) + '</b>' + (d.tiers_payant ? ' <span style="font-size:11px;color:var(--mut);">(tiers payant)</span>' : '') + ' ' +
         '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="ouvrirDocument(\'' + _escHtml(d.id) + '\')">' + (d.statut === 'emis' ? 'Voir' : 'Modifier') + '</button></div></div>';
   }).join('');
 }
@@ -31082,13 +31104,14 @@ function _htmlEditeurDocument() {
     '<div class="stitle">' + (e.type === 'devis' ? 'Devis' : 'Facture') + (e.id ? ' (brouillon)' : ' (nouveau)') + (e.devisNumero ? ' — selon devis ' + _escHtml(e.devisNumero) : '') + '</div>' +
     '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien émetteur</div><select class="inp" onchange="modifierChampDocument(\'prat\', this.value)"><option value="">— Choisir —</option>' + pratOpts + '</select></div>' +
     '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prise en charge</div><select class="inp" onchange="modifierChampDocument(\'regime\', this.value)">' + regOpts + '</select></div></div>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:12px;"><input type="checkbox" id="doc-tiers-payant"' + (e.tiersPayant ? ' checked' : '') + ' onchange="modifierChampDocument(\'tiers\', this.checked)"/> <span><b>Tiers payant</b> — la Sécurité sociale vous règle directement sa part (télétransmission) : le document n\'indique que le montant à payer par le patient.</span></label>' +
     (praticiens.length ? '' : '<div style="font-size:12px;color:var(--red);margin-top:6px;">Aucun praticien : créez-en un dans l\'onglet Praticiens (avec SIRET et RPPS/ADELI).</div>') +
     '<div class="stitle" style="margin-top:12px;">Actes</div>' +
     '<input class="inp" id="doc-actes-recherche" placeholder="Rechercher un acte…" oninput="filtrerActesDocument(this.value)"/>' +
     '<div id="doc-actes-liste" style="max-height:240px;overflow:auto;border:1px solid var(--bord);border-radius:8px;padding:4px 10px;margin-top:6px;">' + (actes || '<div style="font-size:12px;color:var(--mut);padding:6px 0;">Catalogue vide : importez le référentiel dans « Paramètres facturation ».</div>') + '</div>' +
     '<div id="doc-lignes" style="margin-top:10px;"></div>' +
     '<div id="doc-totaux" style="margin-top:10px;font-size:13px;padding:10px;border:1px solid var(--bord);border-radius:8px;">' +
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><label for="doc-total-input" style="font-weight:700;">Total à payer (€, sans TVA)</label>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><label for="doc-total-input" style="font-weight:700;">Total des actes (€, sans TVA)</label>' +
       '<input class="inp" id="doc-total-input" style="width:130px;" inputmode="decimal" oninput="modifierTotalFixeDocument(this.value)"/>' +
       '<button class="btn" id="doc-total-somme" style="font-size:11px;padding:3px 8px;display:none;" onclick="revenirALaSommeDocument()">↺ Revenir à la somme des actes</button></div>' +
       '<div id="doc-resume" style="margin-top:8px;font-size:12px;color:var(--mut);"></div></div>' +
@@ -31118,7 +31141,7 @@ function _rendreLignesDocument() {
     : '<div style="font-size:12px;color:var(--mut);">Cochez les actes à facturer.</div>';
   _majTotauxDocument();
 }
-// Champ « Total à payer » : suit la somme des actes tant que le praticien n'a rien fixé.
+// Champ « Total des actes » : suit la somme des actes tant que le praticien n'a rien fixé.
 function _majTotauxDocument() {
   const e = _docEdition;
   const input = document.getElementById('doc-total-input');
@@ -31143,6 +31166,8 @@ function _majResumeDocument() {
     (e.totalIllisible ? '<div style="color:var(--red);">Total illisible : écrivez par exemple 160 ou 160,50.</div>' : '') +
     (lignesIllisibles ? '<div style="color:var(--red);">Une quantité est illisible (1 à 99).</div>' : '') +
     '<div>Somme des actes (tarifs de convention) : ' + _eur(c.sousTotalCents) + '</div>' +
+    (e.tiersPayant ? '<div>Payé directement par la Sécurité sociale (tiers payant) : <b>− ' + _eur(Math.min(c.secuNette, c.totalCents)) + '</b></div>' +
+      '<div style="font-size:14px;color:var(--txt);">Montant à payer par le patient : <b>' + _eur(c.totalCents - Math.min(c.secuNette, c.totalCents)) + '</b></div>' : '') +
     '<div>Remboursement Sécurité sociale estimé : <b>' + _eur(c.secuNette) + '</b>' + (c.franchise ? ' (franchise de ' + _eur(c.franchise) + ' déduite)' : '') +
       ' · mutuelle (ticket modérateur) : ' + _eur(c.tmTotal) + '</div>' +
     '<div>Reste à charge avant mutuelle : <b>' + _eur(c.resteApresSecu) + '</b></div>';
