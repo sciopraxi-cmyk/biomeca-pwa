@@ -872,6 +872,7 @@ async function saveToSupabase() {
   // Le localStorage reste mis à jour par savePatients() upstream — donc rien
   // n'est perdu en RAM, le prochain save (post-load) propagera bien en DB.
   if(!_dataLoaded) {
+    if (typeof _etatApresCloud === 'function') _etatApresCloud(false);
     console.warn('[#64] saveToSupabase() called before loadSupabaseData completed — SKIP to prevent data loss', {
       // #47 — identifiant technique, jamais l'adresse (donnée personnelle).
       userId: pwaUser?.id,
@@ -904,6 +905,7 @@ async function saveToSupabase() {
             'Recharger maintenant pour récupérer la version du serveur ?'
           );
           if (reload) location.reload();
+          if (typeof _etatApresCloud === 'function') _etatApresCloud(false);
           return; // NE PAS écraser le cloud
         }
       }
@@ -949,12 +951,14 @@ async function saveToSupabase() {
       });
       _showSyncErrorBanner(SYNC_FAIL_MSG);
       _syncErrorShown = true;
+      if (typeof _etatApresCloud === 'function') _etatApresCloud(false);
       // Hook Sentry défensif (V2 — actif quand Sentry intégré). Voir task #69.
       if (typeof Sentry !== 'undefined' && Sentry?.captureMessage) {
         Sentry.captureMessage('saveToSupabase: response not ok', { level: 'error', tags: { event: 'sync_failed_response_not_ok' } });
       }
     } else {
       _confirmerSyncCloud(_seqEnvoi, _horodatage);
+      if (typeof _etatApresCloud === 'function') _etatApresCloud(true, _seqEnvoi);
     }
     if (ok && _syncErrorShown) {
       // Path success post-fail : recovery détectée → hide banner + log structuré.
@@ -990,6 +994,7 @@ async function saveToSupabase() {
     });
     _showSyncErrorBanner(SYNC_FAIL_MSG);
     _syncErrorShown = true;
+    if (typeof _etatApresCloud === 'function') _etatApresCloud(false);
     if (typeof Sentry !== 'undefined' && Sentry?.captureException) {
       Sentry.captureException(e, { tags: { event: 'sync_failed_exception' } });
     }
@@ -3667,6 +3672,7 @@ function _masquerBandeau(id) {
 // échouent. Le premier enregistrement réussi lève l'incident (et le bandeau).
 let _stockageIncident = false;
 function _signalerStockagePlein(messageAlerte) {
+  _etatSauvegarde('failed');
   _afficherBandeau(
     'stockage-banner',
     '⚠️ Stockage de cet appareil plein : vos dernières modifications ne sont PAS enregistrées. ' +
@@ -3685,11 +3691,80 @@ function _stockageRetabli() {
 // 8.5 — l'envoi d'une photo a échoué : bandeau (la photo reste à l'écran et
 // sera renvoyée à la prochaine sauvegarde). Appelé par uploadPhotoBase64.
 function _signalerEchecEnvoiPhoto() {
+  _photoEchecDansSauvegarde = true;
+  if (_etatSauv === 'saving' || _etatSauv === 'saved') _etatSauvegarde('pending');
   _afficherBandeau(
     'photo-envoi-banner',
     '⚠️ Une photo n\'a pas pu être envoyée. Elle reste affichée et sera renvoyée à la prochaine ' +
     'sauvegarde ; si ce message revient, vérifiez la connexion avant de quitter la page.'
   );
+}
+
+// ─── A2 / PR 3 — indicateur d'état de la sauvegarde ───
+// État GLOBAL (les patients partent ensemble dans un seul enregistrement) :
+//   dirty   saisie en attente d'autosave            gris
+//   saving  enregistrement en cours (photos comprises) gris
+//   saved   écrit sur l'appareil ET confirmé serveur   vert
+//   pending écrit sur l'appareil, serveur non confirmé orange
+//   failed  écriture locale impossible / refusée       rouge
+// null = rien d'affiché. Les `typeof … === 'function'` des appelants gardent
+// les harnais de test qui n'extraient qu'une partie des fonctions.
+let _etatSauv = null;
+let _photoEchecDansSauvegarde = false;
+const ETAT_SAUV_TEXTES = {
+  dirty:   { t: 'Modifications non enregistrées…', c: '#4b5563' },
+  saving:  { t: 'Enregistrement…', c: '#4b5563' },
+  saved:   { t: 'Enregistré ✓', c: '#15803d' },
+  pending: { t: 'Enregistré ici — serveur en attente', c: '#b45309' },
+  failed:  { t: 'Échec de sauvegarde', c: '#b91c1c' },
+};
+// L'indicateur est inséré PAR LE SCRIPT à gauche de chaque bouton « Sauvegarder »
+// (et non écrit dans le HTML) : la structure des pages, figée par les tests
+// #268, ne bouge pas. Posturo est généré après coup : on rappelle cette
+// insertion à chaque rendu et à chaque ouverture de page.
+const ETAT_SAUV_BOUTONS = [
+  'savePedicurieBilan()', 'savePodopediatrieBilan()', 'saveBilan()', 'savePosturoBilan()',
+];
+function _installerIndicateursEtat() {
+  ETAT_SAUV_BOUTONS.forEach(function(appel) {
+    document.querySelectorAll('button[onclick="' + appel + '"]').forEach(function(btn) {
+      const prev = btn.previousElementSibling;
+      if (prev && prev.classList && prev.classList.contains('etat-sauv')) return;
+      const span = document.createElement('span');
+      span.className = 'etat-sauv';
+      span.setAttribute('role', 'status');
+      span.setAttribute('aria-live', 'polite');
+      span.style.cssText = 'font-size:12px;font-weight:600;align-self:center;';
+      btn.parentNode.insertBefore(span, btn);
+    });
+  });
+}
+function _rendreEtatSauvegarde() {
+  _installerIndicateursEtat();
+  const def = ETAT_SAUV_TEXTES[_etatSauv];
+  document.querySelectorAll('.etat-sauv').forEach(function(el) {
+    el.textContent = def ? def.t : '';
+    el.style.color = def ? def.c : '';
+    el.dataset.etat = _etatSauv || '';
+  });
+}
+function _etatSauvegarde(phase) {
+  if (phase === 'saving') _photoEchecDansSauvegarde = false;
+  _etatSauv = phase;
+  _rendreEtatSauvegarde();
+}
+// Résultat de l'écriture locale (savePatients).
+function _etatApresLocal(ok) {
+  if (!ok) _etatSauvegarde('failed');
+  else if (_etatSauv === 'failed') _etatSauvegarde('saving');
+}
+// Résultat de l'envoi au serveur (saveToSupabase).
+function _etatApresCloud(ok, seqEnvoi) {
+  if (_etatSauv !== 'saving' && _etatSauv !== 'pending') return;
+  if (!ok || _photoEchecDansSauvegarde) { _etatSauvegarde('pending'); return; }
+  // une écriture plus récente que l'envoi attend encore : pas « Enregistré »
+  if (Number.isFinite(seqEnvoi) && _nonSyncSeq > seqEnvoi) { _etatSauvegarde('saving'); return; }
+  _etatSauvegarde('saved');
 }
 
 function _showSyncErrorBanner(message) {
@@ -5499,7 +5574,7 @@ function savePatients() {
             '➡️  Cliquez ANNULER pour PROTÉGER vos données (recommandé).\n' +
             'Ne cliquez OK QUE si vous venez VOLONTAIREMENT de supprimer un patient ou un bilan.'
           );
-          if (!ok) return false; // abort — le finally restaure les dataURLs en RAM
+          if (!ok) { _etatSauvegarde('failed'); return false; } // abort — le finally restaure les dataURLs en RAM
         }
       }
     }
@@ -5553,6 +5628,7 @@ function savePatients() {
     localStorage.setItem(currentPatientsKey, JSON.stringify(patients));
     _marquerNonSynchronise(); // A2 — effacé quand le cloud confirme (saveToSupabase)
     _stockageRetabli(); // A2 PR 2 — l'écriture a réussi : fin de l'incident « stockage plein »
+    if (typeof _etatApresLocal === 'function') _etatApresLocal(true);
   } catch(e) {
     if (e && (e.name === 'QuotaExceededError' || e.code === 22 || (e.message && e.message.toLowerCase().includes('quota')))) {
       _signalerStockagePlein(
@@ -21186,6 +21262,7 @@ function syncOpenedBilanPedicurieToHistory() {
 // pas le retour (fire-and-forget), signature compatible.
 async function savePedicurieBilan(silent) {
   if (!currentPatient) { if (!silent) alert('Sélectionnez un patient'); return; }
+  if (typeof _etatSauvegarde === 'function') _etatSauvegarde('saving');
   if (!currentPatient.bilanDataPedicurie) currentPatient.bilanDataPedicurie = {};
   const d = currentPatient.bilanDataPedicurie;
   if (!d.id) d.id = crypto.randomUUID();
@@ -21263,6 +21340,7 @@ function syncOpenedBilanPodopediatrieToHistory() {
 // Cette signature est utilisée par le sweep-avant-quitter de nav().
 async function savePodopediatrieBilan(silent) {
   if (!currentPatient) { if (!silent) alert('Sélectionnez un patient'); return; }
+  if (typeof _etatSauvegarde === 'function') _etatSauvegarde('saving');
   if (!currentPatient.bilanDataPodopediatrie) currentPatient.bilanDataPodopediatrie = {};
   const d = currentPatient.bilanDataPodopediatrie;
   if (!d.id) d.id = crypto.randomUUID();
@@ -24039,6 +24117,7 @@ function _stripBackgroundFromRestore(canvas) {
 
 async function saveBilan() {
   if(!currentPatient) { alert('Aucun patient sélectionné.'); return; }
+  if (typeof _etatSauvegarde === 'function') _etatSauvegarde('saving');
   if(!bilanData) bilanData = {};
 
   // INVARIANT (fix #154) : les sweeps ci-dessous 1/2/3/4/5 sont le miroir strict
@@ -24664,6 +24743,7 @@ async function saveBilanSilent() {
   // migration + savePatients s'exécutent en background (fire-and-forget côté caller),
   // mais l'ordre interne sweep → migrate → savePatients → restore est strict.
   if(!currentPatient) return;
+  if (typeof _etatSauvegarde === 'function') _etatSauvegarde('saving');
   if(!bilanData) bilanData = {};
   _balayerBilanSport();
   // #99 + Bug édition perdue — reset _userDirty pour les 5 canvas APRÈS sweep.
@@ -24982,6 +25062,7 @@ function injectBilanPosturoPage() {
   div.id = 'pg-bilan-posturo';
   div.innerHTML = getBilanPosturoHTML();
   main.appendChild(div);
+  if (typeof _installerIndicateursEtat === 'function') _installerIndicateursEtat(); // A2 PR 3
 }
 
 function getBilanPosturoHTML() {
@@ -29704,6 +29785,7 @@ async function savePosturoBilan(silent = false) {
   // #277 — silencieux (autosave, nav, verrouillage) : jamais d'alerte, même
   // sans patient ; seul le bouton prévient.
   if(!currentPatient) { if(!silent) alert('Sélectionnez un patient'); return; }
+  if (typeof _etatSauvegarde === 'function') _etatSauvegarde('saving');
   if(!currentPatient.bilanDataPosturo) currentPatient.bilanDataPosturo = {};
   const d = currentPatient.bilanDataPosturo;
   _balayerBilanPosturo(d);
@@ -30197,6 +30279,7 @@ function populateSportSysOptions() {
 }
 document.addEventListener('DOMContentLoaded', populateSportSysOptions);
 document.addEventListener('DOMContentLoaded', _installerSauvegardeTests); // #279 étape 4
+document.addEventListener('DOMContentLoaded', _installerIndicateursEtat); // A2 PR 3 — pages statiques
 
 // feat-biomec-capteurs (A) — synchroniser les sliders « Taille points » avec
 // markerSizeFactor chargé depuis localStorage au boot (les value="" du HTML
@@ -30250,6 +30333,7 @@ function _scheduleBilanAutosave(flavor) {
   if (flavor === false) flavor = 'posturo';
   clearTimeout(_bilanAutosaveTimer);
   _bilanAutosaveFlavor = flavor;
+  if (typeof _etatSauvegarde === 'function') _etatSauvegarde('dirty');
   _bilanAutosaveTimer = setTimeout(function() {
     _bilanAutosaveFlavor = null;
     _lancerSauvegardeAutomatique(flavor);
