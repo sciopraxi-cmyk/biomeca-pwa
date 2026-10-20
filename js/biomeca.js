@@ -3030,11 +3030,11 @@ function checkAccessStatus() {
   }
 
   if (level === 'readonly') {
-    _hideAccessOverlay();
-    _showAccessBanner({
-      text: "Votre abonnement est suspendu. Vos patients et bilans restent consultables. Reprenez votre abonnement pour créer de nouveaux patients et bilans. L'impression et l'export PDF restent disponibles.",
-      background: '#e67e22',
-    });
+    // Ancien abonné (abonnement résilié, licence payée) : même fenêtre unique que l'essai
+    // expiré — réabonnement requis pour accéder à la plateforme ; seules la récupération de
+    // ses données (export CSV des patients, devis et factures émis) reste possible.
+    _hideAccessBanner();
+    _showAccessOverlay({ cause: 'subscription_ended' });
     applyReadOnlyUI(window._accessLevel);
     return;
   }
@@ -3279,7 +3279,7 @@ function showSubscribeModal() {
   // Cf. C6 — backdrop click logic appliquée aussi.
   const closeBtn = document.getElementById('ms-close');
   if (closeBtn) {
-    closeBtn.style.display = window._accessLevel === 'blocked' ? 'none' : 'inline-block';
+    closeBtn.style.display = _accesVerrouille() ? 'none' : 'inline-block';
   }
   // Reset bandeau d'erreur d'éventuel call précédent.
   const errEl = document.getElementById('ms-err');
@@ -3307,9 +3307,16 @@ function showSubscribeModal() {
   }
 }
 
+// Accès verrouillé : compte « bloqué » (essai expiré) ou « lecture seule » (abonnement terminé).
+// Dans les deux cas une seule fenêtre est offerte : réabonnement, récupération des données.
+function _accesVerrouille() {
+  const l = window._accessLevel;
+  return l === 'blocked' || l === 'readonly';
+}
+
 function closeSubscribeModal() {
-  // Refuse de fermer si user en accès bloqué (cf. C6).
-  if (window._accessLevel === 'blocked') return;
+  // Refuse de fermer si l'accès est verrouillé (bloqué ou abonnement terminé, cf. C6).
+  if (_accesVerrouille()) return;
   const modal = document.getElementById('modal-subscribe');
   if (modal) modal.style.display = 'none';
 }
@@ -3803,16 +3810,21 @@ function _showAccessOverlay({ cause }) {
   const o = document.getElementById('trial-expired-overlay');
   if (!o) return;
   o.style.display = 'flex';
-  // Documents déjà émis récupérables, sauf si l'état du compte est inconnu (fail-secure).
-  const recup = document.getElementById('overlay-recuperer-docs');
-  if (recup) recup.style.display = cause === 'trial_expired' || cause === 'never_paid' ? '' : 'none';
+  // Récupération des données (export CSV, documents émis) : pour un ancien abonné ou un essai
+  // expiré. Jamais quand l'état du compte est inconnu (fail-secure), ni pour un compte qui n'a
+  // jamais rien eu à lui.
+  const recup = document.getElementById('overlay-recuperation');
+  if (recup) recup.style.display = cause === 'trial_expired' || cause === 'subscription_ended' ? '' : 'none';
   const wrapper = o.firstElementChild;
   if (!wrapper || wrapper.children.length < 3) return;
   const titleEl = wrapper.children[1];
   const msgEl = wrapper.children[2];
   if (cause === 'trial_expired') {
     if (titleEl) titleEl.textContent = 'Votre essai est terminé';
-    if (msgEl) msgEl.textContent = 'Votre essai gratuit de 14 jours est terminé. Choisissez une formule pour continuer.';
+    if (msgEl) msgEl.textContent = 'Votre essai gratuit de 14 jours est terminé. Pour accéder à la plateforme, choisissez une formule. Vos données restent à votre disposition ci-dessous.';
+  } else if (cause === 'subscription_ended') {
+    if (titleEl) titleEl.textContent = 'Votre abonnement est terminé';
+    if (msgEl) msgEl.textContent = 'Pour accéder à la plateforme, réabonnez-vous. Vos données restent à votre disposition ci-dessous.';
   } else if (cause === 'never_paid') {
     if (titleEl) titleEl.textContent = 'Bienvenue';
     if (msgEl) msgEl.textContent = 'Démarrez votre essai gratuit de 14 jours ou choisissez une formule.';
@@ -31243,6 +31255,12 @@ function _htmlRecuperationDocuments(liste) {
     '<div style="font-size:12px;color:var(--mut);margin-bottom:12px;">Vos documents émis restent à votre disposition, même sans abonnement.</div>' +
     corps +
     '<div style="margin-top:14px;"><button class="btn" style="font-size:12px;padding:5px 14px;" onclick="document.getElementById(\'modal-recuperation-documents\').style.display=\'none\'">Fermer</button></div></div>';
+}
+// Export CSV des patients depuis la fenêtre d'accès verrouillé : attend que les données du
+// compte soient chargées (sinon le fichier serait vide et trompeur).
+function exporterPatientsDepuisAcces() {
+  if (!_dataLoaded) { alert('Vos données sont en cours de chargement. Réessayez dans un instant.'); return; }
+  exportPatientsCSV();
 }
 async function ouvrirRecuperationDocuments() {
   let modal = document.getElementById('modal-recuperation-documents');

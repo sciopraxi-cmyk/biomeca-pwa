@@ -405,18 +405,53 @@
   ],
   [
    2,
-   "button",
+   "div",
    [
     [
      "id",
-     "overlay-recuperer-docs"
-    ],
+     "overlay-recuperation"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Récupérer mes données"
+  ],
+  [
+   3,
+   "button",
+   [
+    [
+     "onclick",
+     "exporterPatientsDepuisAcces()"
+    ]
+   ],
+   "📤 Exporter mes patients (CSV)"
+  ],
+  [
+   3,
+   "button",
+   [
     [
      "onclick",
      "ouvrirRecuperationDocuments()"
     ]
    ],
-   "🧾 Récupérer mes devis et factures émis"
+   "🧾 Mes devis et factures émis"
+  ],
+  [
+   2,
+   "button",
+   [
+    [
+     "onclick",
+     "pwaLogout()"
+    ]
+   ],
+   "Se déconnecter"
   ]
  ],
  "podo-age": [

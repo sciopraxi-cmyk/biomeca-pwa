@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RACINE } from './helpers/mirror-diff.mjs';
 
-// #260 — en lecture seule (abonnement suspendu), l'impression / export PDF
-// restent possibles ; seule la création est bloquée. 'blocked' bloque tout.
+// #260 — gardes d'impression de applyReadOnlyUI (inchangées). NOTE du 20/10/2026 : un ancien
+// abonné (« lecture seule ») ne voit plus l'application mais une fenêtre unique de
+// réabonnement ; ces gardes restent en défense en profondeur.
 const SRC = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
 
 function extraire(debut, fin) {
@@ -113,8 +114,9 @@ describe('#260 impression en lecture seule', () => {
     }
   });
 
-  it('le bandeau ne promet plus un PDF réservé', () => {
+  it("le bandeau « abonnement suspendu » n'existe plus : décision du 20/10/2026, un ancien abonné a une fenêtre unique de réabonnement (remplace #260 pour la lecture seule)", () => {
     expect(SRC).not.toContain('pour créer de nouveaux bilans et exporter en PDF');
-    expect(SRC).toContain("L'impression et l'export PDF restent disponibles");
+    expect(SRC).not.toContain('Votre abonnement est suspendu');
+    expect(SRC).toContain("_showAccessOverlay({ cause: 'subscription_ended' })");
   });
 });

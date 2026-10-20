@@ -1435,22 +1435,23 @@ describe('abonnement terminé : consulter et imprimer, ne plus créer', () => {
     await ko.f.ouvrirRecuperationDocuments();
     expect(ko.iframes.at(-1).innerHTML).toMatch(/Documents indisponibles \(panne\)/);
   });
-  it("écran d'accès bloqué : le bouton « Récupérer » apparaît pour un essai expiré ou un compte jamais payé, jamais quand l'état du compte est inconnu", () => {
+  it("fenêtre d'abonnement terminé : bloc « Récupérer mes données » (essai expiré, ancien abonné), jamais quand le compte est illisible", () => {
     const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
-    expect(html).toContain('id="overlay-recuperer-docs"');
+    expect(html).toContain('id="overlay-recuperation"');
     expect(html).toContain('onclick="ouvrirRecuperationDocuments()"');
     const essai = (cause) => {
-      const bouton = { style: { display: 'none' } };
+      const bloc = { style: { display: 'none' } };
       const wrapper = { children: [{}, { textContent: '' }, { textContent: '' }] };
       const overlay = { style: {}, firstElementChild: wrapper };
       const e = monter({
-        champs: { 'trial-expired-overlay': overlay, 'overlay-recuperer-docs': bouton },
+        champs: { 'trial-expired-overlay': overlay, 'overlay-recuperation': bloc },
       });
       e.f._showAccessOverlay({ cause });
-      return bouton.style.display;
+      return bloc.style.display;
     };
     expect(essai('trial_expired')).toBe('');
-    expect(essai('never_paid')).toBe('');
+    expect(essai('subscription_ended')).toBe('');
+    expect(essai('never_paid')).toBe('none');
     expect(essai('donnees_indisponibles')).toBe('none');
     expect(essai('inconnue')).toBe('none');
   });

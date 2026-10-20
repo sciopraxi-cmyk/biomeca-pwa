@@ -603,7 +603,12 @@
     <div style="font-size:17px;font-weight:700;color:var(--txt);margin-bottom:8px;">Essai gratuit terminé</div>
     <div style="font-size:13px;color:var(--mut);margin-bottom:20px;">Choisissez une formule pour continuer.</div>
     <button onclick="showSubscribeModal()" style="background:var(--blue);color:#fff;border:none;padding:12px 28px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">Voir les formules</button>
-    <button id="overlay-recuperer-docs" onclick="ouvrirRecuperationDocuments()" style="display:none;background:none;color:var(--txt);border:1px solid var(--bord);padding:10px 28px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-top:10px;">🧾 Récupérer mes devis et factures émis</button>
+    <div id="overlay-recuperation" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid var(--bord);">
+      <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:8px;">Récupérer mes données</div>
+      <button onclick="exporterPatientsDepuisAcces()" style="background:none;color:var(--txt);border:1px solid var(--bord);padding:10px 20px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-bottom:8px;">📤 Exporter mes patients (CSV)</button>
+      <button onclick="ouvrirRecuperationDocuments()" style="background:none;color:var(--txt);border:1px solid var(--bord);padding:10px 20px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;width:100%;">🧾 Mes devis et factures émis</button>
+    </div>
+    <button onclick="pwaLogout()" style="background:none;border:none;color:var(--mut);font-size:12px;cursor:pointer;margin-top:14px;text-decoration:underline;">Se déconnecter</button>
   </div>
 </div>
 <div class="topbar">
