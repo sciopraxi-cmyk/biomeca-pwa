@@ -46,6 +46,7 @@ function charger(opts = {}) {
     let pwaUser = { id: ${JSON.stringify(UID)}, token: 'jeton-synthetique' };
     let patients = [], praticiens = [], currentPatient = null, bilanData = {};
     let _dataLoaded = true, _loadedFromFallback = false, _syncErrorShown = false;
+    let _nonSyncSeq = 0, _dernierSyncCloudAt = null; // A2 / PR 1 — marqueur « non synchronisé »
     const reponse = ${JSON.stringify(opts.reponse || 'exception')};
     const supa = {
       async saveData() { await null; if (reponse === 'exception') throw new Error('réseau indisponible'); return false; },
@@ -62,7 +63,7 @@ function charger(opts = {}) {
     ${tableau('POSTURO_PHOTO_KEYS')}
     ${tableau('PODOPEDIATRIE_PHOTO_KEYS')}
     ${tableau('PEDICURIE_GALLERY_DEFS')}
-    ${['_scopedKey', '_galleryDynKeys', '_pedicurieDynKeys', '_stripDataURLsForPersist', '_restoreDataURLsAfterPersist', 'migrateBilanFlags', 'saveToSupabase', 'loadSupabaseData'].map(fonction).join('\n')}
+    ${['_scopedKey', '_lireMarqueurNonSync', '_marquerNonSynchronise', '_confirmerSyncCloud', '_recupererSaisieNonSynchronisee', '_countDataUnits', '_galleryDynKeys', '_pedicurieDynKeys', '_stripDataURLsForPersist', '_restoreDataURLsAfterPersist', 'migrateBilanFlags', 'saveToSupabase', 'loadSupabaseData'].map(fonction).join('\n')}
     return {
       saveToSupabase, loadSupabaseData,
       poser(p) { patients = p; },

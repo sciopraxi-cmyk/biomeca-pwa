@@ -59,6 +59,9 @@ function charger(noms, p, reponses = [], extra = '') {
     function selectPatient(x) { currentPatient = x; } function nav() {}
     function renderPatientList() {} function renderPratList() {} function populatePratSelect() {}
     function showAccessRestrictedModal() {}
+    // A2 / PR 1 — reprise au démarrage : sans marqueur dans ce scénario, bouchons neutres.
+    function _scopedKey() { return null; } function _recupererSaisieNonSynchronisee() { return false; }
+    let _dernierSyncCloudAt = null;
     function _aboMeta() { return { modules: ['podo_sport'] }; }
     ${extra}
     ${optionnelle('_nbTestsMesures')}

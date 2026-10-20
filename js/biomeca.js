@@ -715,6 +715,7 @@ async function onPwaLoginSuccess() {
 // ─── Chargement des données ───
 async function loadSupabaseData() {
   if(!pwaUser?.token) return;
+  let _saisieRecuperee = false; // A2 — saisie locale non synchronisée reprise au démarrage
 
   try {
     // Charger patients depuis Supabase (table user_data)
@@ -724,7 +725,9 @@ async function loadSupabaseData() {
       const d = typeof myRow.data === 'string' ? JSON.parse(myRow.data) : myRow.data;
       patients = d.patients || [];
       praticiens = d.praticiens || [];
+      _dernierSyncCloudAt = myRow.updated_at || null; // A2 — base du marqueur « non synchronisé »
       _dataLoaded = true;  // Task #64 — patients global est peuplé, saveToSupabase peut écrire
+      _saisieRecuperee = _recupererSaisieNonSynchronisee(myRow.updated_at);
       _loadedFromFallback = false; // #114-1a — mémoire vient du cloud confirmé.
       // Appliquer les modules depuis user_metadata Supabase (fraîches, task #58).
       // Refonte enum droits → array modules : la source de vérité est désormais
@@ -816,7 +819,8 @@ async function loadSupabaseData() {
     // Migration #39 (29 avril 2026) : currentBilanType + currentBilanSousType
     // → currentBilanSportSousType / currentBilanPosturoSousType (indépendants).
     const flagsMigrated = migrateBilanFlags(patients);
-    if(migrated || flagsMigrated) { console.log('Migration bilans OK'); savePatients(); }
+    if(migrated || flagsMigrated || _saisieRecuperee) { console.log('Migration bilans OK'); savePatients(); }
+    if (_saisieRecuperee) alert('✓ Une saisie non envoyée lors de la dernière fermeture a été retrouvée et renvoyée au serveur.');
   } catch(e) {
     // Fallback localStorage si Supabase indisponible.
     // #65 — clé localStorage unifiée sur bm4-patients/bm4-praticiens : le
@@ -908,6 +912,8 @@ async function saveToSupabase() {
       console.warn('[#114-1a] reconcile cloud injoignable, save local poursuivi :', e?.message);
     }
   }
+  const _seqEnvoi = _nonSyncSeq; // A2 — état envoyé = celui du marqueur courant
+  const _horodatage = new Date().toISOString();
   const data = { patients, praticiens };
   // Task #38 — message banner uniforme entre les 2 paths fail.
   const SYNC_FAIL_MSG = '⚠️ Synchronisation cloud échouée. Vos données sont sauvegardées localement et seront resynchronisées au prochain enregistrement.';
@@ -915,7 +921,7 @@ async function saveToSupabase() {
     const ok = await supa.saveData('user_data', {
       user_id: pwaUser.id,
       data: data,
-      updated_at: new Date().toISOString()
+      updated_at: _horodatage
     });
     if(!ok) {
       // Path !ok (response API non OK) — task #38.
@@ -947,7 +953,10 @@ async function saveToSupabase() {
       if (typeof Sentry !== 'undefined' && Sentry?.captureMessage) {
         Sentry.captureMessage('saveToSupabase: response not ok', { level: 'error', tags: { event: 'sync_failed_response_not_ok' } });
       }
-    } else if (_syncErrorShown) {
+    } else {
+      _confirmerSyncCloud(_seqEnvoi, _horodatage);
+    }
+    if (ok && _syncErrorShown) {
       // Path success post-fail : recovery détectée → hide banner + log structuré.
       _hideSyncErrorBanner();
       console.log('[#38] saveToSupabase recovered', {
@@ -5297,6 +5306,118 @@ function _restoreDataURLsAfterPersist(stash) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// A2 / PR 1 — saisie non synchronisée (trous 8.1 et 8.3)
+// ═══════════════════════════════════════════════════════════════════
+// Au démarrage, la mémoire vient du CLOUD ; le stockage local n'est relu que
+// si le cloud est injoignable. Une écriture locale seule serait donc perdue à
+// la réouverture. Chaque écriture locale pose donc un MARQUEUR
+// (bm4-nonsync:<uid> = { seq, t, base }) tant que le cloud n'a pas confirmé ;
+// saveToSupabase l'efface à la confirmation. `base` = updated_at du dernier état
+// cloud connu : au démarrage, la saisie locale n'est reprise QUE si le cloud est
+// resté à cette base (aucune autre modification depuis). Sinon une copie est
+// gardée à part (bm4-recuperation:<uid>:<t>), jamais supprimée, jamais appliquée.
+let _nonSyncSeq = 0;
+let _dernierSyncCloudAt = null;
+let _urgenceFermeture = false;
+
+function _lireMarqueurNonSync() {
+  const k = _scopedKey('bm4-nonsync');
+  if (!k) return null;
+  try {
+    const m = JSON.parse(localStorage.getItem(k) || 'null');
+    return m && typeof m === 'object' ? m : null;
+  } catch (_e) { return null; }
+}
+
+function _marquerNonSynchronise() {
+  const k = _scopedKey('bm4-nonsync');
+  if (!k) return;
+  try {
+    const prev = _lireMarqueurNonSync();
+    _nonSyncSeq = Math.max(_nonSyncSeq + 1, Date.now(), prev && Number.isFinite(prev.seq) ? prev.seq + 1 : 0);
+    localStorage.setItem(k, JSON.stringify({
+      seq: _nonSyncSeq,
+      t: new Date().toISOString(),
+      base: prev && 'base' in prev ? prev.base : _dernierSyncCloudAt,
+    }));
+  } catch (_e) { /* quota : le marqueur est facultatif, jamais bloquant */ }
+}
+
+// Le cloud a confirmé l'envoi de l'état de numéro `seqEnvoi` (horodaté `at`).
+function _confirmerSyncCloud(seqEnvoi, at) {
+  _dernierSyncCloudAt = at;
+  const k = _scopedKey('bm4-nonsync');
+  if (!k) return;
+  try {
+    const m = _lireMarqueurNonSync();
+    if (!m) return;
+    if (Number.isFinite(m.seq) && m.seq > seqEnvoi) {
+      // Des écritures plus récentes attendent encore : le cloud est maintenant à `at`.
+      m.base = at;
+      localStorage.setItem(k, JSON.stringify(m));
+    } else {
+      localStorage.removeItem(k);
+    }
+  } catch (_e) { /* best-effort */ }
+}
+
+// Écriture LOCALE synchrone, sans dialogue, AVANT l'envoi des photos (qui
+// attend le réseau). Sans elle, fermer l'onglet pendant l'envoi perd le texte
+// ET la photo (trou 8.3). N'écrit que si des images non envoyées existent ou
+// si la fermeture est en cours (la sérialisation n'est pas gratuite).
+// `preparer` : mise à jour de currentPatient avant sérialisation (sport).
+function _ecrireLocalAvantEnvoi(preparer) {
+  if (!pwaUser?.id || !_dataLoaded || !currentPatient) return false;
+  const k = _scopedKey('bm4-patients');
+  if (!k) return false;
+  let stash = null;
+  try {
+    if (typeof preparer === 'function') preparer();
+    stash = _stripDataURLsForPersist(patients);
+    const json = JSON.stringify(patients);
+    if (!_urgenceFermeture && !json.includes('"data:image')) return false;
+    localStorage.setItem(k, json);
+    _marquerNonSynchronise();
+    return true;
+  } catch (e) {
+    console.warn('[A2] écriture locale anticipée impossible :', e?.message);
+    return false;
+  } finally {
+    if (stash) _restoreDataURLsAfterPersist(stash);
+  }
+}
+
+// Reprise au démarrage (cloud joignable). Retourne true si `patients` a été
+// remplacé par la version locale : l'appelant doit alors la renvoyer au cloud.
+function _recupererSaisieNonSynchronisee(rowUpdatedAt) {
+  const m = _lireMarqueurNonSync();
+  const kP = _scopedKey('bm4-patients');
+  const kM = _scopedKey('bm4-nonsync');
+  if (!m || !kP || !kM) return false;
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(kP) || 'null'); } catch (_e) { local = null; }
+  if (!Array.isArray(local)) return false; // marqueur conservé
+  if (Number.isFinite(m.seq)) _nonSyncSeq = Math.max(_nonSyncSeq, m.seq);
+  const memeBase = !!m.base && !!rowUpdatedAt && Date.parse(m.base) === Date.parse(rowUpdatedAt);
+  const pasPlusPauvre = _countDataUnits(local) >= _countDataUnits(patients);
+  if (memeBase && pasPlusPauvre) {
+    patients = local;
+    return true;
+  }
+  try {
+    localStorage.setItem(_scopedKey('bm4-recuperation') + ':' + (m.t || Date.now()), JSON.stringify(local));
+    localStorage.removeItem(kM);
+    alert(
+      'ℹ️ Une saisie faite sur cet appareil n\'avait pas pu être envoyée au serveur, ' +
+      'mais le serveur a changé depuis (ou contient plus de données).\n\n' +
+      'Elle n\'a PAS été appliquée pour ne rien écraser. Une copie est conservée sur cet appareil ; ' +
+      'signalez-le si une information manque.'
+    );
+  } catch (_e) { /* copie impossible : marqueur conservé, rien n'est écrasé */ }
+  return false;
+}
+
 function savePatients() {
   // #125 — Garde attribuable : sans user_id, on n'écrit RIEN (aucune clé
   // globale, aucune attribution incertaine). Cohérent avec le pattern
@@ -5388,6 +5509,7 @@ function savePatients() {
     // #125 — écriture SCOPÉE (bm4-patients:<uid>). currentPatientsKey non-null
     // ici grâce à la garde en tête de savePatients.
     localStorage.setItem(currentPatientsKey, JSON.stringify(patients));
+    _marquerNonSynchronise(); // A2 — effacé quand le cloud confirme (saveToSupabase)
   } catch(e) {
     if (e && (e.name === 'QuotaExceededError' || e.code === 22 || (e.message && e.message.toLowerCase().includes('quota')))) {
       alert(
@@ -21013,6 +21135,7 @@ async function savePedicurieBilan(silent) {
   // ne bloque pas la sauvegarde clinique (dataURLs restent en RAM, retry au
   // prochain save). Stash capturé pour restauration RAM post-savePatients.
   let photoStash = {};
+  _ecrireLocalAvantEnvoi(); // A2 — avant l'envoi des photos (8.3)
   try {
     photoStash = await migratePedicuriePhotos(d, currentPatient.id, d.id) || {};
   } catch (e) {
@@ -21119,6 +21242,7 @@ async function savePodopediatrieBilan(silent) {
   // une photo tout juste importée alerte « Capture d'abord la photo… ». Miroir
   // strict de saveBilanSilent L14855-14861 (sport) et savePosturoBilan L19352/19362.
   let photoStash = {};
+  _ecrireLocalAvantEnvoi(); // A2 — avant l'envoi des photos (8.3)
   try {
     photoStash = await migratePodopediatriePhotos(d, currentPatient.id, d.id) || {};
   } catch (e) {
@@ -23935,6 +24059,9 @@ async function saveBilan() {
   // de rapport attend sa fin (cf. _sauvegardesEnCours).
   const _fermerFenetre = _ouvrirFenetreSauvegarde('sport');
   try {
+    // A2 — texte + photos non envoyées en local AVANT l'envoi (8.3). Le clone de
+    // bilanData est posé ici (il l'est de toute façon après l'envoi).
+    _ecrireLocalAvantEnvoi(() => { currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData)); });
     const _postureStash = await migrateSportBilanDataPhotos(
       bilanData, currentPatient.id, currentPatient.mesures._bilanId
     );
@@ -24484,6 +24611,9 @@ async function saveBilanSilent() {
   // de rapport attend sa fin (cf. _sauvegardesEnCours).
   const _fermerFenetre = _ouvrirFenetreSauvegarde('sport');
   try {
+    // A2 — texte + photos non envoyées en local AVANT l'envoi (8.3). Le clone de
+    // bilanData est posé ici (il l'est de toute façon après l'envoi).
+    _ecrireLocalAvantEnvoi(() => { currentPatient.bilanData = JSON.parse(JSON.stringify(bilanData)); });
     const _postureStash = await migrateSportBilanDataPhotos(
       bilanData, currentPatient.id, currentPatient.mesures._bilanId
     );
@@ -29525,6 +29655,7 @@ async function savePosturoBilan(silent = false) {
   // de rapport attend sa fin (cf. _sauvegardesEnCours).
   const _fermerFenetre = _ouvrirFenetreSauvegarde('posturo');
   try {
+    _ecrireLocalAvantEnvoi(); // A2 — texte + photos non envoyées en local AVANT l'envoi (8.3)
     const photoStash = await migratePosturoPhotos(d, currentPatient.id, d.id);
     // Si on édite un bilan archivé (ouvert via ouvrirBilanPosturo), synchroniser
     // ses modifications vers son entrée dans bilansPosturo[]. Mirror sport.
@@ -30039,18 +30170,46 @@ let _bilanAutosaveTimer = null;
 // #140 Phase 2b1 — Ajouté 'podopediatrie' pour le dessin sur silhouettes morpho podo.
 // Rétro-compat : un boolean (true=sport, false=posturo) est encore accepté pour
 // les call-sites qui n'ont pas migré vers la string flavor.
+let _bilanAutosaveFlavor = null;
+function _lancerSauvegardeAutomatique(flavor) {
+  if (flavor === 'sport' && typeof saveBilanSilent === 'function') return saveBilanSilent();
+  else if (flavor === 'posturo' && typeof savePosturoBilan === 'function') return savePosturoBilan(true);
+  else if (flavor === 'pedicurie' && typeof savePedicurieBilan === 'function') return savePedicurieBilan(true);
+  else if (flavor === 'podopediatrie' && typeof savePodopediatrieBilan === 'function') return savePodopediatrieBilan(true);
+}
 function _scheduleBilanAutosave(flavor) {
   // Normalisation rétro-compat boolean → flavor string.
   if (flavor === true)  flavor = 'sport';
   if (flavor === false) flavor = 'posturo';
   clearTimeout(_bilanAutosaveTimer);
+  _bilanAutosaveFlavor = flavor;
   _bilanAutosaveTimer = setTimeout(function() {
-    if (flavor === 'sport' && typeof saveBilanSilent === 'function') saveBilanSilent();
-    else if (flavor === 'posturo' && typeof savePosturoBilan === 'function') savePosturoBilan(true);
-    else if (flavor === 'pedicurie' && typeof savePedicurieBilan === 'function') savePedicurieBilan(true);
-    else if (flavor === 'podopediatrie' && typeof savePodopediatrieBilan === 'function') savePodopediatrieBilan(true);
+    _bilanAutosaveFlavor = null;
+    _lancerSauvegardeAutomatique(flavor);
   }, 1000);
 }
+// A2 / PR 1 (trou 8.1) — une saisie faite < 1 s avant la fermeture de l'onglet
+// ou la mise en arrière-plan est écrite tout de suite : la partie synchrone de
+// la sauvegarde (balayage du DOM puis écriture locale + marqueur) s'exécute
+// avant tout await. L'envoi au cloud suit si le navigateur le permet ; sinon
+// la reprise se fait au démarrage suivant (_recupererSaisieNonSynchronisee).
+function _viderAutosaveAvantFermeture() {
+  if (!_bilanAutosaveFlavor) return;
+  const flavor = _bilanAutosaveFlavor;
+  _bilanAutosaveFlavor = null;
+  clearTimeout(_bilanAutosaveTimer);
+  _urgenceFermeture = true;
+  try {
+    const r = _lancerSauvegardeAutomatique(flavor);
+    if (r && typeof r.catch === 'function') r.catch(function() {});
+  } catch (_e) { /* jamais d'exception à la fermeture */ } finally {
+    _urgenceFermeture = false;
+  }
+}
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') _viderAutosaveAvantFermeture();
+});
+window.addEventListener('pagehide', _viderAutosaveAvantFermeture);
 document.addEventListener('input', function(e) {
   const inSport        = e.target.closest && e.target.closest('#pg-bilan');
   const inPosturo      = e.target.closest && e.target.closest('#pg-bilan-posturo');
