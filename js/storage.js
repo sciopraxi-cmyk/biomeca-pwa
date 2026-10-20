@@ -57,10 +57,13 @@ async function uploadPhotoBase64(dataUrl, path) {
     });
     if (!res.ok) {
       const err = await res.text();
+      // A2 PR 2 (8.5) — l'échec n'est plus seulement dans la console.
+      if (typeof window._signalerEchecEnvoiPhoto === 'function') window._signalerEchecEnvoiPhoto();
       return { ok: false, error: `Upload ${res.status} : ${err}` };
     }
     return { ok: true, path };
   } catch (e) {
+    if (typeof window._signalerEchecEnvoiPhoto === 'function') window._signalerEchecEnvoiPhoto();
     return { ok: false, error: e.message || String(e) };
   }
 }
@@ -192,7 +195,22 @@ async function deleteSportBilanFolder(userId, patientId, bilanId) {
 
 // Récupère une photo depuis Storage et la retourne sous forme de dataUrl,
 // pour ré-alimenter une UI qui consomme du `data:image/...` (img.src, canvas).
+// A2 PR 2 — chemins dont le rechargement a échoué (galeries : « photo non
+// rechargée » + Réessayer au lieu d'un « chargement… » sans fin).
+const _photosRechargeEchec = new Set();
+function _photoRechargeEchouee(path) {
+  return _photosRechargeEchec.has(path);
+}
+function _oublierEchecPhoto(path) {
+  _photosRechargeEchec.delete(path);
+}
 async function prefetchPhotoToDataUrl(path) {
+  const r = await _prefetchPhotoBrut(path);
+  if (r.ok) _photosRechargeEchec.delete(path);
+  else _photosRechargeEchec.add(path);
+  return r;
+}
+async function _prefetchPhotoBrut(path) {
   try {
     const signed = await getPhotoSignedUrl(path);
     if (!signed.ok) return { ok: false, error: signed.error };

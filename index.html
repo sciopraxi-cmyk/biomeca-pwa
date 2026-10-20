@@ -584,6 +584,15 @@
   <span id="sync-error-banner-text"></span>
   <button onclick="_hideSyncErrorBanner()" aria-label="Masquer la notification" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:0 6px;line-height:1;">✕</button>
 </div>
+<!-- A2 PR 2 — stockage local plein (8.4) et échec d'envoi de photo (8.5) -->
+<div id="stockage-banner" role="alert" style="display:none;background:#c0392b;color:#fff;text-align:center;padding:7px 40px 7px 16px;font-size:12px;font-weight:600;position:relative;">
+  <span id="stockage-banner-text"></span>
+  <button onclick="_masquerBandeau('stockage-banner')" aria-label="Masquer la notification" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:0 6px;line-height:1;">✕</button>
+</div>
+<div id="photo-envoi-banner" role="alert" style="display:none;background:#c0392b;color:#fff;text-align:center;padding:7px 40px 7px 16px;font-size:12px;font-weight:600;position:relative;">
+  <span id="photo-envoi-banner-text"></span>
+  <button onclick="_masquerBandeau('photo-envoi-banner')" aria-label="Masquer la notification" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:0 6px;line-height:1;">✕</button>
+</div>
 <div id="trial-banner" style="display:none;background:#e67e22;color:#fff;text-align:center;padding:7px 16px;font-size:12px;font-weight:600;position:relative;">
   <span id="trial-banner-text"></span>
   &nbsp;·&nbsp;<span onclick="showSubscribeModal()" style="cursor:pointer;text-decoration:underline;">Choisir une formule</span>
