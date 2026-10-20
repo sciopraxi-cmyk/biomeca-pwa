@@ -82,8 +82,8 @@ function monter(o = {}) {
       'let _nonSyncSeq = 0, _dernierSyncCloudAt = null, _dataLoaded = true, _loadedFromFallback = false, _syncErrorShown = false;',
       'let _bilanAutosaveTimer = null, _bilanAutosaveFlavor = null;',
       'let _etatSauv = null, _photoEchecDansSauvegarde = false;',
-      'const ETAT_SAUV_BOUTONS = ' +
-        SRC_BIOMECA.match(/const ETAT_SAUV_BOUTONS = (\[[\s\S]*?\n\]);/)?.[1],
+      'const ETAT_SAUV_ANCRES = ' +
+        SRC_BIOMECA.match(/const ETAT_SAUV_ANCRES = (\[[\s\S]*?\n\]);/)?.[1],
       'const ETAT_SAUV_TEXTES = ' +
         SRC_BIOMECA.match(/const ETAT_SAUV_TEXTES = (\{[\s\S]*?\n\});/)?.[1],
       ...noms.map(biomeca),
@@ -301,19 +301,22 @@ describe('branchement (lecture statique)', () => {
   });
 });
 
-// Mini-DOM : barres de boutons, insertion réelle de l'indicateur.
+// Mini-DOM : barres d'éléments (titres, boutons Imprimer / Rapport), insertion réelle.
+// Chaque élément déclare les sélecteurs qu'il satisfait.
 function miniDom(barres) {
-  const parents = barres.map((appels) => {
+  const parents = barres.map((elems) => {
     const parent = { enfants: [] };
-    appels.forEach((appel) => {
-      const btn = { tag: 'button', onclick: appel, parentNode: parent };
-      Object.defineProperty(btn, 'previousElementSibling', {
-        get: () => parent.enfants[parent.enfants.indexOf(btn) - 1] ?? null,
-      });
-      parent.enfants.push(btn);
+    elems.forEach((sels) => {
+      const el = { tag: 'x', sels, parentNode: parent };
+      const rang = (d) => parent.enfants[parent.enfants.indexOf(el) + d] ?? null;
+      Object.defineProperty(el, 'previousElementSibling', { get: () => rang(-1) });
+      Object.defineProperty(el, 'nextElementSibling', { get: () => rang(1) });
+      Object.defineProperty(el, 'nextSibling', { get: () => rang(1) });
+      parent.enfants.push(el);
     });
     parent.insertBefore = (n, ref) => {
-      parent.enfants.splice(parent.enfants.indexOf(ref), 0, n);
+      const i = ref ? parent.enfants.indexOf(ref) : parent.enfants.length;
+      parent.enfants.splice(i, 0, n);
       n.parentNode = parent;
     };
     return parent;
@@ -322,11 +325,10 @@ function miniDom(barres) {
   return {
     parents,
     document: {
-      querySelectorAll: (sel) => {
-        if (sel === '.etat-sauv') return tous().filter((n) => n.className === 'etat-sauv');
-        const m = sel.match(/^button\[onclick="(.*)"\]$/);
-        return m ? tous().filter((n) => n.tag === 'button' && n.onclick === m[1]) : [];
-      },
+      querySelectorAll: (sel) =>
+        sel === '.etat-sauv'
+          ? tous().filter((n) => n.className === 'etat-sauv')
+          : tous().filter((n) => n.sels?.includes(sel)),
       createElement: (tag) => {
         const el = { tag, style: {}, dataset: {}, setAttribute() {}, textContent: '' };
         el.classList = { contains: (c) => el.className === c };
@@ -337,38 +339,72 @@ function miniDom(barres) {
   };
 }
 
-describe("insertion de l'indicateur par le script (HTML statique inchangé)", () => {
-  const BARRES = [
-    ['nav', 'savePedicurieBilan()', 'print'],
-    ['savePodopediatrieBilan()'],
-    ['saveBilan()', 'printBilan()'],
-    ['savePosturoBilan()', 'buildRapportPosturo()'],
-  ];
-  it('un indicateur, placé juste avant chaque bouton « Sauvegarder » des 4 bilans', () => {
+describe("insertion de l'indicateur par le script (plus de bouton « Sauvegarder »)", () => {
+  const H2_PED = '#pg-pedicurie h2';
+  const H2_PODO = '#pg-podopediatrie h2';
+  const IMPR = 'button[onclick="printBilan()"]';
+  const RAPPORT = 'button[onclick="buildRapportPosturo()"]';
+  const BARRES = [[[], [H2_PED], []], [[], [H2_PODO], []], [[IMPR], []], [[RAPPORT]]];
+  it("un indicateur à l'ancien emplacement du bouton : après le titre (Pédicurie, Podopédiatrie), avant Imprimer (Sport) et avant Rapport (Posturo)", () => {
     const d = miniDom(BARRES);
     const e = monter({ document: d.document });
     e.f._etatSauvegarde('saved');
-    const spans = d.document.querySelectorAll('.etat-sauv');
-    expect(spans).toHaveLength(4);
-    for (const p of d.parents) {
-      const i = p.enfants.findIndex((n) =>
-        /^save(Pedicurie|Podopediatrie|Posturo)?Bilan\(\)$/.test(n.onclick ?? '')
-      );
-      expect(p.enfants[i - 1].className).toBe('etat-sauv');
-      expect(p.enfants[i - 1].textContent).toBe(TEXTES.saved);
-    }
+    expect(d.document.querySelectorAll('.etat-sauv')).toHaveLength(4);
+    const [ped, podo, sport, po] = d.parents.map((p) =>
+      p.enfants.map((n) => n.className ?? n.sels[0] ?? '·')
+    );
+    expect(ped).toEqual(['·', H2_PED, 'etat-sauv', '·']);
+    expect(podo).toEqual(['·', H2_PODO, 'etat-sauv', '·']);
+    expect(sport).toEqual(['etat-sauv', IMPR, '·']);
+    expect(po).toEqual(['etat-sauv', RAPPORT]);
+    for (const p of d.parents)
+      for (const n of p.enfants.filter((x) => x.className === 'etat-sauv'))
+        expect(n.textContent).toBe(TEXTES.saved);
   });
-  it('rappelé plusieurs fois : jamais de doublon ; une barre créée plus tard reçoit le sien', () => {
+  it('rappelé plusieurs fois : jamais de doublon ; une page créée plus tard reçoit le sien', () => {
     const d = miniDom(BARRES.slice(0, 2));
     const e = monter({ document: d.document });
     e.f._etatSauvegarde('saving');
     e.f._etatSauvegarde('saved');
     expect(d.document.querySelectorAll('.etat-sauv')).toHaveLength(2);
     // la page Posturo est générée après coup
-    const plus = miniDom([['savePosturoBilan()']]);
+    const plus = miniDom([[RAPPORT]]);
     const tous = d.document.querySelectorAll;
     d.document.querySelectorAll = (sel) => [...tous(sel), ...plus.document.querySelectorAll(sel)];
     e.f._etatSauvegarde('saved');
     expect(d.document.querySelectorAll('.etat-sauv')).toHaveLength(3);
+  });
+});
+
+describe('A3 — plus de bouton « Sauvegarder » dans les 4 bilans, mais rien ne se perd', () => {
+  const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
+  it("aucun bouton n'appelle les 4 sauvegardes manuelles (HTML statique et gabarit Posturo)", () => {
+    for (const n of [
+      'savePedicurieBilan',
+      'savePodopediatrieBilan',
+      'saveBilan',
+      'savePosturoBilan',
+    ]) {
+      expect(html, n).not.toContain('onclick="' + n + '()"');
+      expect(fonction('getBilanPosturoHTML'), n).not.toContain('onclick="' + n + '()"');
+    }
+    expect(SRC_BIOMECA).not.toMatch(/onclick="save(Pedicurie|Podopediatrie|Posturo)?Bilan\(\)"/);
+  });
+  it("les repères de l'indicateur existent dans les pages (sinon il disparaîtrait)", () => {
+    expect(html).toContain('onclick="printBilan()"');
+    expect(html).toMatch(/id="pg-pedicurie"[\s\S]*?<h2/);
+    expect(html).toMatch(/id="pg-podopediatrie"[\s\S]*?<h2/);
+    expect(fonction('getBilanPosturoHTML')).toContain('onclick="buildRapportPosturo()"');
+  });
+  it("chaque annulation de trait programme l'autosave (le bouton ne le faisait plus pour elle)", () => {
+    const attendu = {
+      undoMorpho: 'sport',
+      undoPieds: 'sport',
+      undoPodoMorpho: 'podopediatrie',
+      undoPodoPieds: 'podopediatrie',
+      undoPosturoBody: 'posturo',
+    };
+    for (const [n, flavor] of Object.entries(attendu))
+      expect(fonction(n), n).toContain("_scheduleBilanAutosave('" + flavor + "')");
   });
 });
