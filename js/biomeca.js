@@ -3018,7 +3018,7 @@ function checkAccessStatus() {
   if (level === 'readonly') {
     _hideAccessOverlay();
     _showAccessBanner({
-      text: "Votre abonnement est suspendu. Vos patients et bilans restent consultables. Reprenez votre abonnement pour créer de nouveaux bilans et exporter en PDF.",
+      text: "Votre abonnement est suspendu. Vos patients et bilans restent consultables. Reprenez votre abonnement pour créer de nouveaux patients et bilans. L'impression et l'export PDF restent disponibles.",
       background: '#e67e22',
     });
     applyReadOnlyUI(window._accessLevel);
@@ -3106,6 +3106,16 @@ function canChangeModule(userData, now) {
 //
 // La sélection par attribut onclick fonctionne pour le HTML statique ET le HTML
 // rendu dynamiquement par innerHTML (l'attribut onclick est inline dans les deux cas).
+// #260 — l'impression / l'export PDF restent possibles en lecture seule
+// (abonnement suspendu : « vos patients et bilans restent consultables »). Seuls
+// 'blocked' (accès refusé) et 'loading' (niveau pas encore connu) les refusent.
+// Niveau absent = comportement historique (autorisé). Source unique des 5
+// gardes d'impression et de applyReadOnlyUI.
+function _accessPermetImpression() {
+  const l = window._accessLevel;
+  return !l || l === 'full' || l === 'readonly';
+}
+
 function applyReadOnlyUI(level) {
   const blocked = level === 'readonly' || level === 'blocked';
   const selectors = [
@@ -3114,13 +3124,18 @@ function applyReadOnlyUI(level) {
     '[onclick*="creerBilanPosturo"]',
     '[onclick*="creerBilanPedicurie"]', // #121 Phase 0 — cohérent avec posturo/sport pour gate abonnement.
     '[onclick*="creerBilanPodopediatrie"]', // #140 Phase 0 — même gate abonnement + gate module (canPodopedia).
+  ];
+  // #260 — boutons d'impression : désactivés seulement si l'accès est bloqué.
+  const impressions = [
     '[onclick*="printRapportPosturo"]',
     '[onclick*="printReport"]',
     '[onclick*="printBilan"]',
   ];
-  const buttons = document.querySelectorAll(selectors.join(','));
+  const bloquerImpression = level === 'blocked';
+  const buttons = document.querySelectorAll(selectors.concat(impressions).join(','));
   buttons.forEach(btn => {
-    if (blocked) {
+    const estImpression = btn.matches(impressions.join(','));
+    if (estImpression ? bloquerImpression : blocked) {
       btn.classList.add('btn-disabled');
       btn.setAttribute('disabled', 'true');
       btn.setAttribute('title', "Reprenez votre abonnement pour activer cette fonctionnalité");
@@ -16899,7 +16914,7 @@ async function validateAndSave() {
 
 function printRapportPosturo() {
   // Gating task #57 — bloque l'impression si pas full access.
-  if (window._accessLevel && window._accessLevel !== 'full') {
+  if (!_accessPermetImpression()) {
     showAccessRestrictedModal('export_pdf');
     return;
   }
@@ -18666,7 +18681,7 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
 
 async function printReport() {
   // Gating task #57 — bloque l'impression si pas full access.
-  if (window._accessLevel && window._accessLevel !== 'full') {
+  if (!_accessPermetImpression()) {
     showAccessRestrictedModal('export_pdf');
     return;
   }
@@ -22756,7 +22771,7 @@ function buildPedicurieRapportHTML(){
 // d'auth/Storage natif (les images du logo et autres ressources résolvent depuis
 // le même origin). Gate d'abonnement comme les autres impressions.
 function printRapportPedicurie(){
-  if (window._accessLevel && window._accessLevel !== 'full') { showAccessRestrictedModal('export_pdf'); return; }
+  if (!_accessPermetImpression()) { showAccessRestrictedModal('export_pdf'); return; }
   if (typeof genererSynthesePedicurie === 'function') genererSynthesePedicurie();
   var wrap = document.getElementById('pedicurie-rapport-iframe-wrap');
   if (!wrap) { alert('Aperçu du rapport indisponible. Ouvrez l\'onglet Synthèse puis réessayez.'); return; }
@@ -23480,7 +23495,7 @@ async function buildPodopediatrieRapportHTML() {
 // ça le clic donne plusieurs secondes de silence apparent (jusqu'à 9 prefetchs
 // Storage). Restauré dans le finally, y compris si une exception remonte.
 async function printRapportPodopediatrie() {
-  if (window._accessLevel && window._accessLevel !== 'full') { showAccessRestrictedModal('export_pdf'); return; }
+  if (!_accessPermetImpression()) { showAccessRestrictedModal('export_pdf'); return; }
   var wrap = document.getElementById('podopediatrie-rapport-iframe-wrap');
   if (!wrap) { alert('Aperçu du rapport indisponible.'); return; }
   var btn = document.getElementById('podo-btn-print');
@@ -24296,7 +24311,7 @@ function printBilan() {
   // Gating task #57 — bloque l'impression si pas full access.
   // (printReport a aussi un early-return en double sécurité, mais on stop ici
   // pour éviter la capture inutile et le delay de 200ms.)
-  if (window._accessLevel && window._accessLevel !== 'full') {
+  if (!_accessPermetImpression()) {
     showAccessRestrictedModal('export_pdf');
     return;
   }
