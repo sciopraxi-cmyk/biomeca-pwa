@@ -44,7 +44,9 @@ const NOMS = [
   'retirerLigneDocument',
   'modifierLigneDocument',
   'modifierTotalFixeDocument',
-  'basculerTotalFixeDocument',
+  'revenirALaSommeDocument',
+  '_htmlPartsLigne',
+  '_majResumeDocument',
   'modifierChampDocument',
   '_preparerDocument',
   'enregistrerBrouillonDocument',
@@ -197,6 +199,7 @@ function monter(o = {}) {
 }
 
 const HARNAIS = monter();
+const f0 = () => HARNAIS.f;
 const L = (acte, qte = 1, prix) => ({
   ...HARNAIS.f._ligneDepuisActe(acte),
   qte,
@@ -409,8 +412,8 @@ describe('instantanés et mentions', () => {
   });
 });
 
-describe('édition : cases à cocher, lignes, forfait', () => {
-  it('cocher ajoute la ligne au prix du catalogue ; décocher la retire ; doublon impossible', () => {
+describe('édition : cases à cocher, quantité, total à payer', () => {
+  it('cocher ajoute la ligne au tarif du catalogue ; décocher la retire ; doublon impossible', () => {
     const e = monter();
     e.f.nouveauDocument('facture');
     e.f.basculerActeDocument('a-pod1', true);
@@ -423,43 +426,94 @@ describe('édition : cases à cocher, lignes, forfait', () => {
     e.f.basculerActeDocument('a-pod1', false);
     expect(e.f.etat().edition.lignes.map((l) => l.code)).toEqual(['LPP-2122121']);
   });
-  it("le prix de la ligne est modifiable par le praticien ; illisible = null, refusé à l'enregistrement", () => {
+  it("la quantité se modifie (1 à 99) ; illisible = null, refusée à l'enregistrement ; le tarif ne se modifie pas ligne par ligne", async () => {
     const e = monter();
     e.f.nouveauDocument('facture');
-    e.f.basculerActeDocument('a-lpp', true);
-    e.f.modifierLigneDocument(0, 'prix', '150');
-    expect(e.f.etat().edition.lignes[0].prix_cents).toBe(15000);
-    e.f.modifierLigneDocument(0, 'prix', '15x');
-    expect(e.f.etat().edition.lignes[0].prix_cents).toBeNull();
+    e.f.basculerActeDocument('a-pod1', true);
     e.f.modifierLigneDocument(0, 'qte', '2');
     expect(e.f.etat().edition.lignes[0].qte).toBe(2);
+    e.f.modifierLigneDocument(0, 'prix', '1');
+    expect(e.f.etat().edition.lignes[0].prix_cents).toBe(3000);
     for (const q of ['0', '', 'a', '100', '1.5']) {
       e.f.modifierLigneDocument(0, 'qte', q);
       expect(e.f.etat().edition.lignes[0].qte, q).toBeNull();
     }
+    await e.f.enregistrerBrouillonDocument();
+    expect(e.alertes[0]).toMatch(/Quantité invalide/);
+    expect(e.appels).toHaveLength(0);
   });
-  it('forfait : coché il reprend la somme des lignes ; décoché il revient à la somme ; saisie illisible = null', () => {
+  it('total à payer : vide = somme des actes ; valeur = fixé par le praticien ; illisible signalé', () => {
     const e = monter();
     e.f.nouveauDocument('facture');
     e.f.basculerActeDocument('a-pod1', true);
-    e.f.basculerTotalFixeDocument(true);
-    expect(e.f.etat().edition).toMatchObject({ forfait: true, totalFixeCents: 3000 });
+    expect(e.f.etat().edition).toMatchObject({ totalFixeCents: null, totalIllisible: false });
     e.f.modifierTotalFixeDocument('45,50');
-    expect(e.f.etat().edition.totalFixeCents).toBe(4550);
+    expect(e.f.etat().edition).toMatchObject({ totalFixeCents: 4550, totalIllisible: false });
     e.f.modifierTotalFixeDocument('abc');
-    expect(e.f.etat().edition.totalFixeCents).toBeNull();
-    e.f.basculerTotalFixeDocument(false);
-    expect(e.f.etat().edition).toMatchObject({ forfait: false, totalFixeCents: null });
+    expect(e.f.etat().edition).toMatchObject({ totalFixeCents: null, totalIllisible: true });
+    e.f.modifierTotalFixeDocument('');
+    expect(e.f.etat().edition).toMatchObject({ totalFixeCents: null, totalIllisible: false });
+    e.f.modifierTotalFixeDocument('160');
+    e.f.revenirALaSommeDocument();
+    expect(e.f.etat().edition).toMatchObject({ totalFixeCents: null, totalIllisible: false });
   });
-  it('un forfait coché dont le total est illisible est refusé, jamais ignoré en silence', async () => {
+  it("un total illisible est refusé à l'enregistrement, jamais ignoré en silence", async () => {
     const e = monter();
     e.f.nouveauDocument('facture');
     e.f.basculerActeDocument('a-pod1', true);
-    e.f.basculerTotalFixeDocument(true);
     e.f.modifierTotalFixeDocument('abc');
     await e.f.enregistrerBrouillonDocument();
-    expect(e.alertes[0]).toMatch(/Total fixé invalide/);
+    expect(e.alertes[0]).toMatch(/Total à payer invalide/);
     expect(e.appels).toHaveLength(0);
+  });
+  it('total égal à la somme des actes : pas de « total fixé » ; différent : total_fixe', () => {
+    const lignes = [L(acte('a-pod1'))];
+    const base = { type: 'facture', regime: 'standard', lignes };
+    expect(
+      f0()._ligneBaseDocument({ ...base, totalFixeCents: 3000 }, PATIENT, PRAT).total_fixe
+    ).toBe(false);
+    expect(
+      f0()._ligneBaseDocument({ ...base, totalFixeCents: 2500 }, PATIENT, PRAT).total_fixe
+    ).toBe(true);
+    expect(
+      f0()._ligneBaseDocument({ ...base, totalFixeCents: null }, PATIENT, PRAT).total_fixe
+    ).toBe(false);
+  });
+  it("FRAPPE DANS LE TOTAL : le champ n'est jamais réécrit (sinon un seul chiffre se tape) ; le résumé, si", () => {
+    const ecritures = [];
+    const input = {};
+    Object.defineProperty(input, 'value', { get: () => '', set: (v) => ecritures.push(v) });
+    const resume = { innerHTML: '' };
+    const bouton = { style: {} };
+    const champs = { 'doc-total-input': input, 'doc-resume': resume, 'doc-total-somme': bouton };
+    const e = monter({ champs });
+    e.f.nouveauDocument('facture');
+    e.f.basculerActeDocument('a-pod1', true);
+    ecritures.length = 0;
+    for (const saisie of ['1', '16', '160', '160,', '160,5']) e.f.modifierTotalFixeDocument(saisie);
+    expect(ecritures).toEqual([]);
+    expect(resume.innerHTML).toMatch(/Reste à charge avant mutuelle/);
+    expect(bouton.style.display).toBe('');
+  });
+  it("le champ suit la somme des actes tant que rien n'est fixé, puis garde le montant du praticien", () => {
+    const input = { value: '' };
+    const champs = {
+      'doc-total-input': input,
+      'doc-resume': { innerHTML: '' },
+      'doc-total-somme': { style: {} },
+      'doc-lignes': { innerHTML: '' },
+    };
+    const e = monter({ champs });
+    e.f.nouveauDocument('facture');
+    e.f.basculerActeDocument('a-pod117', true);
+    expect(input.value).toBe('35,10');
+    e.f.basculerActeDocument('a-lpp', true);
+    expect(input.value).toBe('63,14');
+    e.f.modifierTotalFixeDocument('160');
+    e.f.basculerActeDocument('a-pod1', true);
+    expect(input.value).toBe('160,00'); // le praticien a fixé : les actes ajoutés ne le changent pas
+    e.f.revenirALaSommeDocument();
+    expect(input.value).toBe('93,14');
   });
   it('le praticien par défaut est celui du patient ; changement de régime et de note pris en compte', () => {
     const e = monter({ prats: [{ ...PRAT, id: 1, nom: 'Autre' }, PRAT] });
@@ -477,8 +531,6 @@ describe('enregistrement, émission, suppression, règlement', () => {
     e.f.nouveauDocument('facture');
     e.f.basculerActeDocument('a-pod117', true);
     e.f.basculerActeDocument('a-lpp', true);
-    e.f.modifierLigneDocument(1, 'prix', '150');
-    e.f.basculerTotalFixeDocument(true);
     e.f.modifierTotalFixeDocument('160');
   };
   const reponse = (a) => {
@@ -637,7 +689,13 @@ describe('enregistrement, émission, suppression, règlement', () => {
     e.f.ouvrirDocument('a');
     expect(e.f.etat()).toMatchObject({ edition: null, vue: 'a' });
     e.f.ouvrirDocument('b');
-    expect(e.f.etat().edition).toMatchObject({ id: 'b', regime: 'ald', forfait: false, pratId: 7 });
+    expect(e.f.etat().edition).toMatchObject({
+      id: 'b',
+      regime: 'ald',
+      totalFixeCents: null,
+      totalIllisible: false,
+      pratId: 7,
+    });
   });
   it('liste : seuls les documents du patient (filtre patient_ref) sont demandés', async () => {
     const e = monter({ reponse });
@@ -678,7 +736,11 @@ describe('affichage', () => {
     expect(h).toContain('FACTURE F-2026-0001');
     expect(h).toContain('20/10/2026');
     expect(h).toContain('TVA non applicable, article 261-4-1° du CGI');
-    expect(h).toContain('Total des lignes');
+    expect(h).toContain('Somme des actes');
+    expect(h).toContain('total fixé par le praticien');
+    expect(h).toContain('Tarif de convention 35,10');
+    expect(h).toMatch(/Sécu 21,06[^<]*mutuelle 14,04/);
+    expect(h).toContain('Non remboursé par la Sécurité sociale'.slice(0, 0));
     expect(h).toContain('160,00');
     expect(h).toContain('Remboursement estimé (indicatif)');
     expect(h).toContain('SIRET 12345678900012');

@@ -30810,7 +30810,7 @@ function _ligneBaseDocument(etat, patient, praticien) {
   const calc = _calculerDocument(lignes, etat.regime, etat.totalFixeCents);
   return {
     type: etat.type, patient_ref: String(patient?.id ?? ''), patient: _patientInstantane(patient),
-    emetteur, regime: etat.regime, lignes, total_fixe: Number.isInteger(etat.totalFixeCents),
+    emetteur, regime: etat.regime, lignes, total_fixe: Number.isInteger(etat.totalFixeCents) && etat.totalFixeCents !== calc.sousTotalCents,
     total_cents: calc.totalCents, mention_tva: _mentionTva(praticien),
     note: String(etat.note ?? '').trim().slice(0, 1000) || null, devis_numero: etat.devisNumero || null,
   };
@@ -30852,7 +30852,7 @@ function nouveauDocument(type) {
   _docVue = null;
   _docEdition = {
     id: null, type, pratId: _praticienParDefaut(currentPatient)?.id ?? null, regime: 'standard',
-    lignes: [], forfait: false, totalFixeCents: null, note: '', devisNumero: null,
+    lignes: [], totalFixeCents: null, totalIllisible: false, note: '', devisNumero: null,
   };
   renderDocumentsPage();
 }
@@ -30865,7 +30865,7 @@ function ouvrirDocument(id) {
   _docEdition = {
     id: d.id, type: d.type, pratId: pr?.id ?? null, regime: d.regime,
     lignes: d.lignes.map((l) => Object.assign({}, l)),
-    forfait: !!d.total_fixe, totalFixeCents: d.total_fixe ? d.total_cents : null, note: d.note || '', devisNumero: d.devis_numero || null,
+    totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.devis_numero || null,
   };
   renderDocumentsPage();
 }
@@ -30890,38 +30890,41 @@ function modifierLigneDocument(i, champ, saisie) {
   const l = _docEdition?.lignes[i];
   if (!l) return;
   if (champ === 'qte') { const n = parseInt(saisie, 10); l.qte = /^\d{1,2}$/.test(String(saisie).trim()) && n >= 1 ? n : null; }
-  if (champ === 'prix') l.prix_cents = _eurosVersCentimes(saisie);
   _majTotauxDocument();
 }
+// « Total à payer » : vide = somme des actes ; sinon le montant fixé par le praticien.
 function modifierTotalFixeDocument(saisie) {
   if (!_docEdition) return;
-  _docEdition.totalFixeCents = _eurosVersCentimes(saisie); // null si vide ou illisible
-  _majTotauxDocument();
+  const t = String(saisie ?? '').trim();
+  if (t === '') { _docEdition.totalFixeCents = null; _docEdition.totalIllisible = false; }
+  else {
+    const c = _eurosVersCentimes(t);
+    _docEdition.totalFixeCents = c; // null si illisible
+    _docEdition.totalIllisible = c === null;
+  }
+  _majResumeDocument(); // jamais le champ lui-même : on perdrait le curseur en pleine frappe
 }
-function basculerTotalFixeDocument(actif) {
+function revenirALaSommeDocument() {
   if (!_docEdition) return;
-  _docEdition.forfait = !!actif;
-  _docEdition.totalFixeCents = actif ? _calculerDocument(_docEdition.lignes, _docEdition.regime, null).totalCents : null;
-  renderDocumentsPage();
+  _docEdition.totalFixeCents = null; _docEdition.totalIllisible = false;
+  _majTotauxDocument();
 }
 function modifierChampDocument(champ, valeur) {
   if (!_docEdition) return;
-  if (champ === 'regime' && REGIMES_REMBOURSEMENT[valeur]) _docEdition.regime = valeur;
+  if (champ === 'regime' && REGIMES_REMBOURSEMENT[valeur]) { _docEdition.regime = valeur; _rendreLignesDocument(); }
   if (champ === 'note') _docEdition.note = valeur;
   if (champ === 'prat') _docEdition.pratId = valeur;
-  _majTotauxDocument();
 }
 // État de l'éditeur → { base: ligne de base de données, controle: document à valider }.
-// Prix ou quantité illisibles sont null (refusés par la validation) ; un forfait coché
-// dont le total est illisible est refusé aussi, jamais ignoré en silence.
+// Quantité illisible = null (refusée par la validation) ; un total à payer illisible est
+// refusé aussi, jamais ignoré en silence.
 function _preparerDocument(pourEmission) {
   const e = _docEdition;
   const pr = _praticienDuDocument(e);
-  const totalFixe = e.forfait ? e.totalFixeCents : null;
-  const base = _ligneBaseDocument(Object.assign({}, e, { totalFixeCents: totalFixe }), currentPatient, pr);
-  const controle = Object.assign({}, base, { totalFixeCents: totalFixe });
+  const base = _ligneBaseDocument(e, currentPatient, pr);
+  const controle = Object.assign({}, base, { totalFixeCents: e.totalFixeCents });
   let v = _validerDocument(controle, pourEmission);
-  if (v.ok && e.forfait && !Number.isInteger(e.totalFixeCents)) v = { ok: false, erreur: 'Total fixé invalide (exemple : 150 ou 150,00).' };
+  if (v.ok && e.totalIllisible) v = { ok: false, erreur: 'Total à payer invalide (exemple : 160 ou 160,50).' };
   return { base, v };
 }
 async function enregistrerBrouillonDocument(silencieux) {
@@ -30984,7 +30987,7 @@ async function creerFactureDepuisDevis(id) {
   _docEdition = {
     id: null, type: 'facture', pratId: pr?.id ?? null, regime: d.regime,
     lignes: d.lignes.map((l) => Object.assign({}, l)),
-    forfait: !!d.total_fixe, totalFixeCents: d.total_fixe ? d.total_cents : null, note: d.note || '', devisNumero: d.numero,
+    totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.numero,
   };
   _docVue = null;
   const row = await enregistrerBrouillonDocument(true);
@@ -30994,13 +30997,22 @@ async function creerFactureDepuisDevis(id) {
 const _eur = (c) => _escHtml(_centimesVersEuros(c));
 const _CSS_BTN = 'font-size:12px;padding:5px 12px;';
 // Document ÉMIS en lecture seule (aperçu à l'écran ; le PDF viendra à l'étape 2b-2).
+// Sous l'intitulé d'une ligne : tarif de convention, part Sécu et part mutuelle (indicatives).
+function _htmlPartsLigne(l, regime) {
+  const p = _partsRemboursement(l.base_remboursable_cents, regime);
+  const txt = p
+    ? 'Tarif de convention ' + _centimesVersEuros(p.base) + ' · Sécu ' + _centimesVersEuros(p.secu) + ' · mutuelle ' + _centimesVersEuros(p.resteTM)
+    : 'Non remboursé par la Sécurité sociale';
+  return '<div style="font-size:11px;color:var(--mut);">' + _escHtml(txt) + '</div>';
+}
 function _htmlDocumentEmis(d) {
   const e = d.emetteur || {}, p = d.patient || {};
   const c = _calculerDocument(d.lignes, d.regime, d.total_fixe ? d.total_cents : null);
   const titre = d.type === 'devis' ? 'DEVIS' : 'FACTURE';
   const lignes = d.lignes.map((l) =>
     '<tr><td style="padding:6px 8px;border-bottom:1px solid var(--bord);">' + _escHtml(l.libelle) +
-    (l.cotation ? ' <span style="color:var(--mut);">(' + _escHtml(l.cotation) + ')</span>' : '') + '</td>' +
+    (l.cotation ? ' <span style="color:var(--mut);">(' + _escHtml(l.cotation) + ')</span>' : '') +
+    _htmlPartsLigne(l, d.regime) + '</td>' +
     '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;">' + _escHtml(l.qte) + '</td>' +
     '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.prix_cents) + '</td>' +
     '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.qte * l.prix_cents) + '</td></tr>'
@@ -31018,8 +31030,8 @@ function _htmlDocumentEmis(d) {
     '<div style="font-size:12px;margin-bottom:12px;"><b>Patient</b><div>' + _escHtml((p.civilite ? p.civilite + ' ' : '') + (p.prenom || '') + ' ' + (p.nom || '')) + '</div>' +
       bloc('', p.adresse) + (p.cp || p.ville ? '<div>' + _escHtml((p.cp || '') + ' ' + (p.ville || '')) + '</div>' : '') + '</div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:var(--mut);font-size:11px;">' +
-      '<th style="padding:6px 8px;">Acte</th><th style="padding:6px 8px;text-align:right;">Qté</th><th style="padding:6px 8px;text-align:right;">Prix unitaire</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>' + lignes + '</tbody></table>' +
-    (d.total_fixe ? '<div style="text-align:right;font-size:12px;color:var(--mut);margin-top:6px;">Total des lignes : ' + _eur(c.sousTotalCents) + '</div>' : '') +
+      '<th style="padding:6px 8px;">Acte</th><th style="padding:6px 8px;text-align:right;">Qté</th><th style="padding:6px 8px;text-align:right;">Tarif</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>' + lignes + '</tbody></table>' +
+    (d.total_fixe ? '<div style="text-align:right;font-size:12px;color:var(--mut);margin-top:6px;">Somme des actes : ' + _eur(c.sousTotalCents) + ' — total fixé par le praticien</div>' : '') +
     '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:6px;">Total à payer : ' + _eur(d.total_cents) + '</div>' +
     '<div style="font-size:12px;color:var(--mut);margin-top:8px;">' + _escHtml(d.mention_tva) + '</div>' +
     (d.note ? '<div style="font-size:12px;margin-top:8px;white-space:pre-wrap;">' + _escHtml(d.note) + '</div>' : '') +
@@ -31028,7 +31040,7 @@ function _htmlDocumentEmis(d) {
       '<div>Base de remboursement : ' + _eur(c.baseTotal) + ' · part Sécurité sociale : ' + _eur(c.secuTotal) +
         (c.franchise ? ' − franchise ' + _eur(c.franchise) : '') + ' = ' + _eur(c.secuNette) + '</div>' +
       '<div>Ticket modérateur (part complémentaire selon votre contrat) : ' + _eur(c.tmTotal) +
-        ' · part hors base (prix libre) : ' + _eur(c.horsBase) + '</div>' +
+        ' · part non remboursable (prix libre) : ' + _eur(c.horsBase) + '</div>' +
       '<div>Reste à votre charge avant complémentaire : ' + _eur(c.resteApresSecu) + '</div></div>';
   if (d.type === 'facture') {
     const modeOpts = Object.keys(MODES_PAIEMENT).map((k) =>
@@ -31069,13 +31081,17 @@ function _htmlEditeurDocument() {
   return '<div class="card" id="doc-editeur" style="padding:16px;">' +
     '<div class="stitle">' + (e.type === 'devis' ? 'Devis' : 'Facture') + (e.id ? ' (brouillon)' : ' (nouveau)') + (e.devisNumero ? ' — selon devis ' + _escHtml(e.devisNumero) : '') + '</div>' +
     '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien émetteur</div><select class="inp" onchange="modifierChampDocument(\'prat\', this.value)"><option value="">— Choisir —</option>' + pratOpts + '</select></div>' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Remboursement</div><select class="inp" onchange="modifierChampDocument(\'regime\', this.value)">' + regOpts + '</select></div></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prise en charge</div><select class="inp" onchange="modifierChampDocument(\'regime\', this.value)">' + regOpts + '</select></div></div>' +
     (praticiens.length ? '' : '<div style="font-size:12px;color:var(--red);margin-top:6px;">Aucun praticien : créez-en un dans l\'onglet Praticiens (avec SIRET et RPPS/ADELI).</div>') +
     '<div class="stitle" style="margin-top:12px;">Actes</div>' +
     '<input class="inp" id="doc-actes-recherche" placeholder="Rechercher un acte…" oninput="filtrerActesDocument(this.value)"/>' +
     '<div id="doc-actes-liste" style="max-height:240px;overflow:auto;border:1px solid var(--bord);border-radius:8px;padding:4px 10px;margin-top:6px;">' + (actes || '<div style="font-size:12px;color:var(--mut);padding:6px 0;">Catalogue vide : importez le référentiel dans « Paramètres facturation ».</div>') + '</div>' +
     '<div id="doc-lignes" style="margin-top:10px;"></div>' +
-    '<div id="doc-totaux" style="margin-top:10px;"></div>' +
+    '<div id="doc-totaux" style="margin-top:10px;font-size:13px;padding:10px;border:1px solid var(--bord);border-radius:8px;">' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><label for="doc-total-input" style="font-weight:700;">Total à payer (€, sans TVA)</label>' +
+      '<input class="inp" id="doc-total-input" style="width:130px;" inputmode="decimal" oninput="modifierTotalFixeDocument(this.value)"/>' +
+      '<button class="btn" id="doc-total-somme" style="font-size:11px;padding:3px 8px;display:none;" onclick="revenirALaSommeDocument()">↺ Revenir à la somme des actes</button></div>' +
+      '<div id="doc-resume" style="margin-top:8px;font-size:12px;color:var(--mut);"></div></div>' +
     '<div style="margin-top:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Note (facultatif)</div><textarea class="inp" rows="2" maxlength="1000" oninput="modifierChampDocument(\'note\', this.value)">' + _escHtml(e.note) + '</textarea></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
       '<button class="btn" style="' + _CSS_BTN + '" onclick="enregistrerBrouillonDocument()">💾 Enregistrer le brouillon</button>' +
@@ -31094,30 +31110,42 @@ function _rendreLignesDocument() {
   if (!el || !_docEdition) return;
   const ls = _docEdition.lignes;
   el.innerHTML = ls.length ? ls.map((l, i) =>
-    '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--bord);font-size:12px;">' +
-    '<span style="flex:1;">' + _escHtml(l.libelle) + '</span>' +
-    '<input class="inp" style="width:56px;" inputmode="numeric" value="' + _escHtml(l.qte ?? '') + '" oninput="modifierLigneDocument(' + i + ', \'qte\', this.value)" aria-label="Quantité"/>' +
-    '<span>×</span><input class="inp" style="width:90px;" inputmode="decimal" value="' + _escHtml(l.prix_cents == null ? '' : (l.prix_cents / 100).toFixed(2).replace('.', ',')) + '" oninput="modifierLigneDocument(' + i + ', \'prix\', this.value)" aria-label="Prix unitaire en euros"/><span>€</span>' +
+    '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--bord);font-size:12px;">' +
+    '<div style="flex:1;">' + _escHtml(l.libelle) + _htmlPartsLigne(l, _docEdition.regime) + '</div>' +
+    '<span style="color:var(--mut);">Qté</span><input class="inp" style="width:52px;" inputmode="numeric" value="' + _escHtml(l.qte ?? '') + '" oninput="modifierLigneDocument(' + i + ', \'qte\', this.value)" aria-label="Quantité"/>' +
+    '<span style="white-space:nowrap;width:78px;text-align:right;">' + _eur(l.prix_cents) + '</span>' +
     '<button class="btn" style="font-size:11px;padding:2px 8px;" onclick="retirerLigneDocument(' + i + ')" aria-label="Retirer la ligne">✕</button></div>').join('')
     : '<div style="font-size:12px;color:var(--mut);">Cochez les actes à facturer.</div>';
   _majTotauxDocument();
 }
+// Champ « Total à payer » : suit la somme des actes tant que le praticien n'a rien fixé.
 function _majTotauxDocument() {
-  const el = document.getElementById('doc-totaux');
+  const e = _docEdition;
+  const input = document.getElementById('doc-total-input');
+  if (e && input && e.totalFixeCents === null && !e.totalIllisible) {
+    const somme = _calculerDocument(e.lignes, e.regime, null).sousTotalCents;
+    input.value = e.lignes.length ? (somme / 100).toFixed(2).replace('.', ',') : '';
+  } else if (e && input && Number.isInteger(e.totalFixeCents)) {
+    input.value = (e.totalFixeCents / 100).toFixed(2).replace('.', ',');
+  }
+  _majResumeDocument();
+}
+// Résumé sous le champ : mis à jour SANS toucher au champ (sinon le curseur saute).
+function _majResumeDocument() {
+  const el = document.getElementById('doc-resume');
   if (!el || !_docEdition) return;
   const e = _docEdition;
   const lignesIllisibles = e.lignes.some((l) => !Number.isInteger(l.qte) || !Number.isInteger(l.prix_cents));
-  const totalIllisible = e.forfait && !Number.isInteger(e.totalFixeCents);
-  const c = _calculerDocument(e.lignes, e.regime, e.forfait && Number.isInteger(e.totalFixeCents) ? e.totalFixeCents : null);
-  const valFixe = Number.isInteger(e.totalFixeCents) ? (e.totalFixeCents / 100).toFixed(2).replace('.', ',') : '';
-  el.innerHTML = '<div style="font-size:12px;padding:10px;border:1px solid var(--bord);border-radius:8px;">' +
-    '<div>Total des lignes : <b>' + _eur(c.sousTotalCents) + '</b></div>' +
-    '<label style="display:flex;gap:6px;align-items:center;margin:6px 0;"><input type="checkbox"' + (e.forfait ? ' checked' : '') + ' onchange="basculerTotalFixeDocument(this.checked)"/> Fixer un total (forfait) — le détail des lignes reste affiché</label>' +
-    (e.forfait ? '<div><input class="inp" style="width:120px;" inputmode="decimal" value="' + _escHtml(valFixe) + '" oninput="modifierTotalFixeDocument(this.value)" aria-label="Total fixé en euros"/> €</div>' : '') +
-    '<div style="margin-top:6px;font-size:14px;">Total à payer : <b>' + (lignesIllisibles || totalIllisible ? '—' : _eur(c.totalCents)) + '</b> <span style="color:var(--mut);font-size:11px;">(sans TVA)</span></div>' +
-    (lignesIllisibles || totalIllisible ? '<div style="color:var(--red);">Une quantité, un prix ou le total fixé est illisible : corrigez-le avant d\'enregistrer.</div>' : '') +
-    '<div style="margin-top:6px;color:var(--mut);">Remboursement estimé (indicatif) : Sécurité sociale <b>' + _eur(c.secuNette) + '</b>' + (c.franchise ? ' (franchise ' + _eur(c.franchise) + ' déduite)' : '') +
-    ' · ticket modérateur ' + _eur(c.tmTotal) + ' · part hors base ' + _eur(c.horsBase) + ' · reste après Sécu ' + _eur(c.resteApresSecu) + '</div></div>';
+  const c = _calculerDocument(e.lignes, e.regime, Number.isInteger(e.totalFixeCents) ? e.totalFixeCents : null);
+  const btn = document.getElementById('doc-total-somme');
+  if (btn) btn.style.display = Number.isInteger(e.totalFixeCents) && e.totalFixeCents !== c.sousTotalCents ? '' : 'none';
+  el.innerHTML =
+    (e.totalIllisible ? '<div style="color:var(--red);">Total illisible : écrivez par exemple 160 ou 160,50.</div>' : '') +
+    (lignesIllisibles ? '<div style="color:var(--red);">Une quantité est illisible (1 à 99).</div>' : '') +
+    '<div>Somme des actes (tarifs de convention) : ' + _eur(c.sousTotalCents) + '</div>' +
+    '<div>Remboursement Sécurité sociale estimé : <b>' + _eur(c.secuNette) + '</b>' + (c.franchise ? ' (franchise de ' + _eur(c.franchise) + ' déduite)' : '') +
+      ' · mutuelle (ticket modérateur) : ' + _eur(c.tmTotal) + '</div>' +
+    '<div>Reste à charge avant mutuelle : <b>' + _eur(c.resteApresSecu) + '</b></div>';
 }
 async function renderDocumentsPage() {
   const el = document.getElementById('documents-contenu');
