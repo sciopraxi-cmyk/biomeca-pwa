@@ -252,13 +252,13 @@ describe('#268 L2 — vignettes de capture posturale (sp, pp, po)', () => {
 });
 
 describe('#268 L3 — hors périmètre : valeurs figées (lot clinique dédié)', () => {
-  it('D1. Gradation HAS (computePedicurieGrade) : palette inchangée', () => {
+  it('D1. Gradation HAS (computePedicurieGrade) : palette du lot clinique du 19/10 (option 2)', () => {
     const f = fonction('computePedicurieGrade');
     for (const l of [
-      "0: { bg: 'rgba(34,197,94,0.12)',  border: '#22c55e' },",
-      "1: { bg: 'rgba(217,119,6,0.12)',  border: '#d97706' },",
-      "2: { bg: 'rgba(234,88,12,0.14)',  border: '#ea580c' },",
-      "3: { bg: 'rgba(220,38,38,0.14)',  border: '#dc2626' },",
+      "0: { bg: 'rgba(22,101,52,0.12)',  border: '#166534', sym: '✓', bw: '4px' },",
+      "1: { bg: 'rgba(133,77,14,0.14)',  border: '#854d0e', sym: '▲', bw: '6px' },",
+      "2: { bg: 'rgba(154,52,18,0.14)',  border: '#9a3412', sym: '◆', bw: '8px' },",
+      "3: { bg: 'rgba(153,27,27,0.16)',  border: '#991b1b', sym: '⬣', bw: '10px' },",
     ])
       expect(f).toContain(l);
     expect(f).toContain("banner.style.color       = '#1f2937';");
