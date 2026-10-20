@@ -3718,24 +3718,29 @@ const ETAT_SAUV_TEXTES = {
   pending: { t: 'Enregistré ici — serveur en attente', c: '#b45309' },
   failed:  { t: 'Échec de sauvegarde', c: '#b91c1c' },
 };
-// L'indicateur est inséré PAR LE SCRIPT à gauche de chaque bouton « Sauvegarder »
-// (et non écrit dans le HTML) : la structure des pages, figée par les tests
-// #268, ne bouge pas. Posturo est généré après coup : on rappelle cette
+// L'indicateur est inséré PAR LE SCRIPT (et non écrit dans le HTML ni dans le gabarit
+// Posturo : tests de structure #268). Posturo est généré après coup : on rappelle cette
 // insertion à chaque rendu et à chaque ouverture de page.
-const ETAT_SAUV_BOUTONS = [
-  'savePedicurieBilan()', 'savePodopediatrieBilan()', 'saveBilan()', 'savePosturoBilan()',
+// A3 — les boutons « Sauvegarder » n'existent plus (l'autosave suffit) : l'indicateur
+// se place à l'endroit où était le bouton, repéré par un élément voisin qui, lui,
+// reste. `avant` : juste avant l'élément ; `apres` : juste après.
+const ETAT_SAUV_ANCRES = [
+  { sel: '#pg-pedicurie h2',                       pos: 'apres' },
+  { sel: '#pg-podopediatrie h2',                   pos: 'apres' },
+  { sel: 'button[onclick="printBilan()"]',         pos: 'avant' },
+  { sel: 'button[onclick="buildRapportPosturo()"]', pos: 'avant' },
 ];
 function _installerIndicateursEtat() {
-  ETAT_SAUV_BOUTONS.forEach(function(appel) {
-    document.querySelectorAll('button[onclick="' + appel + '"]').forEach(function(btn) {
-      const prev = btn.previousElementSibling;
-      if (prev && prev.classList && prev.classList.contains('etat-sauv')) return;
+  ETAT_SAUV_ANCRES.forEach(function(a) {
+    document.querySelectorAll(a.sel).forEach(function(ref) {
+      const voisin = a.pos === 'avant' ? ref.previousElementSibling : ref.nextElementSibling;
+      if (voisin && voisin.classList && voisin.classList.contains('etat-sauv')) return;
       const span = document.createElement('span');
       span.className = 'etat-sauv';
       span.setAttribute('role', 'status');
       span.setAttribute('aria-live', 'polite');
       span.style.cssText = 'font-size:12px;font-weight:600;align-self:center;';
-      btn.parentNode.insertBefore(span, btn);
+      ref.parentNode.insertBefore(span, a.pos === 'avant' ? ref : ref.nextSibling);
     });
   });
 }
@@ -20790,6 +20795,8 @@ function undoMorpho() {
   } else if(c._baseSnapshot) {
     ctx.putImageData(c._baseSnapshot, 0, 0);
   }
+  // A3 — plus de bouton « Sauvegarder » : l'annulation d'un trait est enregistrée par l'autosave.
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('sport');
 }
 
 // #140 Phase 2b1 — PODOPÉDIATRIE MORPHOSTATIQUE (silhouettes dessinables)
@@ -20856,6 +20863,8 @@ function undoPodoMorpho() {
   } else if (c._baseSnapshot) {
     ctx.putImageData(c._baseSnapshot, 0, 0);
   }
+  // A3 — plus de bouton « Sauvegarder » : l'annulation d'un trait est enregistrée par l'autosave.
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('podopediatrie');
 }
 
 // #147 — Reset MINIMAL sur les 4 canvases morpho podo (motif clearPodoPieds).
@@ -21091,6 +21100,8 @@ function undoPieds() {
   } else if(c._baseSnapshot) {
     ctx.putImageData(c._baseSnapshot, 0, 0);
   }
+  // A3 — plus de bouton « Sauvegarder » : l'annulation d'un trait est enregistrée par l'autosave.
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('sport');
 }
 
 // #99 + Bug édition perdue (gating _restoreReady) — paramètre optionnel `onReady`
@@ -25072,7 +25083,6 @@ function getBilanPosturoHTML() {
     <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;white-space:nowrap;">← Patients</button>
     <div style="font-size:15px;font-weight:700;color:var(--posturo-encre);">🧍 Bilan Global de la Posture</div>
     <div style="display:flex;gap:6px;">
-      <button class="btn" onclick="savePosturoBilan()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">💾 Sauvegarder</button>
       <button class="btn" onclick="buildRapportPosturo()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">📄 Rapport</button>
     </div>
   </div>
@@ -29367,6 +29377,8 @@ function undoPosturoBody() {
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
+  // A3 — plus de bouton « Sauvegarder » : l'annulation d'un trait est enregistrée par l'autosave.
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave('posturo');
 }
 
 function undoPosturoFeet() {

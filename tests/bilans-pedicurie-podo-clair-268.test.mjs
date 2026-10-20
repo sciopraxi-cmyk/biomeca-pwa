@@ -153,7 +153,7 @@ describe('#268 L3 — couleurs d’identité arbitrées', () => {
       if (o.attrs.id === 'pdtab-0') expect(s.background).toBe('var(--pedicurie-btn)');
       else expect(s.color).toBe('var(--pedicurie-encre)');
     }
-    for (const re of [/Sauvegarder/, /Appliquer le grade/, /Générer la synthèse/])
+    for (const re of [/Appliquer le grade/, /Générer la synthèse/])
       expect(style(bouton(ped, re)).background, String(re)).toBe('var(--pedicurie-btn)');
     expect(style(tous(ped).find((n) => n.attrs.id === 'ped-btn-print')).background).toBe(
       'var(--pedicurie-btn)'
@@ -169,7 +169,6 @@ describe('#268 L3 — couleurs d’identité arbitrées', () => {
     const onglets = tous(podo).filter((n) => aCl(n, 'podopediatrie-tab'));
     expect(onglets).toHaveLength(12);
     for (const o of onglets) expect(style(o).border).toBe('1px solid var(--podo-encre)');
-    expect(style(bouton(podo, /Sauvegarder/)).background).toBe('var(--podo-encre)');
     expect(style(tous(podo).find((n) => n.attrs.id === 'podo-btn-print')).background).toBe(
       'var(--podo-encre)'
     );

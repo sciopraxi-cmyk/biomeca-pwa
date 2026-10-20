@@ -6,7 +6,6 @@
 [3,"button",[["onclick","nav('pg-patients')"]],"← Patients"],
 [3,"div",[],"🧍 Bilan Global de la Posture"],
 [3,"div",[],""],
-[4,"button",[["class","btn"],["onclick","savePosturoBilan()"]],"💾 Sauvegarder"],
 [4,"button",[["class","btn"],["onclick","buildRapportPosturo()"]],"📄 Rapport"],
 [2,"div",[["id","posturo-tabs"]],""],
 [3,"button",[["class","btn posturo-tab act"],["id","ptab-0"],["onclick","showPosturoSection(0)"]],"1. Anamnèse"],
