@@ -30746,7 +30746,7 @@ function _ligneDepuisActe(a) {
     franchise: a.franchise !== false,
   };
 }
-const _chiffresSeuls = (s) => String(s ?? '').replace(/[\s.\-]/g, '');
+const _chiffresSeuls = (s) => String(s ?? '').replace(/[\s.-]/g, '');
 function _mentionTva(pr) { return String(pr?.mentionTva ?? '').trim() || MENTION_TVA_DEFAUT; }
 function _emetteurDepuisPraticien(pr) {
   const t = (v, n) => String(v ?? '').trim().slice(0, n);
