@@ -62,6 +62,16 @@ const NOMS = [
   '_htmlDocumentEmis',
   '_htmlApercuDocument',
   '_htmlPageImpressionDocument',
+  '_accessPermetCreationDocument',
+  '_normaliserIban',
+  '_ibanValide',
+  '_bicValide',
+  '_formaterIban',
+  '_erreurCoordonneesBancaires',
+  'chargerDocumentsEmis',
+  '_htmlRecuperationDocuments',
+  'ouvrirRecuperationDocuments',
+  '_showAccessOverlay',
   'imprimerDocument',
   'visualiserBrouillonDocument',
   'fermerApercuDocument',
@@ -1122,16 +1132,14 @@ describe("impression d'un document émis (facture ou devis)", () => {
     expect(e.ecrit).toHaveLength(0);
     expect(e.imprime).toHaveLength(0);
   });
-  it("accès bloqué (abonnement) : fenêtre d'accès restreint, aucune impression ; accès en lecture seule : impression permise", async () => {
-    const bloque = monter({ liste: [emis()], acces: 'blocked' });
-    bloque.f.imprimerDocument('e1');
-    await new Promise((r) => setTimeout(r, 400));
-    expect(bloque.modales).toEqual(['export_pdf']);
-    expect(bloque.imprime).toHaveLength(0);
-    const lecture = monter({ liste: [emis()], acces: 'readonly' });
-    lecture.f.imprimerDocument('e1');
-    await new Promise((r) => setTimeout(r, 400));
-    expect(lecture.imprime).toHaveLength(1);
+  it("l'impression d'un document ÉMIS n'est jamais refusée : abonné actif, ancien abonné (lecture seule) et compte bloqué", async () => {
+    for (const acces of [undefined, 'full', 'readonly', 'blocked']) {
+      const e = monter({ liste: [emis()], acces });
+      e.f.imprimerDocument('e1');
+      await new Promise((r) => setTimeout(r, 400));
+      expect(e.imprime, String(acces)).toHaveLength(1);
+      expect(e.modales, String(acces)).toEqual([]);
+    }
   });
 });
 
@@ -1288,6 +1296,304 @@ describe('aperçu du brouillon : ce que recevra le patient, avant émission', ()
     const rendu = fonction('renderDocumentsPage');
     expect(rendu).toContain('_docEdition && _docApercu');
     expect(rendu).toContain('_htmlApercuDocument()');
+  });
+});
+
+describe('abonnement terminé : consulter et imprimer, ne plus créer', () => {
+  const emis = (o = {}) => ({
+    id: 'e1',
+    type: 'facture',
+    statut: 'emis',
+    numero: 'F-2026-0007',
+    date_document: '2026-10-20',
+    emetteur: { nom: 'Dr Fictif' },
+    patient: { nom: 'Martin', prenom: 'Paul' },
+    regime: 'standard',
+    lignes: [L(acte('a-pod1'))],
+    total_fixe: false,
+    total_cents: 3000,
+    tiers_payant: false,
+    part_secu_cents: 0,
+    mention_tva: 'm',
+    ...o,
+  });
+  const brouillon = {
+    id: 'b1',
+    type: 'facture',
+    statut: 'brouillon',
+    emetteur: { nom: 'Dr Fictif' },
+    lignes: [L(acte('a-pod1'))],
+    regime: 'standard',
+    total_cents: 3000,
+  };
+  it('niveaux autorisés à créer : abonné actif (ou niveau inconnu historique) ; refusés : lecture seule, bloqué, en chargement', () => {
+    const ok = (acces) => monter({ acces }).f._accessPermetCreationDocument();
+    expect(ok(undefined)).toBe(true);
+    expect(ok('full')).toBe(true);
+    for (const n of ['readonly', 'blocked', 'loading']) expect(ok(n), n).toBe(false);
+  });
+  it('ancien abonné (lecture seule) : nouveau devis, nouvelle facture, brouillon, enregistrement, émission, facture depuis devis refusés', async () => {
+    const devis = emis({ id: 'dv', type: 'devis', numero: 'D-1' });
+    const e = monter({ acces: 'readonly', liste: [brouillon, devis] });
+    e.f.nouveauDocument('devis');
+    e.f.nouveauDocument('facture');
+    e.f.ouvrirDocument('b1');
+    await e.f.creerFactureDepuisDevis('dv');
+    e.f.setEdition({
+      id: null,
+      type: 'facture',
+      pratId: 7,
+      regime: 'standard',
+      lignes: [L(acte('a-pod1'))],
+      totalFixeCents: null,
+      totalIllisible: false,
+      note: '',
+    });
+    await e.f.enregistrerBrouillonDocument();
+    await e.f.emettreDocumentCourant();
+    expect(e.modales).toEqual(Array(6).fill('create_document'));
+    expect(e.appels).toHaveLength(0);
+  });
+  it("compte bloqué : mêmes refus (le bouton n'est de toute façon pas atteignable)", () => {
+    const e = monter({ acces: 'blocked' });
+    e.f.nouveauDocument('facture');
+    expect(e.modales).toEqual(['create_document']);
+    expect(e.f.etat().edition).toBeNull();
+  });
+  it('ancien abonné : peut OUVRIR un document émis et enregistrer un règlement sur une facture émise', async () => {
+    const champs = {
+      'doc-reglement-mode': { value: 'virement' },
+      'doc-reglement-date': { value: '2026-10-21' },
+    };
+    const e = monter({
+      acces: 'readonly',
+      liste: [emis()],
+      champs,
+      reponse: () => ({ status: 200, json: [] }),
+    });
+    e.f.ouvrirDocument('e1');
+    expect(e.f.etat().vue).toBe('e1');
+    await e.f.enregistrerReglementDocument('e1');
+    expect(e.appels[0].corps).toEqual({ paiement_mode: 'virement', paiement_date: '2026-10-21' });
+    expect(e.modales).toEqual([]);
+  });
+  it('abonné actif : rien ne change (création possible)', () => {
+    const e = monter({ acces: 'full' });
+    e.f.nouveauDocument('facture');
+    expect(e.modales).toEqual([]);
+    expect(e.f.etat().edition).not.toBeNull();
+  });
+  it('page des documents : boutons « + Nouveau » seulement pour un abonné actif, sinon un message explicite', () => {
+    const src = fonction('renderDocumentsPage');
+    expect(src).toContain('_accessPermetCreationDocument()');
+    expect(src).toContain('Votre abonnement est terminé');
+    expect(src).toContain('consulter et imprimer');
+    expect(src).toContain("window._accessLevel === 'readonly'");
+  });
+  it('fenêtre de refus : intitulé « Création de devis et de factures »', () => {
+    expect(fonction('showAccessRestrictedModal')).toContain(
+      "create_document: 'Création de devis et de factures'"
+    );
+  });
+  it("récupération depuis l'écran bloqué : liste de TOUS les documents émis du compte (aucun filtre patient), triés du plus récent", async () => {
+    const e = monter({ reponse: () => ({ status: 200, json: [emis()] }) });
+    await e.f.chargerDocumentsEmis();
+    expect(e.appels[0].url).toMatch(
+      /documents_facturation\?select=\*&statut=eq\.emis&order=emis_at\.desc$/
+    );
+    expect(e.appels[0].url).not.toContain('patient_ref');
+  });
+  it('liste de récupération : numéro, date, patient, net à payer, bouton imprimer ; HTML échappé ; vide = message', () => {
+    const h = monter().f._htmlRecuperationDocuments([
+      emis(),
+      emis({
+        id: 'x2',
+        type: 'devis',
+        numero: 'D-1',
+        patient: { nom: '<b>X</b>', prenom: 'Y' },
+        tiers_payant: true,
+        part_secu_cents: 1800,
+      }),
+    ]);
+    expect(h).toContain('Facture F-2026-0007');
+    expect(h).toContain('Devis D-1');
+    expect(h).toContain('20/10/2026');
+    expect(h).toContain('Paul Martin');
+    expect(h).toContain('12,00');
+    expect(h).toContain("imprimerDocument('e1')");
+    expect(h).not.toContain('<b>X</b>');
+    expect(monter().f._htmlRecuperationDocuments([])).toContain('Aucun document émis');
+  });
+  it("ouvrirRecuperationDocuments : charge puis affiche la liste ; en cas d'échec, message clair", async () => {
+    const e = monter({ reponse: () => ({ status: 200, json: [emis()] }) });
+    await e.f.ouvrirRecuperationDocuments();
+    const modale = e.iframes.at(-1);
+    expect(modale.id).toBe('modal-recuperation-documents');
+    expect(modale.style.display).toBe('flex');
+    expect(modale.innerHTML).toContain('Facture F-2026-0007');
+    const ko = monter({ reponse: () => ({ status: 500, json: { message: 'panne' } }) });
+    await ko.f.ouvrirRecuperationDocuments();
+    expect(ko.iframes.at(-1).innerHTML).toMatch(/Documents indisponibles \(panne\)/);
+  });
+  it("écran d'accès bloqué : le bouton « Récupérer » apparaît pour un essai expiré ou un compte jamais payé, jamais quand l'état du compte est inconnu", () => {
+    const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
+    expect(html).toContain('id="overlay-recuperer-docs"');
+    expect(html).toContain('onclick="ouvrirRecuperationDocuments()"');
+    const essai = (cause) => {
+      const bouton = { style: { display: 'none' } };
+      const wrapper = { children: [{}, { textContent: '' }, { textContent: '' }] };
+      const overlay = { style: {}, firstElementChild: wrapper };
+      const e = monter({
+        champs: { 'trial-expired-overlay': overlay, 'overlay-recuperer-docs': bouton },
+      });
+      e.f._showAccessOverlay({ cause });
+      return bouton.style.display;
+    };
+    expect(essai('trial_expired')).toBe('');
+    expect(essai('never_paid')).toBe('');
+    expect(essai('donnees_indisponibles')).toBe('none');
+    expect(essai('inconnue')).toBe('none');
+  });
+});
+
+describe('coordonnées bancaires du praticien (IBAN, BIC) sur les devis et factures', () => {
+  const f = () => HARNAIS.f;
+  const IBAN = 'FR76 3000 6000 0112 3456 7890 189';
+  it("clé de contrôle IBAN : exemples publics valides acceptés, une erreur d'un chiffre refusée", () => {
+    for (const ok of [
+      IBAN,
+      'fr76300060000112345678901 89',
+      'GB82 WEST 1234 5698 7654 32',
+      'DE89 3704 0044 0532 0130 00',
+    ])
+      expect(f()._ibanValide(ok), ok).toBe(true);
+    for (const ko of [
+      'FR76 3000 6000 0112 3456 7890 188',
+      'FR76',
+      '',
+      'XX00',
+      '1234 5678',
+      'FR76 3000 6000 0112 3456 7890 18!',
+    ])
+      expect(f()._ibanValide(ko), ko).toBe(false);
+  });
+  it('BIC : 8 ou 11 caractères', () => {
+    for (const ok of ['BNPAFRPP', 'bnpafrpp', 'BNPAFRPPXXX'])
+      expect(f()._bicValide(ok), ok).toBe(true);
+    for (const ko of ['', 'BNPAFR', 'BNPAFRPPX', '1234FRPP', 'BNPA1RPP'])
+      expect(f()._bicValide(ko), ko).toBe(false);
+  });
+  it('affichage en groupes de quatre ; normalisation (espaces, minuscules)', () => {
+    expect(f()._formaterIban('fr7630006000011234567890189')).toBe(
+      'FR76 3000 6000 0112 3456 7890 189'
+    );
+    expect(f()._normaliserIban(' fr76 3000 ')).toBe('FR763000');
+  });
+  it('message de la fiche praticien : IBAN faux, BIC faux, BIC sans IBAN ; rien ou tout bon : aucune erreur', () => {
+    expect(f()._erreurCoordonneesBancaires(IBAN, 'BNPAFRPP')).toBeNull();
+    expect(f()._erreurCoordonneesBancaires('', '')).toBeNull();
+    expect(f()._erreurCoordonneesBancaires(IBAN, '')).toBeNull();
+    expect(f()._erreurCoordonneesBancaires('FR76 3000 6000 0112 3456 7890 188', '')).toMatch(
+      /IBAN invalide/
+    );
+    expect(f()._erreurCoordonneesBancaires(IBAN, 'XX')).toMatch(/BIC invalide/);
+    expect(f()._erreurCoordonneesBancaires('', 'BNPAFRPP')).toMatch(/BIC sans IBAN/);
+  });
+  it("l'émetteur copié dans le document porte l'IBAN et le BIC normalisés", () => {
+    const e = f()._emetteurDepuisPraticien({
+      ...PRAT,
+      iban: IBAN.toLowerCase(),
+      bic: ' bnpafrpp ',
+    });
+    expect(e.iban).toBe('FR7630006000011234567890189');
+    expect(e.bic).toBe('BNPAFRPP');
+    expect(f()._emetteurDepuisPraticien(PRAT)).toMatchObject({ iban: '', bic: '' });
+  });
+  it('validation du document : coordonnées bancaires fausses refusées (brouillon comme émission) ; absentes acceptées', () => {
+    const doc = (o) => ({
+      type: 'facture',
+      patient_ref: '42',
+      regime: 'standard',
+      lignes: [L(acte('a-pod1'))],
+      emetteur: { ...f()._emetteurDepuisPraticien(PRAT), ...o },
+    });
+    expect(f()._validerDocument(doc({}), true).ok).toBe(true);
+    expect(
+      f()._validerDocument(doc({ iban: IBAN.replace(/ /g, ''), bic: 'BNPAFRPP' }), true).ok
+    ).toBe(true);
+    for (const pour of [false, true]) {
+      const r = f()._validerDocument(doc({ iban: 'FR7630006000011234567890188' }), pour);
+      expect(r.ok).toBe(false);
+      expect(r.erreur).toMatch(/IBAN invalide/);
+    }
+  });
+  it('devis ET facture (émis et aperçu) affichent « Règlement par virement » avec IBAN groupé et BIC ; sans IBAN, rien', () => {
+    const base = {
+      id: 'i',
+      statut: 'emis',
+      numero: 'N-1',
+      date_document: '2026-10-20',
+      patient: { nom: 'y' },
+      regime: 'standard',
+      lignes: [L(acte('a-pod1'))],
+      total_cents: 3000,
+      mention_tva: 'm',
+    };
+    const avec = {
+      ...base.emetteur,
+      nom: 'Dr',
+      iban: 'FR7630006000011234567890189',
+      bic: 'BNPAFRPP',
+    };
+    for (const type of ['facture', 'devis']) {
+      const d = { ...base, type, emetteur: avec };
+      for (const h of [
+        f()._htmlDocumentEmis(d),
+        f()._htmlCorpsDocument(d, true),
+        f()._htmlPageImpressionDocument(d),
+      ]) {
+        expect(h, type).toContain('Règlement par virement');
+        expect(h, type).toContain('IBAN FR76 3000 6000 0112 3456 7890 189');
+        expect(h, type).toContain('BIC BNPAFRPP');
+      }
+    }
+    const sans = f()._htmlDocumentEmis({ ...base, type: 'facture', emetteur: { nom: 'Dr' } });
+    expect(sans).not.toContain('Règlement par virement');
+    const sansBic = f()._htmlDocumentEmis({
+      ...base,
+      type: 'facture',
+      emetteur: { nom: 'Dr', iban: 'FR7630006000011234567890189' },
+    });
+    expect(sansBic).toContain('IBAN FR76');
+    expect(sansBic).not.toContain('BIC');
+  });
+  it("l'IBAN affiché est échappé", () => {
+    const h = f()._htmlDocumentEmis({
+      id: 'i',
+      type: 'facture',
+      statut: 'emis',
+      numero: 'N',
+      patient: {},
+      regime: 'standard',
+      lignes: [L(acte('a-pod1'))],
+      total_cents: 3000,
+      mention_tva: 'm',
+      emetteur: { nom: 'Dr', iban: '<script>x</script>' },
+    });
+    expect(h).not.toContain('<script>');
+  });
+  it('la fiche praticien : champs IBAN et BIC, enregistrés, rechargés et contrôlés avant sauvegarde', () => {
+    const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
+    for (const id of ['pr-iban', 'pr-bic']) {
+      expect(html, id).toContain(`id="${id}"`);
+      expect(fonction('createPraticien'), id).toContain(id);
+      expect(fonction('editPraticien'), id).toContain(id);
+      expect(fonction('saveEditPraticien'), id).toContain(id);
+    }
+    for (const n of ['createPraticien', 'saveEditPraticien']) {
+      expect(fonction(n), n).toContain('_erreurCoordonneesBancaires(');
+      expect(fonction(n), n).toContain('if (errBanque) { alert(errBanque); return; }');
+    }
   });
 });
 

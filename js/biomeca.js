@@ -3130,6 +3130,15 @@ function _accessPermetImpression() {
   return !l || l === 'full' || l === 'readonly';
 }
 
+// Facturation : créer, modifier ou émettre un devis / une facture est réservé aux abonnés actifs.
+// Un ancien abonné (« lecture seule ») ou un compte « bloqué » ne crée plus de document ;
+// il CONSULTE et IMPRIME toujours ses documents déjà émis (obligation de conservation) et
+// l'ancien abonné peut encore enregistrer un règlement. Garde d'interface, comme les autres.
+function _accessPermetCreationDocument() {
+  const l = window._accessLevel;
+  return !l || l === 'full';
+}
+
 function applyReadOnlyUI(level) {
   const blocked = level === 'readonly' || level === 'blocked';
   const selectors = [
@@ -3172,6 +3181,7 @@ function showAccessRestrictedModal(reason) {
     create_patient: 'Création de patient',
     create_bilan: 'Création de bilan',
     export_pdf: 'Export PDF',
+    create_document: 'Création de devis et de factures',
   };
   const label = labels[reason] || 'Cette fonctionnalité';
 
@@ -3793,6 +3803,9 @@ function _showAccessOverlay({ cause }) {
   const o = document.getElementById('trial-expired-overlay');
   if (!o) return;
   o.style.display = 'flex';
+  // Documents déjà émis récupérables, sauf si l'état du compte est inconnu (fail-secure).
+  const recup = document.getElementById('overlay-recuperer-docs');
+  if (recup) recup.style.display = cause === 'trial_expired' || cause === 'never_paid' ? '' : 'none';
   const wrapper = o.firstElementChild;
   if (!wrapper || wrapper.children.length < 3) return;
   const titleEl = wrapper.children[1];
@@ -6568,6 +6581,8 @@ function _pratLogoBlockHTML(prat, height) {
 function createPraticien() {
   const nom = document.getElementById('pr-nom').value.trim();
   if (!nom) { alert('Nom obligatoire.'); return; }
+  const errBanque = _erreurCoordonneesBancaires(document.getElementById('pr-iban').value, document.getElementById('pr-bic').value);
+  if (errBanque) { alert(errBanque); return; }
   const pr = {
     id:Date.now(), nom,
     titre:document.getElementById('pr-titre').value,
@@ -6575,11 +6590,11 @@ function createPraticien() {
     tel:document.getElementById('pr-tel').value,
     adresse:document.getElementById('pr-adresse').value,
     email:document.getElementById('pr-email').value,
-    siret:document.getElementById('pr-siret').value.trim(), rpps:document.getElementById('pr-rpps').value.trim(), mentionTva:document.getElementById('pr-mention-tva').value.trim(), // facturation
+    siret:document.getElementById('pr-siret').value.trim(), rpps:document.getElementById('pr-rpps').value.trim(), iban:_normaliserIban(document.getElementById('pr-iban').value), bic:_normaliserIban(document.getElementById('pr-bic').value), mentionTva:document.getElementById('pr-mention-tva').value.trim(), // facturation
     logo:_pratLogoDataUrl, // #229-B
   };
   praticiens.push(pr); savePraticiens();
-  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-mention-tva'].forEach(id=>{document.getElementById(id).value='';});
+  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-iban','pr-bic','pr-mention-tva'].forEach(id=>{document.getElementById(id).value='';});
   removePraticienLogo(); // #229-B — reset du formulaire
   renderPratList(); populatePratSelect();
   alert(`✓ Praticien enregistré : ${pr.nom}`);
@@ -8717,6 +8732,8 @@ function editPraticien(i) {
   document.getElementById('pr-email').value = pr.email || '';
   document.getElementById('pr-siret').value = pr.siret || '';
   document.getElementById('pr-rpps').value = pr.rpps || '';
+  document.getElementById('pr-iban').value = pr.iban ? _formaterIban(pr.iban) : '';
+  document.getElementById('pr-bic').value = pr.bic || '';
   document.getElementById('pr-mention-tva').value = pr.mentionTva || '';
   // #229-B — charger le logo existant dans l'état + l'aperçu du formulaire.
   _pratLogoDataUrl = pr.logo || '';
@@ -8736,6 +8753,8 @@ function editPraticien(i) {
 function saveEditPraticien(i) {
   const pr = praticiens[i];
   if(!pr) return;
+  const errBanque = _erreurCoordonneesBancaires(document.getElementById('pr-iban').value, document.getElementById('pr-bic').value);
+  if (errBanque) { alert(errBanque); return; }
   pr.nom = document.getElementById('pr-nom').value.trim();
   pr.titre = document.getElementById('pr-titre').value.trim();
   pr.cabinet = document.getElementById('pr-cabinet').value.trim();
@@ -8744,6 +8763,8 @@ function saveEditPraticien(i) {
   pr.email = document.getElementById('pr-email').value.trim();
   pr.siret = document.getElementById('pr-siret').value.trim();
   pr.rpps = document.getElementById('pr-rpps').value.trim();
+  pr.iban = _normaliserIban(document.getElementById('pr-iban').value);
+  pr.bic = _normaliserIban(document.getElementById('pr-bic').value);
   pr.mentionTva = document.getElementById('pr-mention-tva').value.trim();
   pr.logo = _pratLogoDataUrl; // #229-B — '' si retiré via le bouton ✕
   savePatients();
@@ -8751,7 +8772,7 @@ function saveEditPraticien(i) {
   // Remettre le bouton en mode création
   const btn = document.querySelector('#pg-praticiens button[onclick*="saveEditPraticien"]');
   if(btn) { btn.textContent = '✓ Enregistrer le praticien'; btn.onclick = createPraticien; }
-  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-mention-tva'].forEach(id => {
+  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-iban','pr-bic','pr-mention-tva'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   removePraticienLogo(); // #229-B — reset du formulaire
@@ -30758,12 +30779,38 @@ function _ligneDepuisActe(a) {
 }
 const _chiffresSeuls = (s) => String(s ?? '').replace(/[\s.-]/g, '');
 function _mentionTva(pr) { return String(pr?.mentionTva ?? '').trim() || MENTION_TVA_DEFAUT; }
+// IBAN : espaces retirés, majuscules ; valide par la clé de contrôle (modulo 97) et la longueur
+// (15 à 34 caractères). BIC : 8 ou 11 caractères (4 lettres banque, 2 lettres pays, 2 code place,
+// 3 code agence facultatif).
+function _normaliserIban(v) { return String(v ?? '').replace(/\s+/g, '').toUpperCase(); }
+function _ibanValide(v) {
+  const i = _normaliserIban(v);
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(i)) return false;
+  const t = i.slice(4) + i.slice(0, 4);
+  let reste = 0;
+  for (const c of t) {
+    const n = c >= 'A' ? String(c.charCodeAt(0) - 55) : c;
+    for (const d of n) reste = (reste * 10 + Number(d)) % 97;
+  }
+  return reste === 1;
+}
+function _bicValide(v) { return /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(_normaliserIban(v)); }
+function _formaterIban(v) { return _normaliserIban(v).replace(/(.{4})/g, '$1 ').trim(); }
+// Vérifie les coordonnées bancaires d'une fiche praticien ; retourne un message ou null.
+function _erreurCoordonneesBancaires(iban, bic) {
+  const i = _normaliserIban(iban), b = _normaliserIban(bic);
+  if (i && !_ibanValide(i)) return 'IBAN invalide : vérifiez les chiffres (la clé de contrôle ne correspond pas).';
+  if (b && !_bicValide(b)) return 'BIC invalide : 8 ou 11 caractères, par exemple BNPAFRPP.';
+  if (b && !i) return 'Un BIC sans IBAN : saisissez aussi l\'IBAN, ou videz le BIC.';
+  return null;
+}
 function _emetteurDepuisPraticien(pr) {
   const t = (v, n) => String(v ?? '').trim().slice(0, n);
   return {
     nom: t(pr?.nom, 120), titre: t(pr?.titre, 120), cabinet: t(pr?.cabinet, 120),
     adresse: t(pr?.adresse, 300), tel: t(pr?.tel, 40), email: t(pr?.email, 120),
     siret: _chiffresSeuls(pr?.siret), rpps: _chiffresSeuls(pr?.rpps),
+    iban: _normaliserIban(pr?.iban), bic: _normaliserIban(pr?.bic),
   };
 }
 function _patientInstantane(p) {
@@ -30797,6 +30844,8 @@ function _validerDocument(d, pourEmission) {
   const calc = _calculerDocument(d.lignes, d.regime, d.totalFixeCents);
   if (calc.totalCents > ACTE_MONTANT_MAX_CENTS) return ko('Le total dépasse 100 000 €.');
   if (!String(d.emetteur?.nom ?? '').trim()) return ko('Choisissez le praticien émetteur.');
+  const banque = _erreurCoordonneesBancaires(d.emetteur?.iban, d.emetteur?.bic);
+  if (banque) return ko(banque + ' Corrigez la fiche du praticien (onglet Praticiens).');
   if (pourEmission) {
     const e = d.emetteur;
     if (!/^\d{14}$/.test(e.siret)) return ko('SIRET manquant ou invalide (14 chiffres) : complétez la fiche du praticien (onglet Praticiens).');
@@ -30867,6 +30916,7 @@ function ouvrirDocumentsPatient(idx) {
   nav('pg-documents');
 }
 function nouveauDocument(type) {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
   _docVue = null; _docApercu = false;
   _docEdition = {
     id: null, type, pratId: _praticienParDefaut(currentPatient)?.id ?? null, regime: 'standard',
@@ -30879,6 +30929,7 @@ function ouvrirDocument(id) {
   if (!d) return;
   _docApercu = false;
   if (d.statut === 'emis') { _docEdition = null; _docVue = id; renderDocumentsPage(); return; }
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
   _docVue = null;
   const pr = praticiens.find((p) => p.nom === d.emetteur?.nom) || _praticienParDefaut(currentPatient);
   _docEdition = {
@@ -30949,6 +31000,7 @@ function _preparerDocument(pourEmission) {
 }
 async function enregistrerBrouillonDocument(silencieux) {
   if (!_docEdition || !currentPatient) return null;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return null; }
   const { base, v } = _preparerDocument(false);
   if (!v.ok) { alert(v.erreur); return null; }
   try {
@@ -30966,6 +31018,7 @@ async function enregistrerBrouillonDocument(silencieux) {
 }
 async function emettreDocumentCourant() {
   if (!_docEdition || !currentPatient) return;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
   const { v } = _preparerDocument(true);
   if (!v.ok) { alert(v.erreur); return; }
   const nom = _docEdition.type === 'devis' ? 'ce devis' : 'cette facture';
@@ -31001,6 +31054,7 @@ async function enregistrerReglementDocument(id) {
   } catch (e) { alert('Règlement non enregistré (' + e.message + ').'); }
 }
 async function creerFactureDepuisDevis(id) {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
   const d = _docListe.find((x) => x.id === id && x.type === 'devis' && x.statut === 'emis');
   if (!d || !currentPatient) return;
   const pr = praticiens.find((p) => p.nom === d.emetteur?.nom) || _praticienParDefaut(currentPatient);
@@ -31087,6 +31141,7 @@ function _htmlCorpsDocument(d, apercu) {
       : '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:6px;">Total à payer : ' + _eur(d.total_cents) + '</div>') +
     '<div style="font-size:12px;color:var(--mut);margin-top:8px;">' + _escHtml(d.mention_tva) + '</div>' +
     (d.note ? '<div style="font-size:12px;margin-top:8px;white-space:pre-wrap;">' + _escHtml(d.note) + '</div>' : '') +
+    (e.iban ? '<div style="font-size:12px;margin-top:8px;"><b>Règlement par virement</b> — IBAN ' + _escHtml(_formaterIban(e.iban)) + (e.bic ? ' · BIC ' + _escHtml(e.bic) : '') + '</div>' : '') +
     '<div style="font-size:12px;margin-top:12px;padding:10px;border:1px dashed var(--bord);border-radius:8px;">' +
       '<b>' + (d.tiers_payant ? 'Prise en charge Sécurité sociale (tiers payant, estimée)' : 'Remboursement estimé (indicatif)') + '</b> — ' + _escHtml(REGIMES_REMBOURSEMENT[d.regime]?.libelle || '') +
       '<div>Base de remboursement : ' + _eur(c.baseTotal) + ' · part Sécurité sociale : ' + _eur(c.secuTotal) +
@@ -31150,7 +31205,7 @@ function _htmlPageImpressionDocument(d) {
 function imprimerDocument(id) {
   const d = _docListe.find((x) => x.id === id && x.statut === 'emis');
   if (!d) return;
-  if (!_accessPermetImpression()) { showAccessRestrictedModal('export_pdf'); return; }
+  // Aucune garde d'abonnement : un document émis se récupère et s'imprime toujours.
   document.querySelectorAll('iframe.doc-impression').forEach((f) => f.remove());
   const iframe = document.createElement('iframe');
   iframe.className = 'doc-impression';
@@ -31163,6 +31218,49 @@ function imprimerDocument(id) {
     try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
     catch (_e) { alert('Impression impossible. Réessayez ou utilisez Cmd/Ctrl+P.'); }
   }, 300);
+}
+// Compte « bloqué » (essai expiré sans paiement) : il ne voit plus l'application, mais ses
+// documents DÉJÀ ÉMIS restent récupérables et imprimables. Liste de tous les documents émis
+// du compte (le patient et l'émetteur sont des instantanés : aucune donnée locale requise).
+async function chargerDocumentsEmis() {
+  const res = await _docRequete('documents_facturation?select=*&statut=eq.emis&order=emis_at.desc');
+  _docListe = await res.json();
+  return _docListe;
+}
+function _htmlRecuperationDocuments(liste) {
+  const corps = liste.length
+    ? liste.map((d) => {
+        const p = d.patient || {};
+        const nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim();
+        return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+          '<div style="font-size:13px;text-align:left;"><b>' + (d.type === 'devis' ? 'Devis' : 'Facture') + ' ' + _escHtml(d.numero) + '</b>' +
+            '<div style="font-size:11px;color:var(--mut);">' + _escHtml(_dateFr(d.date_document)) + (nom ? ' · ' + _escHtml(nom) : '') + ' · ' + _eur(_netDocument(d)) + '</div></div>' +
+          '<button class="btn" style="font-size:11px;padding:3px 10px;" onclick="imprimerDocument(\'' + _escHtml(d.id) + '\')">🖨 Imprimer</button></div>';
+      }).join('')
+    : '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun document émis sur ce compte.</div>';
+  return '<div style="background:var(--card);border-radius:14px;padding:24px;max-width:520px;width:100%;max-height:80vh;overflow:auto;">' +
+    '<div style="font-size:17px;font-weight:700;color:var(--txt);margin-bottom:4px;">Mes devis et factures émis</div>' +
+    '<div style="font-size:12px;color:var(--mut);margin-bottom:12px;">Vos documents émis restent à votre disposition, même sans abonnement.</div>' +
+    corps +
+    '<div style="margin-top:14px;"><button class="btn" style="font-size:12px;padding:5px 14px;" onclick="document.getElementById(\'modal-recuperation-documents\').style.display=\'none\'">Fermer</button></div></div>';
+}
+async function ouvrirRecuperationDocuments() {
+  let modal = document.getElementById('modal-recuperation-documents');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-recuperation-documents';
+    modal.className = 'page-claire';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10001;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:24px;color:var(--mut);font-size:13px;">Chargement de vos documents…</div>';
+  modal.style.display = 'flex';
+  try {
+    modal.innerHTML = _htmlRecuperationDocuments(await chargerDocumentsEmis());
+  } catch (err) {
+    modal.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:24px;max-width:420px;font-size:13px;"><div style="color:var(--red);">Documents indisponibles (' + _escHtml(err.message) + '). Vérifiez votre connexion puis réessayez.</div>' +
+      '<div style="margin-top:12px;"><button class="btn" style="font-size:12px;padding:5px 14px;" onclick="document.getElementById(\'modal-recuperation-documents\').style.display=\'none\'">Fermer</button></div></div>';
+  }
 }
 function _htmlListeDocuments() {
   if (!_docListe.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun document pour ce patient.</div>';
@@ -31278,9 +31376,13 @@ async function renderDocumentsPage() {
   const vue = _docVue && _docListe.find((x) => x.id === _docVue && x.statut === 'emis');
   if (vue) { el.innerHTML = _htmlDocumentEmis(vue); return; }
   _docVue = null;
-  el.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
-    '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'devis\')">+ Nouveau devis</button>' +
-    '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'facture\')">+ Nouvelle facture</button></div>' +
+  const creation = _accessPermetCreationDocument();
+  el.innerHTML = (creation
+    ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'devis\')">+ Nouveau devis</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'facture\')">+ Nouvelle facture</button></div>'
+    : '<div style="font-size:12px;margin-bottom:10px;padding:8px 12px;border-radius:8px;border:1px solid var(--bord);">Votre abonnement est terminé : vous pouvez <b>consulter et imprimer</b> vos documents émis' +
+      (window._accessLevel === 'readonly' ? ' et enregistrer un règlement' : '') + '. Reprenez votre abonnement pour créer de nouveaux devis et factures.</div>') +
     '<div class="card" style="padding:12px 16px;">' + _htmlListeDocuments() + '</div>';
 }
 

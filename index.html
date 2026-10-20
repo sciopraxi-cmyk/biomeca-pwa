@@ -603,6 +603,7 @@
     <div style="font-size:17px;font-weight:700;color:var(--txt);margin-bottom:8px;">Essai gratuit terminé</div>
     <div style="font-size:13px;color:var(--mut);margin-bottom:20px;">Choisissez une formule pour continuer.</div>
     <button onclick="showSubscribeModal()" style="background:var(--blue);color:#fff;border:none;padding:12px 28px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">Voir les formules</button>
+    <button id="overlay-recuperer-docs" onclick="ouvrirRecuperationDocuments()" style="display:none;background:none;color:var(--txt);border:1px solid var(--bord);padding:10px 28px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-top:10px;">🧾 Récupérer mes devis et factures émis</button>
   </div>
 </div>
 <div class="topbar">
@@ -3532,6 +3533,10 @@
       <div class="g2" style="margin-top:6px;">
         <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">SIRET (14 chiffres, pour les devis et factures)</div><input class="inp" id="pr-siret" inputmode="numeric" maxlength="20" placeholder="123 456 789 00012"/></div>
         <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">N° RPPS (11 chiffres) ou ADELI (9 chiffres)</div><input class="inp" id="pr-rpps" inputmode="numeric" maxlength="20" placeholder="10001234567"/></div>
+      </div>
+      <div class="g2" style="margin-top:6px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">IBAN (affiché sur les devis et factures, facultatif)</div><input class="inp" id="pr-iban" maxlength="42" autocomplete="off" placeholder="FR76 3000 6000 0112 3456 7890 189"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">BIC (facultatif)</div><input class="inp" id="pr-bic" maxlength="11" autocomplete="off" placeholder="BNPAFRPP"/></div>
       </div>
       <div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Mention de TVA sur les documents (vide = « TVA non applicable, article 261-4-1° du CGI » — à faire valider par votre expert-comptable)</div><input class="inp" id="pr-mention-tva" maxlength="300"/></div>
       <!-- #229-B — logo du cabinet, affiché au centre du header des rapports.

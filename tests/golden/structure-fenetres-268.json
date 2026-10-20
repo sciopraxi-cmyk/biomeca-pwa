@@ -402,6 +402,21 @@
     ]
    ],
    "Voir les formules"
+  ],
+  [
+   2,
+   "button",
+   [
+    [
+     "id",
+     "overlay-recuperer-docs"
+    ],
+    [
+     "onclick",
+     "ouvrirRecuperationDocuments()"
+    ]
+   ],
+   "🧾 Récupérer mes devis et factures émis"
   ]
  ],
  "podo-age": [
