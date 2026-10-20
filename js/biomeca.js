@@ -3650,6 +3650,48 @@ function _hideAccessOverlay() {
 // Affiché par saveToSupabase() lorsque la sync DB échoue (path !ok ou catch).
 // Caché automatiquement au prochain save success (via flag _syncErrorShown).
 // Dismissible manuellement par bouton ✕ (cf. index.html #sync-error-banner).
+// ─── A2 / PR 2 — bandeaux non bloquants (8.4 stockage, 8.5 photo) ───
+function _afficherBandeau(id, texte) {
+  const b = document.getElementById(id);
+  const t = document.getElementById(id + '-text');
+  if (t) t.textContent = texte;
+  if (b) b.style.display = 'block';
+}
+function _masquerBandeau(id) {
+  const b = document.getElementById(id);
+  if (b) b.style.display = 'none';
+}
+
+// 8.4 — stockage local plein : UNE boîte de dialogue par incident (au lieu d'une
+// à chaque autosave), puis un bandeau qui reste affiché tant que les écritures
+// échouent. Le premier enregistrement réussi lève l'incident (et le bandeau).
+let _stockageIncident = false;
+function _signalerStockagePlein(messageAlerte) {
+  _afficherBandeau(
+    'stockage-banner',
+    '⚠️ Stockage de cet appareil plein : vos dernières modifications ne sont PAS enregistrées. ' +
+    'Ne fermez pas l\'onglet ; supprimez d\'anciens bilans ou patients de test.'
+  );
+  if (_stockageIncident) return;
+  _stockageIncident = true;
+  alert(messageAlerte);
+}
+function _stockageRetabli() {
+  if (!_stockageIncident) return;
+  _stockageIncident = false;
+  _masquerBandeau('stockage-banner');
+}
+
+// 8.5 — l'envoi d'une photo a échoué : bandeau (la photo reste à l'écran et
+// sera renvoyée à la prochaine sauvegarde). Appelé par uploadPhotoBase64.
+function _signalerEchecEnvoiPhoto() {
+  _afficherBandeau(
+    'photo-envoi-banner',
+    '⚠️ Une photo n\'a pas pu être envoyée. Elle reste affichée et sera renvoyée à la prochaine ' +
+    'sauvegarde ; si ce message revient, vérifiez la connexion avant de quitter la page.'
+  );
+}
+
 function _showSyncErrorBanner(message) {
   const b = document.getElementById('sync-error-banner');
   const t = document.getElementById('sync-error-banner-text');
@@ -5493,7 +5535,7 @@ function savePatients() {
   // Si l'opération réduit le stockage (suppression), on autorise toujours pour permettre le déblocage.
   if (ratio >= STORAGE_CRITICAL_THRESHOLD && !isReduction) {
     const used = (beforeBytes / 1024 / 1024).toFixed(1);
-    alert(
+    _signalerStockagePlein(
       '⚠️ ESPACE DE STOCKAGE CRITIQUE\n\n' +
       'Vous utilisez ' + used + ' Mo sur 10 Mo disponibles dans le stockage local du navigateur.\n\n' +
       'Pour éviter toute perte de données :\n' +
@@ -5510,9 +5552,10 @@ function savePatients() {
     // ici grâce à la garde en tête de savePatients.
     localStorage.setItem(currentPatientsKey, JSON.stringify(patients));
     _marquerNonSynchronise(); // A2 — effacé quand le cloud confirme (saveToSupabase)
+    _stockageRetabli(); // A2 PR 2 — l'écriture a réussi : fin de l'incident « stockage plein »
   } catch(e) {
     if (e && (e.name === 'QuotaExceededError' || e.code === 22 || (e.message && e.message.toLowerCase().includes('quota')))) {
-      alert(
+      _signalerStockagePlein(
         '⚠️ ESPACE DE STOCKAGE PLEIN\n\n' +
         'La sauvegarde a échoué : la limite de 5 à 10 Mo selon le navigateur est atteinte.\n\n' +
         'Vos modifications en cours sont en mémoire mais NON sauvegardées sur cet appareil. ' +
@@ -7914,9 +7957,9 @@ async function addGalleryPhotos(galId, input) {
 // (id réservé '__legacy' → paire cfg.legacy.dataKey/pathKey au lieu du préfixe).
 function _galleryEntryData(cfg, t, id) {
   if (id === '__legacy' && cfg.legacy) {
-    return { data: t[cfg.legacy.dataKey], hasPath: !!t[cfg.legacy.pathKey] };
+    return { data: t[cfg.legacy.dataKey], hasPath: !!t[cfg.legacy.pathKey], path: t[cfg.legacy.pathKey] };
   }
-  return { data: t[cfg.prefix + id], hasPath: !!t[cfg.prefix + id + 'Path'] };
+  return { data: t[cfg.prefix + id], hasPath: !!t[cfg.prefix + id + 'Path'], path: t[cfg.prefix + id + 'Path'] };
 }
 
 function deleteGalleryPhoto(galId, id) {
@@ -7956,9 +7999,13 @@ function renderGallery(galId) {
   }
   wrap.innerHTML = ids
     .map((id) => {
-      const { data, hasPath } = _galleryEntryData(cfg, t, id);
+      const { data, hasPath, path } = _galleryEntryData(cfg, t, id);
+      // A2 PR 2 — un rechargement échoué n'est plus un « chargement… » sans fin.
+      const echec = !data && hasPath && typeof window._photoRechargeEchouee === 'function' && window._photoRechargeEchouee(path);
       const inner = data
         ? '<img src="' + data + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;cursor:zoom-in;" onclick="openGalleryLightbox(\'' + galId + "','" + id + '\')"/>'
+        : echec
+        ? '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:100%;height:100%;font-size:10px;font-weight:600;color:#b91c1c;text-align:center;padding:4px;">⚠️ photo non rechargée<button onclick="retryGalleryPhoto(\'' + galId + "','" + id + '\')" style="font-size:10px;padding:3px 8px;border:1px solid #b91c1c;border-radius:5px;background:#fff;color:#b91c1c;cursor:pointer;">Réessayer</button></div>'
         : '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:10px;color:#888;text-align:center;padding:4px;">' + (hasPath ? 'chargement…' : 'photo indisponible') + '</div>';
       return (
         '<div style="position:relative;width:110px;height:110px;background:#f3f4f6;border:1px solid var(--bord);border-radius:8px;">' +
@@ -8060,6 +8107,26 @@ function _podoscopeTargets() {
 async function addPodoscopePhotos(input) {
   return addGalleryPhotos('sp-podoscope', input);
 }
+
+// A2 PR 2 — nouvel essai de rechargement d'une photo dont le chargement a échoué.
+async function retryGalleryPhoto(galId, id) {
+  const cfg = PHOTO_GALLERIES[galId];
+  if (!cfg) return;
+  const targets = cfg.getTargets();
+  if (targets.length === 0) return;
+  const legacy = id === '__legacy' && cfg.legacy;
+  const dataKey = legacy ? cfg.legacy.dataKey : cfg.prefix + id;
+  const pathKey = legacy ? cfg.legacy.pathKey : cfg.prefix + id + 'Path';
+  const path = targets.map((t) => t[pathKey]).find(Boolean);
+  if (!path) return;
+  if (typeof window._oublierEchecPhoto === 'function') window._oublierEchecPhoto(path);
+  renderGallery(galId); // « chargement… » pendant le nouvel essai
+  try { await ensureSession(); } catch (_e) { /* l'échec du rechargement sera affiché */ }
+  const r = await window.prefetchPhotoToDataUrl(path);
+  if (r.ok) targets.forEach((t) => { if (t[pathKey] === path && !t[dataKey]) t[dataKey] = r.dataUrl; });
+  renderGallery(galId);
+}
+window.retryGalleryPhoto = retryGalleryPhoto; // appelée par l'attribut onclick des vignettes
 
 function deletePodoscopePhoto(id) {
   return deleteGalleryPhoto('sp-podoscope', id);
