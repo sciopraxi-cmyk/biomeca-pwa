@@ -139,27 +139,77 @@ describe('référentiel : données datées, sourcées, cohérentes', () => {
     expect(new Set(codes).size).toBe(codes.length);
   });
   it('montants entiers, cohérents avec la cotation × la lettre-clé (POD 30 €, AMP 0,63 €)', () => {
+    let verifies = 0;
     for (const a of ref.actes) {
       expect(Number.isInteger(a.montant_cents), a.code).toBe(true);
-      const [lettre, coef] = [
-        a.cotation.split(' ')[0],
-        parseFloat(a.cotation.split(' ')[1].replace(',', '.')),
-      ];
-      const base = { POD: 3000, AMP: 63 }[lettre];
-      expect(Math.abs(a.montant_cents - coef * base), a.code).toBeLessThanOrEqual(15);
+      const m = /^(POD|AMP) ([\d,]+)$/.exec(a.cotation ?? '');
+      if (!m) continue;
+      const base = { POD: 3000, AMP: 63 }[m[1]];
+      expect(
+        Math.abs(a.montant_cents - parseFloat(m[2].replace(',', '.')) * base),
+        a.code
+      ).toBeLessThanOrEqual(1);
+      verifies++;
+    }
+    expect(verifies).toBe(15);
+  });
+  it('chaque montant correspond au document de référence du praticien (20/10/2026)', () => {
+    const doc = {
+      'POD-0,67': 2010,
+      'POD-1': 3000,
+      'POD-1,17': 3510,
+      'AMP-31,7': 1997,
+      'AMP-REED-1': 860,
+      'AMP-REED-2': 1292,
+      'AMP-MASS-1': 428,
+      'AMP-MASS-2': 643,
+      'AMP-MPS': 3024,
+      'AMP-PATHO-1': 126,
+      'AMP-PATHO-2': 95,
+      'AMP-PANS-S': 47,
+      'AMP-PANS-M1': 79,
+      'AMP-PANS-M2': 126,
+      'AMP-PANS-HYG': 95,
+      'LPP-2180450': 2588,
+      'LPP-2122121': 2804,
+      'LPP-2140455': 2886,
+      'LPP-2158449': 5468,
+      'TEL-POT': 3000,
+      'TEL-TMP': 63,
+      'TEL-RQD': 1000,
+      'FRAIS-IFD': 250,
+      'FRAIS-IK-PLAINE': 35,
+      'FRAIS-IK-MONTAGNE': 50,
+      'MAJ-NUIT': 76,
+      'MAJ-DIMANCHE': 61,
+    };
+    const m = Object.fromEntries(ref.actes.map((a) => [a.code, a.montant_cents]));
+    expect(m).toEqual(doc);
+  });
+  it('part Sécu + part mutuelle = base, pour chaque acte chiffré (60 % / 40 %)', () => {
+    for (const a of ref.actes) {
+      const x = /Sécu 60 % : ([\d,]+) €.*?mutuelle 40 % : ([\d,]+) €/.exec(a.remboursement ?? '');
+      if (!x) continue;
+      const [secu, mut] = [x[1], x[2]].map((v) =>
+        Math.round(parseFloat(v.replace(',', '.')) * 100)
+      );
+      const base = /Base LPP ([\d,]+) €/.exec(a.remboursement)?.[1];
+      const total = base ? Math.round(parseFloat(base.replace(',', '.')) * 100) : a.montant_cents;
+      expect(Math.abs(secu + mut - total), a.code).toBeLessThanOrEqual(1);
     }
   });
-  it('les 3 cotations POD de la fiche du 19/10/2026', () => {
-    const m = Object.fromEntries(ref.actes.map((a) => [a.code, a.montant_cents]));
-    expect(m['POD-0,67']).toBe(2000);
-    expect(m['POD-1']).toBe(3000);
-    expect(m['POD-1,17']).toBe(3500);
+  it('les semelles LPP sont datées du 07/07/2023 et signalées « à confirmer » (unité ou paire)', () => {
+    const lpp = ref.actes.filter((a) => a.code.startsWith('LPP-'));
+    expect(lpp).toHaveLength(4);
+    for (const a of lpp) {
+      expect(a.date_effet).toBe('2023-07-07');
+      expect(a.note).toMatch(/à confirmer/);
+      expect(a.note).toMatch(/prix de vente libre/);
+    }
   });
-  it('un tarif de source secondaire est signalé « à confirmer »', () => {
-    expect(ref.actes.find((a) => a.code === 'AMP-31,7').note).toMatch(/à confirmer/);
-  });
-  it('aucun tarif LPP de semelle (ambigus : unité ou paire) ni majoration', () => {
-    expect(JSON.stringify(ref)).not.toMatch(/LPP|semelle|nuit|dimanche/i);
+  it('les majorations ne sont jamais proposées avec une séance POD', () => {
+    for (const c of ['MAJ-NUIT', 'MAJ-DIMANCHE'])
+      expect(ref.actes.find((a) => a.code === c).note).toMatch(/Jamais sur une séance POD/);
   });
 });
 
@@ -173,9 +223,9 @@ describe('import du référentiel : idempotent, jamais destructif', () => {
       expect(a).toMatchObject({
         perso: false,
         actif: true,
-        date_effet: ref.version,
         source: ref.source,
       });
+      expect(a.date_effet).toBe(ref.actes.find((x) => x.code === a.code).date_effet || ref.version);
     }
   });
   it('un acte déjà présent (même modifié) est ignoré : jamais écrasé', () => {
@@ -187,11 +237,13 @@ describe('import du référentiel : idempotent, jamais destructif', () => {
     expect(f._actesAImporter(ref.actes, ref)).toEqual([]);
   });
   it('importerReferentielActes : un seul POST des seuls actes absents ; message si déjà fait', async () => {
+    const ref = monter().f.REFERENTIEL_ACTES_POD;
     const e = monter({ lignes: [{ id: '1', code: 'POD-1' }] });
     await e.f.importerReferentielActes();
     const post = e.appels.filter((a) => a.methode === 'POST');
     expect(post).toHaveLength(1);
-    expect(post[0].corps.map((a) => a.code)).toEqual(['POD-0,67', 'POD-1,17', 'AMP-31,7']);
+    expect(post[0].corps).toHaveLength(ref.actes.length - 1);
+    expect(post[0].corps.map((a) => a.code)).not.toContain('POD-1');
     const e2 = monter({ lignes: ref.actes.map((a, i) => ({ id: String(i), code: a.code })) });
     await e2.f.importerReferentielActes();
     expect(e2.appels.filter((a) => a.methode === 'POST')).toHaveLength(0);
