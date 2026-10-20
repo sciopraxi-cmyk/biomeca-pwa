@@ -22531,12 +22531,15 @@ function computePedicurieGrade() {
     2: 'neuropathie + déformation et/ou artériopathie',
     3: 'antécédent de plaie ou d\'amputation',
   }[grade];
-  // Couleurs par grade. Texte sombre #1f2937 lisible sur tous les fonds.
+  // Couleurs par grade (palette validée par Joël le 19/10/2026, option 2). Texte
+  // sombre #1f2937 lisible sur tous les fonds. La couleur n'est JAMAIS le seul
+  // indice : symbole (✓ ▲ ◆ ⬣) et bordure qui s'épaissit avec le grade. Titre
+  // ≥ 5,5:1 sur son fond (grade 0 : 1,88:1 avant).
   const palette = {
-    0: { bg: 'rgba(34,197,94,0.12)',  border: '#22c55e' },
-    1: { bg: 'rgba(217,119,6,0.12)',  border: '#d97706' },
-    2: { bg: 'rgba(234,88,12,0.14)',  border: '#ea580c' },
-    3: { bg: 'rgba(220,38,38,0.14)',  border: '#dc2626' },
+    0: { bg: 'rgba(22,101,52,0.12)',  border: '#166534', sym: '✓', bw: '4px' },
+    1: { bg: 'rgba(133,77,14,0.14)',  border: '#854d0e', sym: '▲', bw: '6px' },
+    2: { bg: 'rgba(154,52,18,0.14)',  border: '#9a3412', sym: '◆', bw: '8px' },
+    3: { bg: 'rgba(153,27,27,0.16)',  border: '#991b1b', sym: '⬣', bw: '10px' },
   }[grade];
   const critPush = [];
   if (plaie)         critPush.push('plaie &gt; 4 semaines');
@@ -22548,9 +22551,9 @@ function computePedicurieGrade() {
     ? '<div style="font-size:11px;margin-top:4px;color:#444;">Critères déclencheurs : ' + critPush.join(' · ') + '.</div>'
     : '<div style="font-size:11px;margin-top:4px;color:#444;">Aucun critère de risque retenu — grade 0 par défaut.</div>';
   banner.style.background  = palette.bg;
-  banner.style.borderLeft  = '4px solid ' + palette.border;
+  banner.style.borderLeft  = palette.bw + ' solid ' + palette.border;
   banner.style.color       = '#1f2937';
-  banner.innerHTML = '<strong style="color:' + palette.border + ';">Grade suggéré : ' + grade + '</strong> — ' + signification + critereStr;
+  banner.innerHTML = '<strong style="color:' + palette.border + ';">' + palette.sym + ' Grade suggéré : ' + grade + '</strong> — ' + signification + critereStr;
   banner.dataset.suggested = String(grade);
   return grade;
 }
