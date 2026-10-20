@@ -20,6 +20,8 @@ const NOMS = [
   '_centimesVersEuros',
   '_validerActe',
   '_actesAImporter',
+  '_actesACompleter',
+  '_partsRemboursement',
   '_actesRequete',
   'chargerActes',
   'importerReferentielActes',
@@ -53,8 +55,9 @@ function monter(o = {}) {
     'let _actesCache = [], _acteEnEdition = null;',
     'const _escHtml = (s) => String(s ?? "");',
     constante('REFERENTIEL_ACTES_POD'),
+    constante('REGIMES_REMBOURSEMENT'),
     ...NOMS.map(fonction),
-    `return { ${NOMS.join(', ')}, REFERENTIEL_ACTES_POD, cache: () => _actesCache, edition: () => _acteEnEdition };`,
+    `return { ${NOMS.join(', ')}, REFERENTIEL_ACTES_POD, REGIMES_REMBOURSEMENT, cache: () => _actesCache, edition: () => _acteEnEdition };`,
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   const f = new Function('authFetch', 'document', 'alert', corps)(authFetch, document, (m) =>
@@ -109,6 +112,8 @@ describe("validation d'un acte", () => {
       acte: {
         libelle: 'Consultation',
         montant_cents: 4500,
+        base_remboursable_cents: null,
+        franchise: true,
         cotation: null,
         remboursement: null,
         note: null,
@@ -221,6 +226,82 @@ describe('référentiel : données datées, sourcées, cohérentes', () => {
   });
 });
 
+describe('remboursement : parts calculées sur la base, au centime, comme dans le document', () => {
+  const { f } = monter();
+  const ref = f.REFERENTIEL_ACTES_POD;
+  const eur = (v) => Math.round(parseFloat(v.replace(',', '.')) * 100);
+  it('Sécu 60 % : chaque acte reproduit les chiffres du document (arrondi au centime)', () => {
+    let n = 0;
+    for (const a of ref.actes) {
+      const x = /Sécu 60 % : ([\d,]+) €/.exec(a.remboursement ?? '');
+      if (!x) continue;
+      expect(f._partsRemboursement(a.base_remboursable_cents, 'standard').secu, a.code).toBe(
+        eur(x[1])
+      );
+      n++;
+    }
+    expect(n).toBe(19);
+  });
+  it('ticket modérateur (reste) = base − Sécu : mutuelle du document', () => {
+    for (const a of ref.actes) {
+      const x = /mutuelle 40 % : ([\d,]+) €/.exec(a.remboursement ?? '');
+      if (!x) continue;
+      expect(f._partsRemboursement(a.base_remboursable_cents, 'standard').resteTM, a.code).toBe(
+        eur(x[1])
+      );
+    }
+  });
+  it('100 % en ALD pour les actes POD : 20,10 / 30,00 / 35,10 €, reste 0', () => {
+    for (const [code, ald] of [
+      ['POD-0,67', 2010],
+      ['POD-1', 3000],
+      ['POD-1,17', 3510],
+    ]) {
+      const a = ref.actes.find((x) => x.code === code);
+      expect(f._partsRemboursement(a.base_remboursable_cents, 'ald')).toMatchObject({
+        secu: ald,
+        resteTM: 0,
+      });
+    }
+  });
+  it('Alsace-Moselle 90 %, arrondi : 19,97 € → 17,97 € (1 797 centimes)', () => {
+    expect(f._partsRemboursement(1997, 'alsace_moselle')).toMatchObject({
+      secu: 1797,
+      resteTM: 200,
+    });
+  });
+  it('semelles : la Sécu se calcule sur la base LPP de la paire, pas sur un prix de vente', () => {
+    expect(f._partsRemboursement(2804, 'standard')).toMatchObject({ secu: 1682, resteTM: 1122 });
+  });
+  it('sans base, base invalide ou régime inconnu : null (jamais de calcul inventé)', () => {
+    for (const b of [null, undefined, -1, 1.5, '30'])
+      expect(f._partsRemboursement(b, 'standard'), String(b)).toBeNull();
+    expect(f._partsRemboursement(3000, 'inconnu')).toBeNull();
+    expect(f._partsRemboursement(0, 'standard')).toMatchObject({ secu: 0, resteTM: 0 });
+  });
+  it('base ≤ montant, sans franchise pour les semelles, aucune base pour frais et majorations', () => {
+    for (const a of ref.actes) {
+      if (a.base_remboursable_cents != null)
+        expect(a.base_remboursable_cents, a.code).toBeLessThanOrEqual(a.montant_cents);
+      expect(a.franchise === false, a.code).toBe(a.code.startsWith('LPP-'));
+      if (/^(FRAIS|MAJ|TEL)-/.test(a.code))
+        expect(a.base_remboursable_cents, a.code).toBeUndefined();
+    }
+  });
+  it('validation : base facultative, invalide refusée, franchise par défaut', () => {
+    expect(
+      f._validerActe({ libelle: 'A', montant: '10', base: '' }).acte.base_remboursable_cents
+    ).toBeNull();
+    expect(
+      f._validerActe({ libelle: 'A', montant: '10', base: '8,5' }).acte.base_remboursable_cents
+    ).toBe(850);
+    expect(f._validerActe({ libelle: 'A', montant: '10', base: 'x' }).ok).toBe(false);
+    expect(f._validerActe({ libelle: 'A', montant: '10', franchise: false }).acte.franchise).toBe(
+      false
+    );
+  });
+});
+
 describe('import du référentiel : idempotent, jamais destructif', () => {
   const { f } = monter();
   const ref = f.REFERENTIEL_ACTES_POD;
@@ -252,7 +333,13 @@ describe('import du référentiel : idempotent, jamais destructif', () => {
     expect(post).toHaveLength(1);
     expect(post[0].corps).toHaveLength(ref.actes.length - 1);
     expect(post[0].corps.map((a) => a.code)).not.toContain('POD-1');
-    const e2 = monter({ lignes: ref.actes.map((a, i) => ({ id: String(i), code: a.code })) });
+    const e2 = monter({
+      lignes: ref.actes.map((a, i) => ({
+        id: String(i),
+        code: a.code,
+        base_remboursable_cents: a.base_remboursable_cents ?? null,
+      })),
+    });
     await e2.f.importerReferentielActes();
     expect(e2.appels.filter((a) => a.methode === 'POST')).toHaveLength(0);
     expect(e2.alertes[0]).toMatch(/déjà/);
@@ -329,6 +416,41 @@ describe("enregistrement, modification et désactivation d'un acte", () => {
   it("l'affichage échappe le HTML (aucune injection par un titre d'acte)", () => {
     expect(fonction('renderActesPage')).toContain('_escHtml(a.libelle)');
     expect(fonction('renderActesPage')).toContain('_escHtml(a.id)');
+  });
+});
+
+describe('complétion des actes importés avant l’ajout de la base remboursable', () => {
+  const { f } = monter();
+  const ref = f.REFERENTIEL_ACTES_POD;
+  it('complète UNIQUEMENT base et franchise, jamais montant ni titre', () => {
+    const r = f._actesACompleter(
+      [{ id: 'a', code: 'POD-1', montant_cents: 3100, libelle: 'Modifié' }],
+      ref
+    );
+    expect(r).toEqual([{ id: 'a', champs: { base_remboursable_cents: 3000, franchise: true } }]);
+  });
+  it('semelle : franchise false ; déjà renseigné, personnalisé, frais ou inconnu : ignorés', () => {
+    expect(f._actesACompleter([{ id: 'l', code: 'LPP-2122121' }], ref)[0].champs).toEqual({
+      base_remboursable_cents: 2804,
+      franchise: false,
+    });
+    const ignores = [
+      { id: '1', code: 'POD-1', base_remboursable_cents: 2500 },
+      { id: '2', code: 'POD-1', perso: true },
+      { id: '3', code: 'FRAIS-IFD' },
+      { id: '4', code: 'INCONNU' },
+      { id: '5', code: null },
+    ];
+    expect(f._actesACompleter(ignores, ref)).toEqual([]);
+  });
+  it('importerReferentielActes : PATCH ciblés (id) pour compléter, POST pour les absents', async () => {
+    const e = monter({ lignes: [{ id: 'a-9', code: 'POD-1', montant_cents: 3000 }] });
+    await e.f.importerReferentielActes();
+    const patchs = e.appels.filter((a) => a.methode === 'PATCH');
+    expect(patchs).toHaveLength(1);
+    expect(patchs[0].url).toMatch(/\?id=eq\.a-9$/);
+    expect(Object.keys(patchs[0].corps).sort()).toEqual(['base_remboursable_cents', 'franchise']);
+    expect(e.appels.filter((a) => a.methode === 'POST')).toHaveLength(1);
   });
 });
 

@@ -30406,71 +30406,71 @@ const REFERENTIEL_ACTES_POD = {
   source: 'Référentiel du praticien « POD et AMP podologue » (20/10/2026), d\'après ameli (07/03/2024) et LPP (07/07/2023)',
   actes: [
     // ── Pied diabétique (lettre POD, sans prescription) ──
-    { code: 'POD-0,67', cotation: 'POD 0,67', montant_cents: 2010,
+    { code: 'POD-0,67', cotation: 'POD 0,67', montant_cents: 2010, base_remboursable_cents: 2010,
       libelle: 'Bilan de gradation du risque (grade 0 ou 1, 1 fois par an)',
       remboursement: 'Sécu 60 % : 12,06 € · 100 % en ALD : 20,10 €' },
-    { code: 'POD-1', cotation: 'POD 1', montant_cents: 3000,
+    { code: 'POD-1', cotation: 'POD 1', montant_cents: 3000, base_remboursable_cents: 3000,
       libelle: 'Séance de soins de prévention (grade 2 ou 3)',
       remboursement: 'Sécu 60 % : 18,00 € · 100 % en ALD : 30,00 €',
       note: 'Forfait annuel : 5 séances en grade 2, 6 en grade 3, 8 en grade 3 avec plaie en cours de cicatrisation. Pas deux séances POD le même jour, ni avec un acte AMP.' },
-    { code: 'POD-1,17', cotation: 'POD 1,17', montant_cents: 3510,
+    { code: 'POD-1,17', cotation: 'POD 1,17', montant_cents: 3510, base_remboursable_cents: 3510,
       libelle: 'Séance bilan et soins (grade 2 ou 3, environ 45 min, au moins 30 min)',
       remboursement: 'Sécu 60 % : 21,06 € · 100 % en ALD : 35,10 €',
       note: 'Compte dans le forfait annuel de séances. Pas deux séances POD le même jour, ni avec un acte AMP.' },
     // ── Pédicurie (lettre AMP, prescription obligatoire sauf verrues) ──
-    { code: 'AMP-31,7', cotation: 'AMP 31,7', montant_cents: 1997,
+    { code: 'AMP-31,7', cotation: 'AMP 31,7', montant_cents: 1997, base_remboursable_cents: 1997,
       libelle: 'Verrues plantaires par kératolytique (4 séances maximum)',
       remboursement: 'Sécu 60 % : 11,98 € · mutuelle 40 % : 7,99 €',
       note: 'Sans prescription. Non cumulable avec une séance POD.' },
-    { code: 'AMP-REED-1', cotation: 'AMP 13,65', montant_cents: 860,
+    { code: 'AMP-REED-1', cotation: 'AMP 13,65', montant_cents: 860, base_remboursable_cents: 860,
       libelle: 'Rééducation d\'un pied après chirurgie de l\'avant-pied (30 min)',
       remboursement: 'Sécu 60 % : 5,16 € · mutuelle 40 % : 3,44 €', note: 'Sur prescription.' },
-    { code: 'AMP-REED-2', cotation: 'AMP 20,5', montant_cents: 1292,
+    { code: 'AMP-REED-2', cotation: 'AMP 20,5', montant_cents: 1292, base_remboursable_cents: 1292,
       libelle: 'Rééducation des deux pieds après chirurgie de l\'avant-pied (30 min)',
       remboursement: 'Sécu 60 % : 7,75 € · mutuelle 40 % : 5,17 €', note: 'Sur prescription.' },
-    { code: 'AMP-MASS-1', cotation: 'AMP 6,8', montant_cents: 428,
+    { code: 'AMP-MASS-1', cotation: 'AMP 6,8', montant_cents: 428, base_remboursable_cents: 428,
       libelle: 'Massage d\'un pied après chirurgie de l\'avant-pied',
       remboursement: 'Sécu 60 % : 2,57 € · mutuelle 40 % : 1,71 €', note: 'Sur prescription.' },
-    { code: 'AMP-MASS-2', cotation: 'AMP 10,2', montant_cents: 643,
+    { code: 'AMP-MASS-2', cotation: 'AMP 10,2', montant_cents: 643, base_remboursable_cents: 643,
       libelle: 'Massage des deux pieds après chirurgie de l\'avant-pied',
       remboursement: 'Sécu 60 % : 3,86 € · mutuelle 40 % : 2,57 €', note: 'Sur prescription.' },
-    { code: 'AMP-MPS', cotation: 'AMP 48', montant_cents: 3024,
+    { code: 'AMP-MPS', cotation: 'AMP 48', montant_cents: 3024, base_remboursable_cents: 3024,
       libelle: 'Syndrome main-pied (chimiothérapie), 2 actes maximum',
       remboursement: 'Sécu 60 % : 18,14 € (souvent 100 % en ALD) · mutuelle 40 % : 12,10 €',
       note: 'Sur prescription d\'un oncologue.' },
-    { code: 'AMP-PATHO-1', cotation: 'AMP 2', montant_cents: 126,
+    { code: 'AMP-PATHO-1', cotation: 'AMP 2', montant_cents: 126, base_remboursable_cents: 126,
       libelle: 'Traitement pédicural d\'un cas pathologique (hygroma, onyxis…), 1re séance',
       remboursement: 'Sécu 60 % : 0,76 € · mutuelle 40 % : 0,50 €', note: 'Sur prescription.' },
-    { code: 'AMP-PATHO-2', cotation: 'AMP 1,5', montant_cents: 95,
+    { code: 'AMP-PATHO-2', cotation: 'AMP 1,5', montant_cents: 95, base_remboursable_cents: 95,
       libelle: 'Traitement pédicural d\'un cas pathologique, séances suivantes',
       remboursement: 'Sécu 60 % : 0,57 € · mutuelle 40 % : 0,38 €', note: 'Sur prescription.' },
-    { code: 'AMP-PANS-S', cotation: 'AMP 0,75', montant_cents: 47,
+    { code: 'AMP-PANS-S', cotation: 'AMP 0,75', montant_cents: 47, base_remboursable_cents: 47,
       libelle: 'Pansement petit',
       remboursement: 'Sécu 60 % : 0,28 € · mutuelle 40 % : 0,19 €', note: 'Sur prescription.' },
-    { code: 'AMP-PANS-M1', cotation: 'AMP 1,25', montant_cents: 79,
+    { code: 'AMP-PANS-M1', cotation: 'AMP 1,25', montant_cents: 79, base_remboursable_cents: 79,
       libelle: 'Pansement moyen ou multiple, un pied',
       remboursement: 'Sécu 60 % : 0,47 € · mutuelle 40 % : 0,32 €', note: 'Sur prescription.' },
-    { code: 'AMP-PANS-M2', cotation: 'AMP 2', montant_cents: 126,
+    { code: 'AMP-PANS-M2', cotation: 'AMP 2', montant_cents: 126, base_remboursable_cents: 126,
       libelle: 'Pansement moyen ou multiple, deux pieds',
       remboursement: 'Sécu 60 % : 0,76 € · mutuelle 40 % : 0,50 €', note: 'Sur prescription.' },
-    { code: 'AMP-PANS-HYG', cotation: 'AMP 1,5', montant_cents: 95,
+    { code: 'AMP-PANS-HYG', cotation: 'AMP 1,5', montant_cents: 95, base_remboursable_cents: 95,
       libelle: 'Pansement d\'hygroma après l\'intervention d\'un médecin',
       remboursement: 'Sécu 60 % : 0,57 € · mutuelle 40 % : 0,38 €', note: 'Sur prescription.' },
     // ── Orthèses plantaires (LPP, depuis le 07/07/2023) : tarif de responsabilité ──
     // Montants = base de la PAIRE (2 × le tarif officiel par orthèse). Prix de vente libre.
-    { code: 'LPP-2180450', cotation: 'LPP 2180450', montant_cents: 2588, date_effet: '2023-07-07',
+    { code: 'LPP-2180450', cotation: 'LPP 2180450', montant_cents: 2588, base_remboursable_cents: 2588, franchise: false, date_effet: '2023-07-07',
       libelle: 'Semelles orthopédiques sur mesure, pointure inférieure à 28',
       remboursement: 'Base LPP paire 25,88 € · Sécu 60 % : 15,53 € · mutuelle 40 % : 10,35 €',
       note: 'Montant = base LPP de la PAIRE (2 × 12,94 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
-    { code: 'LPP-2122121', cotation: 'LPP 2122121', montant_cents: 2804, date_effet: '2023-07-07',
+    { code: 'LPP-2122121', cotation: 'LPP 2122121', montant_cents: 2804, base_remboursable_cents: 2804, franchise: false, date_effet: '2023-07-07',
       libelle: 'Semelles orthopédiques sur mesure, pointure 28 à 37',
       remboursement: 'Base LPP paire 28,04 € · Sécu 60 % : 16,82 € · mutuelle 40 % : 11,22 €',
       note: 'Montant = base LPP de la PAIRE (2 × 14,02 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
-    { code: 'LPP-2140455', cotation: 'LPP 2140455', montant_cents: 2886, date_effet: '2023-07-07',
+    { code: 'LPP-2140455', cotation: 'LPP 2140455', montant_cents: 2886, base_remboursable_cents: 2886, franchise: false, date_effet: '2023-07-07',
       libelle: 'Semelles orthopédiques sur mesure, pointure supérieure à 37',
       remboursement: 'Base LPP paire 28,86 € · Sécu 60 % : 17,32 € · mutuelle 40 % : 11,54 €',
       note: 'Montant = base LPP de la PAIRE (2 × 14,43 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
-    { code: 'LPP-2158449', cotation: 'LPP 2158449', montant_cents: 5468, date_effet: '2023-07-07',
+    { code: 'LPP-2158449', cotation: 'LPP 2158449', montant_cents: 5468, base_remboursable_cents: 5468, franchise: false, date_effet: '2023-07-07',
       libelle: 'Semelle monobloc en résine coulée (affections rhumatoïdes ou neurotrophiques)',
       remboursement: 'Base LPP paire 54,68 € · Sécu 60 % : 32,81 € · mutuelle 40 % : 21,87 €',
       note: 'Montant = base LPP de la PAIRE (2 × 27,34 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
@@ -30518,8 +30518,13 @@ function _validerActe(a) {
   const montant = _eurosVersCentimes(a?.montant);
   if (montant === null) return { ok: false, erreur: 'Montant invalide (exemple : 30 ou 30,50 ; 2 décimales au plus).' };
   const net = (v, max) => { const x = String(v ?? '').trim(); return x ? x.slice(0, max) : null; };
+  let base = null;
+  if (String(a?.base ?? '').trim() !== '') {
+    base = _eurosVersCentimes(a.base);
+    if (base === null) return { ok: false, erreur: 'Base remboursable invalide (exemple : 28,04 ; 2 décimales au plus).' };
+  }
   return { ok: true, acte: {
-    libelle, montant_cents: montant,
+    libelle, montant_cents: montant, base_remboursable_cents: base, franchise: a?.franchise !== false,
     cotation: net(a?.cotation, 40), remboursement: net(a?.remboursement, 200), note: net(a?.note, 500),
   } };
 }
@@ -30530,8 +30535,40 @@ function _actesAImporter(existants, referentiel) {
   return referentiel.actes.filter((a) => !codes.has(a.code)).map((a) => ({
     code: a.code, libelle: a.libelle, cotation: a.cotation, montant_cents: a.montant_cents,
     remboursement: a.remboursement || null, note: a.note || null,
+    base_remboursable_cents: Number.isInteger(a.base_remboursable_cents) ? a.base_remboursable_cents : null,
+    franchise: a.franchise !== false,
     source: referentiel.source, date_effet: a.date_effet || referentiel.version, perso: false, actif: true,
   }));
+}
+
+// Régimes de remboursement (taux de la Sécurité sociale sur la base remboursable).
+const REGIMES_REMBOURSEMENT = {
+  standard: { taux: 60, libelle: 'Sécurité sociale 60 %' },
+  ald: { taux: 100, libelle: '100 % (affection de longue durée)' },
+  alsace_moselle: { taux: 90, libelle: '90 % (Alsace-Moselle)' },
+};
+// Part de la Sécurité sociale = taux × base, arrondie au centime (entiers, jamais de
+// flottant). Le reste est le ticket modérateur : INDICATIF, la mutuelle dépend du contrat.
+// Retourne null si l'acte n'a pas de base remboursable. La franchise (1 €) n'est pas
+// déduite ici : elle dépend de la journée (plafond 4 €/jour) et se traite à la facture.
+function _partsRemboursement(baseCents, regime) {
+  const r = REGIMES_REMBOURSEMENT[regime || 'standard'];
+  if (!r || !Number.isInteger(baseCents) || baseCents < 0) return null;
+  const secu = Math.floor((baseCents * r.taux + 50) / 100);
+  return { base: baseCents, taux: r.taux, secu, resteTM: baseCents - secu };
+}
+// Actes DÉJÀ au catalogue dont la base remboursable n'a jamais été renseignée (importés
+// avant l'ajout du champ) : on ne complète QUE ces deux champs, jamais montant ni titre.
+function _actesACompleter(existants, referentiel) {
+  const parCode = new Map(referentiel.actes.map((a) => [a.code, a]));
+  const out = [];
+  (existants || []).forEach((e) => {
+    const ref = e.code && parCode.get(e.code);
+    if (!ref || e.perso || e.base_remboursable_cents != null) return;
+    if (!Number.isInteger(ref.base_remboursable_cents)) return;
+    out.push({ id: e.id, champs: { base_remboursable_cents: ref.base_remboursable_cents, franchise: ref.franchise !== false } });
+  });
+  return out;
 }
 
 let _actesCache = [];
@@ -30550,11 +30587,17 @@ async function importerReferentielActes() {
   try {
     await chargerActes();
     const aImporter = _actesAImporter(_actesCache, REFERENTIEL_ACTES_POD);
-    if (!aImporter.length) { alert('Le référentiel est déjà dans votre catalogue.'); return; }
-    await _actesRequete('', {
+    const aCompleter = _actesACompleter(_actesCache, REFERENTIEL_ACTES_POD);
+    if (!aImporter.length && !aCompleter.length) { alert('Le référentiel est déjà dans votre catalogue.'); return; }
+    if (aImporter.length) await _actesRequete('', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
       body: JSON.stringify(aImporter),
+    });
+    for (const c of aCompleter) await _actesRequete('?id=eq.' + encodeURIComponent(c.id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(c.champs),
     });
     await renderActesPage();
   } catch (e) { alert('Import impossible (' + e.message + '). Rien n\'a été modifié.'); }
@@ -30564,6 +30607,7 @@ async function enregistrerActe() {
   const r = _validerActe({
     libelle: val('acte-libelle'), montant: val('acte-montant'),
     cotation: val('acte-cotation'), remboursement: val('acte-remboursement'), note: val('acte-note'),
+    base: val('acte-base'), franchise: document.getElementById('acte-franchise')?.checked !== false,
   });
   if (!r.ok) { alert(r.erreur); return; }
   try {
@@ -30604,15 +30648,18 @@ function modifierActe(id) {
   set('acte-libelle', a.libelle); set('acte-cotation', a.cotation);
   set('acte-montant', (a.montant_cents / 100).toFixed(2).replace('.', ','));
   set('acte-remboursement', a.remboursement); set('acte-note', a.note);
+  set('acte-base', a.base_remboursable_cents == null ? '' : (a.base_remboursable_cents / 100).toFixed(2).replace('.', ','));
+  const fr = document.getElementById('acte-franchise'); if (fr) fr.checked = a.franchise !== false;
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Modifier l\'acte';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = '';
   document.getElementById('acte-libelle')?.scrollIntoView({ block: 'center' });
 }
 function annulerEditionActe() {
   _acteEnEdition = null;
-  ['acte-libelle', 'acte-cotation', 'acte-montant', 'acte-remboursement', 'acte-note'].forEach((k) => {
+  ['acte-libelle', 'acte-cotation', 'acte-montant', 'acte-remboursement', 'acte-note', 'acte-base'].forEach((k) => {
     const el = document.getElementById(k); if (el) el.value = '';
   });
+  const fr = document.getElementById('acte-franchise'); if (fr) fr.checked = true;
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Nouvel acte personnalisé';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = 'none';
 }
@@ -30635,6 +30682,7 @@ async function renderActesPage() {
           (a.perso ? ' <span style="font-size:11px;color:var(--mut);">(personnalisé)</span>' : '') +
           (a.actif ? '' : ' <span style="font-size:11px;color:var(--red);">(désactivé)</span>') + '</div>' +
         (a.remboursement ? '<div style="font-size:12px;color:var(--mut);">' + _escHtml(a.remboursement) + '</div>' : '') +
+        (function() { const p = _partsRemboursement(a.base_remboursable_cents, 'standard'); return p ? '<div style="font-size:12px;color:var(--mut);">Base remboursable ' + _escHtml(_centimesVersEuros(p.base)) + ' · Sécu 60 % ' + _escHtml(_centimesVersEuros(p.secu)) + ' · reste (ticket modérateur) ' + _escHtml(_centimesVersEuros(p.resteTM)) + (a.franchise === false ? ' · sans franchise' : '') + '</div>' : ''; })() +
         (a.note ? '<div style="font-size:12px;color:var(--mut);font-style:italic;">' + _escHtml(a.note) + '</div>' : '') +
         (a.source ? '<div style="font-size:11px;color:var(--mut);">Source : ' + _escHtml(a.source) + (a.date_effet ? ' · en vigueur au ' + _escHtml(a.date_effet) : '') + '</div>' : '') +
       '</div>' +

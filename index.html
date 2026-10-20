@@ -620,7 +620,7 @@
     <button onclick="nav('pg-praticiens')" id="tn-praticiens">Praticiens</button>
     <button onclick="nav('pg-params')" id="tn-params">Paramètres</button>
     <button onclick="nav('pg-agenda')" id="tn-agenda">📅 Agenda</button>
-    <button onclick="nav('pg-actes')" id="tn-facturation">🧾 Facturation</button>
+    <button onclick="nav('pg-actes')" id="tn-facturation">🧾 Paramètres facturation</button>
   </div>
   <div style="flex:1;"></div>
   <a href="https://www.doctolib.fr" target="_blank" rel="noopener noreferrer" class="tb-doctolib" style="display:flex;align-items:center;gap:6px;background:#fff;border-radius:6px;padding:4px 12px;text-decoration:none;margin-right:8px;font-size:11px;font-weight:700;color:#0e4d91;white-space:nowrap;">
@@ -3474,7 +3474,7 @@
   <div style="padding:16px 20px;max-width:760px;margin:0 auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
       <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
-      <h2 style="margin:0;font-size:18px;color:var(--blue);flex:1;">🧾 Facturation — catalogue d'actes</h2>
+      <h2 style="margin:0;font-size:18px;color:var(--blue);flex:1;">🧾 Paramètres facturation — catalogue d'actes</h2>
     </div>
     <div class="card" style="margin-bottom:16px;">
       <p style="font-size:12px;color:var(--mut);margin:0 0 10px;">Montants <b>sans TVA</b>. Les tarifs du référentiel (POD, AMP, semelles LPP, frais) changent par avenant : ils sont copiés ici, datés et sourcés, et vous pouvez les modifier. Remboursement : Sécurité sociale 60 % (100 % en ALD, 90 % en Alsace-Moselle), mutuelle selon contrat ; franchise de 1 € par acte à la charge du patient. À faire valider par votre expert-comptable.</p>
@@ -3490,6 +3490,10 @@
         <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Remboursement (facultatif)</div><input class="inp" id="acte-remboursement" maxlength="200" placeholder="60 % (100 % en ALD)"/></div>
       </div>
       <div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Note (facultatif)</div><input class="inp" id="acte-note" maxlength="500"/></div>
+      <div class="g2" style="margin-top:6px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Base remboursable en € (facultatif ; vide = non remboursé)</div><input class="inp" id="acte-base" inputmode="decimal" placeholder="28,04"/></div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;align-self:end;padding-bottom:8px;"><input type="checkbox" id="acte-franchise" checked/> Franchise de 1 € applicable</label>
+      </div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn btn-blue" onclick="enregistrerActe()">✓ Enregistrer l'acte</button>
         <button class="btn" id="acte-annuler" onclick="annulerEditionActe()" style="display:none;">Annuler</button>
