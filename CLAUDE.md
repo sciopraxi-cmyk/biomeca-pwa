@@ -309,6 +309,39 @@ ne jamais les commiter, les déplacer ni les citer dans un fichier tracké.
   le stockage, chiffrement HDS compris.
 - **PDF** : Verticy n'a pas de génération PDF côté serveur ; les sorties passent par
   l'impression navigateur comme les autres rapports.
+- **Exception volontaire de `pg-capture`** (décision #279 étape 4) : quitter `pg-capture`
+  écrit le brouillon du test cinématique en cours (`_ecrireBrouillonMaintenant`) **y compris
+  vers le rapport écrit**, alors que `nav` vers `pg-rapport` / `pg-rapport-posturo` ne fait
+  sinon qu'une capture sans écriture (A1). C'est voulu : le déclencheur est la navigation, et
+  le brouillon ne doit pas se perdre. **Ne pas la « corriger »** pour aligner `nav` sur A1.
+- **Marqueur « non synchronisé » (A2)** : au démarrage la mémoire vient du **cloud** ; le
+  stockage local n'est relu qu'en repli. Une écriture locale seule serait donc perdue. Chaque
+  écriture locale pose `bm4-nonsync:<uid>` = `{ seq, t, base }` (`base` = `updated_at` du
+  dernier état cloud connu). Posé par `savePatients`, `_ecrireLocalAvantEnvoi` et
+  `_marquerNonSynchronise` ; effacé par `_confirmerSyncCloud` seulement si aucune écriture
+  plus récente (`seq`) n'attend. Règle de reprise (`_recupererSaisieNonSynchronisee`) : la
+  saisie locale est reprise **uniquement si** le cloud est resté à `base` et que le local n'est
+  pas plus pauvre ; sinon elle est gardée dans `bm4-recuperation:<uid>:<t>`, **jamais
+  appliquée, jamais supprimée** (ne pas ajouter de nettoyage automatique).
+- **Indicateur d'état de sauvegarde (A2)** : 5 états globaux — `dirty`, `saving`, `saved`,
+  `pending` (écrit ici, serveur non confirmé), `failed`. Alimenté par `_etatApresLocal`
+  (résultat de `savePatients`) et `_etatApresCloud` (résultat de `saveToSupabase`) via
+  `_etatSauvegarde`. Le `<span class="etat-sauv">` est **inséré par le script**
+  (`_installerIndicateursEtat`) avant chaque bouton « Sauvegarder », **jamais écrit dans le
+  HTML ni dans le gabarit Posturo** : les tests de structure #268 figent ces pages. Posturo
+  étant généré après coup, l'insertion est rappelée à chaque rendu.
+- **Bandeaux et alerte de stockage (A2)** : `#stockage-banner` (stockage local plein, reste
+  affiché tant que les écritures échouent) et `#photo-envoi-banner` (échec d'envoi d'une
+  photo, appelé par `uploadPhotoBase64`) ; l'alerte de stockage est **unique par incident**
+  (`_stockageIncident`, levé par le premier enregistrement réussi). Les galeries affichent
+  « photo non rechargée » + Réessayer au lieu d'un « chargement… » infini.
+- **Harnais de test qui extraient des fonctions par leur nom** : les tests de `savePatients` /
+  `saveToSupabase` (`synchro-dataurl-269`, `nb-tests-mesures-279`, `a2-*`) construisent leur
+  code en extrayant des fonctions de `js/biomeca.js` **par nom**. Une fonction nouvelle
+  appelée par une fonction extraite doit être **ajoutée à la liste du harnais** (sinon
+  `ReferenceError` dans le test, pas dans l'application). Pour un appel optionnel, la forme
+  `typeof f === 'function'` protège les autres harnais ; ne jamais retirer une assertion pour
+  faire passer un test.
 
 ## Fin de tâche : mise à jour de la documentation
 
