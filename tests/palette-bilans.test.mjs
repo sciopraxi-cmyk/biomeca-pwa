@@ -492,7 +492,7 @@ const HTML = readFileSync(join(RACINE, 'index.html'), 'utf8');
 const CSS_ENTIER = readFileSync(join(RACINE, 'css/biomeca.css'), 'utf8');
 const JS_ENTIER = readFileSync(join(RACINE, 'js/biomeca.js'), 'utf8');
 
-// Les treize pages qui doivent porter la classe. pg-patients y est inclus :
+// Les quatorze pages qui doivent porter la classe. pg-patients y est inclus :
 // #258 l'avait scopée par identifiant, ce lot la migre vers le même
 // mécanisme que les six autres.
 const PAGES_CLAIRES = [
@@ -502,6 +502,7 @@ const PAGES_CLAIRES = [
   'pg-patients',
   'pg-compare',
   'pg-praticiens',
+  'pg-actes', // facturation, étape 1 : page ajoutée en clair d'emblée
   'pg-agenda',
   // #265 lot 3B — le bilan clinique sportif. La bascule y AMÉLIORE la
   // lisibilité, mesuré : 147 éléments porteurs de texte sous 4,5:1 en sombre,
@@ -570,7 +571,7 @@ function classesDe(id) {
 }
 
 describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
-  it('10. Les treize pages du lot portent page-claire', () => {
+  it('10. Les quatorze pages du lot portent page-claire', () => {
     let executes = 0;
     for (const id of PAGES_CLAIRES) {
       const cl = classesDe(id);
@@ -596,7 +597,7 @@ describe('#263 la classe page-claire est posée sur les bonnes pages', () => {
     }
   });
 
-  it('10c. Exactement les PAGES de la liste portent la classe (treize)', () => {
+  it('10c. Exactement les PAGES de la liste portent la classe (quatorze)', () => {
     // Compte d'occurrences, pas de lignes : une page supplémentaire ajoutée
     // ailleurs dans le fichier échapperait aux deux listes ci-dessus.
     // #268-L1 — le compte porte sur les PAGES (balises de classe « page ») :

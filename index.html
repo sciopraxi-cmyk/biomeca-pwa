@@ -3335,6 +3335,13 @@
       <a href="https://supabase.com/dashboard/project/tzivizoacdyopwfzerrb/auth/users" target="_blank" rel="noopener noreferrer" class="btn" style="background:var(--blue);color:#fff;padding:8px 16px;font-size:13px;text-decoration:none;display:inline-block;">🔗 Ouvrir Supabase Users</a>
     </div>
 
+    <!-- Facturation, étape 1 — accès au catalogue d'actes -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="stitle">🧾 Facturation</div>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">Catalogue de vos actes et de leurs montants (sans TVA), pour les devis et factures.</p>
+      <button class="btn btn-blue" onclick="nav('pg-actes')">Catalogue d'actes</button>
+    </div>
+
     <!-- Liste praticiens avec droits -->
     <div class="card" id="params-bloc-users">
       <div class="stitle">Utilisateurs autorisés</div>
@@ -3467,6 +3474,35 @@
 </div>
 
 <!-- ══ PRATICIENS ══ -->
+
+<!-- ══ FACTURATION — CATALOGUE D'ACTES (étape 1) ══ -->
+<div class="page page-claire" id="pg-actes">
+  <div style="padding:16px 20px;max-width:760px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <button onclick="nav('pg-params')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Paramètres</button>
+      <h2 style="margin:0;font-size:18px;color:var(--blue);flex:1;">🧾 Catalogue d'actes</h2>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <p style="font-size:12px;color:var(--mut);margin:0 0 10px;">Montants <b>sans TVA</b>. Les tarifs du référentiel (convention en vigueur au 07/03/2024) changent par avenant : ils sont copiés ici, datés et sourcés, et vous pouvez les modifier. À faire valider par votre expert-comptable.</p>
+      <button class="btn" onclick="importerReferentielActes()" style="font-size:12px;">⬇️ Importer le référentiel POD / AMP</button>
+      <div id="actes-liste" style="margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <div class="stitle" id="acte-form-titre">Nouvel acte personnalisé</div>
+      <div class="g2">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div><input class="inp" id="acte-libelle" maxlength="120" placeholder="Ex. Consultation de podologie"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Montant en € (sans TVA) *</div><input class="inp" id="acte-montant" inputmode="decimal" placeholder="30,00"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Cotation (facultatif)</div><input class="inp" id="acte-cotation" maxlength="40" placeholder="POD 1"/></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Remboursement (facultatif)</div><input class="inp" id="acte-remboursement" maxlength="200" placeholder="60 % (100 % en ALD)"/></div>
+      </div>
+      <div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Note (facultatif)</div><input class="inp" id="acte-note" maxlength="500"/></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn btn-blue" onclick="enregistrerActe()">✓ Enregistrer l'acte</button>
+        <button class="btn" id="acte-annuler" onclick="annulerEditionActe()" style="display:none;">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="page page-claire" id="pg-praticiens">
   <div class="section">

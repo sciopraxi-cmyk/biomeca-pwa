@@ -4790,7 +4790,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-params',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
@@ -4798,6 +4798,7 @@ function nav(id) {
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
+  if(id === 'pg-actes') renderActesPage();
   if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
@@ -30390,6 +30391,185 @@ document.addEventListener('input', function(e) {
     : 'podopediatrie'
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Facturation, étape 1 — catalogue d'actes (table actes_catalogue, RLS par praticien)
+// ═══════════════════════════════════════════════════════════════════
+// Référentiel : DONNÉES datées et sourcées, copiées dans le catalogue du praticien
+// (qui les modifie ensuite) ; jamais lues en dur au moment de facturer. Sans TVA.
+// Source : fiche de cotations du 19/10/2026 (tarifs applicables au 07/03/2024).
+// Les valeurs changent par avenant : à valider avec l'expert-comptable.
+const REFERENTIEL_ACTES_POD = {
+  version: '2024-03-07',
+  source: 'ameli.fr — tarifs conventionnels pédicures-podologues (applicables au 07/03/2024, consulté le 19/10/2026)',
+  actes: [
+    { code: 'POD-0,67', cotation: 'POD 0,67', montant_cents: 2000,
+      libelle: 'Bilan de gradation (diabète, pied à risque)',
+      remboursement: '60 % (100 % en ALD) — 1 par an, sans prescription' },
+    { code: 'POD-1', cotation: 'POD 1', montant_cents: 3000,
+      libelle: 'Séance de soins (diabète, grade 2 ou 3)',
+      remboursement: '60 % (100 % en ALD) — plafond annuel : grade 2 = 5, grade 3 = 6 (8 si plaie en cicatrisation)' },
+    { code: 'POD-1,17', cotation: 'POD 1,17', montant_cents: 3500,
+      libelle: 'Séance de bilan de gradation + soins (diabète, grade 2 ou 3)',
+      remboursement: '60 % (100 % en ALD) — compte dans le plafond annuel de séances' },
+    { code: 'AMP-31,7', cotation: 'AMP 31,7', montant_cents: 1997,
+      libelle: 'Traitement des verrues plantaires',
+      remboursement: '4 séances par an et par patient, sans prescription',
+      note: 'Source secondaire (31,7 × 0,63) : à confirmer sur le texte de l\'avenant.' },
+  ],
+};
+
+const ACTE_MONTANT_MAX_CENTS = 10000000; // 100 000 €, identique au CHECK SQL
+
+// "30", "30,5", "30.50", "1 234,56 €" → centimes entiers ; null si invalide
+// (négatif, plus de 2 décimales, texte, hors plafond). Aucun flottant.
+function _eurosVersCentimes(saisie) {
+  const t = String(saisie ?? '').replace(/[\s\u00a0€]/g, '').replace(',', '.');
+  const m = /^(\d{1,7})(?:\.(\d{1,2}))?$/.exec(t);
+  if (!m) return null;
+  const c = parseInt(m[1], 10) * 100 + (m[2] ? parseInt(m[2].padEnd(2, '0'), 10) : 0);
+  return c <= ACTE_MONTANT_MAX_CENTS ? c : null;
+}
+function _centimesVersEuros(c) {
+  if (!Number.isInteger(c) || c < 0) return '—';
+  const e = Math.floor(c / 100), r = c % 100;
+  return String(e).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + ',' + String(r).padStart(2, '0') + '\u00a0€';
+}
+// Valide un acte saisi ; retourne { ok, erreur, acte } (acte = champs prêts pour la base).
+function _validerActe(a) {
+  const libelle = String(a?.libelle ?? '').trim();
+  if (!libelle) return { ok: false, erreur: 'Le titre de l\'acte est obligatoire.' };
+  if (libelle.length > 120) return { ok: false, erreur: 'Le titre est limité à 120 caractères.' };
+  const montant = _eurosVersCentimes(a?.montant);
+  if (montant === null) return { ok: false, erreur: 'Montant invalide (exemple : 30 ou 30,50 ; 2 décimales au plus).' };
+  const net = (v, max) => { const x = String(v ?? '').trim(); return x ? x.slice(0, max) : null; };
+  return { ok: true, acte: {
+    libelle, montant_cents: montant,
+    cotation: net(a?.cotation, 40), remboursement: net(a?.remboursement, 200), note: net(a?.note, 500),
+  } };
+}
+// Actes du référentiel absents du catalogue (par code) : l'import est idempotent
+// et n'écrase jamais un acte déjà modifié par le praticien.
+function _actesAImporter(existants, referentiel) {
+  const codes = new Set((existants || []).map((e) => e.code).filter(Boolean));
+  return referentiel.actes.filter((a) => !codes.has(a.code)).map((a) => ({
+    code: a.code, libelle: a.libelle, cotation: a.cotation, montant_cents: a.montant_cents,
+    remboursement: a.remboursement || null, note: a.note || null,
+    source: referentiel.source, date_effet: referentiel.version, perso: false, actif: true,
+  }));
+}
+
+let _actesCache = [];
+let _acteEnEdition = null;
+async function _actesRequete(chemin, options) {
+  const res = await authFetch(SUPA_URL + '/rest/v1/actes_catalogue' + chemin, options);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res;
+}
+async function chargerActes() {
+  const res = await _actesRequete('?select=*&order=perso.asc,code.asc.nullslast,libelle.asc');
+  _actesCache = await res.json();
+  return _actesCache;
+}
+async function importerReferentielActes() {
+  try {
+    await chargerActes();
+    const aImporter = _actesAImporter(_actesCache, REFERENTIEL_ACTES_POD);
+    if (!aImporter.length) { alert('Le référentiel est déjà dans votre catalogue.'); return; }
+    await _actesRequete('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(aImporter),
+    });
+    await renderActesPage();
+  } catch (e) { alert('Import impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+async function enregistrerActe() {
+  const val = (id) => document.getElementById(id)?.value;
+  const r = _validerActe({
+    libelle: val('acte-libelle'), montant: val('acte-montant'),
+    cotation: val('acte-cotation'), remboursement: val('acte-remboursement'), note: val('acte-note'),
+  });
+  if (!r.ok) { alert(r.erreur); return; }
+  try {
+    if (_acteEnEdition) {
+      await _actesRequete('?id=eq.' + encodeURIComponent(_acteEnEdition), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(r.acte),
+      });
+    } else {
+      await _actesRequete('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(Object.assign({ perso: true, actif: true }, r.acte)),
+      });
+    }
+    annulerEditionActe();
+    await renderActesPage();
+  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+async function basculerActeActif(id) {
+  const a = _actesCache.find((x) => x.id === id);
+  if (!a) return;
+  try {
+    await _actesRequete('?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ actif: !a.actif }),
+    });
+    await renderActesPage();
+  } catch (e) { alert('Modification impossible (' + e.message + ').'); }
+}
+function modifierActe(id) {
+  const a = _actesCache.find((x) => x.id === id);
+  if (!a) return;
+  _acteEnEdition = id;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v ?? ''; };
+  set('acte-libelle', a.libelle); set('acte-cotation', a.cotation);
+  set('acte-montant', (a.montant_cents / 100).toFixed(2).replace('.', ','));
+  set('acte-remboursement', a.remboursement); set('acte-note', a.note);
+  const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Modifier l\'acte';
+  const b = document.getElementById('acte-annuler'); if (b) b.style.display = '';
+  document.getElementById('acte-libelle')?.scrollIntoView({ block: 'center' });
+}
+function annulerEditionActe() {
+  _acteEnEdition = null;
+  ['acte-libelle', 'acte-cotation', 'acte-montant', 'acte-remboursement', 'acte-note'].forEach((k) => {
+    const el = document.getElementById(k); if (el) el.value = '';
+  });
+  const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Nouvel acte personnalisé';
+  const b = document.getElementById('acte-annuler'); if (b) b.style.display = 'none';
+}
+async function renderActesPage() {
+  const el = document.getElementById('actes-liste');
+  if (!el) return;
+  try { await chargerActes(); } catch (e) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px 0;">Catalogue indisponible (' + _escHtml(e.message) + '). Rien n\'a été modifié.</div>';
+    return;
+  }
+  if (!_actesCache.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun acte. Importez le référentiel ou créez un acte personnalisé.</div>';
+    return;
+  }
+  el.innerHTML = _actesCache.map((a) =>
+    '<div class="acte-ligne" style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bord);' + (a.actif ? '' : 'opacity:.55;') + '">' +
+      '<div style="min-width:0;flex:1;">' +
+        '<div style="font-size:13px;font-weight:700;">' + _escHtml(a.libelle) +
+          (a.cotation ? ' <span style="font-weight:600;color:var(--mut);">· ' + _escHtml(a.cotation) + '</span>' : '') +
+          (a.perso ? ' <span style="font-size:11px;color:var(--mut);">(personnalisé)</span>' : '') +
+          (a.actif ? '' : ' <span style="font-size:11px;color:var(--red);">(désactivé)</span>') + '</div>' +
+        (a.remboursement ? '<div style="font-size:12px;color:var(--mut);">' + _escHtml(a.remboursement) + '</div>' : '') +
+        (a.note ? '<div style="font-size:12px;color:var(--mut);font-style:italic;">' + _escHtml(a.note) + '</div>' : '') +
+        (a.source ? '<div style="font-size:11px;color:var(--mut);">Source : ' + _escHtml(a.source) + (a.date_effet ? ' · en vigueur au ' + _escHtml(a.date_effet) : '') + '</div>' : '') +
+      '</div>' +
+      '<div style="text-align:right;white-space:nowrap;">' +
+        '<div style="font-size:14px;font-weight:700;">' + _escHtml(_centimesVersEuros(a.montant_cents)) + '</div>' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="modifierActe(\'' + _escHtml(a.id) + '\')">Modifier</button> ' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="basculerActeActif(\'' + _escHtml(a.id) + '\')">' + (a.actif ? 'Désactiver' : 'Réactiver') + '</button>' +
+      '</div></div>'
+  ).join('');
+}
 
 // ===== STRIPE + MODULES =====
 var _stripeInstance = null;
