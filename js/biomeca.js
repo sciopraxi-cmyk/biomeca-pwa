@@ -30836,6 +30836,7 @@ function _ligneBaseDocument(etat, patient, praticien) {
 let _docListe = [];
 let _docEdition = null;
 let _docVue = null;
+let _docApercu = false;
 async function _docRequete(chemin, options) {
   const res = await authFetch(SUPA_URL + '/rest/v1/' + chemin, options);
   if (!res.ok) {
@@ -30866,7 +30867,7 @@ function ouvrirDocumentsPatient(idx) {
   nav('pg-documents');
 }
 function nouveauDocument(type) {
-  _docVue = null;
+  _docVue = null; _docApercu = false;
   _docEdition = {
     id: null, type, pratId: _praticienParDefaut(currentPatient)?.id ?? null, regime: 'standard',
     lignes: [], tiersPayant: false, totalFixeCents: null, totalIllisible: false, note: '', devisNumero: null,
@@ -30876,6 +30877,7 @@ function nouveauDocument(type) {
 function ouvrirDocument(id) {
   const d = _docListe.find((x) => x.id === id);
   if (!d) return;
+  _docApercu = false;
   if (d.statut === 'emis') { _docEdition = null; _docVue = id; renderDocumentsPage(); return; }
   _docVue = null;
   const pr = praticiens.find((p) => p.nom === d.emetteur?.nom) || _praticienParDefaut(currentPatient);
@@ -30886,7 +30888,7 @@ function ouvrirDocument(id) {
   };
   renderDocumentsPage();
 }
-function fermerDocument() { _docEdition = null; _docVue = null; renderDocumentsPage(); }
+function fermerDocument() { _docEdition = null; _docVue = null; _docApercu = false; renderDocumentsPage(); }
 function basculerActeDocument(acteId, coche) {
   if (!_docEdition) return;
   const i = _docEdition.lignes.findIndex((l) => l.acte_id === acteId);
@@ -30973,7 +30975,7 @@ async function emettreDocumentCourant() {
   try {
     const res = await _docRequete('rpc/emettre_document', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify({ p_id: row.id }) });
     const emis = await res.json();
-    _docEdition = null; _docVue = emis.id;
+    _docEdition = null; _docApercu = false; _docVue = emis.id;
     await renderDocumentsPage();
   } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
 }
@@ -30983,7 +30985,7 @@ async function supprimerBrouillonDocument() {
   if (!confirm('Supprimer ce brouillon ?')) return;
   try {
     await _docRequete('documents_facturation?id=eq.' + encodeURIComponent(id) + '&statut=eq.brouillon', { method: 'DELETE' });
-    _docEdition = null;
+    _docEdition = null; _docApercu = false;
     await renderDocumentsPage();
   } catch (e) { alert('Suppression impossible (' + e.message + ').'); }
 }
@@ -31007,7 +31009,7 @@ async function creerFactureDepuisDevis(id) {
     lignes: d.lignes.map((l) => Object.assign({}, l)),
     tiersPayant: !!d.tiers_payant, totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.numero,
   };
-  _docVue = null;
+  _docVue = null; _docApercu = false;
   const row = await enregistrerBrouillonDocument(true);
   if (row) await renderDocumentsPage();
 }
@@ -31023,7 +31025,10 @@ function _htmlPartsLigne(l, regime) {
     : 'Non remboursé par la Sécurité sociale';
   return '<div style="font-size:11px;color:var(--mut);">' + _escHtml(txt) + '</div>';
 }
-function _htmlDocumentEmis(d) {
+// Corps du document (en-tête, patient, actes, totaux, mentions, remboursement ; la carte reste
+// OUVERTE, l'appelant ajoute ses actions puis la ferme) : le MÊME code
+// pour le document émis et pour l'aperçu du brouillon, afin que l'aperçu soit fidèle.
+function _htmlCorpsDocument(d, apercu) {
   const e = d.emetteur || {}, p = d.patient || {};
   const c = _calculerDocument(d.lignes, d.regime, d.total_fixe ? d.total_cents : null);
   const titre = d.type === 'devis' ? 'DEVIS' : 'FACTURE';
@@ -31036,14 +31041,20 @@ function _htmlDocumentEmis(d) {
     '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.qte * l.prix_cents) + '</td></tr>'
   ).join('');
   const bloc = (t, v) => v ? '<div>' + t + _escHtml(v) + '</div>' : '';
-  let h = '<div class="card" id="doc-vue" style="padding:16px;">' +
+  const numeroHtml = apercu
+    ? '<span style="font-size:12px;font-weight:600;color:var(--mut);">(numéro attribué à l\'émission)</span>'
+    : _escHtml(d.numero);
+  const dateHtml = apercu ? 'Date : date de l\'émission' : 'Date : ' + _escHtml(_dateFr(d.date_document));
+  const valideHtml = apercu ? 'Valable 90 jours à partir de l\'émission' : 'Valable jusqu\'au ' + _escHtml(_dateFr(d.valide_jusqu_au));
+  let h = '<div class="card" id="' + (apercu ? 'doc-apercu' : 'doc-vue') + '" style="padding:16px;">' +
+    (apercu ? '<div style="margin:-4px -4px 12px;padding:8px 12px;border-radius:8px;background:rgba(217,119,6,0.12);border:1px solid rgba(217,119,6,0.45);font-size:12px;font-weight:700;">APERÇU — brouillon non émis : rien n\'est encore numéroté ni figé.</div>' : '') +
     '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">' +
       '<div style="font-size:12px;"><div style="font-weight:700;font-size:14px;">' + _escHtml(e.nom) + '</div>' +
         bloc('', e.titre) + bloc('', e.cabinet) + bloc('', e.adresse) + bloc('Tél. ', e.tel) + bloc('', e.email) +
         bloc('SIRET ', e.siret) + bloc('RPPS / ADELI ', e.rpps) + '</div>' +
-      '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;">' + titre + ' ' + _escHtml(d.numero) + '</div>' +
-        '<div style="font-size:12px;">Date : ' + _escHtml(_dateFr(d.date_document)) + '</div>' +
-        (d.type === 'devis' ? '<div style="font-size:12px;">Valable jusqu\'au ' + _escHtml(_dateFr(d.valide_jusqu_au)) + '</div>' : '') +
+      '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;">' + titre + ' ' + numeroHtml + '</div>' +
+        '<div style="font-size:12px;">' + dateHtml + '</div>' +
+        (d.type === 'devis' ? '<div style="font-size:12px;">' + valideHtml + '</div>' : '') +
         (d.devis_numero ? '<div style="font-size:12px;">Selon devis ' + _escHtml(d.devis_numero) + '</div>' : '') + '</div></div>' +
     '<div style="font-size:12px;margin-bottom:12px;"><b>Patient</b><div>' + _escHtml((p.civilite ? p.civilite + ' ' : '') + (p.prenom || '') + ' ' + (p.nom || '')) + '</div>' +
       bloc('', p.adresse) + (p.cp || p.ville ? '<div>' + _escHtml((p.cp || '') + ' ' + (p.ville || '')) + '</div>' : '') + '</div>' +
@@ -31064,6 +31075,10 @@ function _htmlDocumentEmis(d) {
       '<div>Ticket modérateur (part complémentaire selon votre contrat) : ' + _eur(c.tmTotal) +
         ' · part non remboursable (prix libre) : ' + _eur(c.horsBase) + '</div>' +
       '<div>Reste à votre charge avant complémentaire : ' + _eur(c.resteApresSecu) + '</div></div>';
+  return h;
+}
+function _htmlDocumentEmis(d) {
+  let h = _htmlCorpsDocument(d, false);
   if (d.type === 'facture') {
     const modeOpts = Object.keys(MODES_PAIEMENT).map((k) =>
       '<option value="' + k + '"' + (d.paiement_mode === k ? ' selected' : '') + '>' + _escHtml(MODES_PAIEMENT[k]) + '</option>').join('');
@@ -31078,6 +31093,26 @@ function _htmlDocumentEmis(d) {
   }
   return h + '<div style="margin-top:10px;"><button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">← Retour à la liste</button></div></div>';
 }
+// Aperçu du brouillon : ce que le patient recevra, avec ce qui manque encore pour émettre.
+function _htmlApercuDocument() {
+  const { base, v } = _preparerDocument(true);
+  const d = Object.assign({}, base, { numero: null });
+  const manque = v.ok ? '' : '<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.4);font-size:12px;"><b>Pour émettre, il manque :</b> ' + _escHtml(v.erreur) + '</div>';
+  const nom = d.type === 'devis' ? 'ce devis' : 'cette facture';
+  return _htmlCorpsDocument(d, true) +
+    manque +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerApercuDocument()">← Modifier le brouillon</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '"' + (v.ok ? '' : ' disabled title="Complétez d\'abord ce qui manque"') + ' onclick="emettreDocumentCourant()">✓ Valider et émettre ' + _escHtml(nom) + '</button></div></div>';
+}
+function visualiserBrouillonDocument() {
+  if (!_docEdition || !currentPatient) return;
+  const { v } = _preparerDocument(false);
+  if (!v.ok) { alert(v.erreur); return; }
+  _docApercu = true;
+  renderDocumentsPage();
+}
+function fermerApercuDocument() { _docApercu = false; renderDocumentsPage(); }
 function _htmlListeDocuments() {
   if (!_docListe.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun document pour ce patient.</div>';
   return _docListe.map((d) => {
@@ -31118,7 +31153,7 @@ function _htmlEditeurDocument() {
     '<div style="margin-top:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Note (facultatif)</div><textarea class="inp" rows="2" maxlength="1000" oninput="modifierChampDocument(\'note\', this.value)">' + _escHtml(e.note) + '</textarea></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
       '<button class="btn" style="' + _CSS_BTN + '" onclick="enregistrerBrouillonDocument()">💾 Enregistrer le brouillon</button>' +
-      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="emettreDocumentCourant()">✓ Émettre</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="visualiserBrouillonDocument()">👁 Visualiser le brouillon</button>' +
       '<button class="btn" style="' + _CSS_BTN + 'color:var(--red);" onclick="supprimerBrouillonDocument()">Supprimer le brouillon</button>' +
       '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">Fermer</button></div></div>';
 }
@@ -31186,6 +31221,7 @@ async function renderDocumentsPage() {
     el.innerHTML = '<div style="font-size:13px;color:var(--red);">Documents indisponibles (' + _escHtml(err.message) + '). Rien n\'a été modifié.</div>';
     return;
   }
+  if (_docEdition && _docApercu) { el.innerHTML = _htmlApercuDocument(); return; }
   if (_docEdition) { el.innerHTML = _htmlEditeurDocument(); _rendreLignesDocument(); return; }
   const vue = _docVue && _docListe.find((x) => x.id === _docVue && x.statut === 'emis');
   if (vue) { el.innerHTML = _htmlDocumentEmis(vue); return; }

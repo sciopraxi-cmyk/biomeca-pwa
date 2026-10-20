@@ -56,7 +56,11 @@ const NOMS = [
   'enregistrerReglementDocument',
   'creerFactureDepuisDevis',
   'ouvrirDocumentsPatient',
+  '_htmlCorpsDocument',
   '_htmlDocumentEmis',
+  '_htmlApercuDocument',
+  'visualiserBrouillonDocument',
+  'fermerApercuDocument',
   '_htmlListeDocuments',
   '_htmlEditeurDocument',
   '_rendreLignesDocument',
@@ -150,7 +154,7 @@ function monter(o = {}) {
   const corps = [
     'const SUPA_URL = "https://x.supabase.co";',
     'const ACTE_MONTANT_MAX_CENTS = 10000000;',
-    'let _actesCache = __actes, _docListe = __liste, _docEdition = null, _docVue = null;',
+    'let _actesCache = __actes, _docListe = __liste, _docEdition = null, _docVue = null, _docApercu = false;',
     'let currentPatient = __patient; const praticiens = __prats;',
     'const _escHtml = (s) => String(s ?? "").replace(/[&<>"\']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;", "\'": "&#39;" }[c]));',
     'const nav = () => {}; const selectPatient = (p) => { currentPatient = p; };',
@@ -169,7 +173,7 @@ function monter(o = {}) {
     ].map(constLigne),
     ...NOMS.map(fonction),
     `return { ${NOMS.join(', ')}, MODES_PAIEMENT, MENTION_TVA_DEFAUT,
-      etat: () => ({ edition: _docEdition, vue: _docVue, liste: _docListe }),
+      etat: () => ({ edition: _docEdition, vue: _docVue, liste: _docListe, apercu: _docApercu }),
       setEdition: (v) => { _docEdition = v; }, setListe: (v) => { _docListe = v; } };`,
   ].join('\n');
   const rendus = [];
@@ -919,6 +923,162 @@ describe('affichage', () => {
     expect(h).toContain('(brouillon)');
     expect(h).toContain('Voir');
     expect(h).toContain('Modifier');
+  });
+});
+
+describe('aperçu du brouillon : ce que recevra le patient, avant émission', () => {
+  const preparer = (o = {}) => {
+    const e = monter(o);
+    e.f.nouveauDocument('facture');
+    e.f.basculerActeDocument('a-pod117', true);
+    e.f.basculerActeDocument('a-lpp', true);
+    e.f.modifierTotalFixeDocument('160');
+    e.f.modifierChampDocument('tiers', true);
+    return e;
+  };
+  it("le bouton « Visualiser le brouillon » est dans l'éditeur ; « Émettre » n'y est plus (on émet depuis l'aperçu)", () => {
+    const e = preparer();
+    const h = e.f._htmlEditeurDocument();
+    expect(h).toContain('visualiserBrouillonDocument()');
+    expect(h).toContain('Visualiser le brouillon');
+    expect(h).not.toContain('emettreDocumentCourant()');
+  });
+  it('aperçu : mention « APERÇU », numéro non attribué, mêmes montants que le document émis', () => {
+    const e = preparer();
+    e.f.visualiserBrouillonDocument();
+    expect(e.f.etat().apercu).toBe(true);
+    const h = e.f._htmlApercuDocument();
+    expect(h).toContain('APERÇU — brouillon non émis');
+    expect(h).toContain("numéro attribué à l'émission");
+    expect(h).toContain('id="doc-apercu"');
+    expect(h).toContain('Total des actes : 160,00');
+    expect(h).toContain('− 36,88');
+    expect(h).toContain('Net à payer par le patient : 123,12');
+    expect(h).toContain('TVA non applicable');
+    expect(h).toContain('Tarif de convention 35,10');
+    expect(h).toContain('Modifier le brouillon');
+    expect(h).toContain('Valider et émettre cette facture');
+    expect(h).not.toMatch(/FACTURE F-/);
+  });
+  it('le devis annonce sa validité de 90 jours sans date inventée', () => {
+    const e = monter();
+    e.f.nouveauDocument('devis');
+    e.f.basculerActeDocument('a-pod1', true);
+    e.f.visualiserBrouillonDocument();
+    const h = e.f._htmlApercuDocument();
+    expect(h).toContain('DEVIS');
+    expect(h).toContain("Valable 90 jours à partir de l'émission");
+    expect(h).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
+  });
+  it('balises équilibrées : une seule carte, bien fermée (aperçu et document émis)', () => {
+    const e = preparer();
+    e.f.visualiserBrouillonDocument();
+    const compte = (h, t) => [
+      (h.match(new RegExp('<' + t + '[ >]', 'g')) || []).length,
+      (h.match(new RegExp('</' + t + '>', 'g')) || []).length,
+    ];
+    for (const h of [
+      e.f._htmlApercuDocument(),
+      e.f._htmlDocumentEmis({
+        id: 'i',
+        type: 'facture',
+        statut: 'emis',
+        numero: 'F-1',
+        date_document: '2026-10-20',
+        emetteur: { nom: 'x' },
+        patient: { nom: 'y' },
+        regime: 'standard',
+        lignes: [L(acte('a-pod1'))],
+        total_cents: 3000,
+        mention_tva: 'm',
+      }),
+    ]) {
+      const [o, c] = compte(h, 'div');
+      expect(o).toBe(c);
+      expect(h.match(/class="card"/g)).toHaveLength(1);
+    }
+  });
+  it('document incomplet (sans SIRET ni RPPS) : aperçu possible, ce qui manque est affiché, « émettre » désactivé', () => {
+    const e = preparer({ prats: [{ ...PRAT, siret: '', rpps: '' }] });
+    e.f.visualiserBrouillonDocument();
+    expect(e.f.etat().apercu).toBe(true);
+    const h = e.f._htmlApercuDocument();
+    expect(h).toContain('Pour émettre, il manque');
+    expect(h).toContain('SIRET');
+    expect(h).toMatch(/<button[^>]*disabled[^>]*>✓ Valider et émettre/);
+  });
+  it("document complet : « Valider et émettre » actif, sans message d'erreur", () => {
+    const e = preparer();
+    e.f.visualiserBrouillonDocument();
+    const h = e.f._htmlApercuDocument();
+    expect(h).not.toContain('Pour émettre, il manque');
+    expect(h).not.toMatch(/<button[^>]*disabled/);
+  });
+  it('aperçu refusé (alerte, rien ne change) si le brouillon est invalide : aucun acte, total illisible', () => {
+    const e = monter();
+    e.f.nouveauDocument('facture');
+    e.f.visualiserBrouillonDocument();
+    expect(e.alertes[0]).toMatch(/au moins un acte/);
+    expect(e.f.etat().apercu).toBe(false);
+    e.f.basculerActeDocument('a-pod1', true);
+    e.f.modifierTotalFixeDocument('abc');
+    e.f.visualiserBrouillonDocument();
+    expect(e.alertes[1]).toMatch(/Total des actes invalide/);
+    expect(e.f.etat().apercu).toBe(false);
+  });
+  it("l'aperçu n'écrit rien (aucun appel réseau) ; « Modifier » retrouve le brouillon intact", () => {
+    const e = preparer();
+    const avant = JSON.stringify(e.f.etat().edition);
+    e.f.visualiserBrouillonDocument();
+    e.f.fermerApercuDocument();
+    expect(e.appels).toHaveLength(0);
+    expect(e.f.etat().apercu).toBe(false);
+    expect(JSON.stringify(e.f.etat().edition)).toBe(avant);
+  });
+  it("l'aperçu est quitté par un nouveau document, la fermeture et l'ouverture d'un autre", () => {
+    const e = preparer({
+      liste: [
+        {
+          id: 'b',
+          type: 'facture',
+          statut: 'brouillon',
+          emetteur: { nom: 'Dr Fictif' },
+          lignes: [L(acte('a-pod1'))],
+          regime: 'standard',
+          total_cents: 3000,
+        },
+      ],
+    });
+    e.f.visualiserBrouillonDocument();
+    e.f.fermerDocument();
+    expect(e.f.etat().apercu).toBe(false);
+    e.f.visualiserBrouillonDocument();
+    e.f.nouveauDocument('devis');
+    expect(e.f.etat().apercu).toBe(false);
+    e.f.basculerActeDocument('a-pod1', true);
+    e.f.visualiserBrouillonDocument();
+    e.f.ouvrirDocument('b');
+    expect(e.f.etat().apercu).toBe(false);
+  });
+  it("l'émission depuis l'aperçu : même parcours qu'avant (brouillon enregistré puis fonction de la base)", async () => {
+    const reponse = (a) => {
+      if (a.url.endsWith('rpc/emettre_document'))
+        return { status: 200, json: { id: 'd1', statut: 'emis', numero: 'F-2026-0001' } };
+      return { status: 201, json: [{ id: 'd1' }] };
+    };
+    const e = preparer({ reponse });
+    e.f.visualiserBrouillonDocument();
+    await e.f.emettreDocumentCourant();
+    expect(e.appels.map((a) => a.methode + ' ' + a.url.split('/rest/v1/')[1])).toEqual([
+      'POST documents_facturation',
+      'POST rpc/emettre_document',
+    ]);
+    expect(e.f.etat()).toMatchObject({ edition: null, vue: 'd1', apercu: false });
+  });
+  it("la page affiche l'aperçu tant que le brouillon est en aperçu (branchement du rendu)", () => {
+    const rendu = fonction('renderDocumentsPage');
+    expect(rendu).toContain('_docEdition && _docApercu');
+    expect(rendu).toContain('_htmlApercuDocument()');
   });
 });
 
