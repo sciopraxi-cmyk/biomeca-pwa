@@ -620,6 +620,7 @@
     <button onclick="nav('pg-praticiens')" id="tn-praticiens">Praticiens</button>
     <button onclick="nav('pg-params')" id="tn-params">Paramètres</button>
     <button onclick="nav('pg-agenda')" id="tn-agenda">📅 Agenda</button>
+    <button onclick="nav('pg-actes')" id="tn-facturation">🧾 Facturation</button>
   </div>
   <div style="flex:1;"></div>
   <a href="https://www.doctolib.fr" target="_blank" rel="noopener noreferrer" class="tb-doctolib" style="display:flex;align-items:center;gap:6px;background:#fff;border-radius:6px;padding:4px 12px;text-decoration:none;margin-right:8px;font-size:11px;font-weight:700;color:#0e4d91;white-space:nowrap;">
@@ -3335,13 +3336,6 @@
       <a href="https://supabase.com/dashboard/project/tzivizoacdyopwfzerrb/auth/users" target="_blank" rel="noopener noreferrer" class="btn" style="background:var(--blue);color:#fff;padding:8px 16px;font-size:13px;text-decoration:none;display:inline-block;">🔗 Ouvrir Supabase Users</a>
     </div>
 
-    <!-- Facturation, étape 1 — accès au catalogue d'actes -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="stitle">🧾 Facturation</div>
-      <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">Catalogue de vos actes et de leurs montants (sans TVA), pour les devis et factures.</p>
-      <button class="btn btn-blue" onclick="nav('pg-actes')">Catalogue d'actes</button>
-    </div>
-
     <!-- Liste praticiens avec droits -->
     <div class="card" id="params-bloc-users">
       <div class="stitle">Utilisateurs autorisés</div>
@@ -3479,8 +3473,8 @@
 <div class="page page-claire" id="pg-actes">
   <div style="padding:16px 20px;max-width:760px;margin:0 auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <button onclick="nav('pg-params')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Paramètres</button>
-      <h2 style="margin:0;font-size:18px;color:var(--blue);flex:1;">🧾 Catalogue d'actes</h2>
+      <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
+      <h2 style="margin:0;font-size:18px;color:var(--blue);flex:1;">🧾 Facturation — catalogue d'actes</h2>
     </div>
     <div class="card" style="margin-bottom:16px;">
       <p style="font-size:12px;color:var(--mut);margin:0 0 10px;">Montants <b>sans TVA</b>. Les tarifs du référentiel (convention en vigueur au 07/03/2024) changent par avenant : ils sont copiés ici, datés et sourcés, et vous pouvez les modifier. À faire valider par votre expert-comptable.</p>

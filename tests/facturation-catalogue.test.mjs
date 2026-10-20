@@ -291,7 +291,7 @@ describe('migration SQL et branchement', () => {
     expect(sql).toMatch(/SET search_path = public/);
     expect(sql).toMatch(/UNIQUE INDEX[\s\S]*\(user_id, code\) WHERE code IS NOT NULL/);
   });
-  it('page, accès depuis Paramètres et ouverture de la page', () => {
+  it("page, onglet « Facturation » à côté d'Agenda (ouvert à tous les praticiens, hors Paramètres) et ouverture de la page", () => {
     expect(html).toContain('id="pg-actes"');
     expect(html).toContain('onclick="nav(\'pg-actes\')"');
     expect(fonction('nav')).toContain("id === 'pg-actes'");

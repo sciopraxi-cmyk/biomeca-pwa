@@ -4790,7 +4790,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-params',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
