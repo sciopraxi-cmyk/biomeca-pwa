@@ -193,18 +193,26 @@ describe('référentiel : données datées, sourcées, cohérentes', () => {
       const [secu, mut] = [x[1], x[2]].map((v) =>
         Math.round(parseFloat(v.replace(',', '.')) * 100)
       );
-      const base = /Base LPP ([\d,]+) €/.exec(a.remboursement)?.[1];
+      const base = /Base LPP paire ([\d,]+) €/.exec(a.remboursement)?.[1];
       const total = base ? Math.round(parseFloat(base.replace(',', '.')) * 100) : a.montant_cents;
       expect(Math.abs(secu + mut - total), a.code).toBeLessThanOrEqual(1);
     }
   });
-  it('les semelles LPP sont datées du 07/07/2023 et signalées « à confirmer » (unité ou paire)', () => {
+  it('semelles LPP : base de la PAIRE = 2 × le tarif officiel par orthèse, datée du 07/07/2023', () => {
+    const parOrtheseOfficiel = {
+      'LPP-2180450': 1294,
+      'LPP-2122121': 1402,
+      'LPP-2140455': 1443,
+      'LPP-2158449': 2734,
+    };
     const lpp = ref.actes.filter((a) => a.code.startsWith('LPP-'));
     expect(lpp).toHaveLength(4);
     for (const a of lpp) {
       expect(a.date_effet).toBe('2023-07-07');
-      expect(a.note).toMatch(/à confirmer/);
+      expect(a.montant_cents, a.code).toBe(2 * parOrtheseOfficiel[a.code]);
+      expect(a.note).toMatch(/PAIRE/);
       expect(a.note).toMatch(/prix de vente libre/);
+      expect(a.note).not.toMatch(/à confirmer/);
     }
   });
   it('les majorations ne sont jamais proposées avec une séance POD', () => {
