@@ -865,6 +865,7 @@ async function loadSupabaseData() {
 
 // ─── Sauvegarde vers Supabase ───
 async function saveToSupabase() {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   if(!pwaUser?.token) return;
   // Guard data race (task #64) : tant que loadSupabaseData n'a pas peuplé les
   // globales patients/praticiens, on REFUSE le POST en DB pour ne pas écraser
@@ -1064,6 +1065,7 @@ function _retirerCollisionsId(rows) {
 // ─── #245 GARDE — FIN ───
 
 async function _syncPatientToNormalizedTables(p) {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   if (!pwaUser?.id || !p) return;
   try {
     if (!p._cloudId) p._cloudId = crypto.randomUUID();
@@ -3030,11 +3032,11 @@ function checkAccessStatus() {
   }
 
   if (level === 'readonly') {
-    _hideAccessOverlay();
-    _showAccessBanner({
-      text: "Votre abonnement est suspendu. Vos patients et bilans restent consultables. Reprenez votre abonnement pour créer de nouveaux patients et bilans. L'impression et l'export PDF restent disponibles.",
-      background: '#e67e22',
-    });
+    // Ancien abonné (abonnement résilié, licence payée) : même fenêtre unique que l'essai
+    // expiré — réabonnement requis pour accéder à la plateforme ; seules la récupération de
+    // ses données (export CSV des patients, devis et factures émis) reste possible.
+    _hideAccessBanner();
+    _showAccessOverlay({ cause: 'subscription_ended' });
     applyReadOnlyUI(window._accessLevel);
     return;
   }
@@ -3126,8 +3128,18 @@ function canChangeModule(userData, now) {
 // Niveau absent = comportement historique (autorisé). Source unique des 5
 // gardes d'impression et de applyReadOnlyUI.
 function _accessPermetImpression() {
+  if (globalThis?._modeConsultation) return true; // consultation : imprimer les rapports est son objet
   const l = window._accessLevel;
   return !l || l === 'full' || l === 'readonly';
+}
+
+// Facturation : créer, modifier ou émettre un devis / une facture est réservé aux abonnés actifs.
+// Un ancien abonné (« lecture seule ») ou un compte « bloqué » ne crée plus de document ;
+// il CONSULTE et IMPRIME toujours ses documents déjà émis (obligation de conservation) et
+// l'ancien abonné peut encore enregistrer un règlement. Garde d'interface, comme les autres.
+function _accessPermetCreationDocument() {
+  const l = window._accessLevel;
+  return !l || l === 'full';
 }
 
 function applyReadOnlyUI(level) {
@@ -3172,6 +3184,7 @@ function showAccessRestrictedModal(reason) {
     create_patient: 'Création de patient',
     create_bilan: 'Création de bilan',
     export_pdf: 'Export PDF',
+    create_document: 'Création de devis et de factures',
   };
   const label = labels[reason] || 'Cette fonctionnalité';
 
@@ -3269,7 +3282,7 @@ function showSubscribeModal() {
   // Cf. C6 — backdrop click logic appliquée aussi.
   const closeBtn = document.getElementById('ms-close');
   if (closeBtn) {
-    closeBtn.style.display = window._accessLevel === 'blocked' ? 'none' : 'inline-block';
+    closeBtn.style.display = 'inline-block'; // toujours : la fermeture ramène à la fenêtre d'abonnement terminé, qui reste dessous
   }
   // Reset bandeau d'erreur d'éventuel call précédent.
   const errEl = document.getElementById('ms-err');
@@ -3288,7 +3301,7 @@ function showSubscribeModal() {
   if (modal) {
     if (modal._backdropHandler) modal.removeEventListener('click', modal._backdropHandler);
     modal._backdropHandler = (e) => {
-      if (e.target === modal && window._accessLevel !== 'blocked') {
+      if (e.target === modal) {
         modal.style.display = 'none';
       }
     };
@@ -3297,9 +3310,16 @@ function showSubscribeModal() {
   }
 }
 
+// Accès verrouillé : compte « bloqué » (essai expiré) ou « lecture seule » (abonnement terminé).
+// Dans les deux cas une seule fenêtre est offerte : réabonnement, récupération des données.
+function _accesVerrouille() {
+  const l = window._accessLevel;
+  return l === 'blocked' || l === 'readonly';
+}
+
 function closeSubscribeModal() {
-  // Refuse de fermer si user en accès bloqué (cf. C6).
-  if (window._accessLevel === 'blocked') return;
+  // Fermer ne donne AUCUN accès : pour un compte verrouillé (bloqué ou abonnement terminé),
+  // la fenêtre unique (#trial-expired-overlay, dessous) reste affichée. C'est le retour.
   const modal = document.getElementById('modal-subscribe');
   if (modal) modal.style.display = 'none';
 }
@@ -3341,24 +3361,25 @@ function msRenderCards() {
   // Edge Function paymentLinkFor qui sélectionne sansLicence si hasLicence.
   const hasLicence = pwaUser?.user_data?.licence_payee === true;
   const licenceLine = hasLicence
-    ? '<div style="font-size:10px;color:#2dd4bf;font-weight:600;margin-top:4px;">✓ Vous avez déjà la licence</div>'
-    : '<div style="font-size:10px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div>';
+    ? '<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:4px;">✓ Vous avez déjà la licence</div>'
+    : '<div style="font-size:10px;color:var(--green);margin-top:4px;">+ 299€ licence & mises à jour</div>';
 
   el.innerHTML = MS_PLAN_NAMES.map((name, idx) => {
     const price = _msIsAnnuel ? MS_PRICES_A[idx] : MS_PRICES_M[idx];
     const period = _msIsAnnuel ? '/ an' : '/ mois';
     const isCurrent = idx === currentPlanIdx;
-    const cardBorder = isCurrent ? '2px solid #2dd4bf' : '1px solid var(--bord)';
+    const cardBorder = isCurrent ? '2px solid var(--green)' : '1px solid var(--bord)';
     const currentBadge = isCurrent
-      ? '<div style="font-size:10px;color:#2dd4bf;font-weight:700;margin-bottom:6px;">VOTRE FORMULE ACTUELLE</div>'
+      ? '<div style="font-size:10px;color:var(--green);font-weight:700;margin-bottom:6px;">VOTRE FORMULE ACTUELLE</div>'
       : '';
     return `
       <div style="background:var(--card);border-radius:12px;padding:18px;border:${cardBorder};">
         ${currentBadge}
-        <div style="font-size:15px;font-weight:700;color:#fff;">${_escHtml(name)}</div>
-        <div style="font-size:22px;font-weight:700;color:#fff;margin-top:8px;">${price}€ <span style="font-size:12px;font-weight:400;color:var(--mut);">${period}</span></div>
+        <div style="font-size:15px;font-weight:700;color:var(--txt);">${_escHtml(name)}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--txt);margin-top:8px;">${price}€ <span style="font-size:12px;font-weight:400;color:var(--mut);">${period}</span></div>
         ${licenceLine}
         <div style="font-size:12px;color:var(--mut);margin-top:10px;">${_escHtml(MS_DESCR[idx])}</div>
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:8px;">🎁 Bilan pédicurie offert</div>
         <button onclick="msSelectPlan(${idx})" class="btn btn-blue" style="width:100%;margin-top:14px;font-size:13px;">Choisir</button>
       </div>`;
   }).join('');
@@ -3382,7 +3403,7 @@ function msShowModulesView() {
   document.getElementById('ms-title').textContent = 'Choisir vos modules';
   const subtitle = document.getElementById('ms-modules-subtitle');
   if (subtitle && _msSelectedPlanIdx !== null) {
-    subtitle.textContent = MS_PLAN_NAMES[_msSelectedPlanIdx] + ' — sélectionnez vos modules.';
+    subtitle.textContent = MS_PLAN_NAMES[_msSelectedPlanIdx] + ' — sélectionnez vos modules. Le bilan pédicurie est offert.';
   }
   const errEl = document.getElementById('ms-err');
   if (errEl) errEl.style.display = 'none';
@@ -3793,13 +3814,21 @@ function _showAccessOverlay({ cause }) {
   const o = document.getElementById('trial-expired-overlay');
   if (!o) return;
   o.style.display = 'flex';
+  // Récupération des données (export CSV, documents émis) : pour un ancien abonné ou un essai
+  // expiré. Jamais quand l'état du compte est inconnu (fail-secure), ni pour un compte qui n'a
+  // jamais rien eu à lui.
+  const recup = document.getElementById('overlay-recuperation');
+  if (recup) recup.style.display = cause === 'trial_expired' || cause === 'subscription_ended' ? '' : 'none';
   const wrapper = o.firstElementChild;
   if (!wrapper || wrapper.children.length < 3) return;
   const titleEl = wrapper.children[1];
   const msgEl = wrapper.children[2];
   if (cause === 'trial_expired') {
     if (titleEl) titleEl.textContent = 'Votre essai est terminé';
-    if (msgEl) msgEl.textContent = 'Votre essai gratuit de 14 jours est terminé. Choisissez une formule pour continuer.';
+    if (msgEl) msgEl.textContent = 'Votre essai gratuit de 14 jours est terminé. Pour accéder à la plateforme, choisissez une formule. Vos données restent à votre disposition ci-dessous.';
+  } else if (cause === 'subscription_ended') {
+    if (titleEl) titleEl.textContent = 'Votre abonnement est terminé';
+    if (msgEl) msgEl.textContent = 'Pour accéder à la plateforme, réabonnez-vous. Vos données restent à votre disposition ci-dessous.';
   } else if (cause === 'never_paid') {
     if (titleEl) titleEl.textContent = 'Bienvenue';
     if (msgEl) msgEl.textContent = 'Démarrez votre essai gratuit de 14 jours ou choisissez une formule.';
@@ -4741,6 +4770,7 @@ function _appliquerTheme() {
 }
 
 function nav(id) {
+  if (globalThis?._modeConsultation && !_consultationNavAutorisee(id)) return;
   // #116 — Capture-avant-quitter : si on quitte un bilan vers une autre page,
   // capturer le DOM dans bilanData/bilanDataPosturo AVANT de le masquer. Sinon
   // la saisie texte non capturée est perdue au retour (loadBilan re-rend depuis
@@ -4790,7 +4820,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
@@ -4798,6 +4828,8 @@ function nav(id) {
   if(id === 'pg-rapport') buildRapport();
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
+  if(id === 'pg-actes') renderActesPage();
+  if(id === 'pg-documents') renderDocumentsPage();
   if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
@@ -5453,6 +5485,7 @@ function _lireMarqueurNonSync() {
 }
 
 function _marquerNonSynchronise() {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   const k = _scopedKey('bm4-nonsync');
   if (!k) return;
   try {
@@ -5490,6 +5523,7 @@ function _confirmerSyncCloud(seqEnvoi, at) {
 // si la fermeture est en cours (la sérialisation n'est pas gratuite).
 // `preparer` : mise à jour de currentPatient avant sérialisation (sport).
 function _ecrireLocalAvantEnvoi(preparer) {
+  if (globalThis?._modeConsultation) return false; // mode consultation : aucune écriture
   if (!pwaUser?.id || !_dataLoaded || !currentPatient) return false;
   const k = _scopedKey('bm4-patients');
   if (!k) return false;
@@ -5541,6 +5575,7 @@ function _recupererSaisieNonSynchronisee(rowUpdatedAt) {
 }
 
 function savePatients() {
+  if (globalThis?._modeConsultation) return false; // mode consultation : aucune écriture
   // #125 — Garde attribuable : sans user_id, on n'écrit RIEN (aucune clé
   // globale, aucune attribution incertaine). Cohérent avec le pattern
   // _dataLoaded qui protège contre les saves prématurés.
@@ -6435,6 +6470,7 @@ function renderPatientList() {
           <div style="font-size:14px;font-weight:700;color:var(--txt);">${_escHtml(p.prenom)} ${_escHtml(p.nom)}</div>
           <div style="font-size:11px;color:var(--mut);margin-top:2px;">${age} · ${_escHtml(p.sport||'—')}${prat?' · '+_escHtml(prat.nom):''}</div>
         </div>
+        <button onclick="ouvrirDocumentsPatient(${i})" title="Devis et factures" aria-label="Devis et factures" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧾</button>
         <button onclick="editPatient(${i})" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
         <button onclick="deletePatient(${i})" class="bl-x" style="width:32px;height:32px;font-size:13px;">✕</button>
       </div>
@@ -6490,6 +6526,7 @@ function exportAllDataJSON() {
 // PRATICIENS
 // ══════════════════════════════════════════════════════
 function savePraticiens() {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   // #125 — Garde attribuable + écriture SCOPÉE (bm4-praticiens:<uid>).
   // Sans user_id, on n'écrit rien pour ne pas mélanger des comptes.
   if (!pwaUser?.id) return;
@@ -6565,6 +6602,8 @@ function _pratLogoBlockHTML(prat, height) {
 function createPraticien() {
   const nom = document.getElementById('pr-nom').value.trim();
   if (!nom) { alert('Nom obligatoire.'); return; }
+  const errBanque = _erreurCoordonneesBancaires(document.getElementById('pr-iban').value, document.getElementById('pr-bic').value);
+  if (errBanque) { alert(errBanque); return; }
   const pr = {
     id:Date.now(), nom,
     titre:document.getElementById('pr-titre').value,
@@ -6572,10 +6611,11 @@ function createPraticien() {
     tel:document.getElementById('pr-tel').value,
     adresse:document.getElementById('pr-adresse').value,
     email:document.getElementById('pr-email').value,
+    siret:document.getElementById('pr-siret').value.trim(), rpps:document.getElementById('pr-rpps').value.trim(), iban:_normaliserIban(document.getElementById('pr-iban').value), bic:_normaliserIban(document.getElementById('pr-bic').value), mentionTva:document.getElementById('pr-mention-tva').value.trim(), // facturation
     logo:_pratLogoDataUrl, // #229-B
   };
   praticiens.push(pr); savePraticiens();
-  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id=>{document.getElementById(id).value='';});
+  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-iban','pr-bic','pr-mention-tva'].forEach(id=>{document.getElementById(id).value='';});
   removePraticienLogo(); // #229-B — reset du formulaire
   renderPratList(); populatePratSelect();
   alert(`✓ Praticien enregistré : ${pr.nom}`);
@@ -6863,7 +6903,7 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   // sousType deleted par #69.3) déclenche un faux confirm "perdre vos données
   // actuelles" alors qu'il s'agit en réalité des mesures de l'archive précédente.
   // Parité avec creerBilanSport #69.4 qui a déjà ce check.
-  if (p.currentBilanSportSousType && (hasMesures || hasBilanData)) {
+  if (p.currentBilanSportSousType && (hasMesures || hasBilanData) && !globalThis?._modeConsultation) {
     if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
       return;
     }
@@ -8645,7 +8685,7 @@ async function ouvrirBilanPosturo(patIdx, bilanIdx) {
   const hasBilanPosturoData = hasBilanDataContent(p.bilanDataPosturo);
   // Task [#70] — check sousType posturo (mirror sport). Parité avec
   // creerBilanPosturo qui a déjà isInProgress = currentBilanPosturoSousType != null.
-  if (p.currentBilanPosturoSousType && hasBilanPosturoData) {
+  if (p.currentBilanPosturoSousType && hasBilanPosturoData && !globalThis?._modeConsultation) {
     if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
       return;
     }
@@ -8711,6 +8751,11 @@ function editPraticien(i) {
   document.getElementById('pr-tel').value = pr.tel || '';
   document.getElementById('pr-adresse').value = pr.adresse || '';
   document.getElementById('pr-email').value = pr.email || '';
+  document.getElementById('pr-siret').value = pr.siret || '';
+  document.getElementById('pr-rpps').value = pr.rpps || '';
+  document.getElementById('pr-iban').value = pr.iban ? _formaterIban(pr.iban) : '';
+  document.getElementById('pr-bic').value = pr.bic || '';
+  document.getElementById('pr-mention-tva').value = pr.mentionTva || '';
   // #229-B — charger le logo existant dans l'état + l'aperçu du formulaire.
   _pratLogoDataUrl = pr.logo || '';
   _setPratLogoPreview(_pratLogoDataUrl);
@@ -8729,19 +8774,26 @@ function editPraticien(i) {
 function saveEditPraticien(i) {
   const pr = praticiens[i];
   if(!pr) return;
+  const errBanque = _erreurCoordonneesBancaires(document.getElementById('pr-iban').value, document.getElementById('pr-bic').value);
+  if (errBanque) { alert(errBanque); return; }
   pr.nom = document.getElementById('pr-nom').value.trim();
   pr.titre = document.getElementById('pr-titre').value.trim();
   pr.cabinet = document.getElementById('pr-cabinet').value.trim();
   pr.tel = document.getElementById('pr-tel').value.trim();
   pr.adresse = document.getElementById('pr-adresse').value.trim();
   pr.email = document.getElementById('pr-email').value.trim();
+  pr.siret = document.getElementById('pr-siret').value.trim();
+  pr.rpps = document.getElementById('pr-rpps').value.trim();
+  pr.iban = _normaliserIban(document.getElementById('pr-iban').value);
+  pr.bic = _normaliserIban(document.getElementById('pr-bic').value);
+  pr.mentionTva = document.getElementById('pr-mention-tva').value.trim();
   pr.logo = _pratLogoDataUrl; // #229-B — '' si retiré via le bouton ✕
   savePatients();
   renderPratList();
   // Remettre le bouton en mode création
   const btn = document.querySelector('#pg-praticiens button[onclick*="saveEditPraticien"]');
   if(btn) { btn.textContent = '✓ Enregistrer le praticien'; btn.onclick = createPraticien; }
-  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email'].forEach(id => {
+  ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-iban','pr-bic','pr-mention-tva'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   removePraticienLogo(); // #229-B — reset du formulaire
@@ -30334,12 +30386,14 @@ let _bilanAutosaveTimer = null;
 // les call-sites qui n'ont pas migré vers la string flavor.
 let _bilanAutosaveFlavor = null;
 function _lancerSauvegardeAutomatique(flavor) {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   if (flavor === 'sport' && typeof saveBilanSilent === 'function') return saveBilanSilent();
   else if (flavor === 'posturo' && typeof savePosturoBilan === 'function') return savePosturoBilan(true);
   else if (flavor === 'pedicurie' && typeof savePedicurieBilan === 'function') return savePedicurieBilan(true);
   else if (flavor === 'podopediatrie' && typeof savePodopediatrieBilan === 'function') return savePodopediatrieBilan(true);
 }
 function _scheduleBilanAutosave(flavor) {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   // Normalisation rétro-compat boolean → flavor string.
   if (flavor === true)  flavor = 'sport';
   if (flavor === false) flavor = 'posturo';
@@ -30390,6 +30444,976 @@ document.addEventListener('input', function(e) {
     : 'podopediatrie'
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Facturation, étape 1 — catalogue d'actes (table actes_catalogue, RLS par praticien)
+// ═══════════════════════════════════════════════════════════════════
+// Référentiel : DONNÉES datées et sourcées, copiées dans le catalogue du praticien
+// (qui les modifie ensuite) ; jamais lues en dur au moment de facturer. Sans TVA.
+// Source : document de référence du praticien « POD et AMP podologue » (20/10/2026),
+// d'après les tarifs conventionnels ameli (applicables au 07/03/2024) et la LPP des
+// orthèses plantaires (07/07/2023). Les valeurs changent par avenant : à valider
+// avec l'expert-comptable. Montant = tarif de la convention (lettre-clé × coefficient).
+const REFERENTIEL_ACTES_POD = {
+  version: '2024-03-07',
+  source: 'Référentiel du praticien « POD et AMP podologue » (20/10/2026), d\'après ameli (07/03/2024) et LPP (07/07/2023)',
+  actes: [
+    // ── Pied diabétique (lettre POD, sans prescription) ──
+    { code: 'POD-0,67', cotation: 'POD 0,67', montant_cents: 2010, montants_precedents: [2000], base_remboursable_cents: 2010,
+      libelle: 'Bilan de gradation du risque (grade 0 ou 1, 1 fois par an)',
+      remboursement: 'Sécu 60 % : 12,06 € · 100 % en ALD : 20,10 €' },
+    { code: 'POD-1', cotation: 'POD 1', montant_cents: 3000, base_remboursable_cents: 3000,
+      libelle: 'Séance de soins de prévention (grade 2 ou 3)',
+      remboursement: 'Sécu 60 % : 18,00 € · 100 % en ALD : 30,00 €',
+      note: 'Forfait annuel : 5 séances en grade 2, 6 en grade 3, 8 en grade 3 avec plaie en cours de cicatrisation. Pas deux séances POD le même jour, ni avec un acte AMP.' },
+    { code: 'POD-1,17', cotation: 'POD 1,17', montant_cents: 3510, montants_precedents: [3500], base_remboursable_cents: 3510,
+      libelle: 'Séance bilan et soins (grade 2 ou 3, environ 45 min, au moins 30 min)',
+      remboursement: 'Sécu 60 % : 21,06 € · 100 % en ALD : 35,10 €',
+      note: 'Compte dans le forfait annuel de séances. Pas deux séances POD le même jour, ni avec un acte AMP.' },
+    // ── Pédicurie (lettre AMP, prescription obligatoire sauf verrues) ──
+    { code: 'AMP-31,7', cotation: 'AMP 31,7', montant_cents: 1997, base_remboursable_cents: 1997,
+      libelle: 'Verrues plantaires par kératolytique (4 séances maximum)',
+      remboursement: 'Sécu 60 % : 11,98 € · mutuelle 40 % : 7,99 €',
+      note: 'Sans prescription. Non cumulable avec une séance POD.' },
+    { code: 'AMP-REED-1', cotation: 'AMP 13,65', montant_cents: 860, base_remboursable_cents: 860,
+      libelle: 'Rééducation d\'un pied après chirurgie de l\'avant-pied (30 min)',
+      remboursement: 'Sécu 60 % : 5,16 € · mutuelle 40 % : 3,44 €', note: 'Sur prescription.' },
+    { code: 'AMP-REED-2', cotation: 'AMP 20,5', montant_cents: 1292, base_remboursable_cents: 1292,
+      libelle: 'Rééducation des deux pieds après chirurgie de l\'avant-pied (30 min)',
+      remboursement: 'Sécu 60 % : 7,75 € · mutuelle 40 % : 5,17 €', note: 'Sur prescription.' },
+    { code: 'AMP-MASS-1', cotation: 'AMP 6,8', montant_cents: 428, base_remboursable_cents: 428,
+      libelle: 'Massage d\'un pied après chirurgie de l\'avant-pied',
+      remboursement: 'Sécu 60 % : 2,57 € · mutuelle 40 % : 1,71 €', note: 'Sur prescription.' },
+    { code: 'AMP-MASS-2', cotation: 'AMP 10,2', montant_cents: 643, base_remboursable_cents: 643,
+      libelle: 'Massage des deux pieds après chirurgie de l\'avant-pied',
+      remboursement: 'Sécu 60 % : 3,86 € · mutuelle 40 % : 2,57 €', note: 'Sur prescription.' },
+    { code: 'AMP-MPS', cotation: 'AMP 48', montant_cents: 3024, base_remboursable_cents: 3024,
+      libelle: 'Syndrome main-pied (chimiothérapie), 2 actes maximum',
+      remboursement: 'Sécu 60 % : 18,14 € (souvent 100 % en ALD) · mutuelle 40 % : 12,10 €',
+      note: 'Sur prescription d\'un oncologue.' },
+    { code: 'AMP-PATHO-1', cotation: 'AMP 2', montant_cents: 126, base_remboursable_cents: 126,
+      libelle: 'Traitement pédicural d\'un cas pathologique (hygroma, onyxis…), 1re séance',
+      remboursement: 'Sécu 60 % : 0,76 € · mutuelle 40 % : 0,50 €', note: 'Sur prescription.' },
+    { code: 'AMP-PATHO-2', cotation: 'AMP 1,5', montant_cents: 95, base_remboursable_cents: 95,
+      libelle: 'Traitement pédicural d\'un cas pathologique, séances suivantes',
+      remboursement: 'Sécu 60 % : 0,57 € · mutuelle 40 % : 0,38 €', note: 'Sur prescription.' },
+    { code: 'AMP-PANS-S', cotation: 'AMP 0,75', montant_cents: 47, base_remboursable_cents: 47,
+      libelle: 'Pansement petit',
+      remboursement: 'Sécu 60 % : 0,28 € · mutuelle 40 % : 0,19 €', note: 'Sur prescription.' },
+    { code: 'AMP-PANS-M1', cotation: 'AMP 1,25', montant_cents: 79, base_remboursable_cents: 79,
+      libelle: 'Pansement moyen ou multiple, un pied',
+      remboursement: 'Sécu 60 % : 0,47 € · mutuelle 40 % : 0,32 €', note: 'Sur prescription.' },
+    { code: 'AMP-PANS-M2', cotation: 'AMP 2', montant_cents: 126, base_remboursable_cents: 126,
+      libelle: 'Pansement moyen ou multiple, deux pieds',
+      remboursement: 'Sécu 60 % : 0,76 € · mutuelle 40 % : 0,50 €', note: 'Sur prescription.' },
+    { code: 'AMP-PANS-HYG', cotation: 'AMP 1,5', montant_cents: 95, base_remboursable_cents: 95,
+      libelle: 'Pansement d\'hygroma après l\'intervention d\'un médecin',
+      remboursement: 'Sécu 60 % : 0,57 € · mutuelle 40 % : 0,38 €', note: 'Sur prescription.' },
+    // ── Orthèses plantaires (LPP, depuis le 07/07/2023) : tarif de responsabilité ──
+    // Montants = base de la PAIRE (2 × le tarif officiel par orthèse). Prix de vente libre.
+    { code: 'LPP-2180450', cotation: 'LPP 2180450', montant_cents: 2588, base_remboursable_cents: 2588, franchise: false, date_effet: '2023-07-07',
+      libelle: 'Semelles orthopédiques sur mesure, pointure inférieure à 28',
+      remboursement: 'Base LPP paire 25,88 € · Sécu 60 % : 15,53 € · mutuelle 40 % : 10,35 €',
+      note: 'Montant = base LPP de la PAIRE (2 × 12,94 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
+    { code: 'LPP-2122121', cotation: 'LPP 2122121', montant_cents: 2804, base_remboursable_cents: 2804, franchise: false, date_effet: '2023-07-07',
+      libelle: 'Semelles orthopédiques sur mesure, pointure 28 à 37',
+      remboursement: 'Base LPP paire 28,04 € · Sécu 60 % : 16,82 € · mutuelle 40 % : 11,22 €',
+      note: 'Montant = base LPP de la PAIRE (2 × 14,02 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
+    { code: 'LPP-2140455', cotation: 'LPP 2140455', montant_cents: 2886, base_remboursable_cents: 2886, franchise: false, date_effet: '2023-07-07',
+      libelle: 'Semelles orthopédiques sur mesure, pointure supérieure à 37',
+      remboursement: 'Base LPP paire 28,86 € · Sécu 60 % : 17,32 € · mutuelle 40 % : 11,54 €',
+      note: 'Montant = base LPP de la PAIRE (2 × 14,43 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
+    { code: 'LPP-2158449', cotation: 'LPP 2158449', montant_cents: 5468, base_remboursable_cents: 5468, franchise: false, date_effet: '2023-07-07',
+      libelle: 'Semelle monobloc en résine coulée (affections rhumatoïdes ou neurotrophiques)',
+      remboursement: 'Base LPP paire 54,68 € · Sécu 60 % : 32,81 € · mutuelle 40 % : 21,87 €',
+      note: 'Montant = base LPP de la PAIRE (2 × 27,34 € par orthèse, tarif officiel) ; prix de vente libre, à adapter. Prescription sur ordonnance séparée ; hors franchise.' },
+    // ── Télésoin et frais annexes ──
+    { code: 'TEL-POT', cotation: 'POT', montant_cents: 3000,
+      libelle: 'Télésoin : séance de prévention (équivalent de la séance POD)' },
+    { code: 'TEL-TMP', cotation: 'TMP', montant_cents: 63,
+      libelle: 'Télésoin : lettre-clé TMP (équivalent de l\'AMP, par unité)' },
+    { code: 'TEL-RQD', cotation: 'RQD', montant_cents: 1000,
+      libelle: 'Demande de téléexpertise' },
+    { code: 'FRAIS-IFD', cotation: 'IFD', montant_cents: 250,
+      libelle: 'Indemnité forfaitaire de déplacement' },
+    { code: 'FRAIS-IK-PLAINE', cotation: 'IK', montant_cents: 35,
+      libelle: 'Indemnité kilométrique en plaine (par km)' },
+    { code: 'FRAIS-IK-MONTAGNE', cotation: 'IK', montant_cents: 50,
+      libelle: 'Indemnité kilométrique en montagne (par km)' },
+    { code: 'MAJ-NUIT', cotation: null, montant_cents: 76,
+      libelle: 'Majoration de nuit', note: 'Jamais sur une séance POD.' },
+    { code: 'MAJ-DIMANCHE', cotation: null, montant_cents: 61,
+      libelle: 'Majoration du dimanche', note: 'Jamais sur une séance POD.' },
+  ],
+};
+
+const ACTE_MONTANT_MAX_CENTS = 10000000; // 100 000 €, identique au CHECK SQL
+
+// "30", "30,5", "30.50", "1 234,56 €" → centimes entiers ; null si invalide
+// (négatif, plus de 2 décimales, texte, hors plafond). Aucun flottant.
+function _eurosVersCentimes(saisie) {
+  const t = String(saisie ?? '').replace(/[\s\u00a0€]/g, '').replace(',', '.');
+  const m = /^(\d{1,7})(?:\.(\d{1,2}))?$/.exec(t);
+  if (!m) return null;
+  const c = parseInt(m[1], 10) * 100 + (m[2] ? parseInt(m[2].padEnd(2, '0'), 10) : 0);
+  return c <= ACTE_MONTANT_MAX_CENTS ? c : null;
+}
+function _centimesVersEuros(c) {
+  if (!Number.isInteger(c) || c < 0) return '—';
+  const e = Math.floor(c / 100), r = c % 100;
+  return String(e).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + ',' + String(r).padStart(2, '0') + '\u00a0€';
+}
+// Valide un acte saisi ; retourne { ok, erreur, acte } (acte = champs prêts pour la base).
+function _validerActe(a) {
+  const libelle = String(a?.libelle ?? '').trim();
+  if (!libelle) return { ok: false, erreur: 'Le titre de l\'acte est obligatoire.' };
+  if (libelle.length > 120) return { ok: false, erreur: 'Le titre est limité à 120 caractères.' };
+  const montant = _eurosVersCentimes(a?.montant);
+  if (montant === null) return { ok: false, erreur: 'Montant invalide (exemple : 30 ou 30,50 ; 2 décimales au plus).' };
+  const net = (v, max) => { const x = String(v ?? '').trim(); return x ? x.slice(0, max) : null; };
+  let base = null;
+  if (String(a?.base ?? '').trim() !== '') {
+    base = _eurosVersCentimes(a.base);
+    if (base === null) return { ok: false, erreur: 'Base remboursable invalide (exemple : 28,04 ; 2 décimales au plus).' };
+  }
+  return { ok: true, acte: {
+    libelle, montant_cents: montant, base_remboursable_cents: base, franchise: a?.franchise !== false,
+    cotation: net(a?.cotation, 40), remboursement: net(a?.remboursement, 200), note: net(a?.note, 500),
+  } };
+}
+// Actes du référentiel absents du catalogue (par code) : l'import est idempotent
+// et n'écrase jamais un acte déjà modifié par le praticien.
+function _actesAImporter(existants, referentiel) {
+  const codes = new Set((existants || []).map((e) => e.code).filter(Boolean));
+  return referentiel.actes.filter((a) => !codes.has(a.code)).map((a) => ({
+    code: a.code, libelle: a.libelle, cotation: a.cotation, montant_cents: a.montant_cents,
+    remboursement: a.remboursement || null, note: a.note || null,
+    base_remboursable_cents: Number.isInteger(a.base_remboursable_cents) ? a.base_remboursable_cents : null,
+    franchise: a.franchise !== false,
+    source: referentiel.source, date_effet: a.date_effet || referentiel.version, perso: false, actif: true,
+  }));
+}
+
+// Régimes de remboursement (taux de la Sécurité sociale sur la base remboursable).
+const REGIMES_REMBOURSEMENT = {
+  standard: { taux: 60, libelle: 'Sécurité sociale 60 %' },
+  ald: { taux: 100, libelle: '100 % (affection de longue durée)' },
+  alsace_moselle: { taux: 90, libelle: '90 % (Alsace-Moselle)' },
+};
+// Part de la Sécurité sociale = taux × base, arrondie au centime (entiers, jamais de
+// flottant). Le reste est le ticket modérateur : INDICATIF, la mutuelle dépend du contrat.
+// Retourne null si l'acte n'a pas de base remboursable. La franchise (1 €) n'est pas
+// déduite ici : elle dépend de la journée (plafond 4 €/jour) et se traite à la facture.
+function _partsRemboursement(baseCents, regime) {
+  const r = REGIMES_REMBOURSEMENT[regime || 'standard'];
+  if (!r || !Number.isInteger(baseCents) || baseCents < 0) return null;
+  const secu = Math.floor((baseCents * r.taux + 50) / 100);
+  return { base: baseCents, taux: r.taux, secu, resteTM: baseCents - secu };
+}
+// Actes DÉJÀ au catalogue à compléter, sans jamais toucher au titre :
+//  - base remboursable et franchise, s'ils n'ont jamais été renseignés (import antérieur) ;
+//  - montant, UNIQUEMENT s'il vaut exactement un montant d'une version antérieure du
+//    référentiel (montants_precedents : ex. 20,00 € devenu 20,10 €). Un montant que le
+//    praticien a lui-même choisi, donc différent, n'est jamais changé.
+function _actesACompleter(existants, referentiel) {
+  const parCode = new Map(referentiel.actes.map((a) => [a.code, a]));
+  const out = [];
+  (existants || []).forEach((e) => {
+    const ref = e.code && parCode.get(e.code);
+    if (!ref || e.perso) return;
+    const champs = {};
+    if (e.base_remboursable_cents == null && Number.isInteger(ref.base_remboursable_cents)) {
+      champs.base_remboursable_cents = ref.base_remboursable_cents;
+      champs.franchise = ref.franchise !== false;
+    }
+    if ((ref.montants_precedents || []).includes(e.montant_cents) && e.montant_cents !== ref.montant_cents) {
+      champs.montant_cents = ref.montant_cents;
+    }
+    if (Object.keys(champs).length) out.push({ id: e.id, champs });
+  });
+  return out;
+}
+
+let _actesCache = [];
+let _acteEnEdition = null;
+async function _actesRequete(chemin, options) {
+  const res = await authFetch(SUPA_URL + '/rest/v1/actes_catalogue' + chemin, options);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res;
+}
+async function chargerActes() {
+  const res = await _actesRequete('?select=*&order=perso.asc,code.asc.nullslast,libelle.asc');
+  _actesCache = await res.json();
+  return _actesCache;
+}
+async function importerReferentielActes() {
+  try {
+    await chargerActes();
+    const aImporter = _actesAImporter(_actesCache, REFERENTIEL_ACTES_POD);
+    const aCompleter = _actesACompleter(_actesCache, REFERENTIEL_ACTES_POD);
+    if (!aImporter.length && !aCompleter.length) { alert('Le référentiel est déjà dans votre catalogue.'); return; }
+    if (aImporter.length) await _actesRequete('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(aImporter),
+    });
+    for (const c of aCompleter) await _actesRequete('?id=eq.' + encodeURIComponent(c.id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(c.champs),
+    });
+    await renderActesPage();
+  } catch (e) { alert('Import impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+async function enregistrerActe() {
+  const val = (id) => document.getElementById(id)?.value;
+  const r = _validerActe({
+    libelle: val('acte-libelle'), montant: val('acte-montant'),
+    cotation: val('acte-cotation'), remboursement: val('acte-remboursement'), note: val('acte-note'),
+    base: val('acte-base'), franchise: document.getElementById('acte-franchise')?.checked !== false,
+  });
+  if (!r.ok) { alert(r.erreur); return; }
+  try {
+    if (_acteEnEdition) {
+      await _actesRequete('?id=eq.' + encodeURIComponent(_acteEnEdition), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(r.acte),
+      });
+    } else {
+      await _actesRequete('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(Object.assign({ perso: true, actif: true }, r.acte)),
+      });
+    }
+    annulerEditionActe();
+    await renderActesPage();
+  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+async function basculerActeActif(id) {
+  const a = _actesCache.find((x) => x.id === id);
+  if (!a) return;
+  try {
+    await _actesRequete('?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ actif: !a.actif }),
+    });
+    await renderActesPage();
+  } catch (e) { alert('Modification impossible (' + e.message + ').'); }
+}
+function modifierActe(id) {
+  const a = _actesCache.find((x) => x.id === id);
+  if (!a) return;
+  _acteEnEdition = id;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v ?? ''; };
+  set('acte-libelle', a.libelle); set('acte-cotation', a.cotation);
+  set('acte-montant', (a.montant_cents / 100).toFixed(2).replace('.', ','));
+  set('acte-remboursement', a.remboursement); set('acte-note', a.note);
+  set('acte-base', a.base_remboursable_cents == null ? '' : (a.base_remboursable_cents / 100).toFixed(2).replace('.', ','));
+  const fr = document.getElementById('acte-franchise'); if (fr) fr.checked = a.franchise !== false;
+  const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Modifier l\'acte';
+  const b = document.getElementById('acte-annuler'); if (b) b.style.display = '';
+  document.getElementById('acte-libelle')?.scrollIntoView({ block: 'center' });
+}
+function annulerEditionActe() {
+  _acteEnEdition = null;
+  ['acte-libelle', 'acte-cotation', 'acte-montant', 'acte-remboursement', 'acte-note', 'acte-base'].forEach((k) => {
+    const el = document.getElementById(k); if (el) el.value = '';
+  });
+  const fr = document.getElementById('acte-franchise'); if (fr) fr.checked = true;
+  const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Nouvel acte personnalisé';
+  const b = document.getElementById('acte-annuler'); if (b) b.style.display = 'none';
+}
+async function renderActesPage() {
+  const el = document.getElementById('actes-liste');
+  if (!el) return;
+  try { await chargerActes(); } catch (e) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px 0;">Catalogue indisponible (' + _escHtml(e.message) + '). Rien n\'a été modifié.</div>';
+    return;
+  }
+  if (!_actesCache.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun acte. Importez le référentiel ou créez un acte personnalisé.</div>';
+    return;
+  }
+  el.innerHTML = _actesCache.map((a) =>
+    '<div class="acte-ligne" style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bord);' + (a.actif ? '' : 'opacity:.55;') + '">' +
+      '<div style="min-width:0;flex:1;">' +
+        '<div style="font-size:13px;font-weight:700;">' + _escHtml(a.libelle) +
+          (a.cotation ? ' <span style="font-weight:600;color:var(--mut);">· ' + _escHtml(a.cotation) + '</span>' : '') +
+          (a.perso ? ' <span style="font-size:11px;color:var(--mut);">(personnalisé)</span>' : '') +
+          (a.actif ? '' : ' <span style="font-size:11px;color:var(--red);">(désactivé)</span>') + '</div>' +
+        (a.remboursement ? '<div style="font-size:12px;color:var(--mut);">' + _escHtml(a.remboursement) + '</div>' : '') +
+        (function() { const p = _partsRemboursement(a.base_remboursable_cents, 'standard'); return p ? '<div style="font-size:12px;color:var(--mut);">Base remboursable ' + _escHtml(_centimesVersEuros(p.base)) + ' · Sécu 60 % ' + _escHtml(_centimesVersEuros(p.secu)) + ' · reste (ticket modérateur) ' + _escHtml(_centimesVersEuros(p.resteTM)) + (a.franchise === false ? ' · sans franchise' : '') + '</div>' : ''; })() +
+        (a.note ? '<div style="font-size:12px;color:var(--mut);font-style:italic;">' + _escHtml(a.note) + '</div>' : '') +
+        (a.source ? '<div style="font-size:11px;color:var(--mut);">Source : ' + _escHtml(a.source) + (a.date_effet ? ' · en vigueur au ' + _escHtml(a.date_effet) : '') + '</div>' : '') +
+      '</div>' +
+      '<div style="text-align:right;white-space:nowrap;">' +
+        '<div style="font-size:14px;font-weight:700;">' + _escHtml(_centimesVersEuros(a.montant_cents)) + '</div>' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="modifierActe(\'' + _escHtml(a.id) + '\')">Modifier</button> ' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="basculerActeActif(\'' + _escHtml(a.id) + '\')">' + (a.actif ? 'Désactiver' : 'Réactiver') + '</button>' +
+      '</div></div>'
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Facturation, étape 2b-1 — devis et factures par patient
+// (tables documents_facturation + documents_numerotation, RPC emettre_document)
+// ═══════════════════════════════════════════════════════════════════
+// Brouillon librement modifiable ; ÉMIS = numéro D-/F-AAAA-NNNN attribué par la base,
+// document figé (seul le règlement d'une facture s'enregistre). Lignes, patient et
+// émetteur sont des instantanés. Montants en centimes, sans TVA.
+const MENTION_TVA_DEFAUT = 'TVA non applicable, article 261-4-1° du CGI';
+const MODES_PAIEMENT = { especes: 'Espèces', cheque: 'Chèque', carte: 'Carte bancaire', virement: 'Virement' };
+const FRANCHISE_ACTE_CENTS = 100;
+const FRANCHISE_JOUR_MAX_CENTS = 400;
+const DOC_LIGNES_MAX = 50;
+
+// Totaux et remboursement INDICATIF d'un document. Le prix est celui du praticien
+// (ligne par ligne, ou total fixé) ; la part Sécu se calcule sur la BASE remboursable
+// de l'acte (jamais sur le prix) ; la franchise de 1 € par acte (4 € par jour au plus)
+// se déduit de la part Sécu ; la part mutuelle réelle dépend du contrat (non calculée).
+function _calculerDocument(lignes, regime, totalFixeCents) {
+  let sousTotal = 0, baseTotal = 0, secuTotal = 0, tmTotal = 0, nbFranchise = 0;
+  (lignes || []).forEach((l) => {
+    const q = Number.isInteger(l.qte) ? l.qte : 0;
+    sousTotal += q * (Number.isInteger(l.prix_cents) ? l.prix_cents : 0);
+    const p = _partsRemboursement(l.base_remboursable_cents, regime);
+    if (!p) return;
+    baseTotal += q * p.base; secuTotal += q * p.secu; tmTotal += q * p.resteTM;
+    if (l.franchise !== false) nbFranchise += q;
+  });
+  const total = Number.isInteger(totalFixeCents) ? totalFixeCents : sousTotal;
+  const franchise = Math.min(nbFranchise * FRANCHISE_ACTE_CENTS, FRANCHISE_JOUR_MAX_CENTS, secuTotal);
+  const secuNette = secuTotal - franchise;
+  return {
+    sousTotalCents: sousTotal, totalCents: total, baseTotal, secuTotal, franchise, secuNette,
+    tmTotal, horsBase: Math.max(0, total - baseTotal), resteApresSecu: Math.max(0, total - secuNette),
+  };
+}
+function _ligneDepuisActe(a) {
+  return {
+    acte_id: a.id, code: a.code || null, libelle: a.libelle, cotation: a.cotation || null,
+    qte: 1, prix_cents: a.montant_cents,
+    base_remboursable_cents: Number.isInteger(a.base_remboursable_cents) ? a.base_remboursable_cents : null,
+    franchise: a.franchise !== false,
+  };
+}
+const _chiffresSeuls = (s) => String(s ?? '').replace(/[\s.-]/g, '');
+function _mentionTva(pr) { return String(pr?.mentionTva ?? '').trim() || MENTION_TVA_DEFAUT; }
+// IBAN : espaces retirés, majuscules ; valide par la clé de contrôle (modulo 97) et la longueur
+// (15 à 34 caractères). BIC : 8 ou 11 caractères (4 lettres banque, 2 lettres pays, 2 code place,
+// 3 code agence facultatif).
+function _normaliserIban(v) { return String(v ?? '').replace(/\s+/g, '').toUpperCase(); }
+function _ibanValide(v) {
+  const i = _normaliserIban(v);
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(i)) return false;
+  const t = i.slice(4) + i.slice(0, 4);
+  let reste = 0;
+  for (const c of t) {
+    const n = c >= 'A' ? String(c.charCodeAt(0) - 55) : c;
+    for (const d of n) reste = (reste * 10 + Number(d)) % 97;
+  }
+  return reste === 1;
+}
+function _bicValide(v) { return /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(_normaliserIban(v)); }
+function _formaterIban(v) { return _normaliserIban(v).replace(/(.{4})/g, '$1 ').trim(); }
+// Vérifie les coordonnées bancaires d'une fiche praticien ; retourne un message ou null.
+function _erreurCoordonneesBancaires(iban, bic) {
+  const i = _normaliserIban(iban), b = _normaliserIban(bic);
+  if (i && !_ibanValide(i)) return 'IBAN invalide : vérifiez les chiffres (la clé de contrôle ne correspond pas).';
+  if (b && !_bicValide(b)) return 'BIC invalide : 8 ou 11 caractères, par exemple BNPAFRPP.';
+  if (b && !i) return 'Un BIC sans IBAN : saisissez aussi l\'IBAN, ou videz le BIC.';
+  return null;
+}
+function _emetteurDepuisPraticien(pr) {
+  const t = (v, n) => String(v ?? '').trim().slice(0, n);
+  return {
+    nom: t(pr?.nom, 120), titre: t(pr?.titre, 120), cabinet: t(pr?.cabinet, 120),
+    adresse: t(pr?.adresse, 300), tel: t(pr?.tel, 40), email: t(pr?.email, 120),
+    siret: _chiffresSeuls(pr?.siret), rpps: _chiffresSeuls(pr?.rpps),
+    iban: _normaliserIban(pr?.iban), bic: _normaliserIban(pr?.bic),
+  };
+}
+function _patientInstantane(p) {
+  const t = (v, n) => String(v ?? '').trim().slice(0, n);
+  return {
+    civilite: t(p?.civilite, 20), nom: t(p?.nom, 120), prenom: t(p?.prenom, 120),
+    adresse: t(p?.adresse, 300), cp: t(p?.cp, 12), ville: t(p?.ville, 120),
+  };
+}
+// Contrôle d'un document avant enregistrement ; `pourEmission` ajoute les mentions
+// obligatoires de l'émetteur (SIRET 14 chiffres, RPPS 11 ou ADELI 9 chiffres).
+function _validerDocument(d, pourEmission) {
+  const ko = (erreur) => ({ ok: false, erreur });
+  if (!d || (d.type !== 'devis' && d.type !== 'facture')) return ko('Type de document invalide.');
+  if (!d.patient_ref) return ko('Aucun patient sélectionné.');
+  if (!REGIMES_REMBOURSEMENT[d.regime]) return ko('Régime de remboursement invalide.');
+  if (!Array.isArray(d.lignes) || d.lignes.length < 1) return ko('Cochez au moins un acte.');
+  if (d.lignes.length > DOC_LIGNES_MAX) return ko('Au plus ' + DOC_LIGNES_MAX + ' lignes par document.');
+  for (const l of d.lignes) {
+    const nom = String(l.libelle ?? '').trim();
+    if (!nom || nom.length > 120) return ko('Une ligne n\'a pas de titre valide.');
+    if (!Number.isInteger(l.qte) || l.qte < 1 || l.qte > 99) return ko('Quantité invalide pour « ' + nom + ' » (1 à 99).');
+    if (!Number.isInteger(l.prix_cents) || l.prix_cents < 0 || l.prix_cents > ACTE_MONTANT_MAX_CENTS) {
+      return ko('Prix invalide pour « ' + nom + ' » (exemple : 30 ou 30,50).');
+    }
+  }
+  if (d.totalFixeCents != null &&
+      !(Number.isInteger(d.totalFixeCents) && d.totalFixeCents >= 0 && d.totalFixeCents <= ACTE_MONTANT_MAX_CENTS)) {
+    return ko('Total fixé invalide (exemple : 150 ou 150,00).');
+  }
+  const calc = _calculerDocument(d.lignes, d.regime, d.totalFixeCents);
+  if (calc.totalCents > ACTE_MONTANT_MAX_CENTS) return ko('Le total dépasse 100 000 €.');
+  if (!String(d.emetteur?.nom ?? '').trim()) return ko('Choisissez le praticien émetteur.');
+  const banque = _erreurCoordonneesBancaires(d.emetteur?.iban, d.emetteur?.bic);
+  if (banque) return ko(banque + ' Corrigez la fiche du praticien (onglet Praticiens).');
+  if (pourEmission) {
+    const e = d.emetteur;
+    if (!/^\d{14}$/.test(e.siret)) return ko('SIRET manquant ou invalide (14 chiffres) : complétez la fiche du praticien (onglet Praticiens).');
+    if (!/^(\d{9}|\d{11})$/.test(e.rpps)) return ko('N° RPPS (11 chiffres) ou ADELI (9 chiffres) manquant ou invalide : complétez la fiche du praticien.');
+  }
+  return { ok: true };
+}
+function _dateFr(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : '—';
+}
+// Ligne de base de données (brouillon) construite depuis l'état de l'éditeur.
+// Montant réellement dû par le patient : total des actes − part payée directement par la
+// Sécurité sociale (tiers payant). Sans tiers payant, c'est le total.
+function _netDocument(d) { return (d.total_cents ?? 0) - (d.part_secu_cents || 0); }
+function _ligneBaseDocument(etat, patient, praticien) {
+  const emetteur = _emetteurDepuisPraticien(praticien);
+  const lignes = (etat.lignes || []).map((l) => ({
+    acte_id: l.acte_id || null, code: l.code || null, libelle: String(l.libelle ?? '').trim(),
+    cotation: l.cotation || null, qte: l.qte, prix_cents: l.prix_cents,
+    base_remboursable_cents: Number.isInteger(l.base_remboursable_cents) ? l.base_remboursable_cents : null,
+    franchise: l.franchise !== false,
+  }));
+  const calc = _calculerDocument(lignes, etat.regime, etat.totalFixeCents);
+  // Tiers payant : la Sécurité sociale paie directement au praticien sa part (franchise déduite,
+  // donc due par le patient) ; la part est figée dans le document à l'enregistrement.
+  const tiers = etat.tiersPayant === true;
+  return {
+    tiers_payant: tiers, part_secu_cents: tiers ? Math.min(calc.secuNette, calc.totalCents) : 0,
+    type: etat.type, patient_ref: String(patient?.id ?? ''), patient: _patientInstantane(patient),
+    emetteur, regime: etat.regime, lignes, total_fixe: Number.isInteger(etat.totalFixeCents) && etat.totalFixeCents !== calc.sousTotalCents,
+    total_cents: calc.totalCents, mention_tva: _mentionTva(praticien),
+    note: String(etat.note ?? '').trim().slice(0, 1000) || null, devis_numero: etat.devisNumero || null,
+  };
+}
+
+let _docListe = [];
+let _docEdition = null;
+let _docVue = null;
+let _docApercu = false;
+async function _docRequete(chemin, options) {
+  const res = await authFetch(SUPA_URL + '/rest/v1/' + chemin, options);
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { const j = await res.json(); if (j && j.message) msg = j.message; } catch (_e) { /* corps absent */ }
+    throw new Error(msg);
+  }
+  return res;
+}
+const _ENTETES_JSON = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+function _praticienParDefaut(patient) {
+  return praticiens.find((p) => p.id == patient?.pratId) || praticiens[0] || null;
+}
+function _praticienDuDocument(etat) {
+  return praticiens.find((p) => p.id == etat.pratId) || null;
+}
+async function chargerDocuments(patient) {
+  const res = await _docRequete('documents_facturation?select=*&order=created_at.desc&patient_ref=eq.' +
+    encodeURIComponent(String(patient?.id ?? '')));
+  _docListe = await res.json();
+  return _docListe;
+}
+function ouvrirDocumentsPatient(idx) {
+  const p = patients[idx];
+  if (!p) return;
+  selectPatient(p);
+  _docEdition = null; _docVue = null;
+  nav('pg-documents');
+}
+function nouveauDocument(type) {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
+  _docVue = null; _docApercu = false;
+  _docEdition = {
+    id: null, type, pratId: _praticienParDefaut(currentPatient)?.id ?? null, regime: 'standard',
+    lignes: [], tiersPayant: false, totalFixeCents: null, totalIllisible: false, note: '', devisNumero: null,
+  };
+  renderDocumentsPage();
+}
+function ouvrirDocument(id) {
+  const d = _docListe.find((x) => x.id === id);
+  if (!d) return;
+  _docApercu = false;
+  if (d.statut === 'emis') { _docEdition = null; _docVue = id; renderDocumentsPage(); return; }
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
+  _docVue = null;
+  const pr = praticiens.find((p) => p.nom === d.emetteur?.nom) || _praticienParDefaut(currentPatient);
+  _docEdition = {
+    id: d.id, type: d.type, pratId: pr?.id ?? null, regime: d.regime,
+    lignes: d.lignes.map((l) => Object.assign({}, l)),
+    tiersPayant: !!d.tiers_payant, totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.devis_numero || null,
+  };
+  renderDocumentsPage();
+}
+function fermerDocument() { _docEdition = null; _docVue = null; _docApercu = false; renderDocumentsPage(); }
+function basculerActeDocument(acteId, coche) {
+  if (!_docEdition) return;
+  const i = _docEdition.lignes.findIndex((l) => l.acte_id === acteId);
+  if (coche && i < 0) {
+    const a = _actesCache.find((x) => x.id === acteId);
+    if (a) _docEdition.lignes.push(_ligneDepuisActe(a));
+  } else if (!coche && i >= 0) {
+    _docEdition.lignes.splice(i, 1);
+  }
+  _rendreLignesDocument();
+}
+function retirerLigneDocument(i) {
+  if (!_docEdition) return;
+  _docEdition.lignes.splice(i, 1);
+  renderDocumentsPage();
+}
+function modifierLigneDocument(i, champ, saisie) {
+  const l = _docEdition?.lignes[i];
+  if (!l) return;
+  if (champ === 'qte') { const n = parseInt(saisie, 10); l.qte = /^\d{1,2}$/.test(String(saisie).trim()) && n >= 1 ? n : null; }
+  _majTotauxDocument();
+}
+// « Total des actes » : vide = somme des actes ; sinon le montant fixé par le praticien.
+function modifierTotalFixeDocument(saisie) {
+  if (!_docEdition) return;
+  const t = String(saisie ?? '').trim();
+  if (t === '') { _docEdition.totalFixeCents = null; _docEdition.totalIllisible = false; }
+  else {
+    const c = _eurosVersCentimes(t);
+    _docEdition.totalFixeCents = c; // null si illisible
+    _docEdition.totalIllisible = c === null;
+  }
+  _majResumeDocument(); // jamais le champ lui-même : on perdrait le curseur en pleine frappe
+}
+function revenirALaSommeDocument() {
+  if (!_docEdition) return;
+  _docEdition.totalFixeCents = null; _docEdition.totalIllisible = false;
+  _majTotauxDocument();
+}
+function modifierChampDocument(champ, valeur) {
+  if (!_docEdition) return;
+  if (champ === 'regime' && REGIMES_REMBOURSEMENT[valeur]) { _docEdition.regime = valeur; _rendreLignesDocument(); }
+  if (champ === 'tiers') { _docEdition.tiersPayant = valeur === true; _majResumeDocument(); }
+  if (champ === 'note') _docEdition.note = valeur;
+  if (champ === 'prat') _docEdition.pratId = valeur;
+}
+// État de l'éditeur → { base: ligne de base de données, controle: document à valider }.
+// Quantité illisible = null (refusée par la validation) ; un total à payer illisible est
+// refusé aussi, jamais ignoré en silence.
+function _preparerDocument(pourEmission) {
+  const e = _docEdition;
+  const pr = _praticienDuDocument(e);
+  const base = _ligneBaseDocument(e, currentPatient, pr);
+  const controle = Object.assign({}, base, { totalFixeCents: e.totalFixeCents });
+  let v = _validerDocument(controle, pourEmission);
+  if (v.ok && e.totalIllisible) v = { ok: false, erreur: 'Total des actes invalide (exemple : 160 ou 160,50).' };
+  return { base, v };
+}
+async function enregistrerBrouillonDocument(silencieux) {
+  if (!_docEdition || !currentPatient) return null;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return null; }
+  const { base, v } = _preparerDocument(false);
+  if (!v.ok) { alert(v.erreur); return null; }
+  try {
+    const res = _docEdition.id
+      ? await _docRequete('documents_facturation?id=eq.' + encodeURIComponent(_docEdition.id) + '&statut=eq.brouillon',
+          { method: 'PATCH', headers: _ENTETES_JSON, body: JSON.stringify(base) })
+      : await _docRequete('documents_facturation', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify(base) });
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('document introuvable ou déjà émis');
+    _docEdition.id = row.id;
+    if (!silencieux) await renderDocumentsPage();
+    return row;
+  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.'); return null; }
+}
+async function emettreDocumentCourant() {
+  if (!_docEdition || !currentPatient) return;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
+  const { v } = _preparerDocument(true);
+  if (!v.ok) { alert(v.erreur); return; }
+  const nom = _docEdition.type === 'devis' ? 'ce devis' : 'cette facture';
+  if (!confirm('Émettre ' + nom + ' ?\n\nUn numéro lui sera attribué et il ne pourra plus être modifié ni supprimé.')) return;
+  const row = await enregistrerBrouillonDocument(true);
+  if (!row) return;
+  try {
+    const res = await _docRequete('rpc/emettre_document', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify({ p_id: row.id }) });
+    const emis = await res.json();
+    _docEdition = null; _docApercu = false; _docVue = emis.id;
+    await renderDocumentsPage();
+  } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
+}
+async function supprimerBrouillonDocument() {
+  const id = _docEdition?.id;
+  if (!id) { _docEdition = null; await renderDocumentsPage(); return; }
+  if (!confirm('Supprimer ce brouillon ?')) return;
+  try {
+    await _docRequete('documents_facturation?id=eq.' + encodeURIComponent(id) + '&statut=eq.brouillon', { method: 'DELETE' });
+    _docEdition = null; _docApercu = false;
+    await renderDocumentsPage();
+  } catch (e) { alert('Suppression impossible (' + e.message + ').'); }
+}
+async function enregistrerReglementDocument(id) {
+  const mode = document.getElementById('doc-reglement-mode')?.value;
+  const date = document.getElementById('doc-reglement-date')?.value;
+  if (!MODES_PAIEMENT[mode]) { alert('Choisissez le mode de règlement.'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || Number.isNaN(Date.parse(date))) { alert('Date de règlement invalide.'); return; }
+  try {
+    await _docRequete('documents_facturation?id=eq.' + encodeURIComponent(id) + '&type=eq.facture&statut=eq.emis',
+      { method: 'PATCH', headers: _ENTETES_JSON, body: JSON.stringify({ paiement_mode: mode, paiement_date: date }) });
+    await renderDocumentsPage();
+  } catch (e) { alert('Règlement non enregistré (' + e.message + ').'); }
+}
+async function creerFactureDepuisDevis(id) {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
+  const d = _docListe.find((x) => x.id === id && x.type === 'devis' && x.statut === 'emis');
+  if (!d || !currentPatient) return;
+  const pr = praticiens.find((p) => p.nom === d.emetteur?.nom) || _praticienParDefaut(currentPatient);
+  _docEdition = {
+    id: null, type: 'facture', pratId: pr?.id ?? null, regime: d.regime,
+    lignes: d.lignes.map((l) => Object.assign({}, l)),
+    tiersPayant: !!d.tiers_payant, totalFixeCents: d.total_fixe ? d.total_cents : null, totalIllisible: false, note: d.note || '', devisNumero: d.numero,
+  };
+  _docVue = null; _docApercu = false;
+  const row = await enregistrerBrouillonDocument(true);
+  if (row) await renderDocumentsPage();
+}
+
+const _eur = (c) => _escHtml(_centimesVersEuros(c));
+const _CSS_BTN = 'font-size:12px;padding:5px 12px;';
+// Document ÉMIS en lecture seule (aperçu à l'écran ; le PDF viendra à l'étape 2b-2).
+// Sous l'intitulé d'une ligne : tarif de convention, part Sécu et part mutuelle (indicatives).
+// Écart entre le prix fixé par le praticien pour l'ENSEMBLE et la somme des tarifs des actes :
+// affiché comme une ligne du document pour que les lignes s'additionnent exactement au total.
+function _ecartTotalDocument(lignes, totalCents, fixe) {
+  if (!fixe) return null;
+  const somme = _calculerDocument(lignes, 'standard', null).sousTotalCents;
+  const ecart = totalCents - somme;
+  if (!ecart) return null;
+  return {
+    cents: ecart,
+    libelle: ecart > 0 ? "Complément d'honoraires (prix de l'ensemble fixé par le praticien)" : 'Remise (prix de l\'ensemble fixé par le praticien)',
+  };
+}
+function _eurSigne(c) { return (c < 0 ? '− ' : '+ ') + _centimesVersEuros(Math.abs(c)); }
+function _htmlPartsLigne(l, regime) {
+  const p = _partsRemboursement(l.base_remboursable_cents, regime);
+  const txt = p
+    ? 'Tarif de convention ' + _centimesVersEuros(p.base) + ' · Sécu ' + _centimesVersEuros(p.secu) + ' · mutuelle ' + _centimesVersEuros(p.resteTM)
+    : 'Non remboursé par la Sécurité sociale';
+  return '<div style="font-size:11px;color:var(--mut);">' + _escHtml(txt) + '</div>';
+}
+// Corps du document (en-tête, patient, actes, totaux, mentions, remboursement ; la carte reste
+// OUVERTE, l'appelant ajoute ses actions puis la ferme) : le MÊME code
+// pour le document émis et pour l'aperçu du brouillon, afin que l'aperçu soit fidèle.
+function _htmlCorpsDocument(d, apercu) {
+  const e = d.emetteur || {}, p = d.patient || {};
+  const c = _calculerDocument(d.lignes, d.regime, d.total_fixe ? d.total_cents : null);
+  const titre = d.type === 'devis' ? 'DEVIS' : 'FACTURE';
+  const lignes = d.lignes.map((l) =>
+    '<tr><td style="padding:6px 8px;border-bottom:1px solid var(--bord);">' + _escHtml(l.libelle) +
+    (l.cotation ? ' <span style="color:var(--mut);">(' + _escHtml(l.cotation) + ')</span>' : '') +
+    _htmlPartsLigne(l, d.regime) + '</td>' +
+    '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;">' + _escHtml(l.qte) + '</td>' +
+    '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.prix_cents) + '</td>' +
+    '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _eur(l.qte * l.prix_cents) + '</td></tr>'
+  ).join('');
+  const ecart = _ecartTotalDocument(d.lignes, d.total_cents, d.total_fixe);
+  const ligneEcart = ecart
+    ? '<tr><td style="padding:6px 8px;border-bottom:1px solid var(--bord);">' + _escHtml(ecart.libelle) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;">1</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _escHtml(_eurSigne(ecart.cents)) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid var(--bord);text-align:right;white-space:nowrap;">' + _escHtml(_eurSigne(ecart.cents)) + '</td></tr>'
+    : '';
+  const bloc = (t, v) => v ? '<div>' + t + _escHtml(v) + '</div>' : '';
+  const numeroHtml = apercu
+    ? '<span style="font-size:12px;font-weight:600;color:var(--mut);">(numéro attribué à l\'émission)</span>'
+    : _escHtml(d.numero);
+  const dateHtml = apercu ? 'Date : date de l\'émission' : 'Date : ' + _escHtml(_dateFr(d.date_document));
+  const valideHtml = apercu ? 'Valable 90 jours à partir de l\'émission' : 'Valable jusqu\'au ' + _escHtml(_dateFr(d.valide_jusqu_au));
+  let h = '<div class="card" id="' + (apercu ? 'doc-apercu' : 'doc-vue') + '" style="padding:16px;">' +
+    (apercu ? '<div style="margin:-4px -4px 12px;padding:8px 12px;border-radius:8px;background:rgba(217,119,6,0.12);border:1px solid rgba(217,119,6,0.45);font-size:12px;font-weight:700;">APERÇU — brouillon non émis : rien n\'est encore numéroté ni figé.</div>' : '') +
+    '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">' +
+      '<div style="font-size:12px;"><div style="font-weight:700;font-size:14px;">' + _escHtml(e.nom) + '</div>' +
+        bloc('', e.titre) + bloc('', e.cabinet) + bloc('', e.adresse) + bloc('Tél. ', e.tel) + bloc('', e.email) +
+        bloc('SIRET ', e.siret) + bloc('RPPS / ADELI ', e.rpps) + '</div>' +
+      '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;">' + titre + ' ' + numeroHtml + '</div>' +
+        '<div style="font-size:12px;">' + dateHtml + '</div>' +
+        (d.type === 'devis' ? '<div style="font-size:12px;">' + valideHtml + '</div>' : '') +
+        (d.devis_numero ? '<div style="font-size:12px;">Selon devis ' + _escHtml(d.devis_numero) + '</div>' : '') + '</div></div>' +
+    '<div style="font-size:12px;margin-bottom:12px;"><b>Patient</b><div>' + _escHtml((p.civilite ? p.civilite + ' ' : '') + (p.prenom || '') + ' ' + (p.nom || '')) + '</div>' +
+      bloc('', p.adresse) + (p.cp || p.ville ? '<div>' + _escHtml((p.cp || '') + ' ' + (p.ville || '')) + '</div>' : '') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="text-align:left;color:var(--mut);font-size:11px;">' +
+      '<th style="padding:6px 8px;">Acte</th><th style="padding:6px 8px;text-align:right;">Qté</th><th style="padding:6px 8px;text-align:right;">Tarif</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>' + lignes + ligneEcart + '</tbody></table>' +
+    (d.tiers_payant
+      ? '<div style="text-align:right;font-size:13px;margin-top:6px;">Total des actes : ' + _eur(d.total_cents) + '</div>' +
+        '<div style="text-align:right;font-size:13px;">Part payée directement par la Sécurité sociale (tiers payant) : − ' + _eur(d.part_secu_cents) + '</div>' +
+        '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:4px;">Net à payer par le patient : ' + _eur(_netDocument(d)) + '</div>'
+      : '<div style="text-align:right;font-size:16px;font-weight:800;margin-top:6px;">Total à payer : ' + _eur(d.total_cents) + '</div>') +
+    '<div style="font-size:12px;color:var(--mut);margin-top:8px;">' + _escHtml(d.mention_tva) + '</div>' +
+    (d.note ? '<div style="font-size:12px;margin-top:8px;white-space:pre-wrap;">' + _escHtml(d.note) + '</div>' : '') +
+    (e.iban ? '<div style="font-size:12px;margin-top:8px;"><b>Règlement par virement</b> — IBAN ' + _escHtml(_formaterIban(e.iban)) + (e.bic ? ' · BIC ' + _escHtml(e.bic) : '') + '</div>' : '') +
+    '<div style="font-size:12px;margin-top:12px;padding:10px;border:1px dashed var(--bord);border-radius:8px;">' +
+      '<b>' + (d.tiers_payant ? 'Prise en charge Sécurité sociale (tiers payant, estimée)' : 'Remboursement estimé (indicatif)') + '</b> — ' + _escHtml(REGIMES_REMBOURSEMENT[d.regime]?.libelle || '') +
+      '<div>Base de remboursement : ' + _eur(c.baseTotal) + ' · part Sécurité sociale : ' + _eur(c.secuTotal) +
+        (c.franchise ? ' − franchise ' + _eur(c.franchise) : '') + ' = ' + _eur(c.secuNette) + '</div>' +
+      '<div>Ticket modérateur (part complémentaire selon votre contrat) : ' + _eur(c.tmTotal) +
+        ' · part non remboursable (prix libre) : ' + _eur(c.horsBase) + '</div>' +
+      '<div>Reste à votre charge avant complémentaire : ' + _eur(c.resteApresSecu) + '</div></div>';
+  return h;
+}
+function _htmlDocumentEmis(d) {
+  let h = _htmlCorpsDocument(d, false);
+  if (d.type === 'facture') {
+    const modeOpts = Object.keys(MODES_PAIEMENT).map((k) =>
+      '<option value="' + k + '"' + (d.paiement_mode === k ? ' selected' : '') + '>' + _escHtml(MODES_PAIEMENT[k]) + '</option>').join('');
+    h += '<div style="margin-top:12px;font-size:13px;">' +
+      (d.paiement_mode ? '<b style="color:var(--green,#15803d);">Acquittée le ' + _escHtml(_dateFr(d.paiement_date)) + ' — ' + _escHtml(MODES_PAIEMENT[d.paiement_mode]) + '</b>' : '<b>Facture non réglée</b>') +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">' +
+        '<select class="inp" id="doc-reglement-mode" style="width:auto;"><option value="">— Mode de règlement —</option>' + modeOpts + '</select>' +
+        '<input class="inp" type="date" id="doc-reglement-date" style="width:auto;" value="' + _escHtml(d.paiement_date || '') + '"/>' +
+        '<button class="btn" style="' + _CSS_BTN + '" onclick="enregistrerReglementDocument(\'' + _escHtml(d.id) + '\')">' + (d.paiement_mode ? 'Modifier le règlement' : 'Enregistrer le règlement') + '</button></div></div>';
+  } else {
+    h += '<div style="margin-top:12px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="creerFactureDepuisDevis(\'' + _escHtml(d.id) + '\')">🧾 Créer la facture depuis ce devis</button></div>';
+  }
+  return h + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="imprimerDocument(\'' + _escHtml(d.id) + '\')">🖨 Imprimer</button>' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">← Retour à la liste</button></div></div>';
+}
+// Aperçu du brouillon : ce que le patient recevra, avec ce qui manque encore pour émettre.
+function _htmlApercuDocument() {
+  const { base, v } = _preparerDocument(true);
+  const d = Object.assign({}, base, { numero: null });
+  const manque = v.ok ? '' : '<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.4);font-size:12px;"><b>Pour émettre, il manque :</b> ' + _escHtml(v.erreur) + '</div>';
+  const nom = d.type === 'devis' ? 'ce devis' : 'cette facture';
+  return _htmlCorpsDocument(d, true) +
+    manque +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerApercuDocument()">← Modifier le brouillon</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '"' + (v.ok ? '' : ' disabled title="Complétez d\'abord ce qui manque"') + ' onclick="emettreDocumentCourant()">✓ Valider et émettre ' + _escHtml(nom) + '</button></div></div>';
+}
+function visualiserBrouillonDocument() {
+  if (!_docEdition || !currentPatient) return;
+  const { v } = _preparerDocument(false);
+  if (!v.ok) { alert(v.erreur); return; }
+  _docApercu = true;
+  renderDocumentsPage();
+}
+function fermerApercuDocument() { _docApercu = false; renderDocumentsPage(); }
+// Page d'impression d'un document ÉMIS : le MÊME corps que l'écran, sur fond blanc, avec ses
+// propres couleurs (l'iframe d'impression n'hérite pas des variables du thème). Le titre sert
+// de nom de fichier lors d'un « Enregistrer en PDF ».
+function _htmlPageImpressionDocument(d) {
+  const titre = (d.type === 'devis' ? 'Devis ' : 'Facture ') + (d.numero || '');
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + _escHtml(titre) + '</title><style>' +
+    ':root{--bord:#d1d5db;--mut:#4b5563;--txt:#111827;--dim:#6b7280;--red:#b91c1c;--green:#15803d;--blue:#175FA8}' +
+    '@page{size:A4;margin:14mm}' +
+    'html,body{background:#fff;color:#111827;margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}' +
+    '.card{border:none;background:#fff;padding:0!important;max-width:182mm;margin:0 auto}' +
+    'table{border-collapse:collapse;width:100%}tr{page-break-inside:avoid}' +
+    '</style></head><body>' + _htmlCorpsDocument(d, false) + '</div></body></html>';
+}
+function imprimerDocument(id) {
+  const d = _docListe.find((x) => x.id === id && x.statut === 'emis');
+  if (!d) return;
+  // Aucune garde d'abonnement : un document émis se récupère et s'imprime toujours.
+  document.querySelectorAll('iframe.doc-impression').forEach((f) => f.remove());
+  const iframe = document.createElement('iframe');
+  iframe.className = 'doc-impression';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open(); idoc.write(_htmlPageImpressionDocument(d)); idoc.close();
+  setTimeout(function() {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch (_e) { alert('Impression impossible. Réessayez ou utilisez Cmd/Ctrl+P.'); }
+  }, 300);
+}
+// Compte « bloqué » (essai expiré sans paiement) : il ne voit plus l'application, mais ses
+// documents DÉJÀ ÉMIS restent récupérables et imprimables. Liste de tous les documents émis
+// du compte (le patient et l'émetteur sont des instantanés : aucune donnée locale requise).
+async function chargerDocumentsEmis() {
+  const res = await _docRequete('documents_facturation?select=*&statut=eq.emis&order=emis_at.desc');
+  _docListe = await res.json();
+  return _docListe;
+}
+function _htmlRecuperationDocuments(liste) {
+  const corps = liste.length
+    ? liste.map((d) => {
+        const p = d.patient || {};
+        const nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim();
+        return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+          '<div style="font-size:13px;text-align:left;"><b>' + (d.type === 'devis' ? 'Devis' : 'Facture') + ' ' + _escHtml(d.numero) + '</b>' +
+            '<div style="font-size:11px;color:var(--mut);">' + _escHtml(_dateFr(d.date_document)) + (nom ? ' · ' + _escHtml(nom) : '') + ' · ' + _eur(_netDocument(d)) + '</div></div>' +
+          '<button class="btn" style="font-size:11px;padding:3px 10px;" onclick="imprimerDocument(\'' + _escHtml(d.id) + '\')">🖨 Imprimer</button></div>';
+      }).join('')
+    : '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun document émis sur ce compte.</div>';
+  return '<div style="background:var(--card);border-radius:14px;padding:24px;max-width:520px;width:100%;max-height:80vh;overflow:auto;">' +
+    '<div style="font-size:17px;font-weight:700;color:var(--txt);margin-bottom:4px;">Mes devis et factures émis</div>' +
+    '<div style="font-size:12px;color:var(--mut);margin-bottom:12px;">Vos documents émis restent à votre disposition, même sans abonnement.</div>' +
+    corps +
+    '<div style="margin-top:14px;"><button class="btn" style="font-size:12px;padding:5px 14px;" onclick="document.getElementById(\'modal-recuperation-documents\').style.display=\'none\'">Fermer</button></div></div>';
+}
+// Export CSV des patients depuis la fenêtre d'accès verrouillé : attend que les données du
+// compte soient chargées (sinon le fichier serait vide et trompeur).
+function exporterPatientsDepuisAcces() {
+  if (!_dataLoaded) { alert('Vos données sont en cours de chargement. Réessayez dans un instant.'); return; }
+  exportPatientsCSV();
+}
+async function ouvrirRecuperationDocuments() {
+  let modal = document.getElementById('modal-recuperation-documents');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-recuperation-documents';
+    modal.className = 'page-claire';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10001;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:24px;color:var(--mut);font-size:13px;">Chargement de vos documents…</div>';
+  modal.style.display = 'flex';
+  try {
+    modal.innerHTML = _htmlRecuperationDocuments(await chargerDocumentsEmis());
+  } catch (err) {
+    modal.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:24px;max-width:420px;font-size:13px;"><div style="color:var(--red);">Documents indisponibles (' + _escHtml(err.message) + '). Vérifiez votre connexion puis réessayez.</div>' +
+      '<div style="margin-top:12px;"><button class="btn" style="font-size:12px;padding:5px 14px;" onclick="document.getElementById(\'modal-recuperation-documents\').style.display=\'none\'">Fermer</button></div></div>';
+  }
+}
+function _htmlListeDocuments() {
+  if (!_docListe.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun document pour ce patient.</div>';
+  return _docListe.map((d) => {
+    const regl = d.type !== 'facture' || d.statut !== 'emis' ? '' : (d.paiement_mode ? ' · réglée' : ' · non réglée');
+    return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+      '<div style="font-size:13px;"><b>' + (d.type === 'devis' ? 'Devis' : 'Facture') + ' ' + _escHtml(d.numero || '(brouillon)') + '</b>' +
+        '<span style="color:var(--mut);"> · ' + _escHtml(_dateFr(d.date_document || d.created_at)) + regl + '</span></div>' +
+      '<div style="white-space:nowrap;"><b>' + _eur(_netDocument(d)) + '</b>' + (d.tiers_payant ? ' <span style="font-size:11px;color:var(--mut);">(tiers payant)</span>' : '') + ' ' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="ouvrirDocument(\'' + _escHtml(d.id) + '\')">' + (d.statut === 'emis' ? 'Voir' : 'Modifier') + '</button></div></div>';
+  }).join('');
+}
+function _htmlEditeurDocument() {
+  const e = _docEdition;
+  const regOpts = Object.keys(REGIMES_REMBOURSEMENT).map((k) =>
+    '<option value="' + k + '"' + (e.regime === k ? ' selected' : '') + '>' + _escHtml(REGIMES_REMBOURSEMENT[k].libelle) + '</option>').join('');
+  const pratOpts = praticiens.map((p) =>
+    '<option value="' + _escHtml(p.id) + '"' + (p.id == e.pratId ? ' selected' : '') + '>' + _escHtml(p.nom) + '</option>').join('');
+  const actes = _actesCache.filter((a) => a.actif).map((a) =>
+    '<label class="doc-acte" style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:12px;" data-texte="' + _escHtml((a.libelle + ' ' + (a.cotation || '')).toLowerCase()) + '">' +
+    '<input type="checkbox"' + (e.lignes.some((l) => l.acte_id === a.id) ? ' checked' : '') + ' onchange="basculerActeDocument(\'' + _escHtml(a.id) + '\', this.checked)"/>' +
+    '<span style="flex:1;">' + _escHtml(a.libelle) + (a.cotation ? ' <span style="color:var(--mut);">· ' + _escHtml(a.cotation) + '</span>' : '') + '</span>' +
+    '<span style="white-space:nowrap;">' + _eur(a.montant_cents) + '</span></label>').join('');
+  return '<div class="card" id="doc-editeur" style="padding:16px;">' +
+    '<div class="stitle">' + (e.type === 'devis' ? 'Devis' : 'Facture') + (e.id ? ' (brouillon)' : ' (nouveau)') + (e.devisNumero ? ' — selon devis ' + _escHtml(e.devisNumero) : '') + '</div>' +
+    '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien émetteur</div><select class="inp" onchange="modifierChampDocument(\'prat\', this.value)"><option value="">— Choisir —</option>' + pratOpts + '</select></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prise en charge</div><select class="inp" onchange="modifierChampDocument(\'regime\', this.value)">' + regOpts + '</select></div></div>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:12px;"><input type="checkbox" id="doc-tiers-payant"' + (e.tiersPayant ? ' checked' : '') + ' onchange="modifierChampDocument(\'tiers\', this.checked)"/> <span><b>Tiers payant</b> — la Sécurité sociale vous règle directement sa part (télétransmission) : le document n\'indique que le montant à payer par le patient.</span></label>' +
+    (praticiens.length ? '' : '<div style="font-size:12px;color:var(--red);margin-top:6px;">Aucun praticien : créez-en un dans l\'onglet Praticiens (avec SIRET et RPPS/ADELI).</div>') +
+    '<div class="stitle" style="margin-top:12px;">Actes</div>' +
+    '<input class="inp" id="doc-actes-recherche" placeholder="Rechercher un acte…" oninput="filtrerActesDocument(this.value)"/>' +
+    '<div id="doc-actes-liste" style="max-height:240px;overflow:auto;border:1px solid var(--bord);border-radius:8px;padding:4px 10px;margin-top:6px;">' + (actes || '<div style="font-size:12px;color:var(--mut);padding:6px 0;">Catalogue vide : importez le référentiel dans « Paramètres facturation ».</div>') + '</div>' +
+    '<div id="doc-lignes" style="margin-top:10px;"></div>' +
+    '<div id="doc-totaux" style="margin-top:10px;font-size:13px;padding:10px;border:1px solid var(--bord);border-radius:8px;">' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><label for="doc-total-input" style="font-weight:700;">Total des actes (€, sans TVA)</label>' +
+      '<input class="inp" id="doc-total-input" style="width:130px;" inputmode="decimal" oninput="modifierTotalFixeDocument(this.value)"/>' +
+      '<button class="btn" id="doc-total-somme" style="font-size:11px;padding:3px 8px;display:none;" onclick="revenirALaSommeDocument()">↺ Revenir à la somme des actes</button></div>' +
+      '<div id="doc-resume" style="margin-top:8px;font-size:12px;color:var(--mut);"></div></div>' +
+    '<div style="margin-top:10px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Note (facultatif)</div><textarea class="inp" rows="2" maxlength="1000" oninput="modifierChampDocument(\'note\', this.value)">' + _escHtml(e.note) + '</textarea></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="enregistrerBrouillonDocument()">💾 Enregistrer le brouillon</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="visualiserBrouillonDocument()">👁 Visualiser le brouillon</button>' +
+      '<button class="btn" style="' + _CSS_BTN + 'color:var(--red);" onclick="supprimerBrouillonDocument()">Supprimer le brouillon</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerDocument()">Fermer</button></div></div>';
+}
+function filtrerActesDocument(texte) {
+  const t = String(texte ?? '').toLowerCase().trim();
+  document.querySelectorAll('#doc-actes-liste .doc-acte').forEach((el) => {
+    el.style.display = !t || (el.dataset.texte || '').includes(t) ? 'flex' : 'none';
+  });
+}
+function _rendreLignesDocument() {
+  const el = document.getElementById('doc-lignes');
+  if (!el || !_docEdition) return;
+  const ls = _docEdition.lignes;
+  el.innerHTML = ls.length ? ls.map((l, i) =>
+    '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--bord);font-size:12px;">' +
+    '<div style="flex:1;">' + _escHtml(l.libelle) + _htmlPartsLigne(l, _docEdition.regime) + '</div>' +
+    '<span style="color:var(--mut);">Qté</span><input class="inp" style="width:52px;" inputmode="numeric" value="' + _escHtml(l.qte ?? '') + '" oninput="modifierLigneDocument(' + i + ', \'qte\', this.value)" aria-label="Quantité"/>' +
+    '<span style="white-space:nowrap;width:78px;text-align:right;">' + _eur(l.prix_cents) + '</span>' +
+    '<button class="btn" style="font-size:11px;padding:2px 8px;" onclick="retirerLigneDocument(' + i + ')" aria-label="Retirer la ligne">✕</button></div>').join('')
+    : '<div style="font-size:12px;color:var(--mut);">Cochez les actes à facturer.</div>';
+  _majTotauxDocument();
+}
+// Champ « Total des actes » : suit la somme des actes tant que le praticien n'a rien fixé.
+function _majTotauxDocument() {
+  const e = _docEdition;
+  const input = document.getElementById('doc-total-input');
+  if (e && input && e.totalFixeCents === null && !e.totalIllisible) {
+    const somme = _calculerDocument(e.lignes, e.regime, null).sousTotalCents;
+    input.value = e.lignes.length ? (somme / 100).toFixed(2).replace('.', ',') : '';
+  } else if (e && input && Number.isInteger(e.totalFixeCents)) {
+    input.value = (e.totalFixeCents / 100).toFixed(2).replace('.', ',');
+  }
+  _majResumeDocument();
+}
+// Résumé sous le champ : mis à jour SANS toucher au champ (sinon le curseur saute).
+function _majResumeDocument() {
+  const el = document.getElementById('doc-resume');
+  if (!el || !_docEdition) return;
+  const e = _docEdition;
+  const lignesIllisibles = e.lignes.some((l) => !Number.isInteger(l.qte) || !Number.isInteger(l.prix_cents));
+  const c = _calculerDocument(e.lignes, e.regime, Number.isInteger(e.totalFixeCents) ? e.totalFixeCents : null);
+  const btn = document.getElementById('doc-total-somme');
+  if (btn) btn.style.display = Number.isInteger(e.totalFixeCents) && e.totalFixeCents !== c.sousTotalCents ? '' : 'none';
+  el.innerHTML =
+    (e.totalIllisible ? '<div style="color:var(--red);">Total illisible : écrivez par exemple 160 ou 160,50.</div>' : '') +
+    (lignesIllisibles ? '<div style="color:var(--red);">Une quantité est illisible (1 à 99).</div>' : '') +
+    '<div>Somme des actes (tarifs de convention) : ' + _eur(c.sousTotalCents) + '</div>' +
+    (function () { const x = _ecartTotalDocument(e.lignes, c.totalCents, Number.isInteger(e.totalFixeCents)); return x ? '<div>' + _escHtml(x.libelle) + ' : <b>' + _escHtml(_eurSigne(x.cents)) + '</b> — il figurera sur une ligne du document.</div>' : ''; })() +
+    (e.tiersPayant ? '<div>Payé directement par la Sécurité sociale (tiers payant) : <b>− ' + _eur(Math.min(c.secuNette, c.totalCents)) + '</b></div>' +
+      '<div style="font-size:14px;color:var(--txt);">Montant à payer par le patient : <b>' + _eur(c.totalCents - Math.min(c.secuNette, c.totalCents)) + '</b></div>' : '') +
+    '<div>Remboursement Sécurité sociale estimé : <b>' + _eur(c.secuNette) + '</b>' + (c.franchise ? ' (franchise de ' + _eur(c.franchise) + ' déduite)' : '') +
+      ' · mutuelle (ticket modérateur) : ' + _eur(c.tmTotal) + '</div>' +
+    '<div>Reste à charge avant mutuelle : <b>' + _eur(c.resteApresSecu) + '</b></div>';
+}
+async function renderDocumentsPage() {
+  const el = document.getElementById('documents-contenu');
+  if (!el) return;
+  const sub = document.getElementById('documents-patient');
+  if (!currentPatient) {
+    if (sub) sub.textContent = '';
+    el.innerHTML = '<div style="font-size:13px;color:var(--mut);">Sélectionnez un patient depuis la liste (bouton « 🧾 Facturer »).</div>';
+    return;
+  }
+  if (sub) sub.textContent = 'Patient : ' + (currentPatient.prenom || '') + ' ' + (currentPatient.nom || '');
+  try { await Promise.all([chargerDocuments(currentPatient), chargerActes()]); } catch (err) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--red);">Documents indisponibles (' + _escHtml(err.message) + '). Rien n\'a été modifié.</div>';
+    return;
+  }
+  if (_docEdition && _docApercu) { el.innerHTML = _htmlApercuDocument(); return; }
+  if (_docEdition) { el.innerHTML = _htmlEditeurDocument(); _rendreLignesDocument(); return; }
+  const vue = _docVue && _docListe.find((x) => x.id === _docVue && x.statut === 'emis');
+  if (vue) { el.innerHTML = _htmlDocumentEmis(vue); return; }
+  _docVue = null;
+  const creation = _accessPermetCreationDocument();
+  el.innerHTML = (creation
+    ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'devis\')">+ Nouveau devis</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauDocument(\'facture\')">+ Nouvelle facture</button></div>'
+    : '<div style="font-size:12px;margin-bottom:10px;padding:8px 12px;border-radius:8px;border:1px solid var(--bord);">Votre abonnement est terminé : vous pouvez <b>consulter et imprimer</b> vos documents émis' +
+      (window._accessLevel === 'readonly' ? ' et enregistrer un règlement' : '') + '. Reprenez votre abonnement pour créer de nouveaux devis et factures.</div>') +
+    '<div class="card" style="padding:12px 16px;">' + _htmlListeDocuments() + '</div>';
+}
 
 // ===== STRIPE + MODULES =====
 var _stripeInstance = null;
@@ -31121,3 +32145,185 @@ function importPatientsCSV(input) {
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+// Mode consultation : rapports des bilans validés, abonnement terminé
+// ═══════════════════════════════════════════════════════════════════
+// Accessible depuis la fenêtre d'abonnement terminé. LECTURE SEULE TOTALE : ouvrir une archive
+// copie celle-ci dans le bilan courant et déclenche des sauvegardes ; tant que
+// window._modeConsultation est vrai, plus rien ne s'écrit (gardes en tête des fonctions de
+// sauvegarde + filet universel sur localStorage « bm4-* » et sur fetch non GET vers Supabase).
+// La sortie se fait par location.reload() : l'état en mémoire est jeté, la session conservée.
+const _CONSULT_PAGES = ['pg-sport', 'pg-bilan', 'pg-rapport', 'pg-bilan-posturo', 'pg-rapport-posturo', 'pg-pedicurie', 'pg-podopediatrie'];
+function _consultationNavAutorisee(id) {
+  return _CONSULT_PAGES.indexOf(id) !== -1;
+}
+// Écritures Supabase autorisées en consultation : rafraîchir la session et signer les URLs de photos.
+function _consultationFetchAutorise(url, method) {
+  const m = String(method || 'GET').toUpperCase();
+  if (m === 'GET' || m === 'HEAD') return true;
+  const u = String(url || '');
+  if (u.indexOf(SUPA_URL) !== 0) return true; // hors Supabase : pas une écriture de données
+  if (m === 'POST' && u.indexOf('/auth/v1/token') !== -1) return true;
+  if (m === 'POST' && u.indexOf('/storage/v1/object/sign/') !== -1) return true;
+  return false;
+}
+function _installerFiletConsultation() {
+  if (window._filetConsultationPose) return;
+  window._filetConsultationPose = true;
+  const proto = window.Storage && window.Storage.prototype;
+  if (proto) {
+    const setOrig = proto.setItem;
+    const remOrig = proto.removeItem;
+    proto.setItem = function (k) {
+      if (window._modeConsultation && String(k).indexOf('bm4-') === 0) return;
+      return setOrig.apply(this, arguments);
+    };
+    proto.removeItem = function (k) {
+      if (window._modeConsultation && String(k).indexOf('bm4-') === 0) return;
+      return remOrig.apply(this, arguments);
+    };
+  }
+  const fetchOrig = window.fetch;
+  window.fetch = function (input, init) {
+    if (window._modeConsultation) {
+      const url = typeof input === 'string' ? input : input && input.url;
+      const method = (init && init.method) || (input && typeof input === 'object' && input.method) || 'GET';
+      if (!_consultationFetchAutorise(url, method)) {
+        return Promise.resolve(new Response(JSON.stringify({ error: 'mode_consultation' }), { status: 403 }));
+      }
+    }
+    return fetchOrig.apply(this, arguments);
+  };
+}
+
+const _CONSULT_TYPES = [
+  { cle: 'sport', arr: 'bilansSport', titre: 'Podologie du sport' },
+  { cle: 'posturo', arr: 'bilansPosturo', titre: 'Posturologie' },
+  { cle: 'pedicurie', arr: 'bilansPedicurie', titre: 'Pédicurie' },
+  { cle: 'podopediatrie', arr: 'bilansPodopediatrie', titre: 'Podopédiatrie' },
+];
+// Archives = bilans validés (un bilan en cours n'est pas dans ces tableaux).
+function _consultationListe(pats) {
+  const out = [];
+  (pats || []).forEach(function (p, i) {
+    const bilans = [];
+    _CONSULT_TYPES.forEach(function (t) {
+      (p[t.arr] || []).forEach(function (b, bi) {
+        bilans.push({ type: t.cle, titre: t.titre, label: b.label || t.titre, date: b.date || '', patIdx: i, bilanIdx: bi });
+      });
+    });
+    if (bilans.length) out.push({ patIdx: i, nom: ((p.nom || '') + ' ' + (p.prenom || '')).trim() || 'Patient sans nom', bilans: bilans });
+  });
+  return out.sort(function (a, b) { return a.nom.localeCompare(b.nom, 'fr'); });
+}
+function _consultationHtmlListe(liste) {
+  if (!liste.length) return '<div style="padding:24px;color:var(--mut);font-size:14px;">Aucun bilan validé à consulter.</div>';
+  return liste.map(function (pt) {
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--bord);"><div style="font-weight:700;font-size:14px;margin-bottom:6px;">' + _escHtml(pt.nom) + '</div>' +
+      pt.bilans.map(function (b) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 0;font-size:13px;"><span>' +
+          _escHtml(b.titre) + ' · ' + _escHtml(b.label) + (b.date ? ' <span style="color:var(--mut);">· ' + _escHtml(b.date) + '</span>' : '') +
+          '</span><button class="btn" style="font-size:12px;padding:4px 12px;" onclick="consulterRapportBilan(\'' + b.type + '\',' + b.patIdx + ',' + b.bilanIdx + ')">📄 Rapport</button></div>';
+      }).join('') + '</div>';
+  }).join('');
+}
+function _consultationCouche(id, css) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.className = 'page-claire';
+    el.style.cssText = css;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function _consultationAttendre(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+function ouvrirModeConsultation() {
+  if (!_dataLoaded) { alert('Vos données sont en cours de chargement. Réessayez dans un instant.'); return; }
+  window._modeConsultation = true;
+  _installerFiletConsultation();
+  if (!document.getElementById('consultation-style')) {
+    const st = document.createElement('style');
+    st.id = 'consultation-style';
+    st.textContent = 'body.mode-consultation .topbar,body.mode-consultation [onclick*="envoyerRapportMail"],' +
+      'body.mode-consultation #pg-rapport button[onclick*="pg-sport"],body.mode-consultation #pg-rapport-posturo button[onclick*="pg-bilan-posturo"]{display:none !important;}' +
+      'body.mode-consultation .main{padding-top:48px;}';
+    document.head.appendChild(st);
+  }
+  document.body.classList.add('mode-consultation');
+  _hideAccessOverlay();
+  const sub = document.getElementById('modal-subscribe');
+  if (sub) sub.style.display = 'none';
+  const barre = _consultationCouche('consultation-barre', 'position:fixed;top:0;left:0;right:0;height:44px;z-index:10004;background:var(--card);border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13px;');
+  barre.innerHTML = '<button class="btn" style="font-size:12px;padding:4px 12px;" onclick="consultationRetourListe()">← Mes rapports</button>' +
+    '<button id="consultation-imprimer" class="btn" style="font-size:12px;padding:4px 12px;display:none;" onclick="consultationImprimer()">🖨 Imprimer / PDF</button>' +
+    '<span style="flex:1;text-align:center;color:var(--mut);font-size:12px;">Consultation en lecture seule — rien n\'est modifié</span>' +
+    '<button class="btn" style="font-size:12px;padding:4px 12px;" onclick="location.reload()">Quitter</button>';
+  _consultationCouche('consultation-ecran', 'position:fixed;top:44px;left:0;right:0;bottom:0;z-index:10002;background:var(--bg,#fff);overflow:auto;padding:16px;');
+  _consultationCouche('consultation-visionneuse', 'position:fixed;top:44px;left:0;right:0;bottom:0;z-index:10003;background:#fff;display:none;');
+  consultationRetourListe();
+}
+function consultationRetourListe() {
+  if (!window._modeConsultation) return;
+  const ecran = document.getElementById('consultation-ecran');
+  const vis = document.getElementById('consultation-visionneuse');
+  const imp = document.getElementById('consultation-imprimer');
+  if (vis) { vis.style.display = 'none'; vis.innerHTML = ''; }
+  if (imp) imp.style.display = 'none';
+  window._consultationCourant = null;
+  if (ecran) {
+    ecran.style.display = 'block';
+    ecran.innerHTML = '<div style="max-width:760px;margin:0 auto;"><div style="font-size:17px;font-weight:700;margin-bottom:4px;">Mes rapports de bilans</div>' +
+      '<div style="font-size:12px;color:var(--mut);margin-bottom:10px;">Bilans validés uniquement.</div>' + _consultationHtmlListe(_consultationListe(patients)) + '</div>';
+  }
+}
+async function consulterRapportBilan(type, patIdx, bilanIdx) {
+  if (!window._modeConsultation) return;
+  const ecran = document.getElementById('consultation-ecran');
+  const vis = document.getElementById('consultation-visionneuse');
+  const imp = document.getElementById('consultation-imprimer');
+  ecran.innerHTML = '<div style="padding:24px;color:var(--mut);font-size:14px;">Préparation du rapport…</div>';
+  window._consultationCourant = { type: type };
+  try {
+    if (type === 'sport') {
+      ouvrirBilanSport(patIdx, bilanIdx);
+      await _consultationAttendre(500);
+      nav('pg-rapport');
+      await _consultationAttendre(300);
+    } else if (type === 'posturo') {
+      await ouvrirBilanPosturo(patIdx, bilanIdx);
+      await _consultationAttendre(900);
+      await buildRapportPosturo();
+      await _consultationAttendre(300);
+    } else {
+      let html;
+      if (type === 'pedicurie') {
+        await ouvrirBilanPedicurie(patIdx, bilanIdx);
+        await _consultationAttendre(600);
+        genererSynthesePedicurie();
+        html = buildPedicurieRapportHTML();
+      } else {
+        await ouvrirBilanPodopediatrie(patIdx, bilanIdx);
+        await _consultationAttendre(600);
+        html = await buildPodopediatrieRapportHTML();
+      }
+      vis.innerHTML = '<iframe id="consultation-iframe" style="width:100%;height:100%;border:none;"></iframe>';
+      const d = vis.firstChild.contentDocument;
+      d.open(); d.write(html); d.close();
+      vis.style.display = 'block';
+      if (imp) imp.style.display = '';
+    }
+    ecran.style.display = 'none';
+    if (type === 'sport' || type === 'posturo') { if (imp) imp.style.display = 'none'; }
+  } catch (e) {
+    console.error('[consultation] rapport indisponible :', e);
+    ecran.innerHTML = '<div style="padding:24px;color:var(--red);font-size:14px;">Ce rapport n\'a pas pu être préparé. Revenez à la liste et réessayez.</div>';
+  }
+}
+function consultationImprimer() {
+  const f = document.getElementById('consultation-iframe');
+  if (f && f.contentWindow) { f.contentWindow.focus(); f.contentWindow.print(); }
+}

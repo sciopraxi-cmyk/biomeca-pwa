@@ -380,6 +380,7 @@ describe('#261 toute cause émise est une cause traitée', () => {
     expect([...emises].sort(), `émises = {${lisible(emises)}}`).toEqual([
       'donnees_indisponibles',
       'never_paid',
+      'subscription_ended',
       'trial_expired',
     ]);
   });

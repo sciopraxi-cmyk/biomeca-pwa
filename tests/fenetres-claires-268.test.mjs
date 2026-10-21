@@ -8,9 +8,7 @@
 // thème : aucune couleur propre (décision #268-1).
 //
 // Ce que ces tests ne couvrent PAS, et pourquoi :
-//   - « Choisir une formule » (#modal-subscribe) reste sombre : lot L1-bis,
-//     avec sa garde sur les liens de paiement. Dette visible : on passe d'une
-//     fenêtre claire à une fenêtre sombre par « Voir les formules ».
+//   - « Choisir une formule » (#modal-subscribe) est passée en clair le 21/10 (demande de Joël).
 //   - Une fenêtre ouverte sur une page encore SOMBRE (Pédicurie,
 //     Podopédiatrie) reste sombre : la portée claire exige body.theme-clair,
 //     posé par la page active. Accepté, résolu par L3.
@@ -148,13 +146,7 @@ describe('#268 L1 — les dix fenêtres du groupe A portent page-claire', () => 
   it('R2. Le groupe B ne l’a PAS (hors lot, arbitrage du 10/10/2026)', () => {
     // Sans cette moitié, poser la classe partout passerait R1.
     const arbre = analyser(HTML_ENTIER);
-    for (const id of [
-      'modal-subscribe',
-      'backfill-lock-modal',
-      'modal-vignette',
-      'modal-modules-lp',
-      'pwa-login',
-    ]) {
+    for (const id of ['backfill-lock-modal', 'modal-vignette', 'modal-modules-lp', 'pwa-login']) {
       const n = sousArbreParId(arbre, id);
       expect(n, `${id} introuvable`).not.toBeNull();
       expect(aLaClasse(n, 'page-claire'), `${id} ne doit PAS porter page-claire`).toBe(false);

@@ -402,6 +402,67 @@
     ]
    ],
    "Voir les formules"
+  ],
+  [
+   2,
+   "div",
+   [
+    [
+     "id",
+     "overlay-recuperation"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Récupérer mes données"
+  ],
+  [
+   3,
+   "button",
+   [
+    [
+     "onclick",
+     "exporterPatientsDepuisAcces()"
+    ]
+   ],
+   "📤 Exporter mes patients (CSV)"
+  ],
+  [
+   3,
+   "button",
+   [
+    [
+     "onclick",
+     "ouvrirRecuperationDocuments()"
+    ]
+   ],
+   "🧾 Mes devis et factures émis"
+  ],
+  [
+   3,
+   "button",
+   [
+    [
+     "onclick",
+     "ouvrirModeConsultation()"
+    ]
+   ],
+   "📄 Mes rapports de bilans"
+  ],
+  [
+   2,
+   "button",
+   [
+    [
+     "onclick",
+     "pwaLogout()"
+    ]
+   ],
+   "Se déconnecter"
   ]
  ],
  "podo-age": [
