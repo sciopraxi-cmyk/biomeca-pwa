@@ -384,6 +384,24 @@ ne jamais les commiter, les déplacer ni les citer dans un fichier tracké.
 - **Onglet « Mode domicile »** (`#domicile-onglet`) : créé par le script, en bas à gauche, jamais
   écrit dans le HTML (les structures de « Mon compte » sont figées par les tests #268).
 
+## Ordonnances du podologue — acquis (PR #289)
+
+- **Stockage dans le blob existant** : `patient.ordonnances` (copie figée du praticien, sans
+  SIRET ni IBAN, et du patient) et `praticien.modelesOrdonnance`. Aucune table, aucun réseau,
+  aucun envoi (HDS non migré). Écriture uniquement par `savePatients` / `savePraticiens`,
+  jamais en `localStorage` direct.
+- **Signature et tampon** : `praticien.signature` (`data:image` PNG/JPEG/WebP, 400×200 max),
+  relue à l'affichage, **jamais copiée dans l'ordonnance**. Seule une valeur `data:image` est
+  acceptée (sinon ignorée).
+- **Les alertes sont des avertissements, jamais des blocages** : la liste réglementaire des
+  prescriptions du podologue (art. R4322-1 CSP, arrêté du 30/07/2008) n'a pas été lue en texte
+  intégral. Seul un RPPS/ADELI absent bloque l'enregistrement.
+- **Menu « Ajouter à l'ordonnance »** : `ORDO_CATEGORIES[type].produits` est une liste fournie
+  par le praticien, à ne pas modifier sans son accord. Modèles de départ non intégrés : une
+  liste de 6 à 8 est à lui soumettre avant ajout.
+- **Piège** : `palette-bilans.test.mjs` (`COMPTES_ATTENDUS` var() et `PAGES_CLAIRES`) bouge
+  quand on ajoute un bouton ou une page.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
