@@ -126,7 +126,7 @@ describe('lien patient ↔ événement et téléphone', () => {
     { id: 11, nom: 'Durand', prenom: 'Lucie', ddn: '1985-03-12', tel: '06 00 00 00 00' },
     { id: 12, nom: 'Martin', prenom: 'Paul', ddn: '', tel: '' },
   ];
-  it('nom complet et motif affichés dans Verticy seulement pour un événement lié', () => {
+  it('initiales et motif dans la grille pour un événement lié (nom complet seulement au détail)', () => {
     const { f } = monter({
       patients: P,
       prats: [{ id: 7, agendaLiens: { ev1: { patientId: 11, motif: 'Suivi' } } }],
@@ -136,7 +136,8 @@ describe('lien patient ↔ événement et téléphone', () => {
       { id: 'ev2', summary: 'Réunion', source: 'google' },
       { id: 'ev1', summary: 'ev1 apple', source: 'apple' },
     ]);
-    expect(f._agLabel(ev[0])).toBe('Durand Lucie – Suivi');
+    expect(f._agLabel(ev[0])).toBe('L.D. – Suivi');
+    expect(f._agLabel(ev[0])).not.toMatch(/Durand|Lucie/);
     expect(f._agLabel(ev[1])).toBe('Réunion');
     expect(f._agLabel(ev[2])).toBe('ev1 apple');
     expect(f._agTelDe(ev[0])).toBe('06 00 00 00 00');
@@ -148,6 +149,19 @@ describe('lien patient ↔ événement et téléphone', () => {
     });
     const ev = f._agEnrichir([{ id: 'ev1', summary: 'L.D. – Suivi', source: 'google' }]);
     expect(f._agLabel(ev[0])).toBe('L.D. – Suivi');
+  });
+  it('l’info-bulle de la grille ne montre ni le nom complet ni le téléphone', () => {
+    const { f } = monter({
+      patients: [{ id: 11, nom: 'Durand', prenom: 'Lucie', tel: '0600000000' }],
+    });
+    expect(
+      f._agTitleAttr({
+        affichage: 'L.D. – Suivi',
+        summary: 'Durand Lucie',
+        tel: '0600000000',
+        patientId: 11,
+      })
+    ).toBe('L.D. – Suivi');
   });
   it('téléphone : celui de l’événement (Doctolib) d’abord, sinon celui de la fiche', () => {
     const { f } = monter({ patients: P });

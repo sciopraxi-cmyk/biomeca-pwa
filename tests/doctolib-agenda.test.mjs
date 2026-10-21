@@ -20,6 +20,8 @@ const HELPERS = [
   '_importMatchDecision',
   '_accessPermetCreationDocument',
   '_agTelSur',
+  '_agInitiales',
+  '_agTitrePatient',
 ];
 
 function monter(o = {}) {
@@ -341,6 +343,26 @@ describe('affichage dans l’agenda', () => {
     });
     expect(new Date(ev[0].end) - new Date(ev[0].start)).toBe(45 * 60000);
     expect(ev[0].description).toContain('Cab');
+  });
+  it('la grille affiche les INITIALES ; le nom complet reste dans le détail (summary)', () => {
+    const { f } = monter();
+    const ev = f._doctolibEvenements(
+      [
+        {
+          id: '1',
+          debut: '2026-10-22T09:00',
+          duree: 30,
+          nom: 'Durand',
+          prenom: 'Lucie',
+          motif: 'Bilan',
+        },
+      ],
+      new Date('2026-10-19T00:00:00'),
+      new Date('2026-10-26T00:00:00')
+    );
+    expect(ev[0].affichage).toBe('L.D. – Bilan');
+    expect(ev[0].affichage).not.toMatch(/Durand|Lucie/);
+    expect(ev[0].summary).toBe('Durand Lucie – Bilan');
   });
   it('des données stockées corrompues sont ignorées sans exception', () => {
     const { f } = monter();

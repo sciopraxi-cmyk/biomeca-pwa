@@ -2155,8 +2155,8 @@ function _agEnrichir(events) {
     const l = _agLien(e.id);
     const p = l ? _agPatientParId(l.patientId) : null;
     if (!p) return e;
-    const nom = [p.nom, p.prenom].filter(Boolean).join(' ');
-    return Object.assign({}, e, { affichage: l.motif ? nom + ' – ' + l.motif : nom, patientId: p.id });
+    // Grille = initiales + motif (l'écran du cabinet peut être vu) ; nom complet et téléphone seulement dans la fenêtre de détail.
+    return Object.assign({}, e, { affichage: _agTitrePatient(p, l.motif), patientId: p.id });
   });
 }
 function _agLabel(e) {
@@ -2169,8 +2169,7 @@ function _agTelDe(e) {
   return p ? _agTelSur(p.tel) : '';
 }
 function _agTitleAttr(e) {
-  const t = _agTelDe(e);
-  return _escHtml(_agLabel(e) + (t ? ' — ' + t : ''));
+  return _escHtml(_agLabel(e)); // jamais le téléphone ni le nom complet : l'info-bulle est visible à l'écran
 }
 function _agBlocContact(e) {
   const t = _agTelDe(e);
@@ -34489,6 +34488,7 @@ function _doctolibEvenements(rdvs, debutPlage, finPlage) {
     res.push({
       id: 'doctolib:' + _doctolibIdSur(x.id),
       summary: _doctolibLibelle(x),
+      affichage: _agTitrePatient({ nom: x.nom, prenom: x.prenom }, x.motif),
       start: d.toISOString(),
       end: f.toISOString(),
       source: 'doctolib',
