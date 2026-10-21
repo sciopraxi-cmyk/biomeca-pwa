@@ -107,6 +107,7 @@ describe('hors connexion', () => {
     m.f._signalerEchecEnvoiPhoto();
     expect(m.els['photo-envoi-banner'].style.background).toBe('#c0392b');
     expect(m.els['photo-envoi-banner-text'].textContent).toMatch(/⚠️/);
+    expect(m.els['photo-envoi-banner-text'].textContent).toMatch(/gardée sur cet appareil/);
   });
 });
 
@@ -118,6 +119,10 @@ describe('verrouillage et branchements (code source)', () => {
   });
   it('retour du réseau : renvoi des saisies et photos', () => {
     expect(SRC_BIOMECA).toMatch(/addEventListener\('online'[\s\S]{0,300}_renvoyerApresReconnexion/);
+    // tous modes : le renvoi ne dépend pas du mode domicile
+    expect(SRC_BIOMECA).toMatch(
+      /addEventListener\('online', function \(\) \{\s*(\/\/[^\n]*\n\s*)*if \(!pwaUser\) return;/
+    );
     const r = fonction('_renvoyerApresReconnexion');
     expect(r).toMatch(/saveBilanSilent/);
     expect(r).toMatch(/saveToSupabase/);

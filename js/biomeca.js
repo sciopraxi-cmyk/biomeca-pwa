@@ -3754,8 +3754,8 @@ function _signalerEchecEnvoiPhoto() {
   if (bp) bp.style.background = '#c0392b';
   _afficherBandeau(
     'photo-envoi-banner',
-    '⚠️ Une photo n\'a pas pu être envoyée. Elle reste affichée et sera renvoyée à la prochaine ' +
-    'sauvegarde ; si ce message revient, vérifiez la connexion avant de quitter la page.'
+    '⚠️ Une photo n\'a pas pu être envoyée. Elle est gardée sur cet appareil et sera renvoyée ' +
+    'automatiquement au retour de la connexion ou à la prochaine sauvegarde.'
   );
 }
 
@@ -3888,7 +3888,8 @@ window.addEventListener('offline', function () {
   if (_modeDomicileActif() && pwaUser) _showSyncErrorBanner(MSG_HORS_CONNEXION);
 });
 window.addEventListener('online', function () {
-  if (!_modeDomicileActif() || !pwaUser) return;
+  // Tous modes : une photo ou une saisie restée sur l'appareil part dès que le réseau revient.
+  if (!pwaUser) return;
   _hideSyncErrorBanner();
   _renvoyerApresReconnexion();
 });
