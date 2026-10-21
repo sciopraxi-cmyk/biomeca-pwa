@@ -833,10 +833,89 @@
    2,
    "div",
    [],
-   "Titre *"
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "Rendez-vous patient"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "patient"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "Texte libre"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "checked",
+     ""
+    ],
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "libre"
+    ]
+   ],
+   ""
   ],
   [
    2,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-libre"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Titre *"
+  ],
+  [
+   3,
    "input",
    [
     [
@@ -857,6 +936,134 @@
     ]
    ],
    ""
+  ],
+  [
+   2,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-pat"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Patient *"
+  ],
+  [
+   3,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-patient"
+    ],
+    [
+     "list",
+     "agenda-ev-patients"
+    ],
+    [
+     "oninput",
+     "agEvPatientInfo()"
+    ],
+    [
+     "placeholder",
+     "Taper un nom pour rechercher…"
+    ],
+    [
+     "value",
+     ""
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "datalist",
+   [
+    [
+     "id",
+     "agenda-ev-patients"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Motif de consultation"
+  ],
+  [
+   3,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-motif"
+    ],
+    [
+     "list",
+     "agenda-ev-motifs"
+    ],
+    [
+     "placeholder",
+     "Choisir ou écrire un motif"
+    ],
+    [
+     "value",
+     ""
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "datalist",
+   [
+    [
+     "id",
+     "agenda-ev-motifs"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-info"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy."
   ],
   [
    2,
@@ -1049,10 +1256,89 @@
    2,
    "div",
    [],
-   "Titre *"
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "Rendez-vous patient"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "checked",
+     ""
+    ],
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "patient"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "Texte libre"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "libre"
+    ]
+   ],
+   ""
   ],
   [
    2,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-libre"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Titre *"
+  ],
+  [
+   3,
    "input",
    [
     [
@@ -1073,6 +1359,134 @@
     ]
    ],
    ""
+  ],
+  [
+   2,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-pat"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Patient *"
+  ],
+  [
+   3,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-patient"
+    ],
+    [
+     "list",
+     "agenda-ev-patients"
+    ],
+    [
+     "oninput",
+     "agEvPatientInfo()"
+    ],
+    [
+     "placeholder",
+     "Taper un nom pour rechercher…"
+    ],
+    [
+     "value",
+     ""
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "datalist",
+   [
+    [
+     "id",
+     "agenda-ev-patients"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Motif de consultation"
+  ],
+  [
+   3,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-motif"
+    ],
+    [
+     "list",
+     "agenda-ev-motifs"
+    ],
+    [
+     "placeholder",
+     "Choisir ou écrire un motif"
+    ],
+    [
+     "value",
+     ""
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "datalist",
+   [
+    [
+     "id",
+     "agenda-ev-motifs"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-info"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   "Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy."
   ],
   [
    2,
