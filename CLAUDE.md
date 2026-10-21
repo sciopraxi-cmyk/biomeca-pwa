@@ -402,6 +402,34 @@ ne jamais les commiter, les déplacer ni les citer dans un fichier tracké.
 - **Piège** : `palette-bilans.test.mjs` (`COMPTES_ATTENDUS` var() et `PAGES_CLAIRES`) bouge
   quand on ajoute un bouton ou une page.
 
+## Traçabilité de stérilisation — acquis (PR #291)
+
+- **Stockage dans le blob existant** : `praticien.sterilisation` (`{appareils, sets, cycles,
+maintenance, dernierNumero}`) et `patient.soinsSterilisation` (`{id, date, sachets[],
+registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migré).
+  Écriture uniquement par `savePraticiens` / `savePatients`.
+- **Numérotation** des cycles continue (`dernierNumero`), sachets `C0001-01`. Un sachet lié
+  à un soin ne peut pas être retiré de son cycle.
+- **Les alertes sont des avertissements (`confirm`), jamais des blocages** ; seuls la date
+  et l'appareil manquants bloquent. Délais de rappel (Bowie-Dick 7 j, contrôle 365 j, état
+  stérile 60 j) = valeurs par défaut modifiables, à confirmer avec la notice du fabricant.
+  Les textes officiels (R5211-5 et R5212-25 CSP, circulaire DGS/DHOS 138 du 14/03/2001)
+  n'ont pas été lus en intégral ; source consultée : onpp.fr (traçabilité de la
+  stérilisation et de la maintenance).
+- **Export CSV** : toute cellule commençant par `=`, `+`, `-` ou `@` est neutralisée par une
+  apostrophe. **Impression** : aucune garde d'abonnement, aucun nom de patient dans le registre.
+- **Abonnement terminé / compte non conforme** : création bloquée (`create_sterilisation`),
+  consultation, impression et export restent libres.
+- **Harnais** : `tests/sterilisation.test.mjs` extrait de `js/biomeca.js` la section
+  « Traçabilité de stérilisation » (début et fin par repères) ; toute fonction ajoutée dans
+  la section est reprise automatiquement. Ne pas déplacer les repères.
+- **Piège** : `palette-bilans.test.mjs` (`COMPTES_ATTENDUS` : `--mut` 15, `--card` 10,
+  `--bord` 9 ; `PAGES_CLAIRES` contient `pg-sterilisation`) bouge quand on ajoute un
+  bouton ou une page.
+- **Test navigateur sur le VPS** : Chromium de `/opt/playwright` (`--no-sandbox`) avec
+  playwright du dépôt et `python3 -m http.server 8080` ; session simulée (`pwaUser`,
+  `praticiens`, `patients`, `_dataLoaded`, masquer `#pwa-login`, afficher `#biomeca-app`).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
