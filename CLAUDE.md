@@ -343,6 +343,47 @@ ne jamais les commiter, les déplacer ni les citer dans un fichier tracké.
   `typeof f === 'function'` protège les autres harnais ; ne jamais retirer une assertion pour
   faire passer un test.
 
+## Mode domicile et hors connexion — acquis (PR #287)
+
+- **Deux niveaux** : la case « Mode domicile » (réglage par appareil et par compte,
+  `bm4-mode-domicile:<uid>`, activable avec du réseau seulement) et le **passage automatique**
+  hors connexion (`_reseauPerdu`, événement `offline`, exception de requête, sonde de 15 s).
+  `_modeSansVerrou()` = l'un ou l'autre : plus de verrouillage par inactivité, bandeaux **bleus**
+  (`_horsConnexion()`), jamais rouges. Le rouge reste réservé à une vraie panne avec réseau.
+- **Un échec de requête n'est reconnu comme perte de réseau que s'il est une exception**
+  (`_estErreurReseau`), jamais sur un statut HTTP.
+- **Session et abonnement gardés 7 jours** : `bm4-session-hc` (jeton) et `bm4-acces-cache:<uid>`.
+  La copie de session n'existe que si le mode domicile est coché ou pendant une coupure ; effacée
+  à la déconnexion (`clearPwaSession`) et à 7 jours. Ne jamais appliquer le cache d'un autre compte.
+- **Photos en attente** : `_jsonPatientsLocal` remplace toute image `data:image` de plus de 20 Ko par
+  une référence `idb:<empreinte>` dans la copie locale (mémoire inchangée), rangée dans IndexedDB
+  (`verticy-photos`, v2 : `p` en attente, `v` consultées, `m` métadonnées). Toute écriture de
+  `bm4-patients:<uid>` doit passer par `_jsonPatientsLocal` puis `_ecrirePhotosIdb`, **sauf à la
+  fermeture d'onglet** (écriture directe, une écriture asynchrone serait coupée). Au chargement,
+  `_rehydraterPhotosIdb` remet les images ; si le coffre est injoignable, les références sont
+  **conservées**, jamais supprimées.
+- **Ouverture d'IndexedDB : toujours bornée** (2 s, pas d'insistance pendant 30 s,
+  `onversionchange` libère). Un autre onglet resté sur une ancienne version bloque sinon la mise à
+  jour de la base et fige l'ouverture d'un bilan hors connexion.
+- **Renvoi au retour du réseau** (`_renvoyerApresReconnexion`) : relit l'abonnement, envoie les
+  photos de **tous** les patients (`_envoyerPhotosEnAttente`, pas seulement la page ouverte), puis
+  `saveToSupabase`. Une photo n'est retirée que quand son chemin Storage est posé.
+- **Photos déjà envoyées consultables hors connexion** : mode domicile seulement, 200 Mo,
+  éviction des moins récemment lues, **purge à la déconnexion et à la désactivation du mode**
+  (poste partagé : aucune photo de patient ne doit rester). Lecture bornée à 5 s.
+- **Service worker** : les requêtes `/rest/v1/` et `/auth/v1/` de Supabase ne passent **jamais** par le
+  cache (une réponse périmée hors connexion serait prise pour l'état du serveur et pourrait être
+  réécrite par-dessus des données plus récentes). Le **précache en échec fait échouer
+  l'installation** (pas de `.catch`), sinon une version à cache vide reste « en attente » et
+  l'ancien code continue de tourner. `staleWhileRevalidate` rend `Response.error()`, jamais
+  `undefined`. « Mon compte » affiche la version exécutée (`_afficherVersionApp`).
+- **Méthode de test** : sur un localhost passant par un tunnel, couper le wifi coupe aussi le tunnel.
+  Simuler avec F12 → Réseau → Hors connexion, **F5 et non Ctrl+Maj+R**, case « Contourner pour le
+  réseau » décochée. Ne jamais lancer de test automatique sur le compte du praticien ; les essais
+  automatisés créent un patient fictif qu'il faut supprimer (et vérifier : 0 patient).
+- **Onglet « Mode domicile »** (`#domicile-onglet`) : créé par le script, en bas à gauche, jamais
+  écrit dans le HTML (les structures de « Mon compte » sont figées par les tests #268).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
