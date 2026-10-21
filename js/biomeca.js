@@ -1679,6 +1679,7 @@ function showMonCompte() {
   // Avatar
   const init = ((prenom||nom||email)[0]||'?').toUpperCase();
   document.getElementById('mc-avatar').textContent = init;
+  _rendreModeDomicile();
   document.getElementById('mc-nom').textContent = (prenom + ' ' + nom).trim() || email;
   document.getElementById('mc-email').textContent = email;
   document.getElementById('mc-titre').textContent = titre;
@@ -1698,6 +1699,33 @@ function showMonCompte() {
   document.getElementById('mc-cabinet').innerHTML = cabinet ?
     '<div>🏥 ' + cabinet + '</div>' :
     '<div style="color:var(--mut);font-size:12px;">Aucun cabinet renseigné</div>';
+}
+
+// Bloc inséré par le script (jamais écrit dans le HTML : la structure de « Mon compte » est
+// figée par les tests #268), juste avant « Informations cabinet ».
+function _installerModeDomicile() {
+  if (document.getElementById('mc-domicile')) return;
+  const cab = document.getElementById('mc-cabinet');
+  const ancre = cab && cab.parentElement;
+  if (!ancre || !ancre.parentElement) return;
+  const bloc = document.createElement('div');
+  bloc.style.cssText = 'background:var(--bg);border-radius:10px;padding:14px;margin-bottom:16px;';
+  bloc.innerHTML =
+    '<div style="font-size:11px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Mode domicile</div>' +
+    '<label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--txt);cursor:pointer;">' +
+    '<input id="mc-domicile" type="checkbox" onchange="basculerModeDomicile(this)" style="margin-top:3px;"/>' +
+    '<span>Pas de déconnexion automatique, saisie possible sans réseau sur cet appareil.<br/>' +
+    '<span style="font-size:11px;color:var(--mut);">À activer avec du réseau, sur un appareil qui est le vôtre.</span></span></label>' +
+    '<div id="mc-domicile-msg" style="font-size:12px;color:var(--mut);margin-top:6px;"></div>';
+  ancre.parentElement.insertBefore(bloc, ancre);
+}
+
+function _rendreModeDomicile() {
+  _installerModeDomicile();
+  const c = document.getElementById('mc-domicile');
+  if (c) c.checked = _modeDomicileActif();
+  const m = document.getElementById('mc-domicile-msg');
+  if (m) m.textContent = '';
 }
 
 function closeMonCompte() {
@@ -3714,6 +3742,16 @@ function _stockageRetabli() {
 function _signalerEchecEnvoiPhoto() {
   _photoEchecDansSauvegarde = true;
   if (_etatSauv === 'saving' || _etatSauv === 'saved') _etatSauvegarde('pending');
+  // Mode domicile hors connexion : pas d'erreur. La photo est gardée sur l'appareil (elle
+  // garde sa donnée image, jamais retirée tant qu'elle n'est pas envoyée) et part au retour du réseau.
+  if (typeof _modeDomicileActif === 'function' && _modeDomicileActif() && typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const bd = document.getElementById('photo-envoi-banner');
+    if (bd) bd.style.background = '#2c6e91';
+    _afficherBandeau('photo-envoi-banner', '📷 Photo gardée sur cet appareil — elle sera envoyée au retour du réseau.');
+    return;
+  }
+  const bp = document.getElementById('photo-envoi-banner');
+  if (bp) bp.style.background = '#c0392b';
   _afficherBandeau(
     'photo-envoi-banner',
     '⚠️ Une photo n\'a pas pu être envoyée. Elle reste affichée et sera renvoyée à la prochaine ' +
@@ -3796,14 +3834,82 @@ function _etatApresCloud(ok, seqEnvoi) {
 function _showSyncErrorBanner(message) {
   const b = document.getElementById('sync-error-banner');
   const t = document.getElementById('sync-error-banner-text');
-  if (b) b.style.display = 'block';
-  if (t) t.textContent = message;
+  // Mode domicile + pas de réseau : ce n'est pas une erreur, c'est l'état normal.
+  const calme = typeof _modeDomicileActif === 'function' && _modeDomicileActif() && typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (b) {
+    b.style.background = calme ? '#2c6e91' : '#c0392b';
+    b.style.display = 'block';
+  }
+  if (t) t.textContent = calme ? MSG_HORS_CONNEXION : message;
 }
 
 function _hideSyncErrorBanner() {
   const b = document.getElementById('sync-error-banner');
   if (b) b.style.display = 'none';
   _syncErrorShown = false;
+}
+
+// ─── Mode domicile (hors connexion) ───
+// Réglage PAR APPAREIL ET PAR COMPTE (localStorage, clé scopée). Il ne s'active qu'avec du
+// réseau, et supprime le verrouillage par inactivité ; hors connexion, la saisie reste
+// enregistrée sur l'appareil, sans message d'erreur rouge, et part au retour du réseau.
+const MSG_HORS_CONNEXION = 'Hors connexion — vos saisies sont gardées sur cet appareil et partiront au retour du réseau.';
+function _modeDomicileActif() {
+  try {
+    const k = _scopedKey('bm4-mode-domicile');
+    return !!k && localStorage.getItem(k) === '1';
+  } catch (_e) { return false; }
+}
+function _reglerModeDomicile(actif) {
+  const k = _scopedKey('bm4-mode-domicile');
+  if (!k) return false;
+  if (actif && typeof navigator !== 'undefined' && navigator.onLine === false) return false; // à activer avec du réseau
+  try {
+    if (actif) localStorage.setItem(k, '1'); else localStorage.removeItem(k);
+  } catch (_e) { return false; }
+  if (typeof _lastActivity !== 'undefined') _lastActivity = Date.now();
+  return true;
+}
+function basculerModeDomicile(el) {
+  const veut = !!(el && el.checked);
+  const ok = _reglerModeDomicile(veut);
+  const msg = document.getElementById('mc-domicile-msg');
+  if (!ok && veut) {
+    if (el) el.checked = false;
+    if (msg) msg.textContent = 'Pas de réseau : activez le mode domicile quand vous êtes connecté.';
+    return;
+  }
+  if (msg) msg.textContent = veut
+    ? 'Activé : plus de déconnexion automatique sur cet appareil.'
+    : 'Désactivé : déconnexion automatique après 20 minutes d\'inactivité.';
+}
+// Réseau perdu / retrouvé (mode domicile seulement).
+window.addEventListener('offline', function () {
+  if (_modeDomicileActif() && pwaUser) _showSyncErrorBanner(MSG_HORS_CONNEXION);
+});
+window.addEventListener('online', function () {
+  if (!_modeDomicileActif() || !pwaUser) return;
+  _hideSyncErrorBanner();
+  _renvoyerApresReconnexion();
+});
+// Au retour du réseau : réécrit la page en cours (c'est ce qui renvoie les photos en attente),
+// puis envoie les données. Les photos ne sont validées (retirées de la file) que si l'envoi réussit.
+async function _renvoyerApresReconnexion() {
+  try {
+    await ensureSession();
+    const ap = document.querySelector('.page.active');
+    const id = ap ? ap.id : null;
+    if (id === 'pg-bilan' && typeof saveBilanSilent === 'function') await saveBilanSilent();
+    else if (id === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') await savePosturoBilan(true);
+    else if (id === 'pg-pedicurie' && typeof savePedicurieBilan === 'function') await savePedicurieBilan(true);
+    else if (id === 'pg-podopediatrie' && typeof savePodopediatrieBilan === 'function') await savePodopediatrieBilan(true);
+    const k = _scopedKey('bm4-nonsync');
+    if (k && localStorage.getItem(k)) {
+      if (typeof _etatSauvegarde === 'function') _etatSauvegarde('saving');
+      await saveToSupabase();
+    }
+    if (!_photoEchecDansSauvegarde) _masquerBandeau('photo-envoi-banner');
+  } catch (_e) { /* le prochain enregistrement renverra */ }
 }
 
 // Mute le titre + le message internes de l'overlay selon la cause du blocage.
@@ -3902,6 +4008,13 @@ function _idleBeep() {
 function _idleLockTick() {
   // Safety net : si pwaUser a été clear en cours de route, on stoppe.
   if (!pwaUser) { _stopIdleLock(); return; }
+  // Mode domicile : pas de verrouillage par inactivité (l'appareil est celui du praticien).
+  if (_modeDomicileActif()) {
+    var b0 = document.getElementById('idle-warn-banner');
+    if (b0 && b0.style.display !== 'none') b0.style.display = 'none';
+    _idleWarnActive = false;
+    return;
+  }
   var cfg = window._idleLockCfg;
   var elapsed = Date.now() - _lastActivity;
   var banner = document.getElementById('idle-warn-banner');
