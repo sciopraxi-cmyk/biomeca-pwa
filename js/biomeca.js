@@ -1727,12 +1727,24 @@ function _installerModeDomicile() {
     '<input id="mc-domicile" type="checkbox" onchange="basculerModeDomicile(this)" style="margin-top:3px;"/>' +
     '<span>Pas de déconnexion automatique, saisie possible sans réseau sur cet appareil.<br/>' +
     '<span style="font-size:11px;color:var(--mut);">À activer avec du réseau, sur un appareil qui est le vôtre.</span></span></label>' +
-    '<div id="mc-domicile-msg" style="font-size:12px;color:var(--mut);margin-top:6px;"></div>';
+    '<div id="mc-domicile-msg" style="font-size:12px;color:var(--mut);margin-top:6px;"></div>' +
+    '<div id="mc-version" style="font-size:11px;color:var(--mut);margin-top:6px;"></div>';
   ancre.parentElement.insertBefore(bloc, ancre);
+}
+// Version du code réellement exécutée sur cet appareil (aide au support : un ancien code peut
+// rester servi par le cache de l'application).
+function _afficherVersionApp() {
+  const el = document.getElementById('mc-version');
+  if (!el || typeof caches === 'undefined') return;
+  caches.keys().then(function (ks) {
+    const v = ks.filter(function (k) { return k.indexOf('biomeca-v') === 0; }).sort().pop();
+    el.textContent = v ? 'Version de l\'application : ' + v.replace('biomeca-', '') : '';
+  }).catch(function () {});
 }
 
 function _rendreModeDomicile() {
   _installerModeDomicile();
+  _afficherVersionApp();
   const c = document.getElementById('mc-domicile');
   if (c) c.checked = _modeDomicileActif();
   const m = document.getElementById('mc-domicile-msg');

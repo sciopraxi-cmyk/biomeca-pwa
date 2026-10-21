@@ -2,6 +2,7 @@
 // sans réseau, messages calmes, session et abonnement gardés 7 jours, photos rangées dans
 // IndexedDB. Données FICTIVES uniquement.
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { fonction, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
 
 function exec(corps, globales) {
@@ -302,5 +303,24 @@ describe('photos en attente, tous patients', () => {
     const e = fonction('_ecrireLocalAvantEnvoi');
     expect(e).toMatch(/_jsonPatientsLocal/);
     expect(e).toMatch(/!_urgenceFermeture && typeof _jsonPatientsLocal/);
+  });
+});
+
+describe('service worker : mise à jour fiable', () => {
+  const sw = readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+  const install = sw.slice(
+    sw.indexOf("addEventListener('install'"),
+    sw.indexOf("addEventListener('activate'")
+  );
+  it('un précache en échec fait échouer l’installation (pas de version à cache vide en attente)', () => {
+    expect(install).toMatch(/cache\.addAll\(PRECACHE_URLS\)/);
+    expect(install).not.toMatch(/\.catch\(/);
+  });
+  it('polices : jamais `undefined` rendu au navigateur hors connexion', () => {
+    expect(sw).toMatch(/return cached \|\| Response\.error\(\)/);
+  });
+  it('« Mon compte » affiche la version réellement exécutée', () => {
+    expect(SRC_BIOMECA).toMatch(/function _afficherVersionApp/);
+    expect(fonction('_rendreModeDomicile')).toMatch(/_afficherVersionApp/);
   });
 });
