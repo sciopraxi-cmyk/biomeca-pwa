@@ -2883,11 +2883,11 @@ function openAgendaEventModal(eventId, prefillLocal) {
           .join('') +
         '</select></div>'
       : '') +
-    '<div class="g2" style="margin-top:6px;">' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local" style="min-width:0;width:100%;box-sizing:border-box;" value="' +
+    '<div class="g2" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">' +
+    '<div style="flex:1 1 230px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local" style="min-width:0;width:100%;box-sizing:border-box;" value="' +
     startVal +
     '"/></div>' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Fin *</div><input class="inp" id="agenda-ev-end" type="datetime-local" style="min-width:0;width:100%;box-sizing:border-box;" value="' +
+    '<div style="flex:1 1 230px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Fin *</div><input class="inp" id="agenda-ev-end" type="datetime-local" style="min-width:0;width:100%;box-sizing:border-box;" value="' +
     endVal +
     '"/></div>' +
     '</div>' +
