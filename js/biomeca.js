@@ -410,6 +410,8 @@ function savePwaSession(token, refreshToken, user) {
     sessionStorage.setItem('bm_refresh', refreshToken || '');
     sessionStorage.setItem('bm_user', JSON.stringify(user));
   } catch(e) {}
+  // Mode domicile : la copie suit les renouvellements de jeton (le jeton de renouvellement tourne).
+  if (typeof _modeDomicileActif === 'function' && typeof pwaUser !== 'undefined' && pwaUser && _modeDomicileActif()) _memoriserSessionHorsConnexion();
 }
 
 function loadPwaSession() {
@@ -422,6 +424,7 @@ function loadPwaSession() {
 }
 
 function clearPwaSession() {
+  try { localStorage.removeItem('bm4-session-hc'); } catch(e) {}
   try {
     sessionStorage.removeItem('bm_token');
     sessionStorage.removeItem('bm_refresh');
@@ -626,12 +629,15 @@ async function fetchUserDataAtLogin() {
     console.error('[access] fetchUserDataAtLogin: lecture user_data en échec', {
       userId: pwaUser.id,
     });
+    // Hors connexion : dernier statut connu (7 jours max) au lieu de bloquer l'accès.
+    if (typeof _horsConnexion === 'function' && _horsConnexion() && typeof _accesDepuisCache === 'function' && _accesDepuisCache()) return;
     pwaUser.user_data = null;
     return;
   }
   // Requête réussie : soit la ligne, soit {} pour « aucune entrée payante »,
   // qui est un état légitime et non un échec.
   pwaUser.user_data = res.row || {};
+  if (typeof _memoriserAccesHorsConnexion === 'function') _memoriserAccesHorsConnexion();
 }
 // --- #261 FETCH — FIN ---
 
@@ -770,6 +776,7 @@ async function loadSupabaseData() {
         // Détection best-effort : son échec ne doit pas bloquer le boot.
       }
     }
+    if (typeof _rehydraterPhotosIdb === 'function') await _rehydraterPhotosIdb(patients);
     // Migration : anciens bilans (p.bilans[]) → p.bilansSport[]
     let migrated = false;
     patients.forEach(p => {
@@ -834,12 +841,13 @@ async function loadSupabaseData() {
     const kPraticiens = _scopedKey('bm4-praticiens');
     patients = kPatients ? JSON.parse(localStorage.getItem(kPatients) || '[]') : [];
     praticiens = kPraticiens ? JSON.parse(localStorage.getItem(kPraticiens) || '[]') : [];
+    if (typeof _rehydraterPhotosIdb === 'function') await _rehydraterPhotosIdb(patients);
     // Migration #39 sur le fallback aussi
     if (kPatients && migrateBilanFlags(patients)) {
       // fix/269 — même filtre que savePatients : jamais de dataURL (avec path
       // jumeau) réécrite dans le stockage local ; mémoire restaurée ensuite.
       const _stash = _stripDataURLsForPersist(patients);
-      try { localStorage.setItem(kPatients, JSON.stringify(patients)); } catch(_) {} finally { _restoreDataURLsAfterPersist(_stash); }
+      try { localStorage.setItem(kPatients, (typeof _jsonPatientsLocal === 'function' ? _jsonPatientsLocal(patients) : JSON.stringify(patients))); if (typeof _ecrirePhotosIdb === 'function') _ecrirePhotosIdb(); } catch(_) {} finally { _restoreDataURLsAfterPersist(_stash); }
     }
     _dataLoaded = true;  // Task #64 — fallback considéré comme valide, saves autorisés
     _loadedFromFallback = true; // #114-1a — mémoire issue du cache local non confirmée.
@@ -856,6 +864,7 @@ async function loadSupabaseData() {
     }
   }
 
+  setTimeout(function () { if (typeof _nettoyerPhotosIdb === 'function') _nettoyerPhotosIdb(); }, 8000);
   currentPatient = null; bilanData = {};
   renderPatientList();
   renderPratList();
@@ -939,7 +948,7 @@ async function saveToSupabase() {
         // (finally de savePatients, stash des photos) : même filtre que
         // savePatients, puis mémoire restaurée.
         const _stash = _stripDataURLsForPersist(patients);
-        try { localStorage.setItem(kP, JSON.stringify(patients)); } finally { _restoreDataURLsAfterPersist(_stash); }
+        try { localStorage.setItem(kP, (typeof _jsonPatientsLocal === 'function' ? _jsonPatientsLocal(patients) : JSON.stringify(patients))); if (typeof _ecrirePhotosIdb === 'function') _ecrirePhotosIdb(); } finally { _restoreDataURLsAfterPersist(_stash); }
       }
       if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
       console.error('[#38] saveToSupabase failed', {
@@ -959,6 +968,7 @@ async function saveToSupabase() {
       }
     } else {
       _confirmerSyncCloud(_seqEnvoi, _horodatage);
+      if (typeof _reseauPerdu !== 'undefined' && _reseauPerdu && typeof _signalerReseauRetabli === 'function') _signalerReseauRetabli();
       if (typeof _etatApresCloud === 'function') _etatApresCloud(true, _seqEnvoi);
     }
     if (ok && _syncErrorShown) {
@@ -972,6 +982,7 @@ async function saveToSupabase() {
       });
     }
   } catch(e) {
+    if (typeof _estErreurReseau === 'function' && _estErreurReseau(e) && typeof _signalerReseauPerdu === 'function') _signalerReseauPerdu();
     // Path exception (réseau, RLS, etc.) — task #38.
     // #65 — clé unifiée bm4-patients/bm4-praticiens (cf fallback ci-dessus).
     // #125 — écriture SCOPÉE (bm4-patients:<uid>). Si pas de user_id,
@@ -981,7 +992,7 @@ async function saveToSupabase() {
     if (kP) {
       // fix/269 — idem chemin « non OK » : filtre, écriture, mémoire restaurée.
       const _stash = _stripDataURLsForPersist(patients);
-      try { localStorage.setItem(kP, JSON.stringify(patients)); } finally { _restoreDataURLsAfterPersist(_stash); }
+      try { localStorage.setItem(kP, (typeof _jsonPatientsLocal === 'function' ? _jsonPatientsLocal(patients) : JSON.stringify(patients))); if (typeof _ecrirePhotosIdb === 'function') _ecrirePhotosIdb(); } finally { _restoreDataURLsAfterPersist(_stash); }
     }
     if (kPr) localStorage.setItem(kPr, JSON.stringify(praticiens));
     console.error('[#38] saveToSupabase exception', {
@@ -3744,7 +3755,7 @@ function _signalerEchecEnvoiPhoto() {
   if (_etatSauv === 'saving' || _etatSauv === 'saved') _etatSauvegarde('pending');
   // Mode domicile hors connexion : pas d'erreur. La photo est gardée sur l'appareil (elle
   // garde sa donnée image, jamais retirée tant qu'elle n'est pas envoyée) et part au retour du réseau.
-  if (typeof _modeDomicileActif === 'function' && _modeDomicileActif() && typeof navigator !== 'undefined' && navigator.onLine === false) {
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) {
     const bd = document.getElementById('photo-envoi-banner');
     if (bd) bd.style.background = '#2c6e91';
     _afficherBandeau('photo-envoi-banner', '📷 Photo gardée sur cet appareil — elle sera envoyée au retour du réseau.');
@@ -3835,7 +3846,7 @@ function _showSyncErrorBanner(message) {
   const b = document.getElementById('sync-error-banner');
   const t = document.getElementById('sync-error-banner-text');
   // Mode domicile + pas de réseau : ce n'est pas une erreur, c'est l'état normal.
-  const calme = typeof _modeDomicileActif === 'function' && _modeDomicileActif() && typeof navigator !== 'undefined' && navigator.onLine === false;
+  const calme = typeof _horsConnexion === 'function' && _horsConnexion();
   if (b) {
     b.style.background = calme ? '#2c6e91' : '#c0392b';
     b.style.display = 'block';
@@ -3849,10 +3860,209 @@ function _hideSyncErrorBanner() {
   _syncErrorShown = false;
 }
 
+
+// ─── Coffre à photos hors connexion (IndexedDB) ───
+// Une photo pas encore envoyée garde sa donnée image dans les bilans, donc dans le stockage
+// local du navigateur (quelques Mo seulement). Les grosses images sont désormais rangées dans
+// IndexedDB (bien plus de place) et remplacées dans la copie locale par une référence
+// « idb:<empreinte> ». Au rechargement, elles sont remises en place avant tout usage. Une photo
+// n'est retirée du coffre que lorsqu'elle n'est plus référencée (envoyée, donc validée).
+// Sans IndexedDB, ou si l'écriture échoue, la photo reste dans la copie locale comme avant.
+const SEUIL_PHOTO_IDB = 20000;
+let _photosAEcrireIdb = null;
+let _idbPhotosKO = false;
+let _idbPhotosBase = null;
+function _ouvrirIdbPhotos() {
+  if (_idbPhotosBase) return _idbPhotosBase;
+  _idbPhotosBase = new Promise(function (resolve, reject) {
+    if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB indisponible')); return; }
+    const r = indexedDB.open('verticy-photos', 1);
+    r.onupgradeneeded = function () { r.result.createObjectStore('p'); };
+    r.onsuccess = function () { resolve(r.result); };
+    r.onerror = function () { reject(r.error); };
+  });
+  _idbPhotosBase.catch(function () { _idbPhotosBase = null; });
+  return _idbPhotosBase;
+}
+function _refPhotoIdb(d) {
+  let a = 0x811c9dc5, b = 5381;
+  for (let i = 0; i < d.length; i++) {
+    const c = d.charCodeAt(i);
+    a = Math.imul(a ^ c, 16777619) >>> 0;
+    b = (Math.imul(b, 33) + c) >>> 0;
+  }
+  return 'idb:' + a.toString(16) + b.toString(16) + '-' + d.length;
+}
+function _jsonPatientsLocal(arr) {
+  const pend = new Map();
+  const peutRanger = !_idbPhotosKO && typeof indexedDB !== 'undefined' && pwaUser && pwaUser.id;
+  const json = JSON.stringify(arr, function (_k, v) {
+    if (peutRanger && typeof v === 'string' && v.length > SEUIL_PHOTO_IDB && v.startsWith('data:image')) {
+      const ref = _refPhotoIdb(v);
+      pend.set(ref, v);
+      return ref;
+    }
+    return v;
+  });
+  _photosAEcrireIdb = pend;
+  return json;
+}
+// Appelée juste après l'écriture locale réussie de la copie qui contient les références.
+function _ecrirePhotosIdb() {
+  const pend = _photosAEcrireIdb;
+  _photosAEcrireIdb = null;
+  if (!pend || pend.size === 0 || !pwaUser || !pwaUser.id) return Promise.resolve();
+  const uid = pwaUser.id;
+  return _ouvrirIdbPhotos().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      const tx = db.transaction('p', 'readwrite');
+      const st = tx.objectStore('p');
+      pend.forEach(function (val, ref) {
+        const key = uid + '|' + ref;
+        st.count(key).onsuccess = function (ev) { if (!ev.target.result) st.put(val, key); };
+      });
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = tx.onabort = function () { reject(tx.error || new Error('écriture IndexedDB')); };
+    });
+  }).catch(function (e) {
+    // Écriture impossible : on revient à l'ancien fonctionnement (image gardée dans la copie locale).
+    console.error('[photos] coffre IndexedDB indisponible, copie locale directe', e && e.message);
+    _idbPhotosKO = true;
+    if (typeof savePatients === 'function') savePatients();
+  });
+}
+// Remet les images à la place des références (mémoire uniquement).
+async function _rehydraterPhotosIdb(racine) {
+  const porteurs = [];
+  const pile = [racine];
+  while (pile.length) {
+    const o = pile.pop();
+    if (!o || typeof o !== 'object') continue;
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (typeof v === 'string') { if (v.startsWith('idb:')) porteurs.push([o, k, v]); }
+      else if (v && typeof v === 'object') pile.push(v);
+    }
+  }
+  if (!porteurs.length) return;
+  const uid = pwaUser && pwaUser.id;
+  let db = null;
+  try { db = uid ? await _ouvrirIdbPhotos() : null; } catch (_e) { db = null; }
+  await Promise.all(porteurs.map(function (p) {
+    return new Promise(function (resolve) {
+      if (!db) { delete p[0][p[1]]; resolve(); return; }
+      const rq = db.transaction('p', 'readonly').objectStore('p').get(uid + '|' + p[2]);
+      rq.onsuccess = function () {
+        if (typeof rq.result === 'string') p[0][p[1]] = rq.result;
+        else { console.warn('[photos] image absente du coffre', p[2]); delete p[0][p[1]]; }
+        resolve();
+      };
+      rq.onerror = function () { delete p[0][p[1]]; resolve(); };
+    });
+  }));
+}
+// Ménage : retire du coffre les images qu'aucune copie locale ne référence plus (envoyées).
+async function _nettoyerPhotosIdb() {
+  const uid = pwaUser && pwaUser.id;
+  if (!uid) return;
+  try {
+    const refs = new Set();
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf('bm4-') !== 0 || k.indexOf(uid) < 0) continue;
+      const m = (localStorage.getItem(k) || '').match(/idb:[0-9a-f]+-\d+/g);
+      if (m) m.forEach(function (r) { refs.add(uid + '|' + r); });
+    }
+    const db = await _ouvrirIdbPhotos();
+    await new Promise(function (resolve) {
+      const st = db.transaction('p', 'readwrite').objectStore('p');
+      const rq = st.openKeyCursor();
+      rq.onsuccess = function () {
+        const c = rq.result;
+        if (!c) { resolve(); return; }
+        if (typeof c.key === 'string' && c.key.indexOf(uid + '|') === 0 && !refs.has(c.key)) st.delete(c.key);
+        c.continue();
+      };
+      rq.onerror = function () { resolve(); };
+    });
+  } catch (_e) { /* ménage reporté au prochain démarrage */ }
+}
+
 // ─── Mode domicile (hors connexion) ───
 // Réglage PAR APPAREIL ET PAR COMPTE (localStorage, clé scopée). Il ne s'active qu'avec du
 // réseau, et supprime le verrouillage par inactivité ; hors connexion, la saisie reste
 // enregistrée sur l'appareil, sans message d'erreur rouge, et part au retour du réseau.
+// Passage AUTOMATIQUE en mode hors connexion dès que le réseau est perdu (événement du
+// navigateur, ou envoi qui échoue faute de réseau), même si la case n'est pas cochée : plus de
+// verrouillage, messages calmes, session et statut d'abonnement gardés sur l'appareil pour
+// pouvoir recharger la page. Au retour du réseau, tout repart tout seul.
+let _reseauPerdu = false;
+const DUREE_SESSION_HC_MS = 7 * 24 * 3600 * 1000;
+function _horsConnexion() {
+  return _reseauPerdu || (typeof navigator !== 'undefined' && navigator.onLine === false);
+}
+function _modeSansVerrou() {
+  return _modeDomicileActif() || _horsConnexion();
+}
+function _lireSessionHorsConnexion() {
+  try {
+    const raw = localStorage.getItem('bm4-session-hc');
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || !o.token || !o.user || !o.uid || !Number.isFinite(o.t)) return null;
+    if (Date.now() - o.t > DUREE_SESSION_HC_MS) return null;
+    return o;
+  } catch (_e) { return null; }
+}
+// Copie la session et le statut d'abonnement sur l'appareil (7 jours depuis le dernier contact).
+function _memoriserSessionHorsConnexion() {
+  try {
+    if (!pwaUser || !pwaUser.id) return;
+    const s = loadPwaSession();
+    if (!s.token || !s.user) return;
+    localStorage.setItem('bm4-session-hc', JSON.stringify({
+      t: Date.now(), uid: pwaUser.id, token: s.token, refresh: s.refreshToken || '', user: s.user,
+    }));
+    _memoriserAccesHorsConnexion();
+  } catch (_e) { /* stockage indisponible : pas de reprise hors connexion */ }
+}
+function _memoriserAccesHorsConnexion() {
+  try {
+    const k = _scopedKey('bm4-acces-cache');
+    if (!k || !pwaUser || !pwaUser.user_data) return;
+    localStorage.setItem(k, JSON.stringify({
+      t: Date.now(), user_data: pwaUser.user_data,
+      user_metadata: pwaUser.user_metadata || {}, app_metadata: pwaUser.app_metadata || {},
+    }));
+  } catch (_e) { /* idem */ }
+}
+// Statut d'abonnement connu (≤ 7 jours), appliqué à pwaUser ; false si absent ou trop ancien.
+function _accesDepuisCache() {
+  try {
+    const k = _scopedKey('bm4-acces-cache');
+    const o = k ? JSON.parse(localStorage.getItem(k) || 'null') : null;
+    if (!o || !o.user_data || !Number.isFinite(o.t) || Date.now() - o.t > DUREE_SESSION_HC_MS) return false;
+    pwaUser.user_data = o.user_data;
+    if (o.user_metadata) pwaUser.user_metadata = o.user_metadata;
+    if (o.app_metadata) pwaUser.app_metadata = o.app_metadata;
+    return true;
+  } catch (_e) { return false; }
+}
+function _signalerReseauPerdu() {
+  if (_reseauPerdu) return;
+  _reseauPerdu = true;
+  _memoriserSessionHorsConnexion();
+}
+function _signalerReseauRetabli() {
+  _reseauPerdu = false;
+  if (typeof _lastActivity !== 'undefined') _lastActivity = Date.now();
+  // La copie de session n'est gardée que si le mode domicile est coché.
+  if (!_modeDomicileActif()) { try { localStorage.removeItem('bm4-session-hc'); } catch (_e) { /* rien */ } }
+}
+// Une exception de requête (pas une réponse HTTP) = réseau perdu.
+function _estErreurReseau(e) {
+  return !!e && (e instanceof TypeError || /failed to fetch|networkerror|load failed|network request/i.test(String(e.message || e)));
+}
 const MSG_HORS_CONNEXION = 'Hors connexion — vos saisies sont gardées sur cet appareil et partiront au retour du réseau.';
 function _modeDomicileActif() {
   try {
@@ -3868,6 +4078,8 @@ function _reglerModeDomicile(actif) {
     if (actif) localStorage.setItem(k, '1'); else localStorage.removeItem(k);
   } catch (_e) { return false; }
   if (typeof _lastActivity !== 'undefined') _lastActivity = Date.now();
+  if (actif) _memoriserSessionHorsConnexion();
+  else if (!_horsConnexion()) { try { localStorage.removeItem('bm4-session-hc'); } catch (_e) { /* rien */ } }
   return true;
 }
 function basculerModeDomicile(el) {
@@ -3883,21 +4095,33 @@ function basculerModeDomicile(el) {
     ? 'Activé : plus de déconnexion automatique sur cet appareil.'
     : 'Désactivé : déconnexion automatique après 20 minutes d\'inactivité.';
 }
-// Réseau perdu / retrouvé (mode domicile seulement).
+// Réseau perdu / retrouvé : tous modes.
 window.addEventListener('offline', function () {
-  if (_modeDomicileActif() && pwaUser) _showSyncErrorBanner(MSG_HORS_CONNEXION);
+  if (!pwaUser) return;
+  _signalerReseauPerdu();
+  _showSyncErrorBanner(MSG_HORS_CONNEXION);
 });
 window.addEventListener('online', function () {
-  // Tous modes : une photo ou une saisie restée sur l'appareil part dès que le réseau revient.
+  // Une photo ou une saisie restée sur l'appareil part dès que le réseau revient.
   if (!pwaUser) return;
+  _signalerReseauRetabli();
   _hideSyncErrorBanner();
   _renvoyerApresReconnexion();
 });
+// Réseau perdu sans que le navigateur le sache (wifi sans internet) : sonde toutes les 15 s.
+setInterval(function () {
+  if (!pwaUser || !_reseauPerdu || navigator.onLine === false) return;
+  fetch(SUPA_URL + '/auth/v1/health', { method: 'GET', mode: 'no-cors', cache: 'no-store' })
+    .then(function () { _signalerReseauRetabli(); _hideSyncErrorBanner(); _renvoyerApresReconnexion(); })
+    .catch(function () { /* toujours hors connexion */ });
+}, 15000);
 // Au retour du réseau : réécrit la page en cours (c'est ce qui renvoie les photos en attente),
 // puis envoie les données. Les photos ne sont validées (retirées de la file) que si l'envoi réussit.
 async function _renvoyerApresReconnexion() {
   try {
     await ensureSession();
+    // Statut d'abonnement : relu au retour du réseau (la copie gardée hors connexion s'efface).
+    try { await fetchUserDataAtLogin(); checkAccessStatus(); } catch (_e) { /* garde la copie */ }
     const ap = document.querySelector('.page.active');
     const id = ap ? ap.id : null;
     if (id === 'pg-bilan' && typeof saveBilanSilent === 'function') await saveBilanSilent();
@@ -4010,10 +4234,11 @@ function _idleLockTick() {
   // Safety net : si pwaUser a été clear en cours de route, on stoppe.
   if (!pwaUser) { _stopIdleLock(); return; }
   // Mode domicile : pas de verrouillage par inactivité (l'appareil est celui du praticien).
-  if (_modeDomicileActif()) {
+  if (_modeSansVerrou()) {
     var b0 = document.getElementById('idle-warn-banner');
     if (b0 && b0.style.display !== 'none') b0.style.display = 'none';
     _idleWarnActive = false;
+    _lastActivity = Date.now(); // pas de compte à rebours caché : il repart de zéro au retour du réseau
     return;
   }
   var cfg = window._idleLockCfg;
@@ -4143,6 +4368,13 @@ async function pwaLogout() {
 async function initPWA() {
   // Vérifier session existante
   let session = loadPwaSession();
+  // Onglet rouvert avec la copie « hors connexion » (mode domicile, ou réseau perdu avant la
+  // fermeture) : on reprend la session si elle a moins de 7 jours.
+  const copieHC = !session.token ? _lireSessionHorsConnexion() : null;
+  if (copieHC) {
+    savePwaSession(copieHC.token, copieHC.refresh, copieHC.user);
+    session = loadPwaSession();
+  }
   if(session.token && session.user) {
     try {
       // #102 Phase 2b hotfix 3 — refresh préventif AVANT le premier appel réseau
@@ -4155,7 +4387,22 @@ async function initPWA() {
       // >60s (décodage JWT local uniquement) : coût nul dans le cas normal.
       await ensureSession();
       session = loadPwaSession(); // re-lire : ensureSession a pu rafraîchir le token
-      const userData = await supa.getUser();
+      let userData;
+      try {
+        userData = await supa.getUser();
+      } catch (eReseau) {
+        // Pas de réseau au démarrage : reprise sur la copie gardée sur l'appareil (7 jours).
+        const hc = _lireSessionHorsConnexion();
+        if (hc && session.user && hc.uid === (session.user.id || hc.uid) && (_estErreurReseau(eReseau) || navigator.onLine === false)) {
+          _reseauPerdu = true;
+          const isAdminHC = session.user.email?.toLowerCase() === VERTICY_ADMIN_EMAIL;
+          pwaUser = { ...session.user, id: session.user.id || hc.uid, token: session.token, isAdmin: isAdminHC, user_metadata: session.user.user_metadata || {}, app_metadata: session.user.app_metadata || {} };
+          await onPwaLoginSuccess();
+          _showSyncErrorBanner(MSG_HORS_CONNEXION);
+          return;
+        }
+        throw eReseau;
+      }
       if(userData.id) {
         const isAdmin = session.user.email?.toLowerCase() === VERTICY_ADMIN_EMAIL; // #229-C
         // #261 — l'identifiant faisant autorité vient de supa.getUser(), déjà
@@ -5737,7 +5984,8 @@ function savePatients() {
 
   // Calcul de la taille future après sérialisation : seul bm4-patients:<uid> change.
   // (savePatients() n'écrit que sa clé scopée ; bm4-praticiens:<uid> est géré par savePraticiens.)
-  const futurePatientsBytes = JSON.stringify(patients).length * 2;
+  const _jsonLocal = (typeof _jsonPatientsLocal === 'function' ? _jsonPatientsLocal(patients) : JSON.stringify(patients));
+  const futurePatientsBytes = _jsonLocal.length * 2;
   const currentPatientsKey = _scopedKey('bm4-patients');
   const futureKeyBytes = currentPatientsKey.length * 2;
   // Reconstituer la taille post-save totale du stockage BioMéca.
@@ -5779,7 +6027,8 @@ function savePatients() {
   try {
     // #125 — écriture SCOPÉE (bm4-patients:<uid>). currentPatientsKey non-null
     // ici grâce à la garde en tête de savePatients.
-    localStorage.setItem(currentPatientsKey, JSON.stringify(patients));
+    localStorage.setItem(currentPatientsKey, _jsonLocal);
+    if (typeof _ecrirePhotosIdb === 'function') _ecrirePhotosIdb();
     _marquerNonSynchronise(); // A2 — effacé quand le cloud confirme (saveToSupabase)
     _stockageRetabli(); // A2 PR 2 — l'écriture a réussi : fin de l'incident « stockage plein »
     if (typeof _etatApresLocal === 'function') _etatApresLocal(true);

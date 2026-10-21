@@ -63,6 +63,13 @@ async function uploadPhotoBase64(dataUrl, path) {
     }
     return { ok: true, path };
   } catch (e) {
+    // Exception de requête (pas de réponse HTTP) = réseau perdu : passage en mode hors connexion.
+    if (
+      typeof window._signalerReseauPerdu === 'function' &&
+      typeof window._estErreurReseau === 'function' &&
+      window._estErreurReseau(e)
+    )
+      window._signalerReseauPerdu();
     if (typeof window._signalerEchecEnvoiPhoto === 'function') window._signalerEchecEnvoiPhoto();
     return { ok: false, error: e.message || String(e) };
   }
