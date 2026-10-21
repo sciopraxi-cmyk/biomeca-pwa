@@ -4117,6 +4117,82 @@ setInterval(function () {
 }, 15000);
 // Au retour du réseau : réécrit la page en cours (c'est ce qui renvoie les photos en attente),
 // puis envoie les données. Les photos ne sont validées (retirées de la file) que si l'envoi réussit.
+// Photos restées sur l'appareil faute de réseau, pour TOUS les patients (pas seulement la page
+// ouverte) : envoyées vers le stockage, puis la copie locale est réécrite avec leurs chemins.
+let _renvoiPhotosEnCours = false;
+function _photoEnAttente(obj) {
+  if (!obj || typeof obj !== 'object') return false;
+  return Object.keys(obj).some(function (k) {
+    const v = obj[k];
+    return typeof v === 'string' && v.indexOf('data:image') === 0 && !obj[k + 'Path'];
+  });
+}
+function _patientAPhotosEnAttente(p) {
+  if (!p) return false;
+  if (_photoEnAttente(p.bilanData) || _photoEnAttente(p.bilanDataPosturo)) return true;
+  if (_photoEnAttente(p.bilanDataPodopediatrie) || _photoEnAttente(p.bilanDataPedicurie)) return true;
+  const m = p.mesures || {};
+  return Object.keys(m).some(function (tid) {
+    if (tid.charAt(0) === '_') return false;
+    const t = m[tid] || {};
+    return [].concat(t.photos || [], t.frames || []).some(function (e) {
+      return e && typeof e.dataUrl === 'string' && e.dataUrl.indexOf('data:image') === 0 && !e.path;
+    });
+  });
+}
+async function _envoyerPhotosEnAttente() {
+  if (_renvoiPhotosEnCours || !pwaUser || !Array.isArray(patients)) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  _renvoiPhotosEnCours = true;
+  try {
+    await ensureSession();
+    let touche = false;
+    const restaurations = [];
+    for (const p of patients) {
+      if (!p || !p.id || !_patientAPhotosEnAttente(p)) continue;
+      try {
+        if (_photoEnAttente(p.bilanDataPosturo)) {
+          const d = p.bilanDataPosturo;
+          const st = await migratePosturoPhotos(d, p.id, d.id);
+          restaurations.push(function () { Object.assign(d, st); });
+          touche = true;
+        }
+        if (_photoEnAttente(p.bilanDataPodopediatrie)) {
+          const d = p.bilanDataPodopediatrie;
+          const st = (await migratePodopediatriePhotos(d, p.id, d.id)) || {};
+          restaurations.push(function () { restorePodopediatriePhotosStash(d, st); });
+          touche = true;
+        }
+        if (_photoEnAttente(p.bilanDataPedicurie)) {
+          const d = p.bilanDataPedicurie;
+          const st = (await migratePedicuriePhotos(d, p.id, d.id)) || {};
+          restaurations.push(function () { restorePedicuriePhotosStash(d, st); });
+          touche = true;
+        }
+        const bilanId = p.mesures && p.mesures._bilanId;
+        if (bilanId && _photoEnAttente(p.bilanData)) {
+          const bd = p.bilanData;
+          const st = await migrateSportBilanDataPhotos(bd, p.id, bilanId);
+          restaurations.push(function () { restoreSportBilanDataPhotosStash(bd, st); });
+          touche = true;
+        }
+        if (bilanId) {
+          for (const tid in p.mesures) {
+            if (tid.charAt(0) === '_') continue;
+            const st = await migrateSportPhotos(p.mesures[tid], p.id, bilanId, tid);
+            if (st && st.length) { restaurations.push(function () { restoreSportPhotosStash(st); }); touche = true; }
+          }
+        }
+      } catch (e) {
+        console.warn('[photos] renvoi au retour du réseau, patient ignoré', e && e.message);
+      }
+    }
+    if (touche) savePatients();
+    restaurations.forEach(function (r) { try { r(); } catch (_e) { /* affichage seulement */ } });
+  } finally {
+    _renvoiPhotosEnCours = false;
+  }
+}
 async function _renvoyerApresReconnexion() {
   try {
     await ensureSession();
@@ -4128,6 +4204,7 @@ async function _renvoyerApresReconnexion() {
     else if (id === 'pg-bilan-posturo' && typeof savePosturoBilan === 'function') await savePosturoBilan(true);
     else if (id === 'pg-pedicurie' && typeof savePedicurieBilan === 'function') await savePedicurieBilan(true);
     else if (id === 'pg-podopediatrie' && typeof savePodopediatrieBilan === 'function') await savePodopediatrieBilan(true);
+    await _envoyerPhotosEnAttente(); // toutes les photos en attente, quelle que soit la page ouverte
     const k = _scopedKey('bm4-nonsync');
     if (k && localStorage.getItem(k)) {
       if (typeof _etatSauvegarde === 'function') _etatSauvegarde('saving');
@@ -5892,9 +5969,12 @@ function _ecrireLocalAvantEnvoi(preparer) {
   try {
     if (typeof preparer === 'function') preparer();
     stash = _stripDataURLsForPersist(patients);
-    const json = JSON.stringify(patients);
-    if (!_urgenceFermeture && !json.includes('"data:image')) return false;
+    // Fermeture d'onglet : copie directe (une écriture IndexedDB asynchrone pourrait être coupée).
+    const rangerIdb = !_urgenceFermeture && typeof _jsonPatientsLocal === 'function';
+    const json = rangerIdb ? _jsonPatientsLocal(patients) : JSON.stringify(patients);
+    if (!_urgenceFermeture && !json.includes('"data:image') && !json.includes('"idb:')) return false;
     localStorage.setItem(k, json);
+    if (rangerIdb && typeof _ecrirePhotosIdb === 'function') _ecrirePhotosIdb();
     _marquerNonSynchronise();
     return true;
   } catch (e) {

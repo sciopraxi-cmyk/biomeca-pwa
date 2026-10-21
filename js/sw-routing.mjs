@@ -49,6 +49,9 @@ export function pickCacheStrategy({ url, method, swOrigin, basePath }) {
   // 2. Supabase — network-first pour GET, bypass pour mutations.
   if (url.hostname.endsWith('.supabase.co') || url.hostname.endsWith('.supabase.in')) {
     if (method !== 'GET') return 'bypass';
+    // Données et authentification : jamais de réponse périmée du cache (cf. service-worker.js).
+    if (url.pathname.startsWith('/rest/v1/') || url.pathname.startsWith('/auth/v1/'))
+      return 'bypass';
     return 'networkFirst';
   }
   // 3. Google Fonts — stale-while-revalidate.

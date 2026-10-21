@@ -265,3 +265,42 @@ describe('branchements (code source)', () => {
     expect(fonction('clearPwaSession')).toMatch(/bm4-session-hc/);
   });
 });
+
+describe('photos en attente, tous patients', () => {
+  const noms = ['_photoEnAttente', '_patientAPhotosEnAttente'];
+  const f = exec([...noms.map(fonction), 'return { ' + noms.join(', ') + ' };'].join('\n'), {
+    Object,
+    Array,
+    String,
+  });
+  const img = 'data:image/jpeg;base64,AAAA';
+  it('détecte une photo sans chemin, dans chaque type de bilan', () => {
+    expect(f._patientAPhotosEnAttente({ bilanDataPosturo: { _plant_ph_1: img } })).toBe(true);
+    expect(f._patientAPhotosEnAttente({ bilanDataPedicurie: { _x: img } })).toBe(true);
+    expect(f._patientAPhotosEnAttente({ bilanDataPodopediatrie: { _x: img } })).toBe(true);
+    expect(f._patientAPhotosEnAttente({ bilanData: { a: img } })).toBe(true);
+    expect(f._patientAPhotosEnAttente({ mesures: { t1: { photos: [{ dataUrl: img }] } } })).toBe(
+      true
+    );
+  });
+  it('ignore une photo déjà envoyée (chemin présent) et les patients sans photo', () => {
+    expect(
+      f._patientAPhotosEnAttente({ bilanDataPosturo: { _plant_ph_1: img, _plant_ph_1Path: 'u/p' } })
+    ).toBe(false);
+    expect(
+      f._patientAPhotosEnAttente({ mesures: { t1: { photos: [{ dataUrl: img, path: 'u/p' }] } } })
+    ).toBe(false);
+    expect(f._patientAPhotosEnAttente({ nom: 'Fictif' })).toBe(false);
+    expect(f._patientAPhotosEnAttente(null)).toBe(false);
+  });
+  it('le renvoi au retour du réseau envoie ces photos avant la synchronisation', () => {
+    const r = fonction('_renvoyerApresReconnexion');
+    expect(r.indexOf('_envoyerPhotosEnAttente')).toBeGreaterThan(-1);
+    expect(r.indexOf('_envoyerPhotosEnAttente')).toBeLessThan(r.indexOf('saveToSupabase'));
+  });
+  it('l’écriture locale anticipée passe par le coffre, sauf à la fermeture de l’onglet', () => {
+    const e = fonction('_ecrireLocalAvantEnvoi');
+    expect(e).toMatch(/_jsonPatientsLocal/);
+    expect(e).toMatch(/!_urgenceFermeture && typeof _jsonPatientsLocal/);
+  });
+});

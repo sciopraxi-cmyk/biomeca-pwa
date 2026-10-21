@@ -60,8 +60,17 @@ describe('pickCacheStrategy — bypass Stripe', () => {
 });
 
 describe('pickCacheStrategy — Supabase', () => {
-  it('GET REST → networkFirst', () => {
-    const url = new URL('https://tzivizoacdyopwfzerrb.supabase.co/rest/v1/user_data');
+  it('GET REST et auth → bypass (jamais de réponse périmée hors connexion)', () => {
+    for (const chemin of ['/rest/v1/user_data', '/auth/v1/user']) {
+      const url = new URL('https://tzivizoacdyopwfzerrb.supabase.co' + chemin);
+      expect(
+        pickCacheStrategy({ url, method: 'GET', swOrigin: LOCAL_ORIGIN, basePath: LOCAL_BASE })
+      ).toBe('bypass');
+    }
+  });
+
+  it('GET Storage (photos par URL signée) → networkFirst, lisibles hors connexion', () => {
+    const url = new URL('https://tzivizoacdyopwfzerrb.supabase.co/storage/v1/object/sign/b/x.jpg');
     expect(
       pickCacheStrategy({ url, method: 'GET', swOrigin: LOCAL_ORIGIN, basePath: LOCAL_BASE })
     ).toBe('networkFirst');
