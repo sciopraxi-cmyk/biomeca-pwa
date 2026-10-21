@@ -3238,6 +3238,7 @@ function showAccessRestrictedModal(reason) {
     export_pdf: 'Export PDF',
     create_document: 'Création de devis et de factures',
     create_ordonnance: 'Création d\'ordonnances',
+    create_sterilisation: 'Enregistrement en stérilisation',
   };
   const label = labels[reason] || 'Cette fonctionnalité';
 
@@ -5421,7 +5422,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients','pg-ordonnances':'tn-patients',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients','pg-ordonnances':'tn-patients','pg-sterilisation':'tn-sterilisation',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
@@ -5432,6 +5433,7 @@ function nav(id) {
   if(id === 'pg-actes') renderActesPage();
   if(id === 'pg-documents') renderDocumentsPage();
   if(id === 'pg-ordonnances') renderOrdonnancesPage();
+  if(id === 'pg-sterilisation') renderSterilisationPage();
   if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
@@ -7079,6 +7081,7 @@ function renderPatientList() {
         </div>
         <button onclick="ouvrirDocumentsPatient(${i})" title="Devis et factures" aria-label="Devis et factures" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧾</button>
         <button onclick="ouvrirOrdonnancesPatient(${i})" title="Ordonnances" aria-label="Ordonnances" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">📝</button>
+        <button onclick="ouvrirSterilisationPatient(${i})" title="Stérilisation" aria-label="Stérilisation" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧼</button>
         <button onclick="editPatient(${i})" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
         <button onclick="deletePatient(${i})" class="bl-x" style="width:32px;height:32px;font-size:13px;">✕</button>
       </div>
@@ -32730,6 +32733,635 @@ function imprimerOrdonnance(id) {
     try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
     catch (_e) { alert('Impression impossible. Réessayez ou utilisez Cmd/Ctrl+P.'); }
   }, 300);
+}
+
+// ═════════════════════════════════════════════════════════════════
+// Traçabilité de stérilisation — registre des cycles, sets, appareils, maintenance, soins
+// ═════════════════════════════════════════════════════════════════
+// Stockage dans le blob existant (aucune table, aucun SQL) : `praticien.sterilisation`
+// ({ appareils, sets, cycles, maintenance, dernierNumero }) et `patient.soinsSterilisation`
+// (références de sachets utilisées lors d'un soin). Écriture uniquement par savePraticiens /
+// savePatients. Aucun réseau, aucun envoi par e-mail ni SMS (HDS pas migré).
+// Les mentions réglementaires sont des AVERTISSEMENTS, jamais des blocages. Sources citées dans
+// la page : Ordre national des pédicures-podologues (cahier de stérilisation, 5 ans ; lien
+// patient ↔ sachets ↔ autoclave ; registre de maintenance, art. R5211-5 et R5212-25 CSP) et
+// circulaire DGS/DHOS n° 138 du 14 mars 2001. Les textes officiels n'ont pas été lus en intégral.
+const STER_JOURS_BOWIE_DEFAUT = 7;
+const STER_JOURS_CONTROLE_DEFAUT = 365;
+const STER_SACHETS_MAX = 60;
+const STER_ETAT_STERILE_JOURS = 60; // « environ deux mois » (Ordre)
+const STER_RESULTATS = { conforme: 'Conforme', non_conforme: 'Non conforme', non_fait: 'Non réalisé' };
+const STER_TYPES_APPAREIL = ['Autoclave', 'Bac à ultrasons', 'Thermosoudeuse', 'Autre'];
+const STER_TYPES_MAINTENANCE = ['Contrôle', 'Requalification annuelle', 'Maintenance', 'Réparation', 'Autre'];
+let _sterVue = 'cycles';
+let _sterCycleId = null;
+let _sterBrouillon = null;
+let _sterPratId = null;
+let _sterSoinBrouillon = null;
+let _sterPeriode = null;
+
+function _sterJoursEntre(isoA, isoB) {
+  const a = Date.parse(isoA + 'T00:00:00Z'), b = Date.parse(isoB + 'T00:00:00Z');
+  return isNaN(a) || isNaN(b) ? NaN : Math.round((b - a) / 86400000);
+}
+function _sterAjouterJours(iso, n) {
+  const t = Date.parse(iso + 'T00:00:00Z');
+  return isNaN(t) ? '' : new Date(t + n * 86400000).toISOString().slice(0, 10);
+}
+function _sterTexte(v, max) { return Array.from(String(v ?? ''), (c) => (c.charCodeAt(0) < 32 ? ' ' : c)).join('').trim().slice(0, max); }
+function _sterResultat(v) { return v === 'conforme' || v === 'non_conforme' ? v : 'non_fait'; }
+function _sterDonnees(pr) {
+  const s = pr && typeof pr.sterilisation === 'object' && pr.sterilisation ? pr.sterilisation : {};
+  return {
+    appareils: Array.isArray(s.appareils) ? s.appareils : [],
+    sets: Array.isArray(s.sets) ? s.sets : [],
+    cycles: Array.isArray(s.cycles) ? s.cycles : [],
+    maintenance: Array.isArray(s.maintenance) ? s.maintenance : [],
+    dernierNumero: Number.isFinite(s.dernierNumero) ? s.dernierNumero : 0,
+  };
+}
+// Objet réellement stocké (créé à la première écriture seulement).
+function _sterDonneesEcriture(pr) {
+  const d = _sterDonnees(pr);
+  pr.sterilisation = { appareils: d.appareils, sets: d.sets, cycles: d.cycles, maintenance: d.maintenance, dernierNumero: d.dernierNumero };
+  return pr.sterilisation;
+}
+function _sterPrat() {
+  return praticiens.find((p) => p.id == _sterPratId) || _praticienParDefaut(currentPatient) || null;
+}
+function _sterNumeroSuivant(d) {
+  return Math.max(d.dernierNumero || 0, ...d.cycles.map((c) => c.numero || 0)) + 1;
+}
+function _sterRefSachet(numero, i) {
+  return 'C' + String(numero).padStart(4, '0') + '-' + String(i).padStart(2, '0');
+}
+function _sterSachetsDuCycle(c) { return Array.isArray(c?.sachets) ? c.sachets : []; }
+function _sterCycleDeRef(d, ref) {
+  return d.cycles.find((c) => _sterSachetsDuCycle(c).some((s) => s.ref === ref)) || null;
+}
+function _sterSachetsUtilises(pratId) {
+  const res = [];
+  (patients || []).forEach((p) => (Array.isArray(p.soinsSterilisation) ? p.soinsSterilisation : []).forEach((s) => {
+    if (s.registrePratId == pratId) (s.sachets || []).forEach((ref) => res.push({ ref, date: s.date, soinId: s.id, patient: p }));
+  }));
+  return res;
+}
+// Avertissements d'un cycle : jamais bloquants.
+function _sterAlertesCycle(c, aujourdhui) {
+  const a = [];
+  if (c.resultat === 'non_conforme') a.push('Cycle non conforme : les sachets de ce cycle ne doivent pas être utilisés (à re-stériliser).');
+  if (c.bowie === 'non_fait') a.push('Test de Bowie-Dick non renseigné (le dossier de l\'Ordre demande le résultat du jour).');
+  if (c.bowie === 'non_conforme') a.push('Test de Bowie-Dick non conforme : ne pas utiliser l\'autoclave avant vérification.');
+  if (c.indicateur6 === 'non_conforme') a.push('Indicateur de classe 6 non conforme.');
+  if (!c.operateur) a.push('Opérateur non renseigné (signature de l\'opérateur demandée dans le dossier).');
+  if (!_sterSachetsDuCycle(c).length) a.push('Aucun sachet enregistré dans la charge.');
+  if (c.date && aujourdhui && c.date > aujourdhui) a.push('La date du cycle est dans le futur.');
+  return a;
+}
+function _sterValiderCycle(c, d) {
+  if (!_ordoDateValide(c.date)) return { ok: false, erreur: 'Indiquez la date du cycle.' };
+  if (!d.appareils.some((x) => x.id === c.appareilId)) return { ok: false, erreur: 'Choisissez l\'autoclave (onglet « Appareils » pour en ajouter un).' };
+  if (_sterSachetsDuCycle(c).length > STER_SACHETS_MAX) return { ok: false, erreur: 'Au plus ' + STER_SACHETS_MAX + ' sachets par cycle.' };
+  return { ok: true };
+}
+// Rappels (informatifs, dans l'application seulement) : délais modifiables par appareil.
+function _sterRappels(d, aujourdhui) {
+  const r = [];
+  d.appareils.filter((x) => !x.finExploitation).forEach((ap) => {
+    const nom = ap.nom || 'Appareil';
+    if (ap.type === 'Autoclave') {
+      const delai = Number.isFinite(ap.delaiBowieJours) ? ap.delaiBowieJours : STER_JOURS_BOWIE_DEFAUT;
+      const tests = d.cycles.filter((c) => c.appareilId === ap.id && c.bowie && c.bowie !== 'non_fait').map((c) => c.date).sort();
+      const dernier = tests[tests.length - 1];
+      if (!dernier) r.push({ niveau: 'info', texte: nom + ' : aucun test de Bowie-Dick enregistré.' });
+      else {
+        const n = _sterJoursEntre(dernier, aujourdhui);
+        if (n > delai) r.push({ niveau: 'warn', texte: nom + ' : dernier test de Bowie-Dick il y a ' + n + ' jours (rappel tous les ' + delai + ' jours).' });
+      }
+      const dernierCycle = d.cycles.filter((c) => c.appareilId === ap.id).sort((x, y) => String(x.date).localeCompare(String(y.date))).pop();
+      if (dernierCycle && dernierCycle.resultat === 'non_conforme') r.push({ niveau: 'alerte', texte: nom + ' : le dernier cycle (n° ' + dernierCycle.numero + ') est non conforme.' });
+    }
+    const delaiC = Number.isFinite(ap.delaiControleJours) ? ap.delaiControleJours : STER_JOURS_CONTROLE_DEFAUT;
+    const ops = d.maintenance.filter((m) => m.appareilId === ap.id).map((m) => m.date).sort();
+    const ref = ops[ops.length - 1] || ap.miseEnService || '';
+    if (ref) {
+      const n = _sterJoursEntre(ref, aujourdhui);
+      if (n > delaiC) r.push({ niveau: 'warn', texte: nom + ' : dernier contrôle / maintenance' + (ops.length ? '' : ' (ou mise en service)') + ' il y a ' + n + ' jours (rappel tous les ' + delaiC + ' jours ; voir la notice du fabricant).' });
+    } else if (ap.type === 'Autoclave') {
+      r.push({ niveau: 'info', texte: nom + ' : aucune opération de contrôle ou de maintenance enregistrée.' });
+    }
+  });
+  return r;
+}
+function _sterCsvCellule(v) {
+  let s = String(v ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // neutralise les formules des tableurs
+  return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function _sterLignesRegistre(d, du, au) {
+  return d.cycles
+    .filter((c) => (!du || c.date >= du) && (!au || c.date <= au))
+    .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.numero - b.numero))
+    .map((c) => ({
+      numero: c.numero, date: c.date, appareil: c.appareil?.nom || '', serie: c.appareil?.serie || '',
+      type: c.typeCycle || '', resultat: STER_RESULTATS[c.resultat] || '',
+      bowie: STER_RESULTATS[c.bowie] || '', helix: STER_RESULTATS[c.helix] || '', classe6: STER_RESULTATS[c.indicateur6] || '',
+      predes: c.preparation?.predesinfection ? 'oui' : 'non', lavage: c.preparation?.lavage ? 'oui' : 'non', conditionnement: c.preparation?.conditionnement ? 'oui' : 'non',
+      operateur: c.operateur || '', sachets: _sterSachetsDuCycle(c).map((s) => s.ref + (s.libelle ? ' (' + s.libelle + ')' : '')).join(' ; '),
+      observations: c.observations || '',
+    }));
+}
+const STER_COLONNES = [
+  ['numero', 'N° cycle'], ['date', 'Date'], ['appareil', 'Appareil'], ['serie', 'N° de série'], ['type', 'Type de cycle'],
+  ['resultat', 'Résultat'], ['bowie', 'Bowie-Dick'], ['helix', 'Helix'], ['classe6', 'Indicateur classe 6'],
+  ['predes', 'Pré-désinfection'], ['lavage', 'Lavage'], ['conditionnement', 'Conditionnement'],
+  ['operateur', 'Opérateur'], ['sachets', 'Sachets'], ['observations', 'Observations'],
+];
+function _sterCsv(lignes) {
+  return '\ufeff' + [STER_COLONNES.map((c) => _sterCsvCellule(c[1])).join(';')]
+    .concat(lignes.map((l) => STER_COLONNES.map((c) => _sterCsvCellule(c[0] === 'date' ? _dateFr(l.date) : l[c[0]])).join(';')))
+    .join('\r\n') + '\r\n';
+}
+
+// ── Navigation ──
+function ouvrirSterilisationPatient(idx) {
+  const p = patients[idx];
+  if (!p) return;
+  selectPatient(p);
+  _sterPratId = _praticienParDefaut(p)?.id ?? null;
+  _sterVue = 'soin'; _sterSoinBrouillon = null; _sterCycleId = null; _sterBrouillon = null;
+  nav('pg-sterilisation');
+}
+function sterAller(vue) { _sterVue = vue; _sterCycleId = null; _sterBrouillon = null; _sterSoinBrouillon = null; renderSterilisationPage(); }
+function sterChoisirPraticien(id) { _sterPratId = id; _sterVue = _sterVue === 'soin' ? 'soin' : 'cycles'; _sterBrouillon = null; _sterSoinBrouillon = null; renderSterilisationPage(); }
+function _sterDroitEcriture() {
+  if (_accessPermetCreationDocument()) return true;
+  showAccessRestrictedModal('create_sterilisation');
+  return false;
+}
+
+// ── Appareils et maintenance ──
+function _sterLire(id) { const e = document.getElementById(id); return e ? e.value : ''; }
+function ajouterAppareilSterilisation() {
+  if (!_sterDroitEcriture()) return;
+  const pr = _sterPrat();
+  if (!pr) { alert('Créez d\'abord un praticien (onglet Praticiens).'); return; }
+  const nom = _sterTexte(_sterLire('ster-ap-nom'), 80);
+  if (!nom) { alert('Indiquez le nom de l\'appareil.'); return; }
+  const ms = _sterLire('ster-ap-mise');
+  const ap = {
+    id: crypto.randomUUID(), type: STER_TYPES_APPAREIL.includes(_sterLire('ster-ap-type')) ? _sterLire('ster-ap-type') : 'Autre', nom,
+    fabricant: _sterTexte(_sterLire('ster-ap-fab'), 80), fournisseur: _sterTexte(_sterLire('ster-ap-four'), 80),
+    serie: _sterTexte(_sterLire('ster-ap-serie'), 60), lieu: _sterTexte(_sterLire('ster-ap-lieu'), 80),
+    miseEnService: _ordoDateValide(ms) ? ms : '', finExploitation: '',
+  };
+  _sterDonneesEcriture(pr).appareils.push(ap);
+  savePraticiens();
+  renderSterilisationPage();
+}
+function sterReglerDelaisAppareil(id) {
+  if (!_sterDroitEcriture()) return;
+  const pr = _sterPrat(); const ap = pr && _sterDonneesEcriture(pr).appareils.find((a) => a.id === id);
+  if (!ap) return;
+  const n = (v, def) => { const x = parseInt(v, 10); return Number.isFinite(x) && x >= 1 && x <= 3650 ? x : def; };
+  ap.delaiBowieJours = n(_sterLire('ster-delai-bd-' + id), STER_JOURS_BOWIE_DEFAUT);
+  ap.delaiControleJours = n(_sterLire('ster-delai-ct-' + id), STER_JOURS_CONTROLE_DEFAUT);
+  savePraticiens();
+  renderSterilisationPage();
+}
+function sterMettreHorsService(id) {
+  if (!_sterDroitEcriture()) return;
+  const pr = _sterPrat(); const ap = pr && _sterDonneesEcriture(pr).appareils.find((a) => a.id === id);
+  if (!ap) return;
+  if (!confirm('Mettre cet appareil hors service ? Son historique est conservé (à garder 5 ans après la fin d\'exploitation).')) return;
+  ap.finExploitation = _ordoAujourdhui();
+  savePraticiens();
+  renderSterilisationPage();
+}
+function ajouterMaintenanceSterilisation() {
+  if (!_sterDroitEcriture()) return;
+  const pr = _sterPrat();
+  if (!pr) return;
+  const d = _sterDonnees(pr);
+  const appareilId = _sterLire('ster-mt-app');
+  const date = _sterLire('ster-mt-date');
+  if (!d.appareils.some((a) => a.id === appareilId)) { alert('Choisissez l\'appareil.'); return; }
+  if (!_ordoDateValide(date)) { alert('Indiquez la date.'); return; }
+  const type = _sterLire('ster-mt-type');
+  _sterDonneesEcriture(pr).maintenance.push({
+    id: crypto.randomUUID(), appareilId, date, type: STER_TYPES_MAINTENANCE.includes(type) ? type : 'Autre',
+    description: _sterTexte(_sterLire('ster-mt-desc'), 300), operateur: _sterTexte(_sterLire('ster-mt-op'), 80),
+    observations: _sterTexte(_sterLire('ster-mt-obs'), 500), created_at: new Date().toISOString(),
+  });
+  savePraticiens();
+  renderSterilisationPage();
+}
+
+// ── Sets d'instruments ──
+function ajouterSetSterilisation() {
+  if (!_sterDroitEcriture()) return;
+  const pr = _sterPrat();
+  if (!pr) { alert('Créez d\'abord un praticien (onglet Praticiens).'); return; }
+  const nom = _sterTexte(_sterLire('ster-set-nom'), 80);
+  if (!nom) { alert('Indiquez le nom du set.'); return; }
+  const instruments = String(_sterLire('ster-set-instr')).split('\n').map((l) => _sterTexte(l, 100)).filter(Boolean).slice(0, 60);
+  _sterDonneesEcriture(pr).sets.push({ id: crypto.randomUUID(), nom, instruments });
+  savePraticiens();
+  renderSterilisationPage();
+}
+function supprimerSetSterilisation(id) {
+  if (!_sterDroitEcriture()) return;
+  const pr = _sterPrat();
+  if (!pr) return;
+  if (!confirm('Supprimer ce set ? Les cycles déjà enregistrés gardent son nom.')) return;
+  const s = _sterDonneesEcriture(pr);
+  s.sets = s.sets.filter((x) => x.id !== id);
+  savePraticiens();
+  renderSterilisationPage();
+}
+
+// ── Cycles ──
+function _sterNouveauBrouillon() {
+  const pr = _sterPrat(); const d = _sterDonnees(pr);
+  const ap = d.appareils.filter((a) => a.type === 'Autoclave' && !a.finExploitation);
+  return {
+    id: null, numero: _sterNumeroSuivant(d), date: _ordoAujourdhui(), appareilId: (ap[0] || d.appareils[0] || {}).id || '',
+    typeCycle: '134 °C — 18 min', resultat: 'conforme', bowie: 'non_fait', helix: 'non_fait', indicateur6: 'non_fait',
+    operateur: pr?.nom || '', preparation: { predesinfection: true, lavage: true, conditionnement: true },
+    sachets: [], observations: '', created_at: null,
+  };
+}
+function _sterLireFormulaireCycle() {
+  const b = _sterBrouillon;
+  if (!b) return null;
+  const v = (id) => _sterLire('ster-cy-' + id);
+  b.date = v('date') || b.date; b.appareilId = v('app') || b.appareilId; b.typeCycle = _sterTexte(v('type'), 60);
+  b.resultat = _sterResultat(v('res')) === 'non_fait' ? 'conforme' : _sterResultat(v('res'));
+  b.bowie = _sterResultat(v('bd')); b.helix = _sterResultat(v('hx')); b.indicateur6 = _sterResultat(v('c6'));
+  b.operateur = _sterTexte(v('op'), 80); b.observations = _sterTexte(v('obs'), 500);
+  const chk = (id) => { const e = document.getElementById('ster-cy-' + id); return !!(e && e.checked); };
+  b.preparation = { predesinfection: chk('pd'), lavage: chk('lv'), conditionnement: chk('cd') };
+  b.sachets.forEach((s, i) => { const e = document.getElementById('ster-cy-sac-' + i); if (e) s.libelle = _sterTexte(e.value, 80); });
+  return b;
+}
+function nouveauCycleSterilisation() {
+  if (!_sterDroitEcriture()) return;
+  const pr = _sterPrat();
+  if (!pr) { alert('Créez d\'abord un praticien (onglet Praticiens).'); return; }
+  if (!_sterDonnees(pr).appareils.length) { alert('Ajoutez d\'abord votre autoclave (onglet « Appareils »).'); sterAller('appareils'); return; }
+  _sterBrouillon = _sterNouveauBrouillon(); _sterVue = 'cycle-form'; _sterCycleId = null;
+  renderSterilisationPage();
+}
+function modifierCycleSterilisation(id) {
+  if (!_sterDroitEcriture()) return;
+  const c = _sterDonnees(_sterPrat()).cycles.find((x) => x.id === id);
+  if (!c) return;
+  _sterBrouillon = JSON.parse(JSON.stringify(c)); _sterVue = 'cycle-form'; _sterCycleId = id;
+  renderSterilisationPage();
+}
+function ajouterSachetCycle(libelle) {
+  if (!_sterBrouillon) return;
+  _sterLireFormulaireCycle();
+  const b = _sterBrouillon;
+  if (b.sachets.length >= STER_SACHETS_MAX) { alert('Au plus ' + STER_SACHETS_MAX + ' sachets par cycle.'); return; }
+  let i = 1;
+  while (b.sachets.some((s) => s.ref === _sterRefSachet(b.numero, i))) i++;
+  b.sachets.push({ ref: _sterRefSachet(b.numero, i), setId: '', libelle: _sterTexte(libelle, 80) });
+  renderSterilisationPage();
+}
+function ajouterSetAuCycle(setId) {
+  const s = _sterDonnees(_sterPrat()).sets.find((x) => x.id === setId);
+  if (!s) return;
+  ajouterSachetCycle(s.nom);
+  if (_sterBrouillon) _sterBrouillon.sachets[_sterBrouillon.sachets.length - 1].setId = s.id;
+  renderSterilisationPage();
+}
+function retirerSachetCycle(i) {
+  if (!_sterBrouillon) return;
+  _sterLireFormulaireCycle();
+  const s = _sterBrouillon.sachets[i];
+  if (!s) return;
+  if (_sterSachetsUtilises(_sterPrat()?.id).some((u) => u.ref === s.ref)) { alert('Ce sachet est déjà lié à un soin : il ne peut pas être retiré.'); return; }
+  _sterBrouillon.sachets.splice(i, 1);
+  renderSterilisationPage();
+}
+function enregistrerCycleSterilisation() {
+  if (!_sterBrouillon || !_sterDroitEcriture()) return;
+  const pr = _sterPrat();
+  if (!pr) return;
+  _sterLireFormulaireCycle();
+  const b = _sterBrouillon;
+  const d = _sterDonnees(pr);
+  const ap = d.appareils.find((x) => x.id === b.appareilId);
+  const c = {
+    id: b.id || crypto.randomUUID(), numero: b.numero, date: b.date, appareilId: b.appareilId,
+    appareil: ap ? { nom: ap.nom, serie: ap.serie || '' } : null, typeCycle: b.typeCycle, resultat: b.resultat,
+    bowie: b.bowie, helix: b.helix, indicateur6: b.indicateur6, operateur: b.operateur, preparation: b.preparation,
+    sachets: b.sachets.map((s) => ({ ref: s.ref, setId: s.setId || '', libelle: s.libelle || '' })),
+    observations: b.observations, created_at: b.created_at || new Date().toISOString(),
+  };
+  if (b.id) c.modifie_le = new Date().toISOString();
+  const v = _sterValiderCycle(c, d);
+  if (!v.ok) { alert(v.erreur); return; }
+  const alertes = _sterAlertesCycle(c, _ordoAujourdhui());
+  if (alertes.length && !confirm('Avertissements (non bloquants) :\n\n• ' + alertes.join('\n• ') + '\n\nEnregistrer quand même ?')) return;
+  const s = _sterDonneesEcriture(pr);
+  const i = s.cycles.findIndex((x) => x.id === c.id);
+  if (i >= 0) s.cycles[i] = c; else { s.cycles.push(c); s.dernierNumero = Math.max(s.dernierNumero || 0, c.numero); }
+  savePraticiens();
+  _sterBrouillon = null; _sterVue = 'cycle-vue'; _sterCycleId = c.id;
+  renderSterilisationPage();
+}
+function voirCycleSterilisation(id) { _sterVue = 'cycle-vue'; _sterCycleId = id; _sterBrouillon = null; renderSterilisationPage(); }
+
+// ── Soin d'un patient (lien patient ↔ sachets ↔ cycle ↔ autoclave) ──
+function _sterSachetsDisponibles(d, aujourdhui) {
+  const liste = [];
+  d.cycles.forEach((c) => {
+    if (_sterJoursEntre(c.date, aujourdhui) > 120) return;
+    _sterSachetsDuCycle(c).forEach((s) => liste.push({ ref: s.ref, libelle: s.libelle, cycle: c }));
+  });
+  return liste.sort((a, b) => String(b.cycle.date).localeCompare(String(a.cycle.date)) || a.ref.localeCompare(b.ref));
+}
+function _sterAlertesSoin(refs, pratId, aujourdhui, soinId) {
+  const d = _sterDonnees(praticiens.find((p) => p.id == pratId));
+  const a = [];
+  const utilises = _sterSachetsUtilises(pratId).filter((u) => u.soinId !== soinId);
+  refs.forEach((ref) => {
+    const c = _sterCycleDeRef(d, ref);
+    if (!c) { a.push(ref + ' : référence absente du registre.'); return; }
+    if (c.resultat === 'non_conforme') a.push(ref + ' : cycle n° ' + c.numero + ' NON CONFORME, sachet à ne pas utiliser.');
+    if (_sterJoursEntre(c.date, aujourdhui) > STER_ETAT_STERILE_JOURS) a.push(ref + ' : stérilisé il y a plus de ' + STER_ETAT_STERILE_JOURS + ' jours (état stérile conservé environ deux mois selon l\'Ordre).');
+    const u = utilises.find((x) => x.ref === ref);
+    if (u) a.push(ref + ' : déjà utilisé le ' + _dateFr(u.date) + ' (un sachet ouvert n\'est plus stérile).');
+  });
+  return a;
+}
+function nouveauSoinSterilisation() {
+  if (!currentPatient) return;
+  if (!_sterDroitEcriture()) return;
+  _sterSoinBrouillon = { date: _ordoAujourdhui(), refs: [], note: '' };
+  renderSterilisationPage();
+}
+function _sterLireSoin() {
+  const b = _sterSoinBrouillon;
+  if (!b) return null;
+  b.date = _sterLire('ster-soin-date') || b.date;
+  b.note = _sterTexte(_sterLire('ster-soin-note'), 300);
+  const refs = [];
+  document.querySelectorAll('.ster-soin-chk').forEach((e) => { if (e.checked) refs.push(e.value); });
+  const libre = _sterTexte(_sterLire('ster-soin-libre'), 40);
+  if (libre) libre.split(/[\s,;]+/).filter(Boolean).forEach((r) => refs.push(r.toUpperCase()));
+  b.refs = Array.from(new Set(refs));
+  return b;
+}
+function enregistrerSoinSterilisation() {
+  if (!currentPatient || !_sterSoinBrouillon || !_sterDroitEcriture()) return;
+  const b = _sterLireSoin();
+  const pr = _sterPrat();
+  if (!_ordoDateValide(b.date)) { alert('Indiquez la date du soin.'); return; }
+  if (!b.refs.length) { alert('Cochez au moins un sachet.'); return; }
+  const alertes = _sterAlertesSoin(b.refs, pr?.id, _ordoAujourdhui(), null);
+  if (alertes.length && !confirm('Avertissements (non bloquants) :\n\n• ' + alertes.join('\n• ') + '\n\nEnregistrer quand même ?')) return;
+  if (!Array.isArray(currentPatient.soinsSterilisation)) currentPatient.soinsSterilisation = [];
+  currentPatient.soinsSterilisation.push({ id: crypto.randomUUID(), date: b.date, sachets: b.refs, registrePratId: pr?.id ?? null, note: b.note, created_at: new Date().toISOString() });
+  savePatients();
+  _sterSoinBrouillon = null;
+  renderSterilisationPage();
+}
+function supprimerSoinSterilisation(id) {
+  if (!currentPatient || !Array.isArray(currentPatient.soinsSterilisation)) return;
+  if (!_sterDroitEcriture()) return;
+  if (!confirm('Supprimer cette ligne de traçabilité ? Cette action est définitive.')) return;
+  currentPatient.soinsSterilisation = currentPatient.soinsSterilisation.filter((x) => x.id !== id);
+  savePatients();
+  renderSterilisationPage();
+}
+
+// ── Export ──
+function _sterPeriodeLue() {
+  const du = _sterLire('ster-du'), au = _sterLire('ster-au');
+  _sterPeriode = { du: _ordoDateValide(du) ? du : '', au: _ordoDateValide(au) ? au : '' };
+  return _sterPeriode;
+}
+function exporterRegistreSterilisationCsv() {
+  const p = _sterPeriodeLue();
+  const lignes = _sterLignesRegistre(_sterDonnees(_sterPrat()), p.du, p.au);
+  if (!lignes.length) { alert('Aucun cycle sur cette période.'); return; }
+  const url = URL.createObjectURL(new Blob([_sterCsv(lignes)], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'registre-sterilisation.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function _sterHtmlPageImpression(pr, lignes, du, au) {
+  const periode = (du || au) ? 'du ' + (du ? _dateFr(du) : '…') + ' au ' + (au ? _dateFr(au) : '…') : 'toutes périodes';
+  const cols = STER_COLONNES.filter((c) => c[0] !== 'serie' && c[0] !== 'helix' && c[0] !== 'predes' && c[0] !== 'lavage' && c[0] !== 'conditionnement');
+  const th = cols.map((c) => '<th>' + _escHtml(c[1]) + '</th>').join('');
+  const tr = lignes.map((l) => '<tr>' + cols.map((c) => '<td>' + _escHtml(c[0] === 'date' ? _dateFr(l.date) : l[c[0]]) + '</td>').join('') + '</tr>').join('');
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Registre de stérilisation</title><style>' +
+    '@page{size:A4 landscape;margin:10mm}html,body{background:#fff;color:#111827;margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:10px}' +
+    'h1{font-size:15px;margin:0 0 2px}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #9ca3af;padding:3px 4px;text-align:left;vertical-align:top}th{background:#e5e7eb}' +
+    '</style></head><body><h1>Cahier de stérilisation</h1><div>' + _escHtml(pr?.cabinet || pr?.nom || '') + ' · ' + _escHtml(periode) + ' · édité le ' + _escHtml(_dateFr(_ordoAujourdhui())) + '</div>' +
+    '<table><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table>' +
+    '<p style="margin-top:8px">À conserver 5 ans (Ordre national des pédicures-podologues). Aucun nom de patient dans ce registre.</p></body></html>';
+}
+function imprimerRegistreSterilisation() {
+  const p = _sterPeriodeLue();
+  const pr = _sterPrat();
+  const lignes = _sterLignesRegistre(_sterDonnees(pr), p.du, p.au);
+  if (!lignes.length) { alert('Aucun cycle sur cette période.'); return; }
+  // Aucune garde d'abonnement : le registre se consulte et s'imprime toujours (obligation de conservation).
+  document.querySelectorAll('iframe.ster-impression').forEach((f) => f.remove());
+  const iframe = document.createElement('iframe');
+  iframe.className = 'ster-impression';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open(); idoc.write(_sterHtmlPageImpression(pr, lignes, p.du, p.au)); idoc.close();
+  setTimeout(function() {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch (_e) { alert('Impression impossible. Réessayez ou utilisez Cmd/Ctrl+P.'); }
+  }, 300);
+}
+
+// ── Affichage ──
+const _STER_SELECT = (id, valeur, options) => '<select class="inp" id="' + id + '">' + options.map((o) => '<option value="' + _escHtml(o[0]) + '"' + (o[0] === valeur ? ' selected' : '') + '>' + _escHtml(o[1]) + '</option>').join('') + '</select>';
+const _STER_RES_OPT = [['non_fait', 'Non réalisé'], ['conforme', 'Conforme'], ['non_conforme', 'Non conforme']];
+function _sterLabel(t) { return '<div style="font-size:10px;color:var(--mut);margin:8px 0 3px;">' + t + '</div>'; }
+function _sterHtmlRappels(d) {
+  const r = _sterRappels(d, _ordoAujourdhui());
+  if (!r.length) return '';
+  return '<div class="card" style="padding:10px 14px;margin-bottom:10px;border-left:3px solid var(--bord);">' +
+    '<div style="font-size:12px;font-weight:700;margin-bottom:4px;">Rappels</div>' +
+    r.map((x) => '<div style="font-size:12px;padding:2px 0;' + (x.niveau === 'alerte' ? 'color:var(--red);font-weight:700;' : '') + '">• ' + _escHtml(x.texte) + '</div>').join('') + '</div>';
+}
+function _sterHtmlSources() {
+  return '<div style="font-size:11px;color:var(--mut);margin-top:14px;line-height:1.5;">' +
+    '<b>Repères réglementaires</b> (avertissements, jamais des blocages ; textes officiels non lus en intégral) : ' +
+    'cahier de stérilisation à conserver 5 ans avec résultats des tests, date et n° de cycle, n° de sachets (Ordre national des pédicures-podologues, « La traçabilité de la stérilisation ») ; ' +
+    'lien patient ↔ sachets ↔ autoclave sur la fiche de soin (même source) ; inventaire des appareils et registre de maintenance conservé 5 ans après la fin d\'exploitation (art. R5211-5 et R5212-25 du Code de la santé publique, via l\'Ordre) ; ' +
+    'dossier de stérilisation : charge, opérations préalables, type de cycle, indicateurs, signature de l\'opérateur (recommandation de l\'Ordre, circulaire DGS/DHOS n° 138 du 14 mars 2001). ' +
+    'Les rappels (Bowie-Dick tous les 7 jours, contrôle annuel) sont des valeurs par défaut modifiables : suivez la notice de votre fabricant.</div>';
+}
+function _sterHtmlOnglets() {
+  const o = (v, t) => '<button class="btn' + (_sterVue === v || (v === 'cycles' && /^cycle/.test(_sterVue)) ? ' btn-blue' : '') + '" style="' + _CSS_BTN + '" onclick="sterAller(\'' + v + '\')">' + t + '</button>';
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">' + o('cycles', 'Cycles') + o('sets', 'Sets d\'instruments') + o('appareils', 'Appareils et maintenance') + o('soin', 'Soin d\'un patient') + '</div>';
+}
+function _sterHtmlSelecteurPraticien() {
+  if (praticiens.length < 2) return '';
+  const pr = _sterPrat();
+  return '<div style="margin-bottom:8px;font-size:12px;color:var(--mut);">Registre de : <select class="inp" style="width:auto;display:inline-block;" onchange="sterChoisirPraticien(this.value)">' +
+    praticiens.map((p) => '<option value="' + _escHtml(p.id) + '"' + (p.id == pr?.id ? ' selected' : '') + '>' + _escHtml(p.nom) + '</option>').join('') + '</select></div>';
+}
+function _sterHtmlListeCycles(d) {
+  const p = _sterPeriode || { du: '', au: _ordoAujourdhui() };
+  const liste = d.cycles.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.numero - a.numero));
+  const creation = _accessPermetCreationDocument();
+  return (creation ? '<div style="margin-bottom:10px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauCycleSterilisation()">+ Nouveau cycle</button></div>'
+    : '<div style="font-size:12px;margin-bottom:10px;padding:8px 12px;border-radius:8px;border:1px solid var(--bord);">Votre abonnement est terminé : vous pouvez <b>consulter, imprimer et exporter</b> le registre. Reprenez votre abonnement pour enregistrer de nouveaux cycles.</div>') +
+    '<div class="card" style="padding:12px 16px;">' + (liste.length ? liste.map((c) =>
+      '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+      '<div style="font-size:13px;"><b>N° ' + _escHtml(c.numero) + ' · ' + _escHtml(_dateFr(c.date)) + '</b><span style="color:var(--mut);"> · ' + _escHtml(c.appareil?.nom || '') + ' · ' + _sterSachetsDuCycle(c).length + ' sachet(s) · </span>' +
+      '<span' + (c.resultat === 'non_conforme' ? ' style="color:var(--red);font-weight:700;"' : ' style="color:var(--mut);"') + '>' + _escHtml(STER_RESULTATS[c.resultat] || '') + '</span></div>' +
+      '<div style="white-space:nowrap;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="voirCycleSterilisation(\'' + _escHtml(c.id) + '\')">Voir</button></div></div>').join('')
+      : '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun cycle enregistré.</div>') + '</div>' +
+    '<div class="card" style="padding:12px 16px;margin-top:10px;"><div class="stitle">Imprimer ou exporter le registre</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:12px;">Du</span><input class="inp" type="date" id="ster-du" style="width:auto;" value="' + _escHtml(p.du) + '"/>' +
+    '<span style="font-size:12px;">au</span><input class="inp" type="date" id="ster-au" style="width:auto;" value="' + _escHtml(p.au) + '"/></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><button class="btn" style="' + _CSS_BTN + '" onclick="imprimerRegistreSterilisation()">🖨️ Imprimer / PDF</button>' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="exporterRegistreSterilisationCsv()">⬇️ Exporter (CSV)</button></div></div>';
+}
+function _sterHtmlFormCycle(d) {
+  const b = _sterBrouillon;
+  const sets = d.sets;
+  const chk = (id, v, t) => '<label style="font-size:12px;margin-right:12px;"><input type="checkbox" id="ster-cy-' + id + '"' + (v ? ' checked' : '') + '/> ' + t + '</label>';
+  return '<div class="card" style="padding:16px;"><div class="stitle">Cycle n° ' + _escHtml(b.numero) + (b.id ? ' (modification)' : '') + '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;"><div style="flex:1;min-width:150px;">' + _sterLabel('Date') + '<input class="inp" type="date" id="ster-cy-date" value="' + _escHtml(b.date) + '"/></div>' +
+    '<div style="flex:1;min-width:150px;">' + _sterLabel('Appareil') + _STER_SELECT('ster-cy-app', b.appareilId, d.appareils.filter((a) => !a.finExploitation || a.id === b.appareilId).map((a) => [a.id, a.nom + (a.serie ? ' (' + a.serie + ')' : '')])) + '</div></div>' +
+    _sterLabel('Type de cycle') + '<input class="inp" id="ster-cy-type" maxlength="60" list="ster-types" value="' + _escHtml(b.typeCycle) + '"/><datalist id="ster-types"><option value="134 °C — 18 min"><option value="134 °C — 5 min"><option value="121 °C — 20 min"></datalist>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;"><div style="flex:1;min-width:130px;">' + _sterLabel('Résultat du cycle') + _STER_SELECT('ster-cy-res', b.resultat, [['conforme', 'Conforme'], ['non_conforme', 'Non conforme']]) + '</div>' +
+    '<div style="flex:1;min-width:130px;">' + _sterLabel('Test de Bowie-Dick') + _STER_SELECT('ster-cy-bd', b.bowie, _STER_RES_OPT) + '</div>' +
+    '<div style="flex:1;min-width:130px;">' + _sterLabel('Test Helix') + _STER_SELECT('ster-cy-hx', b.helix, _STER_RES_OPT) + '</div>' +
+    '<div style="flex:1;min-width:130px;">' + _sterLabel('Indicateur classe 6') + _STER_SELECT('ster-cy-c6', b.indicateur6, _STER_RES_OPT) + '</div></div>' +
+    _sterLabel('Opérations préalables') + chk('pd', b.preparation.predesinfection, 'Pré-désinfection') + chk('lv', b.preparation.lavage, 'Lavage') + chk('cd', b.preparation.conditionnement, 'Conditionnement sous sachet') +
+    _sterLabel('Opérateur') + '<input class="inp" id="ster-cy-op" maxlength="80" value="' + _escHtml(b.operateur) + '"/>' +
+    _sterLabel('Charge : sachets (numéros attribués automatiquement ; à inscrire sur chaque sachet après le cycle)') +
+    '<div>' + (b.sachets.length ? b.sachets.map((s, i) =>
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><b style="font-size:12px;min-width:74px;">' + _escHtml(s.ref) + '</b>' +
+      '<input class="inp" id="ster-cy-sac-' + i + '" maxlength="80" placeholder="Contenu (ex. set soins)" value="' + _escHtml(s.libelle) + '" style="flex:1;"/>' +
+      '<button class="btn" style="font-size:11px;padding:4px 8px;color:var(--red);" aria-label="Retirer le sachet" onclick="retirerSachetCycle(' + i + ')">✕</button></div>').join('')
+      : '<div style="font-size:12px;color:var(--mut);">Aucun sachet.</div>') + '</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"><button class="btn" style="' + _CSS_BTN + '" onclick="ajouterSachetCycle(\'\')">+ Sachet</button>' +
+    sets.map((s) => '<button class="btn" style="' + _CSS_BTN + '" onclick="ajouterSetAuCycle(\'' + _escHtml(s.id) + '\')">+ ' + _escHtml(s.nom) + '</button>').join('') + '</div>' +
+    _sterLabel('Observations') + '<textarea class="inp" id="ster-cy-obs" rows="2" maxlength="500">' + _escHtml(b.observations) + '</textarea>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="enregistrerCycleSterilisation()">✓ Enregistrer le cycle</button>' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="sterAller(\'cycles\')">Annuler</button></div></div>';
+}
+function _sterHtmlVueCycle(d) {
+  const c = d.cycles.find((x) => x.id === _sterCycleId);
+  if (!c) return '<div style="font-size:13px;color:var(--mut);">Cycle introuvable.</div>';
+  const utilises = _sterSachetsUtilises(_sterPrat()?.id);
+  const ligne = (k, v) => '<div style="font-size:13px;padding:3px 0;"><span style="color:var(--mut);">' + k + ' : </span>' + _escHtml(v || '—') + '</div>';
+  const alertes = _sterAlertesCycle(c, _ordoAujourdhui());
+  const set = (s) => d.sets.find((x) => x.id === s.setId);
+  return '<div class="card" style="padding:16px;"><div class="stitle">Cycle n° ' + _escHtml(c.numero) + ' — ' + _escHtml(_dateFr(c.date)) + '</div>' +
+    ligne('Appareil', (c.appareil?.nom || '') + (c.appareil?.serie ? ' (série ' + c.appareil.serie + ')' : '')) + ligne('Type de cycle', c.typeCycle) +
+    ligne('Résultat', STER_RESULTATS[c.resultat]) + ligne('Bowie-Dick', STER_RESULTATS[c.bowie]) + ligne('Helix', STER_RESULTATS[c.helix]) + ligne('Indicateur classe 6', STER_RESULTATS[c.indicateur6]) +
+    ligne('Opérations préalables', [c.preparation?.predesinfection && 'pré-désinfection', c.preparation?.lavage && 'lavage', c.preparation?.conditionnement && 'conditionnement'].filter(Boolean).join(', ')) +
+    ligne('Opérateur', c.operateur) + ligne('Observations', c.observations) +
+    (alertes.length ? '<div style="font-size:12px;margin:8px 0;padding:8px 12px;border-radius:8px;border:1px solid var(--bord);">' + alertes.map((a) => '• ' + _escHtml(a)).join('<br>') + '</div>' : '') +
+    '<div class="stitle" style="margin-top:10px;">Sachets et patients concernés</div>' +
+    (_sterSachetsDuCycle(c).map((s) => {
+      const u = utilises.filter((x) => x.ref === s.ref);
+      const st = set(s);
+      return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--bord);"><b>' + _escHtml(s.ref) + '</b> ' + _escHtml(s.libelle) +
+        (st && st.instruments.length ? '<div style="color:var(--mut);">' + _escHtml(st.instruments.join(', ')) + '</div>' : '') +
+        '<div style="color:var(--mut);">' + (u.length ? u.map((x) => _escHtml(_dateFr(x.date) + ' : ' + (x.patient.prenom || '') + ' ' + (x.patient.nom || ''))).join(' ; ') : 'Non utilisé') + '</div></div>';
+    }).join('') || '<div style="font-size:12px;color:var(--mut);">Aucun sachet.</div>') +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn" style="' + _CSS_BTN + '" onclick="modifierCycleSterilisation(\'' + _escHtml(c.id) + '\')">Modifier</button>' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="sterAller(\'cycles\')">← Retour au registre</button></div></div>';
+}
+function _sterHtmlSets(d) {
+  return '<div class="card" style="padding:12px 16px;">' + (d.sets.length ? d.sets.map((s) =>
+    '<div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+    '<div style="font-size:13px;"><b>' + _escHtml(s.nom) + '</b><div style="color:var(--mut);font-size:12px;">' + _escHtml((s.instruments || []).join(', ') || 'Aucun instrument listé') + '</div></div>' +
+    '<button class="btn" style="font-size:11px;padding:3px 8px;color:var(--red);" onclick="supprimerSetSterilisation(\'' + _escHtml(s.id) + '\')">Supprimer</button></div>').join('')
+    : '<div style="font-size:13px;color:var(--mut);">Aucun set pour l\'instant.</div>') + '</div>' +
+    (_accessPermetCreationDocument() ? '<div class="card" style="padding:12px 16px;margin-top:10px;"><div class="stitle">Nouveau set</div>' + _sterLabel('Nom (ex. Set soins n° 1)') +
+      '<input class="inp" id="ster-set-nom" maxlength="80"/>' + _sterLabel('Instruments (un par ligne)') + '<textarea class="inp" id="ster-set-instr" rows="4"></textarea>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + ';margin-top:8px;" onclick="ajouterSetSterilisation()">✓ Ajouter le set</button></div>' : '');
+}
+function _sterHtmlAppareils(d) {
+  const creation = _accessPermetCreationDocument();
+  const opt = (liste) => liste.map((t) => [t, t]);
+  return '<div class="card" style="padding:12px 16px;">' + (d.appareils.length ? d.appareils.map((a) => {
+    const fin = a.finExploitation ? '<div style="font-size:12px;color:var(--mut);">Hors service depuis le ' + _escHtml(_dateFr(a.finExploitation)) + ' : registre à conserver jusqu\'au ' + _escHtml(_dateFr(_sterAjouterJours(a.finExploitation, 5 * 365 + 1))) + '.</div>' : '';
+    const delai = (id, v, def) => '<input class="inp" type="number" min="1" max="3650" id="' + id + '" style="width:80px;display:inline-block;" value="' + (Number.isFinite(v) ? v : def) + '"/>';
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--bord);font-size:13px;"><b>' + _escHtml(a.nom) + '</b> <span style="color:var(--mut);">· ' + _escHtml(a.type) + '</span>' +
+      '<div style="font-size:12px;color:var(--mut);">Fabricant : ' + _escHtml(a.fabricant || '—') + ' · Fournisseur : ' + _escHtml(a.fournisseur || '—') + ' · Série : ' + _escHtml(a.serie || '—') + ' · Lieu : ' + _escHtml(a.lieu || '—') + ' · Mise en service : ' + _escHtml(_dateFr(a.miseEnService)) + '</div>' + fin +
+      (creation && !a.finExploitation ? '<div style="font-size:12px;margin-top:4px;">' + (a.type === 'Autoclave' ? 'Rappel Bowie-Dick (jours) ' + delai('ster-delai-bd-' + a.id, a.delaiBowieJours, STER_JOURS_BOWIE_DEFAUT) + ' ' : '') + 'Rappel contrôle (jours) ' + delai('ster-delai-ct-' + a.id, a.delaiControleJours, STER_JOURS_CONTROLE_DEFAUT) +
+        ' <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="sterReglerDelaisAppareil(\'' + _escHtml(a.id) + '\')">Enregistrer</button> <button class="btn" style="font-size:11px;padding:3px 8px;color:var(--red);" onclick="sterMettreHorsService(\'' + _escHtml(a.id) + '\')">Mettre hors service</button></div>' : '') + '</div>';
+  }).join('') : '<div style="font-size:13px;color:var(--mut);">Aucun appareil : ajoutez votre autoclave.</div>') + '</div>' +
+    (creation ? '<div class="card" style="padding:12px 16px;margin-top:10px;"><div class="stitle">Nouvel appareil (inventaire)</div>' +
+      _sterLabel('Type') + _STER_SELECT('ster-ap-type', 'Autoclave', opt(STER_TYPES_APPAREIL)) + _sterLabel('Nom') + '<input class="inp" id="ster-ap-nom" maxlength="80" placeholder="Ex. Autoclave 18 L"/>' +
+      _sterLabel('Fabricant') + '<input class="inp" id="ster-ap-fab" maxlength="80"/>' + _sterLabel('Fournisseur') + '<input class="inp" id="ster-ap-four" maxlength="80"/>' +
+      _sterLabel('N° de série') + '<input class="inp" id="ster-ap-serie" maxlength="60"/>' + _sterLabel('Lieu d\'exploitation') + '<input class="inp" id="ster-ap-lieu" maxlength="80"/>' +
+      _sterLabel('Date de première mise en service') + '<input class="inp" type="date" id="ster-ap-mise"/>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + ';margin-top:8px;" onclick="ajouterAppareilSterilisation()">✓ Ajouter l\'appareil</button></div>' : '') +
+    '<div class="card" style="padding:12px 16px;margin-top:10px;"><div class="stitle">Registre de maintenance et de contrôles</div>' +
+    (d.maintenance.length ? d.maintenance.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).map((m) => {
+      const ap = d.appareils.find((x) => x.id === m.appareilId);
+      return '<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord);"><b>' + _escHtml(_dateFr(m.date)) + '</b> · ' + _escHtml(m.type) + ' · ' + _escHtml(ap?.nom || '') + (m.operateur ? ' · ' + _escHtml(m.operateur) : '') +
+        '<div style="color:var(--mut);">' + _escHtml([m.description, m.observations].filter(Boolean).join(' — ')) + '</div></div>';
+    }).join('') : '<div style="font-size:13px;color:var(--mut);">Aucune opération enregistrée.</div>') + '</div>' +
+    (creation && d.appareils.length ? '<div class="card" style="padding:12px 16px;margin-top:10px;"><div class="stitle">Nouvelle opération</div>' +
+      _sterLabel('Appareil') + _STER_SELECT('ster-mt-app', d.appareils[0].id, d.appareils.map((a) => [a.id, a.nom])) + _sterLabel('Date') + '<input class="inp" type="date" id="ster-mt-date" value="' + _ordoAujourdhui() + '"/>' +
+      _sterLabel('Type') + _STER_SELECT('ster-mt-type', 'Contrôle', opt(STER_TYPES_MAINTENANCE)) + _sterLabel('Descriptif') + '<input class="inp" id="ster-mt-desc" maxlength="300"/>' +
+      _sterLabel('Opérateur') + '<input class="inp" id="ster-mt-op" maxlength="80"/>' + _sterLabel('Observations') + '<input class="inp" id="ster-mt-obs" maxlength="500"/>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + ';margin-top:8px;" onclick="ajouterMaintenanceSterilisation()">✓ Enregistrer</button></div>' : '');
+}
+function _sterHtmlSoin(d) {
+  if (!currentPatient) return '<div style="font-size:13px;color:var(--mut);">Sélectionnez un patient depuis la liste (bouton « 🧼 Stérilisation »).</div>';
+  const soins = (Array.isArray(currentPatient.soinsSterilisation) ? currentPatient.soinsSterilisation : []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const pr = _sterPrat();
+  let h = '<div style="font-size:13px;margin-bottom:8px;">Patient : <b>' + _escHtml((currentPatient.prenom || '') + ' ' + (currentPatient.nom || '')) + '</b></div>';
+  if (_sterSoinBrouillon) {
+    const b = _sterSoinBrouillon;
+    const dispo = _sterSachetsDisponibles(d, _ordoAujourdhui());
+    h += '<div class="card" style="padding:16px;"><div class="stitle">Sachets utilisés pour ce soin</div>' + _sterLabel('Date du soin') + '<input class="inp" type="date" id="ster-soin-date" value="' + _escHtml(b.date) + '"/>' +
+      _sterLabel('Sachets (cycles des 4 derniers mois)') + (dispo.length ? dispo.map((s) =>
+        '<label style="display:block;font-size:12px;padding:2px 0;"><input type="checkbox" class="ster-soin-chk" value="' + _escHtml(s.ref) + '"' + (b.refs.includes(s.ref) ? ' checked' : '') + '/> <b>' + _escHtml(s.ref) + '</b> ' + _escHtml(s.libelle) + ' <span style="color:var(--mut);">· cycle du ' + _escHtml(_dateFr(s.cycle.date)) + (s.cycle.resultat === 'non_conforme' ? ' · NON CONFORME' : '') + '</span></label>').join('')
+        : '<div style="font-size:12px;color:var(--mut);">Aucun sachet récent dans le registre.</div>') +
+      _sterLabel('Autre référence de sachet (séparées par des espaces)') + '<input class="inp" id="ster-soin-libre" maxlength="40"/>' +
+      _sterLabel('Note') + '<input class="inp" id="ster-soin-note" maxlength="300" value="' + _escHtml(b.note) + '"/>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="enregistrerSoinSterilisation()">✓ Enregistrer</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="sterAller(\'soin\')">Annuler</button></div></div>';
+    return h;
+  }
+  h += (_accessPermetCreationDocument() ? '<div style="margin-bottom:10px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauSoinSterilisation()">+ Enregistrer les sachets d\'un soin</button></div>' : '');
+  h += '<div class="card" style="padding:12px 16px;">' + (soins.length ? soins.map((s) => {
+    const cy = (s.sachets || []).map((ref) => { const c = _sterCycleDeRef(_sterDonnees(praticiens.find((p) => p.id == s.registrePratId) || pr), ref); return ref + (c ? ' (cycle n° ' + c.numero + ', ' + _dateFr(c.date) + ', ' + (c.appareil?.nom || '') + ')' : ' (hors registre)'); });
+    return '<div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);font-size:12px;"><div><b>' + _escHtml(_dateFr(s.date)) + '</b><div style="color:var(--mut);">' + cy.map(_escHtml).join('<br>') + '</div>' + (s.note ? '<div>' + _escHtml(s.note) + '</div>' : '') + '</div>' +
+      '<button class="btn" style="font-size:11px;padding:3px 8px;color:var(--red);" onclick="supprimerSoinSterilisation(\'' + _escHtml(s.id) + '\')">Supprimer</button></div>';
+  }).join('') : '<div style="font-size:13px;color:var(--mut);">Aucun sachet enregistré pour ce patient.</div>') + '</div>';
+  return h;
+}
+function renderSterilisationPage() {
+  const el = document.getElementById('ster-contenu');
+  if (!el) return;
+  const pr = _sterPrat();
+  if (!pr) { el.innerHTML = '<div style="font-size:13px;color:var(--red);">Aucun praticien : créez-en un dans l\'onglet Praticiens.</div>'; return; }
+  const d = _sterDonnees(pr);
+  let corps;
+  if (_sterVue === 'cycle-form' && _sterBrouillon) corps = _sterHtmlFormCycle(d);
+  else if (_sterVue === 'cycle-vue') corps = _sterHtmlVueCycle(d);
+  else if (_sterVue === 'sets') corps = _sterHtmlSets(d);
+  else if (_sterVue === 'appareils') corps = _sterHtmlAppareils(d);
+  else if (_sterVue === 'soin') corps = _sterHtmlSoin(d);
+  else corps = _sterHtmlListeCycles(d);
+  el.innerHTML = _sterHtmlSelecteurPraticien() + _sterHtmlOnglets() + (_sterVue === 'cycles' ? _sterHtmlRappels(d) : '') + corps + _sterHtmlSources();
 }
 
 // ===== STRIPE + MODULES =====

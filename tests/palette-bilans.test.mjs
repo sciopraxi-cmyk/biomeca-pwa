@@ -75,15 +75,17 @@ const HEX_RED = '#f04060';
 // exact du bouton ✏️ voisin (+1 --mut, +1 --card, +1 --bord : total 45 → 48).
 // Ordonnances : le bouton « 📝 Ordonnances » de l'en-tête patient fait de même (+1 --mut, +1 --card,
 // +1 --bord : total 97 → 100).
+// Stérilisation : le bouton « 🧼 Stérilisation » de l'en-tête patient fait de même (+1 --mut, +1 --card,
+// +1 --bord : total 100 → 103).
 const COMPTES_ATTENDUS = {
   '--posturo-*': 12,
   '--sport-*': 11,
-  '--mut': 14,
+  '--mut': 15,
   '--txt': 9,
   '--pedicurie-*': 11,
   '--podo-*': 11,
-  '--card': 9,
-  '--bord': 8,
+  '--card': 10,
+  '--bord': 9,
   '--encours-*': 4,
   '--encours': 4,
   '--danger-*': 4,
@@ -509,6 +511,7 @@ const PAGES_CLAIRES = [
   'pg-actes', // facturation, étape 1 : page ajoutée en clair d'emblée
   'pg-documents', // facturation, étape 2b-1 : idem
   'pg-ordonnances', // ordonnances du podologue : idem
+  'pg-sterilisation', // traçabilité de stérilisation : idem
   'pg-agenda',
   // #265 lot 3B — le bilan clinique sportif. La bascule y AMÉLIORE la
   // lisibilité, mesuré : 147 éléments porteurs de texte sous 4,5:1 en sombre,
