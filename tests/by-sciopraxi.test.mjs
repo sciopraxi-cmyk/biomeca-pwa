@@ -17,7 +17,7 @@ describe('« by Sciopraxi » — application', () => {
     expect(HTML.split('assets/by-sciopraxi.png').length - 1).toBe(6 + 1); // 6 affichages + magasin d'images caché
     expect(HTML).toContain('id="imgjs-by-sciopraxi"');
   });
-  it('chaque mention est plus petite que le logo Verticy voisin (hauteur ≤ 30 %)', () => {
+  it('chaque mention est plus petite que le logo Verticy voisin (hauteur ≤ 55 %)', () => {
     const lignes = HTML.split('\n');
     const mentions = lignes
       .map((l, i) => [l, i])
@@ -31,7 +31,7 @@ describe('« by Sciopraxi » — application', () => {
           .join('\n')
           .match(/assets\/verticy-(?:logo-simple|mark)\.png[^>]*height:(\d+)px/g) || [];
       const ref = Math.max(...voisin.map((v) => Number(v.match(/height:(\d+)px/)[1])));
-      expect(h / ref, `ligne ${i + 1}`).toBeLessThanOrEqual(0.3);
+      expect(h / ref, `ligne ${i + 1}`).toBeLessThanOrEqual(0.55);
     }
   });
 });
@@ -43,21 +43,21 @@ describe('« by Sciopraxi » — rapports', () => {
     return new Function(corps)();
   }
   it('mention avec « by » et le logo à la hauteur demandée', () => {
-    const h = monter('http://x/assets/by-sciopraxi.png')(12);
+    const h = monter('http://x/assets/by-sciopraxi.png')(16);
     expect(h).toContain('>by<');
     expect(h).toContain('src="http://x/assets/by-sciopraxi.png"');
-    expect(h).toContain('height:12px');
+    expect(h).toContain('height:16px');
   });
   it('image absente → rien (le lockup reste inchangé)', () => {
-    expect(monter(null)(12)).toBe('');
+    expect(monter(null)(16)).toBe('');
   });
   it('une URL piégée ne peut pas sortir de l’attribut', () => {
-    const h = monter('http://x/a"onerror="alert(1)')(12);
+    const h = monter('http://x/a"onerror="alert(1)')(16);
     expect(h).not.toMatch(/src="[^"]*"onerror/);
     expect(h).not.toContain('"onerror');
   });
   it('les 4 rapports (posturo en direct, impression, pédicurie, podopédiatrie) appellent la mention', () => {
-    expect(SRC_BIOMECA.split("_byScioHtml(12) : ''").length - 1).toBe(4);
+    expect(SRC_BIOMECA.split("_byScioHtml(16) : ''").length - 1).toBe(4);
   });
   it('les lockups des rapports gardent le logo Verticy à 48 px (la mention ne le remplace pas)', () => {
     expect(
