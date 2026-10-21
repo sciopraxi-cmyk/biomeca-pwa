@@ -63,6 +63,8 @@ const NOMS = [
   'supprimerModeleOrdonnance',
   'annulerModeleOrdonnance',
   '_htmlLignesOrdonnance',
+  '_htmlProduitsOrdonnance',
+  'ajouterProduitOrdonnance',
   '_htmlTypeOrdonnance',
   '_htmlRenouvellementOrdonnance',
   '_htmlEditeurOrdonnance',
@@ -710,5 +712,133 @@ describe('signature et tampon du praticien', () => {
     expect(fonction('editPraticien')).toContain('_pratSignatureDataUrl = pr.signature');
     expect(fonction('saveEditPraticien')).toContain('pr.signature = _pratSignatureDataUrl');
     expect(fonction('saveEditPraticien')).toContain('removePraticienSignature()');
+  });
+});
+
+describe('menu déroulant des prescriptions possibles', () => {
+  const LISTE = {
+    topiques: [
+      'Antiseptique',
+      'Antifongique',
+      'Hémostatique',
+      'Anesthésique',
+      'Kératolytique',
+      'Verrucide',
+      'Produit adoucissant',
+      'Produit asséchant',
+      'Produit calmant',
+      'Produit cicatrisant',
+      'Produit révulsif',
+      'Anti-inflammatoire local (uniquement hallux valgus et ongle incarné)',
+    ],
+    pansements: [
+      'Compresses stériles de coton hydrophile',
+      'Compresses stériles de gaze hydrophile',
+      'Compresses non tissées stériles',
+      'Compresses fibres stériles de gaze hydrophile',
+      'Compresses stériles absorbantes',
+      'Sparadrap élastique',
+      'Sparadrap non élastique',
+      'Jersey tubulaire (maintien du pansement)',
+      'Pochette de suture adhésive stérile (maintien du pansement)',
+      'Pansement hydrocolloïde',
+      'Pansement au charbon actif',
+      'Pansement vaseliné',
+      'Pansement hydrofibre',
+      'Pansement hydrogel',
+      'Pansement alginate de calcium',
+    ],
+    appareillages: [
+      'Orthèses plantaires',
+      'Orthonyxie',
+      'Orthoplastie',
+      'Onychoplastie',
+      'Prothèse du pied',
+      'Orthèse du pied',
+      'Autre appareillage podologique',
+    ],
+    chaussures: ['Chaussures thérapeutiques de série'],
+    renouvellement: ["Renouvellement d'orthèses plantaires"],
+  };
+  it('chaque type propose exactement la liste fournie par le praticien', () => {
+    const { f } = monter();
+    for (const [k, attendu] of Object.entries(LISTE))
+      expect(
+        f.ORDO_CATEGORIES[k].produits.map((x) => x.texte),
+        k
+      ).toEqual(attendu);
+  });
+  it("l'ancienne phrase d'aide n'est plus affichée sous le type : un menu déroulant à la place", () => {
+    const { f } = monter({ acces: 'full' });
+    saisir(f);
+    const h = f._htmlEditeurOrdonnance();
+    expect(h).toContain('id="ordo-produit"');
+    expect(h).toContain('onchange="ajouterProduitOrdonnance(this.value)"');
+    expect(h).not.toContain('Antiseptiques, antifongiques, hémostatiques');
+    expect(h).toContain('<option value="0">Antiseptique</option>');
+  });
+  it('pansements : ceux du patient diabétique sont dans un groupe à part', () => {
+    const { f } = monter();
+    const h = f._htmlProduitsOrdonnance('pansements');
+    expect(h).toContain('<optgroup label="Patient diabétique — renouvellement et pose seulement">');
+    expect(h.indexOf('hydrocolloïde')).toBeGreaterThan(h.indexOf('<optgroup'));
+    expect(h.indexOf('Sparadrap élastique')).toBeLessThan(h.indexOf('<optgroup'));
+    expect(f._htmlProduitsOrdonnance('topiques')).not.toContain('optgroup');
+  });
+  it('un choix remplit la première ligne vide, puis ajoute des lignes', () => {
+    const { f } = monter({ acces: 'full' });
+    f.nouvelleOrdonnance();
+    f.ajouterProduitOrdonnance('0');
+    expect(f.etat().edition.lignes).toEqual([{ texte: 'Antiseptique', duree: '' }]);
+    f.ajouterProduitOrdonnance('1');
+    expect(f.etat().edition.lignes).toEqual([
+      { texte: 'Antiseptique', duree: '' },
+      { texte: 'Antifongique', duree: '' },
+    ]);
+  });
+  it('un choix ne remplace pas une ligne déjà remplie ni sa durée', () => {
+    const { f } = monter({ acces: 'full' });
+    saisir(f, {
+      lignes: [
+        { texte: 'Ma ligne', duree: '5 j' },
+        { texte: '', duree: '3 j' },
+      ],
+    });
+    f.ajouterProduitOrdonnance('2');
+    expect(f.etat().edition.lignes).toEqual([
+      { texte: 'Ma ligne', duree: '5 j' },
+      { texte: 'Hémostatique', duree: '3 j' },
+    ]);
+  });
+  it('« — Choisir — » ou valeur inconnue : rien ne change', () => {
+    const { f } = monter({ acces: 'full' });
+    f.nouvelleOrdonnance();
+    f.ajouterProduitOrdonnance('');
+    f.ajouterProduitOrdonnance('99');
+    f.ajouterProduitOrdonnance('abc');
+    expect(f.etat().edition.lignes).toEqual([{ texte: '', duree: '' }]);
+  });
+  it('plafond de lignes respecté', () => {
+    const { f, alertes } = monter({ acces: 'full' });
+    saisir(f, { lignes: Array.from({ length: 20 }, () => ({ texte: 'x', duree: '' })) });
+    f.ajouterProduitOrdonnance('0');
+    expect(f.etat().edition.lignes).toHaveLength(20);
+    expect(alertes.join(' ')).toContain('Au plus 20');
+  });
+  it("un pansement diabétique choisi déclenche l'avertissement existant", () => {
+    const { f } = monter({ acces: 'full' });
+    saisir(f, { categorie: 'pansements', lignes: [{ texte: '', duree: '' }] });
+    const i = f.ORDO_CATEGORIES.pansements.produits.findIndex(
+      (x) => x.texte === 'Pansement hydrogel'
+    );
+    f.ajouterProduitOrdonnance(String(i));
+    expect(f._alertesOrdonnance(f.etat().edition).join(' ')).toContain('diabétique');
+  });
+  it("le même menu sert dans l'éditeur de modèle", () => {
+    const { f } = monter({ acces: 'full' });
+    f.nouveauModeleOrdonnance(false);
+    f.ajouterProduitOrdonnance('0');
+    expect(f.etat().modele.lignes[0].texte).toBe('Antiseptique');
+    expect(f._htmlEditeurModeleOrdonnance()).toContain('id="ordo-produit"');
   });
 });

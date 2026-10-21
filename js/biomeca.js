@@ -32090,26 +32090,72 @@ async function renderDocumentsPage() {
 const ORDO_CATEGORIES = {
   topiques: {
     libelle: 'Topiques à usage externe',
+    produits: [
+      { texte: 'Antiseptique' },
+      { texte: 'Antifongique' },
+      { texte: 'Hémostatique' },
+      { texte: 'Anesthésique' },
+      { texte: 'Kératolytique' },
+      { texte: 'Verrucide' },
+      { texte: 'Produit adoucissant' },
+      { texte: 'Produit asséchant' },
+      { texte: 'Produit calmant' },
+      { texte: 'Produit cicatrisant' },
+      { texte: 'Produit révulsif' },
+      { texte: 'Anti-inflammatoire local (uniquement hallux valgus et ongle incarné)' },
+    ],
     aide: 'Antiseptiques, antifongiques, hémostatiques, anesthésiques, kératolytiques et verrucides, adoucissants, asséchants, calmants, cicatrisants, révulsifs ; anti-inflammatoires locaux uniquement pour l\'hallux valgus et les ongles incarnés. Exclu : toute spécialité contenant une substance vénéneuse (listes I et II, stupéfiants).',
     remboursement: 'Remboursé seulement si le produit figure sur la liste des médicaments remboursables.',
   },
   pansements: {
     libelle: 'Pansements',
+    produits: [
+      { texte: 'Compresses stériles de coton hydrophile' },
+      { texte: 'Compresses stériles de gaze hydrophile' },
+      { texte: 'Compresses non tissées stériles' },
+      { texte: 'Compresses fibres stériles de gaze hydrophile' },
+      { texte: 'Compresses stériles absorbantes' },
+      { texte: 'Sparadrap élastique' },
+      { texte: 'Sparadrap non élastique' },
+      { texte: 'Jersey tubulaire (maintien du pansement)' },
+      { texte: 'Pochette de suture adhésive stérile (maintien du pansement)' },
+      { texte: 'Pansement hydrocolloïde', groupe: 'Patient diabétique — renouvellement et pose seulement' },
+      { texte: 'Pansement au charbon actif', groupe: 'Patient diabétique — renouvellement et pose seulement' },
+      { texte: 'Pansement vaseliné', groupe: 'Patient diabétique — renouvellement et pose seulement' },
+      { texte: 'Pansement hydrofibre', groupe: 'Patient diabétique — renouvellement et pose seulement' },
+      { texte: 'Pansement hydrogel', groupe: 'Patient diabétique — renouvellement et pose seulement' },
+      { texte: 'Pansement alginate de calcium', groupe: 'Patient diabétique — renouvellement et pose seulement' },
+    ],
     aide: 'Compresses stériles, sparadrap, jersey tubulaire, pochette de suture adhésive. Patient diabétique : hydrocolloïdes, charbon actif, vaselinés, hydrofibre, hydrogel, alginate de calcium = renouvellement et pose seulement.',
     remboursement: 'Remboursé seulement si le pansement est inscrit à la LPP.',
   },
   appareillages: {
     libelle: 'Appareillages podologiques',
+    produits: [
+      { texte: 'Orthèses plantaires' },
+      { texte: 'Orthonyxie' },
+      { texte: 'Orthoplastie' },
+      { texte: 'Onychoplastie' },
+      { texte: 'Prothèse du pied' },
+      { texte: 'Orthèse du pied' },
+      { texte: 'Autre appareillage podologique' },
+    ],
     aide: 'Orthèses plantaires, orthonyxies, orthoplasties, onychoplasties, prothèses et orthèses du pied, autres appareillages podologiques.',
     remboursement: null,
   },
   chaussures: {
     libelle: 'Chaussures thérapeutiques de série',
+    produits: [
+      { texte: 'Chaussures thérapeutiques de série' },
+    ],
     aide: 'Chaussures thérapeutiques de série.',
     remboursement: null,
   },
   renouvellement: {
     libelle: 'Renouvellement d\'orthèses plantaires',
+    produits: [
+      { texte: "Renouvellement d'orthèses plantaires" },
+    ],
     aide: 'Possible si l\'ordonnance médicale d\'origine a moins de 3 ans et si le médecin ne l\'a pas exclu par mention expresse. Le médecin prescripteur (ou celui désigné par le patient) doit être informé.',
     remboursement: null,
   },
@@ -32462,12 +32508,42 @@ function _htmlLignesOrdonnance(c) {
     '<input class="inp" maxlength="' + ORDO_DUREE_MAX + '" placeholder="Durée / quantité" style="flex:1;min-width:90px;" value="' + _escHtml(l.duree) + '" oninput="modifierLigneOrdonnance(' + i + ', \'duree\', this.value)"/>' +
     '<button class="btn" style="font-size:11px;padding:4px 8px;color:var(--red);" title="Supprimer la ligne" aria-label="Supprimer la ligne" onclick="retirerLigneOrdonnance(' + i + ')">✕</button></div>').join('');
 }
+// Options du menu « Ajouter à l'ordonnance » : les produits et appareillages que le podologue peut
+// prescrire dans le type choisi (les pansements du patient diabétique sont dans un groupe à part).
+function _htmlProduitsOrdonnance(categorie) {
+  const liste = ORDO_CATEGORIES[categorie]?.produits || [];
+  let h = '<option value="">— Choisir dans la liste —</option>';
+  let groupe = null;
+  liste.forEach((x, i) => {
+    if ((x.groupe || null) !== groupe) {
+      if (groupe) h += '</optgroup>';
+      groupe = x.groupe || null;
+      if (groupe) h += '<optgroup label="' + _escHtml(groupe) + '">';
+    }
+    h += '<option value="' + i + '">' + _escHtml(x.texte) + '</option>';
+  });
+  if (groupe) h += '</optgroup>';
+  return h;
+}
+// Un choix dans le menu remplit la première ligne vide, sinon ajoute une ligne (ordonnance ou modèle).
+function ajouterProduitOrdonnance(valeur) {
+  const c = _ordoCible();
+  if (!c || valeur === '') return;
+  const x = (ORDO_CATEGORIES[c.categorie]?.produits || [])[Number(valeur)];
+  if (!x) return;
+  const vide = c.lignes.find((l) => !String(l.texte ?? '').trim());
+  if (vide) vide.texte = x.texte;
+  else if (c.lignes.length >= ORDO_LIGNES_MAX) { alert('Au plus ' + ORDO_LIGNES_MAX + ' lignes.'); return; }
+  else c.lignes.push({ texte: x.texte, duree: '' });
+  renderOrdonnancesPage();
+}
 function _htmlTypeOrdonnance(c) {
   const opts = Object.keys(ORDO_CATEGORIES).map((k) =>
     '<option value="' + k + '"' + (c.categorie === k ? ' selected' : '') + '>' + _escHtml(ORDO_CATEGORIES[k].libelle) + '</option>').join('');
   return '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Type de prescription</div>' +
     '<select class="inp" onchange="modifierChampOrdonnance(\'categorie\', this.value)">' + opts + '</select>' +
-    '<div style="font-size:11px;color:var(--mut);margin-top:4px;">' + _escHtml(ORDO_CATEGORIES[c.categorie].aide) + '</div>';
+    '<div style="font-size:10px;color:var(--mut);margin:8px 0 3px;">Ajouter à l\'ordonnance</div>' +
+    '<select class="inp" id="ordo-produit" onchange="ajouterProduitOrdonnance(this.value)">' + _htmlProduitsOrdonnance(c.categorie) + '</select>';
 }
 function _htmlRenouvellementOrdonnance(c) {
   if (c.categorie !== 'renouvellement') return '';
