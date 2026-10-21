@@ -212,7 +212,24 @@ function _oublierEchecPhoto(path) {
   _photosRechargeEchec.delete(path);
 }
 async function prefetchPhotoToDataUrl(path) {
-  const r = await _prefetchPhotoBrut(path);
+  let r = await _prefetchPhotoBrut(path);
+  // Mode domicile : photo gardée à l'ouverture en ligne, relue sur l'appareil sans réseau.
+  const domicile = typeof window._modeDomicileActif === 'function' && window._modeDomicileActif();
+  if (domicile) {
+    if (r.ok) {
+      if (typeof window._gardePhotoConsultee === 'function')
+        window._gardePhotoConsultee(path, r.dataUrl);
+    } else if (
+      (typeof window._horsConnexion === 'function' && window._horsConnexion()) ||
+      /failed to fetch|network|load failed/i.test(String(r.error || ''))
+    ) {
+      const gardee =
+        typeof window._lirePhotoConsultee === 'function'
+          ? await window._lirePhotoConsultee(path)
+          : null;
+      if (gardee) r = { ok: true, dataUrl: gardee, depuisAppareil: true };
+    }
+  }
   if (r.ok) _photosRechargeEchec.delete(path);
   else _photosRechargeEchec.add(path);
   return r;

@@ -3888,8 +3888,14 @@ function _ouvrirIdbPhotos() {
   if (_idbPhotosBase) return _idbPhotosBase;
   _idbPhotosBase = new Promise(function (resolve, reject) {
     if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB indisponible')); return; }
-    const r = indexedDB.open('verticy-photos', 1);
-    r.onupgradeneeded = function () { r.result.createObjectStore('p'); };
+    const r = indexedDB.open('verticy-photos', 2);
+    r.onupgradeneeded = function () {
+      // p = photos en attente d'envoi ; v = photos déjà envoyées gardées pour la consultation
+      // hors connexion (mode domicile) ; m = leur taille et leur dernière consultation.
+      ['p', 'v', 'm'].forEach(function (n) {
+        if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n);
+      });
+    };
     r.onsuccess = function () { resolve(r.result); };
     r.onerror = function () { reject(r.error); };
   });
@@ -4000,6 +4006,90 @@ async function _nettoyerPhotosIdb() {
   } catch (_e) { /* ménage reporté au prochain démarrage */ }
 }
 
+// ─── Photos déjà envoyées, consultables hors connexion (mode domicile uniquement) ───
+// Une photo ouverte en ligne est gardée sur l'appareil (IndexedDB) pour rester visible sans
+// réseau. Limite : 200 Mo, les moins récemment consultées partent d'abord. Tout est effacé à la
+// déconnexion et quand le mode domicile est désactivé (poste partagé : rien ne doit rester).
+const PHOTOS_CONSULTEES_MAX = 200 * 1024 * 1024;
+function _clePhotoConsultee(path) {
+  return pwaUser && pwaUser.id && path ? pwaUser.id + '|' + path : null;
+}
+function _gardePhotoConsultee(path, dataUrl) {
+  const cle = _clePhotoConsultee(path);
+  if (!cle || typeof dataUrl !== 'string' || dataUrl.indexOf('data:image') !== 0) return Promise.resolve();
+  return _ouvrirIdbPhotos().then(function (db) {
+    return new Promise(function (resolve) {
+      const tx = db.transaction(['v', 'm'], 'readwrite');
+      tx.objectStore('v').put(dataUrl, cle);
+      tx.objectStore('m').put({ t: Date.now(), n: dataUrl.length }, cle);
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = tx.onabort = function () { resolve(); };
+    });
+  }).then(_elaguerPhotosConsultees).catch(function () { /* facultatif : jamais bloquant */ });
+}
+function _lirePhotoConsultee(path) {
+  const cle = _clePhotoConsultee(path);
+  if (!cle) return Promise.resolve(null);
+  return _ouvrirIdbPhotos().then(function (db) {
+    return new Promise(function (resolve) {
+      const rq = db.transaction('v', 'readonly').objectStore('v').get(cle);
+      rq.onsuccess = function () {
+        const v = rq.result;
+        if (typeof v !== 'string') { resolve(null); return; }
+        const tx = db.transaction('m', 'readwrite');
+        const st = tx.objectStore('m');
+        const g = st.get(cle);
+        g.onsuccess = function () { st.put({ t: Date.now(), n: (g.result && g.result.n) || v.length }, cle); };
+        resolve(v);
+      };
+      rq.onerror = function () { resolve(null); };
+    });
+  }).catch(function () { return null; });
+}
+function _elaguerPhotosConsultees() {
+  return _ouvrirIdbPhotos().then(function (db) {
+    return new Promise(function (resolve) {
+      const tx = db.transaction(['v', 'm'], 'readwrite');
+      const m = tx.objectStore('m');
+      const all = [];
+      const rq = m.openCursor();
+      rq.onsuccess = function () {
+        const c = rq.result;
+        if (c) { all.push({ k: c.key, t: c.value.t, n: c.value.n }); c.continue(); return; }
+        let total = all.reduce(function (a, e) { return a + e.n; }, 0);
+        all.sort(function (a, b) { return a.t - b.t; });
+        for (let i = 0; i < all.length && total > PHOTOS_CONSULTEES_MAX; i++) {
+          tx.objectStore('v').delete(all[i].k);
+          m.delete(all[i].k);
+          total -= all[i].n;
+        }
+      };
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = tx.onabort = function () { resolve(); };
+    });
+  }).catch(function () { /* rien */ });
+}
+// Efface les photos consultées gardées (de l'utilisateur donné, ou de tous si uid absent).
+function _purgerPhotosConsultees(uid) {
+  return _ouvrirIdbPhotos().then(function (db) {
+    return new Promise(function (resolve) {
+      const tx = db.transaction(['v', 'm'], 'readwrite');
+      ['v', 'm'].forEach(function (n) {
+        const st = tx.objectStore(n);
+        const rq = st.openKeyCursor();
+        rq.onsuccess = function () {
+          const c = rq.result;
+          if (!c) return;
+          if (!uid || (typeof c.key === 'string' && c.key.indexOf(uid + '|') === 0)) st.delete(c.key);
+          c.continue();
+        };
+      });
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = tx.onabort = function () { resolve(); };
+    });
+  }).catch(function () { /* rien */ });
+}
+
 // ─── Mode domicile (hors connexion) ───
 // Réglage PAR APPAREIL ET PAR COMPTE (localStorage, clé scopée). Il ne s'active qu'avec du
 // réseau, et supprime le verrouillage par inactivité ; hors connexion, la saisie reste
@@ -4091,7 +4181,10 @@ function _reglerModeDomicile(actif) {
   } catch (_e) { return false; }
   if (typeof _lastActivity !== 'undefined') _lastActivity = Date.now();
   if (actif) _memoriserSessionHorsConnexion();
-  else if (!_horsConnexion()) { try { localStorage.removeItem('bm4-session-hc'); } catch (_e) { /* rien */ } }
+  else {
+    _purgerPhotosConsultees(pwaUser && pwaUser.id); // mode désactivé : plus de photo gardée
+    if (!_horsConnexion()) { try { localStorage.removeItem('bm4-session-hc'); } catch (_e) { /* rien */ } }
+  }
   return true;
 }
 function basculerModeDomicile(el) {
@@ -4416,6 +4509,8 @@ async function pwaLogout() {
   }
   sessionStorage.removeItem('skip_logout_confirm');
   _stopIdleLock();
+  // Poste partagé : à la déconnexion, plus aucune photo de patient ne reste dans le navigateur.
+  try { await _purgerPhotosConsultees(pwaUser && pwaUser.id); } catch (_e) { /* rien */ }
   if(pwaUser?.token) {
     // #203 — le refresh_token permet à signOut de rafraîchir un jeton expiré
     // pour révoquer réellement la session serveur (sinon logout 403 = session

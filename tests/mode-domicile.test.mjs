@@ -56,6 +56,7 @@ function monter({ enLigne = true, uid = 'u-fictif', temps } = {}) {
       'const DUREE_SESSION_HC_MS = 7 * 24 * 3600 * 1000;',
       'let _reseauPerdu = false, _syncErrorShown = false, _photoEchecDansSauvegarde = false, _etatSauv = null, _lastActivity = 0;',
       'function _etatSauvegarde(p) { _etatSauv = p; }',
+      'function _purgerPhotosConsultees() { purges.push(1); }',
       'function loadPwaSession() { return SESS; }',
       ...noms.map(fonction),
       'return { ' +
@@ -63,6 +64,7 @@ function monter({ enLigne = true, uid = 'u-fictif', temps } = {}) {
         ', etat: () => _etatSauv, act: () => _lastActivity, perdu: () => _reseauPerdu };',
     ].join('\n'),
     {
+      purges: [],
       localStorage: ls,
       document: doc,
       navigator: nav,
@@ -322,5 +324,26 @@ describe('service worker : mise à jour fiable', () => {
   it('« Mon compte » affiche la version réellement exécutée', () => {
     expect(SRC_BIOMECA).toMatch(/function _afficherVersionApp/);
     expect(fonction('_rendreModeDomicile')).toMatch(/_afficherVersionApp/);
+  });
+});
+
+describe('photos déjà envoyées, consultables hors connexion', () => {
+  const storage = readFileSync(new URL('../js/storage.js', import.meta.url), 'utf8');
+  it('gardées et relues seulement en mode domicile', () => {
+    const f = storage.slice(
+      storage.indexOf('async function prefetchPhotoToDataUrl'),
+      storage.indexOf('async function _prefetchPhotoBrut')
+    );
+    expect(f).toMatch(/_modeDomicileActif/);
+    expect(f.indexOf('_modeDomicileActif')).toBeLessThan(f.indexOf('_gardePhotoConsultee'));
+    expect(f.indexOf('_modeDomicileActif')).toBeLessThan(f.indexOf('_lirePhotoConsultee'));
+  });
+  it('limite 200 Mo, éviction des moins récentes', () => {
+    expect(SRC_BIOMECA).toMatch(/PHOTOS_CONSULTEES_MAX = 200 \* 1024 \* 1024/);
+    expect(fonction('_elaguerPhotosConsultees')).toMatch(/a\.t - b\.t/);
+  });
+  it('effacées à la déconnexion et à la désactivation du mode', () => {
+    expect(fonction('pwaLogout')).toMatch(/_purgerPhotosConsultees/);
+    expect(fonction('_reglerModeDomicile')).toMatch(/_purgerPhotosConsultees/);
   });
 });
