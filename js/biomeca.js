@@ -7198,6 +7198,56 @@ function loadPraticienLogo(input) {
   input.value = '';
 }
 
+// ===== Signature et tampon du praticien (imprimés sur les ordonnances) =====
+// Même principe que le logo : image redimensionnée côté client (400 × 200 px au plus), PNG
+// conservé (transparence) tant qu'il reste léger, sinon JPEG sur fond blanc. Stockée sur la
+// fiche du praticien (`signature`), jamais copiée dans chaque ordonnance (le dossier patient
+// resterait léger) : une ordonnance enregistrée relit la signature du praticien à l'affichage.
+let _pratSignatureDataUrl = '';
+function _setPratSignaturePreview(url) {
+  const img = document.getElementById('pr-signature-preview');
+  const rm = document.getElementById('pr-signature-remove');
+  if (img) { img.src = url || ''; img.style.display = url ? '' : 'none'; }
+  if (rm) rm.style.display = url ? '' : 'none';
+}
+function removePraticienSignature() {
+  _pratSignatureDataUrl = '';
+  _setPratSignaturePreview('');
+  const input = document.getElementById('pr-signature-input');
+  if (input) input.value = '';
+}
+function loadPraticienSignature(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(1, 400 / img.width, 200 / img.height);
+      const w = Math.max(1, Math.round(img.width * ratio));
+      const h = Math.max(1, Math.round(img.height * ratio));
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      let url = cv.toDataURL('image/png');
+      if (url.length > 120000) {
+        const cv2 = document.createElement('canvas');
+        cv2.width = w; cv2.height = h;
+        const ctx2 = cv2.getContext('2d');
+        ctx2.fillStyle = '#fff'; ctx2.fillRect(0, 0, w, h);
+        ctx2.drawImage(cv, 0, 0);
+        url = cv2.toDataURL('image/jpeg', 0.85);
+      }
+      _pratSignatureDataUrl = url;
+      _setPratSignaturePreview(url);
+    };
+    img.onerror = () => alert('Image illisible — utilisez un PNG, JPEG ou WebP.');
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
 // Bloc HTML du logo praticien pour les headers de rapport ('' si absent).
 // Cadre blanc arrondi aligné sur le lockup Verticy ; dataURL autonome, donc
 // compatible iframes srcdoc (rapports podo/pédicurie, #222).
@@ -7221,10 +7271,12 @@ function createPraticien() {
     email:document.getElementById('pr-email').value,
     siret:document.getElementById('pr-siret').value.trim(), rpps:document.getElementById('pr-rpps').value.trim(), iban:_normaliserIban(document.getElementById('pr-iban').value), bic:_normaliserIban(document.getElementById('pr-bic').value), mentionTva:document.getElementById('pr-mention-tva').value.trim(), // facturation
     logo:_pratLogoDataUrl, // #229-B
+    signature:_pratSignatureDataUrl, // signature et tampon (ordonnances)
   };
   praticiens.push(pr); savePraticiens();
   ['pr-nom','pr-titre','pr-cabinet','pr-tel','pr-adresse','pr-email','pr-siret','pr-rpps','pr-iban','pr-bic','pr-mention-tva'].forEach(id=>{document.getElementById(id).value='';});
   removePraticienLogo(); // #229-B — reset du formulaire
+  removePraticienSignature();
   renderPratList(); populatePratSelect();
   alert(`✓ Praticien enregistré : ${pr.nom}`);
 }
@@ -9367,6 +9419,8 @@ function editPraticien(i) {
   // #229-B — charger le logo existant dans l'état + l'aperçu du formulaire.
   _pratLogoDataUrl = pr.logo || '';
   _setPratLogoPreview(_pratLogoDataUrl);
+  _pratSignatureDataUrl = pr.signature || '';
+  _setPratSignaturePreview(_pratSignatureDataUrl);
   // Changer le bouton en mode édition
   const btn = document.querySelector('#pg-praticiens button[onclick*="createPraticien"]');
   if(btn) {
@@ -9396,6 +9450,7 @@ function saveEditPraticien(i) {
   pr.bic = _normaliserIban(document.getElementById('pr-bic').value);
   pr.mentionTva = document.getElementById('pr-mention-tva').value.trim();
   pr.logo = _pratLogoDataUrl; // #229-B — '' si retiré via le bouton ✕
+  pr.signature = _pratSignatureDataUrl; // '' si retirée
   savePatients();
   renderPratList();
   // Remettre le bouton en mode création
@@ -9405,6 +9460,7 @@ function saveEditPraticien(i) {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   removePraticienLogo(); // #229-B — reset du formulaire
+  removePraticienSignature();
 }
 
 function populatePratSelect() {
@@ -32165,6 +32221,13 @@ function _validerOrdonnance(o) {
   }
   return { ok: true };
 }
+// Signature et tampon : relus sur la fiche du praticien (jamais copiés dans l'ordonnance).
+// Seule une image « data:image » est acceptée.
+function _ordoSignature(o) {
+  const pr = praticiens.find((p) => p.nom === o?.emetteur?.nom);
+  const s = pr && typeof pr.signature === 'string' ? pr.signature : '';
+  return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(s) ? s : '';
+}
 function _ordoPraticienParId(id) { return praticiens.find((p) => p.id == id) || null; }
 function _ordoPraticienParDefaut() { return _praticienParDefaut(currentPatient); }
 function _ordoModelesDe(pr) { return Array.isArray(pr?.modelesOrdonnance) ? pr.modelesOrdonnance : []; }
@@ -32449,6 +32512,7 @@ function _htmlCorpsOrdonnance(o, apercu) {
   const bloc = (t, v) => v ? '<div>' + t + _escHtml(v) + '</div>' : '';
   const cat = ORDO_CATEGORIES[o.categorie] || {};
   const r = o.renouvellement;
+  const signature = _ordoSignature(o);
   const lignes = (o.lignes || []).map((l, i) =>
     '<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--bord);font-size:14px;">' +
     '<div style="width:22px;color:var(--mut);">' + (i + 1) + '.</div>' +
@@ -32472,7 +32536,8 @@ function _htmlCorpsOrdonnance(o, apercu) {
     renouv + lignes +
     (o.note ? '<div style="font-size:13px;margin-top:10px;white-space:pre-wrap;">' + _escHtml(o.note) + '</div>' : '') +
     (cat.remboursement ? '<div style="font-size:11px;color:var(--mut);margin-top:10px;">' + _escHtml(cat.remboursement) + '</div>' : '') +
-    '<div style="margin-top:18px;display:flex;justify-content:flex-end;"><div style="width:230px;height:90px;border:1px solid var(--bord);border-radius:6px;padding:6px;font-size:11px;color:var(--mut);">Signature et cachet</div></div>';
+    '<div style="margin-top:18px;display:flex;justify-content:flex-end;"><div style="width:230px;height:90px;border:1px solid var(--bord);border-radius:6px;padding:6px;font-size:11px;color:var(--mut);box-sizing:border-box;text-align:center;">' +
+      (signature ? '<img class="ordo-signature" src="' + signature + '" alt="Signature et tampon" style="max-width:100%;max-height:100%;object-fit:contain;"/>' : 'Signature et cachet') + '</div></div>';
 }
 function _htmlApercuOrdonnance() {
   const o = _ordoRecordCourant();

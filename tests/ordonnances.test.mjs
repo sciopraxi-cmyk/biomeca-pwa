@@ -33,6 +33,7 @@ const NOMS = [
   '_ordoLignesNettoyees',
   '_ordonnanceDepuisEtat',
   '_validerOrdonnance',
+  '_ordoSignature',
   '_ordoPraticienParId',
   '_ordoPraticienParDefaut',
   '_ordoModelesDe',
@@ -657,5 +658,57 @@ describe('câblage et garde-fous', () => {
     ]) {
       expect(h.toLowerCase(), t).toContain(t.toLowerCase());
     }
+  });
+});
+
+describe('signature et tampon du praticien', () => {
+  const PNG =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  const prat = (extra) => ({ id: 7, nom: 'Dr Fictif', rpps: '10001234567', ...extra });
+  const rendu = (extra) => {
+    const { f } = monter({ acces: 'full', prats: [prat(extra)] });
+    const e = saisir(f);
+    const rec = f._ordonnanceDepuisEtat(e, f.patient(), f._ordoPraticienParId(7));
+    return { rec, html: f._htmlCorpsOrdonnance(rec, false), f };
+  };
+  it('image enregistrée sur la fiche : imprimée dans le cadre, à la place du texte', () => {
+    const { html } = rendu({ signature: PNG });
+    expect(html).toContain('class="ordo-signature"');
+    expect(html).toContain(PNG);
+    expect(html).not.toContain('Signature et cachet');
+  });
+  it('sans image : le cadre « Signature et cachet » reste', () => {
+    const { html } = rendu({});
+    expect(html).toContain('Signature et cachet');
+    expect(html).not.toContain('ordo-signature');
+  });
+  it("la signature n'est jamais copiée dans l'ordonnance enregistrée (dossier patient léger)", () => {
+    const { rec } = rendu({ signature: PNG });
+    expect(JSON.stringify(rec)).not.toContain('data:image');
+  });
+  it("une valeur qui n'est pas une image data: est ignorée (aucune injection)", () => {
+    for (const mauvais of [
+      'javascript:alert(1)',
+      'https://exemple.invalid/x.png',
+      'data:text/html;base64,AAAA',
+      PNG + '"onerror="x',
+    ]) {
+      const { html } = rendu({ signature: mauvais });
+      expect(html, mauvais).not.toContain('ordo-signature');
+    }
+  });
+  it("page d'impression : la signature y figure aussi", () => {
+    const { f, rec } = rendu({ signature: PNG });
+    expect(f._htmlPageImpressionOrdonnance(rec)).toContain(PNG);
+  });
+  it('formulaire praticien : sélecteur, aperçu, retrait, et enregistrement à la création et à la modification', () => {
+    const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
+    for (const id of ['pr-signature-input', 'pr-signature-preview', 'pr-signature-remove'])
+      expect(html, id).toContain(`id="${id}"`);
+    expect(fonction('createPraticien')).toContain('signature:_pratSignatureDataUrl');
+    expect(fonction('createPraticien')).toContain('removePraticienSignature()');
+    expect(fonction('editPraticien')).toContain('_pratSignatureDataUrl = pr.signature');
+    expect(fonction('saveEditPraticien')).toContain('pr.signature = _pratSignatureDataUrl');
+    expect(fonction('saveEditPraticien')).toContain('removePraticienSignature()');
   });
 });

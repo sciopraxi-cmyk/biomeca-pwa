@@ -3569,6 +3569,17 @@
           <button class="btn" id="pr-logo-remove" onclick="removePraticienLogo()" style="display:none;color:var(--red);font-size:11px;">✕ Retirer</button>
         </div>
       </div>
+      <!-- Signature et tampon : imprimés automatiquement sur les ordonnances. Redimensionnés côté
+           client (400 × 200 px au plus) avant stockage, comme le logo. -->
+      <div style="margin-top:6px;">
+        <div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Signature et tampon (imprimés sur les ordonnances)</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button class="btn" onclick="document.getElementById('pr-signature-input').click()" style="font-size:12px;">✍️ Choisir une image</button>
+          <input type="file" id="pr-signature-input" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="loadPraticienSignature(this)">
+          <img id="pr-signature-preview" alt="" style="height:50px;display:none;background:#fff;border-radius:6px;padding:3px;border:1px solid var(--bord);"/>
+          <button class="btn" id="pr-signature-remove" onclick="removePraticienSignature()" style="display:none;color:var(--red);font-size:11px;">✕ Retirer</button>
+        </div>
+      </div>
       <button class="btn btn-blue btn-full" onclick="createPraticien()">✓ Enregistrer le praticien</button>
     </div>
   </div>
