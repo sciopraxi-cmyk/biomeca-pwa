@@ -73,15 +73,17 @@ const HEX_RED = '#f04060';
 // couleur de leur bilan (déplacement de 6 var() entre familles, total inchangé : 45).
 // Facturation 2b-1 : le bouton « 🧾 Devis et factures » de l'en-tête patient reprend le style
 // exact du bouton ✏️ voisin (+1 --mut, +1 --card, +1 --bord : total 45 → 48).
+// Ordonnances : le bouton « 📝 Ordonnances » de l'en-tête patient fait de même (+1 --mut, +1 --card,
+// +1 --bord : total 97 → 100).
 const COMPTES_ATTENDUS = {
   '--posturo-*': 12,
   '--sport-*': 11,
-  '--mut': 13,
+  '--mut': 14,
   '--txt': 9,
   '--pedicurie-*': 11,
   '--podo-*': 11,
-  '--card': 8,
-  '--bord': 7,
+  '--card': 9,
+  '--bord': 8,
   '--encours-*': 4,
   '--encours': 4,
   '--danger-*': 4,
@@ -506,6 +508,7 @@ const PAGES_CLAIRES = [
   'pg-praticiens',
   'pg-actes', // facturation, étape 1 : page ajoutée en clair d'emblée
   'pg-documents', // facturation, étape 2b-1 : idem
+  'pg-ordonnances', // ordonnances du podologue : idem
   'pg-agenda',
   // #265 lot 3B — le bilan clinique sportif. La bascule y AMÉLIORE la
   // lisibilité, mesuré : 147 éléments porteurs de texte sous 4,5:1 en sombre,

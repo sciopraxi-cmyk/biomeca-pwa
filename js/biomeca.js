@@ -3237,6 +3237,7 @@ function showAccessRestrictedModal(reason) {
     create_bilan: 'Création de bilan',
     export_pdf: 'Export PDF',
     create_document: 'Création de devis et de factures',
+    create_ordonnance: 'Création d\'ordonnances',
   };
   const label = labels[reason] || 'Cette fonctionnalité';
 
@@ -5420,7 +5421,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients','pg-ordonnances':'tn-patients',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
@@ -5430,6 +5431,7 @@ function nav(id) {
   if(id === 'pg-praticiens') renderPratList();
   if(id === 'pg-actes') renderActesPage();
   if(id === 'pg-documents') renderDocumentsPage();
+  if(id === 'pg-ordonnances') renderOrdonnancesPage();
   if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
@@ -7076,6 +7078,7 @@ function renderPatientList() {
           <div style="font-size:11px;color:var(--mut);margin-top:2px;">${age} · ${_escHtml(p.sport||'—')}${prat?' · '+_escHtml(prat.nom):''}</div>
         </div>
         <button onclick="ouvrirDocumentsPatient(${i})" title="Devis et factures" aria-label="Devis et factures" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧾</button>
+        <button onclick="ouvrirOrdonnancesPatient(${i})" title="Ordonnances" aria-label="Ordonnances" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">📝</button>
         <button onclick="editPatient(${i})" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
         <button onclick="deletePatient(${i})" class="bl-x" style="width:32px;height:32px;font-size:13px;">✕</button>
       </div>
@@ -32018,6 +32021,574 @@ async function renderDocumentsPage() {
     : '<div style="font-size:12px;margin-bottom:10px;padding:8px 12px;border-radius:8px;border:1px solid var(--bord);">Votre abonnement est terminé : vous pouvez <b>consulter et imprimer</b> vos documents émis' +
       (window._accessLevel === 'readonly' ? ' et enregistrer un règlement' : '') + '. Reprenez votre abonnement pour créer de nouveaux devis et factures.</div>') +
     '<div class="card" style="padding:12px 16px;">' + _htmlListeDocuments() + '</div>';
+}
+
+// ═════════════════════════════════════════════════════════════════
+// Ordonnances du podologue — modèles réutilisables + ordonnances par patient
+// ═════════════════════════════════════════════════════════════════
+// Stockage dans le blob existant (aucune table, aucun SQL) : `patient.ordonnances` (copie figée
+// du praticien et du patient à la date de l'ordonnance) et `praticien.modelesOrdonnance`.
+// Aucun réseau : tout fonctionne hors connexion. Aucun envoi par e-mail ni SMS (HDS pas migré).
+// Le texte reste libre : les alertes sont des AVERTISSEMENTS, jamais des blocages (la liste
+// réglementaire des prescriptions du podologue n'a pas été lue en texte intégral).
+const ORDO_CATEGORIES = {
+  topiques: {
+    libelle: 'Topiques à usage externe',
+    aide: 'Antiseptiques, antifongiques, hémostatiques, anesthésiques, kératolytiques et verrucides, adoucissants, asséchants, calmants, cicatrisants, révulsifs ; anti-inflammatoires locaux uniquement pour l\'hallux valgus et les ongles incarnés. Exclu : toute spécialité contenant une substance vénéneuse (listes I et II, stupéfiants).',
+    remboursement: 'Remboursé seulement si le produit figure sur la liste des médicaments remboursables.',
+  },
+  pansements: {
+    libelle: 'Pansements',
+    aide: 'Compresses stériles, sparadrap, jersey tubulaire, pochette de suture adhésive. Patient diabétique : hydrocolloïdes, charbon actif, vaselinés, hydrofibre, hydrogel, alginate de calcium = renouvellement et pose seulement.',
+    remboursement: 'Remboursé seulement si le pansement est inscrit à la LPP.',
+  },
+  appareillages: {
+    libelle: 'Appareillages podologiques',
+    aide: 'Orthèses plantaires, orthonyxies, orthoplasties, onychoplasties, prothèses et orthèses du pied, autres appareillages podologiques.',
+    remboursement: null,
+  },
+  chaussures: {
+    libelle: 'Chaussures thérapeutiques de série',
+    aide: 'Chaussures thérapeutiques de série.',
+    remboursement: null,
+  },
+  renouvellement: {
+    libelle: 'Renouvellement d\'orthèses plantaires',
+    aide: 'Possible si l\'ordonnance médicale d\'origine a moins de 3 ans et si le médecin ne l\'a pas exclu par mention expresse. Le médecin prescripteur (ou celui désigné par le patient) doit être informé.',
+    remboursement: null,
+  },
+};
+const ORDO_LIGNES_MAX = 20;
+const ORDO_TEXTE_MAX = 300;
+const ORDO_DUREE_MAX = 60;
+const ORDO_MODELES_MAX = 100;
+const ORDO_RENOUV_ANS = 3;
+const _ORDO_RE_DIABETIQUE = /hydrocolloid|charbon|vaselin|hydrofibre|hydrogel|alginate/;
+const _ORDO_RE_ANTI_INFL = /anti-?inflammatoire|\bains\b|diclofenac|ibuprofene|ketoprofene|niflumique/;
+const _ORDO_RE_HORS_COMPETENCE = /antibiotique|antalgique|paracetamol|doliprane|tramadol|opioide|corticoide|comprime|gelule|sirop|voie orale|injectable|radiographie|echographie|\birm\b|analyse de sang|prise de sang|biologie|arret de travail|kinesitherapie|\bkine\b/;
+let _ordoEdition = null;
+let _ordoApercu = false;
+let _ordoVueId = null;
+let _ordoModeles = false;
+let _ordoModele = null;
+
+function _ordoSansAccent(s) { return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function _ordoDateValide(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
+  if (!m) return false;
+  const d = new Date(iso + 'T00:00:00Z');
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
+}
+function _ordoAujourdhui() { return new Date().toISOString().slice(0, 10); }
+// Variables des modèles : {nom} {prenom} {date} remplacées à l'application du modèle.
+function _ordoVariables(texte, patient, dateIso) {
+  return String(texte ?? '')
+    .replace(/\{nom\}/g, String(patient?.nom ?? ''))
+    .replace(/\{prenom\}/g, String(patient?.prenom ?? ''))
+    .replace(/\{date\}/g, _ordoDateValide(dateIso) ? _dateFr(dateIso) : '');
+}
+// L'ordonnance d'origine a-t-elle 3 ans ou plus à la date de l'ordonnance ?
+function _ordoOrigineTropAncienne(origineIso, dateIso) {
+  if (!_ordoDateValide(origineIso) || !_ordoDateValide(dateIso)) return false;
+  const lim = new Date(origineIso + 'T00:00:00Z');
+  lim.setUTCFullYear(lim.getUTCFullYear() + ORDO_RENOUV_ANS);
+  return lim.toISOString().slice(0, 10) <= dateIso;
+}
+// Avertissements (jamais bloquants) sur le contenu d'une ordonnance en cours de saisie.
+function _alertesOrdonnance(e) {
+  const alertes = [];
+  const texte = _ordoSansAccent((e.lignes || []).map((l) => (l.texte || '') + ' ' + (l.duree || '')).join(' \n '));
+  if (_ORDO_RE_HORS_COMPETENCE.test(texte)) {
+    alertes.push('Cette ordonnance semble contenir une prescription hors du champ du podologue (médicament par voie générale, imagerie, biologie, arrêt de travail, kinésithérapie…). Orientez plutôt vers un médecin.');
+  }
+  if (_ORDO_RE_DIABETIQUE.test(texte)) {
+    alertes.push('Pansement réservé au patient diabétique : le podologue peut seulement le renouveler et le poser, pas le prescrire en première intention.');
+  }
+  if (_ORDO_RE_ANTI_INFL.test(texte)) {
+    alertes.push('Anti-inflammatoire : autorisé uniquement en local, pour l\'hallux valgus et les ongles incarnés.');
+  }
+  if (e.categorie === 'renouvellement') {
+    const r = e.renouv || {};
+    if (!_ordoDateValide(r.dateOrigine)) alertes.push('Indiquez la date de l\'ordonnance médicale d\'origine.');
+    else if (_ordoOrigineTropAncienne(r.dateOrigine, e.date)) alertes.push('L\'ordonnance médicale d\'origine date de ' + ORDO_RENOUV_ANS + ' ans ou plus : le renouvellement n\'est pas possible.');
+    else if (_ordoDateValide(e.date) && r.dateOrigine > e.date) alertes.push('La date de l\'ordonnance d\'origine est postérieure à celle d\'aujourd\'hui.');
+    if (r.exclu) alertes.push('Le médecin a exclu le renouvellement par mention expresse : ne renouvelez pas cette ordonnance.');
+    if (!r.informe) alertes.push('Le médecin prescripteur (ou le médecin désigné par le patient) doit être informé du renouvellement : cochez la case une fois fait.');
+  }
+  return alertes;
+}
+function _ordoEmetteur(pr) {
+  const e = _emetteurDepuisPraticien(pr);
+  return { nom: e.nom, titre: e.titre, cabinet: e.cabinet, adresse: e.adresse, tel: e.tel, email: e.email, rpps: e.rpps };
+}
+function _ordoPatientInstantane(p) {
+  const t = (v, n) => String(v ?? '').trim().slice(0, n);
+  return { civilite: t(p?.civilite, 20), nom: t(p?.nom, 120), prenom: t(p?.prenom, 120), ddn: _ordoDateValide(p?.ddn) ? p.ddn : '' };
+}
+function _ordoLignesNettoyees(lignes) {
+  return (lignes || [])
+    .map((l) => ({ texte: String(l?.texte ?? '').trim(), duree: String(l?.duree ?? '').trim() }))
+    .filter((l) => l.texte || l.duree);
+}
+// État de l'éditeur → ordonnance prête à être conservée (copie figée du praticien et du patient).
+function _ordonnanceDepuisEtat(e, patient, praticien) {
+  const r = e.renouv || {};
+  return {
+    id: e.id || crypto.randomUUID(),
+    created_at: e.created_at || new Date().toISOString(),
+    date: e.date,
+    categorie: e.categorie,
+    // Variables {nom} {prenom} {date} résolues à l'enregistrement : jamais d'accolades sur le papier.
+    lignes: _ordoLignesNettoyees(e.lignes).map((l) => ({ texte: _ordoVariables(l.texte, patient, e.date), duree: _ordoVariables(l.duree, patient, e.date) })),
+    renouvellement: e.categorie === 'renouvellement'
+      ? { date_origine: _ordoDateValide(r.dateOrigine) ? r.dateOrigine : '', medecin: String(r.medecin ?? '').trim().slice(0, 120), medecin_informe: r.informe === true, exclu: r.exclu === true }
+      : null,
+    note: String(e.note ?? '').trim().slice(0, 500),
+    emetteur: _ordoEmetteur(praticien),
+    patient: _ordoPatientInstantane(patient),
+  };
+}
+// Contrôle bloquant : seulement ce qui rendrait l'ordonnance inutilisable (identité, RPPS, contenu).
+function _validerOrdonnance(o) {
+  const ko = (erreur) => ({ ok: false, erreur });
+  if (!o || !ORDO_CATEGORIES[o.categorie]) return ko('Choisissez le type d\'ordonnance.');
+  if (!_ordoDateValide(o.date)) return ko('Date de l\'ordonnance invalide.');
+  if (!String(o.emetteur?.nom ?? '').trim()) return ko('Choisissez le praticien.');
+  if (!/^(\d{9}|\d{11})$/.test(String(o.emetteur?.rpps ?? ''))) return ko('N° RPPS (11 chiffres) ou ADELI (9 chiffres) manquant ou invalide : complétez la fiche du praticien (onglet Praticiens).');
+  if (!String(o.patient?.nom ?? '').trim()) return ko('Aucun patient sélectionné.');
+  if (!Array.isArray(o.lignes) || o.lignes.length < 1) return ko('Saisissez au moins une ligne de prescription.');
+  if (o.lignes.length > ORDO_LIGNES_MAX) return ko('Au plus ' + ORDO_LIGNES_MAX + ' lignes par ordonnance.');
+  for (const l of o.lignes) {
+    if (!l.texte) return ko('Une ligne n\'a pas de texte : complétez-la ou supprimez-la.');
+    if (l.texte.length > ORDO_TEXTE_MAX) return ko('Une ligne dépasse ' + ORDO_TEXTE_MAX + ' caractères.');
+    if (l.duree.length > ORDO_DUREE_MAX) return ko('Une durée ou quantité dépasse ' + ORDO_DUREE_MAX + ' caractères.');
+  }
+  return { ok: true };
+}
+function _ordoPraticienParId(id) { return praticiens.find((p) => p.id == id) || null; }
+function _ordoPraticienParDefaut() { return _praticienParDefaut(currentPatient); }
+function _ordoModelesDe(pr) { return Array.isArray(pr?.modelesOrdonnance) ? pr.modelesOrdonnance : []; }
+function _ordoCible() { return _ordoModele || _ordoEdition; }
+
+function ouvrirOrdonnancesPatient(idx) {
+  const p = patients[idx];
+  if (!p) return;
+  selectPatient(p);
+  _ordoEdition = null; _ordoApercu = false; _ordoVueId = null; _ordoModeles = false; _ordoModele = null;
+  nav('pg-ordonnances');
+}
+function nouvelleOrdonnance() {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  _ordoVueId = null; _ordoApercu = false; _ordoModeles = false; _ordoModele = null;
+  _ordoEdition = {
+    id: null, created_at: null, pratId: _ordoPraticienParDefaut()?.id ?? null, date: _ordoAujourdhui(),
+    categorie: 'topiques', lignes: [{ texte: '', duree: '' }], renouv: { dateOrigine: '', medecin: '', informe: false, exclu: false }, note: '',
+  };
+  renderOrdonnancesPage();
+}
+function modifierOrdonnance(id) {
+  const o = (currentPatient?.ordonnances || []).find((x) => x.id === id);
+  if (!o) return;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  const pr = praticiens.find((p) => p.nom === o.emetteur?.nom) || _ordoPraticienParDefaut();
+  const r = o.renouvellement || {};
+  _ordoVueId = null; _ordoApercu = false;
+  _ordoEdition = {
+    id: o.id, created_at: o.created_at, pratId: pr?.id ?? null, date: o.date, categorie: o.categorie,
+    lignes: o.lignes.map((l) => Object.assign({}, l)),
+    renouv: { dateOrigine: r.date_origine || '', medecin: r.medecin || '', informe: r.medecin_informe === true, exclu: r.exclu === true },
+    note: o.note || '',
+  };
+  renderOrdonnancesPage();
+}
+// « Dupliquer » : nouvelle ordonnance datée d'aujourd'hui, mêmes lignes (renouvellement d'un traitement).
+function dupliquerOrdonnance(id) {
+  const o = (currentPatient?.ordonnances || []).find((x) => x.id === id);
+  if (!o) return;
+  nouvelleOrdonnance();
+  if (!_ordoEdition) return;
+  _ordoEdition.categorie = o.categorie;
+  _ordoEdition.lignes = o.lignes.map((l) => Object.assign({}, l));
+  const r = o.renouvellement || {};
+  _ordoEdition.renouv = { dateOrigine: r.date_origine || '', medecin: r.medecin || '', informe: false, exclu: false };
+  renderOrdonnancesPage();
+}
+function fermerOrdonnance() { _ordoEdition = null; _ordoApercu = false; _ordoVueId = null; _ordoModeles = false; _ordoModele = null; renderOrdonnancesPage(); }
+function voirOrdonnance(id) { _ordoEdition = null; _ordoApercu = false; _ordoVueId = id; renderOrdonnancesPage(); }
+function supprimerOrdonnance(id) {
+  if (!currentPatient || !Array.isArray(currentPatient.ordonnances)) return;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  if (!confirm('Supprimer cette ordonnance ? Cette action est définitive.')) return;
+  const avant = currentPatient.ordonnances.slice();
+  currentPatient.ordonnances = avant.filter((x) => x.id !== id);
+  if (savePatients() === false) { currentPatient.ordonnances = avant; alert('Suppression impossible : la sauvegarde a échoué. Rien n\'a été modifié.'); return; }
+  fermerOrdonnance();
+}
+// Champs de l'éditeur (ordonnance ou modèle) : jamais de réaffichage du champ en cours de frappe.
+function modifierChampOrdonnance(champ, valeur) {
+  const c = _ordoCible();
+  if (!c) return;
+  if (champ === 'prat') { c.pratId = valeur; if (_ordoEdition && c === _ordoEdition) renderOrdonnancesPage(); return; }
+  if (champ === 'date') c.date = valeur;
+  if (champ === 'note') c.note = valeur;
+  if (champ === 'titre') c.titre = valeur;
+  if (champ === 'categorie' && ORDO_CATEGORIES[valeur]) { c.categorie = valeur; renderOrdonnancesPage(); return; }
+  if (champ === 'origine') c.renouv.dateOrigine = valeur;
+  if (champ === 'medecin') c.renouv.medecin = valeur;
+  if (champ === 'informe') c.renouv.informe = valeur === true;
+  if (champ === 'exclu') c.renouv.exclu = valeur === true;
+  _majAlertesOrdonnance();
+}
+function modifierLigneOrdonnance(i, champ, valeur) {
+  const c = _ordoCible();
+  const l = c?.lignes[i];
+  if (!l) return;
+  if (champ === 'texte') l.texte = valeur;
+  if (champ === 'duree') l.duree = valeur;
+  _majAlertesOrdonnance();
+}
+function ajouterLigneOrdonnance() {
+  const c = _ordoCible();
+  if (!c) return;
+  if (c.lignes.length >= ORDO_LIGNES_MAX) { alert('Au plus ' + ORDO_LIGNES_MAX + ' lignes.'); return; }
+  c.lignes.push({ texte: '', duree: '' });
+  renderOrdonnancesPage();
+}
+function retirerLigneOrdonnance(i) {
+  const c = _ordoCible();
+  if (!c) return;
+  c.lignes.splice(i, 1);
+  if (!c.lignes.length) c.lignes.push({ texte: '', duree: '' });
+  renderOrdonnancesPage();
+}
+function _majAlertesOrdonnance() {
+  const el = document.getElementById('ordo-alertes');
+  if (el && _ordoEdition) el.innerHTML = _htmlAlertesOrdonnance(_ordoEdition);
+}
+function _htmlAlertesOrdonnance(e) {
+  const a = _alertesOrdonnance(e);
+  if (!a.length) return '';
+  return '<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(217,119,6,0.12);border:1px solid rgba(217,119,6,0.45);font-size:12px;">' +
+    '<b>À vérifier (vous pouvez passer outre) :</b><ul style="margin:4px 0 0 16px;padding:0;">' +
+    a.map((t) => '<li>' + _escHtml(t) + '</li>').join('') + '</ul></div>';
+}
+// Applique un modèle du praticien : type, lignes et variables {nom} {prenom} {date}.
+function appliquerModeleOrdonnance(modeleId) {
+  if (!_ordoEdition || !modeleId) return;
+  const pr = _ordoPraticienParId(_ordoEdition.pratId);
+  const m = _ordoModelesDe(pr).find((x) => x.id === modeleId);
+  if (!m) return;
+  _ordoEdition.categorie = m.categorie;
+  _ordoEdition.lignes = m.lignes.map((l) => ({
+    texte: _ordoVariables(l.texte, currentPatient, _ordoEdition.date),
+    duree: _ordoVariables(l.duree, currentPatient, _ordoEdition.date),
+  }));
+  renderOrdonnancesPage();
+}
+function _ordoRecordCourant() {
+  return _ordonnanceDepuisEtat(_ordoEdition, currentPatient, _ordoPraticienParId(_ordoEdition.pratId));
+}
+function visualiserOrdonnance() {
+  if (!_ordoEdition || !currentPatient) return;
+  const v = _validerOrdonnance(_ordoRecordCourant());
+  if (!v.ok) { alert(v.erreur); return; }
+  _ordoApercu = true;
+  renderOrdonnancesPage();
+}
+function fermerApercuOrdonnance() { _ordoApercu = false; renderOrdonnancesPage(); }
+// Conserve l'ordonnance dans le dossier du patient (sauvegarde locale + cloud via savePatients).
+// En cas d'échec de la sauvegarde, la mémoire est remise comme avant : rien n'est à moitié enregistré.
+function enregistrerOrdonnance(imprimer) {
+  if (!_ordoEdition || !currentPatient) return;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  const o = _ordoRecordCourant();
+  const v = _validerOrdonnance(o);
+  if (!v.ok) { alert(v.erreur); return; }
+  const avant = Array.isArray(currentPatient.ordonnances) ? currentPatient.ordonnances.slice() : null;
+  const liste = avant ? avant.slice() : [];
+  const i = liste.findIndex((x) => x.id === o.id);
+  if (i >= 0) liste[i] = o; else liste.push(o);
+  currentPatient.ordonnances = liste;
+  if (savePatients() === false) {
+    if (avant) currentPatient.ordonnances = avant; else delete currentPatient.ordonnances;
+    alert('Ordonnance non enregistrée : la sauvegarde a échoué. Rien n\'a été modifié.');
+    return;
+  }
+  _ordoEdition = null; _ordoApercu = false; _ordoVueId = o.id;
+  renderOrdonnancesPage();
+  if (imprimer) imprimerOrdonnance(o.id);
+}
+
+// ── Modèles ──
+function ouvrirModelesOrdonnance() {
+  _ordoModeles = true; _ordoModele = null; _ordoEdition = null; _ordoVueId = null; _ordoApercu = false;
+  renderOrdonnancesPage();
+}
+function nouveauModeleOrdonnance(depuisEdition) {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  const src = depuisEdition ? _ordoEdition : null;
+  const pratId = src?.pratId ?? _ordoPraticienParDefaut()?.id ?? null;
+  if (!_ordoPraticienParId(pratId)) { alert('Aucun praticien : créez-en un dans l\'onglet Praticiens.'); return; }
+  _ordoModele = {
+    id: null, pratId, titre: '', categorie: src?.categorie || 'topiques',
+    lignes: src ? _ordoLignesNettoyees(src.lignes) : [{ texte: '', duree: '' }],
+    renouv: { dateOrigine: '', medecin: '', informe: false, exclu: false },
+    retour: depuisEdition ? 'edition' : 'modeles',
+  };
+  if (!_ordoModele.lignes.length) _ordoModele.lignes.push({ texte: '', duree: '' });
+  _ordoModeles = true;
+  renderOrdonnancesPage();
+}
+function modifierModeleOrdonnance(id) {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  const pr = _ordoPraticienParDefaut();
+  const m = _ordoModelesDe(pr).find((x) => x.id === id);
+  if (!m) return;
+  _ordoModele = { id: m.id, pratId: pr.id, titre: m.titre, categorie: m.categorie, lignes: m.lignes.map((l) => Object.assign({}, l)), renouv: { dateOrigine: '', medecin: '', informe: false, exclu: false }, retour: 'modeles' };
+  renderOrdonnancesPage();
+}
+function _validerModeleOrdonnance(m) {
+  const ko = (erreur) => ({ ok: false, erreur });
+  if (!m.titre || !m.titre.trim()) return ko('Donnez un nom au modèle.');
+  if (m.titre.trim().length > 80) return ko('Le nom du modèle dépasse 80 caractères.');
+  if (!ORDO_CATEGORIES[m.categorie]) return ko('Choisissez le type du modèle.');
+  if (!m.lignes.length) return ko('Saisissez au moins une ligne.');
+  if (m.lignes.length > ORDO_LIGNES_MAX) return ko('Au plus ' + ORDO_LIGNES_MAX + ' lignes.');
+  for (const l of m.lignes) {
+    if (!l.texte) return ko('Une ligne n\'a pas de texte : complétez-la ou supprimez-la.');
+    if (l.texte.length > ORDO_TEXTE_MAX) return ko('Une ligne dépasse ' + ORDO_TEXTE_MAX + ' caractères.');
+    if (l.duree.length > ORDO_DUREE_MAX) return ko('Une durée ou quantité dépasse ' + ORDO_DUREE_MAX + ' caractères.');
+  }
+  return { ok: true };
+}
+function enregistrerModeleOrdonnance() {
+  if (!_ordoModele) return;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  const pr = _ordoPraticienParId(_ordoModele.pratId);
+  if (!pr) { alert('Choisissez le praticien.'); return; }
+  const m = { id: _ordoModele.id || crypto.randomUUID(), titre: String(_ordoModele.titre ?? '').trim(), categorie: _ordoModele.categorie, lignes: _ordoLignesNettoyees(_ordoModele.lignes) };
+  const v = _validerModeleOrdonnance(m);
+  if (!v.ok) { alert(v.erreur); return; }
+  const avant = Array.isArray(pr.modelesOrdonnance) ? pr.modelesOrdonnance.slice() : null;
+  const liste = avant ? avant.slice() : [];
+  const i = liste.findIndex((x) => x.id === m.id);
+  if (i < 0 && liste.length >= ORDO_MODELES_MAX) { alert('Au plus ' + ORDO_MODELES_MAX + ' modèles.'); return; }
+  if (i >= 0) liste[i] = m; else liste.push(m);
+  pr.modelesOrdonnance = liste;
+  savePraticiens();
+  const retour = _ordoModele.retour;
+  _ordoModele = null;
+  if (retour === 'edition') { _ordoModeles = false; }
+  renderOrdonnancesPage();
+}
+function supprimerModeleOrdonnance(id) {
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_ordonnance'); return; }
+  const pr = _ordoPraticienParDefaut();
+  if (!pr || !_ordoModelesDe(pr).some((x) => x.id === id)) return;
+  if (!confirm('Supprimer ce modèle ? Les ordonnances déjà créées ne changent pas.')) return;
+  pr.modelesOrdonnance = _ordoModelesDe(pr).filter((x) => x.id !== id);
+  savePraticiens();
+  renderOrdonnancesPage();
+}
+
+// ── Affichage ──
+function _htmlLignesOrdonnance(c) {
+  return c.lignes.map((l, i) =>
+    '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">' +
+    '<textarea class="inp" rows="2" maxlength="' + ORDO_TEXTE_MAX + '" placeholder="Produit ou appareillage, posologie / consignes" style="flex:3;" oninput="modifierLigneOrdonnance(' + i + ', \'texte\', this.value)">' + _escHtml(l.texte) + '</textarea>' +
+    '<input class="inp" maxlength="' + ORDO_DUREE_MAX + '" placeholder="Durée / quantité" style="flex:1;min-width:90px;" value="' + _escHtml(l.duree) + '" oninput="modifierLigneOrdonnance(' + i + ', \'duree\', this.value)"/>' +
+    '<button class="btn" style="font-size:11px;padding:4px 8px;color:var(--red);" title="Supprimer la ligne" aria-label="Supprimer la ligne" onclick="retirerLigneOrdonnance(' + i + ')">✕</button></div>').join('');
+}
+function _htmlTypeOrdonnance(c) {
+  const opts = Object.keys(ORDO_CATEGORIES).map((k) =>
+    '<option value="' + k + '"' + (c.categorie === k ? ' selected' : '') + '>' + _escHtml(ORDO_CATEGORIES[k].libelle) + '</option>').join('');
+  return '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Type de prescription</div>' +
+    '<select class="inp" onchange="modifierChampOrdonnance(\'categorie\', this.value)">' + opts + '</select>' +
+    '<div style="font-size:11px;color:var(--mut);margin-top:4px;">' + _escHtml(ORDO_CATEGORIES[c.categorie].aide) + '</div>';
+}
+function _htmlRenouvellementOrdonnance(c) {
+  if (c.categorie !== 'renouvellement') return '';
+  const r = c.renouv;
+  return '<div style="margin-top:10px;padding:10px;border:1px solid var(--bord);border-radius:8px;">' +
+    '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de l\'ordonnance médicale d\'origine</div>' +
+    '<input class="inp" type="date" value="' + _escHtml(r.dateOrigine) + '" onchange="modifierChampOrdonnance(\'origine\', this.value)"/></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Médecin prescripteur</div>' +
+    '<input class="inp" maxlength="120" value="' + _escHtml(r.medecin) + '" oninput="modifierChampOrdonnance(\'medecin\', this.value)"/></div></div>' +
+    '<label style="display:flex;gap:8px;margin-top:8px;font-size:12px;"><input type="checkbox"' + (r.informe ? ' checked' : '') + ' onchange="modifierChampOrdonnance(\'informe\', this.checked)"/> Le médecin prescripteur (ou celui désigné par le patient) a été informé</label>' +
+    '<label style="display:flex;gap:8px;margin-top:6px;font-size:12px;"><input type="checkbox"' + (r.exclu ? ' checked' : '') + ' onchange="modifierChampOrdonnance(\'exclu\', this.checked)"/> Le médecin a exclu le renouvellement par une mention expresse</label></div>';
+}
+function _htmlEditeurOrdonnance() {
+  const e = _ordoEdition;
+  const pratOpts = praticiens.map((p) => '<option value="' + _escHtml(p.id) + '"' + (p.id == e.pratId ? ' selected' : '') + '>' + _escHtml(p.nom) + '</option>').join('');
+  const modeles = _ordoModelesDe(_ordoPraticienParId(e.pratId));
+  const modOpts = modeles.map((m) => '<option value="' + _escHtml(m.id) + '">' + _escHtml(m.titre) + ' — ' + _escHtml(ORDO_CATEGORIES[m.categorie]?.libelle || '') + '</option>').join('');
+  return '<div class="card" id="ordo-editeur" style="padding:16px;">' +
+    '<div class="stitle">Ordonnance ' + (e.id ? '(modification)' : '(nouvelle)') + '</div>' +
+    '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien</div><select class="inp" onchange="modifierChampOrdonnance(\'prat\', this.value)"><option value="">— Choisir —</option>' + pratOpts + '</select></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date</div><input class="inp" type="date" value="' + _escHtml(e.date) + '" onchange="modifierChampOrdonnance(\'date\', this.value)"/></div></div>' +
+    '<div style="margin-top:8px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Modèle</div>' +
+    (modeles.length
+      ? '<select class="inp" onchange="appliquerModeleOrdonnance(this.value)"><option value="">— Appliquer un modèle (remplace les lignes) —</option>' + modOpts + '</select>'
+      : '<div style="font-size:12px;color:var(--mut);">Aucun modèle pour ce praticien. Créez-en depuis « Mes modèles », ou enregistrez cette ordonnance comme modèle.</div>') + '</div>' +
+    '<div style="margin-top:8px;">' + _htmlTypeOrdonnance(e) + '</div>' +
+    _htmlRenouvellementOrdonnance(e) +
+    '<div style="font-size:10px;color:var(--mut);margin:10px 0 3px;">Lignes de prescription</div>' +
+    '<div id="ordo-lignes">' + _htmlLignesOrdonnance(e) + '</div>' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="ajouterLigneOrdonnance()">+ Ajouter une ligne</button>' +
+    '<div style="margin-top:8px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Remarque imprimée (facultatif)</div>' +
+    '<textarea class="inp" rows="2" maxlength="500" oninput="modifierChampOrdonnance(\'note\', this.value)">' + _escHtml(e.note) + '</textarea></div>' +
+    '<div id="ordo-alertes">' + _htmlAlertesOrdonnance(e) + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="visualiserOrdonnance()">Aperçu</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="nouveauModeleOrdonnance(true)">Enregistrer comme modèle</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerOrdonnance()">Annuler</button></div></div>';
+}
+// Corps imprimable : le MÊME code pour l'aperçu, la fiche enregistrée et l'impression.
+function _htmlCorpsOrdonnance(o, apercu) {
+  const e = o.emetteur || {}, p = o.patient || {};
+  const bloc = (t, v) => v ? '<div>' + t + _escHtml(v) + '</div>' : '';
+  const cat = ORDO_CATEGORIES[o.categorie] || {};
+  const r = o.renouvellement;
+  const lignes = (o.lignes || []).map((l, i) =>
+    '<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--bord);font-size:14px;">' +
+    '<div style="width:22px;color:var(--mut);">' + (i + 1) + '.</div>' +
+    '<div style="flex:1;white-space:pre-wrap;">' + _escHtml(l.texte) + '</div>' +
+    (l.duree ? '<div style="white-space:nowrap;color:var(--mut);">' + _escHtml(l.duree) + '</div>' : '') + '</div>').join('');
+  const renouv = r
+    ? '<div style="font-size:13px;margin:10px 0;padding:8px 10px;border:1px solid var(--bord);border-radius:6px;">Renouvellement de la prescription médicale d\'orthèses plantaires' +
+      (r.date_origine ? ' du ' + _escHtml(_dateFr(r.date_origine)) : '') + (r.medecin ? ', établie par ' + _escHtml(r.medecin) : '') + '.' +
+      (r.medecin_informe ? ' Le médecin prescripteur est informé de ce renouvellement.' : '') + '</div>'
+    : '';
+  return '<div class="card" id="' + (apercu ? 'ordo-apercu' : 'ordo-vue') + '" style="padding:16px;">' +
+    (apercu ? '<div style="margin:-4px -4px 12px;padding:8px 12px;border-radius:8px;background:rgba(217,119,6,0.12);border:1px solid rgba(217,119,6,0.45);font-size:12px;font-weight:700;">APERÇU — ordonnance non enregistrée</div>' : '') +
+    '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">' +
+      '<div style="font-size:12px;"><div style="font-weight:700;font-size:14px;">' + _escHtml(e.nom) + '</div>' +
+        bloc('', e.titre) + bloc('', e.cabinet) + bloc('', e.adresse) + bloc('Tél. ', e.tel) + bloc('', e.email) + bloc('RPPS / ADELI ', e.rpps) + '</div>' +
+      '<div style="text-align:right;"><div style="font-size:18px;font-weight:800;">ORDONNANCE</div>' +
+        '<div style="font-size:12px;">Date : ' + _escHtml(_dateFr(o.date)) + '</div></div></div>' +
+    '<div style="font-size:13px;margin-bottom:12px;"><b>Patient</b> : ' + _escHtml((p.civilite ? p.civilite + ' ' : '') + (p.prenom || '') + ' ' + (p.nom || '')) +
+      (p.ddn ? ' — né(e) le ' + _escHtml(_dateFr(p.ddn)) : '') + '</div>' +
+    '<div style="font-size:12px;color:var(--mut);margin-bottom:4px;">' + _escHtml(cat.libelle || '') + '</div>' +
+    renouv + lignes +
+    (o.note ? '<div style="font-size:13px;margin-top:10px;white-space:pre-wrap;">' + _escHtml(o.note) + '</div>' : '') +
+    (cat.remboursement ? '<div style="font-size:11px;color:var(--mut);margin-top:10px;">' + _escHtml(cat.remboursement) + '</div>' : '') +
+    '<div style="margin-top:18px;display:flex;justify-content:flex-end;"><div style="width:230px;height:90px;border:1px solid var(--bord);border-radius:6px;padding:6px;font-size:11px;color:var(--mut);">Signature et cachet</div></div>';
+}
+function _htmlApercuOrdonnance() {
+  const o = _ordoRecordCourant();
+  return _htmlCorpsOrdonnance(o, true) +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerApercuOrdonnance()">← Modifier</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="enregistrerOrdonnance(false)">✓ Enregistrer</button>' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="enregistrerOrdonnance(true)">🖨 Enregistrer et imprimer</button></div></div>';
+}
+function _htmlOrdonnanceEnregistree(o) {
+  return _htmlCorpsOrdonnance(o, false) +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="imprimerOrdonnance(\'' + _escHtml(o.id) + '\')">🖨 Imprimer</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="modifierOrdonnance(\'' + _escHtml(o.id) + '\')">Modifier</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="dupliquerOrdonnance(\'' + _escHtml(o.id) + '\')">Dupliquer</button>' +
+      '<button class="btn" style="' + _CSS_BTN + ';color:var(--red);" onclick="supprimerOrdonnance(\'' + _escHtml(o.id) + '\')">Supprimer</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerOrdonnance()">← Retour à la liste</button></div></div>';
+}
+function _htmlListeOrdonnances() {
+  const liste = (currentPatient?.ordonnances || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.created_at).localeCompare(String(a.created_at)));
+  if (!liste.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucune ordonnance pour ce patient.</div>';
+  return liste.map((o) =>
+    '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+    '<div style="font-size:13px;"><b>' + _escHtml(_dateFr(o.date)) + '</b><span style="color:var(--mut);"> · ' + _escHtml(ORDO_CATEGORIES[o.categorie]?.libelle || '') + ' · ' + _escHtml((o.lignes[0]?.texte || '').slice(0, 60)) + '</span></div>' +
+    '<div style="white-space:nowrap;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="voirOrdonnance(\'' + _escHtml(o.id) + '\')">Voir</button></div></div>').join('');
+}
+function _htmlListeModelesOrdonnance() {
+  const pr = _ordoPraticienParDefaut();
+  if (!pr) return '<div style="font-size:13px;color:var(--red);">Aucun praticien : créez-en un dans l\'onglet Praticiens.</div>';
+  const modeles = _ordoModelesDe(pr);
+  return '<div style="font-size:12px;color:var(--mut);margin-bottom:6px;">Modèles de ' + _escHtml(pr.nom) + '</div>' +
+    (modeles.length ? modeles.map((m) =>
+      '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
+      '<div style="font-size:13px;"><b>' + _escHtml(m.titre) + '</b><span style="color:var(--mut);"> · ' + _escHtml(ORDO_CATEGORIES[m.categorie]?.libelle || '') + ' · ' + m.lignes.length + ' ligne' + (m.lignes.length > 1 ? 's' : '') + '</span></div>' +
+      '<div style="white-space:nowrap;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="modifierModeleOrdonnance(\'' + _escHtml(m.id) + '\')">Modifier</button> ' +
+      '<button class="btn" style="font-size:11px;padding:3px 8px;color:var(--red);" onclick="supprimerModeleOrdonnance(\'' + _escHtml(m.id) + '\')">Supprimer</button></div></div>').join('')
+      : '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun modèle pour l\'instant.</div>');
+}
+function _htmlEditeurModeleOrdonnance() {
+  const m = _ordoModele;
+  return '<div class="card" id="ordo-modele-editeur" style="padding:16px;">' +
+    '<div class="stitle">Modèle d\'ordonnance ' + (m.id ? '(modification)' : '(nouveau)') + '</div>' +
+    '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom du modèle</div>' +
+    '<input class="inp" maxlength="80" placeholder="Ex. Verrue plantaire" value="' + _escHtml(m.titre) + '" oninput="modifierChampOrdonnance(\'titre\', this.value)"/>' +
+    '<div style="margin-top:8px;">' + _htmlTypeOrdonnance(m) + '</div>' +
+    '<div style="font-size:10px;color:var(--mut);margin:10px 0 3px;">Lignes (variables possibles : {nom} {prenom} {date})</div>' +
+    '<div id="ordo-lignes">' + _htmlLignesOrdonnance(m) + '</div>' +
+    '<button class="btn" style="' + _CSS_BTN + '" onclick="ajouterLigneOrdonnance()">+ Ajouter une ligne</button>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="enregistrerModeleOrdonnance()">✓ Enregistrer le modèle</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="annulerModeleOrdonnance()">Annuler</button></div></div>';
+}
+function annulerModeleOrdonnance() {
+  const retour = _ordoModele?.retour;
+  _ordoModele = null;
+  if (retour === 'edition') _ordoModeles = false;
+  renderOrdonnancesPage();
+}
+function renderOrdonnancesPage() {
+  const el = document.getElementById('ordonnances-contenu');
+  if (!el) return;
+  const sub = document.getElementById('ordonnances-patient');
+  if (!currentPatient) {
+    if (sub) sub.textContent = '';
+    el.innerHTML = '<div style="font-size:13px;color:var(--mut);">Sélectionnez un patient depuis la liste (bouton « 📝 Ordonnances »).</div>';
+    return;
+  }
+  if (sub) sub.textContent = 'Patient : ' + (currentPatient.prenom || '') + ' ' + (currentPatient.nom || '');
+  if (_ordoModele) { el.innerHTML = _htmlEditeurModeleOrdonnance(); return; }
+  if (_ordoModeles) {
+    el.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouveauModeleOrdonnance(false)">+ Nouveau modèle</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="fermerOrdonnance()">← Retour aux ordonnances</button></div>' +
+      '<div class="card" style="padding:12px 16px;">' + _htmlListeModelesOrdonnance() + '</div>';
+    return;
+  }
+  if (_ordoEdition && _ordoApercu) { el.innerHTML = _htmlApercuOrdonnance(); return; }
+  if (_ordoEdition) { el.innerHTML = _htmlEditeurOrdonnance(); return; }
+  const vue = _ordoVueId && (currentPatient.ordonnances || []).find((x) => x.id === _ordoVueId);
+  if (vue) { el.innerHTML = _htmlOrdonnanceEnregistree(vue); return; }
+  _ordoVueId = null;
+  const creation = _accessPermetCreationDocument();
+  el.innerHTML = (creation
+    ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+      '<button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="nouvelleOrdonnance()">+ Nouvelle ordonnance</button>' +
+      '<button class="btn" style="' + _CSS_BTN + '" onclick="ouvrirModelesOrdonnance()">Mes modèles</button></div>'
+    : '<div style="font-size:12px;margin-bottom:10px;padding:8px 12px;border-radius:8px;border:1px solid var(--bord);">Votre abonnement est terminé : vous pouvez <b>consulter et imprimer</b> vos ordonnances. Reprenez votre abonnement pour en créer de nouvelles.</div>') +
+    '<div class="card" style="padding:12px 16px;">' + _htmlListeOrdonnances() + '</div>';
+}
+// Page d'impression A4 (fond blanc, couleurs propres : l'iframe n'hérite pas du thème). Le titre sert
+// de nom de fichier pour « Enregistrer en PDF ».
+function _htmlPageImpressionOrdonnance(o) {
+  const titre = 'Ordonnance ' + _dateFr(o.date);
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + _escHtml(titre) + '</title><style>' +
+    ':root{--bord:#d1d5db;--mut:#4b5563;--txt:#111827;--dim:#6b7280;--red:#b91c1c;--green:#15803d;--blue:#175FA8}' +
+    '@page{size:A4;margin:14mm}' +
+    'html,body{background:#fff;color:#111827;margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}' +
+    '.card{border:none;background:#fff;padding:0!important;max-width:182mm;margin:0 auto}' +
+    '</style></head><body>' + _htmlCorpsOrdonnance(o, false) + '</div></body></html>';
+}
+function imprimerOrdonnance(id) {
+  const o = (currentPatient?.ordonnances || []).find((x) => x.id === id);
+  if (!o) return;
+  // Aucune garde d'abonnement : une ordonnance enregistrée se consulte et s'imprime toujours.
+  document.querySelectorAll('iframe.ordo-impression').forEach((f) => f.remove());
+  const iframe = document.createElement('iframe');
+  iframe.className = 'ordo-impression';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open(); idoc.write(_htmlPageImpressionOrdonnance(o)); idoc.close();
+  setTimeout(function() {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch (_e) { alert('Impression impossible. Réessayez ou utilisez Cmd/Ctrl+P.'); }
+  }, 300);
 }
 
 // ===== STRIPE + MODULES =====
