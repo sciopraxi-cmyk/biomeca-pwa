@@ -3884,10 +3884,21 @@ const SEUIL_PHOTO_IDB = 20000;
 let _photosAEcrireIdb = null;
 let _idbPhotosKO = false;
 let _idbPhotosBase = null;
+let _idbEchecAt = 0;
 function _ouvrirIdbPhotos() {
   if (_idbPhotosBase) return _idbPhotosBase;
+  // Après un échec, on n'insiste pas pendant 30 s : l'ouverture d'une page ne doit jamais
+  // attendre à répétition une base bloquée.
+  if (_idbEchecAt && Date.now() - _idbEchecAt < 30000) return Promise.reject(new Error('IndexedDB indisponible (échec récent)'));
   _idbPhotosBase = new Promise(function (resolve, reject) {
     if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB indisponible')); return; }
+    let fini = false;
+    // Jamais d'attente sans fin : un autre onglet resté sur une ancienne version peut BLOQUER
+    // la mise à jour de la base ; l'ouverture échoue alors au bout de 2 s et l'application
+    // continue sans le coffre (la photo s'ouvre, seule la copie locale est absente).
+    const delai = setTimeout(function () {
+      if (!fini) { fini = true; reject(new Error('IndexedDB bloquée (autre onglet ouvert ?)')); }
+    }, 2000);
     const r = indexedDB.open('verticy-photos', 2);
     r.onupgradeneeded = function () {
       // p = photos en attente d'envoi ; v = photos déjà envoyées gardées pour la consultation
@@ -3896,10 +3907,15 @@ function _ouvrirIdbPhotos() {
         if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n);
       });
     };
-    r.onsuccess = function () { resolve(r.result); };
-    r.onerror = function () { reject(r.error); };
+    r.onsuccess = function () {
+      // Une version plus récente de la base demandée ailleurs : on libère pour ne pas la bloquer.
+      r.result.onversionchange = function () { r.result.close(); _idbPhotosBase = null; };
+      if (fini) { r.result.close(); return; }
+      fini = true; clearTimeout(delai); resolve(r.result);
+    };
+    r.onerror = function () { if (!fini) { fini = true; clearTimeout(delai); reject(r.error); } };
   });
-  _idbPhotosBase.catch(function () { _idbPhotosBase = null; });
+  _idbPhotosBase.catch(function () { _idbPhotosBase = null; _idbEchecAt = Date.now(); });
   return _idbPhotosBase;
 }
 function _refPhotoIdb(d) {
@@ -3965,7 +3981,15 @@ async function _rehydraterPhotosIdb(racine) {
   if (!porteurs.length) return;
   const uid = pwaUser && pwaUser.id;
   let db = null;
+  let indisponible = false;
   try { db = uid ? await _ouvrirIdbPhotos() : null; } catch (_e) { db = null; }
+  if (!db && uid) {
+    try { db = await _ouvrirIdbPhotos(); } catch (_e2) { db = null; } // 2e essai
+    indisponible = !db;
+  }
+  // Coffre injoignable : on GARDE les références (rien n'est supprimé de la copie locale) ;
+  // les images se rétabliront au prochain démarrage.
+  if (indisponible) { console.warn('[photos] coffre injoignable, images non remises en place'); return; }
   await Promise.all(porteurs.map(function (p) {
     return new Promise(function (resolve) {
       if (!db) { delete p[0][p[1]]; resolve(); return; }

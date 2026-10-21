@@ -347,3 +347,19 @@ describe('photos déjà envoyées, consultables hors connexion', () => {
     expect(fonction('_reglerModeDomicile')).toMatch(/_purgerPhotosConsultees/);
   });
 });
+
+describe('base de photos : jamais d’attente sans fin', () => {
+  it('ouverture bornée à 2 s, pas d’insistance après un échec, libération sur demande', () => {
+    const o = fonction('_ouvrirIdbPhotos');
+    expect(o).toMatch(/\}, 2000\)/);
+    expect(o).toMatch(/_idbEchecAt/);
+    expect(o).toMatch(/onversionchange/);
+  });
+  it('coffre injoignable au démarrage : les références sont gardées, rien n’est supprimé', () => {
+    expect(fonction('_rehydraterPhotosIdb')).toMatch(/if \(indisponible\)[\s\S]{0,200}return;/);
+  });
+  it('copie gardée : lecture abandonnée au bout de 5 s', () => {
+    const st = readFileSync(new URL('../js/storage.js', import.meta.url), 'utf8');
+    expect(st).toMatch(/setTimeout\(\(\) => res\(null\), 5000\)/);
+  });
+});

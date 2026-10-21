@@ -225,7 +225,11 @@ async function prefetchPhotoToDataUrl(path) {
     ) {
       const gardee =
         typeof window._lirePhotoConsultee === 'function'
-          ? await window._lirePhotoConsultee(path)
+          ? await Promise.race([
+              window._lirePhotoConsultee(path),
+              // Jamais d'attente sans fin : au bout de 5 s on abandonne la copie gardée.
+              new Promise((res) => setTimeout(() => res(null), 5000)),
+            ])
           : null;
       if (gardee) r = { ok: true, dataUrl: gardee, depuisAppareil: true };
     }
