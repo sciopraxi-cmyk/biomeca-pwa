@@ -63,6 +63,13 @@ async function uploadPhotoBase64(dataUrl, path) {
     }
     return { ok: true, path };
   } catch (e) {
+    // Exception de requête (pas de réponse HTTP) = réseau perdu : passage en mode hors connexion.
+    if (
+      typeof window._signalerReseauPerdu === 'function' &&
+      typeof window._estErreurReseau === 'function' &&
+      window._estErreurReseau(e)
+    )
+      window._signalerReseauPerdu();
     if (typeof window._signalerEchecEnvoiPhoto === 'function') window._signalerEchecEnvoiPhoto();
     return { ok: false, error: e.message || String(e) };
   }
@@ -205,7 +212,28 @@ function _oublierEchecPhoto(path) {
   _photosRechargeEchec.delete(path);
 }
 async function prefetchPhotoToDataUrl(path) {
-  const r = await _prefetchPhotoBrut(path);
+  let r = await _prefetchPhotoBrut(path);
+  // Mode domicile : photo gardée à l'ouverture en ligne, relue sur l'appareil sans réseau.
+  const domicile = typeof window._modeDomicileActif === 'function' && window._modeDomicileActif();
+  if (domicile) {
+    if (r.ok) {
+      if (typeof window._gardePhotoConsultee === 'function')
+        window._gardePhotoConsultee(path, r.dataUrl);
+    } else if (
+      (typeof window._horsConnexion === 'function' && window._horsConnexion()) ||
+      /failed to fetch|network|load failed/i.test(String(r.error || ''))
+    ) {
+      const gardee =
+        typeof window._lirePhotoConsultee === 'function'
+          ? await Promise.race([
+              window._lirePhotoConsultee(path),
+              // Jamais d'attente sans fin : au bout de 5 s on abandonne la copie gardée.
+              new Promise((res) => setTimeout(() => res(null), 5000)),
+            ])
+          : null;
+      if (gardee) r = { ok: true, dataUrl: gardee, depuisAppareil: true };
+    }
+  }
   if (r.ok) _photosRechargeEchec.delete(path);
   else _photosRechargeEchec.add(path);
   return r;

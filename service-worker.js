@@ -10,7 +10,7 @@
 // 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
 // clients sur du code de mois précédents). Toute évolution ultérieure du code
 // applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
-const CACHE_VERSION = 'biomeca-v195';
+const CACHE_VERSION = 'biomeca-v202';
 const CACHE_PREFIX  = 'biomeca-';
 
 // #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur
@@ -71,7 +71,11 @@ self.addEventListener('install', event => {
     caches.open(CACHE_VERSION)
       .then(cache => cache.addAll(PRECACHE_URLS))
       .then(() => self.skipWaiting())
-      .catch(err => console.warn('[SW] precache failed:', err))
+    // Pas de catch : si le précache échoue (appareil hors connexion pendant la mise à jour),
+    // l'installation ÉCHOUE et cette version est écartée, l'ancienne reste en place et la
+    // mise à jour sera retentée. Avant, l'échec était avalé : une version à cache vide restait
+    // « en attente », puis purgeait l'ancien cache à son activation (page introuvable hors
+    // connexion), pendant que l'ancien code continuait de tourner.
   );
 });
 
@@ -115,6 +119,13 @@ self.addEventListener('fetch', event => {
   if (url.hostname.endsWith('.supabase.co') || url.hostname.endsWith('.supabase.in')) {
     if (req.method !== 'GET') {
       return; // POST/PATCH/DELETE/PUT → bypass strict
+    }
+    // Données (REST) et authentification : JAMAIS de réponse périmée du cache. Hors connexion,
+    // l'application doit recevoir une vraie erreur réseau pour activer ses protections (copie
+    // locale, marqueur « non synchronisé ») ; une ancienne réponse serait prise pour l'état
+    // actuel du serveur et pourrait être réécrite par-dessus des données plus récentes.
+    if (url.pathname.startsWith('/rest/v1/') || url.pathname.startsWith('/auth/v1/')) {
+      return;
     }
     event.respondWith(networkFirst(req));
     return;
@@ -233,7 +244,9 @@ function staleWhileRevalidate(req) {
         return resp;
       }).catch(err => {
         console.warn('[SW] swr network failed:', err);
-        return cached; // si le réseau échoue et qu'on a un cache, on s'en contente
+        // Cache si on en a un ; sinon une vraie erreur réseau (et non `undefined`, qui
+        // provoquait « Failed to convert value to 'Response' »).
+        return cached || Response.error();
       });
       return cached || networkUpdate;
     });
