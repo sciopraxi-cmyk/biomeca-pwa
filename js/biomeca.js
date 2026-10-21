@@ -1823,7 +1823,7 @@ async function tryStartTrial() {
 // single-compte (un seul lien ICS). Chaque événement Google porte désormais
 // connectionId + accountEmail (tagués côté google-calendar-events) : la
 // grille les colore par compte (1er compte = bleu historique inchangé,
-// suivants = palette AG_GOOGLE_ACCENTS) et saveAgendaEvent()/deleteAgendaEvent()
+// suivants = palette AG_PALETTE) et saveAgendaEvent()/deleteAgendaEvent()
 // les renvoient pour cibler le bon compte côté serveur.
 //
 // Apple (#178) : pas d'OAuth, le praticien colle l'URL d'un flux ICS public
@@ -1876,15 +1876,8 @@ function renderGoogleCalendarStatus(connections) {
   const box = document.getElementById('agenda-google-status');
   if (!box) return;
   const rows = connections
-    .map(function (c, i) {
-      const accent = AG_GOOGLE_ACCENTS[i % AG_GOOGLE_ACCENTS.length];
-      // #187-fix — le 1er compte n'a pas d'accent (AG_GOOGLE_ACCENTS[0] = null,
-      // cf. plus bas) et ses événements gardent donc la couleur PAR DÉFAUT de
-      // la grille : var(--blue), qui malgré son nom vaut #2dd4bf (un
-      // sarcelle/vert, pas un bleu — piège de nommage, cf. CLAUDE.md). La
-      // pastille utilisait à tort le bleu Google #4285F4, d'où l'incohérence
-      // pastille bleue / événements verts signalée par Scio le 05/08/2026.
-      const dotColor = accent ? accent.fg : 'var(--blue)';
+    .map(function (c) {
+      const dotColor = _agCouleur('google:' + c.id).fg;
       return (
         '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">' +
         '<span style="width:10px;height:10px;border-radius:50%;background:' +
@@ -2006,54 +1999,193 @@ const agCal = {
   appleConnected: false,
 };
 
-// #187 — accent visuel par compte Google au-delà du 1er (qui garde le bleu/
-// vert historique var(--blue)/var(--green) — les deux valent #2dd4bf,
-// teinte ~174°, cf. css/biomeca.css — aucun style inline, zéro régression
-// visuelle pour l'usage à un seul compte).
-// #187-UX — Scio a trouvé les teintes #2/#3/#4 d'origine (vert/cyan/indigo)
-// trop proches les unes des autres ET du teal #1 (toutes dans la bande
-// ~150-210°). Palette refaite en reprenant les 4 couleurs d'identité des
-// bilans (#122/#140) pour rester cohérent avec le reste de l'app : le
-// compte #1 (teal, sans accent) tombe déjà sur la couleur Posturo #2dd4bf —
-// les comptes #2-#4 reprennent donc les 3 autres (Sport bleu, Podopédiatrie
-// rose, Pédicurie ambre). Pas de violet : réservé à Apple Calendar dans
-// cette même grille (var(--purple) #a78bfa, ~255°) — un compte Google
-// violet serait indiscernable d'un événement Apple. Le compte #5 (au-delà
-// des 4 bilans) reçoit un magenta ~300°, seule teinte encore libre entre
-// le violet Apple (~255°) et le rouge suppression/erreur (var(--red)
-// #f04060, ~350°, dont le rose Podopédiatrie ~347° est déjà voisin — accepté
-// ici puisque c'est la couleur identitaire existante du module) :
-const AG_GOOGLE_ACCENTS = [
-  null, // compte #1 : style CSS par défaut, inchangé (teal ~174°, = Posturo)
-  { bg: 'rgba(55,138,221,0.15)', fg: '#378ADD' }, // compte #2 : bleu (Sport)
-  { bg: 'rgba(225,29,72,0.15)', fg: '#e11d48' }, // compte #3 : rose (Podopédiatrie)
-  { bg: 'rgba(217,119,6,0.15)', fg: '#d97706' }, // compte #4 : ambre (Pédicurie)
-  { bg: 'rgba(192,38,211,0.15)', fg: '#c026d3' }, // compte #5 : magenta ~300° (pas de 5e bilan)
+// ===== Agenda : couleurs par compte, patient lié à un événement, téléphone =====
+// Couleurs : un choix par compte (clé « google:<id> », « apple », « doctolib »), rangé dans
+// praticiens[0].agendaCouleurs ({ clé: indice de palette }) par savePraticiens. Palette à encre
+// foncée sur fond clair du même ton (lisible sur la page claire de l'agenda).
+// Liens : praticiens[0].agendaLiens ({ idEvenementGoogle: { patientId, motif } }). Le titre envoyé à
+// Google ne porte que les INITIALES du patient + le motif ; le nom complet et le téléphone ne
+// sont affichés que dans Verticy, à partir de ce lien et de la fiche patient.
+const AG_PALETTE = [
+  { nom: 'Vert sapin', fg: '#0F766E' },
+  { nom: 'Bleu', fg: '#1D4ED8' },
+  { nom: 'Rose', fg: '#BE123C' },
+  { nom: 'Ambre', fg: '#B45309' },
+  { nom: 'Violet', fg: '#6D28D9' },
+  { nom: 'Olive', fg: '#4D7C0F' },
+  { nom: 'Magenta', fg: '#A21CAF' },
+  { nom: 'Gris', fg: '#475569' },
 ];
-// Au-delà de 5 comptes, la couleur recommence à tourner (#187 accepte une
-// dégradation gracieuse ici : l'email dans la modale reste la source fiable
-// de distinction, la couleur n'est qu'un repère visuel rapide).
-function _agGoogleAccentIndex(connectionId) {
-  const idx = agCal.googleConnections.findIndex(function (c) {
-    return c.id === connectionId;
+const AG_DEFAUT_GOOGLE = [0, 1, 2, 3, 6];
+const AG_DEFAUT_APPLE = 4;
+const AG_DEFAUT_DOCTOLIB = 5;
+const AG_MOTIFS = ['Première consultation', 'Consultation de suivi', 'Bilan podologique', 'Semelles orthopédiques', 'Contrôle semelles', 'Soin de pédicurie', 'Visite à domicile'];
+
+function _agPrat() {
+  return Array.isArray(praticiens) && praticiens[0] ? praticiens[0] : null;
+}
+function _agCleCouleur(e) {
+  if (!e) return '';
+  if (e.source === 'google') return 'google:' + (e.connectionId || '');
+  if (e.source === 'apple' || e.source === 'doctolib') return e.source;
+  return '';
+}
+function _agIndexCouleur(cle) {
+  const pr = _agPrat();
+  const choix = pr && pr.agendaCouleurs && typeof pr.agendaCouleurs === 'object' ? pr.agendaCouleurs[cle] : undefined;
+  if (Number.isInteger(choix) && choix >= 0 && choix < AG_PALETTE.length) return choix;
+  if (cle === 'apple') return AG_DEFAUT_APPLE;
+  if (cle === 'doctolib') return AG_DEFAUT_DOCTOLIB;
+  const id = String(cle).slice(7);
+  const rang = agCal.googleConnections.findIndex(function (c) {
+    return c.id === id;
   });
-  return idx >= 0 ? idx % AG_GOOGLE_ACCENTS.length : 0;
+  return AG_DEFAUT_GOOGLE[(rang >= 0 ? rang : 0) % AG_DEFAUT_GOOGLE.length];
 }
-// Style inline pour un événement Google d'un compte autre que le 1er —
-// chaîne vide pour Apple (garde sa classe CSS dédiée) et pour le 1er compte
-// Google (garde le style par défaut inchangé).
-// #193 — pose des VARIABLES CSS (--ev-bg/--ev-fg/--ev-fg-hover) plutôt que
-// des propriétés directes (background/color) : ces dernières, en inline,
-// ont une spécificité imbattable par les règles :hover de css/biomeca.css,
-// ce qui gelait le survol sur les événements accentués (Scio, 05/08/2026).
-// Les classes .cal-week-event/.cal-evchip/.cal-week-allday lisent ces
-// variables via var(--ev-fg, repli-par-défaut), donc :hover reprend la main.
+function _agHexRgba(hex, a) {
+  const n = parseInt(String(hex).slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function _agCouleur(cle) {
+  const fg = AG_PALETTE[_agIndexCouleur(cle)].fg;
+  return { fg: fg, bg: _agHexRgba(fg, 0.15) };
+}
+// Variables CSS posées en inline (#193 : :hover garde la main via var()).
 function _agEventAccentStyle(e) {
-  if (e.source !== 'google') return '';
-  const accent = AG_GOOGLE_ACCENTS[_agGoogleAccentIndex(e.connectionId)];
-  if (!accent) return '';
-  return '--ev-bg:' + accent.bg + ';--ev-fg:' + accent.fg + ';--ev-fg-hover:#fff;';
+  const cle = _agCleCouleur(e);
+  if (!cle) return '';
+  const c = _agCouleur(cle);
+  return '--ev-bg:' + c.bg + ';--ev-fg:' + c.fg + ';--ev-fg-hover:#fff;';
 }
+function agChoisirCouleur(cle, idx) {
+  if (globalThis?._modeConsultation) return;
+  if (!_accessPermetCreationDocument()) { showAccessRestrictedModal('create_document'); return; }
+  const pr = _agPrat();
+  if (!pr || !(Number.isInteger(idx) && idx >= 0 && idx < AG_PALETTE.length)) return;
+  if (!/^(google:[A-Za-z0-9_-]+|apple|doctolib)$/.test(String(cle))) return;
+  const avant = pr.agendaCouleurs;
+  pr.agendaCouleurs = Object.assign({}, avant && typeof avant === 'object' ? avant : {}, { [cle]: idx });
+  savePraticiens();
+  if (typeof renderGoogleCalendarStatus === 'function' && agCal.googleConnections.length) renderGoogleCalendarStatus(agCal.googleConnections);
+  renderAgendaCalendar();
+}
+function _agRendreCouleurs() {
+  const box = document.getElementById('agenda-couleurs');
+  if (!box) return;
+  const lignes = [];
+  agCal.googleConnections.forEach(function (c, i) {
+    lignes.push(['google:' + c.id, c.google_email || 'Compte Google ' + (i + 1)]);
+  });
+  if (agCal.appleConnected) lignes.push(['apple', 'Apple Calendar']);
+  if (_doctolibStock().rdv.length) lignes.push(['doctolib', 'Doctolib']);
+  if (!lignes.length) { box.innerHTML = ''; return; }
+  box.innerHTML =
+    '<div style="font-size:11px;color:var(--mut);margin-bottom:4px;">Couleurs des agendas</div>' +
+    lignes
+      .map(function (l) {
+        const actif = _agIndexCouleur(l[0]);
+        return (
+          '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 0;">' +
+          '<span style="font-size:12px;min-width:170px;">' + _escHtml(l[1]) + '</span>' +
+          AG_PALETTE.map(function (p, k) {
+            return (
+              '<button type="button" title="' + _escHtml(p.nom) + '" aria-label="' + _escHtml(l[1] + ' : ' + p.nom) + '" onclick="agChoisirCouleur(\'' + l[0] + '\',' + k + ')" ' +
+              'style="width:18px;height:18px;border-radius:50%;cursor:pointer;padding:0;background:' + p.fg + ';border:' + (k === actif ? '3px solid var(--txt)' : '1px solid var(--bord)') + ';"></button>'
+            );
+          }).join('') +
+          '</div>'
+        );
+      })
+      .join('');
+}
+// Initiales « L.D. » (initiale du prénom puis du nom), jamais le nom complet.
+function _agInitiales(nom, prenom) {
+  const ini = function (s) {
+    const m = String(s || '').trim().match(/[A-Za-zÀ-ÖØ-öø-ÿ]/);
+    return m ? m[0].toUpperCase() + '.' : '';
+  };
+  return ini(prenom) + ini(nom);
+}
+function _agTitrePatient(p, motif) {
+  const base = _agInitiales(p && p.nom, p && p.prenom) || 'RDV';
+  const m = String(motif || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return m ? base + ' – ' + m : base;
+}
+function _agTelSur(v) {
+  return String(v == null ? '' : v).replace(/[^0-9+ .()-]/g, '').trim().slice(0, 20);
+}
+function _agPatientParId(id) {
+  if (id == null || id === '') return null;
+  return (Array.isArray(patients) ? patients : []).find(function (p) {
+    return p.id == id;
+  }) || null;
+}
+function _agPatientChoix() {
+  return (Array.isArray(patients) ? patients : [])
+    .map(function (p) {
+      const ddn = p.ddn ? String(p.ddn).split('-').reverse().join('/') : '';
+      return { id: p.id, label: [p.nom, p.prenom].filter(Boolean).join(' ') + (ddn ? ' – ' + ddn : '') };
+    })
+    .filter(function (x) {
+      return x.label.trim();
+    })
+    .sort(function (a, b) {
+      return a.label.localeCompare(b.label, 'fr');
+    });
+}
+function _agLien(eventId) {
+  const pr = _agPrat();
+  const l = pr && pr.agendaLiens && typeof pr.agendaLiens === 'object' ? pr.agendaLiens[eventId] : null;
+  return l && typeof l === 'object' ? l : null;
+}
+function _agEcrireLien(eventId, patientId, motif) {
+  const pr = _agPrat();
+  if (!pr || !eventId) return;
+  if (patientId == null && !_agLien(eventId)) return; // rien à retirer : aucune écriture
+  const liens = Object.assign({}, pr.agendaLiens && typeof pr.agendaLiens === 'object' ? pr.agendaLiens : {});
+  if (patientId == null) delete liens[eventId];
+  else liens[eventId] = { patientId: patientId, motif: String(motif || '').slice(0, 80) };
+  pr.agendaLiens = liens;
+  savePraticiens();
+}
+// Texte affiché dans la grille : nom complet pour un événement lié à un patient, sinon le titre.
+function _agEnrichir(events) {
+  return events.map(function (e) {
+    if (e.source !== 'google') return e;
+    const l = _agLien(e.id);
+    const p = l ? _agPatientParId(l.patientId) : null;
+    if (!p) return e;
+    const nom = [p.nom, p.prenom].filter(Boolean).join(' ');
+    return Object.assign({}, e, { affichage: l.motif ? nom + ' – ' + l.motif : nom, patientId: p.id });
+  });
+}
+function _agLabel(e) {
+  return e.affichage || e.summary;
+}
+function _agTelDe(e) {
+  const direct = _agTelSur(e && e.tel);
+  if (direct) return direct;
+  const p = _agPatientParId(e && e.patientId);
+  return p ? _agTelSur(p.tel) : '';
+}
+function _agTitleAttr(e) {
+  const t = _agTelDe(e);
+  return _escHtml(_agLabel(e) + (t ? ' — ' + t : ''));
+}
+function _agBlocContact(e) {
+  const t = _agTelDe(e);
+  if (!t) return '';
+  const href = 'tel:' + t.replace(/[^0-9+]/g, '');
+  return '<div style="font-size:13px;margin-bottom:8px;">📞 <a href="' + _escHtml(href) + '" style="color:var(--verticy-bleu,#175FA8);font-weight:600;">' + _escHtml(t) + '</a></div>';
+}
+// Raison lisible d'un refus de Google (le texte brut vient de l'Edge Function).
+function _agRaisonEchecGoogle(msg) {
+  const m = String(msg || '');
+  if (/invalid_grant|expired|revoked/i.test(m)) return "l'autorisation Google a expiré ou a été retirée";
+  if (/rate|quota|limit/i.test(m)) return "limite d'appels Google atteinte, réessayez dans quelques minutes";
+  return 'Google a refusé la connexion';
+}
+// ===== FIN AGENDA COULEURS / PATIENT / TÉLÉPHONE =====
 
 const AG_CAL_HOUR_START = 7; // fenêtre visible par défaut : 07h→21h (horaires cabinet usuels)
 const AG_CAL_HOUR_END = 21;
@@ -2197,7 +2329,7 @@ async function loadAgendaCalendarEvents() {
       return acc.concat(list);
     }, []);
     // Doctolib (import CSV, lecture seule) : ajouté APRÈS le dédoublonnage, jamais retiré par lui.
-    agCal.events = _agDedupeEvents(merged).concat(_doctolibEvenements(_doctolibStock().rdv, start, end));
+    agCal.events = _agEnrichir(_agDedupeEvents(merged).concat(_doctolibEvenements(_doctolibStock().rdv, start, end)));
     renderAgendaCalendar();
   } catch (e) {
     console.error('[agenda] loadAgendaCalendarEvents failed:', e);
@@ -2278,13 +2410,20 @@ function renderAgendaCalendar() {
   // "jamais dessiné" vs "existe mais rechargement échoué".
   const failedBanner =
     agCal.googleFailedAccounts && agCal.googleFailedAccounts.length > 0
-      ? '<div style="background:#c0392b22;color:#c0392b;border:1px solid #c0392b55;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:8px;">⚠ ' +
+      ? '<div style="background:#c0392b22;color:#c0392b;border:1px solid #c0392b55;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:8px;">' +
         agCal.googleFailedAccounts
           .map(function (a) {
-            return _escHtml(a.google_email || 'compte Google');
+            return (
+              '<div style="margin:2px 0;">⚠ <strong>' +
+              _escHtml(a.google_email || 'compte Google') +
+              '</strong> : ' +
+              _escHtml(_agRaisonEchecGoogle(a.error)) +
+              ' — ses rendez-vous peuvent manquer. ' +
+              '<button class="btn" onclick="connectGoogleCalendar()" style="font-size:11px;padding:3px 10px;background:#c0392b;color:#fff;">Reconnecter</button></div>'
+            );
           })
-          .join(', ') +
-        ' — rechargement impossible, ces rendez-vous peuvent manquer. Reconnecte ce compte si besoin.</div>'
+          .join('') +
+        '<div style="font-size:11px;margin-top:4px;">Si cela revient chaque semaine, l\'application Google est encore en mode « test » (autorisation limitée à 7 jours) : voir la console Google Cloud, écran de consentement OAuth.</div></div>'
       : '';
 
   const grid = agCal.view === 'week' ? _agRenderWeekGrid() : _agRenderMonthGrid();
@@ -2295,6 +2434,7 @@ function renderAgendaCalendar() {
   const prevBody = box.querySelector('.cal-week-bodyrow');
   const prevScrollTop = prevBody ? prevBody.scrollTop : null;
   box.innerHTML = failedBanner + toolbar + grid;
+  _agRendreCouleurs();
   if (agCal.view === 'week') {
     const newBody = box.querySelector('.cal-week-bodyrow');
     if (newBody) {
@@ -2443,9 +2583,9 @@ function _agRenderMonthGrid() {
             '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
             e.id +
             '\')" title="' +
-            _escHtml(e.summary) +
+            _agTitleAttr(e) +
             '">' +
-            _escHtml(e.summary) +
+            _escHtml(_agLabel(e)) +
             '</div>'
           );
         })
@@ -2522,8 +2662,10 @@ function _agRenderWeekGrid() {
         _agEventAccentStyle(e) +
         '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
         e.id +
-        '\')">' +
-        _escHtml(e.summary) +
+        '\')" title="' +
+        _agTitleAttr(e) +
+        '">' +
+        _escHtml(_agLabel(e)) +
         '</div>';
     });
     // #192 — segments du jour + calage anti-recouvrement (côte à côte plutôt
@@ -2574,9 +2716,9 @@ function _agRenderWeekGrid() {
         '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
         e.id +
         '\')" title="' +
-        _escHtml(e.summary) +
+        _agTitleAttr(e) +
         '">' +
-        _escHtml(e.summary) +
+        _escHtml(_agLabel(e)) +
         '</div>';
     });
 
@@ -2670,6 +2812,7 @@ function openAgendaEventModal(eventId, prefillLocal) {
       '<div style="font-size:13px;margin-bottom:8px;">' +
       _escHtml(_agFormatRangeReadable(existing.start, existing.end)) +
       '</div>' +
+      _agBlocContact(existing) +
       (existing.description
         ? '<div style="font-size:12px;color:var(--mut);white-space:pre-wrap;margin-bottom:8px;">' + _escHtml(existing.description) + '</div>'
         : '') +
@@ -2694,6 +2837,10 @@ function openAgendaEventModal(eventId, prefillLocal) {
     endVal = _agToLocalInputValue(endDate.toISOString());
   }
 
+  const lien = existing ? _agLien(existing.id) : null;
+  const patientLie = lien ? _agPatientParId(lien.patientId) : null;
+  const choix = _agPatientChoix();
+  const libelleLie = patientLie ? (choix.find(function (c) { return c.id == patientLie.id; }) || { label: '' }).label : '';
   const overlay = document.createElement('div');
   overlay.className = 'cal-event-modal-backdrop page-claire'; // #268-L1 — portée claire
   overlay.id = 'agenda-event-modal-backdrop';
@@ -2705,10 +2852,24 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '<div class="stitle">' +
     (existing ? 'Modifier l\'événement' : 'Nouvel événement') +
     '</div>' +
-    '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div>' +
+    '<div style="display:flex;gap:14px;margin-bottom:8px;font-size:13px;">' +
+    '<label><input type="radio" name="agenda-ev-mode" value="patient" onchange="agEvMode()"' + (patientLie ? ' checked' : '') + '/> Rendez-vous patient</label>' +
+    '<label><input type="radio" name="agenda-ev-mode" value="libre" onchange="agEvMode()"' + (patientLie ? '' : ' checked') + '/> Texte libre</label>' +
+    '</div>' +
+    '<div id="agenda-ev-libre"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div>' +
     '<input class="inp" id="agenda-ev-title" placeholder="Consultation..." value="' +
     (existing ? _escHtml(existing.summary) : '') +
-    '"/>' +
+    '"/></div>' +
+    '<div id="agenda-ev-pat" style="display:none;">' +
+    '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Patient *</div>' +
+    '<input class="inp" id="agenda-ev-patient" list="agenda-ev-patients" autocomplete="off" placeholder="Taper un nom pour rechercher…" oninput="agEvPatientInfo()" value="' + _escHtml(libelleLie) + '"/>' +
+    '<datalist id="agenda-ev-patients">' + choix.map(function (c) { return '<option value="' + _escHtml(c.label) + '"></option>'; }).join('') + '</datalist>' +
+    '<div style="font-size:10px;color:var(--mut);margin:6px 0 3px;">Motif de consultation</div>' +
+    '<input class="inp" id="agenda-ev-motif" list="agenda-ev-motifs" autocomplete="off" placeholder="Choisir ou écrire un motif" value="' + _escHtml(lien ? lien.motif || '' : '') + '"/>' +
+    '<datalist id="agenda-ev-motifs">' + AG_MOTIFS.map(function (m) { return '<option value="' + _escHtml(m) + '"></option>'; }).join('') + '</datalist>' +
+    '<div id="agenda-ev-info" style="font-size:12px;margin-top:6px;"></div>' +
+    '<div style="font-size:10px;color:var(--mut);margin-top:4px;">Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy.</div>' +
+    '</div>' +
     // #187 — sélecteur de compte Google cible, uniquement à la création et
     // seulement s'il y a un vrai choix à faire (>1 compte connecté). En
     // édition, l'événement reste sur son compte d'origine (existing.connectionId,
@@ -2724,10 +2885,10 @@ function openAgendaEventModal(eventId, prefillLocal) {
         '</select></div>'
       : '') +
     '<div class="g2" style="margin-top:6px;">' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local" value="' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Début *</div><input class="inp" id="agenda-ev-start" type="datetime-local" style="min-width:0;width:100%;box-sizing:border-box;" value="' +
     startVal +
     '"/></div>' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Fin *</div><input class="inp" id="agenda-ev-end" type="datetime-local" value="' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Fin *</div><input class="inp" id="agenda-ev-end" type="datetime-local" style="min-width:0;width:100%;box-sizing:border-box;" value="' +
     endVal +
     '"/></div>' +
     '</div>' +
@@ -2741,6 +2902,34 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '</div>' +
     '</div>';
   document.body.appendChild(overlay);
+  agEvMode();
+  agEvPatientInfo();
+}
+
+// Bascule « Rendez-vous patient » / « Texte libre » dans la fenêtre d'événement.
+function agEvMode() {
+  const r = document.querySelector('input[name="agenda-ev-mode"]:checked');
+  const patient = !!r && r.value === 'patient';
+  const pat = document.getElementById('agenda-ev-pat');
+  const libre = document.getElementById('agenda-ev-libre');
+  if (pat) pat.style.display = patient ? '' : 'none';
+  if (libre) libre.style.display = patient ? 'none' : '';
+}
+function _agPatientDuChamp() {
+  const el = document.getElementById('agenda-ev-patient');
+  const v = el ? el.value.trim().toLowerCase() : '';
+  if (!v) return null;
+  const c = _agPatientChoix().find(function (x) {
+    return x.label.toLowerCase() === v;
+  });
+  return c ? _agPatientParId(c.id) : null;
+}
+// Téléphone du patient choisi, affiché sous le champ (lien « appeler »).
+function agEvPatientInfo() {
+  const box = document.getElementById('agenda-ev-info');
+  if (!box) return;
+  const p = _agPatientDuChamp();
+  box.innerHTML = p ? _agBlocContact({ tel: p.tel }) || '<span style="color:var(--mut);">Pas de téléphone sur la fiche.</span>' : '';
 }
 
 function closeAgendaEventModal() {
@@ -2754,7 +2943,16 @@ async function saveAgendaEvent() {
   const startEl = document.getElementById('agenda-ev-start');
   const endEl = document.getElementById('agenda-ev-end');
   const descEl = document.getElementById('agenda-ev-desc');
-  const title = titleEl ? titleEl.value.trim() : '';
+  const modeEl = document.querySelector('input[name="agenda-ev-mode"]:checked');
+  const modePatient = !!modeEl && modeEl.value === 'patient';
+  const motifEl = document.getElementById('agenda-ev-motif');
+  const motif = motifEl ? motifEl.value.trim() : '';
+  const patient = modePatient ? _agPatientDuChamp() : null;
+  if (modePatient && !patient) {
+    alert('Choisissez un patient dans la liste (tapez le début du nom, puis cliquez sur la ligne proposée).');
+    return;
+  }
+  const title = modePatient ? _agTitrePatient(patient, motif) : titleEl ? titleEl.value.trim() : '';
   const start = startEl ? startEl.value : '';
   const end = endEl ? endEl.value : '';
   const desc = descEl ? descEl.value : '';
@@ -2805,6 +3003,14 @@ async function saveAgendaEvent() {
       });
     }
     if (!res.ok) throw new Error('save ' + res.status);
+    // Lien patient ↔ événement (local) : posé, mis à jour ou retiré selon le mode choisi.
+    try {
+      const data = await res.json();
+      const evId = (data && data.event && data.event.id) || agCal.editingId;
+      if (evId && (patient || agCal.editingId)) _agEcrireLien(evId, patient ? patient.id : null, motif);
+    } catch (_e) {
+      /* réponse sans corps : l'événement est créé, seul le lien patient manque */
+    }
     closeAgendaEventModal();
     await loadAgendaCalendarEvents();
   } catch (e) {
@@ -2829,6 +3035,7 @@ async function deleteAgendaEvent() {
       { method: 'DELETE' }
     );
     if (!res.ok) throw new Error('delete ' + res.status);
+    _agEcrireLien(agCal.editingId, null, '');
     closeAgendaEventModal();
     await loadAgendaCalendarEvents();
   } catch (e) {
@@ -34108,9 +34315,9 @@ function importPatientsCSV(input) {
 // Aucune extraction de pages, aucune API : le praticien dépose LUI-MÊME l'export officiel de son
 // compte (Paramètres avancés → Données → Exports). Le fichier est lu dans le navigateur, rien n'est
 // envoyé. Stockage dans le blob existant : `praticiens[0].agendaDoctolib` ({ importeLe, rdv[] }),
-// écrit par savePraticiens seulement. Seuls id, début, durée, agenda, motif, statut, nom, prénom
-// et le lien vers la fiche sont gardés : notes, honoraires, e-mail, téléphone, adresse et date de
-// naissance ne sont PAS conservés. Affichage en lecture seule dans la grille de l'agenda.
+// écrit par savePraticiens seulement. Seuls id, début, durée, agenda, motif, statut, nom, prénom,
+// téléphone portable et le lien vers la fiche sont gardés : notes, honoraires, e-mail, adresse et
+// date de naissance ne sont PAS conservés. Affichage en lecture seule dans la grille de l'agenda.
 const DOCTOLIB_JOURS_PASSE = 14;
 const DOCTOLIB_JOURS_FUTUR = 180;
 const DOCTOLIB_MAX_RDV = 2500;
@@ -34149,6 +34356,7 @@ function _doctolibMapHeaders(rawHeaders) {
     ),
     prenom: find((h) => (h.includes('prenom') && !h.includes('medecin')) || h === 'patient first name' || h === 'first name'),
     ddn: find((h) => (h.includes('naissance') && h.includes('date')) || h === 'birth date' || h === 'date of birth' || h === 'birthdate'),
+    tel: find((h) => h.includes('portable') || h.includes('mobile') || h === 'cell phone' || h === 'mobile phone'),
   };
 }
 // 'YYYY-MM-DD HH:MM[:SS]', 'YYYY-MM-DDTHH:MM[:SS][Z|±hh:mm]', 'DD/MM/YYYY HH:MM[:SS]' → heure
@@ -34236,7 +34444,7 @@ function _doctolibAnalyser(text, liste, aujourdhui) {
       else if (c) { patientId = c.id; stats.reconnus++; }
       else stats.sansFiche++;
     }
-    rdv.push({ id, debut, duree, agenda, motif, statut: _doctolibTexte(val(cols, map.statut), 30), nom, prenom, patientId });
+    rdv.push({ id, debut, duree, agenda, motif, statut: _doctolibTexte(val(cols, map.statut), 30), nom, prenom, tel: _agTelSur(val(cols, map.tel)), patientId });
   }
   rdv.sort((a, b) => a.debut.localeCompare(b.debut));
   if (rdv.length > DOCTOLIB_MAX_RDV) { stats.tronques = rdv.length - DOCTOLIB_MAX_RDV; rdv.length = DOCTOLIB_MAX_RDV; }
@@ -34274,6 +34482,8 @@ function _doctolibEvenements(rdvs, debutPlage, finPlage) {
       start: d.toISOString(),
       end: f.toISOString(),
       source: 'doctolib',
+      tel: _agTelSur(x.tel),
+      patientId: x.patientId == null ? null : x.patientId,
       description: [x.agenda ? 'Agenda : ' + x.agenda : '', x.statut ? 'Statut : ' + x.statut : ''].filter(Boolean).join('\n'),
     });
   });
@@ -34300,7 +34510,7 @@ function _doctolibResume(res, etatAvant) {
   if (s.illisibles) msg += '\n• ' + s.illisibles + ' ligne(s) à date illisible ignorée(s)';
   if (s.tronques) msg += '\n• ' + s.tronques + ' rendez-vous au-delà de ' + DOCTOLIB_MAX_RDV + ' non conservés';
   if (etatAvant) msg += '\n\nLes rendez-vous Doctolib déjà importés sur cette période seront remplacés.';
-  msg += '\n\nLe fichier reste sur votre ordinateur. Notes, honoraires, e-mail, téléphone et date de naissance ne sont pas conservés.\n\nImporter ?';
+  msg += '\n\nLe fichier reste sur votre ordinateur. Le téléphone portable est conservé pour pouvoir appeler le patient ; notes, honoraires, e-mail, adresse et date de naissance ne sont pas conservés.\n\nImporter ?';
   return msg;
 }
 function _lancerImportDoctolib(text) {

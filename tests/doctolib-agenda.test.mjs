@@ -19,6 +19,7 @@ const HELPERS = [
   '_importNormDdn',
   '_importMatchDecision',
   '_accessPermetCreationDocument',
+  '_agTelSur',
 ];
 
 function monter(o = {}) {
@@ -145,15 +146,16 @@ describe('analyse du fichier', () => {
       statut: 'Confirmé',
       nom: 'Durand',
       prenom: 'Lucie',
+      tel: '0600000000',
       patientId: null,
     });
     const brut = JSON.stringify(r);
     for (const secret of [
       'NOTE-SECRETE',
-      '0600000000',
       'lucie@exemple.invalid',
       '1985-03-12',
       '51',
+      'Secrétaire',
     ]) {
       expect(brut).not.toContain(secret);
     }

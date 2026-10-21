@@ -3607,7 +3607,7 @@
     <div class="card" style="margin-bottom:16px;">
       <div class="stitle">Doctolib</div>
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
-        Doctolib n'offre pas d'intégration directe (API réservée aux partenaires). Dans Doctolib : Paramètres avancés → Données → Exports → « Historique de RDV », puis importez le fichier CSV ici : vos rendez-vous s'affichent dans le calendrier ci-dessous, en lecture seule (« Nom Prénom – motif »). Le fichier est lu sur votre ordinateur uniquement ; notes, honoraires, e-mail, téléphone et date de naissance ne sont pas conservés. Le bouton « Doctolib » du header ouvre toujours votre agenda dans un nouvel onglet.
+        Doctolib n'offre pas d'intégration directe (API réservée aux partenaires). Dans Doctolib : Paramètres avancés → Données → Exports → « Historique de RDV », puis importez le fichier CSV ici : vos rendez-vous s'affichent dans le calendrier ci-dessous, en lecture seule (« Nom Prénom – motif »). Le fichier est lu sur votre ordinateur ; le téléphone portable est conservé pour pouvoir appeler le patient, mais pas les notes, honoraires, e-mail, adresse ni date de naissance. Le bouton « Doctolib » du header ouvre toujours votre agenda dans un nouvel onglet.
       </p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <button class="btn btn-blue" onclick="document.getElementById('agenda-doctolib-input').click()" style="font-size:12px;">📥 Importer l'export Doctolib (CSV)</button>
@@ -3638,6 +3638,7 @@
     <!-- Grille calendrier unifiée — fusion Google + Apple (#182/#178) -->
     <div class="card" id="agenda-calendar-card" style="display:none;">
       <div class="stitle">Calendrier</div>
+      <div id="agenda-couleurs" style="margin-bottom:10px;"></div>
       <div id="agenda-calendar-grid"></div>
     </div>
   </div>
