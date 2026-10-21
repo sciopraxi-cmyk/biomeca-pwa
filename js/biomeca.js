@@ -716,6 +716,7 @@ async function onPwaLoginSuccess() {
   // #131 — démarrer le compteur d'inactivité (masque toujours le banner
   // d'avertissement s'il traînait d'une session précédente non nettoyée).
   _startIdleLock();
+  if (_modeDomicileActif()) _signalerModeDomicile(); // rappel à chaque ouverture
 }
 
 // ─── Chargement des données ───
@@ -4211,6 +4212,33 @@ function _reglerModeDomicile(actif) {
   }
   return true;
 }
+// Onglet « Mode domicile » : petit onglet vert fixé en bas à gauche de l'écran (il ne recouvre ni le menu ni les boutons du haut), visible tant que le mode
+// est actif (poste personnel : on voit d'un coup d'œil qu'il n'y a pas de déconnexion
+// automatique). Un clic ouvre « Mon compte » pour le désactiver. Créé par le script (jamais
+// dans le HTML figé). Le message complet est affiché 8 s à l'activation.
+let _bandeauDomicileTimer = null;
+function _signalerModeDomicile() {
+  if (typeof document === 'undefined') return;
+  let o = document.getElementById('domicile-onglet');
+  if (!o) {
+    o = document.createElement('div');
+    o.id = 'domicile-onglet';
+    o.setAttribute('role', 'status');
+    o.title = 'Mode domicile activé — cliquez pour le gérer dans Mon compte';
+    o.style.cssText =
+      'position:fixed;bottom:0;left:16px;z-index:9000;background:#1e8449;color:#fff;' +
+      'padding:4px 14px;border-radius:10px 10px 0 0;font-size:12px;font-weight:700;cursor:pointer;' +
+      'box-shadow:0 -2px 6px rgba(0,0,0,.25);white-space:nowrap;';
+    o.onclick = function () { if (typeof showMonCompte === 'function') showMonCompte(); };
+    document.body.appendChild(o);
+  }
+  o.textContent = '🏠 Mode domicile';
+  o.style.display = 'block';
+}
+function _masquerOngletDomicile() {
+  const o = document.getElementById('domicile-onglet');
+  if (o) o.style.display = 'none';
+}
 function basculerModeDomicile(el) {
   const veut = !!(el && el.checked);
   const ok = _reglerModeDomicile(veut);
@@ -4220,6 +4248,8 @@ function basculerModeDomicile(el) {
     if (msg) msg.textContent = 'Pas de réseau : activez le mode domicile quand vous êtes connecté.';
     return;
   }
+  if (veut) _signalerModeDomicile();
+  else _masquerOngletDomicile();
   if (msg) msg.textContent = veut
     ? 'Activé : plus de déconnexion automatique sur cet appareil.'
     : 'Désactivé : déconnexion automatique après 20 minutes d\'inactivité.';
@@ -4533,6 +4563,7 @@ async function pwaLogout() {
   }
   sessionStorage.removeItem('skip_logout_confirm');
   _stopIdleLock();
+  _masquerOngletDomicile(); // l'onglet appartient à la session qui se ferme
   // Poste partagé : à la déconnexion, plus aucune photo de patient ne reste dans le navigateur.
   try { await _purgerPhotosConsultees(pwaUser && pwaUser.id); } catch (_e) { /* rien */ }
   if(pwaUser?.token) {

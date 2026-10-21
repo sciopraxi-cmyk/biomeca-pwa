@@ -35,6 +35,8 @@ function monter({ enLigne = true, uid = 'u-fictif', temps } = {}) {
     '_modeDomicileActif',
     '_reglerModeDomicile',
     'basculerModeDomicile',
+    '_signalerModeDomicile',
+    '_masquerOngletDomicile',
     '_horsConnexion',
     '_modeSansVerrou',
     '_lireSessionHorsConnexion',
@@ -361,5 +363,27 @@ describe('base de photos : jamais d’attente sans fin', () => {
   it('copie gardée : lecture abandonnée au bout de 5 s', () => {
     const st = readFileSync(new URL('../js/storage.js', import.meta.url), 'utf8');
     expect(st).toMatch(/setTimeout\(\(\) => res\(null\), 5000\)/);
+  });
+});
+
+describe('onglet « Mode domicile »', () => {
+  it('affiché à l’activation, retiré à la désactivation', () => {
+    const m = monter();
+    m.els['domicile-onglet'] = elt();
+    const c = elt();
+    c.checked = true;
+    m.f.basculerModeDomicile(c);
+    expect(m.f._modeDomicileActif()).toBe(true);
+    c.checked = false;
+    m.f.basculerModeDomicile(c);
+    expect(m.f._modeDomicileActif()).toBe(false);
+    expect(m.els['domicile-onglet'].style.display).toBe('none');
+  });
+  it('rappelé à chaque ouverture, masqué à la déconnexion, clic = Mon compte', () => {
+    expect(fonction('onPwaLoginSuccess')).toMatch(
+      /_modeDomicileActif\(\)\) _signalerModeDomicile\(\)/
+    );
+    expect(fonction('pwaLogout')).toMatch(/_masquerOngletDomicile/);
+    expect(fonction('_signalerModeDomicile')).toMatch(/showMonCompte/);
   });
 });
