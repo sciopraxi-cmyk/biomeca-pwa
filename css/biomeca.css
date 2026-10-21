@@ -1108,6 +1108,12 @@ body.printing #rpt-print{display:block!important;}
   background:rgba(167,139,250,0.15); color:var(--purple); border-left-color:var(--purple);
 }
 .cal-evchip-apple:hover { background:var(--purple); color:#1a1030; }
+/* Doctolib (import CSV, lecture seule) : vert olive, distinct du teal Google, du violet Apple
+   et des comptes accentués (bleu, rose, ambre, magenta). */
+.cal-evchip-doctolib {
+  background:rgba(101,163,13,0.15); color:#4d7c0f; border-left-color:#65a30d;
+}
+.cal-evchip-doctolib:hover { background:#65a30d; color:#fff; }
 .cal-more { font-size:9px; color:var(--mut); margin-top:2px; cursor:pointer; }
 
 /* Structure flex à 2 lignes (header + body), chacune avec une case fixe de
@@ -1158,6 +1164,13 @@ body.printing #rpt-print{display:block!important;}
   background:rgba(167,139,250,0.15); color:var(--purple); border-left-color:var(--purple);
 }
 .cal-week-event-apple:hover { background:var(--purple); color:#1a1030; }
+.cal-week-event-doctolib {
+  background:rgba(101,163,13,0.15); color:#4d7c0f; border-left-color:#65a30d;
+}
+.cal-week-event-doctolib:hover { background:#65a30d; color:#fff; }
+.cal-week-allday-doctolib {
+  background:rgba(101,163,13,0.15); color:#4d7c0f; border-left-color:#65a30d;
+}
 .cal-week-allday {
   background:var(--ev-bg, var(--orange-d)); color:var(--ev-fg, var(--orange)); border-left:3px solid var(--ev-fg, var(--orange));
   border-radius:3px; padding:1px 4px; font-size:10px; margin:2px; cursor:pointer;

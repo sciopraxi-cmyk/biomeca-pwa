@@ -3603,12 +3603,18 @@
   <div style="padding:16px 20px;max-width:1040px;margin:0 auto;">
     <h2 style="font-size:18px;color:var(--blue);margin-bottom:16px;">📅 Agenda</h2>
 
-    <!-- Doctolib — lien externe (déjà en place dans le header) -->
+    <!-- Doctolib — import du fichier d'export (CSV), lecture seule -->
     <div class="card" style="margin-bottom:16px;">
       <div class="stitle">Doctolib</div>
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px;">
-        Aucune intégration directe possible (API réservée aux partenaires Doctolib). Utilisez le bouton « Doctolib » du header pour ouvrir votre agenda dans un nouvel onglet.
+        Doctolib n'offre pas d'intégration directe (API réservée aux partenaires). Dans Doctolib : Paramètres avancés → Données → Exports → « Historique de RDV », puis importez le fichier CSV ici : vos rendez-vous s'affichent dans le calendrier ci-dessous, en lecture seule (« Nom Prénom – motif »). Le fichier est lu sur votre ordinateur uniquement ; notes, honoraires, e-mail, téléphone et date de naissance ne sont pas conservés. Le bouton « Doctolib » du header ouvre toujours votre agenda dans un nouvel onglet.
       </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-blue" onclick="document.getElementById('agenda-doctolib-input').click()" style="font-size:12px;">📥 Importer l'export Doctolib (CSV)</button>
+        <button class="btn" id="agenda-doctolib-remove" onclick="retirerAgendaDoctolib()" style="font-size:12px;display:none;">Retirer les RDV Doctolib</button>
+        <input type="file" id="agenda-doctolib-input" accept=".csv" style="display:none;" onchange="importDoctolibAgendaCSV(this)">
+      </div>
+      <div id="agenda-doctolib-status" style="font-size:13px;color:var(--mut);margin-top:8px;"></div>
     </div>
 
     <!-- Google Calendar — OAuth lecture/écriture -->
