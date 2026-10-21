@@ -865,6 +865,7 @@ async function loadSupabaseData() {
 
 // ─── Sauvegarde vers Supabase ───
 async function saveToSupabase() {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   if(!pwaUser?.token) return;
   // Guard data race (task #64) : tant que loadSupabaseData n'a pas peuplé les
   // globales patients/praticiens, on REFUSE le POST en DB pour ne pas écraser
@@ -1064,6 +1065,7 @@ function _retirerCollisionsId(rows) {
 // ─── #245 GARDE — FIN ───
 
 async function _syncPatientToNormalizedTables(p) {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   if (!pwaUser?.id || !p) return;
   try {
     if (!p._cloudId) p._cloudId = crypto.randomUUID();
@@ -3126,6 +3128,7 @@ function canChangeModule(userData, now) {
 // Niveau absent = comportement historique (autorisé). Source unique des 5
 // gardes d'impression et de applyReadOnlyUI.
 function _accessPermetImpression() {
+  if (globalThis?._modeConsultation) return true; // consultation : imprimer les rapports est son objet
   const l = window._accessLevel;
   return !l || l === 'full' || l === 'readonly';
 }
@@ -4766,6 +4769,7 @@ function _appliquerTheme() {
 }
 
 function nav(id) {
+  if (globalThis?._modeConsultation && !_consultationNavAutorisee(id)) return;
   // #116 — Capture-avant-quitter : si on quitte un bilan vers une autre page,
   // capturer le DOM dans bilanData/bilanDataPosturo AVANT de le masquer. Sinon
   // la saisie texte non capturée est perdue au retour (loadBilan re-rend depuis
@@ -5480,6 +5484,7 @@ function _lireMarqueurNonSync() {
 }
 
 function _marquerNonSynchronise() {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   const k = _scopedKey('bm4-nonsync');
   if (!k) return;
   try {
@@ -5517,6 +5522,7 @@ function _confirmerSyncCloud(seqEnvoi, at) {
 // si la fermeture est en cours (la sérialisation n'est pas gratuite).
 // `preparer` : mise à jour de currentPatient avant sérialisation (sport).
 function _ecrireLocalAvantEnvoi(preparer) {
+  if (globalThis?._modeConsultation) return false; // mode consultation : aucune écriture
   if (!pwaUser?.id || !_dataLoaded || !currentPatient) return false;
   const k = _scopedKey('bm4-patients');
   if (!k) return false;
@@ -5568,6 +5574,7 @@ function _recupererSaisieNonSynchronisee(rowUpdatedAt) {
 }
 
 function savePatients() {
+  if (globalThis?._modeConsultation) return false; // mode consultation : aucune écriture
   // #125 — Garde attribuable : sans user_id, on n'écrit RIEN (aucune clé
   // globale, aucune attribution incertaine). Cohérent avec le pattern
   // _dataLoaded qui protège contre les saves prématurés.
@@ -6518,6 +6525,7 @@ function exportAllDataJSON() {
 // PRATICIENS
 // ══════════════════════════════════════════════════════
 function savePraticiens() {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   // #125 — Garde attribuable + écriture SCOPÉE (bm4-praticiens:<uid>).
   // Sans user_id, on n'écrit rien pour ne pas mélanger des comptes.
   if (!pwaUser?.id) return;
@@ -6894,7 +6902,7 @@ function ouvrirBilanSport(patIdx, bilanIdx) {
   // sousType deleted par #69.3) déclenche un faux confirm "perdre vos données
   // actuelles" alors qu'il s'agit en réalité des mesures de l'archive précédente.
   // Parité avec creerBilanSport #69.4 qui a déjà ce check.
-  if (p.currentBilanSportSousType && (hasMesures || hasBilanData)) {
+  if (p.currentBilanSportSousType && (hasMesures || hasBilanData) && !globalThis?._modeConsultation) {
     if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
       return;
     }
@@ -8676,7 +8684,7 @@ async function ouvrirBilanPosturo(patIdx, bilanIdx) {
   const hasBilanPosturoData = hasBilanDataContent(p.bilanDataPosturo);
   // Task [#70] — check sousType posturo (mirror sport). Parité avec
   // creerBilanPosturo qui a déjà isInProgress = currentBilanPosturoSousType != null.
-  if (p.currentBilanPosturoSousType && hasBilanPosturoData) {
+  if (p.currentBilanPosturoSousType && hasBilanPosturoData && !globalThis?._modeConsultation) {
     if (!confirm('⚠️ Vous avez un bilan en cours non-archivé. Ouvrir cette archive perdra vos données actuelles.\n\nCliquez Annuler puis allez finaliser ou abandonner votre bilan en cours d\'abord.')) {
       return;
     }
@@ -30377,12 +30385,14 @@ let _bilanAutosaveTimer = null;
 // les call-sites qui n'ont pas migré vers la string flavor.
 let _bilanAutosaveFlavor = null;
 function _lancerSauvegardeAutomatique(flavor) {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   if (flavor === 'sport' && typeof saveBilanSilent === 'function') return saveBilanSilent();
   else if (flavor === 'posturo' && typeof savePosturoBilan === 'function') return savePosturoBilan(true);
   else if (flavor === 'pedicurie' && typeof savePedicurieBilan === 'function') return savePedicurieBilan(true);
   else if (flavor === 'podopediatrie' && typeof savePodopediatrieBilan === 'function') return savePodopediatrieBilan(true);
 }
 function _scheduleBilanAutosave(flavor) {
+  if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
   // Normalisation rétro-compat boolean → flavor string.
   if (flavor === true)  flavor = 'sport';
   if (flavor === false) flavor = 'posturo';
@@ -32134,3 +32144,185 @@ function importPatientsCSV(input) {
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+// Mode consultation : rapports des bilans validés, abonnement terminé
+// ═══════════════════════════════════════════════════════════════════
+// Accessible depuis la fenêtre d'abonnement terminé. LECTURE SEULE TOTALE : ouvrir une archive
+// copie celle-ci dans le bilan courant et déclenche des sauvegardes ; tant que
+// window._modeConsultation est vrai, plus rien ne s'écrit (gardes en tête des fonctions de
+// sauvegarde + filet universel sur localStorage « bm4-* » et sur fetch non GET vers Supabase).
+// La sortie se fait par location.reload() : l'état en mémoire est jeté, la session conservée.
+const _CONSULT_PAGES = ['pg-sport', 'pg-bilan', 'pg-rapport', 'pg-bilan-posturo', 'pg-rapport-posturo', 'pg-pedicurie', 'pg-podopediatrie'];
+function _consultationNavAutorisee(id) {
+  return _CONSULT_PAGES.indexOf(id) !== -1;
+}
+// Écritures Supabase autorisées en consultation : rafraîchir la session et signer les URLs de photos.
+function _consultationFetchAutorise(url, method) {
+  const m = String(method || 'GET').toUpperCase();
+  if (m === 'GET' || m === 'HEAD') return true;
+  const u = String(url || '');
+  if (u.indexOf(SUPA_URL) !== 0) return true; // hors Supabase : pas une écriture de données
+  if (m === 'POST' && u.indexOf('/auth/v1/token') !== -1) return true;
+  if (m === 'POST' && u.indexOf('/storage/v1/object/sign/') !== -1) return true;
+  return false;
+}
+function _installerFiletConsultation() {
+  if (window._filetConsultationPose) return;
+  window._filetConsultationPose = true;
+  const proto = window.Storage && window.Storage.prototype;
+  if (proto) {
+    const setOrig = proto.setItem;
+    const remOrig = proto.removeItem;
+    proto.setItem = function (k) {
+      if (window._modeConsultation && String(k).indexOf('bm4-') === 0) return;
+      return setOrig.apply(this, arguments);
+    };
+    proto.removeItem = function (k) {
+      if (window._modeConsultation && String(k).indexOf('bm4-') === 0) return;
+      return remOrig.apply(this, arguments);
+    };
+  }
+  const fetchOrig = window.fetch;
+  window.fetch = function (input, init) {
+    if (window._modeConsultation) {
+      const url = typeof input === 'string' ? input : input && input.url;
+      const method = (init && init.method) || (input && typeof input === 'object' && input.method) || 'GET';
+      if (!_consultationFetchAutorise(url, method)) {
+        return Promise.resolve(new Response(JSON.stringify({ error: 'mode_consultation' }), { status: 403 }));
+      }
+    }
+    return fetchOrig.apply(this, arguments);
+  };
+}
+
+const _CONSULT_TYPES = [
+  { cle: 'sport', arr: 'bilansSport', titre: 'Podologie du sport' },
+  { cle: 'posturo', arr: 'bilansPosturo', titre: 'Posturologie' },
+  { cle: 'pedicurie', arr: 'bilansPedicurie', titre: 'Pédicurie' },
+  { cle: 'podopediatrie', arr: 'bilansPodopediatrie', titre: 'Podopédiatrie' },
+];
+// Archives = bilans validés (un bilan en cours n'est pas dans ces tableaux).
+function _consultationListe(pats) {
+  const out = [];
+  (pats || []).forEach(function (p, i) {
+    const bilans = [];
+    _CONSULT_TYPES.forEach(function (t) {
+      (p[t.arr] || []).forEach(function (b, bi) {
+        bilans.push({ type: t.cle, titre: t.titre, label: b.label || t.titre, date: b.date || '', patIdx: i, bilanIdx: bi });
+      });
+    });
+    if (bilans.length) out.push({ patIdx: i, nom: ((p.nom || '') + ' ' + (p.prenom || '')).trim() || 'Patient sans nom', bilans: bilans });
+  });
+  return out.sort(function (a, b) { return a.nom.localeCompare(b.nom, 'fr'); });
+}
+function _consultationHtmlListe(liste) {
+  if (!liste.length) return '<div style="padding:24px;color:var(--mut);font-size:14px;">Aucun bilan validé à consulter.</div>';
+  return liste.map(function (pt) {
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--bord);"><div style="font-weight:700;font-size:14px;margin-bottom:6px;">' + _escHtml(pt.nom) + '</div>' +
+      pt.bilans.map(function (b) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 0;font-size:13px;"><span>' +
+          _escHtml(b.titre) + ' · ' + _escHtml(b.label) + (b.date ? ' <span style="color:var(--mut);">· ' + _escHtml(b.date) + '</span>' : '') +
+          '</span><button class="btn" style="font-size:12px;padding:4px 12px;" onclick="consulterRapportBilan(\'' + b.type + '\',' + b.patIdx + ',' + b.bilanIdx + ')">📄 Rapport</button></div>';
+      }).join('') + '</div>';
+  }).join('');
+}
+function _consultationCouche(id, css) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.className = 'page-claire';
+    el.style.cssText = css;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function _consultationAttendre(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+function ouvrirModeConsultation() {
+  if (!_dataLoaded) { alert('Vos données sont en cours de chargement. Réessayez dans un instant.'); return; }
+  window._modeConsultation = true;
+  _installerFiletConsultation();
+  if (!document.getElementById('consultation-style')) {
+    const st = document.createElement('style');
+    st.id = 'consultation-style';
+    st.textContent = 'body.mode-consultation .topbar,body.mode-consultation [onclick*="envoyerRapportMail"],' +
+      'body.mode-consultation #pg-rapport button[onclick*="pg-sport"],body.mode-consultation #pg-rapport-posturo button[onclick*="pg-bilan-posturo"]{display:none !important;}' +
+      'body.mode-consultation .main{padding-top:48px;}';
+    document.head.appendChild(st);
+  }
+  document.body.classList.add('mode-consultation');
+  _hideAccessOverlay();
+  const sub = document.getElementById('modal-subscribe');
+  if (sub) sub.style.display = 'none';
+  const barre = _consultationCouche('consultation-barre', 'position:fixed;top:0;left:0;right:0;height:44px;z-index:10004;background:var(--card);border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13px;');
+  barre.innerHTML = '<button class="btn" style="font-size:12px;padding:4px 12px;" onclick="consultationRetourListe()">← Mes rapports</button>' +
+    '<button id="consultation-imprimer" class="btn" style="font-size:12px;padding:4px 12px;display:none;" onclick="consultationImprimer()">🖨 Imprimer / PDF</button>' +
+    '<span style="flex:1;text-align:center;color:var(--mut);font-size:12px;">Consultation en lecture seule — rien n\'est modifié</span>' +
+    '<button class="btn" style="font-size:12px;padding:4px 12px;" onclick="location.reload()">Quitter</button>';
+  _consultationCouche('consultation-ecran', 'position:fixed;top:44px;left:0;right:0;bottom:0;z-index:10002;background:var(--bg,#fff);overflow:auto;padding:16px;');
+  _consultationCouche('consultation-visionneuse', 'position:fixed;top:44px;left:0;right:0;bottom:0;z-index:10003;background:#fff;display:none;');
+  consultationRetourListe();
+}
+function consultationRetourListe() {
+  if (!window._modeConsultation) return;
+  const ecran = document.getElementById('consultation-ecran');
+  const vis = document.getElementById('consultation-visionneuse');
+  const imp = document.getElementById('consultation-imprimer');
+  if (vis) { vis.style.display = 'none'; vis.innerHTML = ''; }
+  if (imp) imp.style.display = 'none';
+  window._consultationCourant = null;
+  if (ecran) {
+    ecran.style.display = 'block';
+    ecran.innerHTML = '<div style="max-width:760px;margin:0 auto;"><div style="font-size:17px;font-weight:700;margin-bottom:4px;">Mes rapports de bilans</div>' +
+      '<div style="font-size:12px;color:var(--mut);margin-bottom:10px;">Bilans validés uniquement.</div>' + _consultationHtmlListe(_consultationListe(patients)) + '</div>';
+  }
+}
+async function consulterRapportBilan(type, patIdx, bilanIdx) {
+  if (!window._modeConsultation) return;
+  const ecran = document.getElementById('consultation-ecran');
+  const vis = document.getElementById('consultation-visionneuse');
+  const imp = document.getElementById('consultation-imprimer');
+  ecran.innerHTML = '<div style="padding:24px;color:var(--mut);font-size:14px;">Préparation du rapport…</div>';
+  window._consultationCourant = { type: type };
+  try {
+    if (type === 'sport') {
+      ouvrirBilanSport(patIdx, bilanIdx);
+      await _consultationAttendre(500);
+      nav('pg-rapport');
+      await _consultationAttendre(300);
+    } else if (type === 'posturo') {
+      await ouvrirBilanPosturo(patIdx, bilanIdx);
+      await _consultationAttendre(900);
+      await buildRapportPosturo();
+      await _consultationAttendre(300);
+    } else {
+      let html;
+      if (type === 'pedicurie') {
+        await ouvrirBilanPedicurie(patIdx, bilanIdx);
+        await _consultationAttendre(600);
+        genererSynthesePedicurie();
+        html = buildPedicurieRapportHTML();
+      } else {
+        await ouvrirBilanPodopediatrie(patIdx, bilanIdx);
+        await _consultationAttendre(600);
+        html = await buildPodopediatrieRapportHTML();
+      }
+      vis.innerHTML = '<iframe id="consultation-iframe" style="width:100%;height:100%;border:none;"></iframe>';
+      const d = vis.firstChild.contentDocument;
+      d.open(); d.write(html); d.close();
+      vis.style.display = 'block';
+      if (imp) imp.style.display = '';
+    }
+    ecran.style.display = 'none';
+    if (type === 'sport' || type === 'posturo') { if (imp) imp.style.display = 'none'; }
+  } catch (e) {
+    console.error('[consultation] rapport indisponible :', e);
+    ecran.innerHTML = '<div style="padding:24px;color:var(--red);font-size:14px;">Ce rapport n\'a pas pu être préparé. Revenez à la liste et réessayez.</div>';
+  }
+}
+function consultationImprimer() {
+  const f = document.getElementById('consultation-iframe');
+  if (f && f.contentWindow) { f.contentWindow.focus(); f.contentWindow.print(); }
+}
