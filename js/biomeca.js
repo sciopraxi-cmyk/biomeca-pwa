@@ -5756,6 +5756,15 @@ function nav(id) {
 // pour éviter de sérialiser le user dans onclick="..." (apostrophes, escaping).
 let _adminUsersCache = [];
 
+// « by Sciopraxi » sous le lockup Verticy des rapports : « by » en petit gris + logo Sciopraxi, bien
+// plus petit que Verticy. src = URL absolue de #imgjs-by-sciopraxi (l'iframe about:blank ne résout
+// pas une URL relative). '' si l'image n'est pas disponible : le lockup reste inchangé.
+function _byScioHtml(hpx) {
+  const el = typeof document !== 'undefined' ? document.getElementById('imgjs-by-sciopraxi') : null;
+  const src = el && el.src ? String(el.src).replace(/["'<>&]/g, '') : '';
+  if (!src) return '';
+  return '<span style="display:flex;align-items:center;justify-content:center;gap:4px;line-height:1;margin-top:2px;"><span style="font-size:8px;color:#6b7280;font-family:Arial,sans-serif;">by</span><img src="' + src + '" alt="Sciopraxi" style="height:' + (hpx > 0 ? hpx : 12) + 'px;display:block;"/></span>';
+}
 function _escHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
@@ -19016,7 +19025,7 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = [], fichesFai
   // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés
   // dans un cadre blanc arrondi. Style inline sur <img> pour surpasser
   // `.logo{height:50px}` local.
-  bodyHtml += '<span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="'+logo+'" alt="Verticy" style="height:48px;display:block;"/><img src="'+wordmarkSrc+'" alt="Verticy" style="height:14px;display:block;"/></span>';
+  bodyHtml += '<span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="'+logo+'" alt="Verticy" style="height:48px;display:block;"/><img src="'+wordmarkSrc+'" alt="Verticy" style="height:14px;display:block;"/>'+(typeof _byScioHtml === 'function' ? _byScioHtml(12) : '')+'</span>';
   // #229-B — logo du cabinet au centre du header ('' si absent, le
   // space-between du .header centre naturellement le 3e enfant).
   bodyHtml += _pratLogoBlockHTML(prat);
@@ -19250,6 +19259,7 @@ async function buildRapport() {
               <div style="background:#fff;border-radius:8px;padding:10px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;">
                 <img src="${logoSrc}" alt="Verticy" style="height:48px;display:block;">
                 <img src="${wordmarkSrc}" alt="Verticy" style="height:14px;display:block;">
+                ${typeof _byScioHtml === 'function' ? _byScioHtml(12) : ''}
               </div>
               <div style="font-size:20px;font-weight:700;color:#378ADD;letter-spacing:3px;">BILAN</div>
             </div>
@@ -23975,7 +23985,7 @@ function buildPedicurieRapportHTML(){
     + '<div class="rp-page">'
     // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
     // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + _pratLogoBlockHTML(prat) + pratInfo + '</div>'
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/>' + (typeof _byScioHtml === 'function' ? _byScioHtml(12) : '') + '</span>' + _pratLogoBlockHTML(prat) + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Pédicurie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _pedEscapeHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + synth + '</div>'
@@ -24696,7 +24706,7 @@ async function buildPodopediatrieRapportHTML() {
     + '<div class="rp-page">'
     // Lockup Verticy : pictogramme (48px) + wordmark (image, 18px) empilés,
     // cadre blanc. Inline style height:48px surpasse `.logo{height:64px}` local.
-    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/></span>' + _pratLogoBlockHTML(prat) + pratInfo + '</div>'
+    + '<div class="header"><span style="display:inline-flex;flex-direction:column;align-items:center;background:#fff;border-radius:8px;padding:10px 16px;gap:6px;"><img class="logo" src="' + logo + '" alt="Verticy" style="height:48px;display:block;"/><img src="' + wordmark + '" alt="Verticy" style="height:14px;display:block;"/>' + (typeof _byScioHtml === 'function' ? _byScioHtml(12) : '') + '</span>' + _pratLogoBlockHTML(prat) + pratInfo + '</div>'
     + '<div class="titre-rapport"><h1>Bilan de Podopédiatrie</h1><div class="sub">Généré le ' + dateStr + '</div></div>'
     + '<div class="patient-card"><div class="patient-avatar">' + initiales + '</div><div style="flex:1;"><div class="patient-name">' + _escHtml(((p.prenom || '') + ' ' + (p.nom || '')).trim() || '—') + '</div><div class="patient-details">' + (details || '') + '</div><div class="patient-right">' + chips + '</div></div><div class="patient-metrics">' + metrics + '</div></div>'
     + '<div class="rp-body">' + body + '</div>'
