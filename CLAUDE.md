@@ -430,6 +430,28 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   playwright du dépôt et `python3 -m http.server 8080` ; session simulée (`pwaUser`,
   `praticiens`, `patients`, `_dataLoaded`, masquer `#pwa-login`, afficher `#biomeca-app`).
 
+## Agenda, Doctolib et marque — acquis (PR #293)
+
+- **Doctolib : import manuel seulement.** Pas d'extension (les CGU soumettent toute
+  extraction automatisée à accord). On importe l'export officiel « Historique de RDV »
+  (CSV), en **lecture seule** (`praticien.agendaDoctolib`). Si un partenariat est accordé,
+  une API pourra être étudiée ; pas avant.
+- **Confidentialité de l'agenda** : la grille affiche des **initiales partout** (Doctolib,
+  Google, événements liés) ; nom complet et téléphone **seulement dans la fenêtre de
+  détail**. Un événement lié à un patient (`praticien.agendaLiens`) n'envoie à Google que
+  les **initiales + le motif**, jamais le nom complet.
+- **Couleurs par compte** : `praticien.agendaCouleurs` (Google, Apple, Doctolib).
+  Le téléphone est cliquable (`tel:`), y compris pour Doctolib.
+- **Échec Google** : bandeau avec la raison et un bouton « Reconnecter ». Cause probable
+  des échecs répétés : application OAuth en mode « Testing » (autorisation de 7 jours),
+  à publier ; la vérification Google sera nécessaire avant ouverture à tous (scope
+  sensible `calendar.events`).
+- **Marque** : logo « by Sciopraxi » (`assets/by-sciopraxi.png`), nettement plus petit que
+  Verticy, sous le logo Verticy sur les écrans de connexion, l'en-tête de l'app,
+  l'en-tête de rapport et les 4 rapports.
+- **Tests** : fichiers d'export Doctolib **fictifs** uniquement, dates calées sur la
+  semaine de test ; aucun envoi vers Google dans les tests (faux serveur).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
