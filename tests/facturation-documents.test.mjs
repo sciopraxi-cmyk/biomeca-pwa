@@ -196,6 +196,7 @@ function monter(o = {}) {
     'const _escHtml = (s) => String(s ?? "").replace(/[&<>"\']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;", "\'": "&#39;" }[c]));',
     'const window = { _accessLevel: __acces }; const _accessPermetImpression = () => { const l = window._accessLevel; return !l || l === "full" || l === "readonly"; }; const showAccessRestrictedModal = (r) => __modales.push(r);',
     'const nav = () => {}; const selectPatient = (p) => { currentPatient = p; };',
+    'const notifierEvenement = (t, o) => { __rendus.notifs = (__rendus.notifs || []).concat([[t, o]]); };',
     'const patients = [__patient]; async function renderDocumentsPage() { __rendus.push(1); } async function chargerActes() { return _actesCache; }',
     constBloc('REGIMES_REMBOURSEMENT'),
     ...[
@@ -756,6 +757,17 @@ describe('enregistrement, émission, suppression, règlement', () => {
     expect(e.appels[1].corps).toEqual({ p_id: 'doc-1' });
     for (const a of e.appels) expect(JSON.stringify(a.corps)).not.toMatch(/"numero"|"statut"/);
     expect(e.f.etat()).toMatchObject({ edition: null, vue: 'doc-1' });
+  });
+  it('émission réussie : une notification « facture éditée » (numéro seulement) ; émission refusée : aucune', async () => {
+    const e = monter({ reponse });
+    brouillonPret(e);
+    await e.f.emettreDocumentCourant();
+    expect(e.rendus.notifs).toHaveLength(1);
+    expect(e.rendus.notifs[0][0]).toMatch(/^(facture_editee|devis_emis)$/);
+    const r = monter({ reponse, prats: [{ ...PRAT, siret: '' }] });
+    brouillonPret(r);
+    await r.f.emettreDocumentCourant();
+    expect(r.rendus.notifs).toBeUndefined();
   });
   it('émission refusée sans SIRET / RPPS : explication, aucun appel réseau', async () => {
     const e = monter({ reponse, prats: [{ ...PRAT, siret: '' }] });

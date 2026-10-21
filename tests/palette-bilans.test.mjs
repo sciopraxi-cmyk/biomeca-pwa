@@ -512,6 +512,7 @@ const PAGES_CLAIRES = [
   'pg-documents', // facturation, étape 2b-1 : idem
   'pg-ordonnances', // ordonnances du podologue : idem
   'pg-sterilisation', // traçabilité de stérilisation : idem
+  'pg-notifications', // centre de notifications : idem
   'pg-agenda',
   // #265 lot 3B — le bilan clinique sportif. La bascule y AMÉLIORE la
   // lisibilité, mesuré : 147 éléments porteurs de texte sous 4,5:1 en sombre,

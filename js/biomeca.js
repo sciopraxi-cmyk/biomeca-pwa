@@ -4394,9 +4394,12 @@ function _signalerReseauPerdu() {
   if (_reseauPerdu) return;
   _reseauPerdu = true;
   _memoriserSessionHorsConnexion();
+  if (typeof notifierEvenement === 'function') notifierEvenement('reseau_perdu');
 }
 function _signalerReseauRetabli() {
+  const _etaitPerdu = _reseauPerdu;
   _reseauPerdu = false;
+  if (_etaitPerdu && typeof notifierReseauRetabli === 'function') notifierReseauRetabli();
   if (typeof _lastActivity !== 'undefined') _lastActivity = Date.now();
   // La copie de session n'est gardée que si le mode domicile est coché.
   if (!_modeDomicileActif()) { try { localStorage.removeItem('bm4-session-hc'); } catch (_e) { /* rien */ } }
@@ -5635,7 +5638,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients','pg-ordonnances':'tn-patients','pg-sterilisation':'tn-sterilisation',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients','pg-ordonnances':'tn-patients','pg-sterilisation':'tn-sterilisation','pg-notifications':'tn-notifications',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
@@ -5647,6 +5650,8 @@ function nav(id) {
   if(id === 'pg-documents') renderDocumentsPage();
   if(id === 'pg-ordonnances') renderOrdonnancesPage();
   if(id === 'pg-sterilisation') renderSterilisationPage();
+  if(id === 'pg-notifications') renderNotificationsPage();
+  _notifMajPastille();
   if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
@@ -31941,6 +31946,7 @@ async function emettreDocumentCourant() {
   try {
     const res = await _docRequete('rpc/emettre_document', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify({ p_id: row.id }) });
     const emis = await res.json();
+    notifierEvenement(emis.type === 'devis' ? 'devis_emis' : 'facture_editee', { detail: 'n° ' + (emis.numero || '') });
     _docEdition = null; _docApercu = false; _docVue = emis.id;
     await renderDocumentsPage();
   } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
@@ -32957,6 +32963,171 @@ function imprimerOrdonnance(id) {
     catch (_e) { alert('Impression impossible. Réessayez ou utilisez Cmd/Ctrl+P.'); }
   }, 300);
 }
+
+// ═══════════════════════════════════════════════════════
+// Notifications — centre et historique
+// ═══════════════════════════════════════════════════════
+// Stockage dans le blob existant (aucune table, aucun SQL) : `praticien.notifications`
+// ({ liste, dernierId }) sur le premier praticien du compte, comme l'agenda Doctolib. Écriture
+// uniquement par savePraticiens. Aucun réseau, aucun envoi. AUCUNE purge automatique et aucun
+// bouton de suppression : l'historique se conserve. Le texte stocké ne reprend jamais le contenu
+// d'un message ni un nom : le patient concerné n'est retrouvé qu'à l'affichage, par son
+// identifiant (`cible.patientId`). Les notifications liées au portail patient (message,
+// devis signé, questionnaire, séance d'exercices, protocole terminé) sont déclarées ici ; elles
+// seront émises par les lots du portail.
+const NOTIF_TYPES = {
+  import_doctolib: { icone: '📥', titre: 'Import Doctolib effectué', systeme: true },
+  reseau_perdu: { icone: '📡', titre: 'Connexion internet perdue', systeme: true },
+  facture_editee: { icone: '🧾', titre: 'Facture éditée', systeme: true },
+  devis_emis: { icone: '📄', titre: 'Devis émis', systeme: true },
+  email_essai: { icone: '📧', titre: 'E-mail d\u2019accès généré (boîte d\u2019essai, non envoyé)', systeme: true },
+  patient_message: { icone: '✉️', titre: 'Nouveau message d\u2019un patient', systeme: false },
+  patient_devis_signe: { icone: '✍️', titre: 'Devis signé par un patient', systeme: false },
+  patient_questionnaire: { icone: '📝', titre: 'Questionnaire rempli par un patient', systeme: false },
+  patient_sequence_exercices: { icone: '🏃', titre: 'Séquence d\u2019exercices effectuée par un patient', systeme: false },
+  patient_protocole_termine: { icone: '✅', titre: 'Protocole d\u2019exercices terminé par un patient', systeme: false },
+};
+let _notifFiltre = 'tous';
+
+function _notifPrat() {
+  return Array.isArray(praticiens) ? praticiens[0] || null : null;
+}
+function _notifDonnees(pr) {
+  const n = pr && typeof pr.notifications === 'object' && pr.notifications ? pr.notifications : {};
+  const liste = Array.isArray(n.liste) ? n.liste.filter((x) => x && typeof x === 'object' && NOTIF_TYPES[x.type]) : [];
+  return { liste, dernierId: Math.max(Number(n.dernierId) || 0, ...liste.map((x) => Number(x.id) || 0)) };
+}
+function _notifTexte(v, max) {
+  return Array.from(String(v ?? ''), (c) => (c.charCodeAt(0) < 32 ? ' ' : c)).join('').trim().slice(0, max);
+}
+function _notifNonLus() {
+  return _notifDonnees(_notifPrat()).liste.filter((x) => !x.lu).length;
+}
+function _notifMajPastille() {
+  const el = document.getElementById('notif-pastille');
+  if (!el) return;
+  const n = _notifNonLus();
+  el.textContent = n > 99 ? '99+' : String(n);
+  el.style.display = n > 0 ? 'inline-block' : 'none';
+}
+function _notifEcrire(pr, donnees) {
+  pr.notifications = { liste: donnees.liste, dernierId: donnees.dernierId };
+  savePraticiens();
+}
+// Crée une notification ; retourne l'entrée, ou null (type inconnu, aucun praticien, consultation,
+// échec d'enregistrement). Ne bloque jamais l'action de l'utilisateur.
+function notifierEvenement(type, opts) {
+  try {
+    if (!NOTIF_TYPES[type] || globalThis?._modeConsultation) return null;
+    const pr = _notifPrat();
+    if (!pr) return null;
+    const d = _notifDonnees(pr);
+    const o = opts || {};
+    const e = { id: d.dernierId + 1, date: new Date().toISOString(), type, detail: _notifTexte(o.detail, 80), lu: false };
+    if (o.patientId !== undefined && o.patientId !== null) e.cible = { patientId: o.patientId };
+    if (type === 'reseau_perdu') e.retourLe = '';
+    d.liste.push(e);
+    d.dernierId = e.id;
+    _notifEcrire(pr, d);
+    _notifMajPastille();
+    return e;
+  } catch (err) {
+    console.warn('notifierEvenement:', err);
+    return null;
+  }
+}
+// Une coupure = une seule ligne ; le retour du réseau s'inscrit dans la même ligne.
+function notifierReseauRetabli() {
+  try {
+    if (globalThis?._modeConsultation) return;
+    const pr = _notifPrat();
+    if (!pr) return;
+    const d = _notifDonnees(pr);
+    const e = [...d.liste].reverse().find((x) => x.type === 'reseau_perdu');
+    if (!e || e.retourLe) return;
+    e.retourLe = new Date().toISOString();
+    _notifEcrire(pr, d);
+  } catch (err) {
+    console.warn('notifierReseauRetabli:', err);
+  }
+}
+function _notifDateHeure(iso) {
+  const t = Date.parse(iso || '');
+  if (isNaN(t)) return '—';
+  const d = new Date(t);
+  const p = (n) => String(n).padStart(2, '0');
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' à ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function _notifNomPatient(e) {
+  const id = e && e.cible ? e.cible.patientId : undefined;
+  const p = id === undefined ? null : (Array.isArray(patients) ? patients : []).find((x) => x.id == id);
+  return p ? [p.prenom, p.nom].filter(Boolean).join(' ') : '';
+}
+function _notifHtmlLigne(e) {
+  const t = NOTIF_TYPES[e.type];
+  const nom = _notifNomPatient(e);
+  const cliquable = !!(e.cible && nom);
+  let sous = _notifDateHeure(e.date);
+  if (nom) sous += ' · ' + _escHtml(nom);
+  if (e.detail) sous += ' · ' + _escHtml(e.detail);
+  if (e.type === 'reseau_perdu') sous += e.retourLe ? ' · retour à ' + _escHtml(_notifDateHeure(e.retourLe)) : ' · toujours hors connexion';
+  return '<div class="notif-ligne" data-notif-id="' + e.id + '" onclick="ouvrirNotification(' + e.id + ')" style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--bord);border-radius:8px;margin-bottom:6px;cursor:pointer;' +
+    (e.lu ? '' : 'border-left:4px solid var(--blue);font-weight:600;') + '">' +
+    '<span style="font-size:18px;">' + t.icone + '</span>' +
+    '<span style="flex:1;"><span style="display:block;font-size:13px;">' + _escHtml(t.titre) + '</span>' +
+    '<span style="display:block;font-size:11px;color:var(--mut);font-weight:400;">' + sous + '</span></span>' +
+    (cliquable ? '<span style="font-size:11px;color:var(--blue);font-weight:400;">Ouvrir le patient →</span>' : '') +
+    (e.lu ? '' : '<span style="font-size:10px;color:var(--blue);">non lu</span>') + '</div>';
+}
+function renderNotificationsPage() {
+  const el = document.getElementById('notif-contenu');
+  if (!el) return;
+  const pr = _notifPrat();
+  if (!pr) { el.innerHTML = '<div style="font-size:13px;color:var(--red);">Aucun praticien : créez-en un dans l\'onglet Praticiens.</div>'; _notifMajPastille(); return; }
+  const tous = _notifDonnees(pr).liste;
+  const nonLus = tous.filter((x) => !x.lu).length;
+  const filtres = [['tous', 'Tous (' + tous.length + ')'], ['nonlus', 'Non lus (' + nonLus + ')'], ['systeme', 'Système'], ['patient', 'Patients']];
+  let vus = tous;
+  if (_notifFiltre === 'nonlus') vus = tous.filter((x) => !x.lu);
+  else if (_notifFiltre === 'systeme') vus = tous.filter((x) => NOTIF_TYPES[x.type].systeme);
+  else if (_notifFiltre === 'patient') vus = tous.filter((x) => !NOTIF_TYPES[x.type].systeme);
+  vus = [...vus].sort((a, b) => b.id - a.id);
+  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;">' +
+    filtres.map((f) => '<button class="btn notif-filtre' + (_notifFiltre === f[0] ? ' btn-blue' : '') + '" onclick="filtrerNotifications(\'' + f[0] + '\')" style="font-size:12px;padding:5px 12px;">' + f[1] + '</button>').join('') +
+    '<span style="flex:1;"></span>' +
+    (nonLus ? '<button class="btn" onclick="toutMarquerLuNotifications()" style="font-size:12px;padding:5px 12px;">Tout marquer comme lu</button>' : '') + '</div>' +
+    (vus.length ? vus.map(_notifHtmlLigne).join('') : '<div style="font-size:13px;color:var(--mut);padding:12px;">Aucune notification.</div>') +
+    '<div style="font-size:11px;color:var(--mut);margin-top:10px;">L\u2019historique est conservé : aucune notification n\u2019est supprimée automatiquement. Le texte d\u2019une notification ne contient jamais le contenu d\u2019un message.</div>';
+  _notifMajPastille();
+}
+function filtrerNotifications(f) {
+  _notifFiltre = ['tous', 'nonlus', 'systeme', 'patient'].includes(f) ? f : 'tous';
+  renderNotificationsPage();
+}
+function toutMarquerLuNotifications() {
+  if (globalThis?._modeConsultation) return;
+  const pr = _notifPrat();
+  if (!pr) return;
+  const d = _notifDonnees(pr);
+  if (!d.liste.some((x) => !x.lu)) return;
+  d.liste.forEach((x) => { x.lu = true; });
+  _notifEcrire(pr, d);
+  renderNotificationsPage();
+}
+function ouvrirNotification(id) {
+  const pr = _notifPrat();
+  if (!pr) return;
+  const d = _notifDonnees(pr);
+  const e = d.liste.find((x) => x.id === Number(id));
+  if (!e) return;
+  if (!e.lu && !globalThis?._modeConsultation) { e.lu = true; _notifEcrire(pr, d); }
+  const p = e.cible ? (Array.isArray(patients) ? patients : []).find((x) => x.id == e.cible.patientId) : null;
+  if (p) { selectPatient(p); nav('pg-patients'); } else renderNotificationsPage();
+  _notifMajPastille();
+}
+
+// Appelées par les onclick du centre de notifications.
+Object.assign(window, { filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification });
 
 // ═════════════════════════════════════════════════════════════════
 // Traçabilité de stérilisation — registre des cycles, sets, appareils, maintenance, soins
@@ -34540,6 +34711,7 @@ function _lancerImportDoctolib(text) {
     return;
   }
   _agRafraichirDoctolib();
+  notifierEvenement('import_doctolib', { detail: res.rdv.length + ' rendez-vous' });
 }
 function importDoctolibAgendaCSV(input) {
   const file = input.files && input.files[0];
