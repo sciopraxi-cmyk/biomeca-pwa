@@ -565,6 +565,7 @@ const FENETRES_CLAIRES_HTML = [
   'modal-mon-compte',
   'trial-expired-overlay',
   'modal-podopediatrie-age',
+  'modal-subscribe',
 ];
 
 // Extrait la valeur de class="…" de la balise portant cet identifiant.

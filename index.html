@@ -504,12 +504,12 @@
 <!-- z-index 10002 (au-dessus de modal-access-restricted=10001) pour pouvoir s'ouvrir
      depuis n'importe quel overlay. Cards rendues dynamiquement par showSubscribeModal()
      dans #ms-cards selon licence_payee + formule actuelle + état toggle. -->
-<div id="modal-subscribe" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10002;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
+<div id="modal-subscribe" class="page-claire" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10002;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
   <div style="background:var(--card);border-radius:14px;padding:24px;max-width:900px;width:100%;max-height:90vh;overflow-y:auto;">
 
     <!-- Header : titre + close conditionnel -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-      <h2 id="ms-title" style="font-size:18px;font-weight:700;margin:0;color:#fff;">Choisir une formule</h2>
+      <h2 id="ms-title" style="font-size:18px;font-weight:700;margin:0;color:var(--txt);">Choisir une formule</h2>
       <button id="ms-close" onclick="closeSubscribeModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--mut);display:none;" aria-label="Fermer">✕</button>
     </div>
 
@@ -553,7 +553,7 @@
       <!-- Bandeau d'erreur conditionnel : lock 30j (next_change_date formatée
            en français) ou erreur Edge Function (réseau, validation, etc.).
            Hidden par défaut, affiché par subscribePaymentLink en cas d'échec. -->
-      <div id="ms-err" style="display:none;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:#e74c3c;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;"></div>
+      <div id="ms-err" style="display:none;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:var(--red);padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;"></div>
 
       <!-- Boutons Retour (← vue 1) + Confirmer (→ subscribePaymentLink → Stripe). -->
       <div style="display:flex;gap:10px;justify-content:flex-end;">

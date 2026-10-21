@@ -3282,7 +3282,7 @@ function showSubscribeModal() {
   // Cf. C6 — backdrop click logic appliquée aussi.
   const closeBtn = document.getElementById('ms-close');
   if (closeBtn) {
-    closeBtn.style.display = _accesVerrouille() ? 'none' : 'inline-block';
+    closeBtn.style.display = 'inline-block'; // toujours : la fermeture ramène à la fenêtre d'abonnement terminé, qui reste dessous
   }
   // Reset bandeau d'erreur d'éventuel call précédent.
   const errEl = document.getElementById('ms-err');
@@ -3301,7 +3301,7 @@ function showSubscribeModal() {
   if (modal) {
     if (modal._backdropHandler) modal.removeEventListener('click', modal._backdropHandler);
     modal._backdropHandler = (e) => {
-      if (e.target === modal && window._accessLevel !== 'blocked') {
+      if (e.target === modal) {
         modal.style.display = 'none';
       }
     };
@@ -3318,8 +3318,8 @@ function _accesVerrouille() {
 }
 
 function closeSubscribeModal() {
-  // Refuse de fermer si l'accès est verrouillé (bloqué ou abonnement terminé, cf. C6).
-  if (_accesVerrouille()) return;
+  // Fermer ne donne AUCUN accès : pour un compte verrouillé (bloqué ou abonnement terminé),
+  // la fenêtre unique (#trial-expired-overlay, dessous) reste affichée. C'est le retour.
   const modal = document.getElementById('modal-subscribe');
   if (modal) modal.style.display = 'none';
 }
@@ -3361,24 +3361,25 @@ function msRenderCards() {
   // Edge Function paymentLinkFor qui sélectionne sansLicence si hasLicence.
   const hasLicence = pwaUser?.user_data?.licence_payee === true;
   const licenceLine = hasLicence
-    ? '<div style="font-size:10px;color:#2dd4bf;font-weight:600;margin-top:4px;">✓ Vous avez déjà la licence</div>'
-    : '<div style="font-size:10px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div>';
+    ? '<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:4px;">✓ Vous avez déjà la licence</div>'
+    : '<div style="font-size:10px;color:var(--green);margin-top:4px;">+ 299€ licence & mises à jour</div>';
 
   el.innerHTML = MS_PLAN_NAMES.map((name, idx) => {
     const price = _msIsAnnuel ? MS_PRICES_A[idx] : MS_PRICES_M[idx];
     const period = _msIsAnnuel ? '/ an' : '/ mois';
     const isCurrent = idx === currentPlanIdx;
-    const cardBorder = isCurrent ? '2px solid #2dd4bf' : '1px solid var(--bord)';
+    const cardBorder = isCurrent ? '2px solid var(--green)' : '1px solid var(--bord)';
     const currentBadge = isCurrent
-      ? '<div style="font-size:10px;color:#2dd4bf;font-weight:700;margin-bottom:6px;">VOTRE FORMULE ACTUELLE</div>'
+      ? '<div style="font-size:10px;color:var(--green);font-weight:700;margin-bottom:6px;">VOTRE FORMULE ACTUELLE</div>'
       : '';
     return `
       <div style="background:var(--card);border-radius:12px;padding:18px;border:${cardBorder};">
         ${currentBadge}
-        <div style="font-size:15px;font-weight:700;color:#fff;">${_escHtml(name)}</div>
-        <div style="font-size:22px;font-weight:700;color:#fff;margin-top:8px;">${price}€ <span style="font-size:12px;font-weight:400;color:var(--mut);">${period}</span></div>
+        <div style="font-size:15px;font-weight:700;color:var(--txt);">${_escHtml(name)}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--txt);margin-top:8px;">${price}€ <span style="font-size:12px;font-weight:400;color:var(--mut);">${period}</span></div>
         ${licenceLine}
         <div style="font-size:12px;color:var(--mut);margin-top:10px;">${_escHtml(MS_DESCR[idx])}</div>
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:8px;">🎁 Bilan pédicurie offert</div>
         <button onclick="msSelectPlan(${idx})" class="btn btn-blue" style="width:100%;margin-top:14px;font-size:13px;">Choisir</button>
       </div>`;
   }).join('');
@@ -3402,7 +3403,7 @@ function msShowModulesView() {
   document.getElementById('ms-title').textContent = 'Choisir vos modules';
   const subtitle = document.getElementById('ms-modules-subtitle');
   if (subtitle && _msSelectedPlanIdx !== null) {
-    subtitle.textContent = MS_PLAN_NAMES[_msSelectedPlanIdx] + ' — sélectionnez vos modules.';
+    subtitle.textContent = MS_PLAN_NAMES[_msSelectedPlanIdx] + ' — sélectionnez vos modules. Le bilan pédicurie est offert.';
   }
   const errEl = document.getElementById('ms-err');
   if (errEl) errEl.style.display = 'none';

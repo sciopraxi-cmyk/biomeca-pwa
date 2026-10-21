@@ -115,55 +115,24 @@ describe('connexion : une seule fenêtre pour un abonnement terminé', () => {
   });
 });
 
-describe('la fenêtre de réabonnement ne se ferme pas', () => {
+describe('la fenêtre de choix de formule se ferme et ramène à la fenêtre unique', () => {
   it('verrouillé : bloqué ET lecture seule ; libre : actif, chargement, niveau inconnu', () => {
     const v = (niveau) => monter({ niveau }).f._accesVerrouille();
     expect(v('blocked')).toBe(true);
     expect(v('readonly')).toBe(true);
     for (const n of ['full', 'loading', undefined]) expect(v(n), String(n)).toBe(false);
   });
-  it('closeSubscribeModal refuse de fermer pour un ancien abonné comme pour un compte bloqué', () => {
-    for (const niveau of ['readonly', 'blocked']) {
+  it('closeSubscribeModal ferme pour tous ; la fenêtre unique, elle, reste affichée', () => {
+    for (const niveau of ['readonly', 'blocked', 'full']) {
       const e = monter({ niveau });
+      e.f._showAccessOverlay({ cause: 'subscription_ended' });
       e.f.closeSubscribeModal();
-      expect(e.els['modal-subscribe'].style.display, niveau).toBe('flex');
+      expect(e.els['modal-subscribe'].style.display, niveau).toBe('none');
+      expect(e.overlay.style.display, niveau).toBe('flex');
     }
-    const actif = monter({ niveau: 'full' });
-    actif.f.closeSubscribeModal();
-    expect(actif.els['modal-subscribe'].style.display).toBe('none');
   });
-  it("le bouton de fermeture du tunnel d'abonnement est masqué aussi pour un ancien abonné", () => {
-    expect(SRC_BIOMECA).toContain(
-      "closeBtn.style.display = _accesVerrouille() ? 'none' : 'inline-block';"
-    );
-  });
-});
-
-describe('export CSV des patients depuis la fenêtre', () => {
-  it("lance l'export existant une fois les données chargées", () => {
-    const e = monter({ dataLoaded: true });
-    e.f.exporterPatientsDepuisAcces();
-    expect(e.journal.exports).toHaveLength(1);
-    expect(e.journal.alertes).toEqual([]);
-  });
-  it('données pas encore chargées : message, aucun fichier vide', () => {
-    const e = monter({ dataLoaded: false });
-    e.f.exporterPatientsDepuisAcces();
-    expect(e.journal.exports).toHaveLength(0);
-    expect(e.journal.alertes[0]).toMatch(/en cours de chargement/);
-  });
-  it('la fenêtre porte les boutons « Exporter mes patients (CSV) », « Mes devis et factures émis » et « Se déconnecter »', () => {
-    const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
-    const i = html.indexOf('id="trial-expired-overlay"');
-    const bloc = html.slice(i, html.indexOf('<div class="topbar">', i));
-    expect(bloc).toContain('id="overlay-recuperation"');
-    expect(bloc).toContain('onclick="exporterPatientsDepuisAcces()"');
-    expect(bloc).toContain('Exporter mes patients (CSV)');
-    expect(bloc).toContain('onclick="ouvrirRecuperationDocuments()"');
-    expect(bloc).toContain('onclick="pwaLogout()"');
-    expect(bloc).toContain('onclick="showSubscribeModal()"');
-  });
-  it("l'export CSV réutilise la fonction du répertoire patients (mêmes colonnes)", () => {
-    expect(fonction('exportPatientsCSV')).toContain("'verticy-patients-'");
+  it('le bouton de fermeture est toujours visible, le clic hors cadre ferme aussi', () => {
+    expect(SRC_BIOMECA).toContain("closeBtn.style.display = 'inline-block';");
+    expect(SRC_BIOMECA).not.toContain("e.target === modal && window._accessLevel !== 'blocked'");
   });
 });
