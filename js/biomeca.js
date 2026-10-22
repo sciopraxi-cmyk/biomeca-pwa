@@ -944,7 +944,18 @@ async function saveToSupabase() {
   }
   const _seqEnvoi = _nonSyncSeq; // A2 — état envoyé = celui du marqueur courant
   const _horodatage = new Date().toISOString();
-  const data = { patients, praticiens };
+  // Les photos déjà envoyées dans Storage (chemin jumeau) ne repartent JAMAIS dans le dossier cloud :
+  // un dossier de 11 Mo dépassait le délai de 8 s de la base (erreur 57014). savePatients filtrait déjà ;
+  // savePraticiens (notifications, agenda, facturation) ne le faisait pas. Le filtre est donc ici,
+  // quel que soit l'appelant. Instantané figé avant tout await, mémoire restaurée aussitôt (l'affichage
+  // garde ses images). Une photo sans chemin (pas encore envoyée) n'est jamais retirée.
+  const _stashCloud = typeof _stripDataURLsForPersist === 'function' ? _stripDataURLsForPersist(patients) : [];
+  let data;
+  try {
+    data = JSON.parse(JSON.stringify({ patients, praticiens }));
+  } finally {
+    if (typeof _restoreDataURLsAfterPersist === 'function') _restoreDataURLsAfterPersist(_stashCloud);
+  }
   // Task #38 — message banner uniforme entre les 2 paths fail.
   const SYNC_FAIL_MSG = '⚠️ Synchronisation cloud échouée. Vos données sont sauvegardées localement et seront resynchronisées au prochain enregistrement.';
   try {
