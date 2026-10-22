@@ -77,6 +77,25 @@ export default [
     },
   },
 
+  // Portail patient (lot b) : page séparée, module ES chargé par le navigateur ;
+  // son service worker est distinct de celui de l'application praticien.
+  {
+    files: ['patient/*.js', 'patient/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
+  {
+    files: ['patient/sw.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'script',
+      globals: { ...globals.serviceworker },
+    },
+  },
+
   // service-worker.js : code propre, règles strictes avec contexte SW
   {
     files: ['service-worker.js'],

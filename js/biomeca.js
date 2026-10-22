@@ -577,6 +577,13 @@ async function pwaLogin() {
 
   try {
     const { status, body } = await supa.signIn(email, pwd);
+    if(body.access_token && body.user?.app_metadata?.role === 'patient') {
+      // Portail patient : un compte patient n'entre pas dans l'application praticien.
+      errEl.textContent = 'Ce compte est un compte patient. Ouvrez l’application patient (carte « Je suis un patient » sur la page d’accueil).';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Se connecter';
+      return;
+    }
     if(body.access_token) {
       const isAdmin = email.toLowerCase() === VERTICY_ADMIN_EMAIL; // #229-C
       pwaUser = { email, token: body.access_token, id: body.user?.id, isAdmin, user_metadata: body.user?.user_metadata || {}, app_metadata: body.user?.app_metadata || {} };
@@ -2176,6 +2183,7 @@ function _agEcrireLien(eventId, patientId, motif) {
   else liens[eventId] = { patientId: patientId, motif: String(motif || '').slice(0, 80) };
   pr.agendaLiens = liens;
   savePraticiens();
+  if (patientId != null && typeof _portailCreerAccesAuto === 'function') _portailCreerAccesAuto(patientId);
 }
 // Texte affiché dans la grille : nom complet pour un événement lié à un patient, sinon le titre.
 function _agEnrichir(events) {
@@ -3481,6 +3489,7 @@ function showAccessRestrictedModal(reason) {
     create_document: 'Création de devis et de factures',
     create_ordonnance: 'Création d\'ordonnances',
     create_sterilisation: 'Enregistrement en stérilisation',
+    create_portail: 'Gestion de l\'accès au portail patient',
   };
   const label = labels[reason] || 'Cette fonctionnalité';
 
@@ -7338,6 +7347,7 @@ function renderPatientList() {
         <button onclick="ouvrirDocumentsPatient(${i})" title="Devis et factures" aria-label="Devis et factures" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧾</button>
         <button onclick="ouvrirOrdonnancesPatient(${i})" title="Ordonnances" aria-label="Ordonnances" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">📝</button>
         <button onclick="ouvrirSterilisationPatient(${i})" title="Stérilisation" aria-label="Stérilisation" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧼</button>
+        <button onclick="ouvrirPortailPatient(${i})" title="Accès au portail patient" aria-label="Accès au portail patient" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🔑</button>
         <button onclick="editPatient(${i})" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
         <button onclick="deletePatient(${i})" class="bl-x" style="width:32px;height:32px;font-size:13px;">✕</button>
       </div>
@@ -35129,3 +35139,189 @@ function consultationImprimer() {
   const f = document.getElementById('consultation-iframe');
   if (f && f.contentWindow) { f.contentWindow.focus(); f.contentWindow.print(); }
 }
+
+// ─── Portail patient — accès depuis la fiche (lot b) ───
+// Le compte du patient est créé et géré par l'Edge Function `patient-compte` (clé d'administration côté serveur) ;
+// ici on ne fait qu'appeler la fonction et LIRE patient_comptes (RLS : le praticien propriétaire).
+// Aucun mot de passe ni aucune date n'est conservé ici ; l'identifiant (code court) est affiché.
+// Le portail lui-même vit dans /patient/ (page séparée, installable).
+function _portailUrlApp() {
+  return new URL('patient/', location.href).href;
+}
+function _portailSecretDdn(p) {
+  const m = String((p && p.ddn) || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[1] + m[2] + m[3] : '';
+}
+function _portailEstMineur(p) {
+  const m = String((p && p.ddn) || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return false;
+  const n = new Date(+m[1] + 18, +m[2] - 1, +m[3]);
+  return n.getTime() > Date.now();
+}
+function _portailCabinet(p) {
+  const pr = (Array.isArray(praticiens) ? praticiens : []).find((x) => p && x.id === p.pratId) || (praticiens || [])[0];
+  if (!pr) return '';
+  return String(pr.cabinet || [pr.prenom, pr.nom].filter(Boolean).join(' ')).slice(0, 120);
+}
+function _portailLibelleStatut(c) {
+  if (!c) return '';
+  if (c.statut === 'suspendu') return '⛔ Accès fermé';
+  if (c.statut === 'initial') return '⏳ En attente de la première connexion';
+  return '✅ Actif' + (c.dernier_acces_at ? ' · dernière visite le ' + new Date(c.dernier_acces_at).toLocaleDateString('fr-FR') : '');
+}
+async function _portailAppeler(action, p, extra) {
+  const res = await authFetch(SUPA_URL + '/functions/v1/patient-compte', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action: action, patient_id: p._cloudId }, extra || {})),
+  });
+  let body = null;
+  try { body = await res.json(); } catch (_e) { /* corps vide */ }
+  return { status: res.status, body: body };
+}
+async function _portailLireCompte(p) {
+  const res = await authFetch(
+    SUPA_URL + '/rest/v1/patient_comptes?select=identifiant,statut,bloque_jusqu,representant_legal_nom,representant_legal_lien,premier_acces_at,dernier_acces_at&patient_id=eq.' +
+      encodeURIComponent(p._cloudId)
+  );
+  if (!res.ok) throw new Error('lecture ' + res.status);
+  const l = await res.json();
+  return Array.isArray(l) && l.length ? l[0] : null;
+}
+function _portailFermer() {
+  const m = document.getElementById('portail-patient-modal');
+  if (m) m.remove();
+}
+function _portailAfficher(idx, compte, message) {
+  const p = patients[idx];
+  const m = document.getElementById('portail-patient-modal');
+  if (!p || !m) return;
+  const cadre = m.firstElementChild;
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+    '<div style="font-weight:700;font-size:16px;color:var(--txt);">🔑 Accès au portail patient</div>' +
+    '<button class="btn" onclick="_portailFermer()" aria-label="Fermer" style="background:var(--card);border:1px solid var(--bord);color:var(--txt);">✕</button></div>' +
+    '<div style="font-size:12px;color:var(--mut);margin-bottom:12px;">' + _escHtml((p.prenom || '') + ' ' + (p.nom || '')) + '</div>';
+  if (message) html += '<div id="portail-msg" role="alert" style="margin-bottom:12px;padding:10px;border-radius:8px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:13px;">' + _escHtml(message) + '</div>';
+  if (!compte) {
+    html += '<div style="font-size:13px;color:var(--txt);line-height:1.5;margin-bottom:14px;">Le patient aura un <strong>identifiant</strong> à lui. À sa première connexion, son mot de passe est sa <strong>date de naissance à l\'envers</strong> (année, mois, jour), puis il choisit le sien.</div>' +
+      '<button class="btn btn-blue" id="portail-creer" onclick="portailCreerAcces(' + idx + ')">Créer l\'accès</button>';
+  } else {
+    html += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:12px;">' +
+      '<div style="font-size:11px;color:var(--mut);">Identifiant du patient</div>' +
+      '<div id="portail-identifiant" style="font-size:24px;font-weight:700;letter-spacing:2px;color:var(--txt);">' + _escHtml(compte.identifiant) + '</div>' +
+      '<div style="font-size:12px;color:var(--mut);margin-top:6px;">' + _escHtml(_portailLibelleStatut(compte)) + '</div>' +
+      (compte.statut === 'initial'
+        ? '<div style="font-size:12px;color:var(--txt);margin-top:8px;">Mot de passe de la 1<sup>re</sup> connexion : date de naissance à l\'envers → <strong>' + _escHtml(_portailSecretDdnAffiche(p)) + '</strong> (à usage unique)</div>'
+        : '') +
+      (compte.bloque_jusqu && new Date(compte.bloque_jusqu) > new Date()
+        ? '<div style="font-size:12px;color:#991b1b;margin-top:6px;">🔒 Bloqué temporairement après des essais incorrects.</div>' : '') +
+      '</div>';
+    const mineur = _portailEstMineur(p);
+    html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Représentant légal' + (mineur ? ' (patient mineur)' : ' (si nécessaire)') + '</div>' +
+      (mineur && !compte.representant_legal_nom ? '<div style="font-size:12px;color:#92400e;margin-bottom:6px;">⚠️ Patient mineur : renseignez le représentant légal.</div>' : '') +
+      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;">' +
+      '<input class="inp" id="portail-rep-nom" maxlength="120" placeholder="Nom et prénom" value="' + _escHtml(compte.representant_legal_nom || '') + '"/>' +
+      '<input class="inp" id="portail-rep-lien" maxlength="60" placeholder="Lien (mère, père…)" value="' + _escHtml(compte.representant_legal_lien || '') + '"/></div>' +
+      '<button class="btn" style="margin-top:8px;" onclick="portailEnregistrerRepresentant(' + idx + ')">Enregistrer</button></div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+      '<button class="btn" onclick="window.open(_portailUrlApp(),\'_blank\',\'noopener\')">Ouvrir l\'application patient</button>' +
+      '<button class="btn" onclick="portailAction(' + idx + ',\'reinitialiser\')">Réinitialiser l\'accès</button>' +
+      (compte.statut === 'suspendu'
+        ? '<button class="btn" onclick="portailAction(' + idx + ',\'reactiver\')">Rouvrir l\'accès</button>'
+        : '<button class="btn" onclick="portailAction(' + idx + ',\'suspendre\')">Fermer l\'accès</button>') +
+      '</div>';
+  }
+  cadre.innerHTML = html;
+}
+function _portailSecretDdnAffiche(p) {
+  return _portailSecretDdn(p) || '—';
+}
+async function ouvrirPortailPatient(idx) {
+  const p = patients[idx];
+  if (!p) return;
+  _portailFermer();
+  const modal = document.createElement('div');
+  modal.id = 'portail-patient-modal';
+  modal.className = 'page-claire';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+  modal.innerHTML = '<div style="background:var(--card);border-radius:12px;padding:22px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">Chargement…</div>';
+  document.body.appendChild(modal);
+  if (!p._cloudId) { _portailAfficher(idx, null, 'Enregistrez d\'abord la fiche du patient, puis rouvrez cette fenêtre.'); return; }
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) { _portailAfficher(idx, null, 'Cette fonction demande une connexion internet.'); return; }
+  try {
+    _portailAfficher(idx, await _portailLireCompte(p), '');
+  } catch (_e) {
+    _portailAfficher(idx, null, 'Lecture impossible pour le moment. Réessayez dans un instant.');
+  }
+}
+async function portailCreerAcces(idx) {
+  const p = patients[idx];
+  if (!p) return;
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  const b = document.getElementById('portail-creer');
+  if (b) b.disabled = true;
+  try {
+    const r = await _portailAppeler('creer', p, { cabinet: _portailCabinet(p) });
+    if (r.status === 200 && r.body && r.body.ok) { _portailAfficher(idx, await _portailLireCompte(p), ''); return; }
+    _portailAfficher(idx, null, (r.body && r.body.message) || 'Création impossible, réessayez.');
+  } catch (_e) {
+    _portailAfficher(idx, null, 'Création impossible : vérifiez votre connexion.');
+  }
+}
+async function portailAction(idx, action) {
+  const p = patients[idx];
+  if (!p) return;
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  if (action === 'reinitialiser' && !confirm('Réinitialiser l\'accès ? Le patient devra se reconnecter avec sa date de naissance et choisir un nouveau mot de passe.')) return;
+  if (action === 'suspendre' && !confirm('Fermer l\'accès de ce patient au portail ?')) return;
+  try {
+    const r = await _portailAppeler(action, p);
+    const ok = r.status === 200 && r.body && r.body.ok;
+    _portailAfficher(idx, await _portailLireCompte(p), ok ? '' : (r.body && r.body.message) || 'Action impossible, réessayez.');
+  } catch (_e) {
+    _portailAfficher(idx, null, 'Action impossible : vérifiez votre connexion.');
+  }
+}
+async function portailEnregistrerRepresentant(idx) {
+  const p = patients[idx];
+  if (!p || !p._cloudId) return;
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  const nom = document.getElementById('portail-rep-nom').value.trim().slice(0, 120);
+  const lien = document.getElementById('portail-rep-lien').value.trim().slice(0, 60);
+  try {
+    const res = await authFetch(SUPA_URL + '/rest/v1/patient_comptes?patient_id=eq.' + encodeURIComponent(p._cloudId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ representant_legal_nom: nom || null, representant_legal_lien: lien || null }),
+    });
+    if (!res.ok) throw new Error('écriture ' + res.status);
+    _portailAfficher(idx, await _portailLireCompte(p), '');
+  } catch (_e) {
+    _portailAfficher(idx, await _portailLireCompte(p).catch(() => null), 'Enregistrement impossible, réessayez.');
+  }
+}
+// Création automatique quand un événement de l'agenda est lié à un patient (idempotent côté
+// serveur). Silencieuse : aucune alerte, l'e-mail d'accès reste en boîte d'essai (lot suivant).
+const _portailDejaTente = new Set();
+function _portailCreerAccesAuto(patientId) {
+  try {
+    const p = _agPatientParId(patientId);
+    if (!p || !p._cloudId || !_portailSecretDdn(p) || _portailDejaTente.has(p._cloudId)) return;
+    if (globalThis._modeConsultation || (typeof _horsConnexion === 'function' && _horsConnexion())) return;
+    _portailDejaTente.add(p._cloudId);
+    setTimeout(function () {
+      _portailAppeler('creer', p, { cabinet: _portailCabinet(p) }).catch(function () {
+        _portailDejaTente.delete(p._cloudId);
+      });
+    }, 3000);
+  } catch (_e) { /* jamais bloquant pour l'agenda */ }
+}
+// Appelées par les onclick de la fenêtre « Accès au portail patient ».
+Object.assign(window, {
+  ouvrirPortailPatient,
+  portailAction,
+  portailCreerAcces,
+  portailEnregistrerRepresentant,
+  _portailFermer,
+  _portailUrlApp,
+});

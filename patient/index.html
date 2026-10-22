@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://tzivizoacdyopwfzerrb.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <meta name="theme-color" content="#0b1e3d" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Verticy — Mon espace patient</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="../assets/favicon-32.png" />
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="patient.css" />
+  </head>
+  <body>
+    <main class="cadre">
+      <header class="entete">
+        <img class="logo" src="../assets/verticy-logo-simple.png" alt="Verticy" />
+        <span class="by"><span>by</span><img src="../assets/by-sciopraxi.png" alt="Sciopraxi" /></span>
+      </header>
+
+      <!-- Écran 0 : chargement -->
+      <section id="ecran-chargement" class="ecran" aria-live="polite">
+        <p class="grand">⏳ Un instant…</p>
+      </section>
+
+      <!-- Écran 1 : connexion -->
+      <section id="ecran-connexion" class="ecran" hidden>
+        <h1>Bienvenue 👋</h1>
+        <p class="doux">Entrez les informations reçues de votre praticien.</p>
+        <form id="form-connexion" autocomplete="on" novalidate>
+          <label for="identifiant">Votre identifiant</label>
+          <input
+            id="identifiant"
+            name="username"
+            inputmode="text"
+            autocapitalize="characters"
+            autocomplete="username"
+            placeholder="ABCD-1234"
+            maxlength="12"
+            required
+          />
+          <label for="secret">Votre mot de passe</label>
+          <input id="secret" name="password" type="password" autocomplete="current-password" required />
+          <p class="aide" id="aide-premiere">
+            🔑 <strong>Première visite ?</strong> Tapez votre date de naissance à l’envers, sans
+            espace : <strong>année, mois, jour</strong> (exemple : 17 mai 2010 → 20100517).
+          </p>
+          <button id="btn-connexion" class="bouton" type="submit">Se connecter</button>
+        </form>
+        <p id="erreur-connexion" class="erreur" role="alert" hidden></p>
+      </section>
+
+      <!-- Écran 2 : choix du mot de passe (première connexion) -->
+      <section id="ecran-mdp" class="ecran" hidden>
+        <h1>Super, c’est bien vous ! 🎉</h1>
+        <p class="doux">Choisissez maintenant <strong>votre propre mot de passe</strong>. Vous l’utiliserez à chaque visite.</p>
+        <form id="form-mdp" novalidate>
+          <label for="mdp1">Nouveau mot de passe</label>
+          <input id="mdp1" name="new-password" type="password" autocomplete="new-password" required />
+          <label for="mdp2">Tapez-le une 2<sup>e</sup> fois</label>
+          <input id="mdp2" name="new-password-confirm" type="password" autocomplete="new-password" required />
+          <ul id="regles" class="regles" aria-live="polite"></ul>
+          <button id="btn-mdp" class="bouton" type="submit" disabled>Valider mon mot de passe</button>
+        </form>
+        <p id="erreur-mdp" class="erreur" role="alert" hidden></p>
+      </section>
+
+      <!-- Écran 3 : accueil -->
+      <section id="ecran-accueil" class="ecran" hidden>
+        <h1 id="salut">Bonjour 👋</h1>
+        <p id="cabinet" class="doux"></p>
+        <div class="cartes">
+          <div class="carte carte-bientot">
+            <span class="emoji">🏃</span>
+            <span><strong>Mes exercices</strong><small>Bientôt disponible</small></span>
+          </div>
+          <div class="carte carte-bientot">
+            <span class="emoji">🧾</span>
+            <span><strong>Mes documents</strong><small>Devis, factures, ordonnances… bientôt</small></span>
+          </div>
+          <div class="carte carte-bientot">
+            <span class="emoji">📋</span>
+            <span><strong>Mon questionnaire</strong><small>Bientôt disponible</small></span>
+          </div>
+        </div>
+        <p class="doux petit">Votre espace se remplit au fil de vos rendez-vous. Rien à faire pour l’instant ✨</p>
+        <button id="btn-deconnexion" class="bouton bouton-clair" type="button">Me déconnecter</button>
+      </section>
+
+      <!-- Écran 4 : accès fermé / en attente -->
+      <section id="ecran-ferme" class="ecran" hidden>
+        <h1>Accès indisponible</h1>
+        <p id="texte-ferme" class="doux"></p>
+        <button id="btn-retour" class="bouton bouton-clair" type="button">Retour</button>
+      </section>
+    </main>
+    <script type="module" src="patient.js"></script>
+  </body>
+</html>

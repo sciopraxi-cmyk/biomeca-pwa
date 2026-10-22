@@ -77,15 +77,17 @@ const HEX_RED = '#f04060';
 // +1 --bord : total 97 → 100).
 // Stérilisation : le bouton « 🧼 Stérilisation » de l'en-tête patient fait de même (+1 --mut, +1 --card,
 // +1 --bord : total 100 → 103).
+// Portail patient (lot b) : le bouton « 🔑 Accès au portail patient » de l'en-tête patient fait de même
+// (+1 --mut, +1 --card, +1 --bord : total 103 → 106).
 const COMPTES_ATTENDUS = {
   '--posturo-*': 12,
   '--sport-*': 11,
-  '--mut': 15,
+  '--mut': 16,
   '--txt': 9,
   '--pedicurie-*': 11,
   '--podo-*': 11,
-  '--card': 10,
-  '--bord': 9,
+  '--card': 11,
+  '--bord': 10,
   '--encours-*': 4,
   '--encours': 4,
   '--danger-*': 4,
