@@ -27,6 +27,9 @@ export function reglesMotDePasse(mdp) {
   return [
     { ok: m.length >= MOT_DE_PASSE_MIN, texte: `Au moins ${MOT_DE_PASSE_MIN} caractères` },
     { ok: m.length > 0 && !/^(.)\1+$/.test(m), texte: 'Pas le même caractère répété' },
+    { ok: /[a-z]/.test(m) && /[A-Z]/.test(m), texte: 'Une minuscule et une majuscule' },
+    { ok: /[0-9]/.test(m), texte: 'Un chiffre' },
+    { ok: /[^A-Za-z0-9]/.test(m), texte: 'Un symbole (par exemple - ou !)' },
   ];
 }
 

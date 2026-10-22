@@ -156,8 +156,21 @@ Deno.serve(async (req) => {
     const { error: mdpErr } = await supaAdmin.auth.admin.updateUserById(compte.auth_user_id, {
       password: body.mot_de_passe as string,
     });
-    if (mdpErr)
-      return json({ error: 'mise_a_jour_impossible', message: 'Réessayez dans un instant.' }, 500);
+    if (mdpErr) {
+      // Supabase a refusé le mot de passe : on rend le billet pour que le patient puisse réessayer.
+      await supaAdmin
+        .from('patient_comptes')
+        .update({ ticket_nonce: billet.n })
+        .eq('id', compte.id)
+        .eq('statut', 'initial');
+      return json(
+        {
+          error: 'mot_de_passe_faible',
+          message: 'Ce mot de passe est refusé. Essayez-en un autre, plus long.',
+        },
+        400
+      );
+    }
 
     await supaAdmin
       .from('patient_comptes')

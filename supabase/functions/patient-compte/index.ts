@@ -132,7 +132,11 @@ Deno.serve(async (req) => {
       if (cErr || !cree?.user) {
         if (/already|exists|registered/i.test(cErr?.message || '')) continue; // collision d'identifiant
         return json(
-          { error: 'creation_impossible', message: 'Création impossible, réessayez.' },
+          {
+            error: 'creation_impossible',
+            message: 'Création impossible, réessayez.',
+            detail: 'auth: ' + String(cErr?.message || 'inconnu').slice(0, 160),
+          },
           500
         );
       }
@@ -166,7 +170,12 @@ Deno.serve(async (req) => {
           continue;
         }
         return json(
-          { error: 'creation_impossible', message: 'Création impossible, réessayez.' },
+          {
+            error: 'creation_impossible',
+            message: 'Création impossible, réessayez.',
+            detail:
+              'base: ' + String(iErr?.code || '') + ' ' + String(iErr?.message || '').slice(0, 160),
+          },
           500
         );
       }

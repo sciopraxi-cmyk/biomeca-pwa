@@ -76,6 +76,8 @@ export function validerMotDePasse(
   if (mdp.length < MOT_DE_PASSE_MIN) return `Au moins ${MOT_DE_PASSE_MIN} caractères.`;
   if (mdp.length > MOT_DE_PASSE_MAX) return `Au plus ${MOT_DE_PASSE_MAX} caractères.`;
   if (/^(.)\1+$/.test(mdp)) return 'Mot de passe trop simple.';
+  if (!/[a-z]/.test(mdp) || !/[A-Z]/.test(mdp) || !/[0-9]/.test(mdp) || !/[^A-Za-z0-9]/.test(mdp))
+    return 'Il faut une minuscule, une majuscule, un chiffre et un symbole (par exemple - ou !).';
   if (ctx.ddnSecret && mdp.replace(/[\s./-]/g, '').includes(ctx.ddnSecret))
     return 'Ne reprenez pas votre date de naissance.';
   if (
@@ -93,7 +95,8 @@ export function validerMotDePasse(
 export function motDePasseAleatoire(): string {
   const o = new Uint8Array(32);
   crypto.getRandomValues(o);
-  return Array.from(o, (b) => b.toString(16).padStart(2, '0')).join('');
+  // Suffixe fixe : la politique de mot de passe du projet exige les quatre classes de caractères.
+  return Array.from(o, (b) => b.toString(16).padStart(2, '0')).join('') + 'Aa1!';
 }
 
 export function nonceAleatoire(): string {

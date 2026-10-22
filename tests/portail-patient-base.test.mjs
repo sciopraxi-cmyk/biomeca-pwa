@@ -45,10 +45,11 @@ describe('portail-v1 — identifiant, date, mot de passe', () => {
     const ctx = { identifiant: 'K7M2-9QXP', ddnSecret: '20100517' };
     expect(P.validerMotDePasse('court', ctx)).toMatch(/10 caractères/);
     expect(P.validerMotDePasse('aaaaaaaaaaaa', ctx)).toMatch(/simple/);
-    expect(P.validerMotDePasse('x20100517x', ctx)).toMatch(/naissance/);
-    expect(P.validerMotDePasse('zz-k7m2-9qxp-zz', ctx)).toMatch(/identifiant/);
+    expect(P.validerMotDePasse('Xx-20100517-x', ctx)).toMatch(/naissance/);
+    expect(P.validerMotDePasse('Zz-k7m2-9qxp-Zz1', ctx)).toMatch(/identifiant/);
     expect(P.validerMotDePasse('a'.repeat(73), ctx)).toMatch(/Au plus/);
-    expect(P.validerMotDePasse('Soleil-du-matin', ctx)).toBeNull();
+    expect(P.validerMotDePasse('soleildumatin12', ctx)).toMatch(/symbole/);
+    expect(P.validerMotDePasse('Soleil-du-matin-42', ctx)).toBeNull();
     expect(P.validerMotDePasse(undefined, ctx)).not.toBeNull();
   });
   it('comparaison en temps constant', () => {
@@ -101,9 +102,10 @@ describe('interface patient — logique pure', () => {
   });
   it('règles du mot de passe affichées en direct', () => {
     expect(L.reglesMotDePasse('').every((r) => !r.ok)).toBe(true);
-    expect(L.reglesMotDePasse('abcdefghij').every((r) => r.ok)).toBe(true);
-    expect(L.motDePasseAcceptable('abcdefghij', 'abcdefghij')).toBe(true);
-    expect(L.motDePasseAcceptable('abcdefghij', 'abcdefghiX')).toBe(false);
+    expect(L.reglesMotDePasse('Abcdefgh-1').every((r) => r.ok)).toBe(true);
+    expect(L.motDePasseAcceptable('Abcdefgh-1', 'Abcdefgh-1')).toBe(true);
+    expect(L.motDePasseAcceptable('abcdefghij', 'abcdefghij')).toBe(false);
+    expect(L.motDePasseAcceptable('Abcdefgh-1', 'Abcdefgh-2')).toBe(false);
     expect(L.motDePasseAcceptable('court', 'court')).toBe(false);
   });
   it('messages d’erreur en français clair', () => {
@@ -387,6 +389,11 @@ function monterSupabaseFactice(db) {
           return { error: null };
         },
         updateUserById: async (id, a) => {
+          if (a.password && db.refuseMdp)
+            return {
+              data: null,
+              error: { message: 'Password should contain at least one character' },
+            };
           if (a.password) {
             db.mdp[id] = a.password;
             db.updates_mdp.push(id);
@@ -519,7 +526,7 @@ describe('patient-connexion — parcours complet', () => {
     expect(db.patient_comptes[0].statut).toBe('initial');
     // la date de naissance comme mot de passe : refusé
     expect(
-      (await appeler(h, { action: 'definir', billet, mot_de_passe: 'x20100517x' })).statut
+      (await appeler(h, { action: 'definir', billet, mot_de_passe: 'Xx-20100517-x' })).statut
     ).toBe(400);
     const ok = await appeler(h, { action: 'definir', billet, mot_de_passe: MDP_PATIENT_OK });
     expect(ok.statut).toBe(200);
@@ -552,6 +559,24 @@ describe('patient-connexion — parcours complet', () => {
     const gagnant = a.statut === 200 ? 'Premier-choix-du-patient-1' : 'Second-choix-du-pirate-22';
     expect(db.mdp['auth-p1']).toBe(gagnant);
     expect(db.updates_mdp.length).toBe(1);
+  });
+  it('si Supabase refuse le mot de passe, le billet reste utilisable (le patient n’est pas bloqué)', async () => {
+    const r = await conn('20100517');
+    db.refuseMdp = true;
+    const refus = await appeler(h, {
+      action: 'definir',
+      billet: r.corps.billet,
+      mot_de_passe: MDP_PATIENT_OK,
+    });
+    expect(refus.statut).toBe(400);
+    expect(db.patient_comptes[0].statut).toBe('initial');
+    db.refuseMdp = false;
+    const ok = await appeler(h, {
+      action: 'definir',
+      billet: r.corps.billet,
+      mot_de_passe: MDP_PATIENT_OK,
+    });
+    expect(ok.statut).toBe(200);
   });
   it('mot de passe initial à usage unique : la date ne marche plus une fois le mot de passe choisi', async () => {
     const r = await conn('20100517');
@@ -733,7 +758,7 @@ describe('patient-compte — gestion par le praticien', () => {
     expect(c.praticien_id).toBe('prat-1');
     expect(c.cabinet).toBe('Cabinet Fictif');
     expect(db.users[c.auth_user_id].app_metadata).toEqual({ role: 'patient' });
-    expect(db.mdp[c.auth_user_id]).toMatch(/^[0-9a-f]{64}$/);
+    expect(db.mdp[c.auth_user_id]).toMatch(/^[0-9a-f]{64}Aa1!$/);
     expect(db.mdp[c.auth_user_id]).not.toContain('20100517');
     const encore = await avec({ action: 'creer', patient_id: PID });
     expect(encore.corps.existe).toBe(true);
