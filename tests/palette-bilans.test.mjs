@@ -79,15 +79,17 @@ const HEX_RED = '#f04060';
 // +1 --bord : total 100 → 103).
 // Portail patient (lot b) : le bouton « 🔑 Accès au portail patient » de l'en-tête patient fait de même
 // (+1 --mut, +1 --card, +1 --bord : total 103 → 106).
+// Aperçu du portail (v219) : le bouton « 👁 » voisin de 🔑 fait de même (+1 --mut, +1 --card, +1 --bord :
+// total 106 → 109).
 const COMPTES_ATTENDUS = {
   '--posturo-*': 12,
   '--sport-*': 11,
-  '--mut': 16,
+  '--mut': 17,
   '--txt': 9,
   '--pedicurie-*': 11,
   '--podo-*': 11,
-  '--card': 11,
-  '--bord': 10,
+  '--card': 12,
+  '--bord': 11,
   '--encours-*': 4,
   '--encours': 4,
   '--danger-*': 4,

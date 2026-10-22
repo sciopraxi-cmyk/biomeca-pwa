@@ -112,3 +112,11 @@ export function phraseDocuments(nonLus) {
 export function cheminFichierValide(chemin) {
   return /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.html$/.test(String(chemin || ''));
 }
+
+/** Identifiant de fiche demandé par l'aperçu praticien (?apercu=<uuid>) ; null si absent ou tordu. */
+export function apercuDemande(recherche) {
+  const v = new URLSearchParams(String(recherche || '')).get('apercu');
+  return v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+    ? v.toLowerCase()
+    : null;
+}
