@@ -479,6 +479,45 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **Diagnostic d'un dossier lourd** : requêtes de lecture seule sur `pg_column_size` (par bloc
   de `user_data.data`, puis par patient). Ne jamais afficher d'identité dans ces requêtes.
 
+## Portail patient, lot (b) — acquis (PR #298)
+
+- **Architecture** : page séparée `patient/` (CSP sans script ni style en ligne, service worker de
+  portée `/patient/` avec son propre préfixe de cache `verticy-patient-`, jamais `biomeca-`, que
+  l'autre service worker purge). Compte patient = compte Supabase Auth marqué
+  `app_metadata.role = 'patient'` (non modifiable par le client), lié à UNE fiche de `patients`.
+- **Connexion** : le mot de passe Supabase initial est **aléatoire et inconnu** ; la date de
+  naissance (AAAAMMJJ) est vérifiée par l'Edge Function `patient-connexion` (déployée sans
+  jeton), une seule fois, puis un billet signé (HMAC, 10 min) à nonce consommé par UPDATE
+  conditionnel permet de choisir le mot de passe. Jamais la date comme vrai mot de passe :
+  une limite d'essais côté interface seule serait contournable en appelant Supabase directement.
+- **Essais limités côté base** : `portail_reserver_tentative` compte l'essai AVANT de le
+  vérifier (5 essais, blocage 15 min), réservée au `service_role` ; limite par adresse IP en
+  plus (douce : peut dépasser de quelques requêtes simultanées). Supabase ignore une adresse
+  IP falsifiée dans `x-forwarded-for`.
+- **Politique de mot de passe du projet** : minuscule + majuscule + chiffre + symbole. Tout mot de
+  passe fabriqué par le code doit la respecter ; si Supabase refuse le mot de passe choisi, le
+  billet doit être **rendu** (sinon le patient est bloqué).
+- **RLS** : politiques `RESTRICTIVE` `pas_patient` sur les tables praticien et sur le stockage
+  `patient-media` ; les tables des lots suivants doivent s'appuyer sur `portail_patient_actuel()`
+  (compte actif seulement). Le client n'écrit jamais dans `patient_comptes` (GRANT de colonnes
+  limité au représentant légal) : création, réinitialisation et fermeture passent par
+  `patient-compte` (clé d'administration serveur, qui ignore la RLS : contrôler explicitement que la
+  fiche appartient au praticien).
+- **Fonctions praticien** : `start-trial`, `help-chat` et `prepare-module-change` refusent un
+  compte patient (sinon un patient obtiendrait un essai gratuit). Dette : les fonctions du
+  calendrier acceptent encore tout compte connecté.
+- **Aucune donnée lourde ni de santé dans le blob praticien** pour le portail : tables dédiées.
+  Les futurs documents du portail seront copiés au moment où le praticien les partage.
+- **Preuve** : `supabase/tests/portail-patient-base.test.sql` (banc d'attaques sur base jetable,
+  finit par `TOUT_OK`) et `tests/portail-patient-base.test.mjs` (parcours complet des deux fonctions sur
+  base simulée ; la base simulée doit rendre un tour de boucle d'événements par requête, sinon
+  les appels simultanés ne s'entrelacent pas). Les attaques réelles se jouent avec des patients
+  FICTIFS puis se nettoient (aucun compte `@patients.verticy.invalid` ne doit rester).
+- **Pièges** : le motif `service_role` est interdit même en commentaire dans `js/`,
+  `index.html` et `service-worker.js` (garde de la CI) ; ajouter un bouton à la carte patient déplace
+  les `var()` de `palette-bilans.test.mjs` ; les fonctions appelées par `onclick` passent par
+  `Object.assign(window, …)` pour ne pas ajouter d'avertissement ESLint.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
