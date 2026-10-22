@@ -212,3 +212,86 @@ input:focus-visible,
     transform: scale(0.98);
   }
 }
+
+.carte-bouton {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  position: relative;
+}
+.carte-bouton:focus-visible,
+.ligne-document:focus-visible {
+  outline: 3px solid var(--marine);
+  outline-offset: 2px;
+}
+.pastille {
+  margin-left: auto;
+  min-width: 28px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+}
+.pastille[hidden] {
+  display: none;
+}
+.groupe-documents {
+  margin: 18px 0 6px;
+  font-size: 19px;
+  color: var(--marine);
+}
+.ligne-document {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 8px 0;
+  padding: 14px;
+  font: inherit;
+  text-align: left;
+  color: var(--texte);
+  background: #f4fbfd;
+  border: 2px solid var(--bord);
+  border-radius: 16px;
+  cursor: pointer;
+}
+.ligne-document.nouveau {
+  border-color: var(--turquoise);
+  background: #ecfdf9;
+}
+.ligne-document strong {
+  display: block;
+  color: var(--marine);
+  font-size: 17px;
+}
+.ligne-document small {
+  display: block;
+  color: var(--doux);
+  font-size: 14px;
+}
+.ligne-document .badge-nouveau {
+  margin-left: auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--turquoise);
+  color: var(--turquoise-encre);
+  font-size: 13px;
+  font-weight: 800;
+}
+.cadre.large {
+  max-width: 940px;
+}
+.zone-document iframe {
+  display: block;
+  width: 100%;
+  height: 68vh;
+  min-height: 420px;
+  border: 2px solid var(--bord);
+  border-radius: 14px;
+  background: #fff;
+}

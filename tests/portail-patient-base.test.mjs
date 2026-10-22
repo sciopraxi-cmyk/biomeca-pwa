@@ -139,8 +139,11 @@ describe('interface patient — garde-fous du dépôt', () => {
   it('CSP stricte : ni script ni style en ligne, aucun gestionnaire onclick', () => {
     const csp = html.match(/Content-Security-Policy"\s+content="([^"]+)"/)[1];
     expect(csp).toMatch(/script-src 'self';/);
-    expect(csp).toMatch(/style-src 'self';/);
-    expect(csp).not.toMatch(/unsafe-inline|unsafe-eval/);
+    // Lot b2 : le style en ligne est admis (rendu des documents du praticien dans un cadre sans
+    // script) ; aucun script en ligne ni eval, jamais.
+    expect(csp).toMatch(/style-src 'self' 'unsafe-inline';/);
+    expect(csp).not.toMatch(/script-src[^;]*unsafe/);
+    expect(csp).not.toMatch(/unsafe-eval/);
     expect(html).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html).not.toMatch(/<script(?![^>]*\bsrc=)/i);
     expect(html).not.toMatch(/\sstyle=/i);

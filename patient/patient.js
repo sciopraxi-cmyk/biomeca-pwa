@@ -2,10 +2,15 @@
 // Aucune dépendance. Les données du patient ne passent que par la fonction SQL portail_moi()
 // (RLS) ; la connexion passe par l'Edge Function patient-connexion (essais limités côté serveur).
 import {
+  cheminFichierValide,
+  dateCourte,
   formaterIdentifiant,
+  grouperDocuments,
   identifiantComplet,
   messageErreur,
   motDePasseAcceptable,
+  nombreNonLus,
+  phraseDocuments,
   reglesMotDePasse,
   salutation,
   sessionAExpirer,
@@ -17,10 +22,11 @@ const SUPA_KEY = 'sb_publishable_aE4_BZYwz6bGGvby4XXAgw_k8ULnrYh';
 const CLE_SESSION = 'verticy-patient-session';
 
 const $ = (id) => document.getElementById(id);
-const ECRANS = ['chargement', 'connexion', 'mdp', 'accueil', 'ferme'];
+const ECRANS = ['chargement', 'connexion', 'mdp', 'accueil', 'ferme', 'documents', 'document'];
 
 function montrer(nom) {
   for (const e of ECRANS) $('ecran-' + e).hidden = e !== nom;
+  document.querySelector('.cadre').classList.toggle('large', nom === 'document');
   const premier = { connexion: 'identifiant', mdp: 'mdp1' }[nom];
   if (premier) $(premier).focus();
 }
@@ -140,6 +146,7 @@ async function ouvrirAccueil() {
   $('salut').textContent = salutation(moi.prenom);
   $('cabinet').textContent = moi.cabinet ? `Votre praticien : ${moi.cabinet}` : '';
   montrer('accueil');
+  majPastilleDocuments();
 }
 
 async function seConnecter(ev) {
@@ -248,12 +255,188 @@ async function deconnecter() {
   montrer('connexion');
 }
 
+// ─── Documents partagés (lecture seule) ───
+let documents = [];
+
+/** Valeur aléatoire à usage unique (aucune donnée personnelle). */
+function nonce() {
+  const a = new Uint8Array(12);
+  crypto.getRandomValues(a);
+  return Array.from(a, (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+/** Appel authentifié (session renouvelée si besoin) ; null si pas de session ou pas de réseau. */
+async function appelAuth(chemin, init) {
+  const s = await sessionValide();
+  if (!s) return null;
+  try {
+    return await fetch(SUPA_URL + chemin, {
+      ...(init || {}),
+      headers: {
+        ...((init && init.headers) || {}),
+        apikey: SUPA_KEY,
+        Authorization: 'Bearer ' + s.access_token,
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function chargerDocuments() {
+  const r = await appelAuth(
+    '/rest/v1/documents_partages?select=id,type,titre,date_document,lu_at,created_at,fichier_chemin&order=created_at.desc'
+  );
+  if (!r || !r.ok) return null;
+  try {
+    const l = await r.json();
+    return Array.isArray(l) ? l : null;
+  } catch {
+    return null;
+  }
+}
+
+function afficherPastille() {
+  const n = nombreNonLus(documents);
+  const p = $('pastille-documents');
+  p.hidden = n === 0;
+  p.textContent = String(n);
+  $('phrase-documents').textContent = phraseDocuments(n);
+}
+
+async function majPastilleDocuments() {
+  const l = await chargerDocuments();
+  if (l) {
+    documents = l;
+    afficherPastille();
+  }
+}
+
+function ligneDocument(d) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ligne-document' + (d.lu_at ? '' : ' nouveau');
+  const texte = document.createElement('span');
+  const t = document.createElement('strong');
+  t.textContent = d.titre;
+  texte.appendChild(t);
+  const date = dateCourte(d.date_document);
+  if (date) {
+    const sm = document.createElement('small');
+    sm.textContent = date;
+    texte.appendChild(sm);
+  }
+  b.appendChild(texte);
+  if (!d.lu_at) {
+    const n = document.createElement('span');
+    n.className = 'badge-nouveau';
+    n.textContent = 'Nouveau';
+    b.appendChild(n);
+  }
+  b.addEventListener('click', () => ouvrirDocument(d));
+  return b;
+}
+
+function afficherListeDocuments() {
+  const zone = $('liste-documents');
+  zone.textContent = '';
+  const groupes = grouperDocuments(documents);
+  $('vide-documents').hidden = groupes.length > 0;
+  for (const g of groupes) {
+    const h = document.createElement('h2');
+    h.className = 'groupe-documents';
+    h.textContent = `${g.emoji} ${g.titre}`;
+    zone.appendChild(h);
+    for (const d of g.documents) zone.appendChild(ligneDocument(d));
+  }
+}
+
+async function ouvrirDocuments() {
+  afficherErreur('erreur-documents', '');
+  montrer('documents');
+  const l = await chargerDocuments();
+  if (l) documents = l;
+  else if (!documents.length) {
+    afficherErreur(
+      'erreur-documents',
+      'Impossible de charger vos documents. Vérifiez votre réseau puis réessayez.'
+    );
+  }
+  afficherListeDocuments();
+}
+
+async function ouvrirDocument(d) {
+  afficherErreur('erreur-document', '');
+  $('titre-document').textContent = d.titre;
+  $('btn-document-imprimer').hidden = true;
+  const zone = $('zone-document');
+  zone.textContent = '⏳ Ouverture…';
+  montrer('document');
+  if (!cheminFichierValide(d.fichier_chemin)) {
+    zone.textContent = '';
+    return afficherErreur('erreur-document', 'Ce document est indisponible.');
+  }
+  // Adresse neuve à chaque ouverture : le réseau de diffusion du stockage garde en mémoire une réponse
+  // par adresse sans revérifier les droits ; sans ce paramètre, un document déjà lu resterait
+  // ouvrable après son retrait par le praticien.
+  const r = await appelAuth(
+    '/storage/v1/object/authenticated/patient-documents/' + d.fichier_chemin + '?v=' + nonce(),
+    { cache: 'no-store' }
+  );
+  if (!r || !r.ok) {
+    zone.textContent = '';
+    return afficherErreur(
+      'erreur-document',
+      r && r.status === 400
+        ? 'Ce document n’est plus disponible. Contactez votre praticien.'
+        : 'Impossible d’ouvrir le document. Vérifiez votre réseau puis réessayez.'
+    );
+  }
+  const html = await r.text();
+  zone.textContent = '';
+  const cadre = document.createElement('iframe');
+  // Aucun script possible (l'option qui les autorise est volontairement absente) ; les deux
+  // options présentes servent uniquement à lancer l'impression depuis cette page.
+  cadre.setAttribute('sandbox', 'allow-same-origin allow-modals');
+  cadre.setAttribute('title', d.titre);
+  cadre.srcdoc = html;
+  zone.appendChild(cadre);
+  $('btn-document-imprimer').hidden = false;
+  if (!d.lu_at) {
+    d.lu_at = new Date().toISOString();
+    appelAuth('/rest/v1/rpc/portail_document_lu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_id: d.id }),
+    });
+    afficherPastille();
+  }
+}
+
+function imprimerDocument() {
+  const cadre = $('zone-document').querySelector('iframe');
+  if (!cadre) return;
+  try {
+    cadre.contentWindow.focus();
+    cadre.contentWindow.print();
+  } catch {
+    afficherErreur('erreur-document', 'Impression impossible. Essayez depuis un ordinateur.');
+  }
+}
+
 // ─── Démarrage ───
 $('form-connexion').addEventListener('submit', seConnecter);
 $('form-mdp').addEventListener('submit', choisirMotDePasse);
 $('mdp1').addEventListener('input', majRegles);
 $('mdp2').addEventListener('input', majRegles);
 $('btn-deconnexion').addEventListener('click', deconnecter);
+$('carte-documents').addEventListener('click', ouvrirDocuments);
+$('btn-documents-retour').addEventListener('click', ouvrirAccueil);
+$('btn-document-retour').addEventListener('click', () => {
+  afficherListeDocuments();
+  montrer('documents');
+});
+$('btn-document-imprimer').addEventListener('click', imprimerDocument);
 $('btn-retour').addEventListener('click', () => montrer('connexion'));
 $('identifiant').addEventListener('input', (e) => {
   e.target.value = formaterIdentifiant(e.target.value);
