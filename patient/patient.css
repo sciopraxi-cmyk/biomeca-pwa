@@ -31,7 +31,7 @@ body {
   font-size: 18px;
   line-height: 1.5;
   color: var(--texte);
-  background: linear-gradient(180deg, var(--marine) 0, var(--marine) 210px, var(--fond) 210px);
+  background: linear-gradient(180deg, var(--marine) 0, var(--marine) 250px, var(--fond) 250px);
 }
 .cadre {
   max-width: 460px;
@@ -53,9 +53,22 @@ body {
   background: #fff;
   border-radius: 20px;
 }
+/* Le fichier du logo a de larges marges blanches : on le rogne (symbole + mot « Verticy ») pour
+   que ce soit lisible dans l'encadré. */
+.logo-cadre {
+  width: 260px;
+  max-width: 100%;
+  aspect-ratio: 955 / 770;
+  overflow: hidden;
+}
 .logo {
   display: block;
-  height: 104px;
+  width: 160.8%;
+  max-width: none;
+  margin-left: -30.4%;
+  margin-top: -6.3%;
+  mix-blend-mode: multiply;
+  filter: contrast(1.2) brightness(1.06);
 }
 .by {
   display: flex;
