@@ -31,7 +31,7 @@ body {
   font-size: 18px;
   line-height: 1.5;
   color: var(--texte);
-  background: linear-gradient(180deg, var(--marine) 0, var(--marine) 210px, var(--fond) 210px);
+  background: linear-gradient(180deg, var(--marine) 0, var(--marine) 230px, var(--fond) 230px);
 }
 .cadre {
   max-width: 460px;
@@ -44,25 +44,41 @@ body {
   align-items: center;
   padding: 8px 0 18px;
 }
-.logo {
-  height: 120px;
+.marque {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 20px 8px;
   background: #fff;
   border-radius: 20px;
-  padding: 8px 16px;
+}
+/* Le fichier du logo a de larges marges blanches : on le rogne (symbole + mot « Verticy ») pour
+   que ce soit lisible dans l'encadré. */
+.logo-cadre {
+  width: 215px;
+  max-width: 100%;
+  aspect-ratio: 955 / 770;
+  overflow: hidden;
+}
+.logo {
+  display: block;
+  width: 160.8%;
+  max-width: none;
+  margin-left: -30.4%;
+  margin-top: -6.3%;
+  mix-blend-mode: multiply;
+  filter: contrast(1.2) brightness(1.06);
 }
 .by {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 6px;
-  color: #cfe3ee;
+  color: var(--doux);
   font-size: 13px;
 }
 .by img {
-  height: 26px;
-  background: #fff;
-  border-radius: 6px;
-  padding: 2px 6px;
+  height: 22px;
 }
 .ecran {
   background: var(--carte);
