@@ -452,6 +452,33 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **Tests** : fichiers d'export Doctolib **fictifs** uniquement, dates calées sur la
   semaine de test ; aucun envoi vers Google dans les tests (faux serveur).
 
+## Notifications et synchronisation — acquis (PR #296)
+
+- **Centre de notifications** : onglet « 🔔 Notifications » (pastille de non-lus), historique
+  dans le blob praticien `praticien.notifications` ({ liste, dernierId }), **aucune table**,
+  **aucune purge automatique et aucun bouton de suppression**. Export CSV (lecture seule,
+  sans nom de patient, protégé contre les formules de tableur).
+- **Contenu d'une notification** : type, date, identifiants (patient, ordonnance, document),
+  jamais un nom ni le contenu d'un message. Le détail (nom du patient, rendez-vous importés,
+  ordonnance, devis ou facture) est **relu à l'affichage** dans les données du dossier ou
+  dans `documents_facturation` (lecture seule) ; si la source a disparu, un message le dit.
+- **Émetteurs** : import Doctolib (rendez-vous réellement nouveaux), coupure et retour de
+  connexion (une seule ligne par coupure), devis ou facture émis, ordonnance créée. Les types
+  du portail patient (message, devis signé, questionnaire, séquence d'exercices, protocole
+  terminé) sont déclarés ; leurs émetteurs viendront avec le portail.
+- **Écriture différée** : `notifierEvenement` inscrit en mémoire tout de suite et enregistre
+  ~1,5 s plus tard (une seule écriture, immédiate si la page se masque).
+- **Piège de synchronisation (22/10/2026)** : `saveToSupabase` renvoie tout le dossier. Un
+  dossier de 11 Mo (photos « data: » déjà envoyées dans Storage et restées en mémoire) dépassait le délai
+  de 8 s du rôle `authenticated` (erreur PostgreSQL 57014, HTTP 500) : bandeau rouge,
+  modification perdue au rechargement. Règle : **l'envoi au cloud filtre lui-même les photos qui
+  ont un chemin Storage jumeau**, quel que soit l'appelant (`savePatients`, `savePraticiens`),
+  sans jamais retirer une photo sans chemin ; la mémoire est restaurée aussitôt.
+- **Bandeau de synchronisation** : il affiche un **détail technique** (statuts et codes SQL
+  seulement, jamais de donnée) pour diagnostiquer sans console.
+- **Diagnostic d'un dossier lourd** : requêtes de lecture seule sur `pg_column_size` (par bloc
+  de `user_data.data`, puis par patient). Ne jamais afficher d'identité dans ces requêtes.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
