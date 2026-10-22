@@ -83,6 +83,14 @@ let pwaUser = null;
 // rejetée — donc, sur les tables patients/bilans, du CONTENU CLINIQUE.
 // `code` est un SQLSTATE : il identifie la panne sans rien révéler.
 // Obligation du contrat HDS (matrice de responsabilités, point 4).
+// Dernière raison technique d'un échec de synchronisation (statuts et codes seulement, aucune donnée).
+let _raisonEchecSync = '';
+function _messageEchecSync(base) {
+  return _raisonEchecSync ? base + ' [Détail technique : ' + _raisonEchecSync.slice(0, 160) + ']' : base;
+}
+function _noterRaisonEchecSync(t) {
+  _raisonEchecSync = (_raisonEchecSync ? _raisonEchecSync + ' ; ' : '') + String(t).slice(0, 100);
+}
 function _pgrestErrorCode(body) {
   if (typeof body !== 'string' || body === '') return '(corps absent)';
   try {
@@ -239,6 +247,7 @@ const supa = {
   },
 
   async saveData(table, data) {
+    _raisonEchecSync = '';
     const baseHeaders = {
       'Content-Type': 'application/json',
       'Prefer': 'return=minimal'
@@ -252,6 +261,13 @@ const supa = {
     if(patch.ok) {
       const patched = await patch.json();
       if(patched && patched.length > 0) return true; // ligne mise à jour
+      _raisonEchecSync = 'PATCH : aucune ligne mise à jour';
+    } else {
+      // Détail technique (statut + code SQL, jamais le corps) : sans lui, l'échec du POST de repli
+      // (ligne déjà existante) masquait la vraie cause.
+      const errP = await patch.text().catch(() => '');
+      _raisonEchecSync = 'PATCH ' + patch.status + ' ' + _pgrestErrorCode(errP);
+      console.error('Supabase saveData PATCH error', patch.status, _pgrestErrorCode(errP));
     }
     // Si la ligne n'existe pas encore, faire un POST (insertion)
     const post = await authFetch(SUPA_URL + '/rest/v1/' + table, {
@@ -265,6 +281,7 @@ const supa = {
       // Statut + SQLSTATE suffisent au diagnostic.
       const err = await post.text().catch(() => '');
       console.error('Supabase saveData error', post.status, _pgrestErrorCode(err));
+      _raisonEchecSync += (_raisonEchecSync ? ' ; ' : '') + 'POST ' + post.status + ' ' + _pgrestErrorCode(err);
     }
     return post.ok;
   }
@@ -960,7 +977,7 @@ async function saveToSupabase() {
         praticiensCount: praticiens.length,
         timestamp: new Date().toISOString(),
       });
-      _showSyncErrorBanner(SYNC_FAIL_MSG);
+      _showSyncErrorBanner(typeof _messageEchecSync === 'function' ? _messageEchecSync(SYNC_FAIL_MSG) : SYNC_FAIL_MSG);
       _syncErrorShown = true;
       if (typeof _etatApresCloud === 'function') _etatApresCloud(false);
       // Hook Sentry défensif (V2 — actif quand Sentry intégré). Voir task #69.
@@ -1005,7 +1022,8 @@ async function saveToSupabase() {
       error: e instanceof Error ? e.message : String(e),
       timestamp: new Date().toISOString(),
     });
-    _showSyncErrorBanner(SYNC_FAIL_MSG);
+    if (typeof _noterRaisonEchecSync === 'function') _noterRaisonEchecSync(e instanceof Error ? e.name + ' ' + e.message : String(e));
+    _showSyncErrorBanner(typeof _messageEchecSync === 'function' ? _messageEchecSync(SYNC_FAIL_MSG) : SYNC_FAIL_MSG);
     _syncErrorShown = true;
     if (typeof _etatApresCloud === 'function') _etatApresCloud(false);
     if (typeof Sentry !== 'undefined' && Sentry?.captureException) {
@@ -32655,7 +32673,7 @@ function enregistrerOrdonnance(imprimer) {
     alert('Ordonnance non enregistrée : la sauvegarde a échoué. Rien n\'a été modifié.');
     return;
   }
-  if (i < 0) notifierEvenement('ordonnance_creee', { patientId: currentPatient.id });
+  if (i < 0) notifierEvenement('ordonnance_creee', { patientId: currentPatient.id, ordonnanceId: o.id });
   _ordoEdition = null; _ordoApercu = false; _ordoVueId = o.id;
   renderOrdonnancesPage();
   if (imprimer) imprimerOrdonnance(o.id);
@@ -33043,6 +33061,7 @@ function notifierEvenement(type, opts) {
     const o = opts || {};
     const e = { id: d.dernierId + 1, date: new Date().toISOString(), type, detail: _notifTexte(o.detail, 80), lu: false };
     if (o.patientId !== undefined && o.patientId !== null) e.cible = { patientId: o.patientId };
+    if (o.ordonnanceId) e.ordonnanceId = _notifTexte(o.ordonnanceId, 60); // identifiant seul : le contenu est relu à l'affichage
     if (Array.isArray(o.rdv)) {
       // Détail d'un import : identifiant, début et motif seulement (le nom est relu à l'affichage).
       e.rdv = o.rdv.slice(0, NOTIF_RDV_MAX).map((x) => ({ id: _notifTexte(x && x.id, 60), debut: _notifTexte(x && x.debut, 16), motif: _notifTexte(x && x.motif, 60) }));
@@ -33130,6 +33149,13 @@ function _notifDateFr(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
   return m ? m[3] + '/' + m[2] + '/' + m[1] : '—';
 }
+// Ordonnance : relue dans le dossier du patient à l'affichage (jamais copiée dans la notification).
+function _notifHtmlOrdonnance(e) {
+  const p = e.cible ? (Array.isArray(patients) ? patients : []).find((x) => x.id == e.cible.patientId) : null;
+  const o = p && Array.isArray(p.ordonnances) ? p.ordonnances.find((x) => x.id === e.ordonnanceId) : null;
+  if (!o) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Ordonnance introuvable (supprimée ou fiche patient absente).</div>';
+  return '<div style="margin-top:10px;border:1px solid var(--bord);border-radius:8px;padding:12px;">' + _htmlCorpsOrdonnance(o, false) + '</div>';
+}
 function _notifHtmlDetail(e) {
   const t = NOTIF_TYPES[e.type];
   const nom = _notifNomPatient(e);
@@ -33141,6 +33167,8 @@ function _notifHtmlDetail(e) {
     corps += _notifLigneDetail('Retour du réseau', e.retourLe ? _escHtml(_notifDateHeure(e.retourLe)) : 'toujours hors connexion');
     const d = _notifDuree(e.date, e.retourLe);
     if (d) corps += _notifLigneDetail('Durée', _escHtml(d));
+  } else if (e.type === 'ordonnance_creee') {
+    corps += _notifHtmlOrdonnance(e);
   } else if (e.type === 'import_doctolib') {
     corps += _notifLigneDetail('Rendez-vous ajoutés', String(e.rdvTotal !== undefined ? e.rdvTotal : (Array.isArray(e.rdv) ? e.rdv.length : 0)));
   } else if (e.detail) {

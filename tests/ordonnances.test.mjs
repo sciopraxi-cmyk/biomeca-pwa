@@ -364,7 +364,12 @@ describe('enregistrement', () => {
     const { f, sauvegardes } = monter({ acces: 'full' });
     saisir(f);
     f.enregistrerOrdonnance(false);
-    expect(sauvegardes.notifs).toEqual([['ordonnance_creee', { patientId: f.patient().id }]]);
+    expect(sauvegardes.notifs).toEqual([
+      [
+        'ordonnance_creee',
+        { patientId: f.patient().id, ordonnanceId: f.patient().ordonnances[0].id },
+      ],
+    ]);
     const id = f.patient().ordonnances[0].id;
     f.modifierOrdonnance(id);
     f.enregistrerOrdonnance(false);

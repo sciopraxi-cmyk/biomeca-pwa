@@ -47,7 +47,7 @@ function monter(o = {}) {
   const corps = [
     'const praticiens = __prats; const patients = __pats;',
     'const _escHtml = (s) => String(s ?? "").replace(/[&<>"\']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;", "\'": "&#39;" }[c]));',
-    'const window = {};',
+    'const window = {}; const _htmlCorpsOrdonnance = (o) => "CORPS[" + o.id + "]";',
     'const savePraticiens = () => { __sauv.n++; if (__echec) throw new Error("x"); };',
     'const selectPatient = (p) => __sel.push(p.id); const nav = (id) => __navs.push(id);',
     'const globalThis = { _modeConsultation: __consult };',
@@ -137,6 +137,18 @@ describe('Notifications — création', () => {
     expect(m.sauv.n).toBe(1);
     m.flush();
     expect(m.sauv.n).toBe(1);
+  });
+  it('détail d’une ordonnance : contenu relu dans le dossier, jamais stocké dans la notification ; supprimée : message clair', () => {
+    const o = { id: 'o1', lignes: [{ texte: 'Crème fictive' }] };
+    const m = monter({ pats: [{ id: 42, nom: 'Martin', prenom: 'Paul', ordonnances: [o] }] });
+    m.f.notifierEvenement('ordonnance_creee', { patientId: 42, ordonnanceId: 'o1' });
+    expect(JSON.stringify(m.f.prats[0].notifications)).not.toContain('Crème');
+    m.f.ouvrirNotification(1);
+    expect(m.sortie.html).toContain('CORPS[o1]');
+    expect(m.sortie.html).toContain('Paul Martin');
+    o.id = 'autre';
+    m.f.renderNotificationsPage();
+    expect(m.sortie.html).toContain('Ordonnance introuvable');
   });
   it('type « ordonnance créée » déclaré, rattaché au patient', () => {
     const m = monter();
