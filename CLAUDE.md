@@ -518,6 +518,41 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   les `var()` de `palette-bilans.test.mjs` ; les fonctions appelées par `onclick` passent par
   `Object.assign(window, …)` pour ne pas ajouter d'avertissement ESLint.
 
+## Portail patient, lot (b2) — acquis (PR #300)
+
+- **Modèle** : table `documents_partages` (copies figées, jamais le blob) + bucket privé `patient-documents`
+  (HTML seulement, 20 Mo). Chaque document partagé est UN fichier HTML autonome
+  `<id de la fiche>/<uuid>.html` (même rendu que l'impression ; scripts, liens et attributs `on*`
+  retirés, images réduites à 800 px). Devis, factures et ordonnances gardent en plus un `contenu`
+  jsonb (devis/factures construits côté serveur depuis le document émis) pour la signature à venir.
+- **Partage** : automatique à l'émission d'un devis ou d'une facture et à l'enregistrement d'une
+  ordonnance (si le patient a un compte portail ; jamais un brouillon ; silencieux, ne bloque jamais).
+  Les rapports de bilan passent par le bouton « Publier au patient » (générer un rapport ne sauvegarde
+  jamais). Le praticien retire ou remet un document dans la fenêtre 🔑 ; rien n'est supprimé ni purgé.
+  Un document retiré reste retiré si l'application le repartage.
+- **Droits** : le client n'a aucun droit d'écriture sur `documents_partages` ni de modification ou
+  suppression de fichier ; tout passe par des fonctions `SECURITY DEFINER` qui contrôlent la fiche du
+  praticien, le chemin du fichier (dossier de CE patient, fichier déjà déposé) et le compte actif.
+  Le patient lit seulement ses documents non retirés (`portail_patient_actuel()`) et le fichier
+  correspondant (`portail_peut_lire_fichier`) ; sa seule écriture est `portail_document_lu`.
+- **Piège du CDN** : le réseau de diffusion de Supabase garde une réponse 200 par adresse et jeton
+  sans revérifier les droits. L'application patient ajoute donc un paramètre aléatoire `?v=` à chaque
+  ouverture ; sans lui, un document déjà lu restait ouvrable après retrait. Tout futur fichier du
+  portail suit la même règle.
+- **Affichage patient** : cadre `iframe` avec `sandbox="allow-same-origin allow-modals"` (jamais
+  `allow-scripts`) ; la CSP de `/patient/` admet le style en ligne (rendu des documents) mais aucun
+  script en ligne ni `eval`.
+- **Preuve** : `supabase/tests/portail-documents-partages.test.sql` (base jetable, finit par `TOUT_OK`,
+  rejoué avec des règles volontairement cassées) et `tests/portail-documents-partages.test.mjs`. Les
+  attaques réelles se jouent avec des patients FICTIFS puis se nettoient. Supabase interdit de
+  supprimer des lignes de `storage.objects` en SQL : nettoyer par l'API Storage, avec une politique
+  temporaire limitée au préfixe fictif, retirée aussitôt.
+- **Pièges** : un nouveau bouton dans une page de bilan change le golden
+  `tests/golden/structure-pedicurie-podo-268.json` (le régénérer pour les seules lignes ajoutées) ;
+  une fiche toute neuve n'a pas d'identifiant cloud avant sa première synchronisation ; un hook ajouté
+  dans `enregistrerOrdonnance` ou `emettreDocumentCourant` doit être protégé par `typeof` (harnais de
+  tests).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
