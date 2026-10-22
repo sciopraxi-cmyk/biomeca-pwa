@@ -12,11 +12,24 @@ const SECTION = SRC_BIOMECA.slice(debut, fin);
 
 function monter(o = {}) {
   const sauv = { n: 0 };
+  const timers = [];
+  const dl = {};
   const sortie = { html: '' };
   const pastille = { textContent: '', style: {} };
   const selections = [];
   const navs = [];
   const document = {
+    addEventListener() {},
+    createElement: () => ({
+      click() {
+        dl.clic = true;
+      },
+      set download(v) {
+        dl.nom = v;
+      },
+      set href(_v) {},
+    }),
+    body: { appendChild() {}, removeChild() {} },
     getElementById: (id) =>
       id === 'notif-contenu'
         ? {
@@ -38,11 +51,15 @@ function monter(o = {}) {
     'const savePraticiens = () => { __sauv.n++; if (__echec) throw new Error("x"); };',
     'const selectPatient = (p) => __sel.push(p.id); const nav = (id) => __navs.push(id);',
     'const globalThis = { _modeConsultation: __consult };',
+    'const setTimeout = (f) => { __timers.push(f); return __timers.length; }; const clearTimeout = (n) => { if (n) __timers[n - 1] = null; };',
+    'const _todayISO = () => "2026-10-22"; const URL = { createObjectURL: (b) => { __dl.blob = b; return "blob:x"; }, revokeObjectURL() {} }; const Blob = function (p, o) { this.p = p; this.o = o; };',
     SECTION,
-    'return { notifierEvenement, notifierReseauRetabli, renderNotificationsPage, filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification, ouvrirPatientNotification, fermerDetailNotification, _notifNonLus, _notifMajPastille, NOTIF_TYPES, prats: praticiens };',
+    'return { _notifCsv, exporterNotificationsCSV, _notifSauvegarderMaintenant, notifierEvenement, notifierReseauRetabli, renderNotificationsPage, filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification, ouvrirPatientNotification, fermerDetailNotification, _notifNonLus, _notifMajPastille, NOTIF_TYPES, prats: praticiens };',
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   const f = new Function(
+    '__timers',
+    '__dl',
     'document',
     '__prats',
     '__pats',
@@ -53,6 +70,8 @@ function monter(o = {}) {
     '__echec',
     corps
   )(
+    timers,
+    dl,
     document,
     o.prats || [{ id: 7, nom: 'Dr Fictif' }],
     o.pats || [{ id: 42, nom: 'Martin', prenom: 'Paul' }],
@@ -62,7 +81,10 @@ function monter(o = {}) {
     !!o.consult,
     !!o.echec
   );
-  return { f, sauv, sortie, pastille, selections, navs };
+  const flush = () => {
+    timers.splice(0).forEach((t) => t && t());
+  };
+  return { f, sauv, sortie, pastille, selections, navs, timers, flush, dl };
 }
 
 describe('Notifications — création', () => {
@@ -71,6 +93,8 @@ describe('Notifications — création', () => {
     const e = m.f.notifierEvenement('import_doctolib', { detail: '12 rendez-vous' });
     expect(e.id).toBe(1);
     expect(e.lu).toBe(false);
+    expect(m.sauv.n).toBe(0); // enregistrement différé (évite une écriture simultanée)
+    m.flush();
     expect(m.sauv.n).toBe(1);
     expect(m.f.prats[0].notifications.liste).toHaveLength(1);
     expect(m.pastille.textContent).toBe('1');
@@ -87,8 +111,40 @@ describe('Notifications — création', () => {
   });
   it('un échec d’enregistrement ne lève jamais', () => {
     const m = monter({ echec: true });
-    expect(() => m.f.notifierEvenement('facture_editee', { detail: 'n° F1' })).not.toThrow();
+    expect(() => {
+      m.f.notifierEvenement('facture_editee', { detail: 'n° F1' });
+      m.flush();
+    }).not.toThrow();
     expect(m.sauv.n).toBe(1);
+  });
+  it('plusieurs notifications rapprochées = UNE seule écriture différée (jamais deux écritures simultanées)', () => {
+    const m = monter();
+    m.f.notifierEvenement('import_doctolib');
+    m.f.notifierEvenement('facture_editee');
+    m.f.notifierEvenement('ordonnance_creee', { patientId: 42 });
+    expect(m.sauv.n).toBe(0);
+    m.flush();
+    expect(m.sauv.n).toBe(1);
+    expect(m.f.prats[0].notifications.liste).toHaveLength(3);
+    m.flush();
+    expect(m.sauv.n).toBe(1);
+  });
+  it('écriture immédiate possible quand la page se masque ; la notification existe en mémoire dès sa création', () => {
+    const m = monter();
+    m.f.notifierEvenement('import_doctolib');
+    expect(m.f.prats[0].notifications.liste).toHaveLength(1);
+    m.f._notifSauvegarderMaintenant();
+    expect(m.sauv.n).toBe(1);
+    m.flush();
+    expect(m.sauv.n).toBe(1);
+  });
+  it('type « ordonnance créée » déclaré, rattaché au patient', () => {
+    const m = monter();
+    expect(m.f.NOTIF_TYPES.ordonnance_creee.systeme).toBe(false);
+    m.f.notifierEvenement('ordonnance_creee', { patientId: 42 });
+    m.f.ouvrirNotification(1);
+    expect(m.sortie.html).toContain('Ordonnance créée');
+    expect(m.sortie.html).toContain('Paul Martin');
   });
   it('identifiants croissants, sans trou ni réutilisation', () => {
     const m = monter();
@@ -374,5 +430,53 @@ describe('Notifications — branchements prouvés par exécution', () => {
     expect(bloc.indexOf("alert('❌ Enregistrement impossible")).toBeLessThan(
       bloc.indexOf("notifierEvenement('import_doctolib'")
     );
+  });
+});
+
+describe('Notifications — export CSV', () => {
+  const lire = (m) => m.f._notifCsv();
+  it('en-tête, BOM, séparateur « ; », une ligne par notification, du plus ancien au plus récent', () => {
+    const m = monter();
+    m.f.notifierEvenement('import_doctolib', { detail: '2 nouveau(x)' });
+    m.f.notifierEvenement('patient_message', { patientId: 42 });
+    const csv = lire(m);
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    const l = csv.replace(/\r\n$/, '').split('\r\n');
+    expect(l[0]).toBe('\ufeffNuméro;Date;Heure;Catégorie;Notification;Détail;Lu;Retour du réseau');
+    expect(l).toHaveLength(3);
+    expect(l[1]).toMatch(
+      /^1;\d{2}\/\d{2}\/\d{4};\d{2}:\d{2};Système;Import Doctolib effectué;2 nouveau\(x\);non;$/
+    );
+    expect(l[2]).toMatch(/^2;.*;Patient;Nouveau message d’un patient;;non;$/);
+  });
+  it('aucun nom de patient dans le fichier', () => {
+    const m = monter();
+    m.f.notifierEvenement('patient_devis_signe', { patientId: 42 });
+    expect(lire(m)).not.toMatch(/Martin|Paul/);
+  });
+  it('protège contre les formules de tableur et échappe ; et « " »', () => {
+    const m = monter();
+    m.f.notifierEvenement('facture_editee', { detail: '=1+1;"x"' });
+    const csv = lire(m);
+    expect(csv).toContain("'=1+1");
+    expect(csv).toContain('""x""');
+    expect(csv).not.toMatch(/;=1\+1/);
+  });
+  it('le bouton télécharge un fichier daté ; historique vide : aucun bouton', () => {
+    const m = monter();
+    m.f.notifierEvenement('import_doctolib');
+    m.f.renderNotificationsPage();
+    expect(m.sortie.html).toContain('exporterNotificationsCSV()');
+    m.f.exporterNotificationsCSV();
+    expect(m.dl.nom).toBe('notifications-verticy-2026-10-22.csv');
+    expect(m.dl.clic).toBe(true);
+    const v = monter();
+    v.f.renderNotificationsPage();
+    expect(v.sortie.html).not.toContain('exporterNotificationsCSV()');
+  });
+  it('conserve toutes les entrées (500)', () => {
+    const m = monter();
+    for (let i = 0; i < 500; i++) m.f.notifierEvenement('facture_editee', { detail: 'n° ' + i });
+    expect(lire(m).trim().split('\r\n')).toHaveLength(501);
   });
 });

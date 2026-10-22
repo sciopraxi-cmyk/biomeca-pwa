@@ -145,6 +145,7 @@ function monter(o = {}) {
     'const showAccessRestrictedModal = (r) => __modales.push(r);',
     'const savePatients = () => { __sauv.patients++; return __sauvOk(); };',
     'const savePraticiens = () => { __sauv.praticiens++; };',
+    'const notifierEvenement = (t, o) => { (__sauv.notifs = __sauv.notifs || []).push([t, o]); };',
     'const confirm = (m) => __confirm(m);',
     constBloc('ORDO_CATEGORIES'),
     ...CONSTS.map(constLigne),
@@ -358,6 +359,20 @@ describe('enregistrement', () => {
     expect(sauvegardes.patients).toBe(1);
     expect(f.etat().edition).toBe(null);
     expect(f.etat().vueId).toBe(f.patient().ordonnances[0].id);
+  });
+  it('une NOUVELLE ordonnance crée une notification (patient seulement) ; une modification, un échec : aucune', () => {
+    const { f, sauvegardes } = monter({ acces: 'full' });
+    saisir(f);
+    f.enregistrerOrdonnance(false);
+    expect(sauvegardes.notifs).toEqual([['ordonnance_creee', { patientId: f.patient().id }]]);
+    const id = f.patient().ordonnances[0].id;
+    f.modifierOrdonnance(id);
+    f.enregistrerOrdonnance(false);
+    expect(sauvegardes.notifs).toHaveLength(1);
+    const e = monter({ acces: 'full', sauvOk: () => false });
+    saisir(e.f);
+    e.f.enregistrerOrdonnance(false);
+    expect(e.sauvegardes.notifs).toBeUndefined();
   });
   it('modifier une ordonnance enregistrée la remplace (pas de doublon)', () => {
     const { f } = monter({ acces: 'full' });

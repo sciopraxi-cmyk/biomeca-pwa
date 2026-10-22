@@ -32655,6 +32655,7 @@ function enregistrerOrdonnance(imprimer) {
     alert('Ordonnance non enregistrée : la sauvegarde a échoué. Rien n\'a été modifié.');
     return;
   }
+  if (i < 0) notifierEvenement('ordonnance_creee', { patientId: currentPatient.id });
   _ordoEdition = null; _ordoApercu = false; _ordoVueId = o.id;
   renderOrdonnancesPage();
   if (imprimer) imprimerOrdonnance(o.id);
@@ -32981,6 +32982,7 @@ const NOTIF_TYPES = {
   facture_editee: { icone: '🧾', titre: 'Facture éditée', systeme: true },
   devis_emis: { icone: '📄', titre: 'Devis émis', systeme: true },
   email_essai: { icone: '📧', titre: 'E-mail d\u2019accès généré (boîte d\u2019essai, non envoyé)', systeme: true },
+  ordonnance_creee: { icone: '💊', titre: 'Ordonnance créée', systeme: false },
   patient_message: { icone: '✉️', titre: 'Nouveau message d\u2019un patient', systeme: false },
   patient_devis_signe: { icone: '✍️', titre: 'Devis signé par un patient', systeme: false },
   patient_questionnaire: { icone: '📝', titre: 'Questionnaire rempli par un patient', systeme: false },
@@ -33012,9 +33014,23 @@ function _notifMajPastille() {
   el.textContent = n > 99 ? '99+' : String(n);
   el.style.display = n > 0 ? 'inline-block' : 'none';
 }
+// La notification est inscrite en mémoire tout de suite ; l'enregistrement part ~1,5 s plus tard,
+// seul : l'action qui l'a provoquée (ordonnance, import, facture) fait déjà sa propre écriture du
+// même blob, et deux écritures simultanées sont à éviter.
+let _notifTimer = null;
+function _notifSauvegarderMaintenant() {
+  if (_notifTimer !== null) { clearTimeout(_notifTimer); _notifTimer = null; }
+  try { savePraticiens(); } catch (err) { console.warn('notifications (enregistrement):', err); }
+}
 function _notifEcrire(pr, donnees) {
   pr.notifications = { liste: donnees.liste, dernierId: donnees.dernierId };
-  savePraticiens();
+  if (_notifTimer !== null) clearTimeout(_notifTimer);
+  _notifTimer = setTimeout(_notifSauvegarderMaintenant, 1500);
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && _notifTimer !== null) _notifSauvegarderMaintenant();
+  });
 }
 // Crée une notification ; retourne l'entrée, ou null (type inconnu, aucun praticien, consultation,
 // échec d'enregistrement). Ne bloque jamais l'action de l'utilisateur.
@@ -33166,10 +33182,38 @@ function renderNotificationsPage() {
   el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;">' +
     filtres.map((f) => '<button class="btn notif-filtre' + (_notifFiltre === f[0] ? ' btn-blue' : '') + '" onclick="filtrerNotifications(\'' + f[0] + '\')" style="font-size:12px;padding:5px 12px;">' + f[1] + '</button>').join('') +
     '<span style="flex:1;"></span>' +
+    (tous.length ? '<button class="btn" onclick="exporterNotificationsCSV()" style="font-size:12px;padding:5px 12px;">📤 Exporter en CSV</button>' : '') +
     (nonLus ? '<button class="btn" onclick="toutMarquerLuNotifications()" style="font-size:12px;padding:5px 12px;">Tout marquer comme lu</button>' : '') + '</div>' +
     (vus.length ? vus.map(_notifHtmlLigne).join('') : '<div style="font-size:13px;color:var(--mut);padding:12px;">Aucune notification.</div>') +
     '<div style="font-size:11px;color:var(--mut);margin-top:10px;">L\u2019historique est conservé : aucune notification n\u2019est supprimée automatiquement. Le texte d\u2019une notification ne contient jamais le contenu d\u2019un message.</div>';
   _notifMajPastille();
+}
+// Export CSV (lecture seule) : tout l'historique, sans nom de patient ni contenu de message.
+function _notifCsvCellule(v) {
+  let t = String(v ?? '').replace(/[\r\n]+/g, ' ');
+  if (/^[=+\-@\t]/.test(t)) t = "'" + t; // pas de formule interprétée par le tableur
+  return /[;"]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+function _notifCsv() {
+  const liste = [..._notifDonnees(_notifPrat()).liste].sort((a, b) => a.id - b.id);
+  const lignes = [['Numéro', 'Date', 'Heure', 'Catégorie', 'Notification', 'Détail', 'Lu', 'Retour du réseau']];
+  liste.forEach((e) => {
+    const dh = _notifDateHeure(e.date).split(' à ');
+    lignes.push([e.id, dh[0], dh[1] || '', NOTIF_TYPES[e.type].systeme ? 'Système' : 'Patient', NOTIF_TYPES[e.type].titre, e.detail || '', e.lu ? 'oui' : 'non', e.retourLe ? _notifDateHeure(e.retourLe) : '']);
+  });
+  return '\ufeff' + lignes.map((l) => l.map(_notifCsvCellule).join(';')).join('\r\n') + '\r\n';
+}
+function exporterNotificationsCSV() {
+  if (!_notifPrat()) return;
+  const blob = new Blob([_notifCsv()], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'notifications-verticy-' + _todayISO() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 function filtrerNotifications(f) {
   _notifDetailId = null;
@@ -33198,7 +33242,7 @@ function ouvrirNotification(id) {
 }
 
 // Appelées par les onclick du centre de notifications.
-Object.assign(window, { filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification, fermerDetailNotification, ouvrirPatientNotification });
+Object.assign(window, { filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification, fermerDetailNotification, ouvrirPatientNotification, exporterNotificationsCSV });
 
 // ═════════════════════════════════════════════════════════════════
 // Traçabilité de stérilisation — registre des cycles, sets, appareils, maintenance, soins
