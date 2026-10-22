@@ -35,6 +35,7 @@ function monter(o = {}) {
     'const savePraticiens = () => { __sauv.praticiens++; if (__sauv.echec) throw new Error("echec"); };',
     'const showAccessRestrictedModal = (r) => { __sauv.modale = r; };',
     'const confirm = (m) => { __confirms.push(m); return __sauv.confirm !== false; };',
+    'const notifierEvenement = (t, o) => { (__sauv.notifs = __sauv.notifs || []).push([t, o]); };',
     'const _todayISO = () => "2026-10-21";',
     'const document = { getElementById: () => null };',
     ...HELPERS.map(fonction),
@@ -293,6 +294,22 @@ describe('fusion et réimport', () => {
     expect(f.prats[0].agendaDoctolib.rdv).toHaveLength(2);
     expect(sauv.praticiens).toBe(2);
     expect(alertes).toEqual([]);
+  });
+  it('un import réussi crée une notification (nombre seulement) ; un import refusé n’en crée aucune', () => {
+    const { f, sauv } = monter({ prats: [{ id: 7 }] });
+    f._lancerImportDoctolib(csv({ id: '1' }, { id: '2', debut: '2026-10-23 10:00' }));
+    expect(sauv.notifs).toHaveLength(1);
+    expect(sauv.notifs[0][0]).toBe('import_doctolib');
+    expect(sauv.notifs[0][1].detail).toBe('2 nouveau(x) sur 2 rendez-vous');
+    expect(sauv.notifs[0][1].rdv.map((x) => x.id)).toHaveLength(2);
+    // Réimport du même fichier : plus aucun rendez-vous NOUVEAU.
+    f._lancerImportDoctolib(csv({ id: '1' }, { id: '2', debut: '2026-10-23 10:00' }));
+    expect(sauv.notifs[1][1].rdv).toEqual([]);
+    expect(sauv.notifs[1][1].detail).toBe('0 nouveau(x) sur 2 rendez-vous');
+    const v = monter({ prats: [{ id: 7 }] });
+    v.sauv.echec = true;
+    v.f._lancerImportDoctolib(csv({ id: '1' }));
+    expect(v.sauv.notifs).toBeUndefined();
   });
   it('un RDV annulé dans un nouvel export disparaît', () => {
     const { f } = monter({ prats: [{ id: 7 }] });

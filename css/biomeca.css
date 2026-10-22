@@ -382,6 +382,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 .tnav{display:flex;gap:2px;}
 .tnav button{padding:5px 12px;border-radius:var(--rs);border:none;background:transparent;cursor:pointer;font-size:12px;color:var(--mut);font-family:var(--f);}
 .tnav button:hover{background:var(--card);color:var(--txt);}
+/* L'onglet Notifications ajouté : on resserre les onglets pour que « Déconnexion » reste sur la ligne. */
+@media (max-width:1440px){ .tnav{gap:0;} .tnav button{padding:5px 6px;} }
 .tnav button.act{background:var(--blue-d);color:var(--blue);}
 .pt-pill{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--bord);border-radius:20px;padding:3px 10px 3px 6px;cursor:pointer;margin-left:auto;}
 .pt-pill .av{width:22px;height:22px;border-radius:50%;background:var(--blue-d);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--blue);}

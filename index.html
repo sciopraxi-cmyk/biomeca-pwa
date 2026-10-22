@@ -639,6 +639,7 @@
     <button onclick="nav('pg-praticiens')" id="tn-praticiens">Praticiens</button>
     <button onclick="nav('pg-params')" id="tn-params">Paramètres</button>
     <button onclick="nav('pg-agenda')" id="tn-agenda">📅 Agenda</button>
+    <button onclick="nav('pg-notifications')" id="tn-notifications">🔔 Notifications <span id="notif-pastille" style="display:none;background:#c0392b;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:700;margin-left:3px;vertical-align:middle;">0</span></button>
     <button onclick="nav('pg-sterilisation')" id="tn-sterilisation">🧼 Stérilisation</button>
     <button onclick="nav('pg-actes')" id="tn-facturation">🧾 Paramètres facturation</button>
   </div>
@@ -3543,6 +3544,17 @@
     </div>
     <div id="ordonnances-patient" style="font-size:13px;color:var(--mut);margin:0 0 12px 8px;"></div>
     <div id="ordonnances-contenu"></div>
+  </div>
+</div>
+
+<!-- ══ NOTIFICATIONS — historique des événements (système et patients) ══ -->
+<div class="page page-claire" id="pg-notifications">
+  <div style="padding:16px 20px;max-width:820px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
+      <h2 style="margin:0;font-size:18px;color:var(--blue);flex:1;">🔔 Notifications</h2>
+    </div>
+    <div id="notif-contenu"></div>
   </div>
 </div>
 

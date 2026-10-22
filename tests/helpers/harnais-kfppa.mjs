@@ -191,6 +191,8 @@ const BOUCHONS_NAV = [
   'drawPiedsTemplate',
   'initAgendaPage',
   'initMorphoCanvas',
+  '_notifMajPastille',
+  'renderNotificationsPage',
   'injectBilanPosturoPage',
   'loadBilan',
   'populatePratSelect',
