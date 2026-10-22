@@ -72,3 +72,43 @@ export function salutation(prenom) {
     .slice(0, 40);
   return p ? `Bonjour ${p} 👋` : 'Bonjour 👋';
 }
+
+// ─── Documents partagés (lot b2) ───
+export const TYPES_DOCUMENTS = [
+  { type: 'devis', emoji: '📄', titre: 'Mes devis' },
+  { type: 'facture', emoji: '🧾', titre: 'Mes factures' },
+  { type: 'ordonnance', emoji: '💊', titre: 'Mes ordonnances' },
+  { type: 'rapport', emoji: '📊', titre: 'Mes bilans' },
+];
+
+/** Nombre de documents jamais ouverts (pastille « nouveau »). */
+export function nombreNonLus(liste) {
+  return (Array.isArray(liste) ? liste : []).filter((d) => d && !d.lu_at).length;
+}
+
+/** « 2026-05-17 » → « 17/05/2026 » ; vide si la date est illisible. */
+export function dateCourte(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+/** Documents rangés par type (types vides omis), les plus récents d'abord. */
+export function grouperDocuments(liste) {
+  const l = Array.isArray(liste) ? liste.filter((d) => d && d.id) : [];
+  const cle = (d) => `${d.date_document || ''}|${d.created_at || ''}`;
+  return TYPES_DOCUMENTS.map((t) => ({
+    ...t,
+    documents: l.filter((d) => d.type === t.type).sort((a, b) => cle(b).localeCompare(cle(a))),
+  })).filter((g) => g.documents.length > 0);
+}
+
+/** Phrase courte pour la carte d'accueil. */
+export function phraseDocuments(nonLus) {
+  if (nonLus <= 0) return 'Devis, factures, ordonnances, bilans';
+  return nonLus === 1 ? '1 nouveau document' : `${nonLus} nouveaux documents`;
+}
+
+/** Chemin de fichier attendu (même forme que côté serveur) : jamais un chemin tordu. */
+export function cheminFichierValide(chemin) {
+  return /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.html$/.test(String(chemin || ''));
+}

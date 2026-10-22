@@ -31987,6 +31987,7 @@ async function emettreDocumentCourant() {
     const emis = await res.json();
     notifierEvenement(emis.type === 'devis' ? 'devis_emis' : 'facture_editee', { detail: 'n° ' + (emis.numero || ''), patientId: currentPatient ? currentPatient.id : undefined, documentId: emis.id });
     _docEdition = null; _docApercu = false; _docVue = emis.id;
+    if (typeof _portailPartagerAuto === 'function') _portailPartagerAuto('facturation', currentPatient, emis);
     await renderDocumentsPage();
   } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
 }
@@ -32695,6 +32696,7 @@ function enregistrerOrdonnance(imprimer) {
     return;
   }
   if (i < 0) notifierEvenement('ordonnance_creee', { patientId: currentPatient.id, ordonnanceId: o.id });
+  if (typeof _portailPartagerAuto === 'function') _portailPartagerAuto('ordonnance', currentPatient, o);
   _ordoEdition = null; _ordoApercu = false; _ordoVueId = o.id;
   renderOrdonnancesPage();
   if (imprimer) imprimerOrdonnance(o.id);
@@ -35229,9 +35231,11 @@ function _portailAfficher(idx, compte, message) {
       (compte.statut === 'suspendu'
         ? '<button class="btn" onclick="portailAction(' + idx + ',\'reactiver\')">Rouvrir l\'accès</button>'
         : '<button class="btn" onclick="portailAction(' + idx + ',\'suspendre\')">Fermer l\'accès</button>') +
-      '</div>';
+      '</div>' +
+      '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Documents visibles par le patient</div><div id="portail-docs"></div></div>';
   }
   cadre.innerHTML = html;
+  if (compte) _portailChargerDocs(idx);
 }
 function _portailSecretDdnAffiche(p) {
   return _portailSecretDdn(p) || '—';
@@ -35262,7 +35266,7 @@ async function portailCreerAcces(idx) {
   if (b) b.disabled = true;
   try {
     const r = await _portailAppeler('creer', p, { cabinet: _portailCabinet(p) });
-    if (r.status === 200 && r.body && r.body.ok) { _portailAfficher(idx, await _portailLireCompte(p), ''); return; }
+    if (r.status === 200 && r.body && r.body.ok) { _portailCompteCache.delete(p._cloudId); _portailAfficher(idx, await _portailLireCompte(p), ''); return; }
     _portailAfficher(idx, null, (r.body && r.body.message) || 'Création impossible, réessayez.');
   } catch (_e) {
     _portailAfficher(idx, null, 'Création impossible : vérifiez votre connexion.');
@@ -35316,12 +35320,243 @@ function _portailCreerAccesAuto(patientId) {
     }, 3000);
   } catch (_e) { /* jamais bloquant pour l'agenda */ }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Portail patient, lot (b2) : documents partagés
+// ═══════════════════════════════════════════════════════════════════
+// Chaque document partagé est UN fichier HTML autonome (le rendu de l'impression), déposé dans le
+// bucket privé `patient-documents/<id de la fiche>/<uuid>.html`, puis enregistré par une fonction
+// SQL qui contrôle le propriétaire de la fiche (devis et factures : copie construite côté serveur).
+// Partage AUTOMATIQUE à l'émission / à la création, si le patient a un compte portail ; le praticien
+// retire ou remet l'accès document par document (rien n'est supprimé). Un échec est silencieux pour
+// ne jamais bloquer l'émission : le rattrapage à l'ouverture de la fenêtre 🔑 repart des documents
+// pas encore partagés.
+const _PORTAIL_RAPPORTS = {
+  sport: 'Bilan podologie du sport',
+  posturo: 'Bilan postural',
+  podopediatrie: 'Bilan podopédiatrie',
+  pedicurie: 'Bilan pédicurie',
+};
+const _PORTAIL_ICONES = { devis: '📄', facture: '🧾', ordonnance: '💊', rapport: '📊' };
+const _PORTAIL_IMG_MAX = 800;
+const _PORTAIL_IMG_PETITE = 60000;
+const _PORTAIL_HTML_MAX = 18 * 1024 * 1024;
+const _portailCompteCache = new Map();
+
+function _portailPartagePossible(p) {
+  return !!(p && p._cloudId) && !globalThis._modeConsultation && !(typeof _horsConnexion === 'function' && _horsConnexion());
+}
+async function _portailAvecCompte(p) {
+  const memo = _portailCompteCache.get(p._cloudId);
+  if (memo && (memo.oui || Date.now() - memo.t < 60000)) return memo.oui;
+  let oui = false;
+  try { oui = !!(await _portailLireCompte(p)); } catch (_e) { return false; }
+  _portailCompteCache.set(p._cloudId, { oui: oui, t: Date.now() });
+  return oui;
+}
+async function _portailRpc(nom, corps) {
+  const res = await authFetch(SUPA_URL + '/rest/v1/rpc/' + nom, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps),
+  });
+  if (!res.ok) throw new Error(nom + ' ' + res.status);
+  return res.json();
+}
+// Réduit une image (data: ou même origine) : 800 px de large au plus, JPEG, fond blanc.
+function _portailReduireImage(src) {
+  return new Promise(function (resolve) {
+    const img = new Image();
+    img.onload = function () {
+      try {
+        const k = Math.min(1, _PORTAIL_IMG_MAX / (img.naturalWidth || 1));
+        const w = Math.max(1, Math.round(img.naturalWidth * k));
+        const h = Math.max(1, Math.round(img.naturalHeight * k));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+        g.drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', 0.72));
+      } catch (_e) { resolve(null); }
+    };
+    img.onerror = function () { resolve(null); };
+    img.src = src;
+  });
+}
+// HTML prêt à partager : sans script ni lien externe, images réduites et intégrées au fichier.
+async function _portailPreparerHtml(html, cssExtra) {
+  const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  doc.querySelectorAll('script, iframe, object, embed, link, base, meta[http-equiv]').forEach(function (n) { n.remove(); });
+  doc.querySelectorAll('*').forEach(function (n) {
+    Array.from(n.attributes).forEach(function (a) { if (/^on/i.test(a.name)) n.removeAttribute(a.name); });
+  });
+  if (cssExtra) { const st = doc.createElement('style'); st.textContent = cssExtra; doc.head.appendChild(st); }
+  if (!doc.querySelector('meta[charset]')) { const m = doc.createElement('meta'); m.setAttribute('charset', 'utf-8'); doc.head.insertBefore(m, doc.head.firstChild); }
+  const imgs = Array.from(doc.querySelectorAll('img'));
+  for (const im of imgs) {
+    const src = im.getAttribute('src') || '';
+    if (!src) continue;
+    if (/^data:image\/svg/i.test(src) || (/^data:/i.test(src) && src.length < _PORTAIL_IMG_PETITE)) continue;
+    const reduite = await _portailReduireImage(src);
+    if (reduite) im.setAttribute('src', reduite);
+    else if (!/^data:/i.test(src)) im.removeAttribute('src');
+  }
+  const sortie = '<!doctype html>' + doc.documentElement.outerHTML;
+  if (sortie.length > _PORTAIL_HTML_MAX) throw new Error('document trop lourd');
+  return sortie;
+}
+async function _portailDeposerFichier(p, html) {
+  const chemin = p._cloudId + '/' + crypto.randomUUID() + '.html';
+  const res = await authFetch(SUPA_URL + '/storage/v1/object/patient-documents/' + chemin, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/html', 'x-upsert': 'false' },
+    body: new Blob([html], { type: 'text/html' }),
+  });
+  if (!res.ok) throw new Error('dépôt ' + res.status);
+  return chemin;
+}
+async function _portailPartagerFacturation(p, row) {
+  if (!_portailPartagePossible(p) || !row || row.statut !== 'emis' || !(await _portailAvecCompte(p))) return null;
+  const html = await _portailPreparerHtml(_htmlPageImpressionDocument(row));
+  const chemin = await _portailDeposerFichier(p, html);
+  return _portailRpc('documents_partager_facturation', { p_patient: p._cloudId, p_document: row.id, p_chemin: chemin });
+}
+async function _portailPartagerOrdonnance(p, o) {
+  if (!_portailPartagePossible(p) || !o || !(await _portailAvecCompte(p))) return null;
+  const html = await _portailPreparerHtml(_htmlPageImpressionOrdonnance(o));
+  const chemin = await _portailDeposerFichier(p, html);
+  const contenu = { id: o.id, date: o.date, categorie: o.categorie, lignes: o.lignes, renouvellement: o.renouvellement || null, note: o.note || '', emetteur: o.emetteur, patient: o.patient };
+  return _portailRpc('documents_partager_ordonnance', { p_patient: p._cloudId, p_source_ref: String(o.id), p_date: o.date, p_contenu: contenu, p_chemin: chemin });
+}
+// Appelé après une émission / un enregistrement : jamais bloquant, jamais d'alerte.
+function _portailPartagerAuto(genre, p, objet) {
+  try {
+    const tache = genre === 'facturation' ? _portailPartagerFacturation(p, objet) : _portailPartagerOrdonnance(p, objet);
+    tache.catch(function (e) { console.warn('[portail documents] partage différé :', e && e.message); });
+  } catch (_e) { /* jamais bloquant */ }
+}
+// Rattrapage : partage ce qui ne l'est pas encore (devis/factures émis et ordonnances du dossier).
+const _portailRattrapes = new Set();
+async function _portailRattrapage(p) {
+  if (!_portailPartagePossible(p) || _portailRattrapes.has(p._cloudId)) return;
+  _portailRattrapes.add(p._cloudId);
+  try {
+    if (!(await _portailAvecCompte(p))) { _portailRattrapes.delete(p._cloudId); return; }
+    const dejaRes = await authFetch(SUPA_URL + '/rest/v1/documents_partages?select=type,source_ref&patient_id=eq.' + encodeURIComponent(p._cloudId));
+    if (!dejaRes.ok) throw new Error('lecture ' + dejaRes.status);
+    const deja = new Set((await dejaRes.json()).map(function (x) { return x.type + ':' + x.source_ref; }));
+    const docsRes = await authFetch(SUPA_URL + '/rest/v1/documents_facturation?select=*&statut=eq.emis&patient_ref=eq.' + encodeURIComponent(String(p.id)));
+    const docs = docsRes.ok ? await docsRes.json() : [];
+    for (const d of docs) if (!deja.has(d.type + ':' + d.id)) await _portailPartagerFacturation(p, d);
+    for (const o of (p.ordonnances || [])) if (!deja.has('ordonnance:' + o.id)) await _portailPartagerOrdonnance(p, o);
+  } catch (e) {
+    _portailRattrapes.delete(p._cloudId);
+    console.warn('[portail documents] rattrapage :', e && e.message);
+  }
+}
+// ── Rapports de bilan : bouton « Publier au patient » ──
+function _portailCssRapportSport() {
+  let css = '';
+  try {
+    Array.from(document.styleSheets).forEach(function (f) {
+      try { Array.from(f.cssRules).forEach(function (r) { if (r.selectorText && r.selectorText.indexOf('.rp-') !== -1) css += r.cssText + '\n'; }); } catch (_e) { /* feuille externe */ }
+    });
+  } catch (_e) { /* ignoré */ }
+  return css;
+}
+async function _portailHtmlRapport(module) {
+  if (module === 'pedicurie') {
+    if (typeof genererSynthesePedicurie === 'function') genererSynthesePedicurie();
+    return buildPedicurieRapportHTML();
+  }
+  if (module === 'podopediatrie') return buildPodopediatrieRapportHTML();
+  if (module === 'posturo') {
+    const ifr = document.querySelector('#rapport-posturo-body iframe');
+    if (!ifr || !ifr.contentDocument || !ifr.contentDocument.body || !ifr.contentDocument.body.innerHTML.trim()) return '';
+    return '<!doctype html>' + ifr.contentDocument.documentElement.outerHTML;
+  }
+  if (module === 'sport') {
+    const corps = document.getElementById('rpt-body');
+    if (!corps || !corps.innerHTML.trim()) return '';
+    return '<!doctype html><html lang="fr"><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">' + corps.innerHTML + '</body></html>';
+  }
+  return '';
+}
+async function portailPublierRapport(module) {
+  const p = (typeof currentPatient !== 'undefined') ? currentPatient : null;
+  if (!p) { alert('Aucun patient sélectionné.'); return; }
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  if (!p._cloudId) { alert('Enregistrez d\'abord la fiche du patient, puis recommencez.'); return; }
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) { alert('Cette fonction demande une connexion internet.'); return; }
+  if (!(await _portailAvecCompte(p))) {
+    alert('Ce patient n\'a pas encore d\'accès au portail.\n\nCréez-le avec le bouton 🔑 de sa fiche, puis publiez à nouveau le rapport.');
+    return;
+  }
+  const label = _PORTAIL_RAPPORTS[module] || 'Bilan';
+  if (!confirm('Publier ce rapport dans l\'espace de ' + (p.prenom || 'ce patient') + ' ?\n\nLe patient pourra le lire, photos comprises. Vous pourrez retirer l\'accès à tout moment depuis le bouton 🔑 de sa fiche.')) return;
+  try {
+    const brut = await _portailHtmlRapport(module);
+    if (!brut) { alert('Le rapport n\'est pas encore affiché. Ouvrez-le (onglet Rapport / Synthèse) puis réessayez.'); return; }
+    const html = await _portailPreparerHtml(brut, module === 'sport' ? _portailCssRapportSport() : '');
+    const chemin = await _portailDeposerFichier(p, html);
+    const jour = new Date().toISOString().slice(0, 10);
+    const ref = crypto.randomUUID();
+    const id = await _portailRpc('documents_partager_rapport', {
+      p_patient: p._cloudId, p_source_ref: ref, p_titre: label + ' du ' + _dateFr(jour), p_date: jour, p_chemin: chemin,
+    });
+    if (!id) { alert('Publication impossible : le patient n\'a pas d\'accès au portail.'); return; }
+    alert('✅ Rapport publié : ' + (p.prenom || 'le patient') + ' le trouvera dans « Mes documents ».');
+  } catch (e) {
+    console.warn('[portail documents] publication :', e && e.message);
+    alert('Publication impossible pour le moment (' + (e && e.message ? e.message : 'erreur') + '). Rien n\'a été partagé. Réessayez.');
+  }
+}
+// ── Fenêtre 🔑 : liste des documents partagés, retrait / remise ──
+async function _portailChargerDocs(idx) {
+  const p = patients[idx];
+  const zone = document.getElementById('portail-docs');
+  if (!p || !p._cloudId || !zone) return;
+  zone.textContent = 'Chargement des documents…';
+  try {
+    await _portailRattrapage(p);
+    const res = await authFetch(SUPA_URL + '/rest/v1/documents_partages?select=id,type,titre,date_document,retire,lu_at&order=created_at.desc&patient_id=eq.' + encodeURIComponent(p._cloudId));
+    if (!res.ok) throw new Error('lecture ' + res.status);
+    const l = await res.json();
+    const cible = document.getElementById('portail-docs');
+    if (!cible) return;
+    cible.innerHTML = _portailHtmlDocs(idx, l);
+  } catch (_e) {
+    const cible = document.getElementById('portail-docs');
+    if (cible) cible.textContent = 'Liste indisponible pour le moment.';
+  }
+}
+function _portailHtmlDocs(idx, l) {
+  if (!l.length) return '<div style="font-size:12px;color:var(--mut);">Aucun document partagé pour l\'instant. Les devis, factures et ordonnances apparaîtront ici dès leur création.</div>';
+  return l.map(function (d) {
+    return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bord);">' +
+      '<div style="font-size:12px;' + (d.retire ? 'opacity:.55;' : '') + '">' + (_PORTAIL_ICONES[d.type] || '📄') + ' ' + _escHtml(d.titre) +
+      '<span style="color:var(--mut);"> · ' + (d.retire ? 'accès retiré' : d.lu_at ? 'lu' : 'pas encore lu') + '</span></div>' +
+      '<button class="btn" style="font-size:11px;padding:3px 8px;white-space:nowrap;" onclick="portailRetirerDocument(' + idx + ',\'' + _escHtml(d.id) + '\',' + (d.retire ? 'false' : 'true') + ')">' + (d.retire ? 'Remettre' : 'Retirer') + '</button></div>';
+  }).join('');
+}
+async function portailRetirerDocument(idx, id, retirer) {
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  if (retirer && !confirm('Retirer l\'accès du patient à ce document ? Il ne le verra plus ; rien n\'est supprimé et vous pourrez le remettre.')) return;
+  try {
+    await _portailRpc('documents_partages_retirer', { p_id: id, p_retire: !!retirer });
+  } catch (_e) { alert('Action impossible, réessayez.'); }
+  _portailChargerDocs(idx);
+}
+
 // Appelées par les onclick de la fenêtre « Accès au portail patient ».
 Object.assign(window, {
   ouvrirPortailPatient,
   portailAction,
   portailCreerAcces,
   portailEnregistrerRepresentant,
+  portailPublierRapport,
+  portailRetirerDocument,
   _portailFermer,
   _portailUrlApp,
 });

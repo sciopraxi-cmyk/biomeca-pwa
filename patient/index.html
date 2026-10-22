@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://tzivizoacdyopwfzerrb.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://tzivizoacdyopwfzerrb.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
     />
     <meta name="theme-color" content="#0b1e3d" />
     <meta name="robots" content="noindex, nofollow" />
@@ -78,10 +78,11 @@
             <span class="emoji">🏃</span>
             <span><strong>Mes exercices</strong><small>Bientôt disponible</small></span>
           </div>
-          <div class="carte carte-bientot">
+          <button id="carte-documents" class="carte carte-bouton" type="button">
             <span class="emoji">🧾</span>
-            <span><strong>Mes documents</strong><small>Devis, factures, ordonnances… bientôt</small></span>
-          </div>
+            <span><strong>Mes documents</strong><small id="phrase-documents">Devis, factures, ordonnances, bilans</small></span>
+            <span id="pastille-documents" class="pastille" hidden></span>
+          </button>
           <div class="carte carte-bientot">
             <span class="emoji">📋</span>
             <span><strong>Mon questionnaire</strong><small>Bientôt disponible</small></span>
@@ -89,6 +90,25 @@
         </div>
         <p class="doux petit">Votre espace se remplit au fil de vos rendez-vous. Rien à faire pour l’instant ✨</p>
         <button id="btn-deconnexion" class="bouton bouton-clair" type="button">Me déconnecter</button>
+      </section>
+
+      <!-- Écran 5 : liste des documents -->
+      <section id="ecran-documents" class="ecran" hidden>
+        <h1>🧾 Mes documents</h1>
+        <p class="doux">Touchez un document pour le lire.</p>
+        <div id="liste-documents"></div>
+        <p id="vide-documents" class="doux" hidden>Rien pour l’instant. Vos documents arriveront ici ✨</p>
+        <p id="erreur-documents" class="erreur" role="alert" hidden></p>
+        <button id="btn-documents-retour" class="bouton bouton-clair" type="button">← Retour</button>
+      </section>
+
+      <!-- Écran 6 : un document -->
+      <section id="ecran-document" class="ecran" hidden>
+        <h1 id="titre-document">Document</h1>
+        <div id="zone-document" class="zone-document" aria-live="polite"></div>
+        <p id="erreur-document" class="erreur" role="alert" hidden></p>
+        <button id="btn-document-imprimer" class="bouton" type="button" hidden>🖨️ Imprimer / enregistrer en PDF</button>
+        <button id="btn-document-retour" class="bouton bouton-clair" type="button">← Mes documents</button>
       </section>
 
       <!-- Écran 4 : accès fermé / en attente -->
