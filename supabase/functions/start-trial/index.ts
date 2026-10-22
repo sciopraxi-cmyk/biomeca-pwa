@@ -59,6 +59,10 @@ Deno.serve(async (req) => {
 
   const { data: userData, error: authError } = await supaAdmin.auth.getUser(token);
   if (authError || !userData?.user) return json({ error: 'Invalid token' }, 401);
+  // Portail patient (lot b) : un compte patient n'a rien à faire ici.
+  if ((userData.user.app_metadata as Record<string, unknown> | undefined)?.role === 'patient') {
+    return json({ error: 'forbidden' }, 403);
+  }
   const user = userData.user;
 
   // ─── Anti-reset : refus si trial déjà démarré ─────────────────────

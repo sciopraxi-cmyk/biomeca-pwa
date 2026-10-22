@@ -80,6 +80,10 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: 'Missing Authorization header' }, 401);
   const { data: userData, error: authError } = await supaAdmin.auth.getUser(token);
   if (authError || !userData?.user) return json({ error: 'Invalid token' }, 401);
+  // Portail patient (lot b) : un compte patient n'a rien à faire ici.
+  if ((userData.user.app_metadata as Record<string, unknown> | undefined)?.role === 'patient') {
+    return json({ error: 'forbidden' }, 403);
+  }
   const userId = userData.user.id;
 
   // ─── Validation du payload ─────────────────────────────────────────
