@@ -31975,7 +31975,7 @@ async function emettreDocumentCourant() {
   try {
     const res = await _docRequete('rpc/emettre_document', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify({ p_id: row.id }) });
     const emis = await res.json();
-    notifierEvenement(emis.type === 'devis' ? 'devis_emis' : 'facture_editee', { detail: 'n° ' + (emis.numero || ''), patientId: currentPatient ? currentPatient.id : undefined });
+    notifierEvenement(emis.type === 'devis' ? 'devis_emis' : 'facture_editee', { detail: 'n° ' + (emis.numero || ''), patientId: currentPatient ? currentPatient.id : undefined, documentId: emis.id });
     _docEdition = null; _docApercu = false; _docVue = emis.id;
     await renderDocumentsPage();
   } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
@@ -33072,6 +33072,7 @@ function notifierEvenement(type, opts) {
     const o = opts || {};
     const e = { id: d.dernierId + 1, date: new Date().toISOString(), type, detail: _notifTexte(o.detail, 80), lu: false };
     if (o.patientId !== undefined && o.patientId !== null) e.cible = { patientId: o.patientId };
+    if (o.documentId) e.documentId = _notifTexte(o.documentId, 60); // identifiant seul : le document est relu à l'affichage
     if (o.ordonnanceId) e.ordonnanceId = _notifTexte(o.ordonnanceId, 60); // identifiant seul : le contenu est relu à l'affichage
     if (Array.isArray(o.rdv)) {
       // Détail d'un import : identifiant, début et motif seulement (le nom est relu à l'affichage).
@@ -33164,8 +33165,24 @@ function _notifDateFr(iso) {
 function _notifHtmlOrdonnance(e) {
   const p = e.cible ? (Array.isArray(patients) ? patients : []).find((x) => x.id == e.cible.patientId) : null;
   const o = p && Array.isArray(p.ordonnances) ? p.ordonnances.find((x) => x.id === e.ordonnanceId) : null;
+  if (!e.ordonnanceId) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Détail non conservé : cette notification a été créée avant cette version.</div>';
   if (!o) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Ordonnance introuvable (supprimée ou fiche patient absente).</div>';
   return '<div style="margin-top:10px;border:1px solid var(--bord);border-radius:8px;padding:12px;">' + _htmlCorpsOrdonnance(o, false) + '</div>';
+}
+// Devis / facture : relu dans la base (table documents_facturation) à l'affichage, jamais copié dans la
+// notification. Lecture seule. Si l'on a quitté le détail entre-temps, rien n'est écrit à l'écran.
+async function _notifChargerDocument(notifId, documentId) {
+  let html;
+  try {
+    const res = await _docRequete('documents_facturation?select=*&id=eq.' + encodeURIComponent(documentId));
+    const lignes = await res.json();
+    const d = Array.isArray(lignes) ? lignes[0] : null;
+    html = d && Array.isArray(d.lignes) ? _htmlCorpsDocument(d, false) : '<span style="color:var(--mut);">Document introuvable (supprimé ?).</span>';
+  } catch (_err) {
+    html = '<span style="color:var(--red);">Document indisponible (hors connexion ?). Rien n\u2019a été modifié.</span>';
+  }
+  const cible = document.getElementById('notif-doc-corps');
+  if (cible && _notifDetailId === notifId) cible.innerHTML = html;
 }
 function _notifHtmlDetail(e) {
   const t = NOTIF_TYPES[e.type];
@@ -33174,6 +33191,9 @@ function _notifHtmlDetail(e) {
   if (e.type === 'devis_emis' || e.type === 'facture_editee') {
     corps += _notifLigneDetail('Document', e.type === 'devis_emis' ? 'Devis' : 'Facture');
     if (e.detail) corps += _notifLigneDetail('Numéro', _escHtml(e.detail.replace(/^n°\s*/, '')));
+    corps += e.documentId
+      ? '<div id="notif-doc-corps" style="margin-top:10px;border:1px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;color:var(--mut);">Chargement du document…</div>'
+      : '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Détail non conservé : cette notification a été créée avant cette version.</div>';
   } else if (e.type === 'reseau_perdu') {
     corps += _notifLigneDetail('Retour du réseau', e.retourLe ? _escHtml(_notifDateHeure(e.retourLe)) : 'toujours hors connexion');
     const d = _notifDuree(e.date, e.retourLe);
@@ -33206,7 +33226,12 @@ function renderNotificationsPage() {
   const pr = _notifPrat();
   if (pr && _notifDetailId !== null) {
     const e = _notifDonnees(pr).liste.find((x) => x.id === _notifDetailId);
-    if (e) { el.innerHTML = _notifHtmlDetail(e); _notifMajPastille(); return; }
+    if (e) {
+      el.innerHTML = _notifHtmlDetail(e);
+      _notifMajPastille();
+      if (e.documentId && (e.type === 'devis_emis' || e.type === 'facture_editee')) _notifChargerDocument(e.id, e.documentId);
+      return;
+    }
     _notifDetailId = null;
   }
   if (!pr) { el.innerHTML = '<div style="font-size:13px;color:var(--red);">Aucun praticien : créez-en un dans l\'onglet Praticiens.</div>'; _notifMajPastille(); return; }

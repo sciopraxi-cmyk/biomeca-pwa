@@ -13,7 +13,8 @@ const SECTION = SRC_BIOMECA.slice(debut, fin);
 function monter(o = {}) {
   const sauv = { n: 0 };
   const timers = [];
-  const dl = {};
+  const dl = { requetes: [] };
+  const docEl = { innerHTML: '' };
   const sortie = { html: '' };
   const pastille = { textContent: '', style: {} };
   const selections = [];
@@ -40,14 +41,16 @@ function monter(o = {}) {
               return sortie.html;
             },
           }
-        : id === 'notif-pastille'
-          ? pastille
-          : null,
+        : id === 'notif-doc-corps'
+          ? docEl
+          : id === 'notif-pastille'
+            ? pastille
+            : null,
   };
   const corps = [
     'const praticiens = __prats; const patients = __pats;',
     'const _escHtml = (s) => String(s ?? "").replace(/[&<>"\']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;", "\'": "&#39;" }[c]));',
-    'const window = {}; const _htmlCorpsOrdonnance = (o) => "CORPS[" + o.id + "]";',
+    'const window = {}; const _htmlCorpsOrdonnance = (o) => "CORPS[" + o.id + "]"; const _htmlCorpsDocument = (d) => "DOC[" + d.numero + "|" + d.lignes.length + "]"; const _docRequete = async (c) => { __dl.requetes.push(c); return __doc(c); };',
     'const savePraticiens = () => { __sauv.n++; if (__echec) throw new Error("x"); };',
     'const selectPatient = (p) => __sel.push(p.id); const nav = (id) => __navs.push(id);',
     'const globalThis = { _modeConsultation: __consult };',
@@ -58,6 +61,7 @@ function monter(o = {}) {
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   const f = new Function(
+    '__doc',
     '__timers',
     '__dl',
     'document',
@@ -70,6 +74,7 @@ function monter(o = {}) {
     '__echec',
     corps
   )(
+    o.doc || (async () => ({ json: async () => [] })),
     timers,
     dl,
     document,
@@ -84,7 +89,7 @@ function monter(o = {}) {
   const flush = () => {
     timers.splice(0).forEach((t) => t && t());
   };
-  return { f, sauv, sortie, pastille, selections, navs, timers, flush, dl };
+  return { docEl, f, sauv, sortie, pastille, selections, navs, timers, flush, dl };
 }
 
 describe('Notifications — création', () => {
@@ -149,6 +154,62 @@ describe('Notifications — création', () => {
     o.id = 'autre';
     m.f.renderNotificationsPage();
     expect(m.sortie.html).toContain('Ordonnance introuvable');
+  });
+  it('détail d’un devis : le document est relu dans la base (lecture seule), jamais stocké dans la notification', async () => {
+    const doc = {
+      id: 'doc-9',
+      numero: 'D-2026-0001',
+      lignes: [{ libelle: 'Bilan fictif' }, { libelle: 'Semelles fictives' }],
+    };
+    const m = monter({ doc: async () => ({ json: async () => [doc] }) });
+    m.f.notifierEvenement('devis_emis', {
+      patientId: 42,
+      detail: 'n° D-2026-0001',
+      documentId: 'doc-9',
+    });
+    expect(JSON.stringify(m.f.prats[0].notifications)).not.toContain('Bilan fictif');
+    m.f.ouvrirNotification(1);
+    expect(m.sortie.html).toContain('Chargement du document');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(m.dl.requetes).toEqual(['documents_facturation?select=*&id=eq.doc-9']);
+    expect(m.docEl.innerHTML).toBe('DOC[D-2026-0001|2]');
+  });
+  it('document introuvable ou base injoignable : message clair, jamais d’exception ; ancienne notification : détail non conservé', async () => {
+    const vide = monter({ doc: async () => ({ json: async () => [] }) });
+    vide.f.notifierEvenement('facture_editee', { patientId: 42, documentId: 'x' });
+    vide.f.ouvrirNotification(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(vide.docEl.innerHTML).toContain('Document introuvable');
+    const ko = monter({
+      doc: async () => {
+        throw new Error('HTTP 500');
+      },
+    });
+    ko.f.notifierEvenement('devis_emis', { patientId: 42, documentId: 'x' });
+    ko.f.ouvrirNotification(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ko.docEl.innerHTML).toContain('Document indisponible');
+    const vieux = monter();
+    vieux.f.notifierEvenement('devis_emis', { patientId: 42, detail: 'n° D-1' });
+    vieux.f.ouvrirNotification(1);
+    expect(vieux.sortie.html).toContain('créée avant cette version');
+    expect(vieux.dl.requetes).toEqual([]);
+  });
+  it('si l’on a quitté le détail avant la réponse, rien n’est écrit à l’écran', async () => {
+    let fin;
+    const m = monter({ doc: () => new Promise((r) => (fin = r)) });
+    m.f.notifierEvenement('devis_emis', { patientId: 42, documentId: 'd' });
+    m.f.ouvrirNotification(1);
+    m.f.fermerDetailNotification();
+    fin({ json: async () => [{ id: 'd', numero: 'D-1', lignes: [] }] });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(m.docEl.innerHTML).toBe('');
+  });
+  it('ordonnance d’avant cette version : détail non conservé (pas « introuvable »)', () => {
+    const m = monter();
+    m.f.notifierEvenement('ordonnance_creee', { patientId: 42 });
+    m.f.ouvrirNotification(1);
+    expect(m.sortie.html).toContain('créée avant cette version');
   });
   it('type « ordonnance créée » déclaré, rattaché au patient', () => {
     const m = monter();
