@@ -31946,7 +31946,7 @@ async function emettreDocumentCourant() {
   try {
     const res = await _docRequete('rpc/emettre_document', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify({ p_id: row.id }) });
     const emis = await res.json();
-    notifierEvenement(emis.type === 'devis' ? 'devis_emis' : 'facture_editee', { detail: 'n° ' + (emis.numero || '') });
+    notifierEvenement(emis.type === 'devis' ? 'devis_emis' : 'facture_editee', { detail: 'n° ' + (emis.numero || ''), patientId: currentPatient ? currentPatient.id : undefined });
     _docEdition = null; _docApercu = false; _docVue = emis.id;
     await renderDocumentsPage();
   } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
@@ -32987,7 +32987,9 @@ const NOTIF_TYPES = {
   patient_sequence_exercices: { icone: '🏃', titre: 'Séquence d\u2019exercices effectuée par un patient', systeme: false },
   patient_protocole_termine: { icone: '✅', titre: 'Protocole d\u2019exercices terminé par un patient', systeme: false },
 };
+const NOTIF_RDV_MAX = 300;
 let _notifFiltre = 'tous';
+let _notifDetailId = null;
 
 function _notifPrat() {
   return Array.isArray(praticiens) ? praticiens[0] || null : null;
@@ -33025,6 +33027,11 @@ function notifierEvenement(type, opts) {
     const o = opts || {};
     const e = { id: d.dernierId + 1, date: new Date().toISOString(), type, detail: _notifTexte(o.detail, 80), lu: false };
     if (o.patientId !== undefined && o.patientId !== null) e.cible = { patientId: o.patientId };
+    if (Array.isArray(o.rdv)) {
+      // Détail d'un import : identifiant, début et motif seulement (le nom est relu à l'affichage).
+      e.rdv = o.rdv.slice(0, NOTIF_RDV_MAX).map((x) => ({ id: _notifTexte(x && x.id, 60), debut: _notifTexte(x && x.debut, 16), motif: _notifTexte(x && x.motif, 60) }));
+      e.rdvTotal = o.rdv.length;
+    }
     if (type === 'reseau_perdu') e.retourLe = '';
     d.liste.push(e);
     d.dernierId = e.id;
@@ -33066,7 +33073,6 @@ function _notifNomPatient(e) {
 function _notifHtmlLigne(e) {
   const t = NOTIF_TYPES[e.type];
   const nom = _notifNomPatient(e);
-  const cliquable = !!(e.cible && nom);
   let sous = _notifDateHeure(e.date);
   if (nom) sous += ' · ' + _escHtml(nom);
   if (e.detail) sous += ' · ' + _escHtml(e.detail);
@@ -33076,13 +33082,78 @@ function _notifHtmlLigne(e) {
     '<span style="font-size:18px;">' + t.icone + '</span>' +
     '<span style="flex:1;"><span style="display:block;font-size:13px;">' + _escHtml(t.titre) + '</span>' +
     '<span style="display:block;font-size:11px;color:var(--mut);font-weight:400;">' + sous + '</span></span>' +
-    (cliquable ? '<span style="font-size:11px;color:var(--blue);font-weight:400;">Ouvrir le patient →</span>' : '') +
+    '<span style="font-size:11px;color:var(--blue);font-weight:400;">Détail →</span>' +
     (e.lu ? '' : '<span style="font-size:10px;color:var(--blue);">non lu</span>') + '</div>';
+}
+function _notifDuree(a, b) {
+  const ms = Date.parse(b || '') - Date.parse(a || '');
+  if (isNaN(ms) || ms < 0) return '';
+  const min = Math.round(ms / 60000);
+  return min < 1 ? 'moins d\u2019une minute' : min < 60 ? min + ' min' : Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0');
+}
+function _notifLigneDetail(k, v) {
+  return '<div style="display:flex;gap:10px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--bord);"><span style="width:150px;color:var(--mut);">' + _escHtml(k) + '</span><span style="flex:1;">' + v + '</span></div>';
+}
+function _notifHtmlRdv(e) {
+  const stock = _notifPrat() && _notifPrat().agendaDoctolib;
+  const actuels = stock && Array.isArray(stock.rdv) ? stock.rdv : [];
+  const liste = Array.isArray(e.rdv) ? e.rdv : [];
+  if (!liste.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun nouveau rendez-vous dans cet import (les rendez-vous déjà connus ont été mis à jour).</div>';
+  const lignes = liste.map((r) => {
+    const a = actuels.find((x) => x && x.id === r.id);
+    const nom = a ? [a.prenom, a.nom].filter(Boolean).join(' ') : '';
+    const hh = /T(\d{2}:\d{2})/.exec(r.debut || '');
+    return '<tr><td style="padding:4px 8px;white-space:nowrap;">' + _escHtml(_notifDateFr(r.debut)) + (hh ? ' ' + hh[1] : '') + '</td><td style="padding:4px 8px;">' +
+      (nom ? _escHtml(nom) : '<span style="color:var(--mut);">plus dans l\u2019agenda</span>') + '</td><td style="padding:4px 8px;">' + _escHtml(r.motif || '—') + '</td></tr>';
+  });
+  const reste = (e.rdvTotal || liste.length) - liste.length;
+  return '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;"><tr style="text-align:left;color:var(--mut);font-size:11px;"><th style="padding:4px 8px;">Date</th><th style="padding:4px 8px;">Patient</th><th style="padding:4px 8px;">Motif</th></tr>' +
+    lignes.join('') + '</table>' + (reste > 0 ? '<div style="font-size:11px;color:var(--mut);">… et ' + reste + ' autre(s) non listé(s).</div>' : '');
+}
+function _notifDateFr(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : '—';
+}
+function _notifHtmlDetail(e) {
+  const t = NOTIF_TYPES[e.type];
+  const nom = _notifNomPatient(e);
+  let corps = _notifLigneDetail('Date', _escHtml(_notifDateHeure(e.date)));
+  if (e.type === 'devis_emis' || e.type === 'facture_editee') {
+    corps += _notifLigneDetail('Document', e.type === 'devis_emis' ? 'Devis' : 'Facture');
+    if (e.detail) corps += _notifLigneDetail('Numéro', _escHtml(e.detail.replace(/^n°\s*/, '')));
+  } else if (e.type === 'reseau_perdu') {
+    corps += _notifLigneDetail('Retour du réseau', e.retourLe ? _escHtml(_notifDateHeure(e.retourLe)) : 'toujours hors connexion');
+    const d = _notifDuree(e.date, e.retourLe);
+    if (d) corps += _notifLigneDetail('Durée', _escHtml(d));
+  } else if (e.type === 'import_doctolib') {
+    corps += _notifLigneDetail('Rendez-vous ajoutés', String(e.rdvTotal !== undefined ? e.rdvTotal : (Array.isArray(e.rdv) ? e.rdv.length : 0)));
+  } else if (e.detail) {
+    corps += _notifLigneDetail('Détail', _escHtml(e.detail));
+  }
+  if (e.cible) corps += _notifLigneDetail('Patient', nom ? '<b>' + _escHtml(nom) + '</b>' : '<span style="color:var(--mut);">fiche introuvable</span>');
+  return '<div style="margin-bottom:10px;"><button class="btn" style="font-size:12px;padding:5px 12px;" onclick="fermerDetailNotification()">← Retour à la liste</button></div>' +
+    '<div style="border:1px solid var(--bord);border-radius:8px;padding:12px 14px;"><div style="font-size:15px;font-weight:600;margin-bottom:8px;">' + t.icone + ' ' + _escHtml(t.titre) + '</div>' + corps +
+    (e.type === 'import_doctolib' ? _notifHtmlRdv(e) : '') +
+    (e.cible && nom ? '<div style="margin-top:12px;"><button class="btn btn-blue" style="font-size:12px;padding:5px 12px;" onclick="ouvrirPatientNotification(' + e.id + ')">Ouvrir la fiche de ' + _escHtml(nom) + ' →</button></div>' : '') + '</div>';
+}
+function fermerDetailNotification() {
+  _notifDetailId = null;
+  renderNotificationsPage();
+}
+function ouvrirPatientNotification(id) {
+  const e = _notifDonnees(_notifPrat()).liste.find((x) => x.id === Number(id));
+  const p = e && e.cible ? (Array.isArray(patients) ? patients : []).find((x) => x.id == e.cible.patientId) : null;
+  if (p) { selectPatient(p); nav('pg-patients'); }
 }
 function renderNotificationsPage() {
   const el = document.getElementById('notif-contenu');
   if (!el) return;
   const pr = _notifPrat();
+  if (pr && _notifDetailId !== null) {
+    const e = _notifDonnees(pr).liste.find((x) => x.id === _notifDetailId);
+    if (e) { el.innerHTML = _notifHtmlDetail(e); _notifMajPastille(); return; }
+    _notifDetailId = null;
+  }
   if (!pr) { el.innerHTML = '<div style="font-size:13px;color:var(--red);">Aucun praticien : créez-en un dans l\'onglet Praticiens.</div>'; _notifMajPastille(); return; }
   const tous = _notifDonnees(pr).liste;
   const nonLus = tous.filter((x) => !x.lu).length;
@@ -33101,6 +33172,7 @@ function renderNotificationsPage() {
   _notifMajPastille();
 }
 function filtrerNotifications(f) {
+  _notifDetailId = null;
   _notifFiltre = ['tous', 'nonlus', 'systeme', 'patient'].includes(f) ? f : 'tous';
   renderNotificationsPage();
 }
@@ -33121,13 +33193,12 @@ function ouvrirNotification(id) {
   const e = d.liste.find((x) => x.id === Number(id));
   if (!e) return;
   if (!e.lu && !globalThis?._modeConsultation) { e.lu = true; _notifEcrire(pr, d); }
-  const p = e.cible ? (Array.isArray(patients) ? patients : []).find((x) => x.id == e.cible.patientId) : null;
-  if (p) { selectPatient(p); nav('pg-patients'); } else renderNotificationsPage();
-  _notifMajPastille();
+  _notifDetailId = e.id;
+  renderNotificationsPage();
 }
 
 // Appelées par les onclick du centre de notifications.
-Object.assign(window, { filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification });
+Object.assign(window, { filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification, fermerDetailNotification, ouvrirPatientNotification });
 
 // ═════════════════════════════════════════════════════════════════
 // Traçabilité de stérilisation — registre des cycles, sets, appareils, maintenance, soins
@@ -34701,6 +34772,8 @@ function _lancerImportDoctolib(text) {
   if (res.erreur) { alert('❌ ' + res.erreur); return; }
   if (!res.plage) { alert('Aucun rendez-vous dans la période affichable (' + _doctolibDateFr(res.fenetre.du) + ' → ' + _doctolibDateFr(res.fenetre.au) + '). Rien n\'a été modifié.'); return; }
   if (!confirm(_doctolibResume(res, stock.rdv.length > 0))) return;
+  const idsAvant = new Set(stock.rdv.map((x) => x && x.id));
+  const ajoutes = res.rdv.filter((x) => !idsAvant.has(x.id));
   const avant = stock.pr.agendaDoctolib;
   stock.pr.agendaDoctolib = { importeLe: new Date().toISOString(), rdv: _doctolibFusionner(stock.rdv, res.rdv, res.plage) };
   try {
@@ -34711,7 +34784,7 @@ function _lancerImportDoctolib(text) {
     return;
   }
   _agRafraichirDoctolib();
-  notifierEvenement('import_doctolib', { detail: res.rdv.length + ' rendez-vous' });
+  notifierEvenement('import_doctolib', { detail: ajoutes.length + ' nouveau(x) sur ' + res.rdv.length + ' rendez-vous', rdv: ajoutes });
 }
 function importDoctolibAgendaCSV(input) {
   const file = input.files && input.files[0];

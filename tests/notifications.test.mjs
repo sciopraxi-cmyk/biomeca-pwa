@@ -39,7 +39,7 @@ function monter(o = {}) {
     'const selectPatient = (p) => __sel.push(p.id); const nav = (id) => __navs.push(id);',
     'const globalThis = { _modeConsultation: __consult };',
     SECTION,
-    'return { notifierEvenement, notifierReseauRetabli, renderNotificationsPage, filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification, _notifNonLus, _notifMajPastille, NOTIF_TYPES, prats: praticiens };',
+    'return { notifierEvenement, notifierReseauRetabli, renderNotificationsPage, filtrerNotifications, toutMarquerLuNotifications, ouvrirNotification, ouvrirPatientNotification, fermerDetailNotification, _notifNonLus, _notifMajPastille, NOTIF_TYPES, prats: praticiens };',
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   const f = new Function(
@@ -186,16 +186,78 @@ describe('Notifications — page, lu / non lu, historique', () => {
     m.f.filtrerNotifications('zzz');
     expect(m.sortie.html).toContain('Import Doctolib effectué');
   });
-  it('clic = lu ; notification patient : ouvre le fiche du patient et affiche son nom à l’affichage seulement', () => {
+  it('clic = lu + vue détail (nom et prénom du patient, bouton vers la fiche) ; la fiche ne s’ouvre que sur demande', () => {
     const m = monter();
-    m.f.notifierEvenement('patient_devis_signe', { patientId: 42 });
+    m.f.notifierEvenement('devis_emis', { patientId: 42, detail: 'n° D-0001' });
     m.f.renderNotificationsPage();
-    expect(m.sortie.html).toContain('Paul Martin');
     m.f.ouvrirNotification(1);
     expect(m.f.prats[0].notifications.liste[0].lu).toBe(true);
+    expect(m.sortie.html).toContain('Paul Martin');
+    expect(m.sortie.html).toContain('Ouvrir la fiche de Paul Martin');
+    expect(m.sortie.html).toContain('D-0001');
+    expect(m.sortie.html).toContain('Retour à la liste');
+    expect(m.navs).toEqual([]);
+    expect(m.pastille.style.display).toBe('none');
+    m.f.ouvrirPatientNotification(1);
     expect(m.selections).toEqual([42]);
     expect(m.navs).toEqual(['pg-patients']);
-    expect(m.pastille.style.display).toBe('none');
+    m.f.fermerDetailNotification();
+    expect(m.sortie.html).toContain('notif-ligne');
+  });
+  it('détail d’un import : liste des rendez-vous ajoutés, noms relus dans l’agenda, jamais stockés dans la notification', () => {
+    const rdv = [
+      {
+        id: 'r1',
+        debut: '2026-10-23T09:30',
+        nom: 'Dupont',
+        prenom: 'Jeanne',
+        motif: 'Soins de pédicurie',
+      },
+      {
+        id: 'r2',
+        debut: '2026-10-24T14:00',
+        nom: 'Durand',
+        prenom: 'Marc',
+        motif: 'Semelles orthopédiques',
+      },
+    ];
+    const m = monter({ prats: [{ id: 7, agendaDoctolib: { rdv: rdv.slice(0, 1) } }] });
+    m.f.notifierEvenement('import_doctolib', { detail: '2 nouveau(x)', rdv });
+    expect(JSON.stringify(m.f.prats[0].notifications)).not.toMatch(/Dupont|Jeanne|Durand|Marc/);
+    m.f.ouvrirNotification(1);
+    const h = m.sortie.html;
+    expect(h).toContain('23/10/2026 09:30');
+    expect(h).toContain('Jeanne Dupont');
+    expect(h).toContain('Soins de pédicurie');
+    expect(h).toContain('24/10/2026 14:00');
+    expect(h).toContain('plus dans l’agenda');
+    expect(h).toContain('Semelles orthopédiques');
+  });
+  it('import sans nouveau rendez-vous : message clair ; liste bornée à 300 avec reste indiqué', () => {
+    const m = monter();
+    m.f.notifierEvenement('import_doctolib', { rdv: [] });
+    m.f.ouvrirNotification(1);
+    expect(m.sortie.html).toContain('Aucun nouveau rendez-vous');
+    const gros = Array.from({ length: 350 }, (_, i) => ({
+      id: 'x' + i,
+      debut: '2026-10-23T09:00',
+      motif: 'm',
+    }));
+    m.f.notifierEvenement('import_doctolib', { rdv: gros });
+    expect(m.f.prats[0].notifications.liste[1].rdv).toHaveLength(300);
+    m.f.ouvrirNotification(2);
+    expect(m.sortie.html).toContain('50 autre(s)');
+  });
+  it('détail d’une coupure : retour et durée ; détail échappé', () => {
+    const m = monter();
+    m.f.notifierEvenement('reseau_perdu');
+    m.f.prats[0].notifications.liste[0].date = '2026-10-22T10:00:00.000Z';
+    m.f.prats[0].notifications.liste[0].retourLe = '2026-10-22T10:07:00.000Z';
+    m.f.ouvrirNotification(1);
+    expect(m.sortie.html).toContain('7 min');
+    m.f.notifierEvenement('patient_message', { patientId: 42, detail: '<i>x</i>' });
+    m.f.ouvrirNotification(2);
+    expect(m.sortie.html).not.toContain('<i>x</i>');
   });
   it('clic sur une notification système : lue, aucune navigation', () => {
     const m = monter();
@@ -304,9 +366,7 @@ describe('Notifications — branchements prouvés par exécution', () => {
   it('le harnais d’import reçoit bien un appel notifierEvenement(import_doctolib) sans nom de patient', async () => {
     const src = SRC_BIOMECA.slice(SRC_BIOMECA.indexOf('function _lancerImportDoctolib'));
     const bloc = src.slice(0, src.indexOf('\nfunction importDoctolibAgendaCSV'));
-    expect(bloc).toMatch(
-      /notifierEvenement\('import_doctolib', \{ detail: res\.rdv\.length \+ ' rendez-vous' \}\)/
-    );
+    expect(bloc).toMatch(/notifierEvenement\('import_doctolib', \{\s*detail: ajoutes\.length/);
     // L'appel vient APRÈS l'enregistrement réussi : un échec d'écriture (return) n'en crée aucun.
     expect(bloc.indexOf('savePraticiens()')).toBeLessThan(
       bloc.indexOf("notifierEvenement('import_doctolib'")

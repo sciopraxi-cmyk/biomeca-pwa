@@ -298,7 +298,14 @@ describe('fusion et réimport', () => {
   it('un import réussi crée une notification (nombre seulement) ; un import refusé n’en crée aucune', () => {
     const { f, sauv } = monter({ prats: [{ id: 7 }] });
     f._lancerImportDoctolib(csv({ id: '1' }, { id: '2', debut: '2026-10-23 10:00' }));
-    expect(sauv.notifs).toEqual([['import_doctolib', { detail: '2 rendez-vous' }]]);
+    expect(sauv.notifs).toHaveLength(1);
+    expect(sauv.notifs[0][0]).toBe('import_doctolib');
+    expect(sauv.notifs[0][1].detail).toBe('2 nouveau(x) sur 2 rendez-vous');
+    expect(sauv.notifs[0][1].rdv.map((x) => x.id)).toHaveLength(2);
+    // Réimport du même fichier : plus aucun rendez-vous NOUVEAU.
+    f._lancerImportDoctolib(csv({ id: '1' }, { id: '2', debut: '2026-10-23 10:00' }));
+    expect(sauv.notifs[1][1].rdv).toEqual([]);
+    expect(sauv.notifs[1][1].detail).toBe('0 nouveau(x) sur 2 rendez-vous');
     const v = monter({ prats: [{ id: 7 }] });
     v.sauv.echec = true;
     v.f._lancerImportDoctolib(csv({ id: '1' }));

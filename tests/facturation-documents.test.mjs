@@ -764,6 +764,7 @@ describe('enregistrement, émission, suppression, règlement', () => {
     await e.f.emettreDocumentCourant();
     expect(e.rendus.notifs).toHaveLength(1);
     expect(e.rendus.notifs[0][0]).toMatch(/^(facture_editee|devis_emis)$/);
+    expect(e.rendus.notifs[0][1].patientId).toBe(PATIENT.id);
     const r = monter({ reponse, prats: [{ ...PRAT, siret: '' }] });
     brouillonPret(r);
     await r.f.emettreDocumentCourant();
