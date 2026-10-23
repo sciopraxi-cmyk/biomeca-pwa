@@ -3511,6 +3511,7 @@
       <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px 8px;">← Patients</button>
       <h2 style="margin:0;font-size:18px;color:var(--blue);flex:1;">🧾 Paramètres facturation — catalogue d'actes</h2>
     </div>
+    <div class="card" style="margin-bottom:16px;font-size:12px;">💡 Pour permettre l'envoi automatique des devis, créez des actes personnalisés <b>dont le titre est identique à vos motifs Doctolib</b>.</div>
     <div class="card" style="margin-bottom:16px;">
       <p style="font-size:12px;color:var(--mut);margin:0 0 10px;">Montants <b>sans TVA</b>. Les tarifs du référentiel (POD, AMP, semelles LPP, frais) changent par avenant : ils sont copiés ici, datés et sourcés, et vous pouvez les modifier. Remboursement : Sécurité sociale 60 % (100 % en ALD, 90 % en Alsace-Moselle), mutuelle selon contrat ; franchise de 1 € par acte à la charge du patient. À faire valider par votre expert-comptable.</p>
       <button class="btn" onclick="importerReferentielActes()" style="font-size:12px;">⬇️ Importer le référentiel POD / AMP</button>
@@ -3524,6 +3525,15 @@
         <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Cotation (facultatif)</div><input class="inp" id="acte-cotation" maxlength="40" placeholder="POD 1"/></div>
         <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Remboursement (facultatif)</div><input class="inp" id="acte-remboursement" maxlength="200" placeholder="60 % (100 % en ALD)"/></div>
       </div>
+      <div class="g2" style="margin-bottom:6px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Catégorie de l'acte Sécurité sociale</div><select class="inp" id="acte-categorie" onchange="choisirCategorieActe(this.value)"><option value="">— Aucune (acte non remboursé) —</option></select></div>
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Acte exact</div><select class="inp" id="acte-reference" onchange="choisirActeReference(this.value)" disabled><option value="">— Choisir la catégorie d'abord —</option></select></div>
+      </div>
+      <div class="g2" style="margin-bottom:6px;">
+        <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prise en charge appliquée au devis / à la facture</div><select class="inp" id="acte-regime"><option value="">— Aucune —</option><option value="standard">Sécurité sociale 60 %</option><option value="ald">100 % (ALD)</option><option value="c2s">100 % (C2S / CMU)</option></select></div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;align-self:end;padding-bottom:8px;"><input type="checkbox" id="acte-sync-doctolib"/> Synchronisation Doctolib</label>
+      </div>
+      <div style="font-size:11px;color:var(--mut);margin-bottom:8px;">Le choix de l'acte exact reprend sa cotation, sa base remboursable et sa franchise dans les devis et factures. « Synchronisation Doctolib » : le titre de cet acte doit être identique au motif de vos RDV Doctolib pour permettre l'envoi automatique du devis.</div>
       <div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Note (facultatif)</div><input class="inp" id="acte-note" maxlength="500"/></div>
       <div class="g2" style="margin-top:6px;">
         <div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Base remboursable en € (facultatif ; vide = non remboursé)</div><input class="inp" id="acte-base" inputmode="decimal" placeholder="28,04"/></div>

@@ -31514,6 +31514,8 @@ function _validerActe(a) {
   return { ok: true, acte: {
     libelle, montant_cents: montant, base_remboursable_cents: base, franchise: a?.franchise !== false,
     cotation: net(a?.cotation, 40), remboursement: net(a?.remboursement, 200), note: net(a?.note, 500),
+    acte_reference: net(a?.reference, 60), regime_defaut: ['standard', 'ald', 'c2s'].includes(a?.regime) ? a.regime : null,
+    sync_doctolib: a?.sync === true,
   } };
 }
 // Actes du référentiel absents du catalogue (par code) : l'import est idempotent
@@ -31534,6 +31536,7 @@ const REGIMES_REMBOURSEMENT = {
   standard: { taux: 60, libelle: 'Sécurité sociale 60 %' },
   ald: { taux: 100, libelle: '100 % (affection de longue durée)' },
   alsace_moselle: { taux: 90, libelle: '90 % (Alsace-Moselle)' },
+  c2s: { taux: 100, libelle: '100 % (C2S / CMU)' },
 };
 // Part de la Sécurité sociale = taux × base, arrondie au centime (entiers, jamais de
 // flottant). Le reste est le ticket modérateur : INDICATIF, la mutuelle dépend du contrat.
@@ -31569,6 +31572,43 @@ function _actesACompleter(existants, referentiel) {
   return out;
 }
 
+// Catégories d'affichage du catalogue (d'après le préfixe du code du référentiel).
+const CATEGORIES_ACTES = [
+  { cle: 'perso', libelle: 'Mes actes personnalisés' },
+  { cle: 'POD', libelle: 'Pied diabétique (POD)' },
+  { cle: 'AMP', libelle: 'Pédicurie (AMP)' },
+  { cle: 'LPP', libelle: 'Orthèses plantaires (LPP)' },
+  { cle: 'TEL', libelle: 'Télésoin' },
+  { cle: 'FRAIS', libelle: 'Frais de déplacement' },
+  { cle: 'MAJ', libelle: 'Majorations' },
+  { cle: 'autre', libelle: 'Autres actes' },
+];
+function _categorieActe(a) {
+  if (a && a.perso) return 'perso';
+  const p = String((a && a.code) || '').split('-')[0];
+  return CATEGORIES_ACTES.some((c) => c.cle === p && p !== 'perso' && p !== 'autre') ? p : 'autre';
+}
+function _htmlLigneActe(a) {
+  return (
+    '<div class="acte-ligne" style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bord);' + (a.actif ? '' : 'opacity:.55;') + '">' +
+      '<div style="min-width:0;flex:1;">' +
+        '<div style="font-size:13px;font-weight:700;">' + _escHtml(a.libelle) +
+          (a.cotation ? ' <span style="font-weight:600;color:var(--mut);">· ' + _escHtml(a.cotation) + '</span>' : '') +
+          (a.perso ? ' <span style="font-size:11px;color:var(--mut);">(personnalisé)</span>' : '') +
+          (a.actif ? '' : ' <span style="font-size:11px;color:var(--red);">(désactivé)</span>') + '</div>' +
+        (a.remboursement ? '<div style="font-size:12px;color:var(--mut);">' + _escHtml(a.remboursement) + '</div>' : '') +
+        (function() { const p = _partsRemboursement(a.base_remboursable_cents, 'standard'); return p ? '<div style="font-size:12px;color:var(--mut);">Base remboursable ' + _escHtml(_centimesVersEuros(p.base)) + ' · Sécu 60 % ' + _escHtml(_centimesVersEuros(p.secu)) + ' · reste (ticket modérateur) ' + _escHtml(_centimesVersEuros(p.resteTM)) + (a.franchise === false ? ' · sans franchise' : '') + '</div>' : ''; })() +
+        (a.note ? '<div style="font-size:12px;color:var(--mut);font-style:italic;">' + _escHtml(a.note) + '</div>' : '') +
+        (a.source ? '<div style="font-size:11px;color:var(--mut);">Source : ' + _escHtml(a.source) + (a.date_effet ? ' · en vigueur au ' + _escHtml(a.date_effet) : '') + '</div>' : '') +
+      '</div>' +
+      '<div style="text-align:right;white-space:nowrap;">' +
+        '<div style="font-size:14px;font-weight:700;">' + _escHtml(_centimesVersEuros(a.montant_cents)) + '</div>' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="modifierActe(\'' + _escHtml(a.id) + '\')">Modifier</button> ' +
+        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="basculerActeActif(\'' + _escHtml(a.id) + '\')">' + (a.actif ? 'Désactiver' : 'Réactiver') + '</button>' +
+      '</div></div>'
+  );
+}
+
 let _actesCache = [];
 let _acteEnEdition = null;
 async function _actesRequete(chemin, options) {
@@ -31600,12 +31640,48 @@ async function importerReferentielActes() {
     await renderActesPage();
   } catch (e) { alert('Import impossible (' + e.message + '). Rien n\'a été modifié.'); }
 }
+// Actes Sécurité sociale (non personnalisés) d'une catégorie, pour le second menu.
+function _actesDeCategorie(cle) {
+  return _actesCache.filter((x) => !x.perso && x.actif && _categorieActe(x) === cle);
+}
+function _remplirCategoriesActe(codeReference) {
+  const cat = document.getElementById('acte-categorie');
+  const ref = document.getElementById('acte-reference');
+  if (!cat || !ref) return;
+  const ref0 = codeReference ? _actesCache.find((x) => !x.perso && x.code === codeReference) : null;
+  const cle = ref0 ? _categorieActe(ref0) : '';
+  cat.innerHTML = '<option value="">— Aucune (acte non remboursé) —</option>' +
+    CATEGORIES_ACTES.filter((c) => c.cle !== 'perso' && _actesDeCategorie(c.cle).length).map((c) =>
+      '<option value="' + c.cle + '"' + (c.cle === cle ? ' selected' : '') + '>' + _escHtml(c.libelle) + '</option>').join('');
+  choisirCategorieActe(cle, ref0 ? ref0.code : '', true);
+}
+function choisirCategorieActe(cle, codeChoisi, sansRemplir) {
+  const ref = document.getElementById('acte-reference');
+  if (!ref) return;
+  const liste = cle ? _actesDeCategorie(cle) : [];
+  ref.disabled = !liste.length;
+  ref.innerHTML = '<option value="">' + (liste.length ? '— Choisir l\'acte exact —' : '— Choisir la catégorie d\'abord —') + '</option>' +
+    liste.map((x) => '<option value="' + _escHtml(x.code) + '"' + (x.code === codeChoisi ? ' selected' : '') + '>' + _escHtml(x.libelle) + (x.cotation ? ' · ' + _escHtml(x.cotation) : '') + '</option>').join('');
+  if (!sansRemplir) choisirActeReference('');
+}
+// L'acte exact choisi reprend cotation, base remboursable, franchise et remboursement (modifiables).
+function choisirActeReference(code) {
+  const x = code ? _actesCache.find((a) => !a.perso && a.code === code) : null;
+  if (!x) return;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v ?? ''; };
+  set('acte-cotation', x.cotation); set('acte-remboursement', x.remboursement);
+  set('acte-base', x.base_remboursable_cents == null ? '' : (x.base_remboursable_cents / 100).toFixed(2).replace('.', ','));
+  const fr = document.getElementById('acte-franchise'); if (fr) fr.checked = x.franchise !== false;
+  const rg = document.getElementById('acte-regime'); if (rg && !rg.value && x.base_remboursable_cents != null) rg.value = 'standard';
+}
 async function enregistrerActe() {
   const val = (id) => document.getElementById(id)?.value;
   const r = _validerActe({
     libelle: val('acte-libelle'), montant: val('acte-montant'),
     cotation: val('acte-cotation'), remboursement: val('acte-remboursement'), note: val('acte-note'),
     base: val('acte-base'), franchise: document.getElementById('acte-franchise')?.checked !== false,
+    reference: val('acte-reference'), regime: val('acte-regime'),
+    sync: document.getElementById('acte-sync-doctolib')?.checked === true,
   });
   if (!r.ok) { alert(r.erreur); return; }
   try {
@@ -31648,6 +31724,9 @@ function modifierActe(id) {
   set('acte-remboursement', a.remboursement); set('acte-note', a.note);
   set('acte-base', a.base_remboursable_cents == null ? '' : (a.base_remboursable_cents / 100).toFixed(2).replace('.', ','));
   const fr = document.getElementById('acte-franchise'); if (fr) fr.checked = a.franchise !== false;
+  _remplirCategoriesActe(a.acte_reference);
+  set('acte-regime', a.regime_defaut);
+  const sy = document.getElementById('acte-sync-doctolib'); if (sy) sy.checked = a.sync_doctolib === true;
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Modifier l\'acte';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = '';
   document.getElementById('acte-libelle')?.scrollIntoView({ block: 'center' });
@@ -31658,6 +31737,9 @@ function annulerEditionActe() {
     const el = document.getElementById(k); if (el) el.value = '';
   });
   const fr = document.getElementById('acte-franchise'); if (fr) fr.checked = true;
+  _remplirCategoriesActe(null);
+  const rg = document.getElementById('acte-regime'); if (rg) rg.value = '';
+  const sy = document.getElementById('acte-sync-doctolib'); if (sy) sy.checked = false;
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Nouvel acte personnalisé';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = 'none';
 }
@@ -31668,27 +31750,17 @@ async function renderActesPage() {
     el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px 0;">Catalogue indisponible (' + _escHtml(e.message) + '). Rien n\'a été modifié.</div>';
     return;
   }
+  if (!_acteEnEdition) _remplirCategoriesActe(null);
   if (!_actesCache.length) {
     el.innerHTML = '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun acte. Importez le référentiel ou créez un acte personnalisé.</div>';
     return;
   }
-  el.innerHTML = _actesCache.map((a) =>
-    '<div class="acte-ligne" style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bord);' + (a.actif ? '' : 'opacity:.55;') + '">' +
-      '<div style="min-width:0;flex:1;">' +
-        '<div style="font-size:13px;font-weight:700;">' + _escHtml(a.libelle) +
-          (a.cotation ? ' <span style="font-weight:600;color:var(--mut);">· ' + _escHtml(a.cotation) + '</span>' : '') +
-          (a.perso ? ' <span style="font-size:11px;color:var(--mut);">(personnalisé)</span>' : '') +
-          (a.actif ? '' : ' <span style="font-size:11px;color:var(--red);">(désactivé)</span>') + '</div>' +
-        (a.remboursement ? '<div style="font-size:12px;color:var(--mut);">' + _escHtml(a.remboursement) + '</div>' : '') +
-        (function() { const p = _partsRemboursement(a.base_remboursable_cents, 'standard'); return p ? '<div style="font-size:12px;color:var(--mut);">Base remboursable ' + _escHtml(_centimesVersEuros(p.base)) + ' · Sécu 60 % ' + _escHtml(_centimesVersEuros(p.secu)) + ' · reste (ticket modérateur) ' + _escHtml(_centimesVersEuros(p.resteTM)) + (a.franchise === false ? ' · sans franchise' : '') + '</div>' : ''; })() +
-        (a.note ? '<div style="font-size:12px;color:var(--mut);font-style:italic;">' + _escHtml(a.note) + '</div>' : '') +
-        (a.source ? '<div style="font-size:11px;color:var(--mut);">Source : ' + _escHtml(a.source) + (a.date_effet ? ' · en vigueur au ' + _escHtml(a.date_effet) : '') + '</div>' : '') +
-      '</div>' +
-      '<div style="text-align:right;white-space:nowrap;">' +
-        '<div style="font-size:14px;font-weight:700;">' + _escHtml(_centimesVersEuros(a.montant_cents)) + '</div>' +
-        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="modifierActe(\'' + _escHtml(a.id) + '\')">Modifier</button> ' +
-        '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="basculerActeActif(\'' + _escHtml(a.id) + '\')">' + (a.actif ? 'Désactiver' : 'Réactiver') + '</button>' +
-      '</div></div>'
+  const groupes = {};
+  _actesCache.forEach((a) => { (groupes[_categorieActe(a)] = groupes[_categorieActe(a)] || []).push(a); });
+  el.innerHTML = CATEGORIES_ACTES.filter((c) => groupes[c.cle]).map((c) =>
+    '<details class="acte-categorie"' + (c.cle === 'perso' ? ' open' : '') + ' style="border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;padding:0 10px;">' +
+    '<summary style="cursor:pointer;font-size:13px;font-weight:700;padding:9px 0;">' + _escHtml(c.libelle) + ' <span style="font-weight:500;color:var(--mut);">(' + groupes[c.cle].length + ')</span></summary>' +
+    groupes[c.cle].map(_htmlLigneActe).join('') + '</details>'
   ).join('');
 }
 
@@ -31903,7 +31975,14 @@ function basculerActeDocument(acteId, coche) {
   const i = _docEdition.lignes.findIndex((l) => l.acte_id === acteId);
   if (coche && i < 0) {
     const a = _actesCache.find((x) => x.id === acteId);
-    if (a) _docEdition.lignes.push(_ligneDepuisActe(a));
+    if (a) {
+      if (!_docEdition.lignes.length && a.regime_defaut && REGIMES_REMBOURSEMENT[a.regime_defaut]) {
+        _docEdition.regime = a.regime_defaut;
+        const sel = document.getElementById('doc-regime');
+        if (sel) sel.value = a.regime_defaut;
+      }
+      _docEdition.lignes.push(_ligneDepuisActe(a));
+    }
   } else if (!coche && i >= 0) {
     _docEdition.lignes.splice(i, 1);
   }
@@ -32253,7 +32332,7 @@ function _htmlEditeurDocument() {
   return '<div class="card" id="doc-editeur" style="padding:16px;">' +
     '<div class="stitle">' + (e.type === 'devis' ? 'Devis' : 'Facture') + (e.id ? ' (brouillon)' : ' (nouveau)') + (e.devisNumero ? ' — selon devis ' + _escHtml(e.devisNumero) : '') + '</div>' +
     '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Praticien émetteur</div><select class="inp" onchange="modifierChampDocument(\'prat\', this.value)"><option value="">— Choisir —</option>' + pratOpts + '</select></div>' +
-    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prise en charge</div><select class="inp" onchange="modifierChampDocument(\'regime\', this.value)">' + regOpts + '</select></div></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prise en charge</div><select class="inp" id="doc-regime" onchange="modifierChampDocument(\'regime\', this.value)">' + regOpts + '</select></div></div>' +
     '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:12px;"><input type="checkbox" id="doc-tiers-payant"' + (e.tiersPayant ? ' checked' : '') + ' onchange="modifierChampDocument(\'tiers\', this.checked)"/> <span><b>Tiers payant</b> — la Sécurité sociale vous règle directement sa part (télétransmission) : le document n\'indique que le montant à payer par le patient.</span></label>' +
     (praticiens.length ? '' : '<div style="font-size:12px;color:var(--red);margin-top:6px;">Aucun praticien : créez-en un dans l\'onglet Praticiens (avec SIRET et RPPS/ADELI).</div>') +
     '<div class="stitle" style="margin-top:12px;">Actes</div>' +
