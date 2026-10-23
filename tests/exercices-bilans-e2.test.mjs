@@ -9,6 +9,10 @@ function monter() {
     'let _exoBib = null;',
     'function _escHtml(s){return String(s);}',
     fonction('_exoBibConstruire'),
+    SRC_BIOMECA.slice(
+      SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'),
+      SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES')) + 1
+    ),
     fonction('_exoBibCats'),
     fonction('_exoBibSubs'),
     fonction('_exoBibLabelSys'),
@@ -118,5 +122,69 @@ describe("plus d'annexes PDF dans les rapports", () => {
     ].forEach((m) => {
       expect(SRC_BIOMECA.includes(m), m).toBe(false);
     });
+  });
+});
+
+describe('podopédiatrie : catégories retirées', () => {
+  const codes = [
+    'systeme-visuel',
+    'systeme-vestibulaire',
+    'systeme-somesthesique',
+    'reeduc-pied',
+    'systeme-mandibulaire',
+    'reeduc-terrain',
+    'reeduc-chaines',
+    'reflexes-archaiques',
+    'respi-sport',
+    'reeduc-posturale',
+    'reeduc-articulaire',
+    'pathologies-genou',
+    'pathologies-hanche',
+    'pathologies-pied',
+    'respi-posture',
+  ];
+  const GARDEES = [
+    'systeme-visuel',
+    'systeme-vestibulaire',
+    'reeduc-pied',
+    'systeme-mandibulaire',
+    'reflexes-archaiques',
+    'respi-posture',
+  ];
+  const base = codes.map((c, i) => ({
+    categorie_id: 'c' + i,
+    categorie_code: c,
+    categorie_libelle: c,
+    bilans: ['sport'],
+    exercice_id: 'e' + i,
+    exercice_code: c + '|x',
+    libelle: 'X',
+  }));
+  it('avec la bibliothèque : seules les catégories adaptées (+ nouvelles et perso)', () => {
+    const f = monter();
+    f.charger(
+      [
+        ...base,
+        {
+          categorie_id: 'cn',
+          categorie_code: 'nouvelle',
+          categorie_libelle: 'Nouvelle',
+          bilans: ['sport'],
+          exercice_id: 'en',
+          exercice_code: 'nouvelle|x',
+          libelle: 'N',
+        },
+      ],
+      [{ id: 'p1', libelle: 'Mes exos', actif: true }],
+      []
+    );
+    expect(f._exoBibCats('podo').map((c) => c.value)).toEqual([...GARDEES, 'nouvelle', 'pcat:p1']);
+    expect(f._exoBibCats('sport').map((c) => c.value)).toContain('respi-sport');
+  });
+  it('sans bibliothèque (hors ligne) : même liste adaptée', () => {
+    const f = monter();
+    const v = f._exoBibCats('podo').map((c) => c.value);
+    expect(v).not.toContain('respi-sport');
+    expect(v).not.toContain('pathologies-pied');
   });
 });

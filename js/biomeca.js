@@ -25933,11 +25933,18 @@ function _exoBibConstruire(base, persoCats, perso) {
   });
   return Array.from(cats.values());
 }
+// Podopédiatrie : catégories qui ne correspondent pas à ce bilan (décision du 23/10/2026). La respiration
+// « (posture) » reste proposée, la respiration « (sport) » est retirée. Les catégories ajoutées ensuite à la base
+// et les catégories personnelles du praticien restent proposées.
+const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'reeduc-chaines', 'reeduc-posturale', 'reeduc-articulaire', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
 function _exoBibCats(bilan) {
+  const podo = bilan === 'podo';
   if (!_exoBib) {
-    return Object.entries(FICHES_SYSTEMES).filter(([, cfg]) => cfg.bilans.includes(bilan))
+    return Object.entries(FICHES_SYSTEMES)
+      .filter(([slug, cfg]) => (podo ? !_EXO_PODO_EXCLUES.includes(slug) : cfg.bilans.includes(bilan)))
       .map(([slug, cfg]) => ({ value: slug, label: cfg.label, subs: cfg.subs.map(o => ({ value: o, label: o })) }));
   }
+  if (podo) return _exoBib.filter(c => !_EXO_PODO_EXCLUES.includes(c.value));
   return _exoBib.filter(c => !c.bilans || c.bilans.includes(bilan));
 }
 function _exoBibSubs(sysValue) {
@@ -26024,7 +26031,7 @@ async function exoBibRafraichir() {
 }
 // Remet à jour tous les select.exo-sys / .exo-sub déjà présents en gardant les valeurs choisies.
 function _exoBibRepeuplerSelects() {
-  [['#ssec-9 select.exo-sys', 'sport'], ['#pg-bilan-posturo select.exo-sys', 'posturo'], ['#pg-podopediatrie select.exo-sys', 'sport']].forEach(([q, bilan]) => {
+  [['#ssec-9 select.exo-sys', 'sport'], ['#pg-bilan-posturo select.exo-sys', 'posturo'], ['#pg-podopediatrie select.exo-sys', 'podo']].forEach(([q, bilan]) => {
     const html = _genSysOptionsHTML(bilan);
     document.querySelectorAll(q).forEach(sel => {
       const prev = sel.value;
@@ -26341,7 +26348,7 @@ function _circChauffeBrancher(pref, zone) {
 }
 // Podopédiatrie : tableaux Express 1, Express 2 et Échauffement (catégorie → exercice de la bibliothèque).
 function _podoCircuitsHTML() {
-  const opts = _genSysOptionsHTML('sport');
+  const opts = _genSysOptionsHTML('podo');
   const sel = '<select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">' + opts + '</select>';
   const bloc = (cle, titre) => {
     let h = '<div id="pd-circ-' + cle + '" style="display:none;margin-bottom:10px;"><div class="podo-field-lbl">' + titre + '</div>';
@@ -26354,7 +26361,7 @@ function _podoCircuitsHTML() {
   };
   return '<div id="pd-circuits-tables" style="margin-top:6px;">' +
     bloc('c1', 'Circuit Express 1 (Demi Tabata 2 min)') + bloc('c2', 'Circuit Express 2 (Demi Tabata 2 min)') +
-    _circChauffeBlocHTML('pd', 'sport') + '</div>';
+    _circChauffeBlocHTML('pd', 'podo') + '</div>';
 }
 const _PODO_VIDE = { sys: ['', '', ''], sub: ['', '', ''], sysLib: ['', '', ''], subLib: ['', '', ''], libre: '' };
 function _podoSyncChauffe() { _circChauffeSync('pd'); }
