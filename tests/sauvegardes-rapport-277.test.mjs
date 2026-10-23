@@ -587,7 +587,6 @@ describe('#277 D — envoi bloqué : rapport construit à 15 s, mention rouge vi
         _prefetchAllSportMesuresPhotos: async () => {},
         _collectAnnotatedPostureViews: async () => [],
         _resolveSportRapportImages: (_bd, cb) => cb({}, {}),
-        _resolveSportFichesImages: (_bd, cb) => cb([], []),
       },
     });
     return {

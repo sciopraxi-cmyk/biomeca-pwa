@@ -617,6 +617,25 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **Piège** : une nouvelle page s'ajoute à `PAGES_CLAIRES` (`palette-bilans.test.mjs`) ; la fonction SQL
   `exercices_base_liste` change de type de retour : `DROP FUNCTION` avant `CREATE`.
 
+## Exercices de la bibliothèque dans les bilans (lot e2, sport et posturo)
+
+- Les listes « catégorie → exercice » des circuits lisent la bibliothèque (`exoBibRafraichir`, `_exoBib*`) :
+  base SCIOPRAXI filtrée par bilan + catégories et exercices perso du praticien ; liste de secours
+  `FICHES_SYSTEMES` hors ligne. Valeurs enregistrées compatibles avec les anciens bilans : catégorie de la
+  base = son code (ancien slug), exercice de la base = code privé de `<catégorie>|`, exercice perso =
+  `perso:<id>`, catégorie perso = `pcat:<id>`. Les libellés choisis sont conservés (`sysLib`/`subLib`,
+  `circ_*_sysLib/_subLib` en posturo) : un exercice perso supprimé reste lisible dans un bilan enregistré.
+- Posturo : `circ_*_sub` est désormais aligné sur `circ_*_sys` (une case vide si pas d'exercice).
+- **Plus aucune annexe PDF/QR en fin de rapport** (décision du 23/10/2026, tout sera sur le portail patient) :
+  code pdf.js, collecteurs et bannière « Annexes incomplètes » supprimés, `assets/vendor/pdfjs` retiré.
+  Le rapport garde le texte « Catégorie → Exercice » dans « Plan de Traitement ».
+- Les listes des bilans se remettent à jour à l'ouverture d'un bilan (`nav`) ET aussitôt après toute création,
+  modification ou suppression dans la page Exercices (`renderExercicesPage`).
+- Bouton « Modifier » d'un exercice perso : nom, catégorie (base ou perso, l'autre colonne remise à NULL), liens,
+  texte, remplacement ou retrait du PDF ; PATCH en `return=representation`, 0 ligne = erreur ; nouveau PDF retiré
+  si le PATCH échoue, ancien PDF supprimé seulement après succès.
+- Preuve : `tests/exercices-bilans-e2.test.mjs`, parcours réel `documents/e2e-exercices-bilans.mjs`.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et

@@ -5911,16 +5911,6 @@
   <div class="rp-footer">Ce rapport présente des mesures biomécaniques objectives comparées à des normes physiologiques de référence. Il ne constitue ni un diagnostic médical, ni une aide à la décision clinique automatisée. L'interprétation, la conclusion clinique et le plan de traitement relèvent exclusivement du jugement du praticien. — www.biomeca-podologie.fr</div>
 </div>
 
-<!-- #88-B pdf.js 3.x UMD — rendu canvas des fiches PDF en annexe du rapport sport
-     (helper _resolveSportFichesImages). UMD volontaire (vs 4.x ESM-only) pour
-     rester compatible <script src> simple. Worker hébergé sur le même CDN. -->
-<script src="assets/vendor/pdfjs/pdf.min.js"></script>
-<script>
-  if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'assets/vendor/pdfjs/pdf.worker.min.js';
-  }
-</script>
 <script src="js/biomeca.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/admin.js"></script>

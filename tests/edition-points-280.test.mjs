@@ -603,7 +603,7 @@ describe('#280 — test déjà validé : brouillon, mesures intact, rapport', ()
     o.env.validerEditionPoints();
     vi.advanceTimersByTime(DELAI);
     const n = nbEcritures(o.env);
-    const r = o.env._buildSportRapportContentHTML(A, {}, {}, [], [], {}, []).bodyHTML;
+    const r = o.env._buildSportRapportContentHTML(A, {}, {}, [], {}).bodyHTML;
     expect(nbEcritures(o.env), 'le rapport n’écrit pas').toBe(n);
     expect(r).toContain('Statique (S) : +14.8°');
     expect(r).toContain('KFPPA Marche : nouvelle capture en cours, non validée');
