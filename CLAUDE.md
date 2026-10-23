@@ -577,6 +577,23 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **Preuve** : `tests/portail-apercu-praticien.test.mjs` ; parcours réel rejouable avec des
   patients fictifs, puis nettoyage.
 
+## Facturation, lot C1 — catégories d'actes et prise en charge par défaut (PR #305)
+
+- **Catalogue** : les actes s'affichent en catégories repliables (`CATEGORIES_ACTES`, `_categorieActe` :
+  préfixe du code du référentiel ; « Mes actes personnalisés » ouverte, `autre` par défaut).
+- **Acte personnalisé** : deux menus (catégorie puis acte exact de référence) qui reprennent cotation,
+  base remboursable et franchise ; colonnes `acte_reference`, `regime_defaut` (standard, ald, c2s) et
+  `sync_doctolib` (migration `facturation-actes-categories.sql`, appliquée à la main, idempotente,
+  rejouée sur base jetable). La liste des régimes de `documents_facturation` accepte aussi `c2s`
+  (100 % de la base), dans `REGIMES_REMBOURSEMENT`.
+- **Devis / facture** : le PREMIER acte coché dans un document vide reprend sa prise en charge par
+  défaut ; s'il a une base remboursable, la case « tiers payant » se coche (net réellement payé par le
+  patient). Le praticien peut tout changer ensuite ; ensuite son choix prime. Un devis émis reste figé.
+- **Pas encore fait** : envoi automatique du devis 3 jours avant le RDV (case « Synchronisation
+  Doctolib » sans effet pour l'instant) et exclusion permanente de « remise semelles ».
+- **Pièges** : un test qui extrait une fonction de `biomeca.js` doit lister les nouvelles fonctions
+  (`NOMS`) et les constantes utilisées ; `renderActesPage` délègue la ligne à `_htmlLigneActe`.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
