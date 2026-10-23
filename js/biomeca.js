@@ -31949,19 +31949,64 @@ async function exercicesOuvrirPdfPerso(chemin) {
     window.open(URL.createObjectURL(await res.blob()), '_blank', 'noopener');
   } catch (e) { alert('PDF indisponible (' + e.message + ').'); }
 }
-// Fiches PDF de la base : fichiers livrés avec l'application (assets/fiches/<catégorie>/<exercice>.pdf).
-// Le chemin est reconstruit depuis le code et contrôlé contre FICHES_SYSTEMES : jamais un chemin libre.
-function _exoCheminPdfBase(code) {
-  const i = String(code || '').indexOf('|');
-  if (i < 0) return null;
-  const slug = code.slice(0, i), sub = code.slice(i + 1);
-  const c = FICHES_SYSTEMES[slug];
-  return c && Array.isArray(c.subs) && c.subs.indexOf(sub) !== -1 ? encodeURI('assets/fiches/' + slug + '/' + sub + '.pdf') : null;
+// Fiches PDF de la base : soit un fichier livré avec l'application (assets/fiches/<catégorie>/<exercice>.pdf),
+// soit un fichier déposé par l'administrateur (base/<uuid>.pdf, bucket privé). Le chemin est contrôlé
+// (même règle que la base de données) : jamais un chemin libre.
+function _exoPdfValide(p) {
+  const t = String(p == null ? '' : p);
+  return /^assets\/fiches\/[a-z0-9-]+\/[^/]+\.pdf$/.test(t) || /^base\/[0-9a-f-]{36}\.pdf$/.test(t);
 }
-function exercicesOuvrirPdfBase(code) {
-  const chemin = _exoCheminPdfBase(code);
-  if (!chemin) { alert('Aucune fiche PDF pour cet exercice.'); return; }
-  window.open(chemin, '_blank', 'noopener');
+function _exoPdfDeLExercice(id) {
+  const a = _exoEtat.baseAdmin.exos.find((x) => x.id === id);
+  if (a) return a.pdf_fichier || null;
+  const b = _exoEtat.base.find((x) => x.exercice_id === id);
+  return b ? b.pdf_fichier || null : null;
+}
+async function exercicesOuvrirPdfBase(id) {
+  const p = _exoPdfDeLExercice(id);
+  if (!p || !_exoPdfValide(p)) { alert('Aucune fiche PDF pour cet exercice.'); return; }
+  if (p.indexOf('assets/') === 0) { window.open(encodeURI(p), '_blank', 'noopener'); return; }
+  const w = window.open('', '_blank'); // ouvert dans le geste du clic (bloqueur de fenêtres)
+  try {
+    const res = await authFetch(SUPA_URL + '/storage/v1/object/authenticated/exercices-pdf/' + p);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const url = URL.createObjectURL(await res.blob());
+    if (w) w.location = url; else window.open(url, '_blank');
+  } catch (e) { if (w) w.close(); alert('PDF indisponible (' + e.message + ').'); }
+}
+async function _exoSupprimerFichierBase(p) {
+  if (p && p.indexOf('base/') === 0) {
+    try { await authFetch(SUPA_URL + '/storage/v1/object/exercices-pdf', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [p] }) }); } catch (_e) { /* fichier orphelin inoffensif */ }
+  }
+}
+// Remplacement par l'administrateur : dépôt du nouveau fichier, puis mise à jour de la ligne, puis
+// suppression de l'ancien fichier déposé (la fiche livrée avec l'application n'est jamais effacée).
+async function exercicesRemplacerPdfBase(id) {
+  const fichier = ((document.getElementById('exb-pdf-' + id) || {}).files || [])[0];
+  if (!fichier) { alert('Choisissez d\'abord un fichier PDF.'); return; }
+  if (fichier.type !== 'application/pdf') { alert('Le fichier doit être un PDF.'); return; }
+  if (fichier.size > EXO_PDF_MAX_OCTETS) { alert('PDF trop lourd (10 Mo au plus).'); return; }
+  const ancien = _exoPdfDeLExercice(id);
+  const chemin = 'base/' + crypto.randomUUID() + '.pdf';
+  try {
+    const dep = await authFetch(SUPA_URL + '/storage/v1/object/exercices-pdf/' + chemin, { method: 'POST', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'false' }, body: fichier });
+    if (!dep.ok) throw new Error('dépôt du PDF ' + dep.status);
+    try {
+      await _exoRequete('exercices_base?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: _exoJson, body: JSON.stringify({ pdf_fichier: chemin, updated_at: new Date().toISOString() }) });
+    } catch (e) { await _exoSupprimerFichierBase(chemin); throw e; }
+    await _exoSupprimerFichierBase(ancien);
+    await renderExercicesPage();
+  } catch (e) { alert('Remplacement impossible (' + e.message + '). L\'ancienne fiche est conservée.'); }
+}
+async function exercicesSupprimerPdfBase(id) {
+  const ancien = _exoPdfDeLExercice(id);
+  if (!ancien) return;
+  if (!confirm('Retirer la fiche PDF de cet exercice ?\n\nElle disparaît pour les praticiens (et leurs patients). Vous pourrez en déposer une nouvelle.')) return;
+  try {
+    await _exoRequete('exercices_base?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: _exoJson, body: JSON.stringify({ pdf_fichier: null, updated_at: new Date().toISOString() }) });
+    await _exoSupprimerFichierBase(ancien);
+    await renderExercicesPage();
+  } catch (e) { alert('Suppression impossible (' + e.message + '). Rien n\'a été modifié.'); }
 }
 // Suppression d'un exercice personnel (confirmée) : la ligne d'abord, puis son PDF.
 async function exercicesSupprimerPerso(id) {
@@ -31982,13 +32027,16 @@ function _exoHtmlBase() {
   const bloc = cats.length
     ? cats.map((c) => '<details data-k="a' + _escHtml(c.id) + '" style="border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;padding:0 10px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;padding:9px 0;">' + _escHtml(c.libelle) + ' <span style="font-weight:500;color:var(--mut);">(' + _escHtml(bilanTxt(c.bilans)) + ')</span></summary>' +
         _exoEtat.baseAdmin.exos.filter((e) => e.categorie_id === c.id).map((e) =>
-          '<div style="padding:8px 0;border-top:1px solid var(--bord);"><div style="font-size:13px;font-weight:600;">' + _escHtml(e.libelle) + (_exoCheminPdfBase(e.code) ? ' <button class="btn" style="font-size:11px;padding:2px 8px;margin-left:6px;" onclick="exercicesOuvrirPdfBase(\'' + _escHtml(e.code).replace(/'/g, '&#39;') + '\')">📄 Ouvrir la fiche</button>' : '') + '</div>' +
+          '<div style="padding:8px 0;border-top:1px solid var(--bord);"><div style="font-size:13px;font-weight:600;">' + _escHtml(e.libelle) + (e.pdf_fichier ? ' <span style="font-size:11px;color:var(--mut);">· 📄 ' + (e.pdf_fichier.indexOf('base/') === 0 ? 'fiche remplacée' : 'fiche d\'origine') + '</span>' : ' <span style="font-size:11px;color:var(--mut);">· aucune fiche PDF</span>') + '</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;">' +
+          (e.pdf_fichier ? '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesOuvrirPdfBase(\'' + _escHtml(e.id) + '\')">📄 Ouvrir la fiche</button><button class="btn" style="font-size:11px;padding:3px 8px;color:var(--red);" onclick="exercicesSupprimerPdfBase(\'' + _escHtml(e.id) + '\')">Supprimer la fiche</button>' : '') +
+          '<input type="file" id="exb-pdf-' + _escHtml(e.id) + '" accept="application/pdf" style="font-size:11px;max-width:200px;"/><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesRemplacerPdfBase(\'' + _escHtml(e.id) + '\')">' + (e.pdf_fichier ? 'Remplacer la fiche' : 'Ajouter une fiche') + '</button></div>' +
           '<textarea class="inp" id="exb-lien-' + _escHtml(e.id) + '" rows="2" placeholder="Liens YouTube (un par ligne)" style="margin-top:4px;">' + _escHtml((e.liens_youtube || []).join('\n')) + '</textarea>' +
           '<textarea class="inp" id="exb-texte-' + _escHtml(e.id) + '" rows="2" placeholder="Texte explicatif (facultatif)" style="margin-top:4px;">' + _escHtml(e.texte || '') + '</textarea>' +
           '<button class="btn" style="font-size:11px;padding:3px 8px;margin-top:4px;" onclick="exercicesEnregistrerBase(\'' + _escHtml(e.id) + '\')">Enregistrer</button></div>').join('') + '</details>').join('')
     : '<div style="font-size:13px;color:var(--mut);">La base est vide : importez les exercices existants.</div>';
   return '<div class="card" style="margin-bottom:16px;"><div class="stitle">Base SCIOPRAXI (administrateur)</div>' +
-    '<p style="font-size:12px;color:var(--mut);margin:0 0 8px;">Les praticiens voient seulement les noms ; vos liens, PDF et textes leur restent invisibles.</p>' +
+    '<p style="font-size:12px;color:var(--mut);margin:0 0 8px;">Les praticiens voient les noms et ouvrent les fiches PDF ; vos liens vidéo et vos textes leur restent invisibles.</p>' +
     '<button class="btn" style="font-size:12px;" onclick="exercicesImporterBase()">⬇️ Importer les catégories et exercices existants</button><div style="margin-top:10px;">' + bloc + '</div></div>';
 }
 function _exoHtmlPerso() {
@@ -32023,7 +32071,7 @@ function _exoHtmlNomsBase() {
   if (!ids.length) return '';
   return '<div class="card"><div class="stitle">Exercices de la base SCIOPRAXI</div>' + ids.map((id) =>
     '<details data-k="n' + _escHtml(id) + '" style="border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;padding:0 10px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;padding:9px 0;">' + _escHtml(groupes[id].nom) + ' <span style="font-weight:500;color:var(--mut);">(' + groupes[id].exos.length + ')</span></summary>' +
-    groupes[id].exos.map((e) => '<div style="font-size:12px;padding:5px 0;border-top:1px solid var(--bord);">' + _escHtml(e.libelle) + ' <span style="color:var(--mut);">' + (e.a_video ? '🎬' : '') + (e.a_texte ? ' 📝' : '') + '</span>' + (e.a_pdf && _exoCheminPdfBase(e.exercice_code) ? ' <button class="btn" style="font-size:11px;padding:2px 8px;margin-left:6px;" onclick="exercicesOuvrirPdfBase(\'' + _escHtml(e.exercice_code).replace(/'/g, '&#39;') + '\')">📄 Ouvrir la fiche</button>' : '') + '</div>').join('') + '</details>').join('') + '</div>';
+    groupes[id].exos.map((e) => '<div style="font-size:12px;padding:5px 0;border-top:1px solid var(--bord);">' + _escHtml(e.libelle) + ' <span style="color:var(--mut);">' + (e.a_video ? '🎬' : '') + (e.a_texte ? ' 📝' : '') + '</span>' + (e.a_pdf && _exoPdfValide(e.pdf_fichier) ? ' <button class="btn" style="font-size:11px;padding:2px 8px;margin-left:6px;" onclick="exercicesOuvrirPdfBase(\'' + _escHtml(e.exercice_id) + '\')">📄 Ouvrir la fiche</button>' : '') + '</div>').join('') + '</details>').join('') + '</div>';
 }
 async function renderExercicesPage() {
   const el = document.getElementById('exercices-contenu');
@@ -32037,7 +32085,7 @@ async function renderExercicesPage() {
   el.innerHTML = (_exoEstAdmin() ? _exoHtmlBase() : '') + _exoHtmlPerso() + _exoHtmlNomsBase();
   el.querySelectorAll('details[data-k]').forEach((d) => { if (ouverts.indexOf(d.getAttribute('data-k')) !== -1) d.open = true; });
 }
-Object.assign(window, { exercicesImporterBase, exercicesEnregistrerBase, exercicesCreerCategorie, exercicesCreerExercice, exercicesBasculerPerso, exercicesEnregistrerPerso, exercicesOuvrirPdfPerso, exercicesOuvrirPdfBase, exercicesSupprimerPerso });
+Object.assign(window, { exercicesImporterBase, exercicesEnregistrerBase, exercicesCreerCategorie, exercicesCreerExercice, exercicesBasculerPerso, exercicesEnregistrerPerso, exercicesOuvrirPdfPerso, exercicesOuvrirPdfBase, exercicesSupprimerPerso, exercicesRemplacerPdfBase, exercicesSupprimerPdfBase });
 
 // ═══════════════════════════════════════════════════════════════════
 // Facturation, étape 2b-1 — devis et factures par patient

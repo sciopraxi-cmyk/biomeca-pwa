@@ -17,6 +17,12 @@ function monter(o = {}) {
   const appels = [];
   const alertes = [];
   const ouvertures = [];
+  const fenetre = {
+    location: null,
+    close() {
+      this.fermee = true;
+    },
+  };
   const champs = o.champs || {};
   const authFetch = async (url, options = {}) => {
     appels.push({
@@ -25,10 +31,17 @@ function monter(o = {}) {
       corps:
         options.body && typeof options.body === 'string' ? JSON.parse(options.body) : options.body,
     });
+    if (o.refuserPatch && (options.method || 'GET') === 'PATCH')
+      return { ok: false, status: 403, json: async () => [] };
     if (o.refuserDelete && (options.method || 'GET') === 'DELETE')
       return { ok: false, status: 403, json: async () => [] };
     if (o.echec) return { ok: false, status: 500, json: async () => [] };
-    return { ok: true, status: 200, json: async () => (o.reponse ? o.reponse(url) : []) };
+    return {
+      ok: true,
+      status: 200,
+      blob: async () => ({}),
+      json: async () => (o.reponse ? o.reponse(url) : []),
+    };
   };
   const document = {
     getElementById: (id) => (id in champs ? champs[id] : { value: '', files: [] }),
@@ -54,7 +67,11 @@ function monter(o = {}) {
       'exercicesCreerExercice',
       '_exoDeposerPdf',
       'exercicesCreerCategorie',
-      '_exoCheminPdfBase',
+      '_exoPdfValide',
+      '_exoPdfDeLExercice',
+      '_exoSupprimerFichierBase',
+      'exercicesRemplacerPdfBase',
+      'exercicesSupprimerPdfBase',
       'exercicesOuvrirPdfBase',
       'exercicesSupprimerPerso',
       '_exoHtmlPerso',
@@ -62,7 +79,7 @@ function monter(o = {}) {
       '_exoHtmlBase',
       'renderExercicesPage',
     ].map(fonction),
-    'return { _exoLienValide, _exoLiensDepuisTexte, _exoEstAdmin, _exoBaseDepuisFiches, chargerExercices, exercicesImporterBase, exercicesCreerExercice, exercicesCreerCategorie, _exoCheminPdfBase, exercicesOuvrirPdfBase, exercicesSupprimerPerso, _exoHtmlPerso, _exoHtmlNomsBase, _exoHtmlBase, etat: () => _exoEtat };',
+    'return { _exoLienValide, _exoLiensDepuisTexte, _exoEstAdmin, _exoBaseDepuisFiches, chargerExercices, exercicesImporterBase, exercicesCreerExercice, exercicesCreerCategorie, _exoPdfValide, exercicesRemplacerPdfBase, exercicesSupprimerPdfBase, exercicesOuvrirPdfBase, exercicesSupprimerPerso, _exoHtmlPerso, _exoHtmlNomsBase, _exoHtmlBase, etat: () => _exoEtat, injecter: (x) => { Object.assign(_exoEtat, x); } };',
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   const f = new Function('authFetch', 'document', 'alert', '__email', 'confirm', 'window', corps)(
@@ -71,9 +88,14 @@ function monter(o = {}) {
     (m) => alertes.push(m),
     o.email || 'a@exemple.invalid',
     () => o.confirmer !== false,
-    { open: (u) => ouvertures.push(u) }
+    {
+      open: (u) => {
+        ouvertures.push(u);
+        return fenetre;
+      },
+    }
   );
-  return { f, appels, alertes, ouvertures };
+  return { f, appels, alertes, ouvertures, fenetre };
 }
 
 describe('liens YouTube', () => {
@@ -273,53 +295,182 @@ describe('affichage', () => {
 });
 
 describe('fiches PDF de la base et suppression', () => {
-  it('chemin PDF reconstruit et contrôlé : jamais un chemin libre', () => {
+  it('chemin PDF contrôlé comme en base : jamais un chemin libre', () => {
     const { f } = monter();
-    expect(f._exoCheminPdfBase('systeme-visuel|2. Rééducation problème de fixation')).toBe(
-      encodeURI('assets/fiches/systeme-visuel/2. Rééducation problème de fixation.pdf')
-    );
-    expect(f._exoCheminPdfBase('reeduc-pied|pied-enfant|short-foot')).toBeNull();
-    expect(f._exoCheminPdfBase('../../etc|passwd')).toBeNull();
-    expect(f._exoCheminPdfBase('systeme-visuel|../../x')).toBeNull();
-    expect(f._exoCheminPdfBase('')).toBeNull();
+    expect(
+      f._exoPdfValide('assets/fiches/systeme-visuel/2. Rééducation problème de fixation.pdf')
+    ).toBe(true);
+    expect(f._exoPdfValide('base/aaaaaaaa-0000-0000-0000-00000000000a.pdf')).toBe(true);
+    for (const mauvais of [
+      '',
+      null,
+      '../../etc/passwd',
+      'assets/../x.pdf',
+      'assets/fiches/../x.pdf',
+      'base/../x.pdf',
+      'http://evil.example/x.pdf',
+      'base/court.pdf',
+      'assets/fiches/a/b.html',
+    ])
+      expect(f._exoPdfValide(mauvais), String(mauvais)).toBe(false);
   });
-  it('ouvre la fiche dans un nouvel onglet ; message si aucune fiche', () => {
+  it("fiche d'origine : ouverte dans un nouvel onglet ; sans fiche : message", async () => {
     const e = monter();
-    e.f.exercicesOuvrirPdfBase('systeme-visuel|2. Rééducation problème de fixation');
-    expect(e.ouvertures).toHaveLength(1);
-    expect(e.ouvertures[0]).toMatch(/^assets\/fiches\/systeme-visuel\/.*\.pdf$/);
-    e.f.exercicesOuvrirPdfBase('reeduc-pied|pied-enfant|short-foot');
+    e.f.injecter({
+      baseAdmin: {
+        cats: [],
+        exos: [
+          { id: 'a', pdf_fichier: 'assets/fiches/systeme-visuel/2. Fixation.pdf' },
+          { id: 'b', pdf_fichier: null },
+        ],
+      },
+    });
+    await e.f.exercicesOuvrirPdfBase('a');
+    expect(e.ouvertures[0]).toBe(encodeURI('assets/fiches/systeme-visuel/2. Fixation.pdf'));
+    await e.f.exercicesOuvrirPdfBase('b');
     expect(e.ouvertures).toHaveLength(1);
     expect(e.alertes).toHaveLength(1);
   });
-  it('le praticien voit le bouton « Ouvrir la fiche » seulement pour les exercices à fiche', async () => {
+  it('le praticien voit le bouton seulement pour les exercices à fiche valide (chemin lu dans la liste)', async () => {
     const base = [
       {
         categorie_id: 'b1',
         categorie_libelle: 'Visuel',
         exercice_id: 'e1',
-        exercice_code: 'systeme-visuel|2. Rééducation problème de fixation',
+        exercice_code: 'x|1',
         libelle: 'Fixation',
         a_video: true,
         a_pdf: true,
         a_texte: false,
+        pdf_fichier: 'base/aaaaaaaa-0000-0000-0000-00000000000a.pdf',
       },
       {
         categorie_id: 'b1',
         categorie_libelle: 'Visuel',
         exercice_id: 'e2',
-        exercice_code: 'reeduc-pied|pied-enfant|short-foot',
+        exercice_code: 'x|2',
         libelle: 'Short foot',
         a_video: true,
         a_pdf: false,
         a_texte: false,
+        pdf_fichier: null,
+      },
+      {
+        categorie_id: 'b1',
+        categorie_libelle: 'Visuel',
+        exercice_id: 'e3',
+        exercice_code: 'x|3',
+        libelle: 'Piégé',
+        a_video: false,
+        a_pdf: true,
+        a_texte: false,
+        pdf_fichier: '../../secret.pdf',
       },
     ];
     const e = monter({ reponse: (u) => (u.includes('rpc/exercices_base_liste') ? base : []) });
     await e.f.chargerExercices();
     const html = e.f._exoHtmlNomsBase();
     expect(html.match(/Ouvrir la fiche/g)).toHaveLength(1);
-    expect(html).not.toMatch(/youtube/i);
+    expect(html).not.toMatch(/youtube|secret/i);
+  });
+  it('fiche remplacée : ouverte par le bucket privé, avec le jeton', async () => {
+    globalThis.URL.createObjectURL = () => 'blob:fictif';
+    const e = monter({ reponse: () => [] });
+    e.f.injecter({
+      base: [{ exercice_id: 'e1', pdf_fichier: 'base/aaaaaaaa-0000-0000-0000-00000000000a.pdf' }],
+    });
+    await e.f.exercicesOuvrirPdfBase('e1');
+    expect(e.appels[0].url).toBe(
+      'https://x.supabase.co/storage/v1/object/authenticated/exercices-pdf/base/aaaaaaaa-0000-0000-0000-00000000000a.pdf'
+    );
+    expect(e.fenetre.location).toBe('blob:fictif');
+  });
+  it('remplacement : refuse un fichier non PDF, trop lourd ou absent ; aucun appel', async () => {
+    for (const fichier of [
+      undefined,
+      { type: 'image/png', size: 5 },
+      { type: 'application/pdf', size: 11 * 1024 * 1024 },
+    ]) {
+      const e = monter({ champs: { 'exb-pdf-a': { files: fichier ? [fichier] : [] } } });
+      await e.f.exercicesRemplacerPdfBase('a');
+      expect(e.appels).toHaveLength(0);
+      expect(e.alertes).toHaveLength(1);
+    }
+  });
+  it("remplacement : dépôt dans base/, mise à jour, puis suppression de l'ancien fichier déposé", async () => {
+    const e = monter({
+      champs: { 'exb-pdf-a': { files: [{ type: 'application/pdf', size: 100 }] } },
+      reponse: () => [],
+    });
+    e.f.injecter({
+      baseAdmin: {
+        cats: [],
+        exos: [{ id: 'a', pdf_fichier: 'base/bbbbbbbb-0000-0000-0000-00000000000b.pdf' }],
+      },
+    });
+    await e.f.exercicesRemplacerPdfBase('a');
+    expect(e.appels[0].url).toBe(
+      'https://x.supabase.co/storage/v1/object/exercices-pdf/base/uuid-1.pdf'
+    );
+    expect(e.appels[1].methode).toBe('PATCH');
+    expect(e.appels[1].corps).toMatchObject({ pdf_fichier: 'base/uuid-1.pdf' });
+    expect(e.appels[2].methode).toBe('DELETE');
+    expect(e.appels[2].corps).toEqual({
+      prefixes: ['base/bbbbbbbb-0000-0000-0000-00000000000b.pdf'],
+    });
+  });
+  it("remplacement d'une fiche d'origine : le fichier livré avec l'application n'est jamais supprimé", async () => {
+    const e = monter({
+      champs: { 'exb-pdf-a': { files: [{ type: 'application/pdf', size: 100 }] } },
+      reponse: () => [],
+    });
+    e.f.injecter({
+      baseAdmin: {
+        cats: [],
+        exos: [{ id: 'a', pdf_fichier: 'assets/fiches/systeme-visuel/1. X.pdf' }],
+      },
+    });
+    await e.f.exercicesRemplacerPdfBase('a');
+    expect(e.appels.some((a) => a.methode === 'DELETE')).toBe(false);
+  });
+  it("échec de la mise à jour : le nouveau fichier est retiré et l'ancienne fiche conservée", async () => {
+    const e = monter({
+      champs: { 'exb-pdf-a': { files: [{ type: 'application/pdf', size: 100 }] } },
+      reponse: () => [],
+      refuserPatch: true,
+    });
+    e.f.injecter({
+      baseAdmin: {
+        cats: [],
+        exos: [{ id: 'a', pdf_fichier: 'base/bbbbbbbb-0000-0000-0000-00000000000b.pdf' }],
+      },
+    });
+    await e.f.exercicesRemplacerPdfBase('a');
+    const dels = e.appels.filter((a) => a.methode === 'DELETE');
+    expect(dels).toHaveLength(1);
+    expect(dels[0].corps).toEqual({ prefixes: ['base/uuid-1.pdf'] });
+    expect(e.alertes[0]).toMatch(/ancienne fiche est conservée/);
+  });
+  it('suppression de la fiche : confirmation, ligne mise à NULL, fichier déposé supprimé', async () => {
+    let e = monter({ confirmer: false });
+    e.f.injecter({
+      baseAdmin: {
+        cats: [],
+        exos: [{ id: 'a', pdf_fichier: 'base/bbbbbbbb-0000-0000-0000-00000000000b.pdf' }],
+      },
+    });
+    await e.f.exercicesSupprimerPdfBase('a');
+    expect(e.appels).toHaveLength(0);
+    e = monter({ reponse: () => [] });
+    e.f.injecter({
+      baseAdmin: {
+        cats: [],
+        exos: [{ id: 'a', pdf_fichier: 'base/bbbbbbbb-0000-0000-0000-00000000000b.pdf' }],
+      },
+    });
+    await e.f.exercicesSupprimerPdfBase('a');
+    expect(e.appels[0].corps).toMatchObject({ pdf_fichier: null });
+    expect(e.appels[1].methode).toBe('DELETE');
   });
   it('suppression : confirmation obligatoire, ligne puis PDF ; annulée = aucun appel', async () => {
     const perso = [

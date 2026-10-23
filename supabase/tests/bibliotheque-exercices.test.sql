@@ -1,5 +1,5 @@
 -- Attaques sur bibliotheque-exercices.sql — base JETABLE seulement. Finit par « TOUT_OK ».
--- Lancement : psql -v ON_ERROR_STOP=1 -v migration=/chemin/bibliotheque-exercices.sql -v migration2=/chemin/bibliotheque-exercices-suppression.sql -f bibliotheque-exercices.test.sql
+-- Lancement : psql -v ON_ERROR_STOP=1 -v migration=/chemin/bibliotheque-exercices.sql -v migration2=/chemin/bibliotheque-exercices-suppression.sql -v migration3=/chemin/bibliotheque-exercices-pdf-base.sql -f bibliotheque-exercices.test.sql
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
 DO $$ BEGIN
@@ -21,6 +21,8 @@ INSERT INTO auth.users VALUES ('00000000-0000-0000-0000-00000000000a','a@exemple
 \i :migration
 \i :migration2
 \i :migration2
+\i :migration3
+\i :migration3
 CREATE SCHEMA IF NOT EXISTS essai; GRANT USAGE ON SCHEMA essai TO PUBLIC;
 CREATE OR REPLACE FUNCTION essai.ctrl(ok boolean, nom text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT ok THEN RAISE EXCEPTION 'ECHEC : %', nom; END IF; RAISE WARNING 'ok : %', nom; END $$;
@@ -59,7 +61,7 @@ CREATE TEMP TABLE n1 AS WITH u AS (UPDATE public.exercices_base SET liens_youtub
 SELECT essai.ctrl((SELECT n FROM n1)=0, 'praticien : ne modifie pas la base (0 ligne touchée)');
 SELECT essai.ctrl((SELECT count(*) FROM public.exercices_base_liste())=2, 'praticien : voit les 2 noms via la fonction');
 SELECT essai.ctrl((SELECT a_video FROM public.exercices_base_liste() WHERE libelle='Fixation') AND NOT (SELECT a_video FROM public.exercices_base_liste() WHERE libelle='Poursuite'), 'praticien : sait seulement s''il y a une vidéo');
-SELECT essai.ctrl(NOT EXISTS (SELECT 1 FROM jsonb_object_keys(to_jsonb((SELECT l FROM public.exercices_base_liste() l LIMIT 1))) k WHERE k IN ('liens_youtube','pdf_fichier','texte')), 'la fonction ne renvoie aucun lien ni texte');
+SELECT essai.ctrl(NOT EXISTS (SELECT 1 FROM jsonb_object_keys(to_jsonb((SELECT l FROM public.exercices_base_liste() l LIMIT 1))) k WHERE k IN ('liens_youtube','texte')), 'la fonction ne renvoie aucun lien ni texte');
 INSERT INTO public.exercices_perso_categories(id,libelle) VALUES ('d0000000-0000-0000-0000-000000000001','Ma catégorie');
 INSERT INTO public.exercices_perso(categorie_perso_id,libelle,liens_youtube) VALUES ('d0000000-0000-0000-0000-000000000001','Mon exo',ARRAY['https://youtu.be/abcdefghijk']);
 INSERT INTO public.exercices_perso(categorie_base_id,libelle,texte) VALUES ('c0000000-0000-0000-0000-000000000001','Mon exo dans catégorie de base','Consigne');
@@ -97,12 +99,40 @@ CREATE TEMP TABLE n6 AS WITH u AS (DELETE FROM storage.objects WHERE bucket_id='
 SELECT essai.ctrl((SELECT n FROM n6)=1, 'A : supprime son propre PDF');
 RESET ROLE;
 
+-- ── PDF de la base ──
+SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000ad","email":"contact@verticy.fr"}';
+SET ROLE authenticated;
+INSERT INTO storage.objects(bucket_id,name) VALUES ('exercices-pdf','base/aaaaaaaa-0000-0000-0000-00000000000a.pdf');
+UPDATE public.exercices_base SET pdf_fichier='base/aaaaaaaa-0000-0000-0000-00000000000a.pdf' WHERE code='systeme-visuel|2';
+SELECT essai.ctrl((SELECT pdf_fichier FROM public.exercices_base_liste() WHERE libelle='Poursuite')='base/aaaaaaaa-0000-0000-0000-00000000000a.pdf', 'admin : remplacement visible dans la liste');
+SELECT essai.refuse($q$UPDATE public.exercices_base SET pdf_fichier='../secret.pdf' WHERE code='systeme-visuel|2'$q$, 'chemin PDF libre refusé');
+SELECT essai.refuse($q$UPDATE public.exercices_base SET pdf_fichier='base/../x.pdf' WHERE code='systeme-visuel|2'$q$, 'chemin avec .. refusé');
+SELECT essai.refuse($q$UPDATE public.exercices_base SET pdf_fichier='http://evil.example/x.pdf' WHERE code='systeme-visuel|2'$q$, 'URL externe refusée');
+RESET ROLE;
+SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","email":"a@exemple.invalid"}';
+SET ROLE authenticated;
+SELECT essai.ctrl((SELECT count(*) FROM storage.objects WHERE name='base/aaaaaaaa-0000-0000-0000-00000000000a.pdf')=1, 'praticien : lit le PDF de la base');
+SELECT essai.refuse($q$INSERT INTO storage.objects(bucket_id,name) VALUES ('exercices-pdf','base/bbbbbbbb-0000-0000-0000-00000000000b.pdf')$q$, 'praticien : ne dépose pas dans la base');
+CREATE TEMP TABLE n8 AS WITH u AS (DELETE FROM storage.objects WHERE name LIKE 'base/%' RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n8)=0, 'praticien : ne supprime pas un PDF de la base');
+CREATE TEMP TABLE n9 AS WITH u AS (UPDATE public.exercices_base SET pdf_fichier=NULL RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n9)=0, 'praticien : ne modifie pas les fiches de la base');
+RESET ROLE;
+SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000ad","email":"contact@verticy.fr"}';
+SET ROLE authenticated;
+UPDATE public.exercices_base SET pdf_fichier=NULL WHERE code='systeme-visuel|2';
+SELECT essai.ctrl((SELECT a_pdf FROM public.exercices_base_liste() WHERE libelle='Poursuite')=false, 'admin : suppression de la fiche visible côté praticien');
+CREATE TEMP TABLE n10 AS WITH u AS (DELETE FROM storage.objects WHERE name='base/aaaaaaaa-0000-0000-0000-00000000000a.pdf' RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n10)=1, 'admin : supprime le fichier remplacé');
+RESET ROLE;
+
 -- PATIENT
 SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000a1","email":"pa@exemple.invalid","app_metadata":{"role":"patient"}}';
 SET ROLE authenticated;
 SELECT essai.ctrl((SELECT count(*) FROM public.exercices_perso)=0 AND (SELECT count(*) FROM public.exercices_base)=0, 'patient : aucune lecture directe');
 SELECT essai.ctrl((SELECT count(*) FROM public.exercices_base_liste())=0, 'patient : la fonction ne renvoie rien');
 SELECT essai.refuse($q$INSERT INTO public.exercices_perso_categories(libelle) VALUES ('P')$q$, 'patient : n''écrit pas');
+SELECT essai.ctrl((SELECT count(*) FROM storage.objects WHERE bucket_id='exercices-pdf')=0, 'patient : ne lit aucun PDF de la bibliothèque');
 CREATE TEMP TABLE n7 AS WITH u AS (DELETE FROM public.exercices_perso RETURNING 1) SELECT count(*) AS n FROM u;
 SELECT essai.ctrl((SELECT n FROM n7)=0, 'patient : ne supprime rien');
 SELECT essai.refuse($q$INSERT INTO storage.objects(bucket_id,name) VALUES ('exercices-pdf','00000000-0000-0000-0000-0000000000a1/p.pdf')$q$, 'patient : ne dépose pas de PDF');
