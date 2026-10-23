@@ -18687,11 +18687,11 @@ function _extractPosturoSections(d) {
     circLabels.forEach(function(lbl, i) {
       const key = cx+'_ex'+(i+1);
       const sys = (d['circ_'+key+'_sys']||[]).filter(Boolean);
-      const sub = (d['circ_'+key+'_sub']||[]).filter(Boolean);
+      const paires = _exoBibPairs(d['circ_'+key+'_sys'], d['circ_'+key+'_sub'], d['circ_'+key+'_sysLib'], d['circ_'+key+'_subLib']);
       const libre = d['circ_'+key] || '';
-      if(sys.length || sub.length || libre) {
+      if(sys.length || libre) {
         let val = '';
-        sys.forEach((s,j) => { if(s) val += s + (sub[j] ? ' → '+sub[j] : '') + ' | '; });
+        paires.forEach(t => { val += t + ' | '; });
         if(libre) val += libre;
         circItems.push([lbl, val.replace(/\s*\|\s*$/,'')]);
       }
@@ -19036,25 +19036,16 @@ function _buildRapportBody(p, d, prat, logo, sections) {
         }).join(' | ')
       );
       bonhommesSection.bodyCanvasData = null;
-      // #88-C Annexes PDF — résolution async APRÈS bonhommes, AVANT injection iframe.
-      _resolvePosturoFichesImages(d, function(fichesPages, fichesFailed) {
-        _doBuildRapport(p, d, prat, logo, sections, fichesPages, fichesFailed);
-      });
+      _doBuildRapport(p, d, prat, logo, sections);
     };
     bcImg.src = bonhommesSection.bodyCanvasData;
     return;
   }
-  // #88-C Annexes PDF — fast-path sans bonhommes, résolution annexes seule.
-  _resolvePosturoFichesImages(d, function(fichesPages, fichesFailed) {
-    _doBuildRapport(p, d, prat, logo, sections, fichesPages, fichesFailed);
-  });
+  _doBuildRapport(p, d, prat, logo, sections);
 }
 
-// #88-C 6e param fichesPages = tableau de dataURLs PNG retournés par
-// _resolvePosturoFichesImages (déjà aplaties multi-pages). Defaut [] = aucun
-// changement pour les call-sites legacy (compat). annexesHTML construit avant
-// le </div> final de .rp-page → 1 page A4 par fiche, page-break-before strict.
-function _doBuildRapport(p, d, prat, logo, sections, fichesPages = [], fichesFailed = []) {
+// Plus d'annexes PDF/QR en fin de rapport (décision du 23/10/2026) : les fiches sont sur le portail patient.
+function _doBuildRapport(p, d, prat, logo, sections) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR');
   const initiales = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
@@ -19214,15 +19205,6 @@ function _doBuildRapport(p, d, prat, logo, sections, fichesPages = [], fichesFai
 
   // FOOTER
   bodyHtml += '<div class="footer"><div class="footer-brand">Verticy</div><div class="footer-info">Bilan Étude de la Posture · '+_escHtml(p.prenom)+' '+_escHtml(p.nom)+' · '+dateStr+'</div></div>';
-  // #88-C Annexes fiches d'exercices — markup miroir sport (#88-B,
-  // _buildSportRapportContentHTML). page-break-before:always pour démarrer chaque
-  // fiche sur une page A4 vierge. object-fit:contain pour respecter le ratio fiche
-  // source. Si fichesPages = [], la map produit '' → bodyHtml inchangé.
-  // #112 — mention rouge AVANT les pages d'annexes si des fiches manquent.
-  bodyHtml += _buildFichesFailHTML(fichesFailed);
-  bodyHtml += (fichesPages || []).map(function(dataURL) {
-    return '<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="'+dataURL+'" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>';
-  }).join('');
   bodyHtml += '</div>';
 
   // Injecter dans un iframe isolé pour éviter les conflits CSS
@@ -19282,8 +19264,8 @@ async function buildRapport() {
   // Fix #150 — `statuses` propagé depuis _resolveSportRapportImages pour
   // discriminer 'ok'/'nu'/'ko' côté rendu (mention rouge, auto-omission blocs).
   _resolveSportRapportImages(p.bilanData || {}, (composites, statuses) => {
-    _resolveSportFichesImages(p.bilanData || {}, (fichesPages, fichesFailed) => {
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses, fichesFailed);
+    {
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, annotatedViews, statuses);
 
       // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
       // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
@@ -19316,7 +19298,7 @@ async function buildRapport() {
           <div>${bodyHTML.trim() ? bodyHTML : bodyFallback}</div>
         </div>`;
       document.getElementById('rpt-body').innerHTML = wrappedHTML;
-    });
+    }
   });
 }
 
@@ -19694,160 +19676,6 @@ async function _resolveSportRapportImages(bd, callback) {
   });
 }
 
-// #88-C Moteur partagé sport+posturo — reçoit un Set('slug|sub') déjà collecté
-// (les collecteurs spécifiques par bilan s'occupent du parcours de la structure
-// de données distincte sport=nested vs posturo=flat). Source unique pour la
-// validation FICHES_SYSTEMES, l'encodage URL, le rendu pdf.js scale 2.0, et la
-// gestion d'erreurs par fiche. Tout changement (échelle, cache LRU, switch pdf.js
-// version) se fait UNIQUEMENT ici. callback toujours appelée — jamais bloquante.
-// #112 — La callback reçoit désormais (pages, failedLabels) : failedLabels =
-// libellés des fiches attendues mais NON rendues (pdf.js indisponible, fiche
-// hors manifeste, fetch/rendu échoué). Les call-sites injectent une mention
-// rouge visible dans le rapport — un rapport amputé ne doit pas avoir l'air
-// normal (même règle maison que #150 pour les images).
-function _resolveFichesImagesFromPairs(pairs, callback) {
-  const labelOf = key => {
-    const idx = key.indexOf('|');
-    return key.slice(0, idx) + ' — ' + key.slice(idx + 1);
-  };
-  // Fast-path : 0 fiche attendue → rien à rendre, rien à signaler.
-  if(pairs.size === 0) {
-    callback([], []);
-    return;
-  }
-  // pdf.js indisponible (script vendor non chargé, mode dégradé) : AUCUNE des
-  // fiches attendues ne peut être rendue — toutes signalées (#112, fin de
-  // l'échec silencieux).
-  if(typeof pdfjsLib === 'undefined') {
-    const allLabels = [];
-    pairs.forEach(key => allLabels.push(labelOf(key)));
-    console.warn('[#112] pdf.js indisponible — aucune fiche rendue :', allLabels.join(' · '));
-    callback([], allLabels);
-    return;
-  }
-  // Validation manifeste + construction des chemins NFC encodés.
-  // assets/fiches/<slug>/<sub>.pdf — slug = ASCII pur, sub = NFC avec accents/espaces/
-  // apostrophes droites. encodeURI laisse intacts /, (, ), ', . — tous valides RFC 3986
-  // sub-delims/unreserved. Encode espaces → %20 et accents UTF-8 (é → %C3%A9).
-  const jobs = [];
-  const failed = [];
-  pairs.forEach(key => {
-    const idx = key.indexOf('|');
-    const slug = key.slice(0, idx);
-    const sub  = key.slice(idx + 1);
-    const cfg = FICHES_SYSTEMES[slug];
-    if(!cfg || !cfg.subs.includes(sub)) {
-      console.warn('[#88] Fiche introuvable dans FICHES_SYSTEMES :', slug, '/', sub);
-      failed.push(labelOf(key));
-      return;
-    }
-    jobs.push({ url: encodeURI('assets/fiches/' + slug + '/' + sub + '.pdf'), label: labelOf(key) });
-  });
-  if(jobs.length === 0) {
-    callback([], failed);
-    return;
-  }
-  // Rendu page à page : pdf.numPages → render canvas (scale 2.0 = QR nets) → dataURL.
-  // try/catch par fiche → skip + warn + AJOUT à failed (#112) ; jamais de rejet
-  // global, callback toujours appelée. Le .flat() à la fin aplatit la liste de
-  // listes en une séquence ordonnée de pages (toutes les pages de la fiche 1,
-  // puis fiche 2, …) — l'ordre des fiches suit l'ordre d'insertion du Set.
-  Promise.all(jobs.map(async job => {
-    try {
-      // verbosity 0 (ERRORS seulement) — les polices embarquées de certaines
-      // fiches PDF ont des programmes de hinting TrueType invalides ; PDF.js
-      // les ignore sans conséquence sur le rendu mais spamme la console de
-      // « Warning: TT: undefined function » (retour terrain). Les vraies
-      // erreurs restent loguées, et le try/catch par fiche (#112) inchangé.
-      const pdf = await pdfjsLib.getDocument({ url: job.url, verbosity: 0 }).promise;
-      const pages = [];
-      for(let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 });
-        const canvas = document.createElement('canvas');
-        canvas.width  = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        pages.push(canvas.toDataURL('image/png'));
-      }
-      return pages;
-    } catch(e) {
-      console.warn('[#88] Échec rendu fiche :', job.url, e);
-      failed.push(job.label);
-      return [];
-    }
-  })).then(results => callback(results.flat(), failed))
-    .catch(e => {
-      console.warn('[#88] Erreur globale annexes :', e);
-      callback([], jobs.map(j => j.label).concat(failed));
-    });
-}
-
-// #112 — Bloc rouge visible dans le rapport quand des fiches prescrites n'ont
-// pas pu être jointes en annexe. Partagé sport + posturo.
-function _buildFichesFailHTML(failed) {
-  if(!failed || failed.length === 0) return '';
-  return (
-    '<div style="page-break-inside:avoid;border:2px solid #c0392b;background:#fdecea;color:#7f1d1d;padding:10px 14px;margin:14px 24px;font-size:11px;border-radius:4px;">' +
-    '<b style="color:#c0392b;">⚠ Annexes incomplètes</b> — ' + failed.length +
-    " fiche(s) d'exercice prescrite(s) n'ont pas pu être jointe(s) à ce rapport :<br>" +
-    failed.map(l => '· ' + _escHtml(l)).join('<br>') +
-    '<br><span style="font-weight:600;">Régénérez le rapport (connexion réseau requise) avant remise au patient.</span></div>'
-  );
-}
-
-// #88-C Collecteur sport — lit la structure nested bd.ttt.{c1,c2,ch}. Filtre via
-// filledExo (exo avec libre OU au moins un sys non vide). Itère sys[i]/sub[i] alignés
-// par index (.exo-pair côté DOM). Inclut les exos détachés (décision #88-A). Dédup
-// par Set('slug|sub') — ordre d'insertion = ordre de découverte c1→c2→ch.
-function _collectSportFichesPairs(bd) {
-  const ttt = (bd && bd.ttt) || {};
-  const filledExo = e => e && (e.libre || (e.sys && e.sys.some(s => s)));
-  const pairs = new Set();
-  ['c1', 'c2', 'ch'].forEach(circ => {
-    (ttt[circ] || []).forEach(exo => {
-      if(!filledExo(exo)) return;
-      (exo.sys || []).forEach((slug, i) => {
-        const sub = (exo.sub || [])[i];
-        if(slug && sub) pairs.add(slug + '|' + sub);
-      });
-    });
-  });
-  return pairs;
-}
-
-// #88-C Collecteur posturo — lit les clés FLAT d.circ_<id>_sys / d.circ_<id>_sub
-// (savePosturoBilan L12321-12332). 8 exos seulement (c1_ex1..c1_ex4 + c2_ex1..c2_ex4),
-// pas de ch (échauffement absent du modèle posturo). Alignement sys[i]↔sub[i] par
-// index : si désalignement DOM (sub manquant pour un slot intermédiaire), la paire
-// non-conforme est filtrée par _resolveFichesImagesFromPairs via FICHES_SYSTEMES.subs.
-function _collectPosturoFichesPairs(d) {
-  const exos = ['c1_ex1','c1_ex2','c1_ex3','c1_ex4','c2_ex1','c2_ex2','c2_ex3','c2_ex4'];
-  const pairs = new Set();
-  exos.forEach(id => {
-    const sys = d['circ_'+id+'_sys'] || [];
-    const sub = d['circ_'+id+'_sub'] || [];
-    sys.forEach((slug, i) => {
-      const s = sub[i];
-      if(slug && s) pairs.add(slug + '|' + s);
-    });
-  });
-  return pairs;
-}
-
-// #88-C Wrapper sport — signature et comportement strictement inchangés depuis #88-B.
-// Call-sites printReport L5986 + buildRapport L5511 préservés sans modification.
-function _resolveSportFichesImages(bd, callback) {
-  _resolveFichesImagesFromPairs(_collectSportFichesPairs(bd), callback);
-}
-
-// #88-C Wrapper posturo — consommé par _buildRapportBody (chaînage post-bonhommes
-// et fast-path), précède _doBuildRapport qui injecte les pages dataURL en annexe.
-function _resolvePosturoFichesImages(d, callback) {
-  _resolveFichesImagesFromPairs(_collectPosturoFichesPairs(d), callback);
-}
-
 // #86 Fix E2E — Constructeur partagé du contenu rapport sport (parité buildRapport
 // vs printReport). Source unique → zéro divergence future entre l'aperçu écran et
 // l'impression PDF. Corrige le bug historique buildRapport L5512 où conclusions_tmp
@@ -19858,14 +19686,13 @@ function _resolvePosturoFichesImages(d, callback) {
 // (« Mesures à signaler » accumulé sur TOUS les tests) + bilanSection
 // (buildBilanPrintSection — qui contient désormais la synthèse clinique en clôture).
 // #98 — composites propagé à buildBilanPrintSection (canvas morpho/pieds).
-// #88-B — fichesPages propagé en suffixe bodyHTML (annexes 1 page par dataURL).
 // #109-A3 — annotatedViews (déjà collectées via _collectAnnotatedPostureViews
 // par les call-sites buildRapport / printReport) propagées en injection sous
 // bilanSection (voisinage de la synthèse clinique posturale).
 // Fix #150 — 6e param `statuses` : map {key → 'ok'|'nu'|'ko'} par silhouette/pieds,
 // produit par _resolveSportRapportImages. Propagé à buildBilanPrintSection pour
 // afficher la mention rouge sur 'ko' et masquer les blocs entièrement 'nu'.
-function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [], annotatedViews = [], statuses = {}, fichesFailed = []) {
+function _buildSportRapportContentHTML(p, prat, composites = {}, annotatedViews = [], statuses = {}) {
   // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
@@ -19920,21 +19747,11 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, fichesPages = [
   const bilanSection = (typeof buildBilanPrintSection === 'function' && p && p.bilanData)
     ? buildBilanPrintSection(p.bilanData, composites, annotatedViews, statuses) : '';
 
-  // #88-B Annexes PDF fiches d'exercices — 1 page imprimable par dataURL retourné
-  // par _resolveSportFichesImages (déjà aplaties multi-pages). page-break-before
-  // garantit que chaque fiche commence sur une nouvelle page. object-fit:contain
-  // pour respecter le ratio de la fiche A4 source. Si fichesPages = [] (fast-path
-  // 0 fiche ou pdf.js indispo), annexesHTML = '' → bodyHTML inchangé.
-  // #112 — mention rouge en tête d'annexes si des fiches prescrites manquent.
-  const annexesHTML = _buildFichesFailHTML(fichesFailed) + (fichesPages || []).map(dataURL =>
-    `<div style="page-break-before:always;break-before:page;margin:0;padding:0;"><img src="${dataURL}" style="width:100%;max-height:100vh;object-fit:contain;display:block;"/></div>`
-  ).join('');
-
   // #109-A4 — Les vues posturales annotées sont désormais injectées DANS la
   // sous-section Bilan Morphostatique (cf. buildBilanPrintSection ci-dessus),
   // juste après les silhouettes. Plus de bloc séparé entre bilanSection et annexes.
   // #277 — mention rouge si des images étaient encore en cours d'envoi.
-  const bodyHTML = _mentionEnvoiEnCoursHTML('sport') + sectionsHTML + concluHTML + bilanSection + annexesHTML;
+  const bodyHTML = _mentionEnvoiEnCoursHTML('sport') + sectionsHTML + concluHTML + bilanSection;
   return { pratHTML, patientHTML, bodyHTML };
 }
 
@@ -19972,10 +19789,10 @@ async function printReport() {
   // ce niveau. Le coût pdf.js est entièrement post-composites — pas de race possible.
   // Fix #150 — statuses propagé (idem buildRapport).
   _resolveSportRapportImages(p.bilanData || {}, (composites, statuses) => {
-    _resolveSportFichesImages(p.bilanData || {}, (fichesPages, fichesFailed) => {
+    {
       // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
       // (source unique commune avec buildRapport, parité visuelle garantie).
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, fichesPages, annotatedViews, statuses, fichesFailed);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, annotatedViews, statuses);
       document.getElementById('rp-prat-block').innerHTML = pratHTML;
       // #229-B — logo du cabinet au centre du header print.
       const rpLogo = document.getElementById('rp-prat-logo');
@@ -19988,13 +19805,13 @@ async function printReport() {
         ? bodyHTML
         : '<p style="color:#888;text-align:center;padding:20px;">Aucune mesure enregistrée pour ce patient.</p>';
 
-      // window.print() déclenché tout au fond, après injection composites + annexes.
+      // window.print() déclenché tout au fond, après injection des composites.
       document.body.classList.add('printing');
       setTimeout(() => {
         window.print();
         setTimeout(() => document.body.classList.remove('printing'), 100);
       }, 300);
-    });
+    }
   });
 }
 
@@ -20605,12 +20422,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
     // wrapper, cf _readSportTttExo L7322-7332). Système rendu via SPORT_SYSTEMES_LABELS
     // (fallback slug brut si non mappé). Sous-exercice (sub[i]) est déjà une string
     // lisible (data dict updateExerciceSubMenu L10660 — listes de strings localisées).
-    const pairs = (exo.sys || []).map((s, i) => {
-      if(!s) return '';
-      const sysLbl = _escHtml(SPORT_SYSTEMES_LABELS[s] || s);
-      const subVal = _escHtml((exo.sub || [])[i] || '');
-      return subVal ? sysLbl + ' → ' + subVal : sysLbl;
-    }).filter(Boolean);
+    const pairs = _exoBibPairs(exo.sys, exo.sub, exo.sysLib, exo.subLib).map(_escHtml);
     let val = _escHtml(exo.libre || '—');
     if(pairs.length) val += ' <span style="color:#666;">[' + pairs.join('] [') + ']</span>';
     if(showRatio && exo.ratio) val += ' <span style="color:#666;">· ' + _escHtml(exo.ratio) + '</span>';
@@ -24849,9 +24661,9 @@ function envoyerRapportMail() {
 let _sportTttCopying = false;
 
 function _readSportTttExo(libreEl) {
-  if(!libreEl) return { sys:[], sub:[], libre:'' };
+  if(!libreEl) return { sys:[], sub:[], sysLib:[], subLib:[], libre:'' };
   const wrap = libreEl.closest('.exo-stack');
-  if(!wrap) return { sys:[], sub:[], libre: libreEl.value || '' };
+  if(!wrap) return { sys:[], sub:[], sysLib:[], subLib:[], libre: libreEl.value || '' };
   // Correction 1 : alignement sub↔sys via .exo-pair de chaque sys (pas un querySelectorAll
   // à plat). Système vide → pas de .exo-pair créé OU pair sans .exo-sub → '' à cet index.
   const sels = Array.from(wrap.querySelectorAll('select.exo-sys'));
@@ -24862,6 +24674,13 @@ function _readSportTttExo(libreEl) {
       if(!pair) return '';
       const sub = pair.querySelector('select.exo-sub');
       return sub ? sub.value : '';
+    }),
+    // Libellés choisis (lot e2) : un exercice perso supprimé reste lisible dans le bilan enregistré.
+    sysLib: sels.map(s => (s.value && s.selectedOptions[0]) ? s.selectedOptions[0].text : ''),
+    subLib: sels.map(s => {
+      const pair = s.closest('.exo-pair');
+      const sub = pair && pair.querySelector('select.exo-sub');
+      return (sub && sub.value && sub.selectedOptions[0]) ? sub.selectedOptions[0].text : '';
     }),
     libre: libreEl.value || ''
   };
@@ -24878,13 +24697,15 @@ function _writeSportTttExo(libreEl, exo) {
   _sportTttCopying = true;
   try {
     sels.forEach((sel, i) => {
+      if(exo.sys && exo.sys[i]) _exoBibAssurerOption(sel, exo.sys[i], (exo.sysLib || [])[i]);
       sel.value = (exo.sys && exo.sys[i]) || '';
       sel.dispatchEvent(new Event('change')); // updateExerciceSubMenu crée/supprime .exo-sub sync
       // Correction 1 : sub via .exo-pair du sys courant (alignement strict)
       if(exo.sub && exo.sub[i]) {
         const pair = sel.closest('.exo-pair');
         const sub = pair ? pair.querySelector('select.exo-sub') : null;
-        if(sub) sub.value = exo.sub[i];
+        if(sub) { _exoBibAssurerOption(sub, exo.sub[i], (exo.subLib || [])[i]); sub.value = exo.sub[i]; }
+        else _exoBibForcerSub(sel, exo.sub[i], (exo.subLib || [])[i]);
       }
     });
     libreEl.value = exo.libre || '';
@@ -25863,7 +25684,7 @@ function clearPiedsCanvas() {
 // Raison : selectPatient(L8551 → ...) → loadBilan → restoreSportTtt → dispatchEvent
 // change → updateExerciceSubMenu lit FICHES_SYSTEMES dès le 1er tick top-level.
 // Si déclaré après, ReferenceError TDZ. Aucun nouveau TDZ créé par le déplacement :
-// les autres consommateurs (_resolveFichesImagesFromPairs, getBilanPosturoHTML, etc.)
+// les autres consommateurs (getBilanPosturoHTML, etc.)
 // sont des fonctions appelées au runtime. SPORT_SYSTEMES_LABELS dérivé reste valide
 // car l'ordre relatif dans le bloc est préservé (FICHES_SYSTEMES déclaré au-dessus).
 // ══════════════════════════════════════════════════════
@@ -26015,11 +25836,11 @@ const FICHES_SYSTEMES = {
 // select.exo-sys. Utilisé par getBilanPosturoHTML (interpolation template literal)
 // et populateSportSysOptions (injection runtime dans #ssec-9). 1 source = FICHES_SYSTEMES.
 function _genSysOptionsHTML(bilan) {
+  if (!_exoBib && typeof exoBibRafraichir === 'function' && typeof loadPwaSession === 'function') {
+    try { if (loadPwaSession().token) exoBibRafraichir(); } catch (_e) { /* pas de session */ }
+  }
   return '<option value="">-- Système --</option>' +
-    Object.entries(FICHES_SYSTEMES)
-      .filter(([, cfg]) => cfg.bilans.includes(bilan))
-      .map(([slug, cfg]) => `<option value="${slug}">${cfg.label}</option>`)
-      .join('');
+    _exoBibCats(bilan).map(c => `<option value="${_escHtml(c.value)}">${_escHtml(c.label)}</option>`).join('');
 }
 
 // #88 Dérivé de FICHES_SYSTEMES — source unique. Fallback brut au call-site
@@ -26027,6 +25848,151 @@ function _genSysOptionsHTML(bilan) {
 const SPORT_SYSTEMES_LABELS = Object.fromEntries(
   Object.entries(FICHES_SYSTEMES).map(([slug, cfg]) => [slug, cfg.label])
 );
+
+// ── Lot e2 — exercices de la BIBLIOTHÈQUE dans les tableaux des bilans (sport, posturo) ──
+// Catégorie (sys) puis exercice (sub). Valeurs enregistrées compatibles avec les anciens bilans :
+// catégorie de la base = son code (= l'ancien slug) ; exercice de la base = son code privé de
+// « code_categorie| » (= l'ancienne chaîne) ; exercice perso = 'perso:<id>' ; catégorie perso = 'pcat:<id>'.
+// Le libellé affiché au moment du choix est conservé (sysLib/subLib) : un exercice perso supprimé
+// reste lisible dans un bilan déjà enregistré.
+var _exoBib = null; // var : évite la zone morte si lu avant cette ligne au démarrage
+var _exoBibEnCours = false;
+function _exoBibConstruire(base, persoCats, perso) {
+  const cats = new Map();
+  (base || []).forEach(r => {
+    if (!r || !r.categorie_code) return;
+    let c = cats.get(r.categorie_code);
+    if (!c) {
+      c = { value: r.categorie_code, label: r.categorie_libelle || r.categorie_code, bilans: r.bilans || [], id: r.categorie_id, subs: [] };
+      cats.set(c.value, c);
+    }
+    if (r.exercice_code) {
+      const pre = r.categorie_code + '|';
+      c.subs.push({ value: r.exercice_code.startsWith(pre) ? r.exercice_code.slice(pre.length) : r.exercice_code, label: r.libelle });
+    }
+  });
+  const parId = new Map();
+  cats.forEach(c => parId.set(c.id, c));
+  (persoCats || []).filter(c => c.actif !== false).forEach(c => {
+    const o = { value: 'pcat:' + c.id, label: c.libelle, bilans: null, id: c.id, subs: [] };
+    cats.set(o.value, o);
+    parId.set(c.id, o);
+  });
+  (perso || []).filter(e => e.actif !== false).forEach(e => {
+    const c = parId.get(e.categorie_base_id || e.categorie_perso_id);
+    if (c) c.subs.push({ value: 'perso:' + e.id, label: e.libelle });
+  });
+  return Array.from(cats.values());
+}
+function _exoBibCats(bilan) {
+  if (!_exoBib) {
+    return Object.entries(FICHES_SYSTEMES).filter(([, cfg]) => cfg.bilans.includes(bilan))
+      .map(([slug, cfg]) => ({ value: slug, label: cfg.label, subs: cfg.subs.map(o => ({ value: o, label: o })) }));
+  }
+  return _exoBib.filter(c => !c.bilans || c.bilans.includes(bilan));
+}
+function _exoBibSubs(sysValue) {
+  const c = (_exoBib || []).find(x => x.value === sysValue);
+  if (c) return c.subs;
+  const f = FICHES_SYSTEMES[sysValue];
+  return f ? f.subs.map(o => ({ value: o, label: o })) : [];
+}
+function _exoBibLabelSys(sys, snap) {
+  if (snap) return snap;
+  const c = (_exoBib || []).find(x => x.value === sys);
+  if (c) return c.label;
+  if (SPORT_SYSTEMES_LABELS[sys]) return SPORT_SYSTEMES_LABELS[sys];
+  return /^(pcat:|perso:)/.test(sys) ? '(catégorie personnelle)' : sys;
+}
+function _exoBibLabelSub(sys, sub, snap) {
+  if (snap) return snap;
+  const o = _exoBibSubs(sys).find(x => x.value === sub);
+  if (o) return o.label;
+  return /^perso:/.test(sub) ? '(exercice personnel supprimé)' : sub;
+}
+// Texte « Catégorie → Exercice » pour les rapports (sans lien ni QR : tout est sur le portail).
+function _exoBibPairs(sysArr, subArr, sysLib, subLib) {
+  return (sysArr || []).map((s, i) => {
+    if (!s) return '';
+    const sl = _exoBibLabelSys(s, (sysLib || [])[i]);
+    const sub = (subArr || [])[i];
+    return sub ? sl + ' → ' + _exoBibLabelSub(s, sub, (subLib || [])[i]) : sl;
+  }).filter(Boolean);
+}
+function _exoBibAssurerOption(sel, value, label) {
+  if (!sel || !value) return;
+  if (!Array.from(sel.options).some(o => o.value === value)) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label || value;
+    sel.appendChild(o);
+  }
+}
+// Catégorie ou exercice qui n'est plus dans la bibliothèque (exercice perso supprimé) : on recrée la
+// liste d'exercices avec la seule valeur enregistrée pour que le bilan reste lisible.
+function _exoBibForcerSub(sel, value, label) {
+  const pair = sel.closest('.exo-pair');
+  if (!pair || !value) return null;
+  let sub = pair.querySelector('select.exo-sub');
+  if (!sub) {
+    sub = document.createElement('select');
+    sub.className = 'inp exo-sub';
+    sub.style.cssText = 'font-size:10px;background:#fff;color:#222;';
+    sub.innerHTML = _exoBibOptionsSub([]);
+    pair.appendChild(sub);
+  }
+  _exoBibAssurerOption(sub, value, label);
+  sub.value = value;
+  return sub;
+}
+function _exoBibOptionsSub(subs) {
+  return '<option value="">-- Exercice --</option>' + subs.map(o => '<option value="' + _escHtml(o.value) + '">' + _escHtml(o.label) + '</option>').join('');
+}
+// Charge la bibliothèque (base + perso) et remet à jour les listes déjà affichées. Silencieux hors ligne.
+async function exoBibRafraichir() {
+  if (_exoBibEnCours) return;
+  _exoBibEnCours = true;
+  try {
+    const rpc = await authFetch(SUPA_URL + '/rest/v1/rpc/exercices_base_liste', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    if (!rpc.ok) throw new Error('HTTP ' + rpc.status);
+    const base = await rpc.json();
+    let pc = [], pe = [];
+    try {
+      const a = await authFetch(SUPA_URL + '/rest/v1/exercices_perso_categories?select=*&order=libelle.asc');
+      const b = await authFetch(SUPA_URL + '/rest/v1/exercices_perso?select=*&order=libelle.asc');
+      if (a.ok) pc = await a.json();
+      if (b.ok) pe = await b.json();
+    } catch (_e) { /* exercices perso indisponibles : la base seule suffit */ }
+    if (Array.isArray(base) && base.length) {
+      _exoBib = _exoBibConstruire(base, pc, pe);
+      _exoBibRepeuplerSelects();
+    }
+  } catch (e) {
+    console.warn('[e2] bibliothèque indisponible, liste de secours :', e && e.message);
+  } finally {
+    _exoBibEnCours = false;
+  }
+}
+// Remet à jour tous les select.exo-sys / .exo-sub déjà présents en gardant les valeurs choisies.
+function _exoBibRepeuplerSelects() {
+  [['#ssec-9 select.exo-sys', 'sport'], ['#pg-bilan-posturo select.exo-sys', 'posturo']].forEach(([q, bilan]) => {
+    const html = _genSysOptionsHTML(bilan);
+    document.querySelectorAll(q).forEach(sel => {
+      const prev = sel.value;
+      const prevTxt = sel.selectedOptions[0] ? sel.selectedOptions[0].text : '';
+      sel.innerHTML = html;
+      if (prev) { _exoBibAssurerOption(sel, prev, prevTxt); sel.value = prev; }
+      const pair = sel.closest('.exo-pair');
+      const sub = pair && pair.querySelector('select.exo-sub');
+      if (sub && prev) {
+        const sv = sub.value;
+        const st = sub.selectedOptions[0] ? sub.selectedOptions[0].text : '';
+        sub.innerHTML = _exoBibOptionsSub(_exoBibSubs(prev));
+        if (sv) { _exoBibAssurerOption(sub, sv, st); sub.value = sv; }
+      }
+    });
+  });
+}
 
 // ══════════════════════════════════════════════════════
 // INIT
@@ -28569,12 +28535,12 @@ function updateExerciceSubMenu(selEl) {
   const oldSub = wrapper.querySelector('.exo-sub');
   if(oldSub) oldSub.remove();
   // #88 Source unique FICHES_SYSTEMES — anciens dicts inline supprimés.
-  const opts = FICHES_SYSTEMES[system]?.subs || [];
+  const opts = _exoBibSubs(system);
   if(!opts.length) return;
   const sub = document.createElement('select');
   sub.className = 'inp exo-sub';
   sub.style.cssText = 'font-size:10px;background:#fff;color:#222;';
-  sub.innerHTML = '<option value="">-- Exercice --</option>' + opts.map(o => '<option value="'+o+'">'+o+'</option>').join('');
+  sub.innerHTML = _exoBibOptionsSub(opts);
   wrapper.appendChild(sub);
 }
 
@@ -30725,9 +30691,13 @@ function _balayerBilanPosturo(d) {
     const rowEl = document.getElementById('po-'+id+'-libre')?.closest('div[style*="border"]');
     if(rowEl) {
       const sels = rowEl.querySelectorAll('select.exo-sys');
-      const subs = rowEl.querySelectorAll('select.exo-sub');
-      d['circ_'+id.replace('-','_')+'_sys'] = Array.from(sels).map(s=>s.value);
-      d['circ_'+id.replace('-','_')+'_sub'] = Array.from(subs).map(s=>s.value);
+      // Exercice aligné sur sa catégorie (lot e2) ; libellés conservés pour les exercices perso.
+      const subDe = s => { const pr = s.closest('.exo-pair'); return pr ? pr.querySelector('select.exo-sub') : null; };
+      const k = 'circ_'+id.replace('-','_');
+      d[k+'_sys'] = Array.from(sels).map(s=>s.value);
+      d[k+'_sub'] = Array.from(sels).map(s=>{ const x = subDe(s); return x ? x.value : ''; });
+      d[k+'_sysLib'] = Array.from(sels).map(s=>(s.value && s.selectedOptions[0]) ? s.selectedOptions[0].text : '');
+      d[k+'_subLib'] = Array.from(sels).map(s=>{ const x = subDe(s); return (x && x.value && x.selectedOptions[0]) ? x.selectedOptions[0].text : ''; });
     }
   });
 
@@ -31082,13 +31052,17 @@ function loadPosturoBilan() {
     const sels = row.querySelectorAll('select.exo-sys');
     sels.forEach((sel, i) => {
       if(sysVals[i]) {
+        _exoBibAssurerOption(sel, sysVals[i], (d['circ_'+key+'_sysLib'] || [])[i]);
         sel.value = sysVals[i];
         updateExerciceSubMenu(sel);
         // Restaurer le sous-menu après création
         setTimeout(() => {
           const sub = sel.nextElementSibling;
           if(sub && sub.classList.contains('exo-sub') && subVals[i]) {
+            _exoBibAssurerOption(sub, subVals[i], (d['circ_'+key+'_subLib'] || [])[i]);
             sub.value = subVals[i];
+          } else if(subVals[i]) {
+            _exoBibForcerSub(sel, subVals[i], (d['circ_'+key+'_subLib'] || [])[i]);
           }
         }, 100);
       }

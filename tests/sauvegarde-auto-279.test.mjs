@@ -294,7 +294,7 @@ describe('#279 étape 4 — reprise, validation, abandon', () => {
     expect(JSON.stringify(A.mesures[T]), 'mesures[test] strictement intact').toBe(avant);
     expect(typeof env._badgeBrouillonTest, 'badge').toBe('function');
     expect(env._badgeBrouillonTest(A, T)).toContain('modification en cours, non validée');
-    const r = env._buildSportRapportContentHTML(A, {}, {}, [], [], {}, []).bodyHTML;
+    const r = env._buildSportRapportContentHTML(A, {}, {}, [], {}).bodyHTML;
     // Format réel du rapport pour un KFPPA validé : « Statique (S) : +3.1° ».
     expect(r, 'valeur validée D au rapport').toContain('Statique (S) : +3.1°');
     expect(r, 'valeur validée G au rapport').toContain('Statique (S) : +4.2°');
@@ -371,7 +371,7 @@ describe('#279 étape 4 — bilan et rapport', () => {
     expect(Object.keys(A.mesures), 'compteurs de tests inchangés').toEqual(cles);
     expect(typeof env._badgeBrouillonTest).toBe('function');
     expect(env._badgeBrouillonTest(A, T)).toContain('en cours — non validé');
-    const r = env._buildSportRapportContentHTML(A, {}, {}, [], [], {}, []).bodyHTML;
+    const r = env._buildSportRapportContentHTML(A, {}, {}, [], {}).bodyHTML;
     expect(r).toContain('Test KFPPA Marche : capture en cours, non validée — non incluse');
     expect(r).toContain('color:#b91c1c');
     expect(r, 'aucune valeur du brouillon').not.toContain('14.8');
@@ -382,7 +382,7 @@ describe('#279 étape 4 — bilan et rapport', () => {
     const { env } = await ouvrir({ patients: [A], envois: ['ok'] });
     await env.captureVidPhotoSlot(0); // écriture différée EN ATTENTE
     const n = nbEcritures(env);
-    env._buildSportRapportContentHTML(A, {}, {}, [], [], {}, []);
+    env._buildSportRapportContentHTML(A, {}, {}, [], {});
     env.buildPrintSection(env.TESTS[T], { photos: env.slots() }, []);
     expect(nbEcritures(env), 'aucune écriture par le rapport').toBe(n);
     expect(brouillon(A), 'l’attente n’a pas été vidée par le rapport').toBeUndefined();
