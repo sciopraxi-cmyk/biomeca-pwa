@@ -31980,6 +31980,13 @@ function basculerActeDocument(acteId, coche) {
         _docEdition.regime = a.regime_defaut;
         const sel = document.getElementById('doc-regime');
         if (sel) sel.value = a.regime_defaut;
+        // Acte remboursable : la part Sécurité sociale est déduite (net réellement payé par le patient) ;
+        // le praticien décoche « tiers payant » si le patient n'a pas droit à la prise en charge.
+        if (Number.isInteger(a.base_remboursable_cents)) {
+          _docEdition.tiersPayant = true;
+          const tp = document.getElementById('doc-tiers-payant');
+          if (tp) tp.checked = true;
+        }
       }
       _docEdition.lignes.push(_ligneDepuisActe(a));
     }

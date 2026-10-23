@@ -612,8 +612,11 @@ describe('édition : cases à cocher, quantité, total à payer', () => {
     expect(e.f.etat().edition.regime).toBe('standard');
     e.f.basculerActeDocument('a-c2s', true);
     expect(e.f.etat().edition.regime).toBe('c2s');
+    expect(e.f.etat().edition.tiersPayant).toBe(true);
+    e.f.modifierChampDocument('tiers', false);
     e.f.modifierChampDocument('regime', 'ald');
     e.f.basculerActeDocument('a-pod1', true);
+    expect(e.f.etat().edition.tiersPayant).toBe(false);
     expect(e.f.etat().edition.regime).toBe('ald');
   });
   it('cocher ajoute la ligne au tarif du catalogue ; décocher la retire ; doublon impossible', () => {
