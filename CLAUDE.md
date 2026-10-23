@@ -570,7 +570,7 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   la synchro, VÉRIFIER la ligne en base et `delete p._cloudId` en cas d'échec, sinon un faux
   identifiant fait croire la fiche enregistrée. Contrôle hors connexion AVANT l'enregistrement.
 - **Pièges** : un attribut `hidden` est écrasé par la classe `.bouton` (masquer par
-  `style.display='none'`) ; chaînes JS à apostrophes sans `\\"` (no-useless-escape = erreur CI) ;
+  `style.display='none'`) ; chaînes JS à apostrophes sans `\"` (no-useless-escape = erreur CI) ;
   chaque bouton ajouté à la carte patient ajoute +1 `--mut`/`--card`/`--bord` à
   `palette-bilans.test.mjs` ; bumper `verticy-patient-vN` casse l'assertion CSP/SW de b2 (la
   mettre à jour).
