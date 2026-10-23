@@ -2098,6 +2098,7 @@
 [13,"option",[["value","reeduc-articulaire"]],"🦴 Rééducation articulaire"],
 [13,"option",[["value","respi-posture"]],"🌬️ Rééducation par la respiration (posture)"],
 [12,"input",[["class","inp"],["id","po-c2-ex4-libre"],["placeholder","✏️ Libre..."]],""],
+[4,"div",[["id","po-programmes-wrap"]],""],
 [4,"div",[],""],
 [5,"div",[],"🗓️ Jours des circuits (programme patient)"],
 [5,"div",[],""],

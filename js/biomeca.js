@@ -5636,7 +5636,7 @@ function nav(id) {
   const _leavingPage = document.querySelector('.page.active');
   const _leavingId = _leavingPage ? _leavingPage.id : null;
   // Lot e2 : à l'ouverture d'un bilan, les listes d'exercices reprennent la bibliothèque à jour.
-  if ((id === 'pg-bilan' || id === 'pg-bilan-posturo') && _leavingId !== id && typeof exoBibRafraichir === 'function') exoBibRafraichir();
+  if ((id === 'pg-bilan' || id === 'pg-bilan-posturo' || id === 'pg-podopediatrie') && _leavingId !== id && typeof exoBibRafraichir === 'function') exoBibRafraichir();
   if (_leavingId && _leavingId !== id) {
     // #277 — vers la page d'un rapport : capture EN MÉMOIRE seulement. Générer
     // un rapport ne déclenche JAMAIS de sauvegarde (CLAUDE.md) ; la saisie et le
@@ -18718,6 +18718,7 @@ function _extractPosturoSections(d) {
     else if(d['test_'+t]==='non') tests.push(label+' ❌');
   });
   if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
+  _progLignesRapport(d.programmes).forEach(t => { const i = t.indexOf(' : '); trait.push(i > 0 ? [t.slice(0, i), t.slice(i + 3)] : ['Programme', t]); });
   if(_texteJoursCircuits(d.joursCircuits)) trait.push(['Jours des circuits', _texteJoursCircuits(d.joursCircuits)]);
   if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
   if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
@@ -20431,8 +20432,10 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
     return '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:90px;white-space:nowrap;">'+durLbl+' ex.'+idx+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+val+'</td></tr>';
   };
   const joursTxt = _texteJoursCircuits(ttt.jours);
-  if(c1n || c2n || chn || ttt.prochainRdv || joursTxt) {
+  const progLignes = _progLignesRapport(ttt.programmes);
+  if(c1n || c2n || chn || ttt.prochainRdv || joursTxt || progLignes.length) {
     h += sec('Plan de Traitement');
+    progLignes.forEach(t => { h += '<p style="font-size:9px;margin:2px 0;">' + _escHtml(t) + '</p>'; });
     if(joursTxt) h += '<p style="font-size:9px;"><strong>Jours des circuits :</strong> ' + _escHtml(joursTxt) + '</p>';
     if(c1n) {
       h += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Circuit Express 1 (Demi Tabata 2min)</div>';
@@ -22169,6 +22172,9 @@ async function savePodopediatrieBilan(silent) {
   document.querySelectorAll('#pg-podopediatrie input[type=radio]').forEach(el => {
     if (el.checked && el.name) d[el.name] = el.value;
   });
+  _progMonter('pd');
+  d.programmes = _progLire('pd');
+  d.circuitsPodo = _podoCircuitsLire();
   // #140 Phase 2b1 — Sérialisation des 4 canvas silhouettes. Garde _userDirty
   // (bugs #94/#103 : sans elle, un re-init post-nav écraserait le dessin stocké
   // par le PNG transparent vide). Miroir strict de saveBilanSilent L14189.
@@ -22220,7 +22226,7 @@ async function savePodopediatrieBilan(silent) {
 // Restauration AUTORITATIVE (miroir loadPedicurieBilan).
 function loadPodopediatrieBilan() {
   const d = currentPatient?.bilanDataPodopediatrie;
-  if (!d) return;
+  if (!d) { _progMonter('pd'); _progEcrire('pd', null); _podoCircuitsEcrire(null); return; }
   document.querySelectorAll('#pg-podopediatrie .podopediatrie-field').forEach(el => {
     const f = el.dataset.field;
     if (!f) return;
@@ -22231,6 +22237,9 @@ function loadPodopediatrieBilan() {
     if (!el.name) return;
     el.checked = (d[el.name] !== undefined && el.value === d[el.name]);
   });
+  _progMonter('pd');
+  _progEcrire('pd', d.programmes);
+  _podoCircuitsEcrire(d.circuitsPodo);
 }
 
 // Bascule de section podopédiatrie + masquage périodique.
@@ -23325,9 +23334,19 @@ function _collectPodopediatrieSyntheseSections(srcData) {
   // buildPodopediatrieRapportHTML pour positionner le schéma plantaire après
   // cette section (sinon fallback juste avant la Synthèse). Pattern miroir
   // isAlerts/isMorpho/isMarche.
-  sections.push({ isTraitement: true, titre: '💊 Traitement', items: [
+  var progD = (typeof currentPatient !== 'undefined' && currentPatient && currentPatient.bilanDataPodopediatrie) || {};
+  var progItems = _progLignesRapport(progD.programmes).map(function (t) { return _escHtml(t); });
+  var circP = progD.circuitsPodo || {};
+  if (progD.programmes && progD.programmes.circuits) {
+    if (progD.programmes.express && progD.programmes.express.actif) {
+      if (_podoCircuitTexte(circP.c1, false)) progItems.push('<strong>Circuit Express 1</strong> : ' + _escHtml(_podoCircuitTexte(circP.c1, false)));
+      if (_podoCircuitTexte(circP.c2, false)) progItems.push('<strong>Circuit Express 2</strong> : ' + _escHtml(_podoCircuitTexte(circP.c2, false)));
+    }
+    if (progD.programmes.chauffe && progD.programmes.chauffe.actif && _podoCircuitTexte(circP.ch, true)) progItems.push('<strong>Circuit Échauffement</strong> : ' + _escHtml(_podoCircuitTexte(circP.ch, true)));
+  }
+  sections.push({ isTraitement: true, titre: '💊 Traitement', items: progItems.concat([
     txtItem('podo_semelles_desc', 'Semelles — description')
-  ].concat(boxItems(pfx('podo_mat_')).length ? ['<strong>Matériaux</strong> : ' + boxItems(pfx('podo_mat_')).join(', ')] : [])
+  ]).concat(boxItems(pfx('podo_mat_')).length ? ['<strong>Matériaux</strong> : ' + boxItems(pfx('podo_mat_')).join(', ')] : [])
    .concat(boxItems(pfx('podo_recouv_')).length ? ['<strong>Recouvrement</strong> : ' + boxItems(pfx('podo_recouv_')).join(', ')] : [])
    .concat(boxItems(pfx('podo_conseil_')).length ? ['<strong>Conseils</strong> : ' + boxItems(pfx('podo_conseil_')).join(', ')] : [])
    .concat([txtItem('podo_conseil_precision', 'Conseils précisions')])
@@ -24801,6 +24820,7 @@ function collectSportTtt(d) {
   const rdvEl = document.getElementById('sp-prochain-rdv');
   d.ttt.prochainRdv = rdvEl ? rdvEl.value : '';
   d.ttt.jours = _lireJoursCircuits('sp');
+  d.ttt.programmes = _progLire('sp');
 }
 
 function restoreSportTtt(d) {
@@ -24845,6 +24865,7 @@ function restoreSportTtt(d) {
   const rdvEl = document.getElementById('sp-prochain-rdv');
   if(rdvEl) rdvEl.value = t.prochainRdv || '';
   _ecrireJoursCircuits('sp', t.jours);
+  _progEcrire('sp', t.programmes);
 }
 
 function clearSportTtt() {
@@ -24865,6 +24886,7 @@ function clearSportTtt() {
     _sportTttCopying = prev;
   }
   _ecrireJoursCircuits('sp', null);
+  _progEcrire('sp', null);
   document.querySelectorAll('input[name="sp-materiaux"]').forEach(e => e.checked = false);
   document.querySelectorAll('input[name="sp-recouvrement"]').forEach(e => e.checked = false);
   const descEl = document.getElementById('sp-semelles-desc');
@@ -25977,7 +25999,7 @@ async function exoBibRafraichir() {
 }
 // Remet à jour tous les select.exo-sys / .exo-sub déjà présents en gardant les valeurs choisies.
 function _exoBibRepeuplerSelects() {
-  [['#ssec-9 select.exo-sys', 'sport'], ['#pg-bilan-posturo select.exo-sys', 'posturo']].forEach(([q, bilan]) => {
+  [['#ssec-9 select.exo-sys', 'sport'], ['#pg-bilan-posturo select.exo-sys', 'posturo'], ['#pg-podopediatrie select.exo-sys', 'sport']].forEach(([q, bilan]) => {
     const html = _genSysOptionsHTML(bilan);
     document.querySelectorAll(q).forEach(sel => {
       const prev = sel.value;
@@ -25994,6 +26016,230 @@ function _exoBibRepeuplerSelects() {
       }
     });
   });
+}
+
+// ── Lot e3a — « Programme du patient » (bilans sport, posturo, podopédiatrie) ──
+// Deux cases : programme de renforcement des muscles profonds des pieds (28 jours) et circuits d'exercices
+// (Express 1 et 2 ensemble, Échauffement), chacun avec sa période. Par défaut : début le lendemain du bilan,
+// fin = début + 27 jours (28 jours d'exercices) ; le praticien peut tout modifier.
+// Préfixes : sp (sport), po (posturo), pd (podopédiatrie). Données : { pied, express, chauffe } = { actif, debut, fin }.
+function _progJour(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? Math.round(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000) : null;
+}
+function _progISO(jour) {
+  return new Date(jour * 86400000).toISOString().slice(0, 10);
+}
+function _progFr(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : '';
+}
+function _progDefaut(dateBilanISO) {
+  const j = _progJour(dateBilanISO);
+  if (j === null) return { debut: '', fin: '' };
+  return { debut: _progISO(j + 1), fin: _progISO(j + 28) };
+}
+const _PROG_LIBELLES = { chauffe: 'Échauffement', express1: 'Express 1', pied: 'programme du pied du jour', express2: 'Express 2' };
+// Périodes valides : le programme du pied s'arrête au jour 28 même si la fin choisie est plus tardive.
+function _progPeriodes(p) {
+  const out = {};
+  [['pied', p && p.pied], ['express', p && p.express], ['chauffe', p && p.chauffe]].forEach(([k, v]) => {
+    if (!v || !v.actif) return;
+    const d = _progJour(v.debut);
+    let f = _progJour(v.fin);
+    if (d === null || f === null || f < d) return;
+    if (k === 'pied' && f > d + 27) f = d + 27;
+    out[k] = [d, f];
+  });
+  return out;
+}
+// Séances par jour sur chaque tronçon de dates : Échauffement, Express 1, programme du pied, Express 2.
+function _progSeances(p) {
+  const per = _progPeriodes(p);
+  const cles = Object.keys(per);
+  if (!cles.length) return [];
+  const bornes = new Set();
+  cles.forEach((k) => { bornes.add(per[k][0]); bornes.add(per[k][1] + 1); });
+  const b = Array.from(bornes).sort((x, y) => x - y);
+  const tr = [];
+  for (let i = 0; i < b.length - 1; i++) {
+    const d = b[i], f = b[i + 1] - 1;
+    const actifs = (k) => per[k] && per[k][0] <= d && per[k][1] >= f;
+    const l = [];
+    if (actifs('chauffe')) l.push(_PROG_LIBELLES.chauffe);
+    if (actifs('express')) l.push(_PROG_LIBELLES.express1);
+    if (actifs('pied')) l.push(_PROG_LIBELLES.pied);
+    if (actifs('express')) l.push(_PROG_LIBELLES.express2);
+    if (!l.length) continue;
+    const prec = tr[tr.length - 1];
+    if (prec && prec.fin + 1 === d && prec.seances.join('|') === l.join('|')) prec.fin = f;
+    else tr.push({ debut: d, fin: f, seances: l });
+  }
+  return tr.map((t) => ({ debut: _progISO(t.debut), fin: _progISO(t.fin), seances: t.seances }));
+}
+function _progTexteSeances(p) {
+  return _progSeances(p).map((t) => 'Du ' + _progFr(t.debut) + ' au ' + _progFr(t.fin) + ' : ' +
+    (t.seances.length === 1 ? '1 séance par jour' : t.seances.length + ' séances par jour') + ' (' + t.seances.join(', ') + ')');
+}
+// Lignes du rapport : périodes puis séances par jour.
+function _progLignesRapport(p) {
+  const l = [];
+  const per = (v) => (v && v.actif && v.debut && v.fin ? 'du ' + _progFr(v.debut) + ' au ' + _progFr(v.fin) : '');
+  if (p && p.pied && p.pied.actif) l.push('Programme de renforcement des muscles profonds des pieds : ' + (per(p.pied) || 'dates à définir'));
+  if (p && p.express && p.express.actif) l.push('Circuits Express 1 et 2 : ' + (per(p.express) || 'dates à définir'));
+  if (p && p.chauffe && p.chauffe.actif) l.push('Circuit Échauffement : ' + (per(p.chauffe) || 'dates à définir'));
+  return l.concat(_progTexteSeances(p));
+}
+function _progChamp(pref, k) {
+  return document.getElementById(pref + '-prog-' + k);
+}
+function _progDateBilan(pref) {
+  let v = '';
+  if (pref === 'po') { const e = document.getElementById('po-date-consult'); v = e ? e.value : ''; }
+  if (pref === 'pd') { const e = document.querySelector('#pg-podopediatrie [data-field="podo_date_consult"]'); v = e ? e.value : ''; }
+  return _progJour(v) !== null ? v : _progISO(Math.floor(Date.now() / 86400000));
+}
+function _progLire(pref) {
+  const lire = (k) => {
+    const c = _progChamp(pref, k + '-on');
+    return { actif: !!(c && c.checked), debut: (_progChamp(pref, k + '-debut') || {}).value || '', fin: (_progChamp(pref, k + '-fin') || {}).value || '' };
+  };
+  const circ = _progChamp(pref, 'circ-on');
+  const circOn = !!(circ && circ.checked);
+  const ex = lire('express'), ch = lire('chauffe');
+  ex.actif = circOn && ex.actif;
+  ch.actif = circOn && ch.actif;
+  return { pied: lire('pied'), circuits: circOn, express: ex, chauffe: ch };
+}
+function _progEcrire(pref, p) {
+  const q = p || {};
+  const poser = (k, v) => {
+    const c = _progChamp(pref, k + '-on');
+    if (c) c.checked = !!(v && v.actif);
+    const d = _progChamp(pref, k + '-debut'), f = _progChamp(pref, k + '-fin');
+    if (d) d.value = (v && v.debut) || '';
+    if (f) f.value = (v && v.fin) || '';
+  };
+  poser('pied', q.pied);
+  poser('express', q.express);
+  poser('chauffe', q.chauffe);
+  const circ = _progChamp(pref, 'circ-on');
+  if (circ) circ.checked = !!q.circuits || !!(q.express && q.express.actif) || !!(q.chauffe && q.chauffe.actif);
+  _progMaj(pref);
+}
+function _progMaj(pref) {
+  const p = _progLire(pref);
+  const aff = (id, on) => { const e = document.getElementById(pref + '-prog-' + id); if (e) e.style.display = on ? '' : 'none'; };
+  const circOn = !!(_progChamp(pref, 'circ-on') || {}).checked;
+  aff('pied-dates', !!(_progChamp(pref, 'pied-on') || {}).checked);
+  aff('circ-detail', circOn);
+  aff('express-dates', circOn && !!(_progChamp(pref, 'express-on') || {}).checked);
+  aff('chauffe-dates', circOn && !!(_progChamp(pref, 'chauffe-on') || {}).checked);
+  if (pref === 'pd') {
+    ['pd-circ-c1', 'pd-circ-c2'].forEach((id) => { const e = document.getElementById(id); if (e) e.style.display = p.express.actif ? '' : 'none'; });
+    const c = document.getElementById('pd-circ-ch');
+    if (c) c.style.display = p.chauffe.actif ? '' : 'none';
+  }
+  const err = [];
+  [['pied', 'programme du pied'], ['express', 'circuits Express'], ['chauffe', 'circuit Échauffement']].forEach(([k, n]) => {
+    const v = p[k];
+    if (v.actif && v.debut && v.fin && _progJour(v.fin) < _progJour(v.debut)) err.push('⚠ ' + n + ' : la date de fin est avant la date de début.');
+  });
+  const note = p.pied.actif && p.pied.debut ? 'Le programme du pied dure 28 jours au plus (jour 1 = ' + _progFr(p.pied.debut) + ').' : '';
+  const res = document.getElementById(pref + '-prog-resume');
+  if (res) {
+    res.innerHTML = err.map((t) => '<div style="color:#b91c1c;">' + _escHtml(t) + '</div>').join('') +
+      _progTexteSeances(p).map((t) => '<div>' + _escHtml(t) + '</div>').join('') +
+      (note ? '<div style="color:#666;">' + _escHtml(note) + '</div>' : '');
+  }
+}
+// Case cochée pour la première fois : dates proposées (lendemain du bilan, 28 jours).
+function _progChange(pref, k) {
+  const c = _progChamp(pref, k + '-on');
+  if (c && c.checked && k !== 'circ') {
+    const d = _progChamp(pref, k + '-debut'), f = _progChamp(pref, k + '-fin');
+    if (d && f && !d.value && !f.value) { const x = _progDefaut(_progDateBilan(pref)); d.value = x.debut; f.value = x.fin; }
+  }
+  _progMaj(pref);
+}
+function _progChangerDate(pref, k, bord) {
+  // Début modifié : la fin suit (début + 27 jours) tant que le praticien n'a pas touché à la fin.
+  const d = _progChamp(pref, k + '-debut'), f = _progChamp(pref, k + '-fin');
+  if (bord === 'debut' && d && f && !f._modifiee && _progJour(d.value) !== null) f.value = _progISO(_progJour(d.value) + 27);
+  if (bord === 'fin' && f) f._modifiee = true;
+  _progMaj(pref);
+}
+function _progHTML(pref) {
+  const ligne = (k, titre) =>
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#222;font-weight:600;margin-top:6px;"><input type="checkbox" id="' + pref + '-prog-' + k + '-on" onchange="_progChange(\'' + pref + '\',\'' + k + '\')"/> ' + titre + '</label>' +
+    '<div id="' + pref + '-prog-' + k + '-dates" style="display:none;margin:4px 0 0 22px;"><span style="font-size:11px;color:#555;">Début</span> <input class="inp" type="date" id="' + pref + '-prog-' + k + '-debut" style="width:auto;background:#fff;color:#222;" onchange="_progChangerDate(\'' + pref + '\',\'' + k + '\',\'debut\')"/> <span style="font-size:11px;color:#555;">Fin</span> <input class="inp" type="date" id="' + pref + '-prog-' + k + '-fin" style="width:auto;background:#fff;color:#222;" onchange="_progChangerDate(\'' + pref + '\',\'' + k + '\',\'fin\')"/></div>';
+  return '<div style="margin:12px 0;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;"><div style="font-size:12px;color:#222;font-weight:600;margin-bottom:2px;">🏋️ Programme du patient</div>' +
+    '<div style="font-size:11px;color:#666;">Par défaut : début le lendemain du bilan, 28 jours d\'exercices. Modifiable.</div>' +
+    ligne('pied', 'Programme de renforcement des muscles profonds des pieds') +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#222;font-weight:600;margin-top:8px;"><input type="checkbox" id="' + pref + '-prog-circ-on" onchange="_progChange(\'' + pref + '\',\'circ\')"/> Circuits d\'exercices</label>' +
+    '<div id="' + pref + '-prog-circ-detail" style="display:none;margin-left:22px;">' +
+    ligne('express', 'Circuits Express 1 et 2') + ligne('chauffe', 'Circuit Échauffement') + '</div>' +
+    '<div id="' + pref + '-prog-resume" style="font-size:11px;color:#2a7a4e;margin-top:8px;line-height:1.6;"></div></div>';
+}
+function _progMonter(pref) {
+  const w = document.getElementById(pref + '-programmes-wrap');
+  if (!w || w.getAttribute('data-monte')) return;
+  w.innerHTML = _progHTML(pref) + (pref === 'pd' ? _podoCircuitsHTML() : '');
+  w.setAttribute('data-monte', '1');
+  _progMaj(pref);
+}
+// Podopédiatrie : tableaux Express 1, Express 2 et Échauffement (catégorie → exercice de la bibliothèque).
+function _podoCircuitsHTML() {
+  const opts = _genSysOptionsHTML('sport');
+  const sel = '<select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">' + opts + '</select>';
+  const bloc = (cle, titre, n, duree, ratio) => {
+    let h = '<div id="pd-circ-' + cle + '" style="display:none;margin-bottom:10px;"><div class="podo-field-lbl">' + titre + '</div>';
+    for (let i = 1; i <= n; i++) {
+      h += '<div class="exo-stack" style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;margin-bottom:4px;"><span style="font-size:10px;color:#2a7a4e;font-weight:700;">' + duree + ' — Exercice ' + i + '</span>' +
+        '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + sel + sel + sel + '</div>' +
+        '<input class="inp" id="pd-' + cle + '-ex' + i + '-libre" placeholder="Exercice libre (facultatif)" style="font-size:11px;background:#fff;color:#222;"/>' +
+        (ratio ? '<select class="inp" id="pd-ch-ex' + i + '-ratio" style="font-size:10px;width:auto;background:#fff;color:#222;"><option value="30/30">30/30</option><option value="45/15">45/15</option></select>' : '') + '</div>';
+    }
+    return h + '</div>';
+  };
+  return '<div id="pd-circuits-tables" style="margin-top:6px;">' +
+    bloc('c1', 'Circuit Express 1 (Demi Tabata 2 min)', 4, '30s (20/10)', false) +
+    bloc('c2', 'Circuit Express 2 (Demi Tabata 2 min)', 4, '30s (20/10)', false) +
+    bloc('ch', 'Circuit Échauffement EMOM (8 min)', 8, '1 min', true) + '</div>';
+}
+function _podoCircuitsLire() {
+  const lire = (cle, n, ratio) => Array.from({ length: n }, (_, k) => {
+    const exo = _readSportTttExo(document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre'));
+    if (ratio) { const r = document.getElementById('pd-ch-ex' + (k + 1) + '-ratio'); exo.ratio = r ? r.value : '30/30'; }
+    return exo;
+  });
+  return { c1: lire('c1', 4, false), c2: lire('c2', 4, false), ch: lire('ch', 8, true) };
+}
+function _podoCircuitsEcrire(c) {
+  const vide = { sys: ['', '', ''], sub: ['', '', ''], sysLib: ['', '', ''], subLib: ['', '', ''], libre: '' };
+  const ecrire = (cle, n, liste, ratio) => {
+    for (let k = 0; k < n; k++) {
+      const libre = document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre');
+      if (!libre) continue;
+      const exo = (liste && liste[k]) || vide;
+      _writeSportTttExo(libre, exo);
+      if (ratio) { const r = document.getElementById('pd-ch-ex' + (k + 1) + '-ratio'); if (r) r.value = exo.ratio || '30/30'; }
+    }
+  };
+  ecrire('c1', 4, c && c.c1, false);
+  ecrire('c2', 4, c && c.c2, false);
+  ecrire('ch', 8, c && c.ch, true);
+}
+// Texte d'un circuit pour le rapport podopédiatrie : « ex.1 Catégorie → Exercice ; ex.2 … ».
+function _podoCircuitTexte(liste, ratio) {
+  const l = [];
+  (liste || []).forEach((exo, i) => {
+    if (!exo || !(exo.libre || (exo.sys || []).some((s) => s))) return;
+    const p = _exoBibPairs(exo.sys, exo.sub, exo.sysLib, exo.subLib);
+    if (exo.libre) p.unshift(exo.libre);
+    l.push('ex.' + (i + 1) + ' ' + p.join(' + ') + (ratio && exo.ratio ? ' (' + exo.ratio + ')' : ''));
+  });
+  return l.join(' ; ');
 }
 
 // ══════════════════════════════════════════════════════
@@ -26060,6 +26306,7 @@ function injectBilanPosturoPage() {
   div.id = 'pg-bilan-posturo';
   div.innerHTML = getBilanPosturoHTML();
   main.appendChild(div);
+  _progMonter('po');
   if (typeof _installerIndicateursEtat === 'function') _installerIndicateursEtat(); // A2 PR 3
 }
 
@@ -27793,6 +28040,7 @@ function getBilanPosturoHTML() {
         </div>
       </div>
     </div>
+      <div id="po-programmes-wrap"></div>
       <div style="margin-bottom:12px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;"><div style="font-size:12px;color:#222;font-weight:600;margin-bottom:6px;">🗓️ Jours des circuits (programme patient)</div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuits Express 1 (matin) et 2 (après-midi), le même jour</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="7"/> Dim</label></div></div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuit Échauffement</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="7"/> Dim</label></div></div></div>
     <div class="card" style="margin-bottom:16px;">
       <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
@@ -30679,7 +30927,7 @@ function _balayerBilanPosturo(d) {
   d.chaineOuv=getChk('po-chaine-ouv'); d.chaineStatOpt=getChk('po-chaine-stat-opt'); d.chaineStatDeg=getChk('po-chaine-stat-deg');
   d.biomecArticulaire=getPoVal('po-biomec-articulaire');
   // Section 9
-  d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv'); d.joursCircuits=_lireJoursCircuits('po');
+  d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv'); d.joursCircuits=_lireJoursCircuits('po'); d.programmes=_progLire('po');
   // #93 — Itère Object.keys(POSTURO_TESTS_AVANT_APRES) pour inclure t9 (Fukuda).
   // La constante est la source unique d'ordre/présence des tests posturo.
   Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { d['test_'+t]=getRad('po-'+t); });
@@ -31033,7 +31281,7 @@ function loadPosturoBilan() {
   setChk('po-chaine-ext',d.chaineExt); setChk('po-chaine-ferm',d.chaineFerm);
   setChk('po-chaine-ouv',d.chaineOuv); setChk('po-chaine-stat-opt',d.chaineStatOpt); setChk('po-chaine-stat-deg',d.chaineStatDeg);
   setPoVal('po-biomec-articulaire',d.biomecArticulaire);
-  setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv); _ecrireJoursCircuits('po',d.joursCircuits);
+  setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv); _ecrireJoursCircuits('po',d.joursCircuits); _progEcrire('po',d.programmes);
   // #93 — Cohérence atomique save↔load : même source ordinale que savePosturoBilan.
   Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { setPosturoRadio('po-'+t, d['test_'+t]); });
   // Matériaux et recouvrement
@@ -31286,6 +31534,7 @@ function populateSportSysOptions() {
   });
 }
 document.addEventListener('DOMContentLoaded', populateSportSysOptions);
+document.addEventListener('DOMContentLoaded', function () { _progMonter('sp'); _progMonter('pd'); });
 document.addEventListener('DOMContentLoaded', _installerSauvegardeTests); // #279 étape 4
 document.addEventListener('DOMContentLoaded', _installerIndicateursEtat); // A2 PR 3 — pages statiques
 

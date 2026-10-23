@@ -2267,6 +2267,8 @@
   [10,"input",[["class","podopediatrie-field"],["data-field","podo_recouv_microfibre"],["type","checkbox"]],""],
   [9,"label",[],"Peaucerie naturelle"],
   [10,"input",[["class","podopediatrie-field"],["data-field","podo_recouv_peaucerie"],["type","checkbox"]],""],
+  [5,"div",[["class","podo-block-title"]],"🏋️ Programme du patient"],
+  [5,"div",[["id","pd-programmes-wrap"]],""],
   [5,"div",[["class","podo-block-title"]],"💡 Conseils et mesures associées"],
   [5,"div",[],""],
   [6,"div",[["class","podo-check-grid"]],""],

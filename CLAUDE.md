@@ -636,6 +636,24 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   si le PATCH échoue, ancien PDF supprimé seulement après succès.
 - Preuve : `tests/exercices-bilans-e2.test.mjs`, parcours réel `documents/e2e-exercices-bilans.mjs`.
 
+## Programme du patient dans les bilans (lot e3a : sport `sp`, posturo `po`, podopédiatrie `pd`)
+
+- Bloc « 🏋️ Programme du patient » (`_progHTML`, `_progMonter`, `_progLire/_progEcrire`, `_progMaj`) : case
+  « Programme de renforcement des muscles profonds des pieds » et case « Circuits d'exercices » (Express 1 et 2
+  ensemble, Échauffement : une période chacun). Dates par défaut : début = lendemain du bilan (date de
+  consultation, sinon aujourd'hui), fin = début + 27 jours ; modifiables (fin qui suit le début tant qu'elle
+  n'a pas été touchée). Le programme du pied s'arrête au jour 28 même si la fin est plus tardive.
+- Séances par jour (`_progSeances`, tronçons de dates) : ordre Échauffement, Express 1, programme du pied du
+  jour, Express 2 ; Express + pied = 3, Échauffement + pied = 2, les trois = 4. Texte dans le bilan et le rapport.
+- Données : `bilanData.ttt.programmes` (sport), `bilanDataPosturo.programmes`, `bilanDataPodopediatrie.programmes`
+  `{ pied, circuits, express, chauffe }` (chacun `{ actif, debut, fin }`). Podopédiatrie : tableaux Express 1,
+  Express 2 (4 exercices) et Échauffement (8, ratio 30/30 ou 45/15) dans `circuitsPodo = { c1, c2, ch }`,
+  catégorie → exercice de la bibliothèque (même lecture que sport via `_readSportTttExo`).
+- Posturo : `po-programmes-wrap` est un simple conteneur dans le gabarit, rempli par `_progMonter('po')` après
+  injection (goldens : lignes ajoutées seulement). Reste à faire (e3b) : tableau de 28 jours du programme du pied
+  (EMOM 45/15) puis portail patient.
+- Preuve : `tests/programmes-bilans-e3a.test.mjs`, parcours réel `documents/e2e-programmes-bilans.mjs`.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
