@@ -5,7 +5,10 @@ import { fonction, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
 function monter() {
   const debut = SRC_BIOMECA.indexOf('const _PROG_LIBELLES');
   const lib = SRC_BIOMECA.slice(debut, SRC_BIOMECA.indexOf('\n', debut) + 1);
+  const dn = SRC_BIOMECA.indexOf('const JOURS_CIRCUITS_NOMS');
+  const noms = SRC_BIOMECA.slice(dn, SRC_BIOMECA.indexOf('\n', dn) + 1);
   const corps = [
+    noms,
     lib,
     fonction('_progJour'),
     fonction('_progJourPied'),
@@ -37,7 +40,12 @@ describe('programme du patient', () => {
       chauffe: P(false, '', ''),
     });
     expect(s).toHaveLength(1);
-    expect(s[0].seances).toEqual(['Express 1', 'programme du pied du jour', 'Express 2']);
+    expect(s[0].groupes).toHaveLength(1);
+    expect(s[0].groupes[0].seances).toEqual([
+      'Express 1',
+      'programme du pied du jour',
+      'Express 2',
+    ]);
   });
   it('Échauffement + programme du pied : 2 séances', () => {
     const s = f._progSeances({
@@ -45,7 +53,7 @@ describe('programme du patient', () => {
       express: P(false, '', ''),
       chauffe: P(true, '2026-10-24', '2026-11-20'),
     });
-    expect(s[0].seances).toEqual(['Échauffement', 'programme du pied du jour']);
+    expect(s[0].groupes[0].seances).toEqual(['Échauffement', 'programme du pied du jour']);
   });
   it('les trois ensemble : Échauffement, Express 1, programme, Express 2', () => {
     const s = f._progSeances({
@@ -53,7 +61,7 @@ describe('programme du patient', () => {
       express: P(true, '2026-10-24', '2026-11-20'),
       chauffe: P(true, '2026-10-24', '2026-11-20'),
     });
-    expect(s[0].seances).toEqual([
+    expect(s[0].groupes[0].seances).toEqual([
       'Échauffement',
       'Express 1',
       'programme du pied du jour',
@@ -66,7 +74,7 @@ describe('programme du patient', () => {
       express: P(true, '2026-10-24', '2026-11-06'),
       chauffe: P(false, '', ''),
     });
-    expect(s.map((t) => [t.debut, t.fin, t.seances.length])).toEqual([
+    expect(s.map((t) => [t.debut, t.fin, t.groupes[0].seances.length])).toEqual([
       ['2026-10-24', '2026-11-06', 3],
       ['2026-11-07', '2026-11-20', 1],
     ]);
@@ -98,6 +106,57 @@ describe('programme du patient', () => {
     expect(l[0]).toContain('sens inverse');
     const court = f._progLignesRapport({ pied: P(true, '2026-10-24', '2026-11-20') });
     expect(court[0]).not.toContain('sens inverse');
+  });
+  it('jours cochés : 24/10/2026 est un samedi ; Express lun-mer-ven, Échauffement mar-mer-jeu', () => {
+    const jours = { express: [1, 3, 5], chauffe: [2, 3, 4] };
+    const s = f._progSeances(
+      {
+        pied: P(true, '2026-10-26', '2026-11-22'),
+        express: P(true, '2026-10-26', '2026-11-22'),
+        chauffe: P(true, '2026-10-26', '2026-11-22'),
+      },
+      jours
+    );
+    expect(s).toHaveLength(1);
+    const par = Object.fromEntries(
+      s[0].groupes.flatMap((g) => g.jours.map((w) => [w, g.seances.length]))
+    );
+    expect(par).toEqual({ 1: 3, 2: 2, 3: 4, 4: 2, 5: 3, 6: 1, 7: 1 }); // lun 3, mar 2, mer 4, jeu 2, ven 3, sam 1, dim 1
+    const txt = f._progTexteSeances(
+      {
+        pied: P(true, '2026-10-26', '2026-11-22'),
+        express: P(true, '2026-10-26', '2026-11-22'),
+        chauffe: P(true, '2026-10-26', '2026-11-22'),
+      },
+      jours
+    )[0];
+    expect(txt).toContain(
+      'mercredi → 4 séances (Échauffement, Express 1, programme du pied du jour, Express 2)'
+    );
+    expect(txt).toContain('lundi, vendredi → 3 séances');
+    expect(txt).toContain('samedi, dimanche → 1 séance (programme du pied du jour)');
+  });
+  it('un circuit sans aucun jour coché compte tous les jours ; jours cochés sans pied : repos les autres jours', () => {
+    const s = f._progSeances(
+      {
+        express: P(true, '2026-10-26', '2026-11-22'),
+        pied: P(false, '', ''),
+        chauffe: P(false, '', ''),
+      },
+      { express: [1], chauffe: [] }
+    );
+    const txt = f._progTexteSeances(
+      { express: P(true, '2026-10-26', '2026-11-22') },
+      { express: [1], chauffe: [] }
+    )[0];
+    expect(s[0].groupes.map((g) => g.jours.length).sort()).toEqual([1, 6]);
+    expect(txt).toContain('mardi, mercredi, jeudi, vendredi, samedi, dimanche → repos');
+    expect(
+      f._progSeances(
+        { express: P(true, '2026-10-26', '2026-11-22') },
+        { express: [], chauffe: [] }
+      )[0].groupes
+    ).toHaveLength(1);
   });
   it('texte du rapport', () => {
     const l = f._progLignesRapport({

@@ -655,6 +655,21 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - Posturo : `po-programmes-wrap` est un simple conteneur dans le gabarit, rempli par `_progMonter('po')` après
   injection (goldens : lignes ajoutées seulement). Reste à faire (e3b) : tableau de 28 jours du programme du pied
   (EMOM 45/15) puis portail patient.
+- Séances par jour : calculées jour de la semaine par jour de la semaine (`_progSeances(p, jours)`) d'après
+  « Jours des circuits » (Express et Échauffement seulement les jours cochés ; aucun jour coché pour un circuit =
+  tous les jours ; programme du pied tous les jours) ; un changement de case se répercute aussitôt (écouteur
+  `change` global sur `*-jours-*`). Podopédiatrie a maintenant son bloc « Jours des circuits » (`pd-jours-*`,
+  `joursCircuits`).
+- Posturo : « Programme du patient » et « Jours des circuits » AU-DESSUS des tableaux Express ; tableau
+  Échauffement (`po-circ-ch`, ajouté par `_progMonter`) visible quand la case est cochée, rempli automatiquement
+  par Express 1 + 2 (`_circChauffeSync`, lecteur `_lireLigneCircuit`), rythme `circ_ch_ratio`. Rapport : section
+  « Traitements » puis circuits « Express 1 (20/10) », « Express 2 (20/10) », « Échauffement EMOM (8 min) — 30/30
+  ou 45/15 », puis plan de semelles.
+- Sport : un seul sélecteur 30/30 ou 45/15 (`sp-ch-ratio`) à côté du titre de l'Échauffement, appliqué aux 8
+  exercices (les sélecteurs par exercice sont masqués, la donnée `ttt.ch[i].ratio` est inchangée) ; le rapport
+  l'affiche à côté du titre du circuit.
+- Piège : le service worker sert les .js en cache d'abord ; changer le code sans changer `CACHE_VERSION` laisse
+  Joël voir l'ancienne version sur son localhost (pousser un correctif = incrémenter la version).
 - Preuve : `tests/programmes-bilans-e3a.test.mjs`, parcours réel `documents/e2e-programmes-bilans.mjs`.
 
 ## Fin de tâche : mise à jour de la documentation

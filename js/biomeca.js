@@ -18682,7 +18682,28 @@ function _extractPosturoSections(d) {
     if(synItems.length) sections.push({titre:'8. Synthèse clinique', items:synItems, color:'#2a7a4e'});
   }
 
-  // Circuits express — encadrés séparés par circuit
+  if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
+  if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
+  const tests = [];
+  // #93 — Libellés rapport posturo lus via TESTS_AVANT_APRES_LABELS (parité R1 :
+  // formulaire = synthèse = rapport). Itère POSTURO_TESTS_AVANT_APRES → ordre
+  // identique au DOM (t1..t4, t9 Fukuda, t5..t8) + inclut le nouveau t9. NB :
+  // libellés rapport passent en format long (ex. « Test de Rotation nucale
+  // amélioré ✅ »), changement rétroactif sur les rapports historiques posturo
+  // (donnée intacte, libellé seul change — validé cadrage #93).
+  Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => {
+    const label = TESTS_AVANT_APRES_LABELS[POSTURO_TESTS_AVANT_APRES[t]];
+    if(d['test_'+t]==='oui') tests.push(label+' ✅');
+    else if(d['test_'+t]==='non') tests.push(label+' ❌');
+  });
+  if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
+  _progLignesRapport(d.programmes, d.joursCircuits).forEach(t => { const i = t.indexOf(' : '); trait.push(i > 0 ? [t.slice(0, i), t.slice(i + 3)] : ['Programme', t]); });
+  if(_texteJoursCircuits(d.joursCircuits)) trait.push(['Jours des circuits', _texteJoursCircuits(d.joursCircuits)]);
+  if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
+  if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
+
+  // Circuits — après « Traitements », avant « Plan de semelles » (décision du 23/10/2026)
+  const circSections = [];
   const circLabels = ['Exercice 1','Exercice 2','Exercice 3','Exercice 4'];
   ['c1','c2'].forEach(function(cx, ci) {
     const circItems = [];
@@ -18699,29 +18720,26 @@ function _extractPosturoSections(d) {
       }
     });
     if(circItems.length) {
-      sections.push({titre:'9. Circuit '+(ci+1), items:circItems, color:'#16a085'});
+      circSections.push({titre:'9. Circuit Express '+(ci+1)+' (20/10)', items:circItems, color:'#16a085'});
     }
   });
 
-  if(d.materiaux && d.materiaux.length) trait.push(['Matériaux', d.materiaux.join(', ')]);
-  if(d.recouvrement && d.recouvrement.length) trait.push(['Recouvrement', d.recouvrement.join(', ')]);
-  const tests = [];
-  // #93 — Libellés rapport posturo lus via TESTS_AVANT_APRES_LABELS (parité R1 :
-  // formulaire = synthèse = rapport). Itère POSTURO_TESTS_AVANT_APRES → ordre
-  // identique au DOM (t1..t4, t9 Fukuda, t5..t8) + inclut le nouveau t9. NB :
-  // libellés rapport passent en format long (ex. « Test de Rotation nucale
-  // amélioré ✅ »), changement rétroactif sur les rapports historiques posturo
-  // (donnée intacte, libellé seul change — validé cadrage #93).
-  Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => {
-    const label = TESTS_AVANT_APRES_LABELS[POSTURO_TESTS_AVANT_APRES[t]];
-    if(d['test_'+t]==='oui') tests.push(label+' ✅');
-    else if(d['test_'+t]==='non') tests.push(label+' ❌');
-  });
-  if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
-  _progLignesRapport(d.programmes).forEach(t => { const i = t.indexOf(' : '); trait.push(i > 0 ? [t.slice(0, i), t.slice(i + 3)] : ['Programme', t]); });
-  if(_texteJoursCircuits(d.joursCircuits)) trait.push(['Jours des circuits', _texteJoursCircuits(d.joursCircuits)]);
-  if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
-  if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
+  // Échauffement = Express 1 (ex.1-4) puis Express 2 (ex.5-8), rythme 30/30 ou 45/15 choisi une fois.
+  if(d.programmes && d.programmes.chauffe && d.programmes.chauffe.actif) {
+    const chItems = [];
+    ['c1','c2'].forEach(function(cx) {
+      [1,2,3,4].forEach(function(i) {
+        const key = cx+'_ex'+i;
+        const paires = _exoBibPairs(d['circ_'+key+'_sys'], d['circ_'+key+'_sub'], d['circ_'+key+'_sysLib'], d['circ_'+key+'_subLib']);
+        const libre = d['circ_'+key] || '';
+        if(libre) paires.push(libre);
+        if(paires.length) chItems.push(['Exercice '+((cx === 'c1' ? 0 : 4) + i), paires.join(' | ')]);
+      });
+    });
+    if(chItems.length) circSections.push({titre:'9. Circuit Échauffement EMOM (8 min) — '+(d.circ_ch_ratio || '30/30'), items:chItems, color:'#f0a500'});
+  }
+
+  circSections.forEach(function(c) { sections.push(c); });
 
   return sections;
 }
@@ -20432,7 +20450,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
     return '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:90px;white-space:nowrap;">'+durLbl+' ex.'+idx+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+val+'</td></tr>';
   };
   const joursTxt = _texteJoursCircuits(ttt.jours);
-  const progLignes = _progLignesRapport(ttt.programmes);
+  const progLignes = _progLignesRapport(ttt.programmes, ttt.jours);
   if(c1n || c2n || chn || ttt.prochainRdv || joursTxt || progLignes.length) {
     h += sec('Plan de Traitement');
     progLignes.forEach(t => { h += '<p style="font-size:9px;margin:2px 0;">' + _escHtml(t) + '</p>'; });
@@ -20452,9 +20470,9 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
       h += '</table></div>';
     }
     if(chn) {
-      h += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Circuit Échauffement EMOM (8min)</div>';
+      h += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Circuit Échauffement EMOM (8min) — ' + _escHtml(((ttt.ch || []).find(e => e && e.ratio) || {}).ratio || '30/30') + '</div>';
       h += '<table style="width:100%;border-collapse:collapse;font-size:9px;">';
-      (ttt.ch || []).forEach((exo, i) => { if(filledExo(exo)) h += renderExo(exo, i+1, '1min', true); });
+      (ttt.ch || []).forEach((exo, i) => { if(filledExo(exo)) h += renderExo(exo, i+1, '1min', false); });
       h += '</table></div>';
     }
     // Prochain RDV — clôture bloc (parité posturo L5300, format date fr-FR via toLocaleDateString)
@@ -22174,6 +22192,7 @@ async function savePodopediatrieBilan(silent) {
   });
   _progMonter('pd');
   d.programmes = _progLire('pd');
+  d.joursCircuits = _lireJoursCircuits('pd');
   d.circuitsPodo = _podoCircuitsLire();
   // #140 Phase 2b1 — Sérialisation des 4 canvas silhouettes. Garde _userDirty
   // (bugs #94/#103 : sans elle, un re-init post-nav écraserait le dessin stocké
@@ -22226,7 +22245,7 @@ async function savePodopediatrieBilan(silent) {
 // Restauration AUTORITATIVE (miroir loadPedicurieBilan).
 function loadPodopediatrieBilan() {
   const d = currentPatient?.bilanDataPodopediatrie;
-  if (!d) { _progMonter('pd'); _progEcrire('pd', null); _podoCircuitsEcrire(null); return; }
+  if (!d) { _progMonter('pd'); _progEcrire('pd', null); _ecrireJoursCircuits('pd', null); _podoCircuitsEcrire(null); return; }
   document.querySelectorAll('#pg-podopediatrie .podopediatrie-field').forEach(el => {
     const f = el.dataset.field;
     if (!f) return;
@@ -22239,6 +22258,8 @@ function loadPodopediatrieBilan() {
   });
   _progMonter('pd');
   _progEcrire('pd', d.programmes);
+  _ecrireJoursCircuits('pd', d.joursCircuits);
+  _progMaj('pd');
   _podoCircuitsEcrire(d.circuitsPodo);
 }
 
@@ -23335,7 +23356,8 @@ function _collectPodopediatrieSyntheseSections(srcData) {
   // cette section (sinon fallback juste avant la Synthèse). Pattern miroir
   // isAlerts/isMorpho/isMarche.
   var progD = (typeof currentPatient !== 'undefined' && currentPatient && currentPatient.bilanDataPodopediatrie) || {};
-  var progItems = _progLignesRapport(progD.programmes).map(function (t) { return _escHtml(t); });
+  var progItems = _progLignesRapport(progD.programmes, progD.joursCircuits).map(function (t) { return _escHtml(t); });
+  if (_texteJoursCircuits(progD.joursCircuits)) progItems.push('<strong>Jours des circuits</strong> : ' + _escHtml(_texteJoursCircuits(progD.joursCircuits)));
   var circP = progD.circuitsPodo || {};
   if (progD.programmes && progD.programmes.circuits) {
     if (progD.programmes.express && progD.programmes.express.actif) {
@@ -24806,7 +24828,8 @@ function collectSportTtt(d) {
     // Fix B — ratio Échauffement 30/30 ÷ 45/15 (lu direct du DOM, non auto-reporté,
     // hors du contenu copié depuis CE → _writeSportTttExo ne le touche jamais)
     const ratioEl = document.getElementById('sp-ch-ex' + i + '-ratio');
-    exo.ratio = ratioEl ? ratioEl.value : '30/30';
+    const maitreEl = document.getElementById('sp-ch-ratio');
+    exo.ratio = maitreEl ? maitreEl.value : (ratioEl ? ratioEl.value : '30/30');
     return exo;
   });
   d.ttt.materiaux = Array.from(
@@ -24850,6 +24873,8 @@ function restoreSportTtt(d) {
     const r = document.getElementById('sp-ch-ex' + i + '-ratio');
     if(r && t.ch && t.ch[i - 1] && t.ch[i - 1].ratio) r.value = t.ch[i - 1].ratio;
   });
+  const maitre = document.getElementById('sp-ch-ratio');
+  if(maitre) maitre.value = (t.ch && t.ch[0] && t.ch[0].ratio) || '30/30';
   if(t.materiaux) {
     document.querySelectorAll('input[name="sp-materiaux"]').forEach(e => {
       e.checked = t.materiaux.includes(e.value);
@@ -26059,11 +26084,16 @@ function _progPeriodes(p) {
   });
   return out;
 }
-// Séances par jour sur chaque tronçon de dates : Échauffement, Express 1, programme du pied, Express 2.
-function _progSeances(p) {
+// Séances par jour sur chaque tronçon de dates, jour de la semaine par jour de la semaine : l'Échauffement et
+// les Express n'ont lieu que les jours cochés dans « Jours des circuits » (aucun jour coché pour un circuit = tous
+// les jours) ; le programme du pied se fait tous les jours. Ordre : Échauffement, Express 1, programme du pied
+// du jour, Express 2. Renvoie [{ debut, fin, groupes: [{ jours: [1-7], seances: [...] }] }].
+function _progSeances(p, jours) {
   const per = _progPeriodes(p);
   const cles = Object.keys(per);
   if (!cles.length) return [];
+  const jEx = (jours && Array.isArray(jours.express) && jours.express) || [];
+  const jCh = (jours && Array.isArray(jours.chauffe) && jours.chauffe) || [];
   const bornes = new Set();
   cles.forEach((k) => { bornes.add(per[k][0]); bornes.add(per[k][1] + 1); });
   const b = Array.from(bornes).sort((x, y) => x - y);
@@ -26071,24 +26101,39 @@ function _progSeances(p) {
   for (let i = 0; i < b.length - 1; i++) {
     const d = b[i], f = b[i + 1] - 1;
     const actifs = (k) => per[k] && per[k][0] <= d && per[k][1] >= f;
-    const l = [];
-    if (actifs('chauffe')) l.push(_PROG_LIBELLES.chauffe);
-    if (actifs('express')) l.push(_PROG_LIBELLES.express1);
-    if (actifs('pied')) l.push(_PROG_LIBELLES.pied);
-    if (actifs('express')) l.push(_PROG_LIBELLES.express2);
-    if (!l.length) continue;
+    if (!actifs('chauffe') && !actifs('express') && !actifs('pied')) continue;
+    const groupes = [];
+    for (let n = 0; n < Math.min(7, f - d + 1); n++) {
+      const w = ((d + n + 3) % 7) + 1; // 1 = lundi … 7 = dimanche (jour 0 = jeudi 01/01/1970)
+      const l = [];
+      if (actifs('chauffe') && (!jCh.length || jCh.includes(w))) l.push(_PROG_LIBELLES.chauffe);
+      if (actifs('express') && (!jEx.length || jEx.includes(w))) l.push(_PROG_LIBELLES.express1);
+      if (actifs('pied')) l.push(_PROG_LIBELLES.pied);
+      if (actifs('express') && (!jEx.length || jEx.includes(w))) l.push(_PROG_LIBELLES.express2);
+      const g = groupes.find((x) => x.seances.join('|') === l.join('|'));
+      if (g) g.jours.push(w); else groupes.push({ jours: [w], seances: l });
+    }
+    groupes.forEach((g) => g.jours.sort((x, y) => x - y));
+    if (groupes.every((g) => !g.seances.length)) continue;
+    const cle = JSON.stringify(groupes);
     const prec = tr[tr.length - 1];
-    if (prec && prec.fin + 1 === d && prec.seances.join('|') === l.join('|')) prec.fin = f;
-    else tr.push({ debut: d, fin: f, seances: l });
+    if (prec && prec.fin + 1 === d && prec.cle === cle) prec.fin = f;
+    else tr.push({ debut: d, fin: f, groupes, cle });
   }
-  return tr.map((t) => ({ debut: _progISO(t.debut), fin: _progISO(t.fin), seances: t.seances }));
+  return tr.map((t) => ({ debut: _progISO(t.debut), fin: _progISO(t.fin), groupes: t.groupes }));
 }
-function _progTexteSeances(p) {
-  return _progSeances(p).map((t) => 'Du ' + _progFr(t.debut) + ' au ' + _progFr(t.fin) + ' : ' +
-    (t.seances.length === 1 ? '1 séance par jour' : t.seances.length + ' séances par jour') + ' (' + t.seances.join(', ') + ')');
+function _progTexteSeances(p, jours) {
+  const nb = (n) => (n === 1 ? '1 séance' : n + ' séances');
+  return _progSeances(p, jours).map((t) => {
+    const g = t.groupes;
+    const corps = g.length === 1
+      ? nb(g[0].seances.length) + ' par jour (' + g[0].seances.join(', ') + ')'
+      : g.map((x) => x.jours.map((w) => JOURS_CIRCUITS_NOMS[w - 1]).join(', ') + ' → ' + (x.seances.length ? nb(x.seances.length) + ' (' + x.seances.join(', ') + ')' : 'repos')).join(' ; ');
+    return 'Du ' + _progFr(t.debut) + ' au ' + _progFr(t.fin) + ' : ' + corps;
+  });
 }
 // Lignes du rapport : périodes puis séances par jour.
-function _progLignesRapport(p) {
+function _progLignesRapport(p, jours) {
   const l = [];
   const per = (v) => (v && v.actif && v.debut && v.fin ? 'du ' + _progFr(v.debut) + ' au ' + _progFr(v.fin) : '');
   if (p && p.pied && p.pied.actif) {
@@ -26099,7 +26144,12 @@ function _progLignesRapport(p) {
   }
   if (p && p.express && p.express.actif) l.push('Circuits Express 1 et 2 : ' + (per(p.express) || 'dates à définir'));
   if (p && p.chauffe && p.chauffe.actif) l.push('Circuit Échauffement : ' + (per(p.chauffe) || 'dates à définir'));
-  return l.concat(_progTexteSeances(p));
+  return l.concat(_progTexteSeances(p, jours));
+}
+// Sport : le rythme 30/30 ou 45/15 se choisit à côté du titre et s'applique aux 8 exercices de l'Échauffement.
+function _chRatioSport(v) {
+  for (let i = 1; i <= 8; i++) { const r = document.getElementById('sp-ch-ex' + i + '-ratio'); if (r) r.value = v; }
+  if (typeof saveBilanSilent === 'function') saveBilanSilent();
 }
 function _progChamp(pref, k) {
   return document.getElementById(pref + '-prog-' + k);
@@ -26140,12 +26190,17 @@ function _progEcrire(pref, p) {
 }
 function _progMaj(pref) {
   const p = _progLire(pref);
+  const jours = _lireJoursCircuits(pref);
   const aff = (id, on) => { const e = document.getElementById(pref + '-prog-' + id); if (e) e.style.display = on ? '' : 'none'; };
   const circOn = !!(_progChamp(pref, 'circ-on') || {}).checked;
   aff('pied-dates', !!(_progChamp(pref, 'pied-on') || {}).checked);
   aff('circ-detail', circOn);
   aff('express-dates', circOn && !!(_progChamp(pref, 'express-on') || {}).checked);
   aff('chauffe-dates', circOn && !!(_progChamp(pref, 'chauffe-on') || {}).checked);
+  if (pref === 'po') {
+    const ch = document.getElementById('po-circ-ch');
+    if (ch) ch.style.display = p.chauffe.actif ? '' : 'none';
+  }
   if (pref === 'pd') {
     ['pd-circ-c1', 'pd-circ-c2'].forEach((id) => { const e = document.getElementById(id); if (e) e.style.display = p.express.actif ? '' : 'none'; });
     const c = document.getElementById('pd-circ-ch');
@@ -26157,10 +26212,15 @@ function _progMaj(pref) {
     if (v.actif && v.debut && v.fin && _progJour(v.fin) < _progJour(v.debut)) err.push('⚠ ' + n + ' : la date de fin est avant la date de début.');
   });
   const note = p.pied.actif && p.pied.debut ? 'Programme du pied : 28 jours, puis retour en sens inverse (jour 29 = exercices du jour 27, jour 30 = jour 26…), 55 jours au plus (jour 1 = ' + _progFr(p.pied.debut) + ').' : '';
+  const sansJours = [];
+  if (p.express.actif && !jours.express.length) sansJours.push('Express');
+  if (p.chauffe.actif && !jours.chauffe.length) sansJours.push('Échauffement');
+  const noteJours = sansJours.length ? 'Jours des circuits non cochés (' + sansJours.join(', ') + ') : compté tous les jours.' : '';
   const res = document.getElementById(pref + '-prog-resume');
   if (res) {
     res.innerHTML = err.map((t) => '<div style="color:#b91c1c;">' + _escHtml(t) + '</div>').join('') +
-      _progTexteSeances(p).map((t) => '<div>' + _escHtml(t) + '</div>').join('') +
+      _progTexteSeances(p, jours).map((t) => '<div>' + _escHtml(t) + '</div>').join('') +
+      (noteJours ? '<div style="color:#666;">' + _escHtml(noteJours) + '</div>' : '') +
       (note ? '<div style="color:#666;">' + _escHtml(note) + '</div>' : '');
   }
 }
@@ -26192,66 +26252,116 @@ function _progHTML(pref) {
     ligne('express', 'Circuits Express 1 et 2') + ligne('chauffe', 'Circuit Échauffement') + '</div>' +
     '<div id="' + pref + '-prog-resume" style="font-size:11px;color:#2a7a4e;margin-top:8px;line-height:1.6;"></div></div>';
 }
+function _joursBlocHTML(pref) {
+  const cases = (k) => JOURS_CIRCUITS_NOMS.map((n, i) => '<label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="' + pref + '-jours-' + k + '" value="' + (i + 1) + '"/> ' + n.charAt(0).toUpperCase() + n.slice(1, 3) + '</label>').join('');
+  return '<div style="margin:12px 0;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;"><div style="font-size:12px;color:#222;font-weight:600;margin-bottom:6px;">🗓️ Jours des circuits (programme patient)</div>' +
+    '<div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuits Express 1 (matin) et 2 (après-midi), le même jour</div><div style="display:flex;gap:10px;flex-wrap:wrap;">' + cases('express') + '</div></div>' +
+    '<div><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuit Échauffement</div><div style="display:flex;gap:10px;flex-wrap:wrap;">' + cases('chauffe') + '</div></div></div>';
+}
+// Un jour coché ou décoché met aussitôt à jour le résumé vert des séances.
+document.addEventListener('change', function (e) {
+  const m = e.target && e.target.name ? /^(sp|po|pd)-jours-/.exec(e.target.name) : null;
+  if (m) _progMaj(m[1]);
+});
 function _progMonter(pref) {
   const w = document.getElementById(pref + '-programmes-wrap');
   if (!w || w.getAttribute('data-monte')) return;
-  w.innerHTML = _progHTML(pref) + (pref === 'pd' ? _podoCircuitsHTML() : '');
+  w.innerHTML = _progHTML(pref) + (pref === 'pd' ? _joursBlocHTML('pd') + _podoCircuitsHTML() : '');
   w.setAttribute('data-monte', '1');
-  if (pref === 'pd') _podoCircuitsBrancher();
+  if (pref === 'pd') _circChauffeBrancher('pd', document.getElementById('pd-circuits-tables'));
+  if (pref === 'po') {
+    // Posturo : le tableau Échauffement est ajouté en fin de la carte des circuits Express (apparaît quand la case est cochée).
+    const carte = (document.getElementById('po-c1-ex1-libre') || {}).closest ? document.getElementById('po-c1-ex1-libre').closest('.card') : null;
+    if (carte && !document.getElementById('po-circ-ch')) {
+      const ch = document.createElement('div');
+      ch.style.marginTop = '12px';
+      ch.innerHTML = _circChauffeBlocHTML('po', 'posturo');
+      carte.appendChild(ch);
+      _circChauffeBrancher('po', carte);
+      _circChauffeSync('po');
+    }
+  }
+  if (pref === 'pd') _circChauffeSync('pd');
   _progMaj(pref);
 }
+// Tableau « Circuit Échauffement » rempli automatiquement (podopédiatrie `pd`, posturo `po`).
+// L'Échauffement = Express 1 (ex.1-4) + Express 2 (ex.5-8) ; il n'est pas modifiable à la main ; le rythme
+// 30/30 ou 45/15 se choisit une fois, à côté du titre, pour tous les exercices.
+function _circChauffeBlocHTML(pref, bilan) {
+  const opts = _genSysOptionsHTML(bilan);
+  const sel = '<select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">' + opts + '</select>';
+  let h = '<div id="' + pref + '-circ-ch" style="display:none;margin-bottom:10px;"><div class="podo-field-lbl" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;">Circuit Échauffement EMOM (8 min) ' +
+    '<select class="inp" id="' + pref + '-ch-ratio" style="font-size:11px;width:auto;background:#fff;color:#222;"><option value="30/30">30/30</option><option value="45/15">45/15</option></select>' +
+    '<span style="font-size:10px;font-weight:400;color:#666;text-transform:none;">rempli automatiquement avec les exercices des circuits Express 1 et 2</span></div>';
+  for (let i = 1; i <= 8; i++) {
+    h += '<div class="exo-stack" style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;margin-bottom:4px;"><span style="font-size:10px;color:#2a7a4e;font-weight:700;">1 min — Exercice ' + i + '</span>' +
+      '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + sel + sel + sel + '</div>' +
+      '<input class="inp" id="' + pref + '-ch-ex' + i + '-libre" placeholder="Exercice libre (facultatif)" style="font-size:11px;background:#fff;color:#222;"/></div>';
+  }
+  return h + '</div>';
+}
+// Lecture d'une ligne de circuit : sport/podopédiatrie (.exo-stack) comme posturo (simple encadré).
+function _lireLigneCircuit(libreEl) {
+  if (!libreEl) return { sys: [], sub: [], sysLib: [], subLib: [], libre: '' };
+  const wrap = libreEl.closest('.exo-stack') || libreEl.closest('div[style*="border"]');
+  if (!wrap) return { sys: [], sub: [], sysLib: [], subLib: [], libre: libreEl.value || '' };
+  const sels = Array.from(wrap.querySelectorAll('select.exo-sys'));
+  const subDe = (x) => { const pr = x.closest('.exo-pair'); return pr ? pr.querySelector('select.exo-sub') : null; };
+  return {
+    sys: sels.map((x) => x.value),
+    sub: sels.map((x) => { const u = subDe(x); return u ? u.value : ''; }),
+    sysLib: sels.map((x) => (x.value && x.selectedOptions[0] ? x.selectedOptions[0].text : '')),
+    subLib: sels.map((x) => { const u = subDe(x); return u && u.value && u.selectedOptions[0] ? u.selectedOptions[0].text : ''; }),
+    libre: libreEl.value || '',
+  };
+}
+function _circChauffeSync(pref) {
+  const prev = _sportTttCopying;
+  _sportTttCopying = true;
+  try {
+    for (let k = 0; k < 8; k++) {
+      const src = document.getElementById(pref + '-' + (k < 4 ? 'c1' : 'c2') + '-ex' + ((k % 4) + 1) + '-libre');
+      const dst = document.getElementById(pref + '-ch-ex' + (k + 1) + '-libre');
+      if (src && dst) _writeSportTttExo(dst, _lireLigneCircuit(src));
+    }
+  } finally {
+    _sportTttCopying = prev;
+  }
+  document.querySelectorAll('#' + pref + '-circ-ch .exo-stack select, #' + pref + '-circ-ch .exo-stack input').forEach((x) => { x.disabled = true; });
+}
+function _circChauffeBrancher(pref, zone) {
+  if (!zone || zone._brancheE3) return;
+  zone._brancheE3 = true;
+  const surChangement = (e) => {
+    if (_sportTttCopying || !e.target || !e.target.closest) return;
+    if (!e.target.closest('#' + pref + '-circ-ch')) _circChauffeSync(pref);
+  };
+  zone.addEventListener('change', surChangement);
+  zone.addEventListener('input', surChangement);
+}
 // Podopédiatrie : tableaux Express 1, Express 2 et Échauffement (catégorie → exercice de la bibliothèque).
-// L'Échauffement = Express 1 + Express 2 : il se remplit tout seul (ex.1-4 = Express 1, ex.5-8 = Express 2) et
-// n'est pas modifiable à la main ; le rythme 30/30 ou 45/15 se choisit une fois pour tous les exercices.
 function _podoCircuitsHTML() {
   const opts = _genSysOptionsHTML('sport');
   const sel = '<select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">' + opts + '</select>';
-  const bloc = (cle, titre, n, duree, extra) => {
-    let h = '<div id="pd-circ-' + cle + '" style="display:none;margin-bottom:10px;"><div class="podo-field-lbl" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + titre + (extra || '') + '</div>';
-    for (let i = 1; i <= n; i++) {
-      h += '<div class="exo-stack" style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;margin-bottom:4px;"><span style="font-size:10px;color:#2a7a4e;font-weight:700;">' + duree + ' — Exercice ' + i + '</span>' +
+  const bloc = (cle, titre) => {
+    let h = '<div id="pd-circ-' + cle + '" style="display:none;margin-bottom:10px;"><div class="podo-field-lbl">' + titre + '</div>';
+    for (let i = 1; i <= 4; i++) {
+      h += '<div class="exo-stack" style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;margin-bottom:4px;"><span style="font-size:10px;color:#2a7a4e;font-weight:700;">30s (20/10) — Exercice ' + i + '</span>' +
         '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + sel + sel + sel + '</div>' +
         '<input class="inp" id="pd-' + cle + '-ex' + i + '-libre" placeholder="Exercice libre (facultatif)" style="font-size:11px;background:#fff;color:#222;"/></div>';
     }
     return h + '</div>';
   };
-  const ratio = '<select class="inp" id="pd-ch-ratio" style="font-size:11px;width:auto;background:#fff;color:#222;"><option value="30/30">30/30</option><option value="45/15">45/15</option></select><span style="font-size:10px;font-weight:400;color:#666;text-transform:none;">rempli automatiquement avec les exercices des circuits Express 1 et 2</span>';
   return '<div id="pd-circuits-tables" style="margin-top:6px;">' +
-    bloc('c1', 'Circuit Express 1 (Demi Tabata 2 min)', 4, '30s (20/10)') +
-    bloc('c2', 'Circuit Express 2 (Demi Tabata 2 min)', 4, '30s (20/10)') +
-    bloc('ch', 'Circuit Échauffement EMOM (8 min)', 8, '1 min', ratio) + '</div>';
+    bloc('c1', 'Circuit Express 1 (Demi Tabata 2 min)') + bloc('c2', 'Circuit Express 2 (Demi Tabata 2 min)') +
+    _circChauffeBlocHTML('pd', 'sport') + '</div>';
 }
 const _PODO_VIDE = { sys: ['', '', ''], sub: ['', '', ''], sysLib: ['', '', ''], subLib: ['', '', ''], libre: '' };
-// Recopie Express 1 (ex.1-4) puis Express 2 (ex.1-4) dans l'Échauffement (ex.1-8) et le verrouille.
-function _podoSyncChauffe() {
-  const prev = _sportTttCopying;
-  _sportTttCopying = true;
-  try {
-    for (let k = 0; k < 8; k++) {
-      const src = document.getElementById('pd-' + (k < 4 ? 'c1' : 'c2') + '-ex' + ((k % 4) + 1) + '-libre');
-      const dst = document.getElementById('pd-ch-ex' + (k + 1) + '-libre');
-      if (src && dst) _writeSportTttExo(dst, _readSportTttExo(src));
-    }
-  } finally {
-    _sportTttCopying = prev;
-  }
-  document.querySelectorAll('#pd-circ-ch .exo-stack select, #pd-circ-ch .exo-stack input').forEach((x) => { x.disabled = true; });
-}
-function _podoCircuitsBrancher() {
-  const zone = document.getElementById('pd-circuits-tables');
-  if (!zone || zone._brancheE3) return;
-  zone._brancheE3 = true;
-  const surChangement = (e) => {
-    if (_sportTttCopying || !e.target || !e.target.closest) return;
-    if (e.target.closest('#pd-circ-c1') || e.target.closest('#pd-circ-c2')) _podoSyncChauffe();
-  };
-  zone.addEventListener('change', surChangement);
-  zone.addEventListener('input', surChangement);
-}
+function _podoSyncChauffe() { _circChauffeSync('pd'); }
 function _podoCircuitsLire() {
-  _podoSyncChauffe();
+  _circChauffeSync('pd');
   const ratio = (document.getElementById('pd-ch-ratio') || {}).value || '30/30';
-  const lire = (cle, n) => Array.from({ length: n }, (_, k) => _readSportTttExo(document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre')));
+  const lire = (cle, n) => Array.from({ length: n }, (_, k) => _lireLigneCircuit(document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre')));
   return { c1: lire('c1', 4), c2: lire('c2', 4), ch: lire('ch', 8).map((e) => Object.assign(e, { ratio })), ratio };
 }
 function _podoCircuitsEcrire(c) {
@@ -26269,7 +26379,7 @@ function _podoCircuitsEcrire(c) {
   }
   const r = document.getElementById('pd-ch-ratio');
   if (r) r.value = (c && (c.ratio || (c.ch && c.ch[0] && c.ch[0].ratio))) || '30/30';
-  _podoSyncChauffe();
+  _circChauffeSync('pd');
 }
 // Texte d'un circuit pour le rapport podopédiatrie : « ex.1 Catégorie → Exercice ; ex.2 … ».
 function _podoCircuitTexte(liste, ratio) {
@@ -27984,6 +28094,8 @@ function getBilanPosturoHTML() {
         </div>
       </div>
     </div>
+      <div id="po-programmes-wrap"></div>
+      <div style="margin-bottom:12px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;"><div style="font-size:12px;color:#222;font-weight:600;margin-bottom:6px;">🗓️ Jours des circuits (programme patient)</div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuits Express 1 (matin) et 2 (après-midi), le même jour</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="7"/> Dim</label></div></div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuit Échauffement</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="7"/> Dim</label></div></div></div>
     <div class="card" style="margin-bottom:16px;">
       <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
         <div style="font-weight:700;color:#2471a3;font-size:14px;">🏋️ Circuits d'exercices</div>
@@ -28081,8 +28193,6 @@ function getBilanPosturoHTML() {
         </div>
       </div>
     </div>
-      <div id="po-programmes-wrap"></div>
-      <div style="margin-bottom:12px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;"><div style="font-size:12px;color:#222;font-weight:600;margin-bottom:6px;">🗓️ Jours des circuits (programme patient)</div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuits Express 1 (matin) et 2 (après-midi), le même jour</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="7"/> Dim</label></div></div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuit Échauffement</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="7"/> Dim</label></div></div></div>
     <div class="card" style="margin-bottom:16px;">
       <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
         <div style="font-weight:700;color:var(--green);font-size:14px;">✅ Tests avant/après</div>
@@ -30968,7 +31078,7 @@ function _balayerBilanPosturo(d) {
   d.chaineOuv=getChk('po-chaine-ouv'); d.chaineStatOpt=getChk('po-chaine-stat-opt'); d.chaineStatDeg=getChk('po-chaine-stat-deg');
   d.biomecArticulaire=getPoVal('po-biomec-articulaire');
   // Section 9
-  d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv'); d.joursCircuits=_lireJoursCircuits('po'); d.programmes=_progLire('po');
+  d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv'); d.joursCircuits=_lireJoursCircuits('po'); d.programmes=_progLire('po'); d.circ_ch_ratio=(document.getElementById('po-ch-ratio')||{}).value||'30/30';
   // #93 — Itère Object.keys(POSTURO_TESTS_AVANT_APRES) pour inclure t9 (Fukuda).
   // La constante est la source unique d'ordre/présence des tests posturo.
   Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { d['test_'+t]=getRad('po-'+t); });
@@ -31322,7 +31432,7 @@ function loadPosturoBilan() {
   setChk('po-chaine-ext',d.chaineExt); setChk('po-chaine-ferm',d.chaineFerm);
   setChk('po-chaine-ouv',d.chaineOuv); setChk('po-chaine-stat-opt',d.chaineStatOpt); setChk('po-chaine-stat-deg',d.chaineStatDeg);
   setPoVal('po-biomec-articulaire',d.biomecArticulaire);
-  setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv); _ecrireJoursCircuits('po',d.joursCircuits); _progEcrire('po',d.programmes);
+  setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv); _ecrireJoursCircuits('po',d.joursCircuits); _progEcrire('po',d.programmes); (function(){ const r=document.getElementById('po-ch-ratio'); if(r) r.value=d.circ_ch_ratio||'30/30'; setTimeout(function(){ _circChauffeSync('po'); },250); })();
   // #93 — Cohérence atomique save↔load : même source ordinale que savePosturoBilan.
   Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { setPosturoRadio('po-'+t, d['test_'+t]); });
   // Matériaux et recouvrement
