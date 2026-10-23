@@ -1,6 +1,6 @@
 // Bibliothèque d'exercices (lot e, étape 1). Fonctions extraites de js/biomeca.js ; réseau simulé ; données FICTIVES.
 import { describe, it, expect } from 'vitest';
-import { fonction, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
+import { fonction, objet, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
 
 const constanteBloc = (debut, fin) => {
   const i = SRC_BIOMECA.indexOf(debut);
@@ -53,6 +53,8 @@ function monter(o = {}) {
     'const crypto = { randomUUID: () => "uuid-1" };',
     FICHES,
     PIED,
+    objet('_EXO_PICTOS'),
+    fonction('_exoAvecPicto'),
     EXO_RE,
     'const EXO_PDF_MAX_OCTETS = 10 * 1024 * 1024;',
     'let _exoEtat = { base: [], baseAdmin: { cats: [], exos: [] }, persoCats: [], perso: [] }; const _exoJson = { "Content-Type": "application/json", "Prefer": "return=minimal" };',

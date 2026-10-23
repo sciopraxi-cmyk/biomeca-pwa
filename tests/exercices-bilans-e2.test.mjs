@@ -1,6 +1,6 @@
 // Lot e2 : exercices de la bibliothèque dans les bilans, et plus d'annexes PDF. Données fictives.
 import { describe, it, expect } from 'vitest';
-import { fonction, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
+import { fonction, objet, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
 
 function monter() {
   const corps = [
@@ -8,6 +8,8 @@ function monter() {
     "const SPORT_SYSTEMES_LABELS = { 'systeme-visuel': '👁️ Système visuel' };",
     'let _exoBib = null;',
     'function _escHtml(s){return String(s);}',
+    objet('_EXO_PICTOS'),
+    fonction('_exoAvecPicto'),
     fonction('_exoBibConstruire'),
     SRC_BIOMECA.slice(
       SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'),
@@ -18,7 +20,7 @@ function monter() {
     fonction('_exoBibLabelSys'),
     fonction('_exoBibLabelSub'),
     fonction('_exoBibPairs'),
-    'return { _exoBibConstruire, _exoBibCats, _exoBibSubs, _exoBibPairs, charger: (b,c,p)=>{ _exoBib = _exoBibConstruire(b,c,p); } };',
+    'return { _exoAvecPicto, _exoBibConstruire, _exoBibCats, _exoBibSubs, _exoBibPairs, charger: (b,c,p)=>{ _exoBib = _exoBibConstruire(b,c,p); } };',
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   return new Function(corps)();
@@ -100,7 +102,7 @@ describe('bibliothèque dans les bilans', () => {
         [],
         ['', '', 'Mon ancien exo']
       )[0]
-    ).toBe('Système visuel → Fixation');
+    ).toBe('👁️ Système visuel → Fixation');
     const p = f._exoBibPairs(['pcat:zz'], ['perso:yy'], ['Ma catégorie'], ['Mon ancien exo']);
     expect(p).toEqual(['Ma catégorie → Mon ancien exo']);
     expect(f._exoBibPairs(['pcat:zz'], ['perso:yy'], [], [])[0]).toContain('supprimé');
@@ -186,5 +188,37 @@ describe('podopédiatrie : catégories retirées', () => {
     const v = f._exoBibCats('podo').map((c) => c.value);
     expect(v).not.toContain('respi-sport');
     expect(v).not.toContain('pathologies-pied');
+  });
+});
+
+describe('petit dessin devant les catégories', () => {
+  it('dessin selon le code ; ⭐ perso ; 🏋️ catégorie inconnue ; jamais deux fois', () => {
+    const f = monter();
+    expect(f._exoAvecPicto('systeme-visuel', 'Système visuel')).toBe('👁️ Système visuel');
+    expect(f._exoAvecPicto('systeme-vestibulaire', 'Système vestibulaire')).toBe(
+      '👂 Système vestibulaire'
+    );
+    expect(f._exoAvecPicto('reeduc-pied', 'Rééducation du pied')).toBe('🦶 Rééducation du pied');
+    expect(f._exoAvecPicto('systeme-mandibulaire', 'Système mandibulaire')).toBe(
+      '🦷 Système mandibulaire'
+    );
+    expect(f._exoAvecPicto('reflexes-archaiques', 'Réflexes archaïques')).toBe(
+      '🧠 Réflexes archaïques'
+    );
+    expect(f._exoAvecPicto('respi-posture', 'Rééducation par la respiration (posture)')).toBe(
+      '🌬️ Rééducation par la respiration (posture)'
+    );
+    expect(f._exoAvecPicto('pcat:p1', 'Mes exos')).toBe('⭐ Mes exos');
+    expect(f._exoAvecPicto('nouvelle-cat', 'Nouvelle')).toBe('🏋️ Nouvelle');
+    expect(f._exoAvecPicto('systeme-visuel', '👁️ Système visuel')).toBe('👁️ Système visuel');
+  });
+  it('les listes des bilans affichent le dessin (base et perso)', () => {
+    const f = monter();
+    f.charger(BASE, [{ id: 'p1', libelle: 'Mes exos', actif: true }], []);
+    expect(f._exoBibCats('sport').map((c) => c.label)).toEqual([
+      '👁️ Système visuel',
+      '🦶 Rééducation du pied',
+      '⭐ Mes exos',
+    ]);
   });
 });
