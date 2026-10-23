@@ -5635,6 +5635,8 @@ function nav(id) {
   // (la partie sweep DOM s'exécute avant le 1er await, fire-and-forget OK).
   const _leavingPage = document.querySelector('.page.active');
   const _leavingId = _leavingPage ? _leavingPage.id : null;
+  // Lot e2 : à l'ouverture d'un bilan, les listes d'exercices reprennent la bibliothèque à jour.
+  if ((id === 'pg-bilan' || id === 'pg-bilan-posturo') && _leavingId !== id && typeof exoBibRafraichir === 'function') exoBibRafraichir();
   if (_leavingId && _leavingId !== id) {
     // #277 — vers la page d'un rapport : capture EN MÉMOIRE seulement. Générer
     // un rapport ne déclenche JAMAIS de sauvegarde (CLAUDE.md) ; la saisie et le
@@ -31907,14 +31909,45 @@ async function exercicesBasculerPerso(id, actif) {
     await renderExercicesPage();
   } catch (e) { alert('Modification impossible (' + e.message + ').'); }
 }
+function exercicesModifierPerso(id) {
+  const bloc = document.getElementById('exp-edit-' + id);
+  if (bloc) bloc.style.display = bloc.style.display === 'none' ? 'block' : 'none';
+}
 async function exercicesEnregistrerPerso(id) {
-  const l = _exoLiensDepuisTexte((document.getElementById('exp-lien-' + id) || {}).value);
-  const texte = (document.getElementById('exp-texte-' + id) || {}).value || '';
+  const el = (x) => document.getElementById(x + id);
+  const l = _exoLiensDepuisTexte((el('exp-lien-') || {}).value);
+  const texte = (el('exp-texte-') || {}).value || '';
   if (!l.ok) { alert(l.erreur); return; }
+  const corps = { liens_youtube: l.liens, texte: texte.trim().slice(0, 4000) || null, updated_at: new Date().toISOString() };
+  const champNom = el('exp-nom-');
+  if (champNom) {
+    const nom = String(champNom.value || '').trim();
+    if (!nom || nom.length > 200) { alert('Donnez un nom d\'exercice (200 caractères au plus).'); return; }
+    corps.libelle = nom;
+  }
+  const champCat = el('exp-cat-');
+  if (champCat && champCat.value) {
+    if (champCat.value.indexOf('base:') === 0) { corps.categorie_base_id = champCat.value.slice(5); corps.categorie_perso_id = null; }
+    else { corps.categorie_perso_id = champCat.value.slice(6); corps.categorie_base_id = null; }
+  }
+  const ancien = _exoEtat.perso.find((x) => x.id === id);
+  const ancienPdf = ancien ? ancien.pdf_chemin : null;
+  let nouveauPdf = null;
   try {
-    await _exoRequete('exercices_perso?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: _exoJson, body: JSON.stringify({ liens_youtube: l.liens, texte: texte.trim().slice(0, 4000) || null, updated_at: new Date().toISOString() }) });
+    const fichier = ((el('exp-pdf-') || {}).files || [])[0];
+    if (fichier) { nouveauPdf = await _exoDeposerPdf(fichier); corps.pdf_chemin = nouveauPdf; }
+    else if (el('exp-pdfsup-') && el('exp-pdfsup-').checked) corps.pdf_chemin = null;
+    const res = await _exoRequete('exercices_perso?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: Object.assign({}, _exoJson, { 'Prefer': 'return=representation' }), body: JSON.stringify(corps) });
+    const lignes = await res.json();
+    if (!Array.isArray(lignes) || lignes.length !== 1) throw new Error('aucune ligne modifiée');
+    if (ancienPdf && ('pdf_chemin' in corps) && corps.pdf_chemin !== ancienPdf) {
+      try { await authFetch(SUPA_URL + '/storage/v1/object/exercices-pdf', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [ancienPdf] }) }); } catch (_e) { /* l'ancien fichier orphelin est inoffensif */ }
+    }
     await renderExercicesPage();
-  } catch (e) { alert('Enregistrement impossible (' + e.message + ').'); }
+  } catch (e) {
+    if (nouveauPdf) { try { await authFetch(SUPA_URL + '/storage/v1/object/exercices-pdf', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [nouveauPdf] }) }); } catch (_e) { /* rien à retirer */ } }
+    alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.');
+  }
 }
 async function exercicesOuvrirPdfPerso(chemin) {
   try {
@@ -32019,14 +32052,22 @@ function _exoHtmlPerso() {
   const opts = Object.keys(optBase).map((id) => '<option value="base:' + _escHtml(id) + '">' + _escHtml(optBase[id]) + ' (catégorie SCIOPRAXI)</option>').join('') +
     _exoEtat.persoCats.filter((c) => c.actif).map((c) => '<option value="perso:' + _escHtml(c.id) + '">' + _escHtml(c.libelle) + ' (la mienne)</option>').join('');
   const nomCat = (e) => e.categorie_base_id ? (optBase[e.categorie_base_id] || 'Catégorie SCIOPRAXI') : ((_exoEtat.persoCats.find((c) => c.id === e.categorie_perso_id) || {}).libelle || '');
+  const optsPour = (e) => Object.keys(optBase).map((id) => '<option value="base:' + _escHtml(id) + '"' + (e.categorie_base_id === id ? ' selected' : '') + '>' + _escHtml(optBase[id]) + ' (catégorie SCIOPRAXI)</option>').join('') +
+    _exoEtat.persoCats.filter((c) => c.actif || c.id === e.categorie_perso_id).map((c) => '<option value="perso:' + _escHtml(c.id) + '"' + (e.categorie_perso_id === c.id ? ' selected' : '') + '>' + _escHtml(c.libelle) + ' (la mienne)</option>').join('');
   const liste = _exoEtat.perso.length ? _exoEtat.perso.map((e) =>
     '<div style="padding:8px 0;border-top:1px solid var(--bord);' + (e.actif ? '' : 'opacity:.55;') + '"><div style="font-size:13px;font-weight:600;">' + _escHtml(e.libelle) + ' <span style="font-weight:500;color:var(--mut);">· ' + _escHtml(nomCat(e)) + (e.actif ? '' : ' · désactivé') + '</span></div>' +
-    '<textarea class="inp" id="exp-lien-' + _escHtml(e.id) + '" rows="2" placeholder="Liens YouTube (un par ligne)" style="margin-top:4px;">' + _escHtml((e.liens_youtube || []).join('\n')) + '</textarea>' +
-    '<textarea class="inp" id="exp-texte-' + _escHtml(e.id) + '" rows="2" placeholder="Texte explicatif" style="margin-top:4px;">' + _escHtml(e.texte || '') + '</textarea>' +
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesEnregistrerPerso(\'' + _escHtml(e.id) + '\')">Enregistrer</button>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesModifierPerso(\'' + _escHtml(e.id) + '\')">✏️ Modifier</button>' +
     (e.pdf_chemin ? '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesOuvrirPdfPerso(\'' + _escHtml(e.pdf_chemin) + '\')">📄 Ouvrir le PDF</button>' : '') +
     '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesBasculerPerso(\'' + _escHtml(e.id) + '\',' + (e.actif ? 'false' : 'true') + ')">' + (e.actif ? 'Désactiver' : 'Réactiver') + '</button>' +
-    '<button class="btn" style="font-size:11px;padding:3px 8px;color:var(--red);" onclick="exercicesSupprimerPerso(\'' + _escHtml(e.id) + '\')">Supprimer</button></div></div>').join('')
+    '<button class="btn" style="font-size:11px;padding:3px 8px;color:var(--red);" onclick="exercicesSupprimerPerso(\'' + _escHtml(e.id) + '\')">Supprimer</button></div>' +
+    '<div id="exp-edit-' + _escHtml(e.id) + '" style="display:none;margin-top:6px;border:1px solid var(--bord);border-radius:8px;padding:8px;">' +
+    '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Catégorie</div><select class="inp" id="exp-cat-' + _escHtml(e.id) + '">' + optsPour(e) + '</select></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom de l\'exercice</div><input class="inp" id="exp-nom-' + _escHtml(e.id) + '" maxlength="200" value="' + _escHtml(e.libelle) + '"/></div></div>' +
+    '<textarea class="inp" id="exp-lien-' + _escHtml(e.id) + '" rows="2" placeholder="Liens YouTube (un par ligne)" style="margin-top:4px;">' + _escHtml((e.liens_youtube || []).join('\n')) + '</textarea>' +
+    '<textarea class="inp" id="exp-texte-' + _escHtml(e.id) + '" rows="2" placeholder="Texte explicatif" style="margin-top:4px;">' + _escHtml(e.texte || '') + '</textarea>' +
+    '<div style="font-size:10px;color:var(--mut);margin:6px 0 3px;">' + (e.pdf_chemin ? 'PDF actuel enregistré : choisissez un fichier pour le remplacer' : 'PDF (facultatif, 10 Mo au plus)') + '</div><input type="file" id="exp-pdf-' + _escHtml(e.id) + '" accept="application/pdf" style="font-size:11px;"/>' +
+    (e.pdf_chemin ? '<label style="display:block;font-size:11px;margin-top:4px;"><input type="checkbox" id="exp-pdfsup-' + _escHtml(e.id) + '"/> Retirer le PDF</label>' : '') +
+    '<div style="display:flex;gap:6px;margin-top:6px;"><button class="btn btn-blue" style="font-size:11px;padding:3px 10px;" onclick="exercicesEnregistrerPerso(\'' + _escHtml(e.id) + '\')">Enregistrer</button><button class="btn" style="font-size:11px;padding:3px 10px;" onclick="exercicesModifierPerso(\'' + _escHtml(e.id) + '\')">Annuler</button></div></div></div>').join('')
     : '<div style="font-size:13px;color:var(--mut);">Aucun exercice personnel pour l\'instant.</div>';
   return '<div class="card" style="margin-bottom:16px;"><div class="stitle">Mes exercices</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:10px;"><input class="inp" id="exo-nouvelle-cat" maxlength="120" placeholder="Nouvelle catégorie (ex. Mobilité du poignet)"/><button class="btn" style="white-space:nowrap;" onclick="exercicesCreerCategorie()">+ Catégorie</button></div>' +
@@ -32054,12 +32095,14 @@ async function renderExercicesPage() {
     el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px 0;">Bibliothèque indisponible (' + _escHtml(e.message) + '). Rien n\'a été modifié.</div>';
     return;
   }
+  // Lot e2 : les listes des bilans sport et posturo reprennent aussitôt ce que le praticien vient de créer ou modifier.
+  if (_exoEtat.base.length) { _exoBib = _exoBibConstruire(_exoEtat.base, _exoEtat.persoCats, _exoEtat.perso); _exoBibRepeuplerSelects(); }
   // Les catégories ouvertes le restent après un enregistrement.
   const ouverts = Array.from(el.querySelectorAll('details[open]')).map((d) => d.getAttribute('data-k'));
   el.innerHTML = (_exoEstAdmin() ? _exoHtmlBase() : '') + _exoHtmlPerso() + _exoHtmlNomsBase();
   el.querySelectorAll('details[data-k]').forEach((d) => { if (ouverts.indexOf(d.getAttribute('data-k')) !== -1) d.open = true; });
 }
-Object.assign(window, { exercicesImporterBase, exercicesEnregistrerBase, exercicesCreerCategorie, exercicesCreerExercice, exercicesBasculerPerso, exercicesEnregistrerPerso, exercicesOuvrirPdfPerso, exercicesOuvrirPdfBase, exercicesSupprimerPerso, exercicesRemplacerPdfBase, exercicesSupprimerPdfBase });
+Object.assign(window, { exercicesModifierPerso, exercicesImporterBase, exercicesEnregistrerBase, exercicesCreerCategorie, exercicesCreerExercice, exercicesBasculerPerso, exercicesEnregistrerPerso, exercicesOuvrirPdfPerso, exercicesOuvrirPdfBase, exercicesSupprimerPerso, exercicesRemplacerPdfBase, exercicesSupprimerPdfBase });
 
 // ═══════════════════════════════════════════════════════════════════
 // Facturation, étape 2b-1 — devis et factures par patient
