@@ -642,13 +642,16 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   « Programme de renforcement des muscles profonds des pieds » et case « Circuits d'exercices » (Express 1 et 2
   ensemble, Échauffement : une période chacun). Dates par défaut : début = lendemain du bilan (date de
   consultation, sinon aujourd'hui), fin = début + 27 jours ; modifiables (fin qui suit le début tant qu'elle
-  n'a pas été touchée). Le programme du pied s'arrête au jour 28 même si la fin est plus tardive.
+  n'a pas été touchée). Programme du pied : jours 1 à 28 dans l'ordre, puis retour en sens inverse (jour 29 =
+  exercices du jour 27, jour 30 = jour 26…, `_progJourPied(n)`), 45 jours au plus (fin plafonnée).
 - Séances par jour (`_progSeances`, tronçons de dates) : ordre Échauffement, Express 1, programme du pied du
   jour, Express 2 ; Express + pied = 3, Échauffement + pied = 2, les trois = 4. Texte dans le bilan et le rapport.
 - Données : `bilanData.ttt.programmes` (sport), `bilanDataPosturo.programmes`, `bilanDataPodopediatrie.programmes`
   `{ pied, circuits, express, chauffe }` (chacun `{ actif, debut, fin }`). Podopédiatrie : tableaux Express 1,
   Express 2 (4 exercices) et Échauffement (8, ratio 30/30 ou 45/15) dans `circuitsPodo = { c1, c2, ch }`,
-  catégorie → exercice de la bibliothèque (même lecture que sport via `_readSportTttExo`).
+  catégorie → exercice de la bibliothèque (même lecture que sport via `_readSportTttExo`). L'Échauffement se
+  remplit tout seul = Express 1 (ex.1-4) + Express 2 (ex.5-8), verrouillé (`_podoSyncChauffe`) ; un seul choix
+  30/30 ou 45/15 à côté du titre (`pd-ch-ratio`, `circuitsPodo.ratio`) s'applique à tous les exercices.
 - Posturo : `po-programmes-wrap` est un simple conteneur dans le gabarit, rempli par `_progMonter('po')` après
   injection (goldens : lignes ajoutées seulement). Reste à faire (e3b) : tableau de 28 jours du programme du pied
   (EMOM 45/15) puis portail patient.

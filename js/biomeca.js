@@ -23342,7 +23342,7 @@ function _collectPodopediatrieSyntheseSections(srcData) {
       if (_podoCircuitTexte(circP.c1, false)) progItems.push('<strong>Circuit Express 1</strong> : ' + _escHtml(_podoCircuitTexte(circP.c1, false)));
       if (_podoCircuitTexte(circP.c2, false)) progItems.push('<strong>Circuit Express 2</strong> : ' + _escHtml(_podoCircuitTexte(circP.c2, false)));
     }
-    if (progD.programmes.chauffe && progD.programmes.chauffe.actif && _podoCircuitTexte(circP.ch, true)) progItems.push('<strong>Circuit Échauffement</strong> : ' + _escHtml(_podoCircuitTexte(circP.ch, true)));
+    if (progD.programmes.chauffe && progD.programmes.chauffe.actif && _podoCircuitTexte(circP.ch, true)) progItems.push('<strong>Circuit Échauffement (' + _escHtml(circP.ratio || (circP.ch[0] && circP.ch[0].ratio) || '30/30') + ')</strong> : ' + _escHtml(_podoCircuitTexte(circP.ch, false)));
   }
   sections.push({ isTraitement: true, titre: '💊 Traitement', items: progItems.concat([
     txtItem('podo_semelles_desc', 'Semelles — description')
@@ -26040,7 +26040,13 @@ function _progDefaut(dateBilanISO) {
   return { debut: _progISO(j + 1), fin: _progISO(j + 28) };
 }
 const _PROG_LIBELLES = { chauffe: 'Échauffement', express1: 'Express 1', pied: 'programme du pied du jour', express2: 'Express 2' };
-// Périodes valides : le programme du pied s'arrête au jour 28 même si la fin choisie est plus tardive.
+// Programme du pied : jours 1 à 28 dans l'ordre, puis retour en sens inverse (jour 29 = exercices du jour 27,
+// jour 30 = jour 26, …) ; il s'arrête à 45 jours au plus. Renvoie le numéro (1-28) des exercices du n-ième jour.
+function _progJourPied(n) {
+  if (!Number.isInteger(n) || n < 1 || n > 45) return null;
+  return n <= 28 ? n : 56 - n;
+}
+// Périodes valides : le programme du pied est plafonné à 45 jours même si la fin choisie est plus tardive.
 function _progPeriodes(p) {
   const out = {};
   [['pied', p && p.pied], ['express', p && p.express], ['chauffe', p && p.chauffe]].forEach(([k, v]) => {
@@ -26048,7 +26054,7 @@ function _progPeriodes(p) {
     const d = _progJour(v.debut);
     let f = _progJour(v.fin);
     if (d === null || f === null || f < d) return;
-    if (k === 'pied' && f > d + 27) f = d + 27;
+    if (k === 'pied' && f > d + 44) f = d + 44;
     out[k] = [d, f];
   });
   return out;
@@ -26085,7 +26091,12 @@ function _progTexteSeances(p) {
 function _progLignesRapport(p) {
   const l = [];
   const per = (v) => (v && v.actif && v.debut && v.fin ? 'du ' + _progFr(v.debut) + ' au ' + _progFr(v.fin) : '');
-  if (p && p.pied && p.pied.actif) l.push('Programme de renforcement des muscles profonds des pieds : ' + (per(p.pied) || 'dates à définir'));
+  if (p && p.pied && p.pied.actif) {
+    const pp = _progPeriodes(p).pied;
+    const apres = pp && pp[1] - pp[0] + 1 > 28 ? ' (au-delà du jour 28, les exercices reprennent en sens inverse)' : '';
+    const fin = p.pied.debut && p.pied.fin && pp && _progISO(pp[1]) !== p.pied.fin ? ' (limité à 45 jours : fin le ' + _progFr(_progISO(pp[1])) + ')' : '';
+    l.push('Programme de renforcement des muscles profonds des pieds : ' + (per(p.pied) || 'dates à définir') + fin + apres);
+  }
   if (p && p.express && p.express.actif) l.push('Circuits Express 1 et 2 : ' + (per(p.express) || 'dates à définir'));
   if (p && p.chauffe && p.chauffe.actif) l.push('Circuit Échauffement : ' + (per(p.chauffe) || 'dates à définir'));
   return l.concat(_progTexteSeances(p));
@@ -26145,7 +26156,7 @@ function _progMaj(pref) {
     const v = p[k];
     if (v.actif && v.debut && v.fin && _progJour(v.fin) < _progJour(v.debut)) err.push('⚠ ' + n + ' : la date de fin est avant la date de début.');
   });
-  const note = p.pied.actif && p.pied.debut ? 'Le programme du pied dure 28 jours au plus (jour 1 = ' + _progFr(p.pied.debut) + ').' : '';
+  const note = p.pied.actif && p.pied.debut ? 'Programme du pied : 28 jours, puis retour en sens inverse (jour 29 = exercices du jour 27, jour 30 = jour 26…), 45 jours au plus (jour 1 = ' + _progFr(p.pied.debut) + ').' : '';
   const res = document.getElementById(pref + '-prog-resume');
   if (res) {
     res.innerHTML = err.map((t) => '<div style="color:#b91c1c;">' + _escHtml(t) + '</div>').join('') +
@@ -26186,49 +26197,79 @@ function _progMonter(pref) {
   if (!w || w.getAttribute('data-monte')) return;
   w.innerHTML = _progHTML(pref) + (pref === 'pd' ? _podoCircuitsHTML() : '');
   w.setAttribute('data-monte', '1');
+  if (pref === 'pd') _podoCircuitsBrancher();
   _progMaj(pref);
 }
 // Podopédiatrie : tableaux Express 1, Express 2 et Échauffement (catégorie → exercice de la bibliothèque).
+// L'Échauffement = Express 1 + Express 2 : il se remplit tout seul (ex.1-4 = Express 1, ex.5-8 = Express 2) et
+// n'est pas modifiable à la main ; le rythme 30/30 ou 45/15 se choisit une fois pour tous les exercices.
 function _podoCircuitsHTML() {
   const opts = _genSysOptionsHTML('sport');
   const sel = '<select class="inp exo-sys" style="font-size:10px;background:#fff;color:#222;" onchange="updateExerciceSubMenu(this)">' + opts + '</select>';
-  const bloc = (cle, titre, n, duree, ratio) => {
-    let h = '<div id="pd-circ-' + cle + '" style="display:none;margin-bottom:10px;"><div class="podo-field-lbl">' + titre + '</div>';
+  const bloc = (cle, titre, n, duree, extra) => {
+    let h = '<div id="pd-circ-' + cle + '" style="display:none;margin-bottom:10px;"><div class="podo-field-lbl" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + titre + (extra || '') + '</div>';
     for (let i = 1; i <= n; i++) {
       h += '<div class="exo-stack" style="display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:6px 8px;margin-bottom:4px;"><span style="font-size:10px;color:#2a7a4e;font-weight:700;">' + duree + ' — Exercice ' + i + '</span>' +
         '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + sel + sel + sel + '</div>' +
-        '<input class="inp" id="pd-' + cle + '-ex' + i + '-libre" placeholder="Exercice libre (facultatif)" style="font-size:11px;background:#fff;color:#222;"/>' +
-        (ratio ? '<select class="inp" id="pd-ch-ex' + i + '-ratio" style="font-size:10px;width:auto;background:#fff;color:#222;"><option value="30/30">30/30</option><option value="45/15">45/15</option></select>' : '') + '</div>';
+        '<input class="inp" id="pd-' + cle + '-ex' + i + '-libre" placeholder="Exercice libre (facultatif)" style="font-size:11px;background:#fff;color:#222;"/></div>';
     }
     return h + '</div>';
   };
+  const ratio = '<select class="inp" id="pd-ch-ratio" style="font-size:11px;width:auto;background:#fff;color:#222;"><option value="30/30">30/30</option><option value="45/15">45/15</option></select><span style="font-size:10px;font-weight:400;color:#666;text-transform:none;">rempli automatiquement avec les exercices des circuits Express 1 et 2</span>';
   return '<div id="pd-circuits-tables" style="margin-top:6px;">' +
-    bloc('c1', 'Circuit Express 1 (Demi Tabata 2 min)', 4, '30s (20/10)', false) +
-    bloc('c2', 'Circuit Express 2 (Demi Tabata 2 min)', 4, '30s (20/10)', false) +
-    bloc('ch', 'Circuit Échauffement EMOM (8 min)', 8, '1 min', true) + '</div>';
+    bloc('c1', 'Circuit Express 1 (Demi Tabata 2 min)', 4, '30s (20/10)') +
+    bloc('c2', 'Circuit Express 2 (Demi Tabata 2 min)', 4, '30s (20/10)') +
+    bloc('ch', 'Circuit Échauffement EMOM (8 min)', 8, '1 min', ratio) + '</div>';
+}
+const _PODO_VIDE = { sys: ['', '', ''], sub: ['', '', ''], sysLib: ['', '', ''], subLib: ['', '', ''], libre: '' };
+// Recopie Express 1 (ex.1-4) puis Express 2 (ex.1-4) dans l'Échauffement (ex.1-8) et le verrouille.
+function _podoSyncChauffe() {
+  const prev = _sportTttCopying;
+  _sportTttCopying = true;
+  try {
+    for (let k = 0; k < 8; k++) {
+      const src = document.getElementById('pd-' + (k < 4 ? 'c1' : 'c2') + '-ex' + ((k % 4) + 1) + '-libre');
+      const dst = document.getElementById('pd-ch-ex' + (k + 1) + '-libre');
+      if (src && dst) _writeSportTttExo(dst, _readSportTttExo(src));
+    }
+  } finally {
+    _sportTttCopying = prev;
+  }
+  document.querySelectorAll('#pd-circ-ch .exo-stack select, #pd-circ-ch .exo-stack input').forEach((x) => { x.disabled = true; });
+}
+function _podoCircuitsBrancher() {
+  const zone = document.getElementById('pd-circuits-tables');
+  if (!zone || zone._brancheE3) return;
+  zone._brancheE3 = true;
+  const surChangement = (e) => {
+    if (_sportTttCopying || !e.target || !e.target.closest) return;
+    if (e.target.closest('#pd-circ-c1') || e.target.closest('#pd-circ-c2')) _podoSyncChauffe();
+  };
+  zone.addEventListener('change', surChangement);
+  zone.addEventListener('input', surChangement);
 }
 function _podoCircuitsLire() {
-  const lire = (cle, n, ratio) => Array.from({ length: n }, (_, k) => {
-    const exo = _readSportTttExo(document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre'));
-    if (ratio) { const r = document.getElementById('pd-ch-ex' + (k + 1) + '-ratio'); exo.ratio = r ? r.value : '30/30'; }
-    return exo;
-  });
-  return { c1: lire('c1', 4, false), c2: lire('c2', 4, false), ch: lire('ch', 8, true) };
+  _podoSyncChauffe();
+  const ratio = (document.getElementById('pd-ch-ratio') || {}).value || '30/30';
+  const lire = (cle, n) => Array.from({ length: n }, (_, k) => _readSportTttExo(document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre')));
+  return { c1: lire('c1', 4), c2: lire('c2', 4), ch: lire('ch', 8).map((e) => Object.assign(e, { ratio })), ratio };
 }
 function _podoCircuitsEcrire(c) {
-  const vide = { sys: ['', '', ''], sub: ['', '', ''], sysLib: ['', '', ''], subLib: ['', '', ''], libre: '' };
-  const ecrire = (cle, n, liste, ratio) => {
-    for (let k = 0; k < n; k++) {
-      const libre = document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre');
-      if (!libre) continue;
-      const exo = (liste && liste[k]) || vide;
-      _writeSportTttExo(libre, exo);
-      if (ratio) { const r = document.getElementById('pd-ch-ex' + (k + 1) + '-ratio'); if (r) r.value = exo.ratio || '30/30'; }
-    }
-  };
-  ecrire('c1', 4, c && c.c1, false);
-  ecrire('c2', 4, c && c.c2, false);
-  ecrire('ch', 8, c && c.ch, true);
+  const prev = _sportTttCopying;
+  _sportTttCopying = true;
+  try {
+    ['c1', 'c2'].forEach((cle) => {
+      for (let k = 0; k < 4; k++) {
+        const libre = document.getElementById('pd-' + cle + '-ex' + (k + 1) + '-libre');
+        if (libre) _writeSportTttExo(libre, (c && c[cle] && c[cle][k]) || _PODO_VIDE);
+      }
+    });
+  } finally {
+    _sportTttCopying = prev;
+  }
+  const r = document.getElementById('pd-ch-ratio');
+  if (r) r.value = (c && (c.ratio || (c.ch && c.ch[0] && c.ch[0].ratio))) || '30/30';
+  _podoSyncChauffe();
 }
 // Texte d'un circuit pour le rapport podopédiatrie : « ex.1 Catégorie → Exercice ; ex.2 … ».
 function _podoCircuitTexte(liste, ratio) {
