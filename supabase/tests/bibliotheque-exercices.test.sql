@@ -1,5 +1,5 @@
 -- Attaques sur bibliotheque-exercices.sql — base JETABLE seulement. Finit par « TOUT_OK ».
--- Lancement : psql -v ON_ERROR_STOP=1 -v migration=/chemin/bibliotheque-exercices.sql -f bibliotheque-exercices.test.sql
+-- Lancement : psql -v ON_ERROR_STOP=1 -v migration=/chemin/bibliotheque-exercices.sql -v migration2=/chemin/bibliotheque-exercices-suppression.sql -f bibliotheque-exercices.test.sql
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
 DO $$ BEGIN
@@ -19,6 +19,8 @@ CREATE OR REPLACE FUNCTION storage.foldername(n text) RETURNS text[] LANGUAGE sq
 INSERT INTO auth.users VALUES ('00000000-0000-0000-0000-00000000000a','a@exemple.invalid'),('00000000-0000-0000-0000-00000000000b','b@exemple.invalid'),('00000000-0000-0000-0000-0000000000ad','contact@verticy.fr'),('00000000-0000-0000-0000-0000000000a1','pa@exemple.invalid') ON CONFLICT DO NOTHING;
 \i :migration
 \i :migration
+\i :migration2
+\i :migration2
 CREATE SCHEMA IF NOT EXISTS essai; GRANT USAGE ON SCHEMA essai TO PUBLIC;
 CREATE OR REPLACE FUNCTION essai.ctrl(ok boolean, nom text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT ok THEN RAISE EXCEPTION 'ECHEC : %', nom; END IF; RAISE WARNING 'ok : %', nom; END $$;
@@ -65,7 +67,9 @@ SELECT essai.ctrl((SELECT count(*) FROM public.exercices_perso)=2, 'praticien : 
 SELECT essai.refuse($q$INSERT INTO public.exercices_perso(libelle) VALUES ('Sans catégorie')$q$, 'une catégorie obligatoire');
 SELECT essai.refuse($q$INSERT INTO public.exercices_perso(categorie_base_id,categorie_perso_id,libelle) VALUES ('c0000000-0000-0000-0000-000000000001','d0000000-0000-0000-0000-000000000001','Deux')$q$, 'une seule catégorie');
 SELECT essai.refuse($q$INSERT INTO public.exercices_perso(user_id,categorie_perso_id,libelle) VALUES ('00000000-0000-0000-0000-00000000000b','d0000000-0000-0000-0000-000000000001','Usurpation')$q$, 'pas d''écriture au nom d''un autre');
-SELECT essai.refuse($q$DELETE FROM public.exercices_perso$q$, 'aucune suppression (droit absent)');
+SELECT essai.refuse($q$DELETE FROM public.exercices_base$q$, 'praticien : ne supprime pas la base');
+SELECT essai.refuse($q$DELETE FROM public.exercices_base_categories$q$, 'praticien : ne supprime pas les catégories de base');
+SELECT essai.refuse($q$DELETE FROM public.exercices_perso_categories WHERE id='d0000000-0000-0000-0000-000000000001'$q$, 'catégorie encore utilisée : suppression refusée');
 SELECT essai.refuse($q$INSERT INTO storage.objects(bucket_id,name) VALUES ('exercices-pdf','00000000-0000-0000-0000-00000000000b/x.pdf')$q$, 'PDF : pas de dépôt chez un autre');
 INSERT INTO storage.objects(bucket_id,name) VALUES ('exercices-pdf','00000000-0000-0000-0000-00000000000a/x.pdf');
 SELECT essai.ctrl((SELECT count(*) FROM storage.objects WHERE bucket_id='exercices-pdf')=1, 'PDF : dépôt dans son dossier');
@@ -79,8 +83,19 @@ SELECT essai.ctrl((SELECT count(*) FROM public.exercices_perso)=0 AND (SELECT co
 SELECT essai.ctrl((SELECT count(*) FROM storage.objects WHERE bucket_id='exercices-pdf')=1 AND (SELECT count(*) FROM storage.objects WHERE name LIKE '%000a/%')=0, 'B : ne voit que son PDF');
 CREATE TEMP TABLE n2 AS WITH u AS (UPDATE public.exercices_perso SET libelle='pirate' RETURNING 1) SELECT count(*) AS n FROM u;
 SELECT essai.ctrl((SELECT n FROM n2)=0, 'B : 0 ligne de A touchée');
+CREATE TEMP TABLE n3 AS WITH u AS (DELETE FROM public.exercices_perso RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n3)=0, 'B : ne supprime rien de A');
+CREATE TEMP TABLE n4 AS WITH u AS (DELETE FROM storage.objects WHERE bucket_id='exercices-pdf' AND name LIKE '%000a/%' RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n4)=0, 'B : ne supprime pas le PDF de A');
 RESET ROLE;
 SELECT essai.ctrl((SELECT libelle FROM public.exercices_perso WHERE libelle='pirate') IS NULL, 'rien modifié');
+SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","email":"a@exemple.invalid"}';
+SET ROLE authenticated;
+CREATE TEMP TABLE n5 AS WITH u AS (DELETE FROM public.exercices_perso WHERE libelle='Mon exo' RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n5)=1, 'A : supprime son propre exercice');
+CREATE TEMP TABLE n6 AS WITH u AS (DELETE FROM storage.objects WHERE bucket_id='exercices-pdf' AND name='00000000-0000-0000-0000-00000000000a/x.pdf' RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n6)=1, 'A : supprime son propre PDF');
+RESET ROLE;
 
 -- PATIENT
 SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000a1","email":"pa@exemple.invalid","app_metadata":{"role":"patient"}}';
@@ -88,6 +103,8 @@ SET ROLE authenticated;
 SELECT essai.ctrl((SELECT count(*) FROM public.exercices_perso)=0 AND (SELECT count(*) FROM public.exercices_base)=0, 'patient : aucune lecture directe');
 SELECT essai.ctrl((SELECT count(*) FROM public.exercices_base_liste())=0, 'patient : la fonction ne renvoie rien');
 SELECT essai.refuse($q$INSERT INTO public.exercices_perso_categories(libelle) VALUES ('P')$q$, 'patient : n''écrit pas');
+CREATE TEMP TABLE n7 AS WITH u AS (DELETE FROM public.exercices_perso RETURNING 1) SELECT count(*) AS n FROM u;
+SELECT essai.ctrl((SELECT n FROM n7)=0, 'patient : ne supprime rien');
 SELECT essai.refuse($q$INSERT INTO storage.objects(bucket_id,name) VALUES ('exercices-pdf','00000000-0000-0000-0000-0000000000a1/p.pdf')$q$, 'patient : ne dépose pas de PDF');
 -- faux admin : e-mail identique mais patient
 SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000a1","email":"contact@verticy.fr","app_metadata":{"role":"patient"}}';

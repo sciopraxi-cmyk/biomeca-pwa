@@ -16,6 +16,7 @@ const EXO_RE = SRC_BIOMECA.slice(
 function monter(o = {}) {
   const appels = [];
   const alertes = [];
+  const ouvertures = [];
   const champs = o.champs || {};
   const authFetch = async (url, options = {}) => {
     appels.push({
@@ -24,6 +25,8 @@ function monter(o = {}) {
       corps:
         options.body && typeof options.body === 'string' ? JSON.parse(options.body) : options.body,
     });
+    if (o.refuserDelete && (options.method || 'GET') === 'DELETE')
+      return { ok: false, status: 403, json: async () => [] };
     if (o.echec) return { ok: false, status: 500, json: async () => [] };
     return { ok: true, status: 200, json: async () => (o.reponse ? o.reponse(url) : []) };
   };
@@ -51,21 +54,26 @@ function monter(o = {}) {
       'exercicesCreerExercice',
       '_exoDeposerPdf',
       'exercicesCreerCategorie',
+      '_exoCheminPdfBase',
+      'exercicesOuvrirPdfBase',
+      'exercicesSupprimerPerso',
       '_exoHtmlPerso',
       '_exoHtmlNomsBase',
       '_exoHtmlBase',
       'renderExercicesPage',
     ].map(fonction),
-    'return { _exoLienValide, _exoLiensDepuisTexte, _exoEstAdmin, _exoBaseDepuisFiches, chargerExercices, exercicesImporterBase, exercicesCreerExercice, exercicesCreerCategorie, _exoHtmlPerso, _exoHtmlNomsBase, _exoHtmlBase, etat: () => _exoEtat };',
+    'return { _exoLienValide, _exoLiensDepuisTexte, _exoEstAdmin, _exoBaseDepuisFiches, chargerExercices, exercicesImporterBase, exercicesCreerExercice, exercicesCreerCategorie, _exoCheminPdfBase, exercicesOuvrirPdfBase, exercicesSupprimerPerso, _exoHtmlPerso, _exoHtmlNomsBase, _exoHtmlBase, etat: () => _exoEtat };',
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
-  const f = new Function('authFetch', 'document', 'alert', '__email', corps)(
+  const f = new Function('authFetch', 'document', 'alert', '__email', 'confirm', 'window', corps)(
     authFetch,
     document,
     (m) => alertes.push(m),
-    o.email || 'a@exemple.invalid'
+    o.email || 'a@exemple.invalid',
+    () => o.confirmer !== false,
+    { open: (u) => ouvertures.push(u) }
   );
-  return { f, appels, alertes };
+  return { f, appels, alertes, ouvertures };
 }
 
 describe('liens YouTube', () => {
@@ -261,5 +269,88 @@ describe('affichage', () => {
     const posts = e.appels.filter((a) => a.methode === 'POST' && !a.url.includes('rpc'));
     expect(posts.every((p) => p.url.includes('on_conflict=code'))).toBe(true);
     expect(posts).toHaveLength(2);
+  });
+});
+
+describe('fiches PDF de la base et suppression', () => {
+  it('chemin PDF reconstruit et contrôlé : jamais un chemin libre', () => {
+    const { f } = monter();
+    expect(f._exoCheminPdfBase('systeme-visuel|2. Rééducation problème de fixation')).toBe(
+      encodeURI('assets/fiches/systeme-visuel/2. Rééducation problème de fixation.pdf')
+    );
+    expect(f._exoCheminPdfBase('reeduc-pied|pied-enfant|short-foot')).toBeNull();
+    expect(f._exoCheminPdfBase('../../etc|passwd')).toBeNull();
+    expect(f._exoCheminPdfBase('systeme-visuel|../../x')).toBeNull();
+    expect(f._exoCheminPdfBase('')).toBeNull();
+  });
+  it('ouvre la fiche dans un nouvel onglet ; message si aucune fiche', () => {
+    const e = monter();
+    e.f.exercicesOuvrirPdfBase('systeme-visuel|2. Rééducation problème de fixation');
+    expect(e.ouvertures).toHaveLength(1);
+    expect(e.ouvertures[0]).toMatch(/^assets\/fiches\/systeme-visuel\/.*\.pdf$/);
+    e.f.exercicesOuvrirPdfBase('reeduc-pied|pied-enfant|short-foot');
+    expect(e.ouvertures).toHaveLength(1);
+    expect(e.alertes).toHaveLength(1);
+  });
+  it('le praticien voit le bouton « Ouvrir la fiche » seulement pour les exercices à fiche', async () => {
+    const base = [
+      {
+        categorie_id: 'b1',
+        categorie_libelle: 'Visuel',
+        exercice_id: 'e1',
+        exercice_code: 'systeme-visuel|2. Rééducation problème de fixation',
+        libelle: 'Fixation',
+        a_video: true,
+        a_pdf: true,
+        a_texte: false,
+      },
+      {
+        categorie_id: 'b1',
+        categorie_libelle: 'Visuel',
+        exercice_id: 'e2',
+        exercice_code: 'reeduc-pied|pied-enfant|short-foot',
+        libelle: 'Short foot',
+        a_video: true,
+        a_pdf: false,
+        a_texte: false,
+      },
+    ];
+    const e = monter({ reponse: (u) => (u.includes('rpc/exercices_base_liste') ? base : []) });
+    await e.f.chargerExercices();
+    const html = e.f._exoHtmlNomsBase();
+    expect(html.match(/Ouvrir la fiche/g)).toHaveLength(1);
+    expect(html).not.toMatch(/youtube/i);
+  });
+  it('suppression : confirmation obligatoire, ligne puis PDF ; annulée = aucun appel', async () => {
+    const perso = [
+      { id: 'p1', libelle: 'Mon exo', pdf_chemin: 'u1/uuid-1.pdf', actif: true, liens_youtube: [] },
+    ];
+    const rep = (u) => (u.includes('exercices_perso?select') ? perso : []);
+    let e = monter({ reponse: rep, confirmer: false });
+    await e.f.chargerExercices();
+    await e.f.exercicesSupprimerPerso('p1');
+    expect(e.appels.some((a) => a.methode === 'DELETE')).toBe(false);
+    e = monter({ reponse: rep });
+    await e.f.chargerExercices();
+    await e.f.exercicesSupprimerPerso('p1');
+    const dels = e.appels.filter((a) => a.methode === 'DELETE');
+    expect(dels[0].url).toMatch(/exercices_perso\?id=eq\.p1$/);
+    expect(dels[1].url).toMatch(/storage\/v1\/object\/exercices-pdf$/);
+    expect(dels[1].corps).toEqual({ prefixes: ['u1/uuid-1.pdf'] });
+  });
+  it("refus du serveur sur la ligne : le PDF n'est pas supprimé et un message s'affiche", async () => {
+    const perso = [
+      { id: 'p1', libelle: 'Mon exo', pdf_chemin: 'u1/uuid-1.pdf', actif: true, liens_youtube: [] },
+    ];
+    const e = monter({
+      reponse: (u) => (u.includes('exercices_perso?select') ? perso : []),
+      refuserDelete: true,
+    });
+    await e.f.chargerExercices();
+    await e.f.exercicesSupprimerPerso('p1');
+    const dels = e.appels.filter((a) => a.methode === 'DELETE');
+    expect(dels).toHaveLength(1);
+    expect(dels[0].url).toMatch(/exercices_perso\?id=/);
+    expect(e.alertes[0]).toMatch(/Suppression impossible/);
   });
 });
