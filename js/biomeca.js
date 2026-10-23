@@ -25906,13 +25906,29 @@ const SPORT_SYSTEMES_LABELS = Object.fromEntries(
 // reste lisible dans un bilan déjà enregistré.
 var _exoBib = null; // var : évite la zone morte si lu avant cette ligne au démarrage
 var _exoBibEnCours = false;
+// Petit dessin devant chaque titre de catégorie (listes des bilans et page Bibliothèque). Le libellé enregistré en
+// base ne change pas : le dessin est ajouté à l'affichage, d'après le code de la catégorie.
+const _EXO_PICTOS = {
+  'systeme-visuel': '👁️', 'systeme-vestibulaire': '👂', 'systeme-somesthesique': '🤸', 'reeduc-pied': '🦶',
+  'systeme-mandibulaire': '🦷', 'reeduc-terrain': '🏃', 'reeduc-chaines': '⛓️', 'reflexes-archaiques': '🧠',
+  'respi-sport': '🌬️', 'reeduc-posturale': '🧍', 'reeduc-articulaire': '🦴', 'pathologies-genou': '🦵',
+  'pathologies-hanche': '🦴', 'pathologies-pied': '🦶', 'respi-posture': '🌬️',
+};
+// Catégorie personnelle (code « pcat:… » ou vide) : ⭐ ; catégorie de la base inconnue de la liste : 🏋️.
+function _exoAvecPicto(code, libelle) {
+  const l = String(libelle || '').trim();
+  if (/^[^A-Za-zÀ-ÿ0-9]/u.test(l)) return l; // déjà un dessin
+  const c = String(code || '');
+  const p = _EXO_PICTOS[c] || (!c || c.indexOf('pcat:') === 0 ? '⭐' : '🏋️');
+  return p + ' ' + l;
+}
 function _exoBibConstruire(base, persoCats, perso) {
   const cats = new Map();
   (base || []).forEach(r => {
     if (!r || !r.categorie_code) return;
     let c = cats.get(r.categorie_code);
     if (!c) {
-      c = { value: r.categorie_code, label: r.categorie_libelle || r.categorie_code, bilans: r.bilans || [], id: r.categorie_id, subs: [] };
+      c = { value: r.categorie_code, label: _exoAvecPicto(r.categorie_code, r.categorie_libelle || r.categorie_code), bilans: r.bilans || [], id: r.categorie_id, subs: [] };
       cats.set(c.value, c);
     }
     if (r.exercice_code) {
@@ -25923,7 +25939,7 @@ function _exoBibConstruire(base, persoCats, perso) {
   const parId = new Map();
   cats.forEach(c => parId.set(c.id, c));
   (persoCats || []).filter(c => c.actif !== false).forEach(c => {
-    const o = { value: 'pcat:' + c.id, label: c.libelle, bilans: null, id: c.id, subs: [] };
+    const o = { value: 'pcat:' + c.id, label: _exoAvecPicto('pcat:', c.libelle), bilans: null, id: c.id, subs: [] };
     cats.set(o.value, o);
     parId.set(c.id, o);
   });
@@ -32439,7 +32455,7 @@ function _exoHtmlBase() {
   const bilanTxt = (b) => (b || []).join(', ');
   const cats = _exoEtat.baseAdmin.cats;
   const bloc = cats.length
-    ? cats.map((c) => '<details data-k="a' + _escHtml(c.id) + '" style="border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;padding:0 10px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;padding:9px 0;">' + _escHtml(c.libelle) + ' <span style="font-weight:500;color:var(--mut);">(' + _escHtml(bilanTxt(c.bilans)) + ')</span></summary>' +
+    ? cats.map((c) => '<details data-k="a' + _escHtml(c.id) + '" style="border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;padding:0 10px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;padding:9px 0;">' + _escHtml(_exoAvecPicto(c.code, c.libelle)) + ' <span style="font-weight:500;color:var(--mut);">(' + _escHtml(bilanTxt(c.bilans)) + ')</span></summary>' +
         _exoEtat.baseAdmin.exos.filter((e) => e.categorie_id === c.id).map((e) =>
           '<div style="padding:8px 0;border-top:1px solid var(--bord);"><div style="font-size:13px;font-weight:600;">' + _escHtml(e.libelle) + (e.pdf_fichier ? ' <span style="font-size:11px;color:var(--mut);">· 📄 ' + (e.pdf_fichier.indexOf('base/') === 0 ? 'fiche remplacée' : 'fiche d\'origine') + '</span>' : ' <span style="font-size:11px;color:var(--mut);">· aucune fiche PDF</span>') + '</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;">' +
@@ -32455,12 +32471,12 @@ function _exoHtmlBase() {
 }
 function _exoHtmlPerso() {
   const optBase = {};
-  _exoEtat.base.forEach((b) => { optBase[b.categorie_id] = b.categorie_libelle; });
+  _exoEtat.base.forEach((b) => { optBase[b.categorie_id] = _exoAvecPicto(b.categorie_code, b.categorie_libelle); });
   const opts = Object.keys(optBase).map((id) => '<option value="base:' + _escHtml(id) + '">' + _escHtml(optBase[id]) + ' (catégorie SCIOPRAXI)</option>').join('') +
-    _exoEtat.persoCats.filter((c) => c.actif).map((c) => '<option value="perso:' + _escHtml(c.id) + '">' + _escHtml(c.libelle) + ' (la mienne)</option>').join('');
-  const nomCat = (e) => e.categorie_base_id ? (optBase[e.categorie_base_id] || 'Catégorie SCIOPRAXI') : ((_exoEtat.persoCats.find((c) => c.id === e.categorie_perso_id) || {}).libelle || '');
+    _exoEtat.persoCats.filter((c) => c.actif).map((c) => '<option value="perso:' + _escHtml(c.id) + '">' + _escHtml(_exoAvecPicto('pcat:', c.libelle)) + ' (la mienne)</option>').join('');
+  const nomCat = (e) => e.categorie_base_id ? (optBase[e.categorie_base_id] || 'Catégorie SCIOPRAXI') : _exoAvecPicto('pcat:', (_exoEtat.persoCats.find((c) => c.id === e.categorie_perso_id) || {}).libelle || '');
   const optsPour = (e) => Object.keys(optBase).map((id) => '<option value="base:' + _escHtml(id) + '"' + (e.categorie_base_id === id ? ' selected' : '') + '>' + _escHtml(optBase[id]) + ' (catégorie SCIOPRAXI)</option>').join('') +
-    _exoEtat.persoCats.filter((c) => c.actif || c.id === e.categorie_perso_id).map((c) => '<option value="perso:' + _escHtml(c.id) + '"' + (e.categorie_perso_id === c.id ? ' selected' : '') + '>' + _escHtml(c.libelle) + ' (la mienne)</option>').join('');
+    _exoEtat.persoCats.filter((c) => c.actif || c.id === e.categorie_perso_id).map((c) => '<option value="perso:' + _escHtml(c.id) + '"' + (e.categorie_perso_id === c.id ? ' selected' : '') + '>' + _escHtml(_exoAvecPicto('pcat:', c.libelle)) + ' (la mienne)</option>').join('');
   const liste = _exoEtat.perso.length ? _exoEtat.perso.map((e) =>
     '<div style="padding:8px 0;border-top:1px solid var(--bord);' + (e.actif ? '' : 'opacity:.55;') + '"><div style="font-size:13px;font-weight:600;">' + _escHtml(e.libelle) + ' <span style="font-weight:500;color:var(--mut);">· ' + _escHtml(nomCat(e)) + (e.actif ? '' : ' · désactivé') + '</span></div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesModifierPerso(\'' + _escHtml(e.id) + '\')">✏️ Modifier</button>' +
@@ -32488,7 +32504,7 @@ function _exoHtmlPerso() {
 }
 function _exoHtmlNomsBase() {
   const groupes = {};
-  _exoEtat.base.forEach((b) => { (groupes[b.categorie_id] = groupes[b.categorie_id] || { nom: b.categorie_libelle, exos: [] }).exos.push(b); });
+  _exoEtat.base.forEach((b) => { (groupes[b.categorie_id] = groupes[b.categorie_id] || { nom: _exoAvecPicto(b.categorie_code, b.categorie_libelle), exos: [] }).exos.push(b); });
   const ids = Object.keys(groupes);
   if (!ids.length) return '';
   return '<div class="card"><div class="stitle">Exercices de la base SCIOPRAXI</div>' + ids.map((id) =>

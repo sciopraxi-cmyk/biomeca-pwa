@@ -634,6 +634,10 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - Bouton « Modifier » d'un exercice perso : nom, catégorie (base ou perso, l'autre colonne remise à NULL), liens,
   texte, remplacement ou retrait du PDF ; PATCH en `return=representation`, 0 ligne = erreur ; nouveau PDF retiré
   si le PATCH échoue, ancien PDF supprimé seulement après succès.
+- Petit dessin devant chaque titre de catégorie (listes des 3 bilans et page Bibliothèque) : `_EXO_PICTOS` par code
+  de catégorie, `_exoAvecPicto(code, libelle)` ; ⭐ pour une catégorie personnelle, 🏋️ pour une catégorie de la base
+  inconnue de la liste. Ajouté à l'affichage seulement : le libellé en base ne change pas. Un nouveau code de
+  catégorie de la base = ajouter son dessin dans `_EXO_PICTOS`.
 - Preuve : `tests/exercices-bilans-e2.test.mjs`, parcours réel `documents/e2e-exercices-bilans.mjs`.
 
 ## Programme du patient dans les bilans (lot e3a : sport `sp`, posturo `po`, podopédiatrie `pd`)
