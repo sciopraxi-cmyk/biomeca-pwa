@@ -643,7 +643,7 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   ensemble, Échauffement : une période chacun). Dates par défaut : début = lendemain du bilan (date de
   consultation, sinon aujourd'hui), fin = début + 27 jours ; modifiables (fin qui suit le début tant qu'elle
   n'a pas été touchée). Programme du pied : jours 1 à 28 dans l'ordre, puis retour en sens inverse (jour 29 =
-  exercices du jour 27, jour 30 = jour 26…, `_progJourPied(n)`), 45 jours au plus (fin plafonnée).
+  exercices du jour 27, jour 30 = jour 26…, `_progJourPied(n)`), 55 jours au plus (le jour 55 = exercices du jour 1 ; fin plafonnée).
 - Séances par jour (`_progSeances`, tronçons de dates) : ordre Échauffement, Express 1, programme du pied du
   jour, Express 2 ; Express + pied = 3, Échauffement + pied = 2, les trois = 4. Texte dans le bilan et le rapport.
 - Données : `bilanData.ttt.programmes` (sport), `bilanDataPosturo.programmes`, `bilanDataPodopediatrie.programmes`

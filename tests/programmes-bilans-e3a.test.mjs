@@ -71,13 +71,13 @@ describe('programme du patient', () => {
       ['2026-11-07', '2026-11-20', 1],
     ]);
   });
-  it('le programme du pied est plafonné à 45 jours ; fin avant début ignorée ; rien de coché = rien', () => {
+  it('le programme du pied est plafonné à 55 jours ; fin avant début ignorée ; rien de coché = rien', () => {
     const s = f._progSeances({
       pied: P(true, '2026-10-24', '2027-03-01'),
       express: P(false, '', ''),
       chauffe: P(false, '', ''),
     });
-    expect(s[0].fin).toBe('2026-12-07'); // 24/10 + 44 jours = 45 jours
+    expect(s[0].fin).toBe('2026-12-17'); // 24/10 + 54 jours = 55 jours
     expect(f._progSeances({ pied: P(true, '2026-11-20', '2026-10-24') })).toEqual([]);
     expect(f._progSeances({})).toEqual([]);
     expect(f._progSeances(undefined)).toEqual([]);
@@ -85,8 +85,8 @@ describe('programme du patient', () => {
   it("au-delà du jour 28 : retour en sens inverse (jour 29 = jour 27, 30 = 26, 31 = 25 …) jusqu'à 45", () => {
     expect([1, 27, 28].map(f._progJourPied)).toEqual([1, 27, 28]);
     expect([29, 30, 31, 32].map(f._progJourPied)).toEqual([27, 26, 25, 24]);
-    expect(f._progJourPied(45)).toBe(11);
-    expect([0, 46, 1.5, null].map(f._progJourPied)).toEqual([null, null, null, null]);
+    expect([45, 55].map(f._progJourPied)).toEqual([11, 1]);
+    expect([0, 56, 1.5, null].map(f._progJourPied)).toEqual([null, null, null, null]);
   });
   it('texte du rapport : mention du sens inverse et du plafond', () => {
     const l = f._progLignesRapport({
@@ -94,7 +94,7 @@ describe('programme du patient', () => {
       express: P(false, '', ''),
       chauffe: P(false, '', ''),
     });
-    expect(l[0]).toContain('limité à 45 jours : fin le 07/12/2026');
+    expect(l[0]).toContain('limité à 55 jours : fin le 17/12/2026');
     expect(l[0]).toContain('sens inverse');
     const court = f._progLignesRapport({ pied: P(true, '2026-10-24', '2026-11-20') });
     expect(court[0]).not.toContain('sens inverse');

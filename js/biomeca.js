@@ -23339,8 +23339,8 @@ function _collectPodopediatrieSyntheseSections(srcData) {
   var circP = progD.circuitsPodo || {};
   if (progD.programmes && progD.programmes.circuits) {
     if (progD.programmes.express && progD.programmes.express.actif) {
-      if (_podoCircuitTexte(circP.c1, false)) progItems.push('<strong>Circuit Express 1</strong> : ' + _escHtml(_podoCircuitTexte(circP.c1, false)));
-      if (_podoCircuitTexte(circP.c2, false)) progItems.push('<strong>Circuit Express 2</strong> : ' + _escHtml(_podoCircuitTexte(circP.c2, false)));
+      if (_podoCircuitTexte(circP.c1, false)) progItems.push('<strong>Circuit Express 1 (20/10)</strong> : ' + _escHtml(_podoCircuitTexte(circP.c1, false)));
+      if (_podoCircuitTexte(circP.c2, false)) progItems.push('<strong>Circuit Express 2 (20/10)</strong> : ' + _escHtml(_podoCircuitTexte(circP.c2, false)));
     }
     if (progD.programmes.chauffe && progD.programmes.chauffe.actif && _podoCircuitTexte(circP.ch, true)) progItems.push('<strong>Circuit Échauffement (' + _escHtml(circP.ratio || (circP.ch[0] && circP.ch[0].ratio) || '30/30') + ')</strong> : ' + _escHtml(_podoCircuitTexte(circP.ch, false)));
   }
@@ -26041,12 +26041,12 @@ function _progDefaut(dateBilanISO) {
 }
 const _PROG_LIBELLES = { chauffe: 'Échauffement', express1: 'Express 1', pied: 'programme du pied du jour', express2: 'Express 2' };
 // Programme du pied : jours 1 à 28 dans l'ordre, puis retour en sens inverse (jour 29 = exercices du jour 27,
-// jour 30 = jour 26, …) ; il s'arrête à 45 jours au plus. Renvoie le numéro (1-28) des exercices du n-ième jour.
+// jour 30 = jour 26, …) ; il s'arrête à 55 jours au plus (le jour 55 = exercices du jour 1). Renvoie le numéro (1-28) des exercices du n-ième jour.
 function _progJourPied(n) {
-  if (!Number.isInteger(n) || n < 1 || n > 45) return null;
+  if (!Number.isInteger(n) || n < 1 || n > 55) return null;
   return n <= 28 ? n : 56 - n;
 }
-// Périodes valides : le programme du pied est plafonné à 45 jours même si la fin choisie est plus tardive.
+// Périodes valides : le programme du pied est plafonné à 55 jours même si la fin choisie est plus tardive.
 function _progPeriodes(p) {
   const out = {};
   [['pied', p && p.pied], ['express', p && p.express], ['chauffe', p && p.chauffe]].forEach(([k, v]) => {
@@ -26054,7 +26054,7 @@ function _progPeriodes(p) {
     const d = _progJour(v.debut);
     let f = _progJour(v.fin);
     if (d === null || f === null || f < d) return;
-    if (k === 'pied' && f > d + 44) f = d + 44;
+    if (k === 'pied' && f > d + 54) f = d + 54;
     out[k] = [d, f];
   });
   return out;
@@ -26094,7 +26094,7 @@ function _progLignesRapport(p) {
   if (p && p.pied && p.pied.actif) {
     const pp = _progPeriodes(p).pied;
     const apres = pp && pp[1] - pp[0] + 1 > 28 ? ' (au-delà du jour 28, les exercices reprennent en sens inverse)' : '';
-    const fin = p.pied.debut && p.pied.fin && pp && _progISO(pp[1]) !== p.pied.fin ? ' (limité à 45 jours : fin le ' + _progFr(_progISO(pp[1])) + ')' : '';
+    const fin = p.pied.debut && p.pied.fin && pp && _progISO(pp[1]) !== p.pied.fin ? ' (limité à 55 jours : fin le ' + _progFr(_progISO(pp[1])) + ')' : '';
     l.push('Programme de renforcement des muscles profonds des pieds : ' + (per(p.pied) || 'dates à définir') + fin + apres);
   }
   if (p && p.express && p.express.actif) l.push('Circuits Express 1 et 2 : ' + (per(p.express) || 'dates à définir'));
@@ -26156,7 +26156,7 @@ function _progMaj(pref) {
     const v = p[k];
     if (v.actif && v.debut && v.fin && _progJour(v.fin) < _progJour(v.debut)) err.push('⚠ ' + n + ' : la date de fin est avant la date de début.');
   });
-  const note = p.pied.actif && p.pied.debut ? 'Programme du pied : 28 jours, puis retour en sens inverse (jour 29 = exercices du jour 27, jour 30 = jour 26…), 45 jours au plus (jour 1 = ' + _progFr(p.pied.debut) + ').' : '';
+  const note = p.pied.actif && p.pied.debut ? 'Programme du pied : 28 jours, puis retour en sens inverse (jour 29 = exercices du jour 27, jour 30 = jour 26…), 55 jours au plus (jour 1 = ' + _progFr(p.pied.debut) + ').' : '';
   const res = document.getElementById(pref + '-prog-resume');
   if (res) {
     res.innerHTML = err.map((t) => '<div style="color:#b91c1c;">' + _escHtml(t) + '</div>').join('') +
