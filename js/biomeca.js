@@ -18715,6 +18715,7 @@ function _extractPosturoSections(d) {
     else if(d['test_'+t]==='non') tests.push(label+' ❌');
   });
   if(tests.length) trait.push(['Tests avant/après', tests.join(' · ')]);
+  if(_texteJoursCircuits(d.joursCircuits)) trait.push(['Jours des circuits', _texteJoursCircuits(d.joursCircuits)]);
   if(d.prochaineRdv) trait.push(['Prochain RDV', new Date(d.prochaineRdv).toLocaleDateString('fr-FR')]);
   if(trait.length) sections.push({titre:'9. Traitements', items:trait, color:'#2a7a4e'});
 
@@ -20614,8 +20615,10 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
     if(showRatio && exo.ratio) val += ' <span style="color:#666;">· ' + _escHtml(exo.ratio) + '</span>';
     return '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;background:#fafafa;width:90px;white-space:nowrap;">'+durLbl+' ex.'+idx+'</td><td style="padding:2px 5px;border:1px solid #e0e0e0;">'+val+'</td></tr>';
   };
-  if(c1n || c2n || chn || ttt.prochainRdv) {
+  const joursTxt = _texteJoursCircuits(ttt.jours);
+  if(c1n || c2n || chn || ttt.prochainRdv || joursTxt) {
     h += sec('Plan de Traitement');
+    if(joursTxt) h += '<p style="font-size:9px;"><strong>Jours des circuits :</strong> ' + _escHtml(joursTxt) + '</p>';
     if(c1n) {
       h += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:700;margin-bottom:3px;">Circuit Express 1 (Demi Tabata 2min)</div>';
       h += '<table style="width:100%;border-collapse:collapse;font-size:9px;">';
@@ -24918,6 +24921,31 @@ function _onSportTttEchauffementChange(idx) {
   bilanData.ttt.ch[idx - 1].detached = true;
 }
 
+// Jours des circuits (programme patient) : 1 = lundi … 7 = dimanche. Express 1 (matin) et 2
+// (après-midi) partagent les mêmes jours. Préfixe de champ : « sp » (sport) ou « po » (posturo).
+const JOURS_CIRCUITS_NOMS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+function _lireJoursCircuits(pref) {
+  const lire = (k) =>
+    Array.from(document.querySelectorAll('input[name="' + pref + '-jours-' + k + '"]:checked'))
+      .map((e) => parseInt(e.value, 10))
+      .filter((n) => n >= 1 && n <= 7);
+  return { express: lire('express'), chauffe: lire('chauffe') };
+}
+function _ecrireJoursCircuits(pref, j) {
+  ['express', 'chauffe'].forEach((k) => {
+    const liste = j && Array.isArray(j[k]) ? j[k] : [];
+    document.querySelectorAll('input[name="' + pref + '-jours-' + k + '"]').forEach((e) => {
+      e.checked = liste.includes(parseInt(e.value, 10));
+    });
+  });
+}
+function _texteJoursCircuits(j) {
+  const t = (l) => l.filter((n) => n >= 1 && n <= 7).map((n) => JOURS_CIRCUITS_NOMS[n - 1]).join(', ');
+  const parts = [];
+  if (j && j.express && j.express.length) parts.push('Circuits Express 1 et 2 : ' + t(j.express));
+  if (j && j.chauffe && j.chauffe.length) parts.push('Échauffement : ' + t(j.chauffe));
+  return parts.join(' · ');
+}
 function collectSportTtt(d) {
   if(!d.ttt) d.ttt = {};
   // Correction 2 : préserve detached depuis bilanData.ttt.ch (variable live).
@@ -24948,6 +24976,7 @@ function collectSportTtt(d) {
   d.ttt.semellesDesc = descEl ? descEl.value : '';
   const rdvEl = document.getElementById('sp-prochain-rdv');
   d.ttt.prochainRdv = rdvEl ? rdvEl.value : '';
+  d.ttt.jours = _lireJoursCircuits('sp');
 }
 
 function restoreSportTtt(d) {
@@ -24991,6 +25020,7 @@ function restoreSportTtt(d) {
   if(descEl) descEl.value = t.semellesDesc || '';
   const rdvEl = document.getElementById('sp-prochain-rdv');
   if(rdvEl) rdvEl.value = t.prochainRdv || '';
+  _ecrireJoursCircuits('sp', t.jours);
 }
 
 function clearSportTtt() {
@@ -25010,6 +25040,7 @@ function clearSportTtt() {
   } finally {
     _sportTttCopying = prev;
   }
+  _ecrireJoursCircuits('sp', null);
   document.querySelectorAll('input[name="sp-materiaux"]').forEach(e => e.checked = false);
   document.querySelectorAll('input[name="sp-recouvrement"]').forEach(e => e.checked = false);
   const descEl = document.getElementById('sp-semelles-desc');
@@ -27793,6 +27824,7 @@ function getBilanPosturoHTML() {
         </div>
       </div>
     </div>
+      <div style="margin-bottom:12px;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;"><div style="font-size:12px;color:#222;font-weight:600;margin-bottom:6px;">🗓️ Jours des circuits (programme patient)</div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuits Express 1 (matin) et 2 (après-midi), le même jour</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-express" value="7"/> Dim</label></div></div><div style="margin-bottom:8px;"><div style="font-size:11px;color:#2a7a4e;font-weight:600;margin-bottom:4px;">Circuit Échauffement</div><div style="display:flex;gap:10px;flex-wrap:wrap;"><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="1"/> Lun</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="2"/> Mar</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="3"/> Mer</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="4"/> Jeu</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="5"/> Ven</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="6"/> Sam</label><label style="font-size:12px;color:#222;display:flex;align-items:center;gap:3px;"><input type="checkbox" name="po-jours-chauffe" value="7"/> Dim</label></div></div></div>
     <div class="card" style="margin-bottom:16px;">
       <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #27ae60;border-radius:8px;padding:12px;margin-bottom:12px;">
         <div style="font-weight:700;color:var(--green);font-size:14px;">✅ Tests avant/après</div>
@@ -30678,7 +30710,7 @@ function _balayerBilanPosturo(d) {
   d.chaineOuv=getChk('po-chaine-ouv'); d.chaineStatOpt=getChk('po-chaine-stat-opt'); d.chaineStatDeg=getChk('po-chaine-stat-deg');
   d.biomecArticulaire=getPoVal('po-biomec-articulaire');
   // Section 9
-  d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv');
+  d.semellesDesc=getPoVal('po-semelles-desc'); d.prochaineRdv=getPoVal('po-prochain-rdv'); d.joursCircuits=_lireJoursCircuits('po');
   // #93 — Itère Object.keys(POSTURO_TESTS_AVANT_APRES) pour inclure t9 (Fukuda).
   // La constante est la source unique d'ordre/présence des tests posturo.
   Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { d['test_'+t]=getRad('po-'+t); });
@@ -31028,7 +31060,7 @@ function loadPosturoBilan() {
   setChk('po-chaine-ext',d.chaineExt); setChk('po-chaine-ferm',d.chaineFerm);
   setChk('po-chaine-ouv',d.chaineOuv); setChk('po-chaine-stat-opt',d.chaineStatOpt); setChk('po-chaine-stat-deg',d.chaineStatDeg);
   setPoVal('po-biomec-articulaire',d.biomecArticulaire);
-  setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv);
+  setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv); _ecrireJoursCircuits('po',d.joursCircuits);
   // #93 — Cohérence atomique save↔load : même source ordinale que savePosturoBilan.
   Object.keys(POSTURO_TESTS_AVANT_APRES).forEach(t => { setPosturoRadio('po-'+t, d['test_'+t]); });
   // Matériaux et recouvrement
