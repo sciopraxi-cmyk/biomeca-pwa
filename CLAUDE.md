@@ -594,6 +594,29 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **Pièges** : un test qui extrait une fonction de `biomeca.js` doit lister les nouvelles fonctions
   (`NOMS`) et les constantes utilisées ; `renderActesPage` délègue la ligne à `_htmlLigneActe`.
 
+## Exercices — jours des circuits et bibliothèque (PR #307, #308)
+
+- **Jours des circuits** : bloc de cases Lun-Dim juste au-dessus de « Tests Avant / Après » (bilans sport et
+  posturo) : une ligne pour Express 1 et 2 (même jour, matin et après-midi), une pour l'Échauffement ;
+  enregistré dans `ttt.jours` (sport) et `joursCircuits` (posturo), repris dans le rapport. Modifier la page
+  du bilan posturo oblige à régénérer les goldens `structure-bilan-posturo-268.json` et
+  `inventaire-couleurs-posturo-268.json` (lignes ajoutées seulement, à vérifier).
+- **Bibliothèque** : base SCIOPRAXI (`exercices_base*`) modifiable par contact@verticy.fr seul
+  (`est_admin_verticy()` : e-mail du JWT ET rôle différent de patient) ; les praticiens la lisent par
+  `exercices_base_liste()` (noms, pastilles, chemin du PDF, jamais liens ni texte) ; exercices et catégories
+  personnels (`exercices_perso*`) propres à chaque praticien ; bucket privé `exercices-pdf`
+  (`<uid>/…` praticien, `base/<uuid>.pdf` admin). Plusieurs vidéos : `liens_youtube text[]` (20 au plus,
+  `exo_liens_ok`). Un UPDATE ou DELETE refusé par la RLS ne lève pas d'erreur (0 ligne) : tester le nombre
+  de lignes, jamais l'absence d'erreur.
+- **Fiches PDF** : `pdf_fichier` = fichier livré (`assets/fiches/…`) ou fichier déposé (`base/<uuid>.pdf`),
+  chemin contrôlé par une contrainte SQL et par `_exoPdfValide`. Le portail patient devra lire ce champ à
+  l'affichage (jamais de copie) pour que remplacement et suppression s'y appliquent aussitôt.
+- **Preuve** : `supabase/tests/bibliotheque-exercices.test.sql` (trois migrations rejouées deux fois, finit
+  par `TOUT_OK`, vérifié avec règles cassées), `tests/bibliotheque-exercices.test.mjs`,
+  `tests/jours-circuits.test.mjs`, parcours réel `documents/e2e-bibliotheque-exercices.mjs`.
+- **Piège** : une nouvelle page s'ajoute à `PAGES_CLAIRES` (`palette-bilans.test.mjs`) ; la fonction SQL
+  `exercices_base_liste` change de type de retour : `DROP FUNCTION` avant `CREATE`.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
