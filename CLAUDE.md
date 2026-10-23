@@ -553,6 +553,30 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   dans `enregistrerOrdonnance` ou `emettreDocumentCourant` doit être protégé par `typeof` (harnais de
   tests).
 
+## Portail patient, lot (B) aperçu praticien — acquis (PR #303)
+
+- **Choix** : aperçu en lecture seule avec le jeton du PRATICIEN, jamais une session patient
+  usurpée (aucun marquage « lu », aucune trace côté patient). Aucun SQL : les politiques
+  `pd_praticien_select` (Storage) et la lecture praticien de `documents_partages` suffisent ;
+  les vérifier dans les migrations avant de redemander un jeton Supabase.
+- **Mécanisme** : `portailApercu(idx)` ouvre `window.open('about:blank')` DANS le geste du clic
+  (sinon le bloqueur de fenêtres), puis fiche → compte (création automatique) →
+  `patient/?apercu=<uuid>`. La page patient demande le jeton à `window.opener` par
+  `postMessage` ; les deux côtés filtrent `e.origin === location.origin` ET `e.source`. La page
+  filtre ses requêtes `retire=eq.false&patient_id=eq.<uuid>` (la RLS praticien renverrait sinon
+  tous ses patients) et saute `portail_document_lu`.
+- **Fiche neuve** : `_portailAssurerFiche(p)` l'enregistre avant 🔑, 👁 et « Publier ».
+  `_syncPatientToNormalizedTables` avale ses erreurs et pose `_cloudId` avant l'écriture : après
+  la synchro, VÉRIFIER la ligne en base et `delete p._cloudId` en cas d'échec, sinon un faux
+  identifiant fait croire la fiche enregistrée. Contrôle hors connexion AVANT l'enregistrement.
+- **Pièges** : un attribut `hidden` est écrasé par la classe `.bouton` (masquer par
+  `style.display='none'`) ; chaînes JS à apostrophes sans `\\"` (no-useless-escape = erreur CI) ;
+  chaque bouton ajouté à la carte patient ajoute +1 `--mut`/`--card`/`--bord` à
+  `palette-bilans.test.mjs` ; bumper `verticy-patient-vN` casse l'assertion CSP/SW de b2 (la
+  mettre à jour).
+- **Preuve** : `tests/portail-apercu-praticien.test.mjs` ; parcours réel rejouable avec des
+  patients fictifs, puis nettoyage.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
