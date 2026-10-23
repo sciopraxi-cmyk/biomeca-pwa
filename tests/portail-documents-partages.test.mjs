@@ -116,7 +116,7 @@ describe('patient — sécurité de l’affichage des documents', () => {
   it('le service worker du portail ne met jamais en cache les documents (Supabase = réseau direct)', () => {
     const sw = lire('patient/sw.js');
     expect(sw).toMatch(/url\.origin !== self\.location\.origin\) return/);
-    expect(sw).toMatch(/verticy-patient-v3/);
+    expect(sw).toMatch(/verticy-patient-v4/);
   });
 });
 

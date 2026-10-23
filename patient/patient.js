@@ -2,6 +2,7 @@
 // Aucune dépendance. Les données du patient ne passent que par la fonction SQL portail_moi()
 // (RLS) ; la connexion passe par l'Edge Function patient-connexion (essais limités côté serveur).
 import {
+  apercuDemande,
   cheminFichierValide,
   dateCourte,
   formaterIdentifiant,
@@ -22,6 +23,30 @@ const SUPA_KEY = 'sb_publishable_aE4_BZYwz6bGGvby4XXAgw_k8ULnrYh';
 const CLE_SESSION = 'verticy-patient-session';
 
 const $ = (id) => document.getElementById(id);
+
+// ─── Aperçu praticien (?apercu=<fiche>) : le portail vu comme le patient, en lecture seule ───
+// Le jeton est celui du PRATICIEN, demandé à la fenêtre Verticy qui a ouvert cette page (même origine).
+const APERCU = apercuDemande(location.search);
+let apercuInfos = { prenom: '', cabinet: '' };
+function demanderJetonApercu() {
+  return new Promise((resolve) => {
+    if (!window.opener) return resolve(null);
+    const fin = (v) => {
+      window.removeEventListener('message', ecoute);
+      clearTimeout(minuteur);
+      resolve(v);
+    };
+    const ecoute = (e) => {
+      if (e.origin !== location.origin || e.source !== window.opener) return;
+      if (!e.data || e.data.type !== 'verticy-apercu-jeton' || !e.data.token) return;
+      apercuInfos = { prenom: String(e.data.prenom || ''), cabinet: String(e.data.cabinet || '') };
+      fin({ access_token: String(e.data.token) });
+    };
+    const minuteur = setTimeout(() => fin(null), 8000);
+    window.addEventListener('message', ecoute);
+    window.opener.postMessage({ type: 'verticy-apercu-demande' }, location.origin);
+  });
+}
 const ECRANS = ['chargement', 'connexion', 'mdp', 'accueil', 'ferme', 'documents', 'document'];
 
 function montrer(nom) {
@@ -94,6 +119,7 @@ async function renouveler(session) {
 
 /** Session valide (renouvelée si besoin) ou null. */
 async function sessionValide() {
+  if (APERCU) return demanderJetonApercu();
   let s = lireSession();
   if (!s) return null;
   if (sessionAExpirer(s, Math.floor(Date.now() / 1000))) {
@@ -125,6 +151,7 @@ async function lireMoi(session) {
 let billet = null; // billet à usage unique entre « date de naissance » et « mot de passe »
 
 async function ouvrirAccueil() {
+  if (APERCU) return ouvrirAccueilApercu();
   const s = await sessionValide();
   if (!s) return montrer('connexion');
   const { statut, moi } = await lireMoi(s);
@@ -145,6 +172,21 @@ async function ouvrirAccueil() {
   }
   $('salut').textContent = salutation(moi.prenom);
   $('cabinet').textContent = moi.cabinet ? `Votre praticien : ${moi.cabinet}` : '';
+  montrer('accueil');
+  majPastilleDocuments();
+}
+
+async function ouvrirAccueilApercu() {
+  const s = await sessionValide();
+  if (!s) {
+    $('texte-ferme').textContent =
+      'Aperçu indisponible : rouvrez-le depuis la fiche du patient dans Verticy (gardez la fenêtre Verticy ouverte).';
+    $('btn-retour').style.display = 'none';
+    return montrer('ferme');
+  }
+  $('salut').textContent = salutation(apercuInfos.prenom);
+  $('cabinet').textContent = apercuInfos.cabinet ? `Votre praticien : ${apercuInfos.cabinet}` : '';
+  $('btn-deconnexion').style.display = 'none';
   montrer('accueil');
   majPastilleDocuments();
 }
@@ -285,7 +327,8 @@ async function appelAuth(chemin, init) {
 
 async function chargerDocuments() {
   const r = await appelAuth(
-    '/rest/v1/documents_partages?select=id,type,titre,date_document,lu_at,created_at,fichier_chemin&order=created_at.desc'
+    '/rest/v1/documents_partages?select=id,type,titre,date_document,lu_at,created_at,fichier_chemin&order=created_at.desc' +
+      (APERCU ? '&retire=eq.false&patient_id=eq.' + APERCU : '')
   );
   if (!r || !r.ok) return null;
   try {
@@ -402,7 +445,7 @@ async function ouvrirDocument(d) {
   cadre.srcdoc = html;
   zone.appendChild(cadre);
   $('btn-document-imprimer').hidden = false;
-  if (!d.lu_at) {
+  if (!d.lu_at && !APERCU) {
     d.lu_at = new Date().toISOString();
     appelAuth('/rest/v1/rpc/portail_document_lu', {
       method: 'POST',
@@ -444,5 +487,12 @@ $('identifiant').addEventListener('input', (e) => {
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
+}
+if (APERCU) {
+  const b = document.createElement('div');
+  b.className = 'bandeau-apercu';
+  b.textContent =
+    '👁 Aperçu praticien : vous voyez ce que voit le patient. Lecture seule, rien n’est marqué comme lu.';
+  document.body.prepend(b);
 }
 ouvrirAccueil();
