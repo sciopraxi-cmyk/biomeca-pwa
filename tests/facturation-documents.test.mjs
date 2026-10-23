@@ -124,6 +124,18 @@ const ACTES = [
     actif: true,
   },
   {
+    id: 'a-c2s',
+    code: null,
+    libelle: 'Séance cabinet C2S',
+    cotation: 'POD 1',
+    montant_cents: 3500,
+    base_remboursable_cents: 3000,
+    franchise: true,
+    regime_defaut: 'c2s',
+    perso: true,
+    actif: true,
+  },
+  {
     id: 'a-lpp',
     code: 'LPP-2122121',
     libelle: 'Semelles 28 à 37',
@@ -594,6 +606,19 @@ describe("tiers payant : le document n'indique que le montant dû par le patient
 });
 
 describe('édition : cases à cocher, quantité, total à payer', () => {
+  it('le premier acte coché reprend sa prise en charge par défaut ; ensuite le choix du praticien prime', () => {
+    const e = monter();
+    e.f.nouveauDocument('devis');
+    expect(e.f.etat().edition.regime).toBe('standard');
+    e.f.basculerActeDocument('a-c2s', true);
+    expect(e.f.etat().edition.regime).toBe('c2s');
+    expect(e.f.etat().edition.tiersPayant).toBe(true);
+    e.f.modifierChampDocument('tiers', false);
+    e.f.modifierChampDocument('regime', 'ald');
+    e.f.basculerActeDocument('a-pod1', true);
+    expect(e.f.etat().edition.tiersPayant).toBe(false);
+    expect(e.f.etat().edition.regime).toBe('ald');
+  });
   it('cocher ajoute la ligne au tarif du catalogue ; décocher la retire ; doublon impossible', () => {
     const e = monter();
     e.f.nouveauDocument('facture');

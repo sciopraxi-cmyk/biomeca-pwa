@@ -30,6 +30,12 @@ const NOMS = [
   'modifierActe',
   'annulerEditionActe',
   'renderActesPage',
+  '_categorieActe',
+  '_actesDeCategorie',
+  '_remplirCategoriesActe',
+  'choisirCategorieActe',
+  'choisirActeReference',
+  '_htmlLigneActe',
 ];
 
 function monter(o = {}) {
@@ -56,6 +62,10 @@ function monter(o = {}) {
     'const _escHtml = (s) => String(s ?? "");',
     constante('REFERENTIEL_ACTES_POD'),
     constante('REGIMES_REMBOURSEMENT'),
+    SRC_BIOMECA.slice(
+      SRC_BIOMECA.indexOf('const CATEGORIES_ACTES = ['),
+      SRC_BIOMECA.indexOf('\n];\n', SRC_BIOMECA.indexOf('const CATEGORIES_ACTES = [')) + 4
+    ),
     ...NOMS.map(fonction),
     `return { ${NOMS.join(', ')}, REFERENTIEL_ACTES_POD, REGIMES_REMBOURSEMENT, cache: () => _actesCache, edition: () => _acteEnEdition };`,
   ].join('\n');
@@ -117,6 +127,9 @@ describe("validation d'un acte", () => {
         cotation: null,
         remboursement: null,
         note: null,
+        acte_reference: null,
+        regime_defaut: null,
+        sync_doctolib: false,
       },
     });
   });
@@ -414,8 +427,8 @@ describe("enregistrement, modification et désactivation d'un acte", () => {
     expect(e.appels.some((a) => a.methode === 'DELETE')).toBe(false);
   });
   it("l'affichage échappe le HTML (aucune injection par un titre d'acte)", () => {
-    expect(fonction('renderActesPage')).toContain('_escHtml(a.libelle)');
-    expect(fonction('renderActesPage')).toContain('_escHtml(a.id)');
+    expect(fonction('_htmlLigneActe')).toContain('_escHtml(a.libelle)');
+    expect(fonction('_htmlLigneActe')).toContain('_escHtml(a.id)');
   });
 });
 
@@ -502,5 +515,85 @@ describe('migration SQL et branchement', () => {
   });
   it('le plafond JS est celui du SQL', () => {
     expect(SRC_BIOMECA).toContain('ACTE_MONTANT_MAX_CENTS = 10000000');
+  });
+});
+
+describe('catégories, acte de référence, prise en charge (lot C1)', () => {
+  const REF = [
+    {
+      id: 'r1',
+      code: 'POD-1',
+      libelle: 'Séance',
+      cotation: 'POD 1',
+      montant_cents: 3000,
+      base_remboursable_cents: 3000,
+      franchise: true,
+      perso: false,
+      actif: true,
+    },
+    {
+      id: 'r2',
+      code: 'LPP-1',
+      libelle: 'Semelles',
+      cotation: 'LPP 1',
+      montant_cents: 5000,
+      base_remboursable_cents: 2804,
+      franchise: false,
+      perso: false,
+      actif: true,
+    },
+    { id: 'p1', code: null, libelle: 'Mon acte', montant_cents: 4000, perso: true, actif: true },
+  ];
+  it('catégorie : perso à part, préfixe du code sinon, « autre » par défaut', () => {
+    const { f } = monter();
+    expect(f._categorieActe(REF[0])).toBe('POD');
+    expect(f._categorieActe(REF[1])).toBe('LPP');
+    expect(f._categorieActe(REF[2])).toBe('perso');
+    expect(f._categorieActe({ code: 'XYZ-1', perso: false })).toBe('autre');
+    expect(f._categorieActe({ code: null, perso: false })).toBe('autre');
+  });
+  it("l'acte exact choisi reprend cotation, base, franchise ; prise en charge Sécu par défaut", async () => {
+    const champs = {
+      'acte-cotation': champ(''),
+      'acte-remboursement': champ(''),
+      'acte-base': champ(''),
+      'acte-franchise': { checked: true },
+      'acte-regime': champ(''),
+    };
+    const e = monter({ lignes: REF, champs });
+    await e.f.chargerActes();
+    e.f.choisirActeReference('LPP-1');
+    expect(champs['acte-cotation'].value).toBe('LPP 1');
+    expect(champs['acte-base'].value).toBe('28,04');
+    expect(champs['acte-franchise'].checked).toBe(false);
+    expect(champs['acte-regime'].value).toBe('standard');
+  });
+  it('enregistrement : référence, prise en charge et Doctolib envoyés ; valeur inconnue refusée', async () => {
+    const champs = {
+      'acte-libelle': champ('Séance cabinet'),
+      'acte-montant': champ('35'),
+      'acte-cotation': champ(''),
+      'acte-remboursement': champ(''),
+      'acte-note': champ(''),
+      'acte-reference': champ('POD-1'),
+      'acte-regime': champ('c2s'),
+      'acte-sync-doctolib': { checked: true },
+    };
+    const e = monter({ champs });
+    await e.f.enregistrerActe();
+    expect(e.appels.find((a) => a.methode === 'POST').corps).toMatchObject({
+      acte_reference: 'POD-1',
+      regime_defaut: 'c2s',
+      sync_doctolib: true,
+      perso: true,
+    });
+    expect(
+      e.f._validerActe({ libelle: 'A', montant: '1', regime: 'pirate' }).acte.regime_defaut
+    ).toBeNull();
+  });
+  it('C2S / CMU : 100 % de la base', () => {
+    const { f } = monter();
+    expect(f.REGIMES_REMBOURSEMENT.c2s.taux).toBe(100);
+    expect(f._partsRemboursement(2804, 'c2s').secu).toBe(2804);
   });
 });
