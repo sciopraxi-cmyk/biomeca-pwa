@@ -5676,7 +5676,7 @@ function nav(id) {
   if (pg) { pg.classList.add('active'); pg.style.display = 'block'; }
   const map = {
     'pg-patients':'tn-patients',
-    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-documents':'tn-patients','pg-ordonnances':'tn-patients','pg-sterilisation':'tn-sterilisation','pg-notifications':'tn-notifications',
+    'pg-praticiens':'tn-praticiens','pg-params':'tn-params','pg-actes':'tn-facturation','pg-exercices':'tn-exercices','pg-documents':'tn-patients','pg-ordonnances':'tn-patients','pg-sterilisation':'tn-sterilisation','pg-notifications':'tn-notifications',
     'pg-sport':'tn-patients','pg-posturo':'tn-patients',
     'pg-agenda':'tn-agenda'
   };
@@ -5685,6 +5685,7 @@ function nav(id) {
   if(id === 'pg-patients') { renderPatientList(); populatePratSelect(); }
   if(id === 'pg-praticiens') renderPratList();
   if(id === 'pg-actes') renderActesPage();
+  if(id === 'pg-exercices') renderExercicesPage();
   if(id === 'pg-documents') renderDocumentsPage();
   if(id === 'pg-ordonnances') renderOrdonnancesPage();
   if(id === 'pg-sterilisation') renderSterilisationPage();
@@ -31795,6 +31796,220 @@ async function renderActesPage() {
     groupes[c.cle].map(_htmlLigneActe).join('') + '</details>'
   ).join('');
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// Bibliothèque d'exercices (lot e, étape 1) : catégories → exercices ; chaque exercice peut avoir
+// un lien YouTube, un PDF (avec son QR code) et un texte libre. BASE SCIOPRAXI : modifiable par
+// l'administrateur seulement, ses liens restent invisibles des praticiens (ils ne voient que les noms).
+// Exercices PERSONNELS : propres à chaque praticien (catégorie existante ou nouvelle). Rien n'est supprimé.
+// ═════════════════════════════════════════════════════════════════════
+const EXO_PDF_MAX_OCTETS = 10 * 1024 * 1024;
+const EXO_LIEN_RE = /^https:\/\/(www\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\/)[A-Za-z0-9_-]{11}([&?#/].*)?$/;
+function _exoLienValide(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' || (t.length <= 200 && EXO_LIEN_RE.test(t));
+}
+// Plusieurs vidéos par exercice : un lien YouTube par ligne (20 au plus).
+function _exoLiensDepuisTexte(txt) {
+  const liens = String(txt == null ? '' : txt).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (liens.length > 20) return { ok: false, erreur: '20 liens au plus par exercice.' };
+  if (!liens.every((l) => _exoLienValide(l))) return { ok: false, erreur: 'Lien invalide : un lien YouTube par ligne (https://www.youtube.com/watch?v=… ou https://youtu.be/…).' };
+  return { ok: true, liens: liens };
+}
+function _exoEstAdmin() {
+  const s = typeof loadPwaSession === 'function' ? loadPwaSession() : null;
+  const mail = String((s && s.user && s.user.email) || (typeof pwaUser !== 'undefined' && pwaUser && pwaUser.email) || '');
+  return mail.toLowerCase() === VERTICY_ADMIN_EMAIL;
+}
+// Exercices de rééducation du pied extraits de la fiche « Rééducation du pied » (une seule fois chacun,
+// dans l'ordre de première apparition). Ils alimentent aussi le futur programme du bilan podopédiatrie.
+const EXERCICES_PIED_ENFANT = [
+  ['sensitive-plantar-activation', 'Sensitive plantar activation (balle à picots ou Arc Z Vibe)'],
+  ['elevation-talons', 'Élévation des talons'],
+  ['grasping-foot-towel', 'Grasping foot with towel'],
+  ['plantar-automassage', 'Plantar automassage'],
+  ['elevation-orteils', 'Élévation des orteils'],
+  ['toes-spread-out-1', 'Toes spread out 1'],
+  ['plantar-massage-ball', 'Plantar massage with ball'],
+  ['short-foot', 'Short foot'],
+  ['monkey-walk', 'Monkey walk'],
+  ['toes-spread-out-2', 'Toes spread out 2'],
+  ['walking-grasping-foot', 'Walking grasping foot'],
+  ['styles-walk-4', '4 styles walk'],
+];
+// Contenu initial de la base : les catégories et exercices déjà présents (fiches PDF existantes).
+function _exoBaseDepuisFiches() {
+  const cats = [];
+  const exos = [];
+  Object.keys(FICHES_SYSTEMES).forEach((slug, i) => {
+    const c = FICHES_SYSTEMES[slug];
+    cats.push({ code: slug, libelle: String(c.label || slug).replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').trim(), bilans: c.bilans || [], ordre: i });
+    (c.subs || []).forEach((sub, j) => {
+      exos.push({ categorie_code: slug, code: slug + '|' + sub, libelle: String(sub).replace(/^\d+\.\s*/, ''), pdf_fichier: 'assets/fiches/' + slug + '/' + sub + '.pdf', ordre: j });
+    });
+  });
+  EXERCICES_PIED_ENFANT.forEach((e, j) => {
+    exos.push({ categorie_code: 'reeduc-pied', code: 'reeduc-pied|pied-enfant|' + e[0], libelle: e[1], pdf_fichier: null, ordre: 100 + j });
+  });
+  return { cats, exos };
+}
+let _exoEtat = { base: [], baseAdmin: { cats: [], exos: [] }, persoCats: [], perso: [] };
+async function _exoRequete(chemin, options) {
+  const res = await authFetch(SUPA_URL + '/rest/v1/' + chemin, options);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res;
+}
+const _exoJson = { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+async function chargerExercices() {
+  const rpc = await authFetch(SUPA_URL + '/rest/v1/rpc/exercices_base_liste', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!rpc.ok) throw new Error('HTTP ' + rpc.status);
+  _exoEtat.base = await rpc.json();
+  _exoEtat.persoCats = await (await _exoRequete('exercices_perso_categories?select=*&order=libelle.asc')).json();
+  _exoEtat.perso = await (await _exoRequete('exercices_perso?select=*&order=libelle.asc')).json();
+  if (_exoEstAdmin()) {
+    _exoEtat.baseAdmin = {
+      cats: await (await _exoRequete('exercices_base_categories?select=*&order=ordre.asc')).json(),
+      exos: await (await _exoRequete('exercices_base?select=*&order=ordre.asc')).json(),
+    };
+  }
+  return _exoEtat;
+}
+async function exercicesImporterBase() {
+  try {
+    const { cats, exos } = _exoBaseDepuisFiches();
+    await _exoRequete('exercices_base_categories?on_conflict=code', { method: 'POST', headers: Object.assign({}, _exoJson, { Prefer: 'return=minimal,resolution=ignore-duplicates' }), body: JSON.stringify(cats) });
+    const ids = {};
+    (await (await _exoRequete('exercices_base_categories?select=id,code')).json()).forEach((c) => { ids[c.code] = c.id; });
+    const lignes = exos.map((e) => ({ categorie_id: ids[e.categorie_code], code: e.code, libelle: e.libelle, pdf_fichier: e.pdf_fichier, ordre: e.ordre })).filter((e) => e.categorie_id);
+    await _exoRequete('exercices_base?on_conflict=code', { method: 'POST', headers: Object.assign({}, _exoJson, { Prefer: 'return=minimal,resolution=ignore-duplicates' }), body: JSON.stringify(lignes) });
+    await renderExercicesPage();
+  } catch (e) { alert('Import impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+async function exercicesEnregistrerBase(id) {
+  const l = _exoLiensDepuisTexte((document.getElementById('exb-lien-' + id) || {}).value);
+  const texte = (document.getElementById('exb-texte-' + id) || {}).value || '';
+  if (!l.ok) { alert(l.erreur); return; }
+  try {
+    await _exoRequete('exercices_base?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: _exoJson, body: JSON.stringify({ liens_youtube: l.liens, texte: texte.trim().slice(0, 4000) || null, updated_at: new Date().toISOString() }) });
+    await renderExercicesPage();
+  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+async function exercicesCreerCategorie() {
+  const nom = String((document.getElementById('exo-nouvelle-cat') || {}).value || '').trim();
+  if (!nom || nom.length > 120) { alert('Donnez un nom de catégorie (120 caractères au plus).'); return; }
+  try {
+    await _exoRequete('exercices_perso_categories', { method: 'POST', headers: _exoJson, body: JSON.stringify({ libelle: nom }) });
+    await renderExercicesPage();
+  } catch (e) { alert('Création impossible (' + e.message + ').'); }
+}
+async function _exoDeposerPdf(fichier) {
+  if (!fichier) return null;
+  if (fichier.type !== 'application/pdf') throw new Error('le fichier doit être un PDF');
+  if (fichier.size > EXO_PDF_MAX_OCTETS) throw new Error('PDF trop lourd (10 Mo au plus)');
+  const chemin = pwaUser.id + '/' + crypto.randomUUID() + '.pdf';
+  const res = await authFetch(SUPA_URL + '/storage/v1/object/exercices-pdf/' + chemin, { method: 'POST', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'false' }, body: fichier });
+  if (!res.ok) throw new Error('dépôt du PDF ' + res.status);
+  return chemin;
+}
+async function exercicesCreerExercice() {
+  const val = (id) => String((document.getElementById(id) || {}).value || '').trim();
+  const libelle = val('exo-libelle'), texte = val('exo-texte'), cat = val('exo-cat');
+  const l = _exoLiensDepuisTexte((document.getElementById('exo-lien') || {}).value);
+  if (!libelle || libelle.length > 200) { alert('Donnez un nom d\'exercice (200 caractères au plus).'); return; }
+  if (!cat) { alert('Choisissez une catégorie.'); return; }
+  if (!l.ok) { alert(l.erreur); return; }
+  const ligne = { libelle, liens_youtube: l.liens, texte: texte.slice(0, 4000) || null };
+  if (cat.indexOf('base:') === 0) ligne.categorie_base_id = cat.slice(5); else ligne.categorie_perso_id = cat.slice(6);
+  try {
+    const pdf = await _exoDeposerPdf(((document.getElementById('exo-pdf') || {}).files || [])[0]);
+    if (pdf) ligne.pdf_chemin = pdf;
+    await _exoRequete('exercices_perso', { method: 'POST', headers: _exoJson, body: JSON.stringify(ligne) });
+    await renderExercicesPage();
+  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+async function exercicesBasculerPerso(id, actif) {
+  try {
+    await _exoRequete('exercices_perso?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: _exoJson, body: JSON.stringify({ actif: actif, updated_at: new Date().toISOString() }) });
+    await renderExercicesPage();
+  } catch (e) { alert('Modification impossible (' + e.message + ').'); }
+}
+async function exercicesEnregistrerPerso(id) {
+  const l = _exoLiensDepuisTexte((document.getElementById('exp-lien-' + id) || {}).value);
+  const texte = (document.getElementById('exp-texte-' + id) || {}).value || '';
+  if (!l.ok) { alert(l.erreur); return; }
+  try {
+    await _exoRequete('exercices_perso?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: _exoJson, body: JSON.stringify({ liens_youtube: l.liens, texte: texte.trim().slice(0, 4000) || null, updated_at: new Date().toISOString() }) });
+    await renderExercicesPage();
+  } catch (e) { alert('Enregistrement impossible (' + e.message + ').'); }
+}
+async function exercicesOuvrirPdfPerso(chemin) {
+  try {
+    const res = await authFetch(SUPA_URL + '/storage/v1/object/authenticated/exercices-pdf/' + chemin);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    window.open(URL.createObjectURL(await res.blob()), '_blank', 'noopener');
+  } catch (e) { alert('PDF indisponible (' + e.message + ').'); }
+}
+function _exoHtmlBase() {
+  const bilanTxt = (b) => (b || []).join(', ');
+  const cats = _exoEtat.baseAdmin.cats;
+  const bloc = cats.length
+    ? cats.map((c) => '<details data-k="a' + _escHtml(c.id) + '" style="border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;padding:0 10px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;padding:9px 0;">' + _escHtml(c.libelle) + ' <span style="font-weight:500;color:var(--mut);">(' + _escHtml(bilanTxt(c.bilans)) + ')</span></summary>' +
+        _exoEtat.baseAdmin.exos.filter((e) => e.categorie_id === c.id).map((e) =>
+          '<div style="padding:8px 0;border-top:1px solid var(--bord);"><div style="font-size:13px;font-weight:600;">' + _escHtml(e.libelle) + (e.pdf_fichier ? ' <span style="font-size:11px;color:var(--mut);">· 📄 PDF</span>' : '') + '</div>' +
+          '<textarea class="inp" id="exb-lien-' + _escHtml(e.id) + '" rows="2" placeholder="Liens YouTube (un par ligne)" style="margin-top:4px;">' + _escHtml((e.liens_youtube || []).join('\n')) + '</textarea>' +
+          '<textarea class="inp" id="exb-texte-' + _escHtml(e.id) + '" rows="2" placeholder="Texte explicatif (facultatif)" style="margin-top:4px;">' + _escHtml(e.texte || '') + '</textarea>' +
+          '<button class="btn" style="font-size:11px;padding:3px 8px;margin-top:4px;" onclick="exercicesEnregistrerBase(\'' + _escHtml(e.id) + '\')">Enregistrer</button></div>').join('') + '</details>').join('')
+    : '<div style="font-size:13px;color:var(--mut);">La base est vide : importez les exercices existants.</div>';
+  return '<div class="card" style="margin-bottom:16px;"><div class="stitle">Base SCIOPRAXI (administrateur)</div>' +
+    '<p style="font-size:12px;color:var(--mut);margin:0 0 8px;">Les praticiens voient seulement les noms ; vos liens, PDF et textes leur restent invisibles.</p>' +
+    '<button class="btn" style="font-size:12px;" onclick="exercicesImporterBase()">⬇️ Importer les catégories et exercices existants</button><div style="margin-top:10px;">' + bloc + '</div></div>';
+}
+function _exoHtmlPerso() {
+  const optBase = {};
+  _exoEtat.base.forEach((b) => { optBase[b.categorie_id] = b.categorie_libelle; });
+  const opts = Object.keys(optBase).map((id) => '<option value="base:' + _escHtml(id) + '">' + _escHtml(optBase[id]) + ' (catégorie SCIOPRAXI)</option>').join('') +
+    _exoEtat.persoCats.filter((c) => c.actif).map((c) => '<option value="perso:' + _escHtml(c.id) + '">' + _escHtml(c.libelle) + ' (la mienne)</option>').join('');
+  const nomCat = (e) => e.categorie_base_id ? (optBase[e.categorie_base_id] || 'Catégorie SCIOPRAXI') : ((_exoEtat.persoCats.find((c) => c.id === e.categorie_perso_id) || {}).libelle || '');
+  const liste = _exoEtat.perso.length ? _exoEtat.perso.map((e) =>
+    '<div style="padding:8px 0;border-top:1px solid var(--bord);' + (e.actif ? '' : 'opacity:.55;') + '"><div style="font-size:13px;font-weight:600;">' + _escHtml(e.libelle) + ' <span style="font-weight:500;color:var(--mut);">· ' + _escHtml(nomCat(e)) + (e.actif ? '' : ' · désactivé') + '</span></div>' +
+    '<textarea class="inp" id="exp-lien-' + _escHtml(e.id) + '" rows="2" placeholder="Liens YouTube (un par ligne)" style="margin-top:4px;">' + _escHtml((e.liens_youtube || []).join('\n')) + '</textarea>' +
+    '<textarea class="inp" id="exp-texte-' + _escHtml(e.id) + '" rows="2" placeholder="Texte explicatif" style="margin-top:4px;">' + _escHtml(e.texte || '') + '</textarea>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesEnregistrerPerso(\'' + _escHtml(e.id) + '\')">Enregistrer</button>' +
+    (e.pdf_chemin ? '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesOuvrirPdfPerso(\'' + _escHtml(e.pdf_chemin) + '\')">📄 Ouvrir le PDF</button>' : '') +
+    '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="exercicesBasculerPerso(\'' + _escHtml(e.id) + '\',' + (e.actif ? 'false' : 'true') + ')">' + (e.actif ? 'Désactiver' : 'Réactiver') + '</button></div></div>').join('')
+    : '<div style="font-size:13px;color:var(--mut);">Aucun exercice personnel pour l\'instant.</div>';
+  return '<div class="card" style="margin-bottom:16px;"><div class="stitle">Mes exercices</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px;"><input class="inp" id="exo-nouvelle-cat" maxlength="120" placeholder="Nouvelle catégorie (ex. Mobilité du poignet)"/><button class="btn" style="white-space:nowrap;" onclick="exercicesCreerCategorie()">+ Catégorie</button></div>' +
+    '<div class="g2"><div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Catégorie *</div><select class="inp" id="exo-cat"><option value="">— Choisir —</option>' + opts + '</select></div>' +
+    '<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom de l\'exercice *</div><input class="inp" id="exo-libelle" maxlength="200"/></div></div>' +
+    '<textarea class="inp" id="exo-lien" rows="2" placeholder="Liens YouTube (facultatif, un par ligne)" style="margin-top:6px;"></textarea>' +
+    '<textarea class="inp" id="exo-texte" rows="2" maxlength="4000" placeholder="Texte explicatif (facultatif)" style="margin-top:6px;"></textarea>' +
+    '<div style="font-size:10px;color:var(--mut);margin:6px 0 3px;">PDF (facultatif, 10 Mo au plus)</div><input type="file" id="exo-pdf" accept="application/pdf"/>' +
+    '<div style="margin-top:8px;"><button class="btn btn-blue" onclick="exercicesCreerExercice()">✓ Ajouter l\'exercice</button></div>' +
+    '<div style="margin-top:12px;">' + liste + '</div></div>';
+}
+function _exoHtmlNomsBase() {
+  const groupes = {};
+  _exoEtat.base.forEach((b) => { (groupes[b.categorie_id] = groupes[b.categorie_id] || { nom: b.categorie_libelle, exos: [] }).exos.push(b); });
+  const ids = Object.keys(groupes);
+  if (!ids.length) return '';
+  return '<div class="card"><div class="stitle">Exercices de la base SCIOPRAXI</div>' + ids.map((id) =>
+    '<details data-k="n' + _escHtml(id) + '" style="border:1px solid var(--bord);border-radius:8px;margin-bottom:8px;padding:0 10px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;padding:9px 0;">' + _escHtml(groupes[id].nom) + ' <span style="font-weight:500;color:var(--mut);">(' + groupes[id].exos.length + ')</span></summary>' +
+    groupes[id].exos.map((e) => '<div style="font-size:12px;padding:5px 0;border-top:1px solid var(--bord);">' + _escHtml(e.libelle) + ' <span style="color:var(--mut);">' + (e.a_video ? '🎬' : '') + (e.a_pdf ? ' 📄' : '') + (e.a_texte ? ' 📝' : '') + '</span></div>').join('') + '</details>').join('') + '</div>';
+}
+async function renderExercicesPage() {
+  const el = document.getElementById('exercices-contenu');
+  if (!el) return;
+  try { await chargerExercices(); } catch (e) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px 0;">Bibliothèque indisponible (' + _escHtml(e.message) + '). Rien n\'a été modifié.</div>';
+    return;
+  }
+  // Les catégories ouvertes le restent après un enregistrement.
+  const ouverts = Array.from(el.querySelectorAll('details[open]')).map((d) => d.getAttribute('data-k'));
+  el.innerHTML = (_exoEstAdmin() ? _exoHtmlBase() : '') + _exoHtmlPerso() + _exoHtmlNomsBase();
+  el.querySelectorAll('details[data-k]').forEach((d) => { if (ouverts.indexOf(d.getAttribute('data-k')) !== -1) d.open = true; });
+}
+Object.assign(window, { exercicesImporterBase, exercicesEnregistrerBase, exercicesCreerCategorie, exercicesCreerExercice, exercicesBasculerPerso, exercicesEnregistrerPerso, exercicesOuvrirPdfPerso });
 
 // ═══════════════════════════════════════════════════════════════════
 // Facturation, étape 2b-1 — devis et factures par patient
