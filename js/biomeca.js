@@ -7348,6 +7348,20 @@ function renderPatientList() {
         </div>
       </div>`;
 
+    // Ostéopathie — carte « Bientôt disponible » : aucun bouton actif, aucun
+    // bilan associé (module à venir). Titre en encre, comme les quatre autres.
+    const modOsteo = `
+      <div class="bl-carte">
+        <img src="assets/bilans/illus-osteopathie.jpg" alt="" style="display:block;width:100%;height:auto;">
+        <div style="padding:12px 13px 13px;display:flex;flex-direction:column;flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--posturo-encre);line-height:1.25;">Ostéopathie</div>
+          <div style="font-size:11px;color:var(--mut);margin-top:4px;flex:1;">Équilibrer · Soulager · Restaurer</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:11px;">
+            <button disabled style="border:none;padding:8px 0;border-radius:7px;font-size:11.5px;font-weight:700;cursor:not-allowed;background:var(--bord);color:var(--dim);grid-column:1/-1;">Bientôt disponible</button>
+          </div>
+        </div>
+      </div>`;
+
     // #121 Phase 0 / #140 Phase 0 — Coin arrondi du header : actif si UN
     // bandeau « en cours » OU UNE liste d'archives est présent, peu importe
     // le type (sport/posturo/pédicurie/podopédiatrie).
@@ -7372,7 +7386,7 @@ function renderPatientList() {
       </div>
       <div style="background:var(--card);border:1px solid var(--bord);border-top:none;border-radius:0 0 12px 12px;padding:14px;">
         <div class="bl-grid" style="margin-bottom:${_hasAnyExpandedBilan?'4px':'0'};">
-          ${modPosturo}${modSport}${modPedicurie}${modPodo}
+          ${modPosturo}${modSport}${modPedicurie}${modPodo}${modOsteo}
         </div>
         ${bilanEnCoursHtml}${bilanPosturoEnCoursHtml}${bilanPedicurieEnCoursHtml}${bilanPodopediatrieEnCoursHtml}${bilansPosturoHtml}${comparePosturoHtml}${bilansPedicurieHtml}${comparePedicurieHtml}${bilansPodopediatrieHtml}${comparePodopediatrieHtml}${bilansSportHtml}${compareSportHtml}
       </div>

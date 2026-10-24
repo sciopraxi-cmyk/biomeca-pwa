@@ -81,19 +81,20 @@ const HEX_RED = '#f04060';
 // (+1 --mut, +1 --card, +1 --bord : total 103 → 106).
 // Aperçu du portail (v219) : le bouton « 👁 » voisin de 🔑 fait de même (+1 --mut, +1 --card, +1 --bord :
 // total 106 → 109).
+// +1 posturo-encre, mut, bord, dim : carte Ostéopathie « Bientôt disponible ».
 const COMPTES_ATTENDUS = {
-  '--posturo-*': 12,
+  '--posturo-*': 13,
   '--sport-*': 11,
-  '--mut': 17,
+  '--mut': 18,
   '--txt': 9,
   '--pedicurie-*': 11,
   '--podo-*': 11,
   '--card': 12,
-  '--bord': 11,
+  '--bord': 12,
   '--encours-*': 4,
   '--encours': 4,
   '--danger-*': 4,
-  '--dim': 3,
+  '--dim': 4,
 };
 
 // #258 — le bloc ENCRES, valeurs exactes. Les quatre premières familles sont
@@ -412,11 +413,12 @@ describe('#258 la zone ne contient plus aucune couleur littérale', () => {
     expect((cssEntier.match(/rgba\(/g) || []).length).toBeGreaterThan(0);
   });
 
-  it('7. Les 4 illustrations de carte sont référencées', () => {
+  it('7. Les 5 illustrations de carte sont référencées', () => {
     const chemins = [
       ...new Set(BLOC_ZONE.match(/assets\/bilans\/illus-[a-z]+\.jpg/g) || []),
     ].sort();
     expect(chemins).toEqual([
+      'assets/bilans/illus-osteopathie.jpg',
       'assets/bilans/illus-pedicurie.jpg',
       'assets/bilans/illus-podopediatrie.jpg',
       'assets/bilans/illus-postural.jpg',
@@ -439,13 +441,13 @@ describe('#258 la zone ne contient plus aucune couleur littérale', () => {
     }
   });
 
-  it('7b. Ces 4 chemins sont AUSSI au précache du service worker', () => {
+  it('7b. Ces 5 chemins sont AUSSI au précache du service worker', () => {
     // Une carte dont l'image n'est pas au cache s'affiche vide hors ligne —
     // mode de fonctionnement réel en cabinet, pas un cas limite.
     const sw = readFileSync(join(RACINE, 'service-worker.js'), 'utf8');
     const dansJs = [...new Set(BLOC_ZONE.match(/assets\/bilans\/illus-[a-z]+\.jpg/g) || [])].sort();
     const dansSw = [...new Set(sw.match(/assets\/bilans\/illus-[a-z]+\.jpg/g) || [])].sort();
-    expect(dansJs.length).toBe(4);
+    expect(dansJs.length).toBe(5);
     expect(dansSw).toEqual(dansJs);
   });
 });

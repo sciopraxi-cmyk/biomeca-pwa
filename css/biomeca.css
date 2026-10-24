@@ -250,8 +250,8 @@ body.theme-clair .tb-doctolib{ border:1px solid var(--bord); }
    consomment — une seule règle de survol au lieu de quatre.
    Rien ici n'est scopé à .theme-clair : ces composants ne vivent que dans
    pg-patients, qui est toujours en thème clair depuis ce lot. */
-.bl-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-@media (max-width:1100px){ .bl-grid{ grid-template-columns:repeat(2,1fr); } }
+.bl-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+@media (max-width:900px){ .bl-grid{ grid-template-columns:repeat(2,1fr); } }
 @media (max-width:620px){ .bl-grid{ grid-template-columns:1fr; } }
 
 .bl-carte{ background:#fff; border:1px solid var(--bord); border-radius:12px;
