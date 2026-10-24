@@ -60,6 +60,17 @@ DELETE FROM public.documents_facturation WHERE id='30000000-0000-0000-0000-00000
 SELECT essai.ctrl((SELECT count(*) FROM public.documents_facturation WHERE id='30000000-0000-0000-0000-0000000000d1') = 1, 'devis émis : jamais supprimé');
 RESET ROLE;
 
+-- ── Suppression d'actes (actes-catalogue-supprimer-perso.sql) ──
+SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a"}';
+SET ROLE authenticated;
+INSERT INTO public.actes_catalogue(code, libelle, montant_cents, perso) VALUES ('POD-X', 'Référentiel', 1000, false);
+DELETE FROM public.actes_catalogue WHERE code = 'POD-X';
+SELECT essai.ctrl((SELECT count(*) FROM public.actes_catalogue WHERE code='POD-X') = 1, 'acte du référentiel : jamais supprimé');
+DELETE FROM public.actes_catalogue WHERE libelle = 'Consultation';
+SELECT essai.ctrl((SELECT count(*) FROM public.actes_catalogue WHERE libelle='Consultation') = 0, 'acte personnalisé : supprimé');
+SELECT essai.ctrl((SELECT count(*) FROM public.documents_facturation WHERE source_rdv='rdv-001') = 1, 'documents intacts après suppression d''un acte');
+RESET ROLE;
+
 -- ── Praticien B : même identifiant de RDV chez lui = autorisé ; ne voit rien de A ──
 SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b"}';
 SET ROLE authenticated;
@@ -68,6 +79,10 @@ INSERT INTO public.documents_facturation(type,patient_ref,patient,emetteur,ligne
 SELECT essai.ctrl(true, 'B : même RDV que A autorisé (unicité par praticien)');
 SELECT essai.ctrl((SELECT count(*) FROM public.devis_auto_parametres) = 0, 'B ne voit pas les paramètres de A');
 SELECT essai.ctrl((SELECT count(*) FROM public.actes_catalogue) = 0, 'B ne voit pas le catalogue de A');
+DELETE FROM public.actes_catalogue;
+RESET ROLE;
+SELECT essai.ctrl((SELECT count(*) FROM public.actes_catalogue WHERE libelle='Bilan podologique') = 1, 'B ne supprime pas le catalogue de A');
+SET ROLE authenticated;
 SELECT essai.ctrl((SELECT count(*) FROM public.documents_facturation) = 1, 'B ne voit que ses documents');
 RESET ROLE;
 

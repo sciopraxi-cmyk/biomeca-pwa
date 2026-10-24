@@ -32290,6 +32290,7 @@ function _htmlLigneActe(a) {
         '<div style="font-size:14px;font-weight:700;">' + _escHtml(_centimesVersEuros(a.montant_cents)) + '</div>' +
         '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="modifierActe(\'' + _escHtml(a.id) + '\')">Modifier</button> ' +
         '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="basculerActeActif(\'' + _escHtml(a.id) + '\')">' + (a.actif ? 'Désactiver' : 'Réactiver') + '</button>' +
+        (a.perso ? ' <button class="btn" style="font-size:11px;padding:3px 8px;color:var(--danger-actif);border-color:var(--danger-actif);" onclick="supprimerActe(\'' + _escHtml(a.id) + '\')">Supprimer</button>' : '') +
       '</div></div>'
   );
 }
@@ -32386,6 +32387,18 @@ async function enregistrerActe() {
     annulerEditionActe();
     await renderActesPage();
   } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\'a été modifié.'); }
+}
+// Suppression d'un acte PERSONNALISÉ seulement (le référentiel se désactive). Les devis et factures
+// déjà créés gardent une copie de leurs lignes : rien n'y change.
+async function supprimerActe(id) {
+  const a = _actesCache.find((x) => x.id === id);
+  if (!a || a.perso !== true) return;
+  if (!confirm('Supprimer définitivement l\u2019acte « ' + a.libelle + ' » ?\n\nLes devis et factures déjà créés ne changent pas. Cette action est irréversible (pour le garder sans l\u2019utiliser, choisissez « Désactiver »).')) return;
+  try {
+    await _actesRequete('?id=eq.' + encodeURIComponent(id) + '&perso=eq.true', { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
+    if (_acteEnEdition === id) annulerEditionActe();
+    await renderActesPage();
+  } catch (e) { alert('Suppression impossible (' + e.message + '). Rien n\u2019a été modifié.'); }
 }
 async function basculerActeActif(id) {
   const a = _actesCache.find((x) => x.id === id);

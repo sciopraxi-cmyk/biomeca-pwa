@@ -27,6 +27,7 @@ const NOMS = [
   'importerReferentielActes',
   'enregistrerActe',
   'basculerActeActif',
+  'supprimerActe',
   'modifierActe',
   'annulerEditionActe',
   'renderActesPage',
@@ -70,8 +71,11 @@ function monter(o = {}) {
     `return { ${NOMS.join(', ')}, REFERENTIEL_ACTES_POD, REGIMES_REMBOURSEMENT, cache: () => _actesCache, edition: () => _acteEnEdition };`,
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
-  const f = new Function('authFetch', 'document', 'alert', corps)(authFetch, document, (m) =>
-    alertes.push(m)
+  const f = new Function('authFetch', 'document', 'alert', 'confirm', corps)(
+    authFetch,
+    document,
+    (m) => alertes.push(m),
+    () => o.confirmer !== false
   );
   return { f, appels, alertes };
 }
@@ -425,6 +429,33 @@ describe("enregistrement, modification et désactivation d'un acte", () => {
     await e.f.basculerActeActif('a-2');
     expect(e.appels.find((a) => a.methode === 'PATCH').corps).toEqual({ actif: false });
     expect(e.appels.some((a) => a.methode === 'DELETE')).toBe(false);
+  });
+  it('suppression : DELETE limité aux actes personnalisés, après confirmation', async () => {
+    const e = monter({
+      lignes: [
+        { id: 'a-p', libelle: 'Perso', montant_cents: 100, actif: true, perso: true },
+        { id: 'a-r', libelle: 'Réf', montant_cents: 100, actif: true, perso: false },
+      ],
+    });
+    await e.f.chargerActes();
+    await e.f.supprimerActe('a-r');
+    expect(e.appels.some((a) => a.methode === 'DELETE')).toBe(false); // référentiel : refusé
+    await e.f.supprimerActe('a-p');
+    const d = e.appels.find((a) => a.methode === 'DELETE');
+    expect(d.url).toMatch(/\?id=eq\.a-p&perso=eq\.true$/);
+  });
+  it('suppression refusée par l\u2019utilisateur : aucune requête', async () => {
+    const e = monter({
+      lignes: [{ id: 'a-p', libelle: 'Perso', montant_cents: 100, actif: true, perso: true }],
+      confirmer: false,
+    });
+    await e.f.chargerActes();
+    await e.f.supprimerActe('a-p');
+    expect(e.appels.some((a) => a.methode === 'DELETE')).toBe(false);
+  });
+  it('le bouton Supprimer n\u2019apparaît que pour un acte personnalisé', () => {
+    const h = fonction('_htmlLigneActe');
+    expect(h).toMatch(/a\.perso \? ' <button[^]*supprimerActe/);
   });
   it("l'affichage échappe le HTML (aucune injection par un titre d'acte)", () => {
     expect(fonction('_htmlLigneActe')).toContain('_escHtml(a.libelle)');
