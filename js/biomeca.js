@@ -26337,6 +26337,20 @@ function _progPortailConstruire(flavor, d) {
   if (!jours.length) return null;
   return { debut: jours[0].date, fin: jours[jours.length - 1].date, jours, noms };
 }
+// Modules cochés dans un bilan mais sans exercice choisi (donc absents du programme publié). Renvoie la liste des titres.
+function _progPortailManques(flavor, d) {
+  d = d || {};
+  const prog = flavor === 'sport' ? (d.ttt || {}).programmes : d.programmes;
+  const per = _progPeriodes(prog);
+  const circ = _progCircuitsDe(flavor, d);
+  const nb = (arr) => arr.filter((ex) => _progExoCodes(ex).codes.length).length;
+  const n1 = nb(circ.c1.slice(0, 4)), n2 = nb(circ.c2.slice(0, 4));
+  const m = [];
+  if (per.chauffe && n1 + n2 === 0) m.push('Échauffement');
+  if (per.express && n1 === 0) m.push('Express 1');
+  if (per.express && n2 === 0) m.push('Express 2');
+  return m;
+}
 function _progTexteSeances(p, jours) {
   const nb = (n) => (n === 1 ? '1 séance' : n + ' séances');
   return _progSeances(p, jours).map((t) => {
@@ -36658,32 +36672,77 @@ async function portailApercu(idx) {
   }
 }
 // ── Fenêtre 🔑 : liste des documents partagés, retrait / remise ──
-// Bilan dont on publie le programme (le premier qui en a un) ; null s'il n'y en a aucun.
+// Bilan dont on publie le programme : celui qui a le plus de séances (jamais « le premier trouvé » : un vieux bilan
+// sport avec le seul programme du pied ne doit pas masquer le bilan podopédiatrie complet). null s'il n'y en a aucun.
 function _portailFlavorProgramme(p) {
-  const l = ['sport', 'podopediatrie', 'posturo'];
-  for (let i = 0; i < l.length; i++) if (_progPortailConstruire(l[i], p[_PORTAIL_DONNEES_BILAN[l[i]]])) return l[i];
-  return null;
+  let meilleur = null, max = 0;
+  ['sport', 'podopediatrie', 'posturo'].forEach(function (f) {
+    const r = _progPortailConstruire(f, p[_PORTAIL_DONNEES_BILAN[f]]);
+    const n = r ? r.jours.reduce(function (t, j) { return t + j.seances.length; }, 0) : 0;
+    if (n > max) { max = n; meilleur = f; }
+  });
+  return meilleur;
 }
-// Ligne d'état du programme dans la fenêtre 🔑 + rattrapage (publication si un bilan en contient un et qu'il n'est pas encore copié).
+// Ligne d'état du programme dans la fenêtre 🔑. Rattrapage : publie seulement s'il n'y a encore AUCUN programme
+// (les publications suivantes viennent de l'enregistrement du bilan ouvert, qui ne doit jamais être écrasé ici).
 async function _portailChargerProgramme(idx) {
   const p = patients[idx];
   const zone = document.getElementById('portail-programme');
   if (!p || !p._cloudId || !zone) return;
   const flavor = _portailFlavorProgramme(p);
   try {
-    if (flavor) await _portailPublierProgramme(p, flavor);
-    const res = await authFetch(SUPA_URL + '/rest/v1/programmes_patient?select=publie_at&patient_id=eq.' + encodeURIComponent(p._cloudId));
+    let res = await authFetch(SUPA_URL + '/rest/v1/programmes_patient?select=publie_at&patient_id=eq.' + encodeURIComponent(p._cloudId));
     if (!res.ok) throw new Error('lecture ' + res.status);
-    const l = await res.json();
+    let l = await res.json();
+    if (!l.length && flavor) {
+      await _portailPublierProgramme(p, flavor);
+      res = await authFetch(SUPA_URL + '/rest/v1/programmes_patient?select=publie_at&patient_id=eq.' + encodeURIComponent(p._cloudId));
+      l = res.ok ? await res.json() : [];
+    }
     const cible = document.getElementById('portail-programme');
     if (!cible) return;
-    cible.textContent = l.length
+    const manques = [];
+    ['sport', 'podopediatrie', 'posturo'].forEach(function (f) {
+      const d = p[_PORTAIL_DONNEES_BILAN[f]];
+      if (!d) return;
+      _progPortailManques(f, d).forEach(function (t) { manques.push(t + ' (bilan ' + (f === 'sport' ? 'sport' : f === 'posturo' ? 'posturo' : 'podopédiatrie') + ')'); });
+    });
+    cible.textContent = '';
+    const ligne = document.createElement('div');
+    ligne.textContent = l.length
       ? '✅ Programme publié le ' + new Date(l[0].publie_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) + ', mis à jour à chaque enregistrement du bilan. Visible dans « Mes exercices » (vidéos comprises dans l\'aperçu ci-dessus).'
-      : flavor ? 'Programme prêt, publication en cours…' : 'Aucun programme : cochez « programme du pied » ou « circuits » dans la partie Traitement d\'un bilan.';
+      : 'Aucun programme : cochez « programme du pied » ou « circuits » dans la partie Traitement d\'un bilan.';
+    cible.appendChild(ligne);
+    if (flavor) {
+      const bt = document.createElement('button');
+      bt.className = 'btn';
+      bt.style.cssText = 'margin-top:6px;font-size:11px;padding:3px 8px;';
+      bt.textContent = '🔄 Republier le programme maintenant';
+      bt.onclick = function () { portailRepublierProgramme(idx); };
+      cible.appendChild(bt);
+    }
+    if (manques.length) {
+      const w = document.createElement('div');
+      w.style.cssText = 'margin-top:6px;color:#92400e;';
+      w.textContent = '⚠️ Coché mais aucun exercice choisi, donc non publié : ' + manques.join(', ') + '.';
+      cible.appendChild(w);
+    }
   } catch (_e) {
     const cible = document.getElementById('portail-programme');
     if (cible) cible.textContent = 'État du programme indisponible pour le moment.';
   }
+}
+// Republication à la demande : le bilan le plus complet remplace la copie du patient.
+async function portailRepublierProgramme(idx) {
+  const p = patients[idx];
+  if (!p || !p._cloudId) return;
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  const flavor = _portailFlavorProgramme(p);
+  if (!flavor) { alert('Aucun programme à publier dans les bilans de ce patient.'); return; }
+  try {
+    await _portailPublierProgramme(p, flavor, true);
+  } catch (_e) { alert('Publication impossible pour le moment, réessayez.'); }
+  _portailChargerProgramme(idx);
 }
 async function _portailChargerDocs(idx) {
   const p = patients[idx];
@@ -36726,6 +36785,7 @@ Object.assign(window, {
   ouvrirPortailPatient,
   portailAction,
   portailApercu,
+  portailRepublierProgramme,
   portailCreerAcces,
   portailEnregistrerRepresentant,
   portailPublierRapport,

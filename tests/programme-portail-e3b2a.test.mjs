@@ -25,9 +25,10 @@ function monter() {
     fonction('_progHashTexte'),
     fonction('_progExoCodes'),
     fonction('_progCircuitsDe'),
+    fonction('_progPortailManques'),
     fonction('_progChronoPortail'),
     fonction('_progPortailConstruire'),
-    'return { _progExoCodes, _progCircuitsDe, _progChronoPortail, _progPortailConstruire, _PIED_JOURS };',
+    'return { _progPortailManques, _progExoCodes, _progCircuitsDe, _progChronoPortail, _progPortailConstruire, _PIED_JOURS };',
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   return new Function(corps)();
@@ -252,5 +253,34 @@ describe('portail patient : affichage du programme (logique pure)', async () => 
     expect(L.phraseChrono({ type: 'emom', travail: 45, repos: 15 })).toContain(
       '1 exercice par minute'
     );
+  });
+});
+
+describe('modules cochés sans exercice', () => {
+  it('signale Échauffement, Express 1 et Express 2 sans exercice ; rien si tout est rempli', () => {
+    const vide = {
+      ttt: {
+        programmes: prog({ chauffe: { actif: true, debut: '2026-10-26', fin: '2026-10-29' } }),
+      },
+    };
+    expect(f._progPortailManques('sport', vide)).toEqual([
+      'Échauffement',
+      'Express 1',
+      'Express 2',
+    ]);
+    expect(
+      f._progPortailManques(
+        'sport',
+        sport(prog({ chauffe: { actif: true, debut: '2026-10-26', fin: '2026-10-29' } }))
+      )
+    ).toEqual([]);
+    const demi = sport(prog());
+    demi.ttt.c2 = [];
+    expect(f._progPortailManques('sport', demi)).toEqual(['Express 2']);
+    expect(
+      f._progPortailManques('sport', {
+        ttt: { programmes: { pied: { actif: true, debut: '2026-10-26', fin: '2026-10-27' } } },
+      })
+    ).toEqual([]);
   });
 });
