@@ -165,7 +165,7 @@ describe('programme du patient', () => {
       chauffe: P(false, '', ''),
     });
     expect(l[0]).toBe(
-      'Programme de renforcement des muscles profonds des pieds : du 24/10/2026 au 20/11/2026'
+      'Programme de renforcement des muscles profonds des pieds : du 24/10/2026 au 20/11/2026 — exercices détaillés sur le portail patient'
     );
     expect(l[1]).toBe('Circuits Express 1 et 2 : du 24/10/2026 au 20/11/2026');
     expect(l[2]).toBe(

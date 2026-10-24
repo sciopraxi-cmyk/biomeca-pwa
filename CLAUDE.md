@@ -718,6 +718,22 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - Scripts : `documents/extraction-qr/` (`libelles.py`, `build_pdf.py`, `build_pdf2.py`, `gen_sql2.py`) ; SQL :
   `documents/sql-reorganisation-categories-exercices.sql` (à coller APRÈS la fusion de cette PR).
 
+## Programme du pied jour par jour (lot e3b-1, PR « programme-pied-tableau-e3b »)
+
+- Quand « programme du pied » est coché (sport `sp`, posturo `po`, podopédiatrie `pd`), le bloc affiche un tableau repliable
+  « 📋 Exercices du pied jour par jour » (`_progPiedTableauHTML`, conteneur `<pref>-prog-pied-tab`, rendu par `_progMaj`).
+  Source : `_PIED_JOURS` (28 jours de la fiche « Rééducation du pied », en dur dans `js/biomeca.js` ; 4 exercices par jour,
+  1 seul aux jours 7, 14, 21, 28). AUCUNE dose (séries, répétitions) : elles restent sur la fiche PDF et le portail (chrono EMOM 45/15).
+- Dates réelles du patient quand elles sont connues ; au-delà du jour 28, lignes en lecture seule « = exercices du jour k (retour en
+  sens inverse) » jusqu'à 55 jours. Seuls les jours 1-28 sont éditables (4 menus, « — » retire un exercice).
+- Modifications du praticien : `programmes.pied.modifs = { '3': ['cle', …] }` (seuls les jours différents de la fiche, nettoyés par
+  `_progModifsNettoyer`) ; état en mémoire `_progModifs[pref]`, lu/écrit par `_progLire`/`_progEcrire`. Les menus sont recréés à chaque
+  changement : `_progPiedRafraichir` appelle `_scheduleBilanAutosave` (l'événement `input` d'un menu détaché n'est plus capté).
+- Exercices d'un jour du programme (pour le portail, e3b-2) : `_progExosProgramme(programmes, n)` (n = 1-55, gère le sens inverse et les modifs).
+- Rapport (choix de Joël : bilan allégé) : une seule ligne « Programme de renforcement … : du JJ/MM/AAAA au JJ/MM/AAAA [— programme
+  personnalisé] — exercices détaillés sur le portail patient » ; pas de tableau, pas de QR, pas de PDF.
+- Tests : `tests/programme-pied-e3b.test.mjs` ; e2e `documents/e2e-programme-pied-e3b.mjs` (vider `_progEcrire(pref, null)` au début : le compte test garde les dates d'un run précédent).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
