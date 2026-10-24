@@ -524,3 +524,35 @@ input:focus-visible,
   background: var(--turquoise);
   border-radius: 18px;
 }
+
+/* Chrono placé dans la carte de l'exercice en cours : collé en haut de l'écran, compact */
+.bloc-chrono.dans-carte {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  box-shadow: 0 4px 10px rgba(11, 30, 61, 0.18);
+}
+.bloc-chrono.dans-carte .chrono-etat {
+  font-size: 15px;
+}
+.bloc-chrono.dans-carte .chrono-temps {
+  margin: 0;
+  font-size: 44px;
+}
+.bloc-chrono.dans-carte #chrono-exo,
+.bloc-chrono.dans-carte .case-son {
+  display: none;
+}
+.bloc-chrono.dans-carte .chrono-boutons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.bloc-chrono.dans-carte .bouton {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 6px;
+  font-size: 15px;
+}

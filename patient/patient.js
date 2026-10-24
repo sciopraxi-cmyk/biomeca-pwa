@@ -735,10 +735,27 @@ function nomsExercice(i) {
     .map((e) => e.nom)
     .join(' + ');
 }
+// Le bloc chrono vit dans la carte de l'exercice en cours (collé en haut de l'écran pendant qu'on suit la vidéo) ;
+// à l'arrêt, à la fin ou au changement de séance il revient à sa place, au-dessus de la liste.
+function rangerChrono() {
+  const bloc = $('bloc-chrono');
+  const liste = $('liste-exercices');
+  bloc.classList.remove('dans-carte');
+  if (bloc.parentNode !== liste.parentNode) liste.parentNode.insertBefore(bloc, liste);
+}
 function surlignerExercice(i, defiler) {
-  document.querySelectorAll('#liste-exercices .exercice').forEach((carte, k) => {
+  const cartes = document.querySelectorAll('#liste-exercices .exercice');
+  if (i < 0 || !cartes[i]) rangerChrono();
+  cartes.forEach((carte, k) => {
     carte.classList.toggle('exercice-courant', k === i);
-    if (k === i && defiler) carte.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (k === i) {
+      const bloc = $('bloc-chrono');
+      bloc.classList.add('dans-carte');
+      const titre = carte.querySelector('h2');
+      if (bloc.parentNode !== carte)
+        carte.insertBefore(bloc, titre ? titre.nextSibling : carte.firstChild);
+      if (defiler) carte.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
   });
 }
 function afficherBoutonsChrono() {
@@ -784,10 +801,7 @@ function majChrono() {
   if (e.index !== chrono.index) {
     const premier = chrono.index === -1;
     chrono.index = e.index;
-    surlignerExercice(
-      e.phase === 'prep' ? -1 : e.exo,
-      chrono.etat === 'marche' && e.phase === 'travail'
-    );
+    surlignerExercice(e.exo, chrono.etat === 'marche' && e.phase !== 'repos');
     if (!premier || e.phase !== 'prep') {
       if (e.phase === 'travail') bip(880, 220);
       if (e.phase === 'repos') bip(520, 220);
@@ -854,6 +868,7 @@ function finirChrono() {
 }
 // Remet le chrono à zéro pour la séance affichée (null = on quitte l'écran : tout s'arrête).
 function reinitialiserChrono(seance) {
+  rangerChrono();
   arreterCompteur();
   relacherEcran();
   chrono.seance = seance;

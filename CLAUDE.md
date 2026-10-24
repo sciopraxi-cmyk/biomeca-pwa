@@ -775,7 +775,7 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   `debutExerciceMs`) ; le temps écoulé est la seule donnée d'état (`base` + `Date.now() - depart`), la PAUSE gèle `base`. Plan = « Prêt ? »
   5 s puis, par exercice, effort + repos (Express 20/10, échauffement 30/30 ou 45/15, pied EMOM 45/15) ; « Passer » = effort de l'exercice
   suivant, « Recommencer l'exercice », « Arrêter ». Bips générés par Web Audio (aucun fichier), triple bip à la fin, case « Son » mémorisée
-  (`verticy-patient-son`), écran gardé allumé (Wake Lock) quand le navigateur le permet. Quitter l'écran arrête tout (`montrer`).
+  (`verticy-patient-son`), écran gardé allumé (Wake Lock) quand le navigateur le permet. Le bloc chrono est DÉPLACÉ dans la carte de l'exercice en cours (compact, `position: sticky; top: 0`, `rangerChrono()` le remet en haut à l'arrêt/fin/changement de séance) : on garde chrono et boutons sous les yeux pendant la vidéo. Quitter l'écran arrête tout (`montrer`).
 - **Validation** : table `programme_validations` (patient, jour, séance, commentaire ≤ 500, une ligne par jour et séance, jamais modifiée) et
   fonction `programme_seance_valider(p_jour, p_seance, p_commentaire)` (patient seulement, jour d'aujourd'hui à l'heure de Paris
   — `portail_aujourdhui()` —, séance présente dans SA copie). Aucun droit d'écriture direct. « Bravo, vous êtes à jour » = toutes les
@@ -790,7 +790,7 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - Preuve : `supabase/tests/portail-programme-validations.test.sql` (banc jetable : prélude, `portail-programme-patient.sql`,
   `portail-programme-validations.sql`, puis le test ; finit `TOUT_OK` ; 10 mutations toutes détectées),
   `tests/portail-chrono-e3b2b.test.mjs`, `tests/portail-suivi-praticien-e3b2b.test.mjs`, E2E `documents/e2e-portail-chrono-e3b2b.mjs`
-  (horloge simulée) et `e2e-portail-suivi-praticien-e3b2b.mjs`. Service workers : `biomeca-v241`, `verticy-patient-v7`.
+  (horloge simulée) et `e2e-portail-suivi-praticien-e3b2b.mjs`. Service workers : `biomeca-v241`, `verticy-patient-v8`.
 
 ## Fin de tâche : mise à jour de la documentation
 
