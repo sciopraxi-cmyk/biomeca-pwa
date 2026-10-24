@@ -21174,8 +21174,6 @@ let drawSize = 4;
 let curveDir = 1; // +1 = courbe droite, -1 = courbe gauche
 let isDrawing = false;
 let drawStart = {x:0,y:0};
-let micRecognition = null;
-let micActive = false;
 let micTargetField = null;
 
 // Silhouettes morphostatiques (dessin sur canvas avec bonhomme SVG)
@@ -25452,35 +25450,6 @@ function loadBilan() {
   // #203 — rendu immédiat (vignettes « chargement… » si Paths pas encore
   // réhydratés) : l'utilisateur voit tout de suite l'état de la galerie.
   renderPodoscopeGallery();
-}
-
-function toggleDictaphone() {
-  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
-    alert('Dictaphone non supporté dans ce navigateur. Utilisez Chrome ou Edge.');return;
-  }
-  if(micActive) {
-    micActive=false; if(micRecognition) micRecognition.stop();
-    document.getElementById('mic-status').style.display='none';
-    document.getElementById('btn-mic').className='btn';
-    return;
-  }
-  micActive=true;
-  document.getElementById('mic-status').style.display='block';
-  document.getElementById('btn-mic').className='btn btn-red';
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  micRecognition=new SR();
-  micRecognition.lang='fr-FR'; micRecognition.continuous=true; micRecognition.interimResults=false;
-  micRecognition.onresult=e=>{
-    const text=e.results[e.results.length-1][0].transcript;
-    // Insérer dans le champ actif
-    const active=document.activeElement;
-    if(active&&(active.tagName==='TEXTAREA'||active.tagName==='INPUT')&&active.classList.contains('bilan-field')){
-      active.value+=(active.value?' ':'')+text;
-      setBilanField(active.dataset.field, active.value);
-    }
-  };
-  micRecognition.onerror=()=>{micActive=false;document.getElementById('mic-status').style.display='none';};
-  micRecognition.start();
 }
 
 function printBilan() {
