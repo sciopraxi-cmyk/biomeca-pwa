@@ -130,6 +130,7 @@ describe("validation d'un acte", () => {
         acte_reference: null,
         regime_defaut: null,
         sync_doctolib: false,
+        devis_mode: 'simple',
       },
     });
   });

@@ -32201,6 +32201,7 @@ function _validerActe(a) {
     cotation: net(a?.cotation, 40), remboursement: net(a?.remboursement, 200), note: net(a?.note, 500),
     acte_reference: net(a?.reference, 60), regime_defaut: ['standard', 'ald', 'c2s'].includes(a?.regime) ? a.regime : null,
     sync_doctolib: a?.sync === true,
+    devis_mode: a?.devisMode === 'semelles' ? 'semelles' : 'simple',
   } };
 }
 // Actes du référentiel absents du catalogue (par code) : l'import est idempotent
@@ -32367,6 +32368,7 @@ async function enregistrerActe() {
     base: val('acte-base'), franchise: document.getElementById('acte-franchise')?.checked !== false,
     reference: val('acte-reference'), regime: val('acte-regime'),
     sync: document.getElementById('acte-sync-doctolib')?.checked === true,
+    devisMode: val('acte-devis-mode'),
   });
   if (!r.ok) { alert(r.erreur); return; }
   try {
@@ -32412,6 +32414,7 @@ function modifierActe(id) {
   _remplirCategoriesActe(a.acte_reference);
   set('acte-regime', a.regime_defaut);
   const sy = document.getElementById('acte-sync-doctolib'); if (sy) sy.checked = a.sync_doctolib === true;
+  set('acte-devis-mode', a.devis_mode === 'semelles' ? 'semelles' : 'simple');
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Modifier l\'acte';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = '';
   document.getElementById('acte-libelle')?.scrollIntoView({ block: 'center' });
@@ -32425,12 +32428,14 @@ function annulerEditionActe() {
   _remplirCategoriesActe(null);
   const rg = document.getElementById('acte-regime'); if (rg) rg.value = '';
   const sy = document.getElementById('acte-sync-doctolib'); if (sy) sy.checked = false;
+  const dm = document.getElementById('acte-devis-mode'); if (dm) dm.value = 'simple';
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Nouvel acte personnalisé';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = 'none';
 }
 async function renderActesPage() {
   const el = document.getElementById('actes-liste');
   if (!el) return;
+  if (typeof remplirParametresDevisAuto === 'function') remplirParametresDevisAuto();
   try { await chargerActes(); } catch (e) {
     el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px 0;">Catalogue indisponible (' + _escHtml(e.message) + '). Rien n\'a été modifié.</div>';
     return;
@@ -33093,6 +33098,136 @@ async function emettreDocumentCourant() {
     if (typeof _portailPartagerAuto === 'function') _portailPartagerAuto('facturation', currentPatient, emis);
     await renderDocumentsPage();
   } catch (e) { alert('Émission impossible (' + e.message + '). Le brouillon est conservé.'); await renderDocumentsPage(); }
+}
+// ── Devis automatique à l'import Doctolib ──
+// Un rendez-vous FUTUR dont le « Motif du RDV » est identique (accents/casse ignorés) au titre d'un acte du
+// catalogue coché « Devis automatique » crée un devis ÉMIS (numéro continu), au montant de cet acte. Un
+// rendez-vous ne produit qu'un devis (documents_facturation.source_rdv, unique par praticien). Le tarif
+// n'est jamais rétroactif : un devis émis reste figé. Intitulé inconnu / patient introuvable / paramètres
+// manquants : rien n'est créé, une notification liste les rendez-vous.
+function _devisAutoPlanifier(rdvs, ctx) {
+  const norm = (t) => _importNormName(String(t ?? ''));
+  const parNom = new Map();
+  (ctx.actes || []).forEach((a) => { if (a && a.sync_doctolib === true && a.actif !== false && !parNom.has(norm(a.libelle))) parNom.set(norm(a.libelle), a); });
+  const deja = ctx.deja instanceof Set ? ctx.deja : new Set();
+  const creer = [], ignores = [];
+  (rdvs || []).forEach((r) => {
+    if (!r || typeof r.debut !== 'string' || r.debut.slice(0, 10) < ctx.aujourdhui || deja.has(r.id)) return;
+    const acte = parNom.get(norm(r.motif));
+    if (!acte) { ignores.push({ rdv: r, raison: 'intitulé non reconnu' }); return; }
+    const patient = r.patientId != null ? (ctx.patients || []).find((p) => p.id == r.patientId) : null;
+    if (!patient) { ignores.push({ rdv: r, raison: 'patient introuvable' }); return; }
+    let lignes, note = '', regime = 'standard', tiers = false;
+    if (acte.devis_mode === 'semelles') {
+      const prm = ctx.params || {};
+      if (!Number.isInteger(prm.secu_semelles_cents) || !prm.secu_semelles_date || !String(prm.secu_semelles_source || '').trim()) {
+        ignores.push({ rdv: r, raison: 'montant Sécu semelles non saisi' }); return;
+      }
+      const compl = Number.isInteger(prm.complement_cents) ? prm.complement_cents : 0;
+      lignes = [Object.assign(_ligneDepuisActe(acte), { base_remboursable_cents: null })];
+      lignes.push({ acte_id: null, code: null, libelle: 'Semelles orthopédiques — base Sécurité sociale (une paire)', cotation: null, qte: 1, prix_cents: prm.secu_semelles_cents, base_remboursable_cents: null, franchise: false });
+      if (compl > 0) lignes.push({ acte_id: null, code: null, libelle: 'Complément d\u2019honoraires', cotation: null, qte: 1, prix_cents: compl, base_remboursable_cents: null, franchise: false });
+      note = 'Montant Sécurité sociale pour une paire de semelles : ' + _centimesVersEuros(prm.secu_semelles_cents).replace(/\u00a0/g, ' ') + ' (' + String(prm.secu_semelles_source).trim().slice(0, 150) + ', tarif du ' + _dateFr(prm.secu_semelles_date) + ').';
+    } else {
+      lignes = [_ligneDepuisActe(acte)];
+      if (acte.regime_defaut && REGIMES_REMBOURSEMENT[acte.regime_defaut]) {
+        regime = acte.regime_defaut;
+        if (Number.isInteger(acte.base_remboursable_cents)) tiers = true;
+      }
+    }
+    const total = lignes.reduce((t, l) => t + l.qte * l.prix_cents, 0);
+    creer.push({ rdv: r, patient, acte, etat: { type: 'devis', pratId: _praticienParDefaut(patient)?.id ?? null, regime, lignes, tiersPayant: tiers, totalFixeCents: null, note, devisNumero: null }, total });
+  });
+  return { creer, ignores };
+}
+function _devisAutoResume(plan) {
+  const total = plan.creer.reduce((t, x) => t + x.total, 0);
+  let msg = plan.creer.length + ' devis seront créés ET émis (total ' + _centimesVersEuros(total).replace(/\u00a0/g, ' ') + '). Un devis émis ne se modifie plus : en cas d\u2019erreur, retirez-le du portail (bouton 🔑) et créez-en un autre.\n';
+  plan.creer.slice(0, 15).forEach((x) => {
+    msg += '\n• ' + _doctolibDateFr(x.rdv.debut) + ' — ' + [x.patient.prenom, x.patient.nom].filter(Boolean).join(' ') + ' — ' + x.acte.libelle + ' — ' + _centimesVersEuros(x.total).replace(/\u00a0/g, ' ');
+  });
+  if (plan.creer.length > 15) msg += '\n… et ' + (plan.creer.length - 15) + ' autre(s).';
+  if (plan.ignores.length) msg += '\n\n' + plan.ignores.length + ' rendez-vous sans devis (intitulé ou patient non reconnu, paramètres manquants) : détail dans Notifications.';
+  return msg;
+}
+async function _devisAutoCreerUn(x) {
+  const pr = _praticienDuDocument(x.etat);
+  const base = _ligneBaseDocument(x.etat, x.patient, pr);
+  const v = _validerDocument(Object.assign({}, base, { totalFixeCents: null }), true);
+  if (!v.ok) return { ok: false, raison: v.erreur };
+  let res;
+  try {
+    res = await authFetch(SUPA_URL + '/rest/v1/documents_facturation', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify(Object.assign({}, base, { source_rdv: String(x.rdv.id).slice(0, 80) })) });
+  } catch (e) { return { ok: false, raison: 'réseau' }; }
+  if (res.status === 409) return { ok: true, dejaFait: true };
+  if (!res.ok) return { ok: false, raison: 'enregistrement refusé (' + res.status + ')' };
+  const rows = await res.json();
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  try {
+    const r2 = await _docRequete('rpc/emettre_document', { method: 'POST', headers: _ENTETES_JSON, body: JSON.stringify({ p_id: row.id }) });
+    const emis = await r2.json();
+    notifierEvenement('devis_emis', { detail: 'n° ' + (emis.numero || ''), patientId: x.patient.id, documentId: emis.id });
+    if (typeof _portailPartagerAuto === 'function') _portailPartagerAuto('facturation', x.patient, emis);
+    return { ok: true, numero: emis.numero };
+  } catch (e) { return { ok: false, raison: 'brouillon créé mais non émis (' + e.message + ')' }; }
+}
+async function _devisAutoApresImport(ajoutes) {
+  if (globalThis?._modeConsultation || !_accessPermetCreationDocument()) return;
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) return;
+  await chargerActes();
+  if (!_actesCache.some((a) => a.sync_doctolib === true)) return;
+  const rp = await authFetch(SUPA_URL + '/rest/v1/devis_auto_parametres?select=*');
+  const lp = rp.ok ? await rp.json() : [];
+  const rd = await _docRequete('documents_facturation?select=source_rdv&source_rdv=not.is.null');
+  const deja = new Set((await rd.json()).map((d) => d.source_rdv));
+  const stock = _doctolibStock();
+  const plan = _devisAutoPlanifier(stock.rdv, { actes: _actesCache, params: lp[0] || null, patients, deja, aujourdhui: _todayISO() });
+  const nouveaux = new Set((ajoutes || []).map((r) => r.id));
+  const aSignaler = plan.ignores.filter((i) => nouveaux.has(i.rdv.id));
+  if (!plan.creer.length && !aSignaler.length) return;
+  let faits = [], echecs = [];
+  if (plan.creer.length && confirm(_devisAutoResume(Object.assign({}, plan, { ignores: aSignaler })))) {
+    for (const x of plan.creer) {
+      const r = await _devisAutoCreerUn(x);
+      if (r.ok) { if (!r.dejaFait) faits.push(x); } else echecs.push({ rdv: x.rdv, raison: r.raison });
+    }
+  }
+  const aNotifier = aSignaler.concat(echecs);
+  if (aNotifier.length) {
+    notifierEvenement('devis_auto_ignores', { detail: aNotifier.length + ' rendez-vous sans devis', rdv: aNotifier.map((i) => Object.assign({}, i.rdv, { raison: i.raison })) });
+  }
+  if (faits.length || echecs.length) alert('✅ ' + faits.length + ' devis créé(s) et émis.' + (echecs.length ? '\n⚠️ ' + echecs.length + ' non créé(s) : voir Notifications.' : ''));
+}
+// Paramètres « semelles » : une ligne par praticien (compte), saisie à la main.
+async function remplirParametresDevisAuto() {
+  try {
+    const r = await authFetch(SUPA_URL + '/rest/v1/devis_auto_parametres?select=*');
+    if (!r.ok) return;
+    const l = (await r.json())[0];
+    const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v ?? ''; };
+    const eur = (c) => (Number.isInteger(c) ? (c / 100).toFixed(2).replace('.', ',') : '');
+    set('dauto-secu', l ? eur(l.secu_semelles_cents) : ''); set('dauto-complement', l ? eur(l.complement_cents) : '');
+    set('dauto-date', l ? l.secu_semelles_date : ''); set('dauto-source', l ? l.secu_semelles_source : '');
+  } catch (_e) { /* rempli plus tard */ }
+}
+function _validerParametresDevisAuto(a) {
+  const secu = String(a.secu ?? '').trim() === '' ? null : _eurosVersCentimes(a.secu);
+  if (String(a.secu ?? '').trim() !== '' && secu === null) return { ok: false, erreur: 'Montant Sécurité sociale invalide (exemple : 135 ou 135,50).' };
+  const compl = String(a.complement ?? '').trim() === '' ? 0 : _eurosVersCentimes(a.complement);
+  if (compl === null) return { ok: false, erreur: 'Complément d\u2019honoraires invalide (exemple : 25 ou 25,50).' };
+  const date = String(a.date ?? '').trim(), source = String(a.source ?? '').trim();
+  if (secu !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !source)) return { ok: false, erreur: 'Le montant Sécurité sociale demande sa date et sa source.' };
+  return { ok: true, param: { secu_semelles_cents: secu, secu_semelles_date: secu !== null ? date : null, secu_semelles_source: secu !== null ? source.slice(0, 300) : null, complement_cents: compl } };
+}
+async function enregistrerParametresDevisAuto() {
+  const val = (id) => document.getElementById(id)?.value;
+  const r = _validerParametresDevisAuto({ secu: val('dauto-secu'), complement: val('dauto-complement'), date: val('dauto-date'), source: val('dauto-source') });
+  if (!r.ok) { alert(r.erreur); return; }
+  try {
+    const res = await authFetch(SUPA_URL + '/rest/v1/devis_auto_parametres?on_conflict=user_id', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(Object.assign({ user_id: pwaUser.id }, r.param)) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const e = document.getElementById('dauto-etat'); if (e) e.textContent = 'Enregistré.';
+  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\u2019a été modifié.'); }
 }
 async function supprimerBrouillonDocument() {
   const id = _docEdition?.id;
@@ -34125,6 +34260,7 @@ const NOTIF_TYPES = {
   reseau_perdu: { icone: '📡', titre: 'Connexion internet perdue', systeme: true },
   facture_editee: { icone: '🧾', titre: 'Facture éditée', systeme: true },
   devis_emis: { icone: '📄', titre: 'Devis émis', systeme: true },
+  devis_auto_ignores: { icone: '⚠️', titre: 'Rendez-vous sans devis automatique', systeme: true },
   email_essai: { icone: '📧', titre: 'E-mail au patient généré (boîte d\u2019essai, non envoyé)', systeme: true },
   ordonnance_creee: { icone: '💊', titre: 'Ordonnance créée', systeme: false },
   patient_message: { icone: '✉️', titre: 'Nouveau message d\u2019un patient', systeme: false },
@@ -34193,7 +34329,7 @@ function notifierEvenement(type, opts) {
     if (o.ordonnanceId) e.ordonnanceId = _notifTexte(o.ordonnanceId, 60); // identifiant seul : le contenu est relu à l'affichage
     if (Array.isArray(o.rdv)) {
       // Détail d'un import : identifiant, début et motif seulement (le nom est relu à l'affichage).
-      e.rdv = o.rdv.slice(0, NOTIF_RDV_MAX).map((x) => ({ id: _notifTexte(x && x.id, 60), debut: _notifTexte(x && x.debut, 16), motif: _notifTexte(x && x.motif, 60) }));
+      e.rdv = o.rdv.slice(0, NOTIF_RDV_MAX).map((x) => { const r = { id: _notifTexte(x && x.id, 60), debut: _notifTexte(x && x.debut, 16), motif: _notifTexte(x && x.motif, 60) }; if (x && x.raison) r.raison = _notifTexte(x.raison, 40); return r; });
       e.rdvTotal = o.rdv.length;
     }
     if (type === 'reseau_perdu') e.retourLe = '';
@@ -34268,7 +34404,7 @@ function _notifHtmlRdv(e) {
     const nom = a ? [a.prenom, a.nom].filter(Boolean).join(' ') : '';
     const hh = /T(\d{2}:\d{2})/.exec(r.debut || '');
     return '<tr><td style="padding:4px 8px;white-space:nowrap;">' + _escHtml(_notifDateFr(r.debut)) + (hh ? ' ' + hh[1] : '') + '</td><td style="padding:4px 8px;">' +
-      (nom ? _escHtml(nom) : '<span style="color:var(--mut);">plus dans l\u2019agenda</span>') + '</td><td style="padding:4px 8px;">' + _escHtml(r.motif || '—') + '</td></tr>';
+      (nom ? _escHtml(nom) : '<span style="color:var(--mut);">plus dans l\u2019agenda</span>') + '</td><td style="padding:4px 8px;">' + _escHtml(r.motif || '—') + (r.raison ? ' <span style="color:var(--encours-encre);font-weight:600;">— ' + _escHtml(r.raison) + '</span>' : '') + '</td></tr>';
   });
   const reste = (e.rdvTotal || liste.length) - liste.length;
   return '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;"><tr style="text-align:left;color:var(--mut);font-size:11px;"><th style="padding:4px 8px;">Date</th><th style="padding:4px 8px;">Patient</th><th style="padding:4px 8px;">Motif</th></tr>' +
@@ -34356,7 +34492,7 @@ function _notifHtmlDetail(e) {
   if (e.cible) corps += _notifLigneDetail('Patient', nom ? '<b>' + _escHtml(nom) + '</b>' : '<span style="color:var(--mut);">fiche introuvable</span>');
   return '<div style="margin-bottom:10px;"><button class="btn" style="font-size:12px;padding:5px 12px;" onclick="fermerDetailNotification()">← Retour à la liste</button></div>' +
     '<div style="border:1px solid var(--bord);border-radius:8px;padding:12px 14px;"><div style="font-size:15px;font-weight:600;margin-bottom:8px;">' + t.icone + ' ' + _escHtml(t.titre) + '</div>' + corps +
-    (e.type === 'import_doctolib' ? _notifHtmlRdv(e) : '') +
+    ((e.type === 'import_doctolib' || e.type === 'devis_auto_ignores') ? _notifHtmlRdv(e) : '') +
     (e.cible && nom ? '<div style="margin-top:12px;"><button class="btn btn-blue" style="font-size:12px;padding:5px 12px;" onclick="ouvrirPatientNotification(' + e.id + ')">Ouvrir la fiche de ' + _escHtml(nom) + ' →</button></div>' : '') + '</div>';
 }
 function fermerDetailNotification() {
@@ -36047,6 +36183,8 @@ function _lancerImportDoctolib(text) {
   }
   _agRafraichirDoctolib();
   notifierEvenement('import_doctolib', { detail: ajoutes.length + ' nouveau(x) sur ' + res.rdv.length + ' rendez-vous', rdv: ajoutes });
+  // Devis automatique : après l'enregistrement de l'import, jamais bloquant pour lui.
+  if (typeof _devisAutoApresImport === 'function') _devisAutoApresImport(ajoutes).catch((e) => console.warn('[devis auto]', e && e.message));
 }
 function importDoctolibAgendaCSV(input) {
   const file = input.files && input.files[0];
