@@ -4,22 +4,34 @@
 import {
   apercuDemande,
   cheminFichierValide,
+  cleExo,
+  cleValidation,
   dateCourte,
+  debutExerciceMs,
+  etatChrono,
+  exosTermines,
   exerciceAffichable,
+  exerciceSuivantMs,
   formaterIdentifiant,
+  formaterTemps,
   grouperDocuments,
   identifiantComplet,
+  indexerExos,
+  indexerValidations,
   jourProgramme,
   libelleJour,
   messageErreur,
   motDePasseAcceptable,
   nombreNonLus,
   phraseChrono,
+  planChrono,
+  PREPARATION_S,
   seancesAbsentes,
   phraseDocuments,
   reglesMotDePasse,
   salutation,
   sessionAExpirer,
+  situationJour,
 } from './patient-logique.mjs';
 
 const SUPA_URL = 'https://tzivizoacdyopwfzerrb.supabase.co';
@@ -64,6 +76,7 @@ const ECRANS = [
 ];
 
 function montrer(nom) {
+  if (nom !== 'exercices') reinitialiserChrono(null);
   for (const e of ECRANS) $('ecran-' + e).hidden = e !== nom;
   document
     .querySelector('.cadre')
@@ -530,14 +543,56 @@ async function chargerProgramme() {
   }
 }
 
+// Séances validées par le patient (jour|séance → ligne).
+let validations = new Map();
+async function chargerValidations() {
+  const r = await appelAuth(
+    '/rest/v1/programme_validations?select=jour,seance_id,commentaire,valide_at&order=jour.asc' +
+      (APERCU ? '&patient_id=eq.' + APERCU : '')
+  );
+  if (!r || !r.ok) return undefined;
+  try {
+    return indexerValidations(await r.json());
+  } catch {
+    return undefined;
+  }
+}
+
+// Exercices validés automatiquement par le chrono (jour|séance|rang).
+let exosValides = new Set();
+const exosEnAttente = new Map(); // envois à refaire (réseau coupé) : clé → { jour, seance, exo }
+async function chargerExosValides() {
+  const r = await appelAuth(
+    '/rest/v1/programme_exos_valides?select=jour,seance_id,exo' +
+      (APERCU ? '&patient_id=eq.' + APERCU : '')
+  );
+  if (!r || !r.ok) return undefined;
+  try {
+    return indexerExos(await r.json());
+  } catch {
+    return undefined;
+  }
+}
+
 async function majCarteExercices() {
-  const p = await chargerProgramme();
+  const [p, v, x] = await Promise.all([
+    chargerProgramme(),
+    chargerValidations(),
+    chargerExosValides(),
+  ]);
   if (p === undefined) return;
   programme = p;
-  $('phrase-exercices').textContent =
-    p && p.contenu && p.contenu.jours && p.contenu.jours.length
-      ? 'Votre programme du jour'
-      : 'Programme bientôt disponible';
+  if (v !== undefined) validations = v;
+  if (x !== undefined) exosValides = x;
+  const c = p && p.contenu;
+  let phrase = 'Programme bientôt disponible';
+  if (c && c.jours && c.jours.length) {
+    const auj = jourProgramme(c, aujourdhuiISO());
+    phrase = situationJour(c, auj.index, validations, aujourdhuiISO()).aJour
+      ? 'Bravo, vous êtes à jour 🎉'
+      : 'Votre programme du jour';
+  }
+  $('phrase-exercices').textContent = phrase;
 }
 
 function elt(tag, classe, texte) {
@@ -549,7 +604,8 @@ function elt(tag, classe, texte) {
 
 // Fiche PDF : sur la même page, dans un cadre sous l'exercice (fiche livrée avec l'application ou fiche privée lue
 // avec la session ; jamais un chemin libre : tout est contrôlé dans patient-logique.mjs).
-function boutonFiche(ex) {
+// `cibleCadre` : zone pleine largeur sous les sous-exercices où s'ouvre la fiche (les colonnes sont trop étroites).
+function boutonFiche(ex, cibleCadre) {
   const zone = elt('div', 'zone-fiche');
   const b = elt('button', 'btn-fiche', '📄 Fiche PDF (avec QR)');
   b.type = 'button';
@@ -581,7 +637,7 @@ function boutonFiche(ex) {
         new Blob([await r.arrayBuffer()], { type: 'application/pdf' })
       );
     }
-    zone.appendChild(cadre);
+    (cibleCadre || zone).appendChild(cadre);
     b.textContent = '✖ Fermer la fiche';
   });
   zone.appendChild(b);
@@ -595,7 +651,7 @@ function boutonFiche(ex) {
   return zone;
 }
 
-function blocSousExercice(ex) {
+function blocSousExercice(ex, cibleCadre) {
   const bloc = elt('div', 'sous-exercice');
   bloc.appendChild(elt('h3', '', ex.nom));
   for (const url of ex.videos) {
@@ -610,13 +666,508 @@ function blocSousExercice(ex) {
     bloc.appendChild(f);
   }
   if (ex.texte) bloc.appendChild(elt('p', 'texte-exercice', ex.texte));
-  if (ex.pdfPublic || ex.pdfPrive) bloc.appendChild(boutonFiche(ex));
+  if (ex.pdfPublic || ex.pdfPrive) bloc.appendChild(boutonFiche(ex, cibleCadre));
   return bloc;
+}
+
+// ─── Chrono d'une séance : pause, « Passer », bips du navigateur (lot e3b-2b) ───
+const chrono = {
+  compte: 0, // exercices déjà traités (validés ou passés) dans le passage en cours
+  plan: null,
+  seance: null,
+  etat: 'pret',
+  base: 0,
+  depart: null,
+  timer: null,
+  index: -1,
+};
+let audio = null;
+let verrouEcran = null;
+
+function sonActif() {
+  try {
+    return localStorage.getItem('verticy-patient-son') !== '0';
+  } catch {
+    return true;
+  }
+}
+// Le navigateur n'autorise le son qu'après un geste du patient : on prépare l'audio au clic.
+function preparerAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audio = audio || new AC();
+    if (audio.state === 'suspended') audio.resume();
+  } catch {
+    audio = null;
+  }
+}
+function bip(frequence, dureeMs, delaiMs) {
+  if (!sonActif() || !audio) return;
+  try {
+    const t0 = audio.currentTime + (delaiMs || 0) / 1000;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = frequence;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.4, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dureeMs / 1000);
+    osc.connect(gain);
+    gain.connect(audio.destination);
+    osc.start(t0);
+    osc.stop(t0 + dureeMs / 1000 + 0.05);
+  } catch {
+    /* le son est un plus : jamais bloquant */
+  }
+}
+function vibrer(motif) {
+  try {
+    if (navigator.vibrate && sonActif()) navigator.vibrate(motif);
+  } catch {
+    /* sans effet */
+  }
+}
+async function garderEcranAllume() {
+  try {
+    if (navigator.wakeLock && !verrouEcran) {
+      verrouEcran = await navigator.wakeLock.request('screen');
+      verrouEcran.addEventListener('release', () => {
+        verrouEcran = null;
+      });
+    }
+  } catch {
+    verrouEcran = null;
+  }
+}
+function relacherEcran() {
+  try {
+    if (verrouEcran) verrouEcran.release();
+  } catch {
+    /* sans effet */
+  }
+  verrouEcran = null;
+}
+
+function ecouleMs() {
+  return chrono.base + (chrono.depart === null ? 0 : Date.now() - chrono.depart);
+}
+function nomsExercice(i) {
+  const seance = chrono.seance;
+  const codes = (seance && seance.exos[i]) || [];
+  return codes
+    .map((code) => exerciceAffichable(programme.contenu.catalogue, code))
+    .filter(Boolean)
+    .map((e) => e.nom)
+    .join(' + ');
+}
+// Le bloc chrono vit dans la carte de l'exercice en cours (collé en haut de l'écran pendant qu'on suit la vidéo) ;
+// à l'arrêt, à la fin ou au changement de séance il revient à sa place, au-dessus de la liste.
+function rangerChrono() {
+  const bloc = $('bloc-chrono');
+  const liste = $('liste-exercices');
+  bloc.classList.remove('dans-carte');
+  if (bloc.parentNode !== liste.parentNode) liste.parentNode.insertBefore(bloc, liste);
+}
+function surlignerExercice(i, defiler) {
+  const cartes = document.querySelectorAll('#liste-exercices .exercice');
+  if (i < 0 || !cartes[i]) rangerChrono();
+  cartes.forEach((carte, k) => {
+    carte.classList.toggle('exercice-courant', k === i);
+    if (k === i) {
+      const bloc = $('bloc-chrono');
+      bloc.classList.add('dans-carte');
+      const titre = carte.querySelector('h2');
+      if (bloc.parentNode !== carte)
+        carte.insertBefore(bloc, titre ? titre.nextSibling : carte.firstChild);
+      if (defiler) carte.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+  });
+}
+function afficherBoutonsChrono() {
+  const e = chrono.etat;
+  const bloc = $('bloc-chrono');
+  const d = $('btn-chrono-demarrer');
+  d.hidden = e === 'marche';
+  d.textContent =
+    { pret: '▶ Lancer le chrono', pause: '▶ Reprendre', fin: '↺ Refaire le chrono' }[e] || '';
+  $('btn-chrono-pause').hidden = e !== 'marche';
+  $('btn-chrono-passer').hidden = e !== 'marche' && e !== 'pause';
+  $('btn-chrono-recommencer').hidden = e !== 'marche' && e !== 'pause';
+  $('btn-chrono-arreter').hidden = e !== 'marche' && e !== 'pause';
+  if (e === 'pret') bloc.dataset.phase = 'prep';
+  if (e === 'fin') bloc.dataset.phase = 'fin';
+}
+function majChrono() {
+  if (!chrono.plan) return;
+  validerExosTermines();
+  const e = etatChrono(chrono.plan, ecouleMs());
+  if (e.termine) return finirChrono();
+  const bloc = $('bloc-chrono');
+  const total = chrono.plan.nbExos;
+  if (chrono.etat === 'pause') {
+    bloc.dataset.phase = 'pause';
+    $('chrono-etat').textContent = '⏸ En pause';
+  } else {
+    bloc.dataset.phase = e.phase;
+    $('chrono-etat').textContent =
+      e.phase === 'prep'
+        ? 'Préparez-vous…'
+        : e.phase === 'travail'
+          ? '💪 Effort !'
+          : (exosValides.has(cleExo(...cleSeanceCourante(), e.exo)) ? '✓ Exercice validé · ' : '') +
+            (e.exo + 1 < total
+              ? '😮‍💨 Repos — ensuite : exercice ' + (e.exo + 2)
+              : '😮‍💨 Repos — dernier exercice terminé');
+  }
+  $('chrono-temps').textContent = formaterTemps(e.restantS);
+  $('chrono-exo').textContent =
+    e.phase === 'prep'
+      ? `Exercice 1 sur ${total}` + (nomsExercice(0) ? ' : ' + nomsExercice(0) : '')
+      : `Exercice ${e.exo + 1} sur ${total}` +
+        (nomsExercice(e.exo) ? ' : ' + nomsExercice(e.exo) : '');
+  if (e.index !== chrono.index) {
+    const premier = chrono.index === -1;
+    chrono.index = e.index;
+    surlignerExercice(e.exo, chrono.etat === 'marche' && e.phase !== 'repos');
+    if (!premier || e.phase !== 'prep') {
+      if (e.phase === 'travail') bip(880, 220);
+      if (e.phase === 'repos') bip(520, 220);
+      vibrer(e.phase === 'travail' ? [150] : [80]);
+    }
+  }
+}
+function lancerCompteur() {
+  if (chrono.timer) clearInterval(chrono.timer);
+  chrono.timer = setInterval(majChrono, 200);
+}
+function arreterCompteur() {
+  if (chrono.timer) clearInterval(chrono.timer);
+  chrono.timer = null;
+}
+function demarrerChrono() {
+  if (!chrono.plan) return;
+  preparerAudio();
+  if (chrono.etat === 'fin') {
+    chrono.base = 0;
+    chrono.index = -1;
+    chrono.compte = 0;
+  }
+  chrono.depart = Date.now();
+  chrono.etat = 'marche';
+  afficherBoutonsChrono();
+  garderEcranAllume();
+  lancerCompteur();
+  majChrono();
+}
+function pauseChrono() {
+  if (chrono.etat !== 'marche') return;
+  chrono.base = ecouleMs();
+  chrono.depart = null;
+  chrono.etat = 'pause';
+  arreterCompteur();
+  relacherEcran();
+  afficherBoutonsChrono();
+  majChrono();
+}
+function sauterChrono(vers) {
+  if (!chrono.plan || (chrono.etat !== 'marche' && chrono.etat !== 'pause')) return;
+  chrono.base = vers(chrono.plan, ecouleMs());
+  // Passer saute l'exercice : il n'est pas validé ; Recommencer revient en arrière sans rien défaire.
+  chrono.compte = exosTermines(chrono.plan, chrono.base);
+  if (chrono.depart !== null) chrono.depart = Date.now();
+  majChrono();
+}
+function finirChrono() {
+  arreterCompteur();
+  relacherEcran();
+  chrono.etat = 'fin';
+  chrono.base = 0;
+  chrono.depart = null;
+  chrono.index = -1;
+  afficherBoutonsChrono();
+  surlignerExercice(chrono.plan.nbExos - 1, false);
+  $('chrono-etat').textContent = '🎉 Séance terminée !';
+  $('chrono-temps').textContent = formaterTemps(0);
+  $('chrono-exo').textContent = '';
+  bip(880, 160, 0);
+  bip(880, 160, 260);
+  bip(1175, 380, 520);
+  vibrer([200, 100, 200, 100, 400]);
+  $('bloc-chrono').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  validerSeanceAuto();
+}
+// ─── Validation automatique : exercice terminé → badge « Validé » ; dernier exercice → séance validée ───
+function cleSeanceCourante() {
+  const { jour, seance } = jourSeanceCourants();
+  return [jour.date, seance.id];
+}
+function jourSeanceCourants() {
+  const jour = programme.contenu.jours[jourCourant];
+  return { jour, seance: jour.seances[seanceCourante] };
+}
+function majBadgesExos() {
+  if (!programme) return;
+  const { jour, seance } = jourSeanceCourants();
+  const auj = jour.date === aujourdhuiISO();
+  document.querySelectorAll('#liste-exercices .exercice').forEach((carte, i) => {
+    const cle = cleExo(jour.date, seance.id, i);
+    const ok = exosValides.has(cle);
+    const essai = !ok && exosEssai.has(cle);
+    carte.classList.toggle('exercice-valide', ok);
+    carte.classList.toggle('exercice-essai', essai);
+    const badge = carte.querySelector('.badge-valide');
+    if (badge) {
+      badge.hidden = !ok && !essai;
+      badge.textContent = ok ? '✓ Validé' : APERCU ? '✓ Fait (aperçu)' : '✓ Fait (essai)';
+    }
+    const bt = carte.querySelector('.btn-sans-chrono');
+    if (bt) bt.hidden = ok || essai || !(auj || APERCU || jour.date > aujourdhuiISO());
+  });
+}
+async function envoyerExo(jour, seance, exo) {
+  const r = await appelAuth('/rest/v1/rpc/programme_exo_valider', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_jour: jour, p_seance: seance, p_exo: exo }),
+  });
+  const cle = cleExo(jour, seance, exo);
+  if (r && r.ok) exosEnAttente.delete(cle);
+  else if (r)
+    exosEnAttente.delete(cle); // refus du serveur : inutile de réessayer
+  else exosEnAttente.set(cle, { jour, seance, exo }); // pas de réseau : on réessaiera
+}
+const exosEssai = new Set(); // jour hors aujourd'hui : « Fait (essai) » à l'écran seulement, rien n'est enregistré
+function validerExo(i) {
+  if (!programme) return;
+  const { jour, seance } = jourSeanceCourants();
+  const cle = cleExo(jour.date, seance.id, i);
+  // Aperçu praticien ou jour d'essai : on montre le résultat à l'écran, SANS rien enregistrer.
+  if (APERCU || jour.date !== aujourdhuiISO()) {
+    // Jour d'essai (ex. programme qui commence lundi, testé samedi) : visible à l'écran, jamais enregistré.
+    exosEssai.add(cle);
+    majBadgesExos();
+    return;
+  }
+  if (exosValides.has(cle)) return;
+  exosValides.add(cle); // tout de suite à l'écran ; l'envoi suit
+  majBadgesExos();
+  envoyerExo(jour.date, seance.id, i);
+  for (const a of [...exosEnAttente.values()]) envoyerExo(a.jour, a.seance, a.exo);
+}
+// « J'ai fait cet exercice sans chrono » : valide l'exercice affiché ; si c'était le dernier manquant, la séance se valide.
+function validerExoSansChrono(i) {
+  validerExo(i);
+  validerSeanceSiComplete();
+}
+function seanceComplete() {
+  const { jour, seance } = jourSeanceCourants();
+  return seance.exos.every((_, i) => exosValides.has(cleExo(jour.date, seance.id, i)));
+}
+async function validerSeanceSiComplete() {
+  if (APERCU || !programme) return false;
+  const { jour, seance } = jourSeanceCourants();
+  if (jour.date !== aujourdhuiISO() || validations.has(cleValidation(jour.date, seance.id)))
+    return false;
+  if (!seanceComplete()) return false;
+  return validerSeance();
+}
+function validerExosTermines() {
+  const n = exosTermines(chrono.plan, ecouleMs());
+  while (chrono.compte < n) {
+    validerExo(chrono.compte);
+    chrono.compte += 1;
+  }
+}
+async function validerSeanceAuto() {
+  if (!programme) return;
+  const { jour, seance } = jourSeanceCourants();
+  if (APERCU) {
+    $('chrono-etat').textContent = '🎉 Séance terminée ! (Aperçu : rien n’est enregistré.)';
+    return;
+  }
+  if (jour.date !== aujourdhuiISO()) {
+    $('chrono-etat').textContent =
+      '🎉 Séance terminée ! (Essai : ce n’est pas le jour de cette séance, rien n’est enregistré.)';
+    return;
+  }
+  if (validations.has(cleValidation(jour.date, seance.id))) return;
+  if (!seanceComplete()) {
+    const manquants = seance.exos
+      .map((_, i) => i + 1)
+      .filter((n) => !exosValides.has(cleExo(jour.date, seance.id, n - 1)));
+    $('chrono-etat').textContent =
+      '🎉 Chrono terminé, mais la séance n’est pas validée : exercice ' +
+      manquants.join(', ') +
+      ' non validé. Utilisez « J’ai fait cet exercice sans chrono ».';
+    return;
+  }
+  $('chrono-etat').textContent = '🎉 Séance terminée ! Validation…';
+  const ok = await validerSeance();
+  $('chrono-etat').textContent = ok
+    ? '🎉 Séance terminée et validée ✅ (un mot ? en bas de page)'
+    : '🎉 Séance terminée ! La validation n’a pas pu partir : utilisez le bouton en bas de page.';
+}
+
+// Remet le chrono à zéro pour la séance affichée (null = on quitte l'écran : tout s'arrête).
+function reinitialiserChrono(seance) {
+  rangerChrono();
+  arreterCompteur();
+  relacherEcran();
+  chrono.seance = seance;
+  chrono.plan = seance ? planChrono(seance) : null;
+  chrono.etat = 'pret';
+  chrono.base = 0;
+  chrono.depart = null;
+  chrono.index = -1;
+  chrono.compte = 0;
+  const bloc = $('bloc-chrono');
+  bloc.hidden = !chrono.plan;
+  if (!chrono.plan) return;
+  $('chk-son').checked = sonActif();
+  $('chrono-etat').textContent = 'Prêt ? Lancez le chrono quand vous êtes installé.';
+  $('chrono-temps').textContent = formaterTemps(PREPARATION_S);
+  $('chrono-exo').textContent = '';
+  afficherBoutonsChrono();
+}
+
+// ─── Validation d'une séance par le patient ───
+function afficherValidation() {
+  const c = programme.contenu;
+  const jour = c.jours[jourCourant];
+  const seance = jour && jour.seances[seanceCourante];
+  const bloc = $('bloc-validation');
+  bloc.hidden = !seance;
+  afficherErreur('erreur-validation', '');
+  if (!seance) return;
+  const auj = aujourdhuiISO();
+  const v = validations.get(cleValidation(jour.date, seance.id));
+  const saisie = $('validation-saisie');
+  saisie.hidden = true;
+  if (v) {
+    if (jour.date === auj && !APERCU) {
+      // Séance validée aujourd'hui : le patient peut écrire (ou corriger) son mot jusqu'à minuit.
+      $('validation-etat').textContent =
+        '✅ Séance validée. Vous pouvez laisser un mot à votre praticien.';
+      saisie.hidden = false;
+      $('btn-valider-seance').hidden = true;
+      $('btn-envoyer-mot').hidden = false;
+      $('btn-envoyer-mot').disabled = false;
+      $('btn-envoyer-mot').textContent = v.commentaire
+        ? '✉️ Modifier mon mot'
+        : '✉️ Envoyer mon mot';
+      $('validation-commentaire').value = v.commentaire || '';
+    } else {
+      const com = v.commentaire ? ` Mot du patient : « ${v.commentaire} »` : '';
+      $('validation-etat').textContent = '✅ Séance validée.' + com;
+    }
+  } else if (jour.date === auj && !APERCU) {
+    $('validation-etat').textContent =
+      'La séance se valide toute seule quand tous ses exercices sont validés (chrono jusqu’au bout, ou « J’ai fait cet exercice sans chrono »).';
+    saisie.hidden = false;
+    $('validation-commentaire').value = '';
+    $('btn-envoyer-mot').hidden = true;
+    $('btn-valider-seance').disabled = false;
+    $('btn-valider-seance').hidden = !seanceComplete(); // secours : tout est validé mais l'envoi de la séance a échoué
+  } else if (jour.date >= auj) {
+    // Aperçu praticien ou jour à venir : le chrono explique déjà « rien n'est enregistré » ; ce cadre ne servirait à rien.
+    bloc.hidden = true;
+  } else {
+    $('validation-etat').textContent =
+      'Séance non faite ce jour-là. Ce n’est pas grave, on continue ! 💪';
+  }
+}
+function afficherBravo() {
+  const c = programme.contenu;
+  const s = situationJour(c, jourCourant, validations, aujourdhuiISO());
+  const el = $('bravo');
+  el.hidden = !s.aJour;
+  el.textContent = s.aJour
+    ? jourCourant === c.jours.length - 1
+      ? '🎉 Bravo, vous avez terminé votre programme !'
+      : '🎉 Bravo, vous êtes à jour !'
+    : '';
+}
+function majPastilles() {
+  const jour = programme.contenu.jours[jourCourant];
+  document.querySelectorAll('.pastille-seance').forEach((b, i) => {
+    const s = jour.seances[i];
+    const faite = validations.has(cleValidation(jour.date, s.id));
+    b.textContent = `${faite ? '✓ ' : ''}${i + 1}. ${s.titre}`;
+  });
+}
+async function envoyerMot() {
+  const jour = programme.contenu.jours[jourCourant];
+  const seance = jour.seances[seanceCourante];
+  const bouton = $('btn-envoyer-mot');
+  const mot = $('validation-commentaire').value.trim();
+  bouton.disabled = true;
+  afficherErreur('erreur-validation', '');
+  const r = await appelAuth('/rest/v1/rpc/programme_seance_commenter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_jour: jour.date, p_seance: seance.id, p_commentaire: mot || null }),
+  });
+  if (!r || !r.ok) {
+    bouton.disabled = false;
+    return afficherErreur(
+      'erreur-validation',
+      !r
+        ? 'Pas de réseau : votre mot n’est pas parti. Réessayez dans un instant.'
+        : 'Impossible d’envoyer votre mot pour le moment. Réessayez.'
+    );
+  }
+  const v = validations.get(cleValidation(jour.date, seance.id));
+  if (v) v.commentaire = mot || null;
+  afficherValidation();
+  $('validation-etat').textContent = mot
+    ? '✅ Séance validée. Votre mot est envoyé à votre praticien ✉️'
+    : '✅ Séance validée. Votre mot a été retiré.';
+}
+
+async function validerSeance() {
+  const jour = programme.contenu.jours[jourCourant];
+  const seance = jour.seances[seanceCourante];
+  const bouton = $('btn-valider-seance');
+  const commentaire = $('validation-commentaire').value.trim();
+  bouton.disabled = true;
+  afficherErreur('erreur-validation', '');
+  const r = await appelAuth('/rest/v1/rpc/programme_seance_valider', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_jour: jour.date,
+      p_seance: seance.id,
+      p_commentaire: commentaire || null,
+    }),
+  });
+  if (!r || !r.ok) {
+    bouton.disabled = false;
+    bouton.hidden = false;
+    afficherErreur(
+      'erreur-validation',
+      !r
+        ? 'Pas de réseau : votre séance n’est pas encore validée. Réessayez dans un instant.'
+        : 'Impossible de valider pour le moment. Réessayez.'
+    );
+    return false;
+  }
+  validations.set(cleValidation(jour.date, seance.id), {
+    jour: jour.date,
+    seance_id: seance.id,
+    commentaire: commentaire || null,
+    valide_at: new Date().toISOString(),
+  });
+  majPastilles();
+  afficherValidation();
+  afficherBravo();
+  return true;
 }
 
 function afficherSeance() {
   const c = programme.contenu;
   const seance = c.jours[jourCourant].seances[seanceCourante];
+  reinitialiserChrono(seance);
   $('phrase-chrono').textContent = seance.chrono
     ? 'Chrono : ' + phraseChrono(seance.chrono) + '.'
     : '';
@@ -624,16 +1175,39 @@ function afficherSeance() {
   liste.textContent = '';
   seance.exos.forEach((codes, i) => {
     const carte = elt('section', 'exercice');
-    carte.appendChild(elt('h2', '', `Exercice ${i + 1}`));
+    const titre = elt('h2', '', `Exercice ${i + 1}`);
+    const badge = elt('span', 'badge-valide', '✓ Validé');
+    badge.hidden = true;
+    titre.appendChild(badge);
+    carte.appendChild(titre);
+    const sans = elt(
+      'button',
+      'bouton bouton-clair btn-sans-chrono',
+      '✋ J’ai fait cet exercice sans chrono'
+    );
+    sans.type = 'button';
+    sans.addEventListener('click', () => validerExoSansChrono(i));
+    carte.appendChild(sans);
+    // 2 ou 3 sous-exercices simultanés : côte à côte, sous UN SEUL chrono (celui de la carte).
+    const grille = elt('div', 'sous-exercices');
+    const fiches = elt('div', 'fiches-carte');
     for (const code of codes) {
       const ex = exerciceAffichable(c.catalogue, code);
-      if (ex) carte.appendChild(blocSousExercice(ex));
+      if (ex) grille.appendChild(blocSousExercice(ex, fiches));
     }
+    grille.dataset.nb = String(Math.min(3, grille.children.length));
+    carte.appendChild(grille);
+    carte.appendChild(fiches);
+    carte.appendChild(carte.querySelector('.btn-sans-chrono'));
     liste.appendChild(carte);
   });
   document.querySelectorAll('.pastille-seance').forEach((b, i) => {
     b.setAttribute('aria-selected', String(i === seanceCourante));
   });
+  majPastilles();
+  majBadgesExos();
+  afficherValidation();
+  afficherBravo();
 }
 
 function afficherJour() {
@@ -676,6 +1250,10 @@ function afficherJour() {
   });
   $('aide-seances').hidden = jour.seances.length < 2;
   zone.hidden = jour.seances.length < 2;
+  if (jour.date === aujourdhuiISO()) {
+    const i = jour.seances.findIndex((s) => !validations.has(cleValidation(jour.date, s.id)));
+    if (i > 0) seanceCourante = i;
+  }
   afficherSeance();
 }
 
@@ -684,7 +1262,13 @@ async function ouvrirExercices() {
   $('zone-exercices').hidden = true;
   $('vide-exercices').hidden = true;
   montrer('exercices');
-  const p = await chargerProgramme();
+  const [p, v, x] = await Promise.all([
+    chargerProgramme(),
+    chargerValidations(),
+    chargerExosValides(),
+  ]);
+  if (v !== undefined) validations = v;
+  if (x !== undefined) exosValides = x;
   if (p === undefined && !programme) {
     return afficherErreur(
       'erreur-exercices',
@@ -711,6 +1295,27 @@ $('btn-deconnexion').addEventListener('click', deconnecter);
 $('carte-documents').addEventListener('click', ouvrirDocuments);
 $('carte-exercices').addEventListener('click', ouvrirExercices);
 $('btn-exercices-retour').addEventListener('click', ouvrirAccueil);
+$('btn-chrono-demarrer').addEventListener('click', demarrerChrono);
+$('btn-chrono-pause').addEventListener('click', pauseChrono);
+$('btn-chrono-passer').addEventListener('click', () => sauterChrono(exerciceSuivantMs));
+$('btn-chrono-recommencer').addEventListener('click', () => sauterChrono(debutExerciceMs));
+$('btn-chrono-arreter').addEventListener('click', () => reinitialiserChrono(chrono.seance));
+$('chk-son').addEventListener('change', (e) => {
+  try {
+    localStorage.setItem('verticy-patient-son', e.target.checked ? '1' : '0');
+  } catch {
+    /* préférence non mémorisée */
+  }
+  if (e.target.checked) preparerAudio();
+});
+$('btn-valider-seance').addEventListener('click', validerSeance);
+$('btn-envoyer-mot').addEventListener('click', envoyerMot);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && chrono.etat === 'marche') {
+    garderEcranAllume();
+    majChrono();
+  }
+});
 $('btn-jour-prec').addEventListener('click', () => {
   if (jourCourant > 0) {
     jourCourant -= 1;

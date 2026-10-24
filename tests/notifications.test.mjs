@@ -246,6 +246,7 @@ describe('Notifications — création', () => {
       'patient_questionnaire',
       'patient_sequence_exercices',
       'patient_protocole_termine',
+      'patient_ressenti',
     ]) {
       expect(m.f.NOTIF_TYPES[t].systeme).toBe(false);
     }

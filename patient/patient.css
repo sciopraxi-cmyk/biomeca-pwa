@@ -436,3 +436,341 @@ input:focus-visible,
 .choix-seances[hidden] {
   display: none;
 }
+
+/* ─── Chrono, validation et « Bravo » (lot e3b-2b) ─── */
+.bloc-chrono {
+  margin: 12px 0;
+  padding: 14px;
+  text-align: center;
+  background: #fff;
+  border: 2px solid var(--bord);
+  border-radius: 18px;
+}
+.bloc-chrono[hidden],
+.bloc-validation[hidden],
+.bravo[hidden] {
+  display: none;
+}
+.chrono-etat {
+  margin: 0;
+  font-weight: 800;
+  color: var(--marine);
+}
+.chrono-temps {
+  margin: 4px 0;
+  font-size: 64px;
+  font-weight: 900;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--marine);
+}
+.bloc-chrono[data-phase='travail'] {
+  background: #e6fbf6;
+  border-color: var(--turquoise);
+}
+.bloc-chrono[data-phase='repos'] {
+  background: #fff7e6;
+  border-color: #f5b942;
+}
+.bloc-chrono[data-phase='fin'] {
+  background: #e6fbf6;
+  border-color: var(--turquoise);
+}
+.chrono-boutons .bouton[hidden],
+#btn-chrono-demarrer[hidden] {
+  display: none;
+}
+.case-son {
+  display: block;
+  margin-top: 12px;
+  font-size: 15px;
+  color: var(--doux);
+}
+.exercice.exercice-courant {
+  border-color: var(--turquoise);
+  box-shadow: 0 0 0 3px var(--turquoise);
+}
+.bloc-validation {
+  margin: 18px 0 8px;
+  padding: 14px;
+  background: #fff;
+  border: 2px solid var(--bord);
+  border-radius: 18px;
+}
+.validation-etat {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--marine);
+}
+.champ-commentaire {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--texte);
+  border: 2px solid var(--bord);
+  border-radius: 12px;
+  resize: vertical;
+}
+.bravo {
+  margin: 12px 0;
+  padding: 16px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--turquoise-encre);
+  background: var(--turquoise);
+  border-radius: 18px;
+}
+
+/* Chrono placé dans la carte de l'exercice en cours : collé en haut de l'écran, compact */
+.bloc-chrono.dans-carte {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  box-shadow: 0 4px 10px rgba(11, 30, 61, 0.18);
+}
+.bloc-chrono.dans-carte .chrono-etat {
+  font-size: 15px;
+}
+.bloc-chrono.dans-carte .chrono-temps {
+  margin: 0;
+  font-size: 44px;
+}
+.bloc-chrono.dans-carte #chrono-exo {
+  display: none;
+}
+.bloc-chrono.dans-carte .case-son {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.bloc-chrono.dans-carte .chrono-boutons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.bloc-chrono.dans-carte .bouton {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 6px;
+  font-size: 15px;
+}
+
+/* Exercice terminé par le chrono : carte verte et mention « Validé » */
+.exercice {
+  position: relative;
+}
+.exercice.exercice-valide {
+  background: #e9fbf6;
+  border-color: var(--turquoise);
+}
+.badge-valide {
+  float: right;
+  padding: 2px 10px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--turquoise-encre);
+  background: var(--turquoise);
+  border-radius: 999px;
+}
+.badge-valide[hidden] {
+  display: none;
+}
+
+/* Sous-exercices simultanés : côte à côte (2 ou 3), un seul chrono pour la carte */
+.sous-exercices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.sous-exercices[data-nb='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sous-exercices[data-nb='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.sous-exercices .sous-exercice {
+  margin: 0;
+  min-width: 0;
+}
+.sous-exercices[data-nb='2'] .sous-exercice h3,
+.sous-exercices[data-nb='3'] .sous-exercice h3 {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.sous-exercices[data-nb='3'] .sous-exercice h3 {
+  font-size: 12px;
+}
+.sous-exercices[data-nb='2'] .texte-exercice,
+.sous-exercices[data-nb='3'] .texte-exercice {
+  font-size: 13px;
+}
+.sous-exercices[data-nb='3'] .texte-exercice {
+  font-size: 11px;
+}
+.sous-exercices[data-nb='2'] .btn-fiche,
+.sous-exercices[data-nb='3'] .btn-fiche {
+  display: block;
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  text-align: center;
+}
+.sous-exercices[data-nb='3'] .btn-fiche {
+  font-size: 11px;
+  padding: 5px 4px;
+}
+.fiches-carte:empty {
+  display: none;
+}
+
+/* Bouton « sans chrono » de chaque exercice et exercice fait en essai */
+.btn-sans-chrono {
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 8px;
+  font-size: 15px;
+}
+.btn-sans-chrono[hidden] {
+  display: none;
+}
+.exercice.exercice-essai {
+  background: #fff7e6;
+  border-color: #f5b942;
+}
+.exercice-essai .badge-valide {
+  color: #5b3b00;
+  background: #f5b942;
+}
+
+/* ─── Ordinateur : la carte de l'exercice en cours tient dans la hauteur de l'écran (vidéos réduites si besoin) ─── */
+@media (min-width: 700px) {
+  .bloc-chrono.dans-carte .case-son {
+    order: 5;
+    flex: 0 0 auto;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .exercice {
+    margin: 8px 0;
+    padding: 8px 12px 10px;
+  }
+  .exercice > h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+  }
+  .exercice .video {
+    display: block;
+    width: min(100%, max(320px, calc((100vh - 340px) * 16 / 9)));
+    margin: 4px auto;
+  }
+  .sous-exercice h3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 2px;
+  }
+  .texte-exercice {
+    max-height: 4.6em;
+    overflow-y: auto;
+    margin: 2px 0;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .btn-sans-chrono {
+    min-height: 38px;
+    margin-top: 6px;
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+  .sous-exercices[data-nb='2'] .btn-fiche,
+  .sous-exercices[data-nb='3'] .btn-fiche,
+  .btn-fiche {
+    display: inline-block;
+    margin: 2px 4px 0 0;
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+  .bloc-chrono.dans-carte {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 12px;
+    margin: 4px 0 6px;
+    padding: 6px 10px;
+  }
+  .bloc-chrono.dans-carte .chrono-temps {
+    order: 1;
+    flex: 0 0 110px;
+    font-size: 40px;
+    text-align: center;
+  }
+  .bloc-chrono.dans-carte .chrono-etat {
+    order: 2;
+    flex: 1 1 calc(100% - 140px);
+    text-align: left;
+    font-size: 16px;
+  }
+  .bloc-chrono.dans-carte #btn-chrono-demarrer {
+    order: 3;
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 38px;
+    margin: 0;
+    padding: 4px 16px;
+    font-size: 15px;
+  }
+  .bloc-chrono.dans-carte .chrono-boutons {
+    order: 4;
+    display: flex;
+    flex: 1 1 0;
+    gap: 6px;
+  }
+  .bloc-chrono.dans-carte .chrono-boutons .bouton {
+    flex: 1 1 0;
+    width: auto;
+    min-height: 38px;
+    margin: 0;
+    padding: 4px 6px;
+    font-size: 14px;
+  }
+}
+
+/* Case « Son » : une vraie petite case, jamais le grand champ de saisie (règle générale `input`) */
+.case-son {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  cursor: pointer;
+}
+.case-son input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
+  accent-color: var(--marine);
+}
+.bloc-chrono:not(.dans-carte) .case-son {
+  display: flex;
+  justify-content: center;
+}
+@media (min-width: 700px) {
+  .bloc-chrono.dans-carte .case-son {
+    flex: 0 0 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* Un bouton marqué « caché » doit vraiment disparaître (la règle .bouton { display: block } l'écrasait) */
+.bouton[hidden] {
+  display: none;
+}
