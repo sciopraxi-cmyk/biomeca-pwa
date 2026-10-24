@@ -734,6 +734,15 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   personnalisé] — exercices détaillés sur le portail patient » ; pas de tableau, pas de QR, pas de PDF.
 - Tests : `tests/programme-pied-e3b.test.mjs` ; e2e `documents/e2e-programme-pied-e3b.mjs` (vider `_progEcrire(pref, null)` au début : le compte test garde les dates d'un run précédent).
 
+## Largeur commune des 4 bilans (PR « largeur-bilans-1100 »)
+
+- Sport, posturo, pédicurie et podopédiatrie avaient 980 / 860 / 900 / 900 px. Décision de Joël (24/10/2026) : 1100 px au plus, centrés,
+  pleine largeur en dessous (tablette). Une seule règle CSS dans `css/biomeca.css` (juste après `.page.active`) sur le premier `div`
+  de `#pg-bilan`, `#pg-bilan-posturo`, `#pg-pedicurie`, `#pg-podopediatrie` (`!important` : les largeurs sont en style en ligne ; le
+  gabarit posturo, construit par script, reçoit 20 px de marge latérale). Aucun HTML modifié (tests de structure intacts). Les rapports
+  (860 px) ne sont pas concernés : ils sont faits pour l'impression. Nouvelle page de bilan = ajouter son id à cette règle.
+- Contrôle : mêmes largeurs à 1440 / 1280 / 1024 / 768 px, pas de défilement horizontal (script ad hoc Playwright).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
