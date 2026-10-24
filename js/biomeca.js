@@ -36286,10 +36286,10 @@ async function _portailAppeler(action, p, extra) {
   return { status: res.status, body: body };
 }
 async function _portailLireCompte(p) {
-  const res = await authFetch(
-    SUPA_URL + '/rest/v1/patient_comptes?select=identifiant,statut,bloque_jusqu,representant_legal_nom,representant_legal_lien,premier_acces_at,dernier_acces_at&patient_id=eq.' +
-      encodeURIComponent(p._cloudId)
-  );
+  const base = 'identifiant,statut,bloque_jusqu,representant_legal_nom,representant_legal_lien,premier_acces_at,dernier_acces_at';
+  const requete = (colonnes) => authFetch(SUPA_URL + '/rest/v1/patient_comptes?select=' + colonnes + '&patient_id=eq.' + encodeURIComponent(p._cloudId));
+  let res = await requete(base + ',notifications_bloquees_at');
+  if (res.status === 400) res = await requete(base); // le SQL du blocage n'est pas encore posé : la fenêtre reste utilisable
   if (!res.ok) throw new Error('lecture ' + res.status);
   const l = await res.json();
   return Array.isArray(l) && l.length ? l[0] : null;
@@ -36337,6 +36337,7 @@ function _portailAfficher(idx, compte, message) {
         : '<button class="btn" onclick="portailAction(' + idx + ',\'suspendre\')">Fermer l\'accès</button>') +
       '</div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Programme d\'exercices</div><div id="portail-programme" style="font-size:12px;color:var(--mut);"></div></div>' +
+      _portailHtmlBlocage(idx, compte) +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Suivi des séances</div><div id="portail-suivi" style="font-size:12px;color:var(--mut);">Chargement…</div></div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Documents visibles par le patient</div><div id="portail-docs"></div></div>';
   }
@@ -36414,6 +36415,35 @@ async function portailAction(idx, action) {
     _portailAfficher(idx, await _portailLireCompte(p), ok ? '' : (r.body && r.body.message) || 'Action impossible, réessayez.');
   } catch (_e) {
     _portailAfficher(idx, null, 'Action impossible : vérifiez votre connexion.');
+  }
+}
+// Blocage des notifications d'un patient (abus de messages) : les mots restent lisibles dans « Suivi des séances ».
+function _portailHtmlBlocage(idx, compte) {
+  if (!('notifications_bloquees_at' in compte)) return '';
+  const bloque = !!compte.notifications_bloquees_at;
+  const depuis = bloque ? ' depuis le ' + new Date(compte.notifications_bloquees_at).toLocaleDateString('fr-FR') : '';
+  return '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Notifications de ce patient</div>' +
+    '<div id="portail-blocage" style="font-size:12px;color:' + (bloque ? 'var(--red)' : 'var(--mut)') + ';">' +
+    (bloque ? '🔕 Bloquées' + _escHtml(depuis) + ' : ses mots et validations restent enregistrés et visibles dans « Suivi des séances », mais ne vous notifient plus.'
+            : '🔔 Actives : vous êtes prévenu de ses ressentis et de la fin de son programme.') + '</div>' +
+    '<button class="btn" style="margin-top:6px;" onclick="portailBasculerNotifications(' + idx + ',' + (bloque ? 'false' : 'true') + ')">' +
+    (bloque ? '🔔 Réactiver les notifications' : '🔕 Bloquer les notifications de ce patient') + '</button></div>';
+}
+async function portailBasculerNotifications(idx, bloquer) {
+  const p = patients[idx];
+  if (!p || !p._cloudId) return;
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  if (bloquer && !confirm('Bloquer les notifications de ce patient ? Ses mots resteront enregistrés et lisibles dans « Suivi des séances », mais ne vous notifieront plus.')) return;
+  try {
+    const res = await authFetch(SUPA_URL + '/rest/v1/patient_comptes?patient_id=eq.' + encodeURIComponent(p._cloudId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ notifications_bloquees_at: bloquer ? new Date().toISOString() : null }),
+    });
+    if (!res.ok) throw new Error('écriture ' + res.status);
+    _portailAfficher(idx, await _portailLireCompte(p), '');
+  } catch (_e) {
+    _portailAfficher(idx, await _portailLireCompte(p).catch(() => null), 'Modification impossible (le SQL du blocage est-il posé ?). Réessayez.');
   }
 }
 async function portailEnregistrerRepresentant(idx) {
@@ -36896,10 +36926,16 @@ async function _portailVerifierMots(force) {
     }
   } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _motsEnCours = false; }
 }
-setInterval(function () {
-  if (typeof _portailVerifierFins === 'function') _portailVerifierFins();
-  if (typeof _portailVerifierMots === 'function') _portailVerifierMots();
-}, 5 * 60 * 1000);
+// Vérification toutes les 30 s tant que l'onglet est visible, et dès qu'on y revient (le patient écrit, le praticien est prévenu vite).
+function _portailVerifierNotifications() {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+  if (typeof _portailVerifierFins === 'function') _portailVerifierFins(true);
+  if (typeof _portailVerifierMots === 'function') _portailVerifierMots(true);
+}
+setInterval(_portailVerifierNotifications, 30 * 1000);
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') _portailVerifierNotifications(); });
+}
 async function _portailChargerDocs(idx) {
   const p = patients[idx];
   const zone = document.getElementById('portail-docs');
@@ -36944,6 +36980,7 @@ Object.assign(window, {
   portailRepublierProgramme,
   portailCreerAcces,
   portailEnregistrerRepresentant,
+  portailBasculerNotifications,
   portailPublierRapport,
   portailRetirerDocument,
   _portailFermer,
