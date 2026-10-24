@@ -4,16 +4,19 @@
 import {
   apercuDemande,
   cheminFichierValide,
+  cleExo,
   cleValidation,
   dateCourte,
   debutExerciceMs,
   etatChrono,
+  exosTermines,
   exerciceAffichable,
   exerciceSuivantMs,
   formaterIdentifiant,
   formaterTemps,
   grouperDocuments,
   identifiantComplet,
+  indexerExos,
   indexerValidations,
   jourProgramme,
   libelleJour,
@@ -555,11 +558,32 @@ async function chargerValidations() {
   }
 }
 
+// Exercices validés automatiquement par le chrono (jour|séance|rang).
+let exosValides = new Set();
+const exosEnAttente = new Map(); // envois à refaire (réseau coupé) : clé → { jour, seance, exo }
+async function chargerExosValides() {
+  const r = await appelAuth(
+    '/rest/v1/programme_exos_valides?select=jour,seance_id,exo' +
+      (APERCU ? '&patient_id=eq.' + APERCU : '')
+  );
+  if (!r || !r.ok) return undefined;
+  try {
+    return indexerExos(await r.json());
+  } catch {
+    return undefined;
+  }
+}
+
 async function majCarteExercices() {
-  const [p, v] = await Promise.all([chargerProgramme(), chargerValidations()]);
+  const [p, v, x] = await Promise.all([
+    chargerProgramme(),
+    chargerValidations(),
+    chargerExosValides(),
+  ]);
   if (p === undefined) return;
   programme = p;
   if (v !== undefined) validations = v;
+  if (x !== undefined) exosValides = x;
   const c = p && p.contenu;
   let phrase = 'Programme bientôt disponible';
   if (c && c.jours && c.jours.length) {
@@ -580,7 +604,8 @@ function elt(tag, classe, texte) {
 
 // Fiche PDF : sur la même page, dans un cadre sous l'exercice (fiche livrée avec l'application ou fiche privée lue
 // avec la session ; jamais un chemin libre : tout est contrôlé dans patient-logique.mjs).
-function boutonFiche(ex) {
+// `cibleCadre` : zone pleine largeur sous les sous-exercices où s'ouvre la fiche (les colonnes sont trop étroites).
+function boutonFiche(ex, cibleCadre) {
   const zone = elt('div', 'zone-fiche');
   const b = elt('button', 'btn-fiche', '📄 Fiche PDF (avec QR)');
   b.type = 'button';
@@ -612,7 +637,7 @@ function boutonFiche(ex) {
         new Blob([await r.arrayBuffer()], { type: 'application/pdf' })
       );
     }
-    zone.appendChild(cadre);
+    (cibleCadre || zone).appendChild(cadre);
     b.textContent = '✖ Fermer la fiche';
   });
   zone.appendChild(b);
@@ -626,7 +651,7 @@ function boutonFiche(ex) {
   return zone;
 }
 
-function blocSousExercice(ex) {
+function blocSousExercice(ex, cibleCadre) {
   const bloc = elt('div', 'sous-exercice');
   bloc.appendChild(elt('h3', '', ex.nom));
   for (const url of ex.videos) {
@@ -641,12 +666,13 @@ function blocSousExercice(ex) {
     bloc.appendChild(f);
   }
   if (ex.texte) bloc.appendChild(elt('p', 'texte-exercice', ex.texte));
-  if (ex.pdfPublic || ex.pdfPrive) bloc.appendChild(boutonFiche(ex));
+  if (ex.pdfPublic || ex.pdfPrive) bloc.appendChild(boutonFiche(ex, cibleCadre));
   return bloc;
 }
 
 // ─── Chrono d'une séance : pause, « Passer », bips du navigateur (lot e3b-2b) ───
 const chrono = {
+  compte: 0, // exercices déjà traités (validés ou passés) dans le passage en cours
   plan: null,
   seance: null,
   etat: 'pret',
@@ -774,6 +800,7 @@ function afficherBoutonsChrono() {
 }
 function majChrono() {
   if (!chrono.plan) return;
+  validerExosTermines();
   const e = etatChrono(chrono.plan, ecouleMs());
   if (e.termine) return finirChrono();
   const bloc = $('bloc-chrono');
@@ -823,6 +850,7 @@ function demarrerChrono() {
   if (chrono.etat === 'fin') {
     chrono.base = 0;
     chrono.index = -1;
+    chrono.compte = 0;
   }
   chrono.depart = Date.now();
   chrono.etat = 'marche';
@@ -844,6 +872,8 @@ function pauseChrono() {
 function sauterChrono(vers) {
   if (!chrono.plan || (chrono.etat !== 'marche' && chrono.etat !== 'pause')) return;
   chrono.base = vers(chrono.plan, ecouleMs());
+  // Passer saute l'exercice : il n'est pas validé ; Recommencer revient en arrière sans rien défaire.
+  chrono.compte = exosTermines(chrono.plan, chrono.base);
   if (chrono.depart !== null) chrono.depart = Date.now();
   majChrono();
 }
@@ -856,16 +886,72 @@ function finirChrono() {
   chrono.index = -1;
   afficherBoutonsChrono();
   surlignerExercice(-1, false);
-  $('chrono-etat').textContent = '🎉 Séance terminée ! Validez-la ci-dessous.';
+  $('chrono-etat').textContent = '🎉 Séance terminée !';
   $('chrono-temps').textContent = formaterTemps(0);
   $('chrono-exo').textContent = '';
   bip(880, 160, 0);
   bip(880, 160, 260);
   bip(1175, 380, 520);
   vibrer([200, 100, 200, 100, 400]);
-  const v = $('bloc-validation');
-  if (!v.hidden) v.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  $('bloc-chrono').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  validerSeanceAuto();
 }
+// ─── Validation automatique : exercice terminé → badge « Validé » ; dernier exercice → séance validée ───
+function jourSeanceCourants() {
+  const jour = programme.contenu.jours[jourCourant];
+  return { jour, seance: jour.seances[seanceCourante] };
+}
+function majBadgesExos() {
+  if (!programme) return;
+  const { jour, seance } = jourSeanceCourants();
+  document.querySelectorAll('#liste-exercices .exercice').forEach((carte, i) => {
+    const ok = exosValides.has(cleExo(jour.date, seance.id, i));
+    carte.classList.toggle('exercice-valide', ok);
+    const badge = carte.querySelector('.badge-valide');
+    if (badge) badge.hidden = !ok;
+  });
+}
+async function envoyerExo(jour, seance, exo) {
+  const r = await appelAuth('/rest/v1/rpc/programme_exo_valider', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_jour: jour, p_seance: seance, p_exo: exo }),
+  });
+  const cle = cleExo(jour, seance, exo);
+  if (r && r.ok) exosEnAttente.delete(cle);
+  else if (r)
+    exosEnAttente.delete(cle); // refus du serveur : inutile de réessayer
+  else exosEnAttente.set(cle, { jour, seance, exo }); // pas de réseau : on réessaiera
+}
+function validerExo(i) {
+  if (APERCU || !programme || !chrono.seance) return;
+  const { jour, seance } = jourSeanceCourants();
+  if (jour.date !== aujourdhuiISO()) return; // seul le jour même se valide
+  const cle = cleExo(jour.date, seance.id, i);
+  if (exosValides.has(cle)) return;
+  exosValides.add(cle); // tout de suite à l'écran ; l'envoi suit
+  majBadgesExos();
+  envoyerExo(jour.date, seance.id, i);
+  for (const a of [...exosEnAttente.values()]) envoyerExo(a.jour, a.seance, a.exo);
+}
+function validerExosTermines() {
+  const n = exosTermines(chrono.plan, ecouleMs());
+  while (chrono.compte < n) {
+    validerExo(chrono.compte);
+    chrono.compte += 1;
+  }
+}
+async function validerSeanceAuto() {
+  if (APERCU || !programme) return;
+  const { jour, seance } = jourSeanceCourants();
+  if (jour.date !== aujourdhuiISO() || validations.has(cleValidation(jour.date, seance.id))) return;
+  $('chrono-etat').textContent = '🎉 Séance terminée ! Validation…';
+  const ok = await validerSeance();
+  $('chrono-etat').textContent = ok
+    ? '🎉 Séance terminée et validée ✅'
+    : '🎉 Séance terminée ! La validation n’a pas pu partir : utilisez le bouton en bas de page.';
+}
+
 // Remet le chrono à zéro pour la séance affichée (null = on quitte l'écran : tout s'arrête).
 function reinitialiserChrono(seance) {
   rangerChrono();
@@ -877,6 +963,7 @@ function reinitialiserChrono(seance) {
   chrono.base = 0;
   chrono.depart = null;
   chrono.index = -1;
+  chrono.compte = 0;
   const bloc = $('bloc-chrono');
   bloc.hidden = !chrono.plan;
   if (!chrono.plan) return;
@@ -904,7 +991,8 @@ function afficherValidation() {
     const com = v.commentaire ? ` Votre mot : « ${v.commentaire} »` : '';
     $('validation-etat').textContent = '✅ Séance validée.' + com;
   } else if (jour.date === auj && !APERCU) {
-    $('validation-etat').textContent = 'Quand vous avez terminé, validez la séance.';
+    $('validation-etat').textContent =
+      'La séance se valide toute seule à la fin du dernier exercice du chrono. Pas de chrono ? Validez-la ici.';
     saisie.hidden = false;
     $('validation-commentaire').value = '';
     $('btn-valider-seance').disabled = false;
@@ -954,12 +1042,13 @@ async function validerSeance() {
   });
   if (!r || !r.ok) {
     bouton.disabled = false;
-    return afficherErreur(
+    afficherErreur(
       'erreur-validation',
       !r
         ? 'Pas de réseau : votre séance n’est pas encore validée. Réessayez dans un instant.'
         : 'Impossible de valider pour le moment. Réessayez.'
     );
+    return false;
   }
   validations.set(cleValidation(jour.date, seance.id), {
     jour: jour.date,
@@ -970,6 +1059,7 @@ async function validerSeance() {
   majPastilles();
   afficherValidation();
   afficherBravo();
+  return true;
 }
 
 function afficherSeance() {
@@ -983,17 +1073,28 @@ function afficherSeance() {
   liste.textContent = '';
   seance.exos.forEach((codes, i) => {
     const carte = elt('section', 'exercice');
-    carte.appendChild(elt('h2', '', `Exercice ${i + 1}`));
+    const titre = elt('h2', '', `Exercice ${i + 1}`);
+    const badge = elt('span', 'badge-valide', '✓ Validé');
+    badge.hidden = true;
+    titre.appendChild(badge);
+    carte.appendChild(titre);
+    // 2 ou 3 sous-exercices simultanés : côte à côte, sous UN SEUL chrono (celui de la carte).
+    const grille = elt('div', 'sous-exercices');
+    const fiches = elt('div', 'fiches-carte');
     for (const code of codes) {
       const ex = exerciceAffichable(c.catalogue, code);
-      if (ex) carte.appendChild(blocSousExercice(ex));
+      if (ex) grille.appendChild(blocSousExercice(ex, fiches));
     }
+    grille.dataset.nb = String(Math.min(3, grille.children.length));
+    carte.appendChild(grille);
+    carte.appendChild(fiches);
     liste.appendChild(carte);
   });
   document.querySelectorAll('.pastille-seance').forEach((b, i) => {
     b.setAttribute('aria-selected', String(i === seanceCourante));
   });
   majPastilles();
+  majBadgesExos();
   afficherValidation();
   afficherBravo();
 }
@@ -1050,8 +1151,13 @@ async function ouvrirExercices() {
   $('zone-exercices').hidden = true;
   $('vide-exercices').hidden = true;
   montrer('exercices');
-  const [p, v] = await Promise.all([chargerProgramme(), chargerValidations()]);
+  const [p, v, x] = await Promise.all([
+    chargerProgramme(),
+    chargerValidations(),
+    chargerExosValides(),
+  ]);
   if (v !== undefined) validations = v;
+  if (x !== undefined) exosValides = x;
   if (p === undefined && !programme) {
     return afficherErreur(
       'erreur-exercices',

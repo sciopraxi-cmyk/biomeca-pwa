@@ -7,6 +7,9 @@ import {
   exerciceSuivantMs,
   formaterTemps,
   cleValidation,
+  cleExo,
+  indexerExos,
+  exosTermines,
   indexerValidations,
   situationJour,
   PREPARATION_S,
@@ -166,5 +169,53 @@ describe('séances validées et « Bravo »', () => {
     expect(situationJour(contenu, 2, v(), '2026-10-28').aJour).toBe(false);
     expect(situationJour(contenu, 9, v(), '2026-10-28')).toMatchObject({ total: 0, aJour: false });
     expect(situationJour(null, 0, v(), '2026-10-28').total).toBe(0);
+  });
+});
+
+describe('exercices validés automatiquement', () => {
+  const p = planChrono({
+    chrono: { type: 'tabata', travail: 20, repos: 10 },
+    exos: [['a', 'b'], ['c', 'd', 'e'], ['f'], ['g']],
+  });
+  it('un exercice est terminé dès que son repos commence', () => {
+    expect(exosTermines(p, 0)).toBe(0);
+    expect(exosTermines(p, 5000)).toBe(0); // début de l'effort 1
+    expect(exosTermines(p, 24999)).toBe(0);
+    expect(exosTermines(p, 25000)).toBe(1); // repos 1
+    expect(exosTermines(p, 35000)).toBe(1); // effort 2
+    expect(exosTermines(p, 5000 + 30000 + 20000)).toBe(2);
+    expect(exosTermines(p, 5000 + 3 * 30000 + 20000)).toBe(4); // dernier effort fini
+    expect(exosTermines(p, p.total * 1000)).toBe(4);
+    expect(exosTermines(p, 9e9)).toBe(4);
+  });
+  it('plusieurs sous-exercices = UN exercice du chrono (un seul compteur)', () => {
+    expect(p.nbExos).toBe(4);
+    expect(p.etapes.filter((e) => e.phase === 'travail').length).toBe(4);
+  });
+  it('Passer pendant l’effort : l’exercice sauté n’est pas compté une fois le saut fait', () => {
+    // simulation du compteur du portail : après un saut, compte = exosTermines(nouveau temps)
+    let compte = 0;
+    const avance = (ms) => {
+      const n = exosTermines(p, ms);
+      const valides = [];
+      while (compte < n) valides.push(compte++);
+      return valides;
+    };
+    expect(avance(10000)).toEqual([]);
+    const saut = exerciceSuivantMs(p, 10000); // effort 1 → effort 2
+    compte = exosTermines(p, saut);
+    expect(compte).toBe(1);
+    expect(avance(saut + 20000)).toEqual([1]); // l'exercice 2 (rang 1) est validé en allant au bout ; l'exercice 1 jamais
+  });
+  it('clés et index (lignes invalides ignorées)', () => {
+    expect(cleExo('2026-10-26', 'pied', 2)).toBe('2026-10-26|pied|2');
+    const s = indexerExos([
+      { jour: '2026-10-26', seance_id: 'pied', exo: 0 },
+      { jour: 'x', seance_id: 'pied', exo: 0 },
+      { jour: '2026-10-26', seance_id: 'pied', exo: '1' },
+      null,
+    ]);
+    expect([...s]).toEqual(['2026-10-26|pied|0']);
+    expect(indexerExos(null).size).toBe(0);
   });
 });

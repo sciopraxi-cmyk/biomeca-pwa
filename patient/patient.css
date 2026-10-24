@@ -556,3 +556,71 @@ input:focus-visible,
   padding: 6px;
   font-size: 15px;
 }
+
+/* Exercice terminé par le chrono : carte verte et mention « Validé » */
+.exercice {
+  position: relative;
+}
+.exercice.exercice-valide {
+  background: #e9fbf6;
+  border-color: var(--turquoise);
+}
+.badge-valide {
+  float: right;
+  padding: 2px 10px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--turquoise-encre);
+  background: var(--turquoise);
+  border-radius: 999px;
+}
+.badge-valide[hidden] {
+  display: none;
+}
+
+/* Sous-exercices simultanés : côte à côte (2 ou 3), un seul chrono pour la carte */
+.sous-exercices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.sous-exercices[data-nb='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sous-exercices[data-nb='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.sous-exercices .sous-exercice {
+  margin: 0;
+  min-width: 0;
+}
+.sous-exercices[data-nb='2'] .sous-exercice h3,
+.sous-exercices[data-nb='3'] .sous-exercice h3 {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.sous-exercices[data-nb='3'] .sous-exercice h3 {
+  font-size: 12px;
+}
+.sous-exercices[data-nb='2'] .texte-exercice,
+.sous-exercices[data-nb='3'] .texte-exercice {
+  font-size: 13px;
+}
+.sous-exercices[data-nb='3'] .texte-exercice {
+  font-size: 11px;
+}
+.sous-exercices[data-nb='2'] .btn-fiche,
+.sous-exercices[data-nb='3'] .btn-fiche {
+  display: block;
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  text-align: center;
+}
+.sous-exercices[data-nb='3'] .btn-fiche {
+  font-size: 11px;
+  padding: 5px 4px;
+}
+.fiches-carte:empty {
+  display: none;
+}

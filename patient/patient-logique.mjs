@@ -350,3 +350,37 @@ export function situationJour(contenu, index, validations, aujourdhui) {
       .map((s) => s.id),
   };
 }
+
+// ─── Exercices validés par le chrono (lot e3b-2b, suite) ───
+
+/** Clé d'un exercice validé : jour, séance, rang de l'exercice (à partir de 0). */
+export function cleExo(jour, seanceId, exo) {
+  return `${jour}|${seanceId}|${exo}`;
+}
+
+/** Exercices validés (lignes { jour, seance_id, exo }) : ensemble de clés. Les lignes invalides sont ignorées. */
+export function indexerExos(lignes) {
+  const s = new Set();
+  for (const l of Array.isArray(lignes) ? lignes : []) {
+    if (
+      l &&
+      /^\d{4}-\d{2}-\d{2}$/.test(l.jour) &&
+      typeof l.seance_id === 'string' &&
+      Number.isInteger(l.exo)
+    ) {
+      s.add(cleExo(l.jour, l.seance_id, l.exo));
+    }
+  }
+  return s;
+}
+
+/**
+ * Nombre d'exercices dont le temps d'effort est entièrement écoulé (exercices 0 à n-1), donc à valider.
+ * Un exercice est terminé dès que son repos commence (ou que le chrono entier est fini).
+ */
+export function exosTermines(plan, ecouleMs) {
+  const e = etatChrono(plan, ecouleMs);
+  if (e.termine) return plan.nbExos;
+  if (e.phase === 'prep') return 0;
+  return e.phase === 'repos' ? e.exo + 1 : e.exo;
+}
