@@ -53,6 +53,9 @@ const PALETTE = {
   '--podo-sombre': '#9f1239',
   '--podo-clair': '#f2a1b5',
   '--encours': '#f7a528',
+  // Ostéopathie (nouvelle famille) : turquoise repris du posturo, encre = teinte de la photo.
+  '--osteo-vif': '#2dd4bf',
+  '--osteo-encre': '#0E7C86',
 };
 
 // #f04060 n'entre pas dans la palette : il avait DÉJÀ sa variable, --red
@@ -81,9 +84,10 @@ const HEX_RED = '#f04060';
 // (+1 --mut, +1 --card, +1 --bord : total 103 → 106).
 // Aperçu du portail (v219) : le bouton « 👁 » voisin de 🔑 fait de même (+1 --mut, +1 --card, +1 --bord :
 // total 106 → 109).
-// +1 posturo-encre, mut, bord, dim : carte Ostéopathie « Bientôt disponible ».
+// Carte Ostéopathie : +1 osteo-encre, mut, bord, dim ; posturo : Initial et pastille passent sur --posturo-encre.
 const COMPTES_ATTENDUS = {
-  '--posturo-*': 13,
+  '--posturo-*': 11,
+  '--osteo-*': 1,
   '--sport-*': 11,
   '--mut': 18,
   '--txt': 9,

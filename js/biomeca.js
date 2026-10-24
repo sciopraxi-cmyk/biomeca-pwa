@@ -7219,7 +7219,7 @@ function renderPatientList() {
         <div style="font-size:10px;font-weight:700;color:var(--posturo-encre);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Bilans posturaux</div>
         ${bilansPosturo.map((b,bi) => `
         <div class="bl-ligne bl-posturo" style="display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:10px;margin-bottom:6px;">
-          <div style="width:7px;height:7px;border-radius:50%;background:var(--posturo-vif);flex-shrink:0;"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:var(--posturo-encre);flex-shrink:0;"></div>
           <span style="font-size:12.5px;color:var(--txt);flex:1;">${b.label}</span>
           <span style="font-size:11px;color:var(--mut);margin-right:6px;">${b.date}</span>
           <button onclick="ouvrirBilanPosturo(${i},${bi})" style="border:none;padding:6px 13px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;background:var(--posturo-encre);color:#fff;">Ouvrir</button>
@@ -7291,7 +7291,7 @@ function renderPatientList() {
           <div style="font-size:11px;color:var(--mut);margin-top:4px;flex:1;">Étude posture · 9 sections</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:11px;">
             ${canPosturo
-              ? `<button onclick="creerBilanPosturo(${i},'initial')" style="border:none;padding:8px 0;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--posturo-vif);color:var(--posturo-contraste);">Initial</button>
+              ? `<button onclick="creerBilanPosturo(${i},'initial')" style="border:none;padding:8px 0;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--posturo-encre);color:#fff;">Initial</button>
                  <button onclick="creerBilanPosturo(${i},'controle')" style="padding:8px 0;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--card);color:var(--posturo-encre);border:1.5px solid var(--posturo-encre);">Contrôle</button>`
               : `<button disabled style="border:none;padding:8px 0;border-radius:7px;font-size:11.5px;font-weight:700;cursor:not-allowed;background:var(--bord);color:var(--dim);grid-column:1/-1;">Non disponible</button>`}
           </div>
@@ -7354,7 +7354,7 @@ function renderPatientList() {
       <div class="bl-carte">
         <img src="assets/bilans/illus-osteopathie.jpg" alt="" style="display:block;width:100%;height:auto;">
         <div style="padding:12px 13px 13px;display:flex;flex-direction:column;flex:1;">
-          <div style="font-size:14px;font-weight:700;color:var(--posturo-encre);line-height:1.25;">Ostéopathie</div>
+          <div style="font-size:14px;font-weight:700;color:var(--osteo-encre);line-height:1.25;">Ostéopathie</div>
           <div style="font-size:11px;color:var(--mut);margin-top:4px;flex:1;">Équilibrer · Soulager · Restaurer</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:11px;">
             <button disabled style="border:none;padding:8px 0;border-radius:7px;font-size:11.5px;font-weight:700;cursor:not-allowed;background:var(--bord);color:var(--dim);grid-column:1/-1;">Bientôt disponible</button>
@@ -26742,7 +26742,7 @@ function getBilanPosturoHTML() {
     <button onclick="nav('pg-patients')" style="background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;white-space:nowrap;">← Patients</button>
     <div style="font-size:15px;font-weight:700;color:var(--posturo-encre);">🧍 Bilan Global de la Posture</div>
     <div style="display:flex;gap:6px;">
-      <button class="btn" onclick="buildRapportPosturo()" style="background:#2dd4bf;color:#04342C;font-size:12px;padding:5px 12px;">📄 Rapport</button>
+      <button class="btn" onclick="buildRapportPosturo()" style="background:var(--posturo-encre);color:#fff;font-size:12px;padding:5px 12px;">📄 Rapport</button>
     </div>
   </div>
   <div style="display:flex;gap:4px;flex-wrap:wrap;padding:0 20px;margin-bottom:20px;" id="posturo-tabs">
