@@ -32201,7 +32201,6 @@ function _validerActe(a) {
     cotation: net(a?.cotation, 40), remboursement: net(a?.remboursement, 200), note: net(a?.note, 500),
     acte_reference: net(a?.reference, 60), regime_defaut: ['standard', 'ald', 'c2s'].includes(a?.regime) ? a.regime : null,
     sync_doctolib: a?.sync === true,
-    devis_mode: a?.devisMode === 'semelles' ? 'semelles' : 'simple',
   } };
 }
 // Actes du référentiel absents du catalogue (par code) : l'import est idempotent
@@ -32368,7 +32367,6 @@ async function enregistrerActe() {
     base: val('acte-base'), franchise: document.getElementById('acte-franchise')?.checked !== false,
     reference: val('acte-reference'), regime: val('acte-regime'),
     sync: document.getElementById('acte-sync-doctolib')?.checked === true,
-    devisMode: val('acte-devis-mode'),
   });
   if (!r.ok) { alert(r.erreur); return; }
   try {
@@ -32414,7 +32412,6 @@ function modifierActe(id) {
   _remplirCategoriesActe(a.acte_reference);
   set('acte-regime', a.regime_defaut);
   const sy = document.getElementById('acte-sync-doctolib'); if (sy) sy.checked = a.sync_doctolib === true;
-  set('acte-devis-mode', a.devis_mode === 'semelles' ? 'semelles' : 'simple');
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Modifier l\'acte';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = '';
   document.getElementById('acte-libelle')?.scrollIntoView({ block: 'center' });
@@ -32428,14 +32425,12 @@ function annulerEditionActe() {
   _remplirCategoriesActe(null);
   const rg = document.getElementById('acte-regime'); if (rg) rg.value = '';
   const sy = document.getElementById('acte-sync-doctolib'); if (sy) sy.checked = false;
-  const dm = document.getElementById('acte-devis-mode'); if (dm) dm.value = 'simple';
   const t = document.getElementById('acte-form-titre'); if (t) t.textContent = 'Nouvel acte personnalisé';
   const b = document.getElementById('acte-annuler'); if (b) b.style.display = 'none';
 }
 async function renderActesPage() {
   const el = document.getElementById('actes-liste');
   if (!el) return;
-  if (typeof remplirParametresDevisAuto === 'function') remplirParametresDevisAuto();
   try { await chargerActes(); } catch (e) {
     el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px 0;">Catalogue indisponible (' + _escHtml(e.message) + '). Rien n\'a été modifié.</div>';
     return;
@@ -33117,26 +33112,16 @@ function _devisAutoPlanifier(rdvs, ctx) {
     if (!acte) { ignores.push({ rdv: r, raison: 'intitulé non reconnu' }); return; }
     const patient = r.patientId != null ? (ctx.patients || []).find((p) => p.id == r.patientId) : null;
     if (!patient) { ignores.push({ rdv: r, raison: 'patient introuvable' }); return; }
-    let lignes, note = '', regime = 'standard', tiers = false;
-    if (acte.devis_mode === 'semelles') {
-      const prm = ctx.params || {};
-      if (!Number.isInteger(prm.secu_semelles_cents) || !prm.secu_semelles_date || !String(prm.secu_semelles_source || '').trim()) {
-        ignores.push({ rdv: r, raison: 'montant Sécu semelles non saisi' }); return;
-      }
-      const compl = Number.isInteger(prm.complement_cents) ? prm.complement_cents : 0;
-      lignes = [Object.assign(_ligneDepuisActe(acte), { base_remboursable_cents: null })];
-      lignes.push({ acte_id: null, code: null, libelle: 'Semelles orthopédiques — base Sécurité sociale (une paire)', cotation: null, qte: 1, prix_cents: prm.secu_semelles_cents, base_remboursable_cents: null, franchise: false });
-      if (compl > 0) lignes.push({ acte_id: null, code: null, libelle: 'Complément d\u2019honoraires', cotation: null, qte: 1, prix_cents: compl, base_remboursable_cents: null, franchise: false });
-      note = 'Montant Sécurité sociale pour une paire de semelles : ' + _centimesVersEuros(prm.secu_semelles_cents).replace(/\u00a0/g, ' ') + ' (' + String(prm.secu_semelles_source).trim().slice(0, 150) + ', tarif du ' + _dateFr(prm.secu_semelles_date) + ').';
-    } else {
-      lignes = [_ligneDepuisActe(acte)];
-      if (acte.regime_defaut && REGIMES_REMBOURSEMENT[acte.regime_defaut]) {
-        regime = acte.regime_defaut;
-        if (Number.isInteger(acte.base_remboursable_cents)) tiers = true;
-      }
+    // Le devis reprend l'acte tel quel (prix, cotation, base remboursable, prise en charge par défaut),
+    // comme lorsque le praticien le coche à la main dans un devis vide.
+    const lignes = [_ligneDepuisActe(acte)];
+    let regime = 'standard', tiers = false;
+    if (acte.regime_defaut && REGIMES_REMBOURSEMENT[acte.regime_defaut]) {
+      regime = acte.regime_defaut;
+      if (Number.isInteger(acte.base_remboursable_cents)) tiers = true;
     }
     const total = lignes.reduce((t, l) => t + l.qte * l.prix_cents, 0);
-    creer.push({ rdv: r, patient, acte, etat: { type: 'devis', pratId: _praticienParDefaut(patient)?.id ?? null, regime, lignes, tiersPayant: tiers, totalFixeCents: null, note, devisNumero: null }, total });
+    creer.push({ rdv: r, patient, acte, etat: { type: 'devis', pratId: _praticienParDefaut(patient)?.id ?? null, regime, lignes, tiersPayant: tiers, totalFixeCents: null, note: '', devisNumero: null }, total });
   });
   return { creer, ignores };
 }
@@ -33176,12 +33161,10 @@ async function _devisAutoApresImport(ajoutes) {
   if (typeof _horsConnexion === 'function' && _horsConnexion()) return;
   await chargerActes();
   if (!_actesCache.some((a) => a.sync_doctolib === true)) return;
-  const rp = await authFetch(SUPA_URL + '/rest/v1/devis_auto_parametres?select=*');
-  const lp = rp.ok ? await rp.json() : [];
   const rd = await _docRequete('documents_facturation?select=source_rdv&source_rdv=not.is.null');
   const deja = new Set((await rd.json()).map((d) => d.source_rdv));
   const stock = _doctolibStock();
-  const plan = _devisAutoPlanifier(stock.rdv, { actes: _actesCache, params: lp[0] || null, patients, deja, aujourdhui: _todayISO() });
+  const plan = _devisAutoPlanifier(stock.rdv, { actes: _actesCache, patients, deja, aujourdhui: _todayISO() });
   const nouveaux = new Set((ajoutes || []).map((r) => r.id));
   const aSignaler = plan.ignores.filter((i) => nouveaux.has(i.rdv.id));
   if (!plan.creer.length && !aSignaler.length) return;
@@ -33197,37 +33180,6 @@ async function _devisAutoApresImport(ajoutes) {
     notifierEvenement('devis_auto_ignores', { detail: aNotifier.length + ' rendez-vous sans devis', rdv: aNotifier.map((i) => Object.assign({}, i.rdv, { raison: i.raison })) });
   }
   if (faits.length || echecs.length) alert('✅ ' + faits.length + ' devis créé(s) et émis.' + (echecs.length ? '\n⚠️ ' + echecs.length + ' non créé(s) : voir Notifications.' : ''));
-}
-// Paramètres « semelles » : une ligne par praticien (compte), saisie à la main.
-async function remplirParametresDevisAuto() {
-  try {
-    const r = await authFetch(SUPA_URL + '/rest/v1/devis_auto_parametres?select=*');
-    if (!r.ok) return;
-    const l = (await r.json())[0];
-    const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v ?? ''; };
-    const eur = (c) => (Number.isInteger(c) ? (c / 100).toFixed(2).replace('.', ',') : '');
-    set('dauto-secu', l ? eur(l.secu_semelles_cents) : ''); set('dauto-complement', l ? eur(l.complement_cents) : '');
-    set('dauto-date', l ? l.secu_semelles_date : ''); set('dauto-source', l ? l.secu_semelles_source : '');
-  } catch (_e) { /* rempli plus tard */ }
-}
-function _validerParametresDevisAuto(a) {
-  const secu = String(a.secu ?? '').trim() === '' ? null : _eurosVersCentimes(a.secu);
-  if (String(a.secu ?? '').trim() !== '' && secu === null) return { ok: false, erreur: 'Montant Sécurité sociale invalide (exemple : 135 ou 135,50).' };
-  const compl = String(a.complement ?? '').trim() === '' ? 0 : _eurosVersCentimes(a.complement);
-  if (compl === null) return { ok: false, erreur: 'Complément d\u2019honoraires invalide (exemple : 25 ou 25,50).' };
-  const date = String(a.date ?? '').trim(), source = String(a.source ?? '').trim();
-  if (secu !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !source)) return { ok: false, erreur: 'Le montant Sécurité sociale demande sa date et sa source.' };
-  return { ok: true, param: { secu_semelles_cents: secu, secu_semelles_date: secu !== null ? date : null, secu_semelles_source: secu !== null ? source.slice(0, 300) : null, complement_cents: compl } };
-}
-async function enregistrerParametresDevisAuto() {
-  const val = (id) => document.getElementById(id)?.value;
-  const r = _validerParametresDevisAuto({ secu: val('dauto-secu'), complement: val('dauto-complement'), date: val('dauto-date'), source: val('dauto-source') });
-  if (!r.ok) { alert(r.erreur); return; }
-  try {
-    const res = await authFetch(SUPA_URL + '/rest/v1/devis_auto_parametres?on_conflict=user_id', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(Object.assign({ user_id: pwaUser.id }, r.param)) });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const e = document.getElementById('dauto-etat'); if (e) e.textContent = 'Enregistré.';
-  } catch (e) { alert('Enregistrement impossible (' + e.message + '). Rien n\u2019a été modifié.'); }
 }
 async function supprimerBrouillonDocument() {
   const id = _docEdition?.id;

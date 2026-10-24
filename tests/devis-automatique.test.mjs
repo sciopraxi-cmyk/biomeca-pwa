@@ -13,7 +13,6 @@ const PURES = [
   '_eurosVersCentimes',
   '_devisAutoPlanifier',
   '_devisAutoResume',
-  '_validerParametresDevisAuto',
 ];
 const POUR_CREATION = [
   '_ligneBaseDocument',
@@ -75,7 +74,6 @@ function monter(o = {}) {
   });
   const authFetch = async (url, opt = {}) => {
     const m = opt.method || 'GET';
-    if (url.includes('/devis_auto_parametres')) return reponse(200, o.params ? [o.params] : []);
     if (url.includes('/rpc/emettre_document')) {
       if (srv.erreurEmission) return reponse(500, { message: 'panne' });
       const { p_id } = JSON.parse(opt.body);
@@ -132,15 +130,16 @@ const ACTES = [
     libelle: 'Consultation de podologie',
     montant_cents: 3500,
     sync_doctolib: true,
-    devis_mode: 'simple',
     actif: true,
   },
   {
     id: 'a2',
-    libelle: 'Bilan podologique',
-    montant_cents: 6000,
+    libelle: 'Semelles orthopédiques',
+    montant_cents: 22000,
     sync_doctolib: true,
-    devis_mode: 'semelles',
+    regime_defaut: 'standard',
+    base_remboursable_cents: 13500,
+    franchise: true,
     actif: true,
   },
   {
@@ -152,12 +151,6 @@ const ACTES = [
   },
   { id: 'a4', libelle: 'Acte désactivé', montant_cents: 1000, sync_doctolib: true, actif: false },
 ];
-const PARAMS = {
-  secu_semelles_cents: 13500,
-  secu_semelles_date: '2026-10-01',
-  secu_semelles_source: 'Avenant fictif',
-  complement_cents: 2500,
-};
 const rdv = (id, motif, patientId = 'p1', debut = '2026-10-27T10:00') => ({
   id,
   motif,
@@ -171,7 +164,6 @@ describe('planification', () => {
     Object.assign(
       {
         actes: ACTES,
-        params: PARAMS,
         patients: [{ id: 'p1', nom: 'M', prenom: 'L', pratId: 7 }],
         deja: new Set(),
         aujourdhui: '2026-10-24',
@@ -184,24 +176,12 @@ describe('planification', () => {
     expect(r.creer).toHaveLength(1);
     expect(r.creer[0].total).toBe(3500);
   });
-  it('semelles : bilan + Sécu + complément = total, note avec source et date', () => {
-    const r = f._devisAutoPlanifier([rdv('r1', 'bilan podologique')], ctx());
-    expect(r.creer[0].etat.lignes.map((l) => l.prix_cents)).toEqual([6000, 13500, 2500]);
+  it('acte avec base remboursable : prise en charge par défaut + tiers payant (comme à la main)', () => {
+    const r = f._devisAutoPlanifier([rdv('r1', 'semelles orthopediques')], ctx());
+    expect(r.creer[0].etat.tiersPayant).toBe(true);
+    expect(r.creer[0].etat.regime).toBe('standard');
+    expect(r.creer[0].etat.lignes[0].base_remboursable_cents).toBe(13500);
     expect(r.creer[0].total).toBe(22000);
-    expect(r.creer[0].etat.note).toContain('Avenant fictif');
-    expect(r.creer[0].etat.note).toContain('01/10/2026');
-  });
-  it('semelles sans montant Sécu saisi → rien créé, raison explicite', () => {
-    const r = f._devisAutoPlanifier([rdv('r1', 'Bilan podologique')], ctx({ params: null }));
-    expect(r.creer).toHaveLength(0);
-    expect(r.ignores[0].raison).toMatch(/Sécu/);
-  });
-  it('complément à zéro : pas de ligne de complément', () => {
-    const r = f._devisAutoPlanifier(
-      [rdv('r1', 'Bilan podologique')],
-      ctx({ params: Object.assign({}, PARAMS, { complement_cents: 0 }) })
-    );
-    expect(r.creer[0].etat.lignes).toHaveLength(2);
   });
   it('intitulé inconnu, acte non synchronisé ou désactivé → ignoré', () => {
     const r = f._devisAutoPlanifier(
@@ -245,50 +225,21 @@ describe('planification', () => {
   });
 });
 
-describe('paramètres semelles', () => {
-  const { f } = monter();
-  it('montant Sécu sans date ni source refusé', () => {
-    expect(
-      f._validerParametresDevisAuto({ secu: '135', complement: '25', date: '', source: '' }).ok
-    ).toBe(false);
-  });
-  it('valeurs correctes → centimes', () => {
-    const r = f._validerParametresDevisAuto({
-      secu: '135,50',
-      complement: '25',
-      date: '2026-10-01',
-      source: 'avenant',
-    });
-    expect(r.param).toEqual({
-      secu_semelles_cents: 13550,
-      secu_semelles_date: '2026-10-01',
-      secu_semelles_source: 'avenant',
-      complement_cents: 2500,
-    });
-  });
-  it('montants illisibles refusés', () => {
-    expect(
-      f._validerParametresDevisAuto({ secu: 'abc', complement: '', date: '', source: '' }).ok
-    ).toBe(false);
-    expect(
-      f._validerParametresDevisAuto({ secu: '', complement: '-5', date: '', source: '' }).ok
-    ).toBe(false);
-  });
-});
-
 describe('création à l\u2019import (faux serveur)', () => {
   it('crée et émet les devis, numérotation continue, partage au portail', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
-    f.setRdv([rdv('r1', 'Consultation de podologie'), rdv('r2', 'Bilan podologique', 'p2')]);
+    const { f, srv } = monter({ actes: ACTES });
+    f.setRdv([rdv('r1', 'Consultation de podologie'), rdv('r2', 'Semelles orthopédiques', 'p2')]);
     await f._devisAutoApresImport([rdv('r1', 'x'), rdv('r2', 'x')]);
     expect(srv.emis.map((d) => d.numero)).toEqual(['D-2026-0001', 'D-2026-0002']);
     expect(srv.emis.map((d) => d.total_cents)).toEqual([3500, 22000]);
+    expect(srv.emis[1].tiers_payant).toBe(true);
+    expect(srv.emis[1].regime).toBe('standard');
     expect(srv.emis.every((d) => d.type === 'devis' && d.source_rdv)).toBe(true);
     expect(srv.partages).toHaveLength(2);
     expect(srv.confirms).toHaveLength(1);
   });
   it('réimport du même fichier : aucun doublon, aucun numéro consommé', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
+    const { f, srv } = monter({ actes: ACTES });
     f.setRdv([rdv('r1', 'Consultation de podologie')]);
     await f._devisAutoApresImport([rdv('r1', 'x')]);
     await f._devisAutoApresImport([]);
@@ -296,7 +247,7 @@ describe('création à l\u2019import (faux serveur)', () => {
     expect(srv.numero).toBe(1);
   });
   it('course (liste « déjà devisés » périmée) : le serveur refuse le doublon, sans erreur affichée', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
+    const { f, srv } = monter({ actes: ACTES });
     f.setRdv([rdv('r1', 'Consultation de podologie')]);
     await f._devisAutoApresImport([rdv('r1', 'x')]);
     srv.masquerDeja = true;
@@ -308,14 +259,14 @@ describe('création à l\u2019import (faux serveur)', () => {
     expect(srv.alertes).toHaveLength(0);
   });
   it('refus au récapitulatif : rien n\u2019est créé', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
+    const { f, srv } = monter({ actes: ACTES });
     srv.confirmer = false;
     f.setRdv([rdv('r1', 'Consultation de podologie')]);
     await f._devisAutoApresImport([rdv('r1', 'x')]);
     expect(srv.docs).toHaveLength(0);
   });
   it('refus puis nouvel import : le rendez-vous est repris (pas perdu)', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
+    const { f, srv } = monter({ actes: ACTES });
     srv.confirmer = false;
     f.setRdv([rdv('r1', 'Consultation de podologie')]);
     await f._devisAutoApresImport([rdv('r1', 'x')]);
@@ -324,7 +275,7 @@ describe('création à l\u2019import (faux serveur)', () => {
     expect(srv.emis).toHaveLength(1);
   });
   it('intitulé inconnu d\u2019un NOUVEAU rendez-vous : notification, aucun devis', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
+    const { f, srv } = monter({ actes: ACTES });
     f.setRdv([rdv('r1', 'Inconnu')]);
     await f._devisAutoApresImport([rdv('r1', 'Inconnu')]);
     expect(srv.docs).toHaveLength(0);
@@ -332,13 +283,13 @@ describe('création à l\u2019import (faux serveur)', () => {
     expect(srv.notifs[0][1].rdv[0].raison).toBe('intitulé non reconnu');
   });
   it('intitulé inconnu d\u2019un rendez-vous déjà connu : pas de nouvelle notification', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
+    const { f, srv } = monter({ actes: ACTES });
     f.setRdv([rdv('r1', 'Inconnu')]);
     await f._devisAutoApresImport([]);
     expect(srv.notifs).toHaveLength(0);
   });
   it('panne à l\u2019émission : signalé, pas d\u2019alerte de succès trompeuse', async () => {
-    const { f, srv } = monter({ actes: ACTES, params: PARAMS });
+    const { f, srv } = monter({ actes: ACTES });
     srv.erreurEmission = true;
     f.setRdv([rdv('r1', 'Consultation de podologie')]);
     await f._devisAutoApresImport([rdv('r1', 'x')]);
@@ -349,7 +300,6 @@ describe('création à l\u2019import (faux serveur)', () => {
   it('praticien sans SIRET/RPPS : émission refusée proprement', async () => {
     const { f, srv } = monter({
       actes: ACTES,
-      params: PARAMS,
       prats: [{ id: 7, nom: 'Dr Fictif' }],
     });
     f.setRdv([rdv('r1', 'Consultation de podologie')]);
@@ -360,7 +310,6 @@ describe('création à l\u2019import (faux serveur)', () => {
   it('aucun acte coché « devis automatique » : rien ne se passe', async () => {
     const { f, srv } = monter({
       actes: [{ id: 'a3', libelle: 'X', montant_cents: 1, sync_doctolib: false }],
-      params: PARAMS,
     });
     f.setRdv([rdv('r1', 'X')]);
     await f._devisAutoApresImport([rdv('r1', 'x')]);
