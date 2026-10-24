@@ -792,7 +792,7 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - Preuve : `supabase/tests/portail-programme-validations.test.sql` (banc jetable : prélude, `portail-programme-patient.sql`,
   `portail-programme-validations.sql`, `portail-programme-exos-valides.sql`, puis les deux tests ; finissent `TOUT_OK` ; mutations toutes détectées),
   `tests/portail-chrono-e3b2b.test.mjs`, `tests/portail-suivi-praticien-e3b2b.test.mjs`, E2E `documents/e2e-portail-chrono-e3b2b.mjs`
-  (horloge simulée) et `e2e-portail-suivi-praticien-e3b2b.mjs`. Service workers : `biomeca-v241`, `verticy-patient-v13`.
+  (horloge simulée) et `e2e-portail-suivi-praticien-e3b2b.mjs`. Service workers : `biomeca-v241`, `verticy-patient-v14`.
 
 ## Fin de tâche : mise à jour de la documentation
 

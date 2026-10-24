@@ -1054,11 +1054,9 @@ function afficherValidation() {
     $('validation-commentaire').value = '';
     $('btn-valider-seance').disabled = false;
     $('btn-valider-seance').hidden = !seanceComplete(); // secours : tout est validé mais l'envoi de la séance a échoué
-  } else if (jour.date === auj) {
-    $('validation-etat').textContent = 'Séance pas encore validée par le patient.';
-  } else if (jour.date > auj) {
-    $('validation-etat').textContent =
-      'Jour d’essai : vous pouvez tester le chrono, mais rien n’est enregistré avant le jour de la séance.';
+  } else if (jour.date >= auj) {
+    // Aperçu praticien ou jour à venir : le chrono explique déjà « rien n'est enregistré » ; ce cadre ne servirait à rien.
+    bloc.hidden = true;
   } else {
     $('validation-etat').textContent =
       'Séance non faite ce jour-là. Ce n’est pas grave, on continue ! 💪';
