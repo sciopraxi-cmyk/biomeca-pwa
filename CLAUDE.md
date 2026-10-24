@@ -797,6 +797,39 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   `tests/portail-chrono-e3b2b.test.mjs`, `tests/portail-suivi-praticien-e3b2b.test.mjs`, E2E `documents/e2e-portail-chrono-e3b2b.mjs`
   (horloge simulée) et `e2e-portail-suivi-praticien-e3b2b.mjs`. Service workers : `biomeca-v241`, `verticy-patient-v17`.
 
+## Devis automatique, catalogue par praticien, carte Ostéopathie, état de publication — acquis (PR #326 à #329)
+
+- **Devis automatique à l'import Doctolib (PR #329)** : `_devisAutoApresImport`, appelé par `_lancerImportDoctolib`. Tout RDV À VENIR dont
+  le motif est égal (accents et casse ignorés) au titre d'un acte du catalogue coché « Devis automatique à l'import Doctolib »
+  (`sync_doctolib`, actif) crée ET émet un devis, après un récapitulatif avec confirmation. Le devis reprend l'acte TEL QUEL (prix,
+  cotation, base remboursable, prise en charge par défaut) : il n'y a ni mode « semelles » ni paramètres de calcul (retirés, l'acte
+  personnalisé contient déjà bilan + part Sécurité sociale déduite + complément). Anti-doublon : `documents_facturation.source_rdv`
+  (index unique par praticien, le 409 est absorbé). Intitulé ou patient inconnu, ou échec : notification `devis_auto_ignores`
+  (RDV nouveaux seulement). Le devis émis est partagé tout seul au portail (`documents_partages`) ; le filet en cas d'erreur est
+  le retrait via 🔑, puis un devis manuel. La table `devis_auto_parametres` et la colonne `actes_catalogue.devis_mode` existent en base
+  mais sont vides et inutilisées.
+- **Piège trigger** : toute migration qui redéfinit `documents_facturation_garde` doit partir de sa DERNIÈRE version (tiers payant,
+  `part_secu_cents`, `source_rdv`), sinon les gardes précédentes sautent. Banc de test = faux serveur en mémoire (409 sur doublon) +
+  sabotages (`tests/devis-automatique.test.mjs`, `supabase/tests/devis-automatique.test.sql`).
+- **Bouton « Supprimer » des actes personnalisés** : policy DELETE `delete_own_perso` limitée à `perso = true` ; les actes du
+  référentiel ne se suppriment pas ; les devis et factures gardent une copie de leurs lignes.
+- **Catalogue PAR PRATICIEN** (décision) : actes et tarifs rangés par compte (RLS `user_id`), chacun les siens. Les sous-comptes
+  titulaire / assistant / remplaçant ne sont PAS construits. L'import range aujourd'hui tout sous `praticiens[0]` : il faudra
+  rapprocher chaque agenda Doctolib (colonne « agenda » du CSV) du bon praticien.
+- **Carte Ostéopathie (PR #327)** : cinquième carte de l'écran des bilans, « Bientôt disponible » (bouton désactivé, aucun bilan
+  associé). Grille de 5 colonnes (2 sous 900 px). Variables `--osteo-vif` / `--osteo-encre` réservées à ce thème turquoise ; le
+  posturo passe en vert foncé (`--posturo-encre`), rapport posturo compris. Tests figés à connaître : `fenetres-claires-268` (structure
+  des fenêtres), `palette-bilans` (comptes de `var()` par famille, aucune couleur hexadécimale dans la zone des bilans),
+  `bilan-posturo-clair-268` (inventaire des couleurs en dur).
+- **État de publication des rapports (PR #328)** : à côté de « Publier au patient », `_portailMajEtatRapports` affiche « Publié le … ✓ à
+  jour » ou « Publié le … · mis à jour depuis ». La fiche garde seulement date + empreinte (`rapportsPublies[module] = { date, emp }`),
+  jamais le contenu ; `_portailEmpreinteRapport` ignore la ligne « Généré le … » qui change chaque jour. Rafraîchi toutes les 3 s sur
+  la page active seulement.
+- **Fenêtres larges (PR #326)** : la fenêtre 🔑 « Accès au portail » (`#portail-patient-modal`) est élargie (`max-width: min(960px, 96vw)`).
+- **Service workers** : praticien `biomeca-v254`, patient `verticy-patient-v18` (inchangé).
+- **Prochain lot** : signature du devis par le patient dans `/patient/` (tracé, IP serveur, horodatage, empreinte SHA-256 de la copie
+  figée, code e-mail pour les mineurs) ; la notification `patient_devis_signe` est déjà déclarée.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
