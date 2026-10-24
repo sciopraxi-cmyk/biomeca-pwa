@@ -691,6 +691,14 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   nouvelle vidéo), utricules, mâchoire, proprioception, avant / après rééducation oculaire, respiration,
   pathologies. Fiche RVO : 2 exercices (la 2e fiche n'a que le titre et le QR, la fiche d'origine n'a pas de texte).
 
+## Exercice « Rééducation du pied » retiré de la bibliothèque
+
+- La fiche « 1. Rééducation du pied » (28 jours) n'est plus un exercice de la catégorie « Rééducation du pied » : c'est
+  le programme de renforcement des muscles profonds des pieds (case du bloc « Programme du patient »). Retirée de
+  `FICHES_SYSTEMES` (liste de secours et import de la base) ; en base, `reeduc-pied|1. Rééducation du pied` est
+  désactivée par SQL (jamais supprimée). La catégorie garde les 12 exercices du pied (`reeduc-pied|pied-enfant|…`,
+  liste de secours = `_exoSubsSecours`). Le fichier PDF reste livré : il sert de source au tableau des 28 jours (e3b).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et

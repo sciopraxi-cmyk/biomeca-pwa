@@ -15,6 +15,7 @@ function monter() {
       SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'),
       SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES')) + 1
     ),
+    fonction('_exoSubsSecours'),
     fonction('_exoBibCats'),
     fonction('_exoBibSubs'),
     fonction('_exoBibLabelSys'),
@@ -220,5 +221,15 @@ describe('petit dessin devant les catégories', () => {
       '🦶 Rééducation du pied',
       '⭐ Mes exos',
     ]);
+  });
+});
+
+describe("catégorie « Rééducation du pied » : plus d'exercice « Rééducation du pied »", () => {
+  it("la fiche 28 jours n'est plus proposée dans la liste de secours ni dans la base importée", () => {
+    expect(SRC_BIOMECA).not.toMatch(/subs: \[\"1\. Rééducation du pied\"\]/);
+    const f = monter();
+    expect(f._exoBibSubs('reeduc-pied').map((o) => o.label)).not.toContain(
+      '1. Rééducation du pied'
+    );
   });
 });

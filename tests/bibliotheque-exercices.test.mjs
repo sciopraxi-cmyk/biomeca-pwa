@@ -141,11 +141,11 @@ describe('plusieurs liens par exercice', () => {
 });
 
 describe('base issue des fiches existantes', () => {
-  it('15 catégories, 56 fiches + 12 exercices du pied, codes uniques, chemins PDF conformes', () => {
+  it('15 catégories, 55 fiches (sans « Rééducation du pied », devenue le programme) + 12 exercices du pied, codes uniques, chemins PDF conformes', () => {
     const { cats, exos } = monter().f._exoBaseDepuisFiches();
     expect(cats).toHaveLength(15);
-    expect(exos).toHaveLength(56 + 12);
-    expect(new Set(exos.map((e) => e.code)).size).toBe(68);
+    expect(exos).toHaveLength(55 + 12);
+    expect(new Set(exos.map((e) => e.code)).size).toBe(67);
     expect(
       exos
         .filter((e) => e.pdf_fichier)

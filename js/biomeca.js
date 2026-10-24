@@ -25773,7 +25773,9 @@ const FICHES_SYSTEMES = {
   'reeduc-pied': {
     label: '🦶 Rééducation du pied',
     bilans: ['sport', 'posturo'],
-    subs: ["1. Rééducation du pied"]
+    // La fiche « 1. Rééducation du pied » (28 jours) n'est plus un exercice : c'est le programme de renforcement des
+    // muscles profonds des pieds, coché dans « Programme du patient ». Restent les exercices du pied (EXERCICES_PIED_ENFANT).
+    subs: []
   },
   'systeme-mandibulaire': {
     label: '🦷 Système mandibulaire',
@@ -25953,12 +25955,18 @@ function _exoBibConstruire(base, persoCats, perso) {
 // « (posture) » reste proposée, la respiration « (sport) » est retirée. Les catégories ajoutées ensuite à la base
 // et les catégories personnelles du praticien restent proposées.
 const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'reeduc-chaines', 'reeduc-posturale', 'reeduc-articulaire', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
+// Liste de secours (hors ligne) : exercices de la catégorie ; ceux du pied viennent de EXERCICES_PIED_ENFANT.
+function _exoSubsSecours(slug, cfg) {
+  const l = cfg.subs.map(o => ({ value: o, label: o }));
+  if (slug === 'reeduc-pied' && typeof EXERCICES_PIED_ENFANT !== 'undefined') EXERCICES_PIED_ENFANT.forEach(e => l.push({ value: 'pied-enfant|' + e[0], label: e[1] }));
+  return l;
+}
 function _exoBibCats(bilan) {
   const podo = bilan === 'podo';
   if (!_exoBib) {
     return Object.entries(FICHES_SYSTEMES)
       .filter(([slug, cfg]) => (podo ? !_EXO_PODO_EXCLUES.includes(slug) : cfg.bilans.includes(bilan)))
-      .map(([slug, cfg]) => ({ value: slug, label: cfg.label, subs: cfg.subs.map(o => ({ value: o, label: o })) }));
+      .map(([slug, cfg]) => ({ value: slug, label: cfg.label, subs: _exoSubsSecours(slug, cfg) }));
   }
   if (podo) return _exoBib.filter(c => !_EXO_PODO_EXCLUES.includes(c.value));
   return _exoBib.filter(c => !c.bilans || c.bilans.includes(bilan));
@@ -25967,7 +25975,7 @@ function _exoBibSubs(sysValue) {
   const c = (_exoBib || []).find(x => x.value === sysValue);
   if (c) return c.subs;
   const f = FICHES_SYSTEMES[sysValue];
-  return f ? f.subs.map(o => ({ value: o, label: o })) : [];
+  return f ? _exoSubsSecours(sysValue, f) : [];
 }
 function _exoBibLabelSys(sys, snap) {
   if (snap) return snap;
