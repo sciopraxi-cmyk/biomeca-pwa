@@ -676,6 +676,21 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   Joël voir l'ancienne version sur son localhost (pousser un correctif = incrémenter la version).
 - Preuve : `tests/programmes-bilans-e3a.test.mjs`, parcours réel `documents/e2e-programmes-bilans.mjs`.
 
+## Fiches PDF découpées : une fiche par exercice (PR « fiches-pdf-une-par-exercice »)
+
+- Les fiches qui contenaient plusieurs exercices (plusieurs QR codes) sont découpées en 63 fiches d'un seul exercice,
+  chacune avec SON QR code : `assets/fiches/<catégorie>/<n°>.<k> <exercice>.pdf` (en-tête de la fiche d'origine +
+  bloc de l'exercice). Les fiches d'origine ne sont ni modifiées ni supprimées. Générées hors dépôt par
+  `documents/extraction-qr/build_pdf.py` (pymupdf, `show_pdf_page` + QR régénéré par zxing-cpp quand le QR d'origine
+  était faux), vérifiées par `verif_pdf.py` (1 page, 1 QR, lien attendu).
+- Dans la base, l'exercice découpé a le code `<code de la fiche d'origine>|<clé>` et son `pdf_fichier` propre ; la fiche
+  entière est désactivée (`actif=false`) mais gardée (les anciens bilans la retrouvent par le préfixe). Le SQL est
+  `documents/sql-decoupage-exercices.sql` : à coller APRÈS la fusion de cette PR (sinon `pdf_fichier` pointe vers un
+  fichier pas encore livré).
+- Non découpées : Landau (1 exercice « superman » en 2 variantes), saccules (1 exercice rebond / corde à sauter,
+  nouvelle vidéo), utricules, mâchoire, proprioception, avant / après rééducation oculaire, respiration,
+  pathologies. Fiche RVO : 2 exercices (la 2e fiche n'a que le titre et le QR, la fiche d'origine n'a pas de texte).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
