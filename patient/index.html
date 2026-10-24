@@ -85,10 +85,11 @@
             <span><strong>Mes documents</strong><small id="phrase-documents">Devis, factures, ordonnances, bilans</small></span>
             <span id="pastille-documents" class="pastille" hidden></span>
           </button>
-          <div class="carte carte-bientot">
+          <button id="carte-messagerie" class="carte carte-bouton" type="button">
             <span class="emoji">💬</span>
-            <span><strong>Messagerie</strong><small>Bientôt disponible : écrire à votre praticien</small></span>
-          </div>
+            <span><strong>Messagerie</strong><small id="phrase-messagerie">Écrire à votre praticien</small></span>
+            <span id="pastille-messagerie" class="pastille" hidden></span>
+          </button>
           <div class="carte carte-bientot">
             <span class="emoji">📋</span>
             <span><strong>Mon questionnaire</strong><small>Bientôt disponible</small></span>
@@ -162,6 +163,24 @@
           </section>
         </div>
         <button id="btn-exercices-retour" class="bouton bouton-clair" type="button">← Retour</button>
+      </section>
+
+      <!-- Écran 8 : messagerie -->
+      <section id="ecran-messagerie" class="ecran" hidden>
+        <h1>💬 Messagerie</h1>
+        <p class="doux petit" id="aide-messagerie">Un message à votre praticien ? Écrivez-le ici, il sera lu dès que possible. Ne l’utilisez pas pour une urgence.</p>
+        <div id="fil-messages" class="fil-messages" role="log" aria-live="polite"></div>
+        <p id="vide-messagerie" class="doux" hidden>Aucun message pour l’instant. Écrivez le premier ✨</p>
+        <p id="ferme-messagerie" class="doux" hidden>La messagerie est fermée pour le moment. Vous pouvez relire vos messages.</p>
+        <form id="form-message" class="form-message" novalidate>
+          <label for="texte-message" class="doux petit">Votre message</label>
+          <textarea id="texte-message" class="champ-commentaire" maxlength="1000" rows="3" autocomplete="off"></textarea>
+          <p id="compteur-message" class="doux petit compteur-message">1000 caractères restants</p>
+          <button id="btn-message-envoyer" class="bouton" type="submit">✉️ Envoyer</button>
+          <button id="btn-message-annuler" class="bouton bouton-clair" type="button" hidden>Annuler la modification</button>
+        </form>
+        <p id="erreur-messagerie" class="erreur" role="alert" hidden></p>
+        <button id="btn-messagerie-retour" class="bouton bouton-clair" type="button">← Retour</button>
       </section>
 
       <!-- Écran 4 : accès fermé / en attente -->

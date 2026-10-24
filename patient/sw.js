@@ -3,7 +3,7 @@
 // worker purge les caches « biomeca-* » à son activation et ne doit jamais toucher à ceux-ci.
 // Aucune donnée n'est mise en cache : seulement la coquille de l'application. Les appels
 // Supabase (authentification, données, fonctions) passent toujours par le réseau.
-const VERSION = 'verticy-patient-v17';
+const VERSION = 'verticy-patient-v18';
 const PREFIXE = 'verticy-patient-';
 const COQUILLE = [
   './',

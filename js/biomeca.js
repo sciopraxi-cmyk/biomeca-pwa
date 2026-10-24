@@ -4957,6 +4957,7 @@ if ('serviceWorker' in navigator) {
 // navigateur. La lecture SCOPÉE (bm4-patients:<uid>) se fait désormais dans
 // loadSupabaseData, une fois pwaUser résolu. La RAM reste vide jusque-là.
 let patients = [];
+let _msgEnCours = false;
 let praticiens = [];
 // Guard data race (task #64) : true uniquement après loadSupabaseData terminée
 // (path success, empty user, OU fallback localStorage). Reset à false au logout
@@ -7353,6 +7354,7 @@ function renderPatientList() {
         <button onclick="ouvrirOrdonnancesPatient(${i})" title="Ordonnances" aria-label="Ordonnances" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">📝</button>
         <button onclick="ouvrirSterilisationPatient(${i})" title="Stérilisation" aria-label="Stérilisation" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🧼</button>
         <button onclick="ouvrirPortailPatient(${i})" title="Accès au portail patient" aria-label="Accès au portail patient" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">🔑</button>
+        <button class="btn-msg-fiche" onclick="portailApercu(${i},'messagerie')" data-msg-patient="${_escHtml(p._cloudId || '')}" title="Messagerie avec le patient" aria-label="Messagerie avec le patient">💬<span class="msg-badge" style="${(globalThis._msgNonLus || {})[p._cloudId] ? '' : 'display:none;'}">${(globalThis._msgNonLus || {})[p._cloudId] || ''}</span></button>
         <button onclick="portailApercu(${i})" title="Ouvrir le portail comme le patient" aria-label="Ouvrir le portail comme le patient" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">👁</button>
         <button onclick="editPatient(${i})" style="background:var(--card);border:1px solid var(--bord);color:var(--mut);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;">✏️</button>
         <button onclick="deletePatient(${i})" class="bl-x" style="width:32px;height:32px;font-size:13px;">✕</button>
@@ -34098,7 +34100,7 @@ const NOTIF_TYPES = {
   reseau_perdu: { icone: '📡', titre: 'Connexion internet perdue', systeme: true },
   facture_editee: { icone: '🧾', titre: 'Facture éditée', systeme: true },
   devis_emis: { icone: '📄', titre: 'Devis émis', systeme: true },
-  email_essai: { icone: '📧', titre: 'E-mail d\u2019accès généré (boîte d\u2019essai, non envoyé)', systeme: true },
+  email_essai: { icone: '📧', titre: 'E-mail au patient généré (boîte d\u2019essai, non envoyé)', systeme: true },
   ordonnance_creee: { icone: '💊', titre: 'Ordonnance créée', systeme: false },
   patient_message: { icone: '✉️', titre: 'Nouveau message d\u2019un patient', systeme: false },
   patient_devis_signe: { icone: '✍️', titre: 'Devis signé par un patient', systeme: false },
@@ -34313,6 +34315,12 @@ function _notifHtmlDetail(e) {
       ? '<div id="notif-mot-corps" style="margin-top:10px;border:1px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;color:var(--mut);">Chargement du mot du patient…</div>'
       : '';
     corps += '<div style="font-size:12px;color:var(--mut);margin-top:8px;">Pour adapter le programme : ouvrez la fiche, modifiez le traitement du bilan (exercices, jours, dates) puis 🔑 Portail patient → « Republier le programme maintenant ».</div>';
+  } else if (e.type === 'patient_message') {
+    corps += _notifLigneDetail('Message', 'Le patient vous a écrit. Le contenu n\u2019est pas copié dans la notification : ouvrez la conversation.');
+    corps += e.cible && nom ? '<div style="margin-top:10px;"><button class="btn btn-blue" style="font-size:12px;padding:5px 12px;" onclick="ouvrirConversationNotification(' + e.id + ')">💬 Ouvrir la conversation de ' + _escHtml(nom) + '</button></div>' : '';
+  } else if (e.type === 'email_essai') {
+    corps += _notifLigneDetail('Détail', e.detail ? _escHtml(e.detail) : 'E-mail généré, non envoyé (boîte d\u2019essai).');
+    corps += _notifLigneDetail('Envoi', 'Boîte d\u2019essai : rien n\u2019est envoyé pour l\u2019instant.');
   } else if (e.type === 'patient_protocole_termine') {
     corps += _notifLigneDetail('Programme', 'Le patient a validé toutes les séances du dernier jour de son programme. Le détail des séances est dans sa fiche : 🔑 Portail patient → Suivi des séances.');
   } else if (e.type === 'import_doctolib') {
@@ -34329,6 +34337,11 @@ function _notifHtmlDetail(e) {
 function fermerDetailNotification() {
   _notifDetailId = null;
   renderNotificationsPage();
+}
+function ouvrirConversationNotification(id) {
+  const e = _notifDonnees(_notifPrat()).liste.find((x) => x.id === Number(id));
+  const i = e && e.cible ? (Array.isArray(patients) ? patients : []).findIndex((x) => x.id == e.cible.patientId) : -1;
+  if (i >= 0) portailApercu(i, 'messagerie');
 }
 function ouvrirPatientNotification(id) {
   const e = _notifDonnees(_notifPrat()).liste.find((x) => x.id === Number(id));
@@ -36288,7 +36301,8 @@ async function _portailAppeler(action, p, extra) {
 async function _portailLireCompte(p) {
   const base = 'identifiant,statut,bloque_jusqu,representant_legal_nom,representant_legal_lien,premier_acces_at,dernier_acces_at';
   const requete = (colonnes) => authFetch(SUPA_URL + '/rest/v1/patient_comptes?select=' + colonnes + '&patient_id=eq.' + encodeURIComponent(p._cloudId));
-  let res = await requete(base + ',notifications_bloquees_at');
+  let res = await requete(base + ',notifications_bloquees_at,messagerie_desactivee_at');
+  if (res.status === 400) res = await requete(base + ',notifications_bloquees_at'); // SQL de la messagerie pas encore posé
   if (res.status === 400) res = await requete(base); // le SQL du blocage n'est pas encore posé : la fenêtre reste utilisable
   if (!res.ok) throw new Error('lecture ' + res.status);
   const l = await res.json();
@@ -36338,6 +36352,7 @@ function _portailAfficher(idx, compte, message) {
       '</div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Programme d\'exercices</div><div id="portail-programme" style="font-size:12px;color:var(--mut);"></div></div>' +
       _portailHtmlBlocage(idx, compte) +
+      _portailHtmlMessagerie(idx, compte) +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Suivi des séances</div><div id="portail-suivi" style="font-size:12px;color:var(--mut);">Chargement…</div></div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Documents visibles par le patient</div><div id="portail-docs"></div></div>';
   }
@@ -36428,6 +36443,37 @@ function _portailHtmlBlocage(idx, compte) {
             : '🔔 Actives : vous êtes prévenu de ses ressentis et de la fin de son programme.') + '</div>' +
     '<button class="btn" style="margin-top:6px;" onclick="portailBasculerNotifications(' + idx + ',' + (bloque ? 'false' : 'true') + ')">' +
     (bloque ? '🔔 Réactiver les notifications' : '🔕 Bloquer les notifications de ce patient') + '</button></div>';
+}
+// Messagerie du patient : active par défaut, désactivable (le patient relit alors l'historique sans pouvoir écrire).
+function _portailHtmlMessagerie(idx, compte) {
+  if (!('messagerie_desactivee_at' in compte)) return '';
+  const off = !!compte.messagerie_desactivee_at;
+  const depuis = off ? ' depuis le ' + new Date(compte.messagerie_desactivee_at).toLocaleDateString('fr-FR') : '';
+  return '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Messagerie de ce patient</div>' +
+    '<div id="portail-messagerie" style="font-size:12px;color:' + (off ? 'var(--red)' : 'var(--mut)') + ';">' +
+    (off ? '💬 Désactivée' + _escHtml(depuis) + ' : le patient relit l\u2019historique mais ne peut plus écrire, et vous non plus.'
+         : '💬 Active : le patient peut vous écrire, vous pouvez lui répondre.') + '</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">' +
+    '<button class="btn btn-blue" onclick="portailApercu(' + idx + ',\'messagerie\')">💬 Ouvrir la conversation</button>' +
+    '<button class="btn" onclick="portailBasculerMessagerie(' + idx + ',' + (off ? 'false' : 'true') + ')">' +
+    (off ? '💬 Réactiver la messagerie' : '🚫 Désactiver la messagerie') + '</button></div></div>';
+}
+async function portailBasculerMessagerie(idx, desactiver) {
+  const p = patients[idx];
+  if (!p || !p._cloudId) return;
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  if (desactiver && !confirm('Désactiver la messagerie de ce patient ? Il pourra relire l\u2019historique mais plus écrire, et vous non plus tant qu\u2019elle est désactivée.')) return;
+  try {
+    const res = await authFetch(SUPA_URL + '/rest/v1/patient_comptes?patient_id=eq.' + encodeURIComponent(p._cloudId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ messagerie_desactivee_at: desactiver ? new Date().toISOString() : null }),
+    });
+    if (!res.ok) throw new Error('écriture ' + res.status);
+    _portailAfficher(idx, await _portailLireCompte(p), '');
+  } catch (_e) {
+    _portailAfficher(idx, await _portailLireCompte(p).catch(() => null), 'Modification impossible (le SQL de la messagerie est-il posé ?). Réessayez.');
+  }
 }
 async function portailBasculerNotifications(idx, bloquer) {
   const p = patients[idx];
@@ -36707,14 +36753,21 @@ async function portailPublierRapport(module) {
 function _portailApercuAutoriser(win, p) {
   const h = async function (e) {
     if (win.closed) { window.removeEventListener('message', h); return; }
-    if (e.origin !== location.origin || e.source !== win || !e.data || e.data.type !== 'verticy-apercu-demande') return;
+    if (e.origin !== location.origin || e.source !== win || !e.data) return;
+    if (e.data.type === 'verticy-apercu-message-envoye') {
+      // Le praticien a écrit dans la messagerie : e-mail d'avertissement au patient, SANS le contenu (boîte d'essai, non envoyé).
+      notifierEvenement('email_essai', { patientId: p.id, detail: 'Nouveau message (sans contenu)' });
+      if (typeof _portailMessagesNonLus === 'function') _portailMessagesNonLus();
+      return;
+    }
+    if (e.data.type !== 'verticy-apercu-demande') return;
     try { await authFetch(SUPA_URL + '/rest/v1/patients?select=id&limit=1'); } catch (_e) { /* jeton éventuellement périmé : l'aperçu l'indiquera */ }
     const sess = loadPwaSession();
     win.postMessage({ type: 'verticy-apercu-jeton', token: sess.token, prenom: p.prenom || '', cabinet: _portailCabinet(p) || '' }, location.origin);
   };
   window.addEventListener('message', h);
 }
-async function portailApercu(idx) {
+async function portailApercu(idx, ecran) {
   const p = patients[idx];
   if (!p) return;
   const win = window.open('about:blank', '_blank');
@@ -36736,7 +36789,7 @@ async function portailApercu(idx) {
     }
     if (compte && compte.statut === 'suspendu') { echec('L\'accès de ce patient est fermé. Rouvrez-le depuis le bouton 🔑 pour voir son portail.'); return; }
     _portailApercuAutoriser(win, p);
-    win.location.href = _portailUrlApp() + '?apercu=' + encodeURIComponent(p._cloudId);
+    win.location.href = _portailUrlApp() + '?apercu=' + encodeURIComponent(p._cloudId) + (ecran === 'messagerie' ? '&ecran=messagerie' : '');
   } catch (_e) {
     echec('Ouverture impossible pour le moment. Vérifiez votre connexion puis réessayez.');
   }
@@ -36926,11 +36979,44 @@ async function _portailVerifierMots(force) {
     }
   } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _motsEnCours = false; }
 }
+// Messagerie : messages du patient pas encore signalés (notification `patient_message`, identifiants seuls ; jamais pour un patient bloqué,
+// le serveur les inscrit « déjà notifiés ») et pastilles de non-lus sur la fiche.
+async function _portailVerifierMessages() {
+  if (_msgEnCours || globalThis._modeConsultation || typeof pwaUser === 'undefined' || !pwaUser) return;
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) return;
+  _msgEnCours = true;
+  try {
+    const l = await _portailRpc('messagerie_a_notifier', {});
+    for (const m of Array.isArray(l) ? l : []) {
+      const p = (Array.isArray(patients) ? patients : []).find(function (x) { return x._cloudId === m.patient_id; });
+      if (!p) continue; // fiche inconnue sur cet appareil : traitée depuis l'appareil qui la connaît
+      if ((await _portailRpc('messagerie_notifie', { p_id: m.id })) === true) notifierEvenement('patient_message', { patientId: p.id });
+    }
+    await _portailMessagesNonLus();
+  } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _msgEnCours = false; }
+}
+async function _portailMessagesNonLus() {
+  try {
+    const l = await _portailRpc('messagerie_non_lus_praticien', {});
+    const carte = {};
+    for (const x of Array.isArray(l) ? l : []) carte[x.patient_id] = Number(x.n) || 0;
+    globalThis._msgNonLus = carte;
+    if (typeof document === 'undefined') return;
+    document.querySelectorAll('[data-msg-patient]').forEach(function (b) {
+      const n = carte[b.getAttribute('data-msg-patient')] || 0;
+      const sp = b.querySelector('.msg-badge');
+      if (!sp) return;
+      sp.textContent = n ? String(n) : '';
+      sp.style.display = n ? '' : 'none';
+    });
+  } catch (_e) { /* silencieux */ }
+}
 // Vérification toutes les 30 s tant que l'onglet est visible, et dès qu'on y revient (le patient écrit, le praticien est prévenu vite).
 function _portailVerifierNotifications() {
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
   if (typeof _portailVerifierFins === 'function') _portailVerifierFins(true);
   if (typeof _portailVerifierMots === 'function') _portailVerifierMots(true);
+  if (typeof _portailVerifierMessages === 'function') _portailVerifierMessages();
 }
 setInterval(_portailVerifierNotifications, 30 * 1000);
 if (typeof document !== 'undefined' && document.addEventListener) {
@@ -36981,6 +37067,8 @@ Object.assign(window, {
   portailCreerAcces,
   portailEnregistrerRepresentant,
   portailBasculerNotifications,
+  portailBasculerMessagerie,
+  ouvrirConversationNotification,
   portailPublierRapport,
   portailRetirerDocument,
   _portailFermer,
