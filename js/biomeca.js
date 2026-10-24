@@ -32961,10 +32961,32 @@ function _praticienParDefaut(patient) {
 function _praticienDuDocument(etat) {
   return praticiens.find((p) => p.id == etat.pratId) || null;
 }
+// Signatures des devis du patient (preuve lue par le praticien propriétaire seulement), rangées par numéro de devis.
+let _docSignatures = {};
+async function _chargerSignaturesDevis(patient) {
+  _docSignatures = {};
+  if (!patient || !patient._cloudId) return;
+  try {
+    const res = await _docRequete('devis_signatures?select=document_id,numero,signe_at,ip,empreinte,trace,mineur,code_verifie&patient_id=eq.' + encodeURIComponent(patient._cloudId));
+    const l = await res.json();
+    for (const x of Array.isArray(l) ? l : []) _docSignatures[x.numero] = x;
+  } catch (_e) { /* SQL pas encore collé ou hors connexion : aucune signature affichée, rien n'est bloqué */ }
+}
+// Bloc « Signé électroniquement » (fenêtre du devis ET impression) : date, IP prise par le serveur, empreinte, tracé.
+function _htmlBlocSignature(sig) {
+  if (!sig) return '';
+  const trace = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(sig.trace || '')
+    ? '<img alt="Signature du patient" src="' + sig.trace + '" style="display:block;max-width:300px;max-height:110px;border:1px solid var(--bord);background:#fff;margin-top:6px;"/>' : '';
+  return '<div style="margin-top:12px;border:1px solid var(--green,#15803d);border-radius:8px;padding:10px 12px;font-size:12px;">' +
+    '<b style="color:var(--green,#15803d);">✍️ Signé électroniquement par le patient le ' + _escHtml(_notifDateHeure(sig.signe_at)) + '</b>' +
+    '<div style="color:var(--mut);margin-top:4px;">Adresse IP : ' + _escHtml(sig.ip) + (sig.code_verifie ? ' · code de confirmation vérifié (personne mineure)' : '') +
+    '<br>Empreinte SHA-256 du devis : <span style="word-break:break-all;font-family:monospace;">' + _escHtml(sig.empreinte) + '</span></div>' + trace + '</div>';
+}
 async function chargerDocuments(patient) {
   const res = await _docRequete('documents_facturation?select=*&order=created_at.desc&patient_ref=eq.' +
     encodeURIComponent(String(patient?.id ?? '')));
   _docListe = await res.json();
+  await _chargerSignaturesDevis(patient);
   return _docListe;
 }
 function ouvrirDocumentsPatient(idx) {
@@ -33325,6 +33347,8 @@ function _htmlDocumentEmis(d) {
         '<input class="inp" type="date" id="doc-reglement-date" style="width:auto;" value="' + _escHtml(d.paiement_date || '') + '"/>' +
         '<button class="btn" style="' + _CSS_BTN + '" onclick="enregistrerReglementDocument(\'' + _escHtml(d.id) + '\')">' + (d.paiement_mode ? 'Modifier le règlement' : 'Enregistrer le règlement') + '</button></div></div>';
   } else {
+    h += _docSignatures[d.numero] ? _htmlBlocSignature(_docSignatures[d.numero])
+      : '<div style="margin-top:12px;font-size:12px;color:var(--mut);">Pas encore signé par le patient.</div>';
     h += '<div style="margin-top:12px;"><button class="btn btn-blue" style="' + _CSS_BTN + '" onclick="creerFactureDepuisDevis(\'' + _escHtml(d.id) + '\')">🧾 Créer la facture depuis ce devis</button></div>';
   }
   return h + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' +
@@ -33362,7 +33386,7 @@ function _htmlPageImpressionDocument(d) {
     'html,body{background:#fff;color:#111827;margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}' +
     '.card{border:none;background:#fff;padding:0!important;max-width:182mm;margin:0 auto}' +
     'table{border-collapse:collapse;width:100%}tr{page-break-inside:avoid}' +
-    '</style></head><body>' + _htmlCorpsDocument(d, false) + '</div></body></html>';
+    '</style></head><body>' + _htmlCorpsDocument(d, false) + (d.type === 'devis' ? _htmlBlocSignature(_docSignatures[d.numero]) : '') + '</div></body></html>';
 }
 function imprimerDocument(id) {
   const d = _docListe.find((x) => x.id === id && x.statut === 'emis');
@@ -33436,7 +33460,8 @@ function _htmlListeDocuments() {
     const regl = d.type !== 'facture' || d.statut !== 'emis' ? '' : (d.paiement_mode ? ' · réglée' : ' · non réglée');
     return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bord);">' +
       '<div style="font-size:13px;"><b>' + (d.type === 'devis' ? 'Devis' : 'Facture') + ' ' + _escHtml(d.numero || '(brouillon)') + '</b>' +
-        '<span style="color:var(--mut);"> · ' + _escHtml(_dateFr(d.date_document || d.created_at)) + regl + '</span></div>' +
+        '<span style="color:var(--mut);"> · ' + _escHtml(_dateFr(d.date_document || d.created_at)) + regl + '</span>' +
+        (d.type === 'devis' && d.statut === 'emis' && _docSignatures[d.numero] ? '<span style="color:var(--green,#15803d);font-weight:700;"> · ✍️ signé le ' + _escHtml(_dateFr(_docSignatures[d.numero].signe_at)) + '</span>' : '') + '</div>' +
       '<div style="white-space:nowrap;"><b>' + _eur(_netDocument(d)) + '</b>' + (d.tiers_payant ? ' <span style="font-size:11px;color:var(--mut);">(tiers payant)</span>' : '') + ' ' +
         '<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="ouvrirDocument(\'' + _escHtml(d.id) + '\')">' + (d.statut === 'emis' ? 'Voir' : 'Modifier') + '</button></div></div>';
   }).join('');
@@ -34402,6 +34427,25 @@ async function _notifChargerDocument(notifId, documentId) {
   const cible = document.getElementById('notif-doc-corps');
   if (cible && _notifDetailId === notifId) cible.innerHTML = html;
 }
+// Devis signé : la preuve (date, IP, empreinte, tracé) est relue dans la base à l'affichage, jamais copiée dans la notification.
+async function _notifChargerSignature(notifId, e) {
+  let html;
+  try {
+    const p = (Array.isArray(patients) ? patients : []).find((x) => x.id == (e.cible && e.cible.patientId));
+    if (!p || !p._cloudId) throw new Error('fiche');
+    const rd = await _docRequete('documents_facturation?select=numero&id=eq.' + encodeURIComponent(e.documentId));
+    const dl = await rd.json();
+    const numero = Array.isArray(dl) && dl[0] ? dl[0].numero : null;
+    if (!numero) throw new Error('devis');
+    const rs = await _docRequete('devis_signatures?select=document_id,numero,signe_at,ip,empreinte,trace,mineur,code_verifie&patient_id=eq.' + encodeURIComponent(p._cloudId) + '&numero=eq.' + encodeURIComponent(numero));
+    const sl = await rs.json();
+    html = Array.isArray(sl) && sl[0] ? _htmlBlocSignature(sl[0]) : '<div style="font-size:13px;color:var(--mut);margin-top:8px;">Signature introuvable.</div>';
+  } catch (_err) {
+    html = '<div style="font-size:13px;color:var(--red);margin-top:8px;">Preuve indisponible (hors connexion ?). Rien n\u2019a été modifié.</div>';
+  }
+  const cible = document.getElementById('notif-sig-corps');
+  if (cible && _notifDetailId === notifId) cible.innerHTML = html;
+}
 // Ressenti du patient : relu dans la base à l'affichage (jamais copié dans la notification), affiché en texte seulement.
 async function _notifChargerMot(notifId, e) {
   let texte, erreur = false;
@@ -34428,6 +34472,11 @@ function _notifHtmlDetail(e) {
     corps += e.documentId
       ? '<div id="notif-doc-corps" style="margin-top:10px;border:1px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;color:var(--mut);">Chargement du document…</div>'
       : '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Détail non conservé : cette notification a été créée avant cette version.</div>';
+  } else if (e.type === 'patient_devis_signe') {
+    corps += _notifLigneDetail('Devis', 'Le patient a signé un devis dans son application.');
+    corps += e.documentId
+      ? '<div id="notif-doc-corps" style="margin-top:10px;border:1px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;color:var(--mut);">Chargement du devis…</div><div id="notif-sig-corps"></div>'
+      : '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Détail non conservé.</div>';
   } else if (e.type === 'reseau_perdu') {
     corps += _notifLigneDetail('Retour du réseau', e.retourLe ? _escHtml(_notifDateHeure(e.retourLe)) : 'toujours hors connexion');
     const d = _notifDuree(e.date, e.retourLe);
@@ -34483,7 +34532,8 @@ function renderNotificationsPage() {
     if (e) {
       el.innerHTML = _notifHtmlDetail(e);
       _notifMajPastille();
-      if (e.documentId && (e.type === 'devis_emis' || e.type === 'facture_editee')) _notifChargerDocument(e.id, e.documentId);
+      if (e.documentId && (e.type === 'devis_emis' || e.type === 'facture_editee' || e.type === 'patient_devis_signe')) _notifChargerDocument(e.id, e.documentId);
+      if (e.documentId && e.type === 'patient_devis_signe') _notifChargerSignature(e.id, e);
       if (e.type === 'patient_ressenti' && e.seance) _notifChargerMot(e.id, e);
       return;
     }
@@ -37183,12 +37233,36 @@ async function _portailMessagesNonLus() {
     });
   } catch (_e) { /* silencieux */ }
 }
+// Signatures de devis par les patients : la liste vient du serveur (jamais pour un patient bloqué) ; on retrouve d'abord le devis réel
+// (source_ref de la copie partagée) AVANT de marquer « notifié », pour réessayer à la prochaine vérification si la lecture échoue.
+let _sigEnCours = false;
+async function _portailVerifierSignatures() {
+  if (_sigEnCours || globalThis._modeConsultation || typeof pwaUser === 'undefined' || !pwaUser) return;
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) return;
+  _sigEnCours = true;
+  try {
+    const l = await _portailRpc('devis_signatures_a_notifier', {});
+    for (const sg of Array.isArray(l) ? l : []) {
+      const p = (Array.isArray(patients) ? patients : []).find(function (x) { return x._cloudId === sg.patient_id; });
+      if (!p) continue; // fiche inconnue sur cet appareil : traitée depuis l'appareil qui la connaît
+      let src = null;
+      try {
+        const r = await authFetch(SUPA_URL + '/rest/v1/documents_partages?select=source_ref&id=eq.' + encodeURIComponent(sg.document_id));
+        const j = r.ok ? await r.json() : [];
+        src = Array.isArray(j) && j[0] ? j[0].source_ref : null;
+      } catch (_e) { src = null; }
+      if (!src) continue;
+      if ((await _portailRpc('devis_signature_notifie', { p_id: sg.id })) === true) notifierEvenement('patient_devis_signe', { patientId: p.id, documentId: src });
+    }
+  } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _sigEnCours = false; }
+}
 // Vérification toutes les 30 s tant que l'onglet est visible, et dès qu'on y revient (le patient écrit, le praticien est prévenu vite).
 function _portailVerifierNotifications() {
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
   if (typeof _portailVerifierFins === 'function') _portailVerifierFins(true);
   if (typeof _portailVerifierMots === 'function') _portailVerifierMots(true);
   if (typeof _portailVerifierMessages === 'function') _portailVerifierMessages();
+  if (typeof _portailVerifierSignatures === 'function') _portailVerifierSignatures();
 }
 setInterval(_portailVerifierNotifications, 30 * 1000);
 if (typeof document !== 'undefined' && document.addEventListener) {
@@ -37206,24 +37280,31 @@ async function _portailChargerDocs(idx) {
     const l = await res.json();
     const cible = document.getElementById('portail-docs');
     if (!cible) return;
-    cible.innerHTML = _portailHtmlDocs(idx, l);
+    const sigs = {};
+    try {
+      const rs = await authFetch(SUPA_URL + '/rest/v1/devis_signatures?select=document_id,signe_at&patient_id=eq.' + encodeURIComponent(p._cloudId));
+      if (rs.ok) for (const x of await rs.json()) sigs[x.document_id] = x.signe_at;
+    } catch (_e) { /* sans la preuve, la liste reste utilisable */ }
+    cible.innerHTML = _portailHtmlDocs(idx, l, sigs);
   } catch (_e) {
     const cible = document.getElementById('portail-docs');
     if (cible) cible.textContent = 'Liste indisponible pour le moment.';
   }
 }
-function _portailHtmlDocs(idx, l) {
+function _portailHtmlDocs(idx, l, sigs) {
+  sigs = sigs || {};
   if (!l.length) return '<div style="font-size:12px;color:var(--mut);">Aucun document partagé pour l\'instant. Les devis, factures et ordonnances apparaîtront ici dès leur création.</div>';
   return l.map(function (d) {
     return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bord);">' +
       '<div style="font-size:12px;' + (d.retire ? 'opacity:.55;' : '') + '">' + (_PORTAIL_ICONES[d.type] || '📄') + ' ' + _escHtml(d.titre) +
-      '<span style="color:var(--mut);"> · ' + (d.retire ? 'accès retiré' : d.lu_at ? 'lu' : 'pas encore lu') + '</span></div>' +
+      '<span style="color:var(--mut);"> · ' + (d.retire ? 'accès retiré' : d.lu_at ? 'lu' : 'pas encore lu') + '</span>' +
+      (sigs[d.id] ? '<span style="color:var(--green,#15803d);font-weight:700;"> · ✍️ signé le ' + _escHtml(_dateFr(sigs[d.id])) + '</span>' : '') + '</div>' +
       '<button class="btn" style="font-size:11px;padding:3px 8px;white-space:nowrap;" onclick="portailRetirerDocument(' + idx + ',\'' + _escHtml(d.id) + '\',' + (d.retire ? 'false' : 'true') + ')">' + (d.retire ? 'Remettre' : 'Retirer') + '</button></div>';
   }).join('');
 }
 async function portailRetirerDocument(idx, id, retirer) {
   if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
-  if (retirer && !confirm('Retirer l\'accès du patient à ce document ? Il ne le verra plus ; rien n\'est supprimé et vous pourrez le remettre.')) return;
+  if (retirer && !confirm('Retirer l\'accès du patient à ce document ? Il ne le verra plus (et ne pourra plus le signer s\'il ne l\'a pas signé) ; rien n\'est supprimé, la preuve d\'une signature reste conservée, et vous pourrez le remettre.')) return;
   try {
     await _portailRpc('documents_partages_retirer', { p_id: id, p_retire: !!retirer });
   } catch (_e) { alert('Action impossible, réessayez.'); }

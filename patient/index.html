@@ -114,6 +114,28 @@
         <h1 id="titre-document">Document</h1>
         <div id="zone-document" class="zone-document" aria-live="polite"></div>
         <p id="erreur-document" class="erreur" role="alert" hidden></p>
+        <!-- Signature du devis (visible seulement pour un devis du patient, jamais dans l'aperçu praticien) -->
+        <div id="zone-signature" class="zone-signature" hidden>
+          <p id="signature-statut" class="signature-statut" role="status"></p>
+          <button id="btn-signature-ouvrir" class="bouton" type="button" hidden>✍️ Lire et signer ce devis</button>
+          <div id="signature-panneau" hidden>
+            <p class="doux">Lisez le devis ci-dessus. Pour l’accepter, signez avec le doigt dans le cadre.</p>
+            <div id="signature-code-bloc" hidden>
+              <p class="doux">Pour une personne mineure, un code de confirmation est demandé.</p>
+              <p id="signature-code-essai" class="bandeau-essai" hidden></p>
+              <label for="signature-code">Code à 6 chiffres</label>
+              <input id="signature-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+              <button id="btn-signature-code" class="bouton bouton-clair" type="button">📨 Recevoir un code</button>
+            </div>
+            <label class="case-accord"><input id="signature-accord" type="checkbox" /> J’ai lu ce devis et je l’accepte.</label>
+            <canvas id="signature-canvas" class="signature-canvas" width="600" height="220" aria-label="Cadre de signature"></canvas>
+            <div class="signature-actions">
+              <button id="btn-signature-effacer" class="bouton bouton-clair" type="button">Effacer</button>
+              <button id="btn-signature-valider" class="bouton" type="button">✅ Signer le devis</button>
+            </div>
+          </div>
+          <p id="erreur-signature" class="erreur" role="alert" hidden></p>
+        </div>
         <button id="btn-document-imprimer" class="bouton" type="button" hidden>🖨️ Imprimer / enregistrer en PDF</button>
         <button id="btn-document-retour" class="bouton bouton-clair" type="button">← Mes documents</button>
       </section>
