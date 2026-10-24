@@ -130,6 +130,6 @@ describe('aperçu praticien — branchements', () => {
   });
   it('service workers incrémentés', () => {
     expect(lire('patient/sw.js')).toMatch(/verticy-patient-v18/);
-    expect(lire('service-worker.js')).toMatch(/biomeca-v250/);
+    expect(lire('service-worker.js')).toMatch(/biomeca-v251/);
   });
 });

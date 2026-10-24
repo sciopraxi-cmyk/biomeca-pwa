@@ -36739,6 +36739,42 @@ async function _portailHtmlRapport(module) {
   }
   return '';
 }
+// ── « Publié le … » / « Mis à jour depuis » à côté du bouton Publier ──
+function _portailEmpreinteRapport(html) {
+  // La date « Généré le … » change chaque jour sans que le bilan ait bougé : on l'ignore.
+  const t = String(html || '').replace(/Généré le [^<"]*/g, '').replace(/\s+/g, ' ');
+  let h = 5381;
+  for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0;
+  return t.length + ':' + h;
+}
+async function _portailMajEtatRapports() {
+  try {
+    const p = (typeof currentPatient !== 'undefined') ? currentPatient : null;
+    document.querySelectorAll('button[onclick^="portailPublierRapport("]').forEach(async function (b) {
+      const page = b.closest('.page');
+      if (!page || !page.classList.contains('active')) return;
+      const m = /portailPublierRapport\('([a-z]+)'\)/.exec(b.getAttribute('onclick') || '');
+      if (!m) return;
+      let el = b.parentNode.querySelector('[data-etat-publie="' + m[1] + '"]');
+      if (!el) {
+        el = document.createElement('span');
+        el.setAttribute('data-etat-publie', m[1]);
+        el.className = 'no-print';
+        el.style.cssText = 'font-size:11px;color:var(--mut);align-self:center;margin-right:6px;';
+        b.parentNode.insertBefore(el, b);
+      }
+      const pub = p && p.rapportsPublies && p.rapportsPublies[m[1]];
+      if (!pub) { el.textContent = ''; return; }
+      const brut = await _portailHtmlRapport(m[1]);
+      if (!brut) { el.textContent = 'Publié le ' + _dateFr(pub.date); return; }
+      const aJour = _portailEmpreinteRapport(brut) === pub.emp;
+      el.textContent = aJour ? 'Publié le ' + _dateFr(pub.date) + ' ✓ à jour' : 'Publié le ' + _dateFr(pub.date) + ' · mis à jour depuis';
+      el.style.color = aJour ? 'var(--mut)' : 'var(--encours-encre)';
+      el.style.fontWeight = aJour ? '400' : '700';
+    });
+  } catch (_e) { /* jamais bloquant */ }
+}
+setInterval(function () { if (!document.hidden) _portailMajEtatRapports(); }, 3000);
 async function portailPublierRapport(module) {
   const p = (typeof currentPatient !== 'undefined') ? currentPatient : null;
   if (!p) { alert('Aucun patient sélectionné.'); return; }
@@ -36765,6 +36801,14 @@ async function portailPublierRapport(module) {
       p_patient: p._cloudId, p_source_ref: ref, p_titre: label + ' du ' + _dateFr(jour), p_date: jour, p_chemin: chemin,
     });
     if (!id) { alert('Publication impossible : le patient n\'a pas d\'accès au portail.'); return; }
+    // Mémorise date + empreinte du rapport publié (petit objet dans la fiche, sans contenu) :
+    // sert à dire au praticien si la version publiée est dépassée.
+    try {
+      p.rapportsPublies = p.rapportsPublies || {};
+      p.rapportsPublies[module] = { date: jour, emp: _portailEmpreinteRapport(brut) };
+      if (typeof savePatients === 'function') savePatients();
+      _portailMajEtatRapports();
+    } catch (_e) { /* jamais bloquant */ }
     alert('✅ Rapport publié : ' + (p.prenom || 'le patient') + ' le trouvera dans « Mes documents ».');
   } catch (e) {
     console.warn('[portail documents] publication :', e && e.message);
