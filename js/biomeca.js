@@ -36388,7 +36388,7 @@ async function ouvrirPortailPatient(idx) {
   modal.id = 'portail-patient-modal';
   modal.className = 'page-claire';
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
-  modal.innerHTML = '<div style="background:var(--card);border-radius:12px;padding:22px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">Chargement…</div>';
+  modal.innerHTML = '<div style="background:var(--card);border-radius:12px;padding:22px;width:100%;max-width:min(960px,96vw);max-height:92vh;overflow-y:auto;">Chargement…</div>';
   document.body.appendChild(modal);
   if (typeof _horsConnexion === 'function' && _horsConnexion()) { _portailAfficher(idx, null, 'Cette fonction demande une connexion internet.'); return; }
   if (!p._cloudId) {
