@@ -26105,6 +26105,126 @@ function _progJourPied(n) {
   if (!Number.isInteger(n) || n < 1 || n > 55) return null;
   return n <= 28 ? n : 56 - n;
 }
+
+// ── Programme du pied : exercices jour par jour (lot e3b, 24/10/2026) ──
+// 28 jours de la fiche « Rééducation du pied » (4 exercices par jour, 1 seul le jour 7, 14, 21 et 28), sans dose :
+// les séries, répétitions et durées restent sur la fiche PDF et sur le portail patient (chrono EMOM 45/15).
+const _PIED_JOURS = [
+  ['sensitive-plantar-activation', 'elevation-talons', 'grasping-foot-towel', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'elevation-orteils', 'toes-spread-out-1', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'short-foot', 'monkey-walk', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'grasping-foot-towel', 'elevation-talons', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'toes-spread-out-1', 'elevation-orteils', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'short-foot', 'monkey-walk', 'plantar-massage-ball'],
+  ['plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'elevation-talons', 'grasping-foot-towel', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'elevation-orteils', 'toes-spread-out-1', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'short-foot', 'monkey-walk', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'grasping-foot-towel', 'elevation-talons', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'toes-spread-out-1', 'elevation-orteils', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'short-foot', 'monkey-walk', 'plantar-massage-ball'],
+  ['plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'elevation-talons', 'grasping-foot-towel', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'elevation-orteils', 'toes-spread-out-2', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'short-foot', 'monkey-walk', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'elevation-talons', 'walking-grasping-foot', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'elevation-orteils', 'toes-spread-out-2', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'short-foot', 'styles-walk-4', 'plantar-massage-ball'],
+  ['plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'elevation-talons', 'grasping-foot-towel', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'elevation-orteils', 'toes-spread-out-2', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'short-foot', 'monkey-walk', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'elevation-talons', 'walking-grasping-foot', 'plantar-massage-ball'],
+  ['sensitive-plantar-activation', 'elevation-orteils', 'toes-spread-out-2', 'plantar-automassage'],
+  ['sensitive-plantar-activation', 'short-foot', 'styles-walk-4', 'plantar-massage-ball'],
+  ['plantar-massage-ball']
+];
+// Exercices modifiés par le praticien : { '3': ['cle', …] } (seuls les jours différents de la fiche) ; gardés dans programmes.pied.modifs.
+var _progModifs = { sp: {}, po: {}, pd: {} };
+var _progPiedOuvert = { sp: false, po: false, pd: false };
+const _PIED_JOURS_SEM = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+function _piedLib(cle) {
+  const l = typeof EXERCICES_PIED_ENFANT !== 'undefined' ? EXERCICES_PIED_ENFANT : [];
+  for (let i = 0; i < l.length; i++) if (l[i][0] === cle) return l[i][1];
+  return cle;
+}
+function _progModifsNettoyer(m) {
+  const connus = {};
+  _PIED_JOURS.forEach((j) => j.forEach((c) => { connus[c] = true; }));
+  const out = {};
+  Object.keys(m || {}).forEach((k) => {
+    const n = +k;
+    if (!Number.isInteger(n) || n < 1 || n > 28 || !Array.isArray(m[k])) return;
+    const l = m[k].filter((c) => connus[c]).slice(0, 4);
+    if (JSON.stringify(l) !== JSON.stringify(_PIED_JOURS[n - 1])) out[n] = l;
+  });
+  return out;
+}
+// Exercices (clés) du jour 1-28 de la fiche, avec les changements du praticien.
+function _progExosJour(modifs, jourBase) {
+  const m = modifs && modifs[jourBase];
+  return Array.isArray(m) ? m : _PIED_JOURS[jourBase - 1] || [];
+}
+// Exercices du n-ième jour du programme (1-55, retour en sens inverse après le jour 28).
+function _progExosProgramme(p, n) {
+  const b = _progJourPied(n);
+  return b ? _progExosJour(p && p.pied && p.pied.modifs, b) : [];
+}
+function _progPiedChoisir(pref, jour, slot, val) {
+  const cur = _progExosJour(_progModifs[pref], jour).slice();
+  while (cur.length < 4) cur.push('');
+  cur[slot] = val;
+  const arr = cur.filter(Boolean);
+  const m = Object.assign({}, _progModifs[pref]);
+  if (JSON.stringify(arr) === JSON.stringify(_PIED_JOURS[jour - 1])) delete m[jour];
+  else m[jour] = arr;
+  _progModifs[pref] = m;
+  _progPiedRafraichir(pref);
+}
+function _progPiedRetablir(pref, jour) {
+  const m = Object.assign({}, _progModifs[pref]);
+  if (jour) delete m[jour];
+  else Object.keys(m).forEach((k) => delete m[k]);
+  _progModifs[pref] = m;
+  _progPiedRafraichir(pref);
+}
+function _progPiedRafraichir(pref) {
+  _progMaj(pref);
+  // Le menu modifié est remplacé par le nouveau tableau : on demande donc nous-mêmes la sauvegarde automatique.
+  const flavor = pref === 'sp' ? 'sport' : pref === 'po' ? 'posturo' : 'podopediatrie';
+  if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave(flavor);
+}
+function _progPiedTableauHTML(pref, p) {
+  const per = _progPeriodes(p).pied;
+  const n = per ? per[1] - per[0] + 1 : 28;
+  const modifs = _progModifs[pref] || {};
+  const nbModif = Object.keys(modifs).length;
+  const opts = (cur) => '<option value="">—</option>' + _PIED_JOURS_EXOS().map((c) => '<option value="' + c + '"' + (c === cur ? ' selected' : '') + '>' + _escHtml(_piedLib(c)) + '</option>').join('');
+  let h = '<details ' + (_progPiedOuvert[pref] ? 'open ' : '') + 'ontoggle="_progPiedOuvert[\'' + pref + '\']=this.open" style="margin:6px 0 0 22px;"><summary style="font-size:12px;color:#2a7a4e;font-weight:600;cursor:pointer;">📋 Exercices du pied jour par jour (' + n + ' jours)' + (nbModif ? ' — ✏️ ' + nbModif + ' jour' + (nbModif > 1 ? 's' : '') + ' modifié' + (nbModif > 1 ? 's' : '') : '') + '</summary>' +
+    '<div style="font-size:11px;color:#666;margin:4px 0;">Les doses ne figurent pas ici : elles sont sur la fiche et sur le portail du patient. Choisissez « — » pour retirer un exercice du jour.' +
+    (nbModif ? ' <a href="#" onclick="_progPiedRetablir(\'' + pref + '\');return false;" style="color:#b45309;">↺ Tout rétablir</a>' : '') + '</div>';
+  for (let i = 1; i <= n; i++) {
+    const base = _progJourPied(i);
+    const date = per ? _PIED_JOURS_SEM[new Date((per[0] + i - 1) * 86400000).getUTCDay()] + ' ' + _progFr(_progISO(per[0] + i - 1)).slice(0, 5) : '';
+    const modif = !!modifs[base];
+    h += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px solid #e5efe9;padding:4px 0;">' +
+      '<span style="font-size:11px;font-weight:600;color:#222;min-width:96px;">' + (date ? date + ' · ' : '') + 'Jour ' + i + (modif ? ' ✏️' : '') + '</span>';
+    if (i <= 28) {
+      const cur = _progExosJour(modifs, i);
+      for (let k = 0; k < 4; k++) h += '<select class="inp" style="font-size:10px;width:auto;max-width:150px;background:#fff;color:#222;" onchange="_progPiedChoisir(\'' + pref + '\',' + i + ',' + k + ',this.value)">' + opts(cur[k] || '') + '</select>';
+      if (modif) h += '<a href="#" onclick="_progPiedRetablir(\'' + pref + '\',' + i + ');return false;" style="font-size:10px;color:#b45309;">↺ rétablir</a>';
+    } else {
+      h += '<span style="font-size:10px;color:#666;">= exercices du jour ' + base + ' (retour en sens inverse) : ' + _escHtml(_progExosJour(modifs, base).map(_piedLib).join(' · ')) + '</span>';
+    }
+    h += '</div>';
+  }
+  return h + '</details>';
+}
+function _PIED_JOURS_EXOS() {
+  const vus = [];
+  _PIED_JOURS.forEach((j) => j.forEach((c) => { if (vus.indexOf(c) < 0) vus.push(c); }));
+  return vus;
+}
 // Périodes valides : le programme du pied est plafonné à 55 jours même si la fin choisie est plus tardive.
 function _progPeriodes(p) {
   const out = {};
@@ -26174,7 +26294,8 @@ function _progLignesRapport(p, jours) {
     const pp = _progPeriodes(p).pied;
     const apres = pp && pp[1] - pp[0] + 1 > 28 ? ' (au-delà du jour 28, les exercices reprennent en sens inverse)' : '';
     const fin = p.pied.debut && p.pied.fin && pp && _progISO(pp[1]) !== p.pied.fin ? ' (limité à 55 jours : fin le ' + _progFr(_progISO(pp[1])) + ')' : '';
-    l.push('Programme de renforcement des muscles profonds des pieds : ' + (per(p.pied) || 'dates à définir') + fin + apres);
+    const perso = p.pied.modifs && Object.keys(p.pied.modifs).length ? ' — programme personnalisé' : '';
+    l.push('Programme de renforcement des muscles profonds des pieds : ' + (per(p.pied) || 'dates à définir') + fin + apres + perso + ' — exercices détaillés sur le portail patient');
   }
   if (p && p.express && p.express.actif) l.push('Circuits Express 1 et 2 : ' + (per(p.express) || 'dates à définir'));
   if (p && p.chauffe && p.chauffe.actif) l.push('Circuit Échauffement : ' + (per(p.chauffe) || 'dates à définir'));
@@ -26204,7 +26325,10 @@ function _progLire(pref) {
   const ex = lire('express'), ch = lire('chauffe');
   ex.actif = circOn && ex.actif;
   ch.actif = circOn && ch.actif;
-  return { pied: lire('pied'), circuits: circOn, express: ex, chauffe: ch };
+  const pied = lire('pied');
+  const mod = _progModifsNettoyer(_progModifs[pref]);
+  if (Object.keys(mod).length) pied.modifs = mod;
+  return { pied, circuits: circOn, express: ex, chauffe: ch };
 }
 function _progEcrire(pref, p) {
   const q = p || {};
@@ -26216,6 +26340,7 @@ function _progEcrire(pref, p) {
     if (f) f.value = (v && v.fin) || '';
   };
   poser('pied', q.pied);
+  _progModifs[pref] = _progModifsNettoyer(q.pied && q.pied.modifs);
   poser('express', q.express);
   poser('chauffe', q.chauffe);
   const circ = _progChamp(pref, 'circ-on');
@@ -26228,6 +26353,8 @@ function _progMaj(pref) {
   const aff = (id, on) => { const e = document.getElementById(pref + '-prog-' + id); if (e) e.style.display = on ? '' : 'none'; };
   const circOn = !!(_progChamp(pref, 'circ-on') || {}).checked;
   aff('pied-dates', !!(_progChamp(pref, 'pied-on') || {}).checked);
+  const tab = document.getElementById(pref + '-prog-pied-tab');
+  if (tab) tab.innerHTML = p.pied.actif ? _progPiedTableauHTML(pref, p) : '';
   aff('circ-detail', circOn);
   aff('express-dates', circOn && !!(_progChamp(pref, 'express-on') || {}).checked);
   aff('chauffe-dates', circOn && !!(_progChamp(pref, 'chauffe-on') || {}).checked);
@@ -26280,7 +26407,7 @@ function _progHTML(pref) {
     '<div id="' + pref + '-prog-' + k + '-dates" style="display:none;margin:4px 0 0 22px;"><span style="font-size:11px;color:#555;">Début</span> <input class="inp" type="date" id="' + pref + '-prog-' + k + '-debut" style="width:auto;background:#fff;color:#222;" onchange="_progChangerDate(\'' + pref + '\',\'' + k + '\',\'debut\')"/> <span style="font-size:11px;color:#555;">Fin</span> <input class="inp" type="date" id="' + pref + '-prog-' + k + '-fin" style="width:auto;background:#fff;color:#222;" onchange="_progChangerDate(\'' + pref + '\',\'' + k + '\',\'fin\')"/></div>';
   return '<div style="margin:12px 0;background:#fff;border:1px solid #a9dfbf;border-radius:8px;padding:10px;"><div style="font-size:12px;color:#222;font-weight:600;margin-bottom:2px;">🏋️ Programme du patient</div>' +
     '<div style="font-size:11px;color:#666;">Par défaut : début le lendemain du bilan, 28 jours d\'exercices. Modifiable.</div>' +
-    ligne('pied', 'Programme de renforcement des muscles profonds des pieds') +
+    ligne('pied', 'Programme de renforcement des muscles profonds des pieds') + '<div id="' + pref + '-prog-pied-tab"></div>' +
     '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#222;font-weight:600;margin-top:8px;"><input type="checkbox" id="' + pref + '-prog-circ-on" onchange="_progChange(\'' + pref + '\',\'circ\')"/> Circuits d\'exercices</label>' +
     '<div id="' + pref + '-prog-circ-detail" style="display:none;margin-left:22px;">' +
     ligne('express', 'Circuits Express 1 et 2') + ligne('chauffe', 'Circuit Échauffement') + '</div>' +
