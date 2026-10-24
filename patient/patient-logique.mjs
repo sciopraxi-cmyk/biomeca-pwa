@@ -192,3 +192,25 @@ export function exerciceAffichable(catalogue, code) {
     texte: typeof e.texte === 'string' ? e.texte : '',
   };
 }
+
+/**
+ * Séances du programme absentes du jour affiché (ex. Express un samedi non coché) avec leur prochaine date.
+ * Renvoie [{ id, titre, date }] (date = null s'il n'y en a plus), dans l'ordre des séances du programme.
+ */
+export function seancesAbsentes(contenu, index) {
+  const jours = contenu && Array.isArray(contenu.jours) ? contenu.jours : [];
+  if (!jours[index]) return [];
+  const ordre = [];
+  for (const j of jours)
+    for (const s of j.seances || [])
+      if (!ordre.some((x) => x.id === s.id)) ordre.push({ id: s.id, titre: s.titre });
+  const presentes = new Set((jours[index].seances || []).map((s) => s.id));
+  return ordre
+    .filter((o) => !presentes.has(o.id))
+    .map((o) => {
+      const suivant = jours
+        .slice(index + 1)
+        .find((j) => (j.seances || []).some((s) => s.id === o.id));
+      return { id: o.id, titre: o.titre, date: suivant ? suivant.date : null };
+    });
+}

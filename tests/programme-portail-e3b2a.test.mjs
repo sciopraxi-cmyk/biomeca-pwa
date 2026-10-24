@@ -284,3 +284,28 @@ describe('modules cochés sans exercice', () => {
     ).toEqual([]);
   });
 });
+
+describe('séances absentes du jour affiché', async () => {
+  const L = await import('../patient/patient-logique.mjs');
+  const s = (id) => ({ id, titre: id });
+  const contenu = {
+    jours: [
+      { date: '2026-10-24', seances: [s('pied')] },
+      { date: '2026-10-25', seances: [s('pied')] },
+      { date: '2026-10-26', seances: [s('chauffe'), s('express1'), s('pied'), s('express2')] },
+      { date: '2026-10-27', seances: [s('pied')] },
+    ],
+  };
+  it('samedi : Échauffement et Express absents, prochaine date = lundi', () => {
+    expect(L.seancesAbsentes(contenu, 0).map((a) => [a.id, a.date])).toEqual([
+      ['chauffe', '2026-10-26'],
+      ['express1', '2026-10-26'],
+      ['express2', '2026-10-26'],
+    ]);
+  });
+  it("jour complet : rien d'absent ; après la dernière séance : date nulle", () => {
+    expect(L.seancesAbsentes(contenu, 2)).toEqual([]);
+    expect(L.seancesAbsentes(contenu, 3).map((a) => a.date)).toEqual([null, null, null]);
+    expect(L.seancesAbsentes(contenu, 9)).toEqual([]);
+  });
+});

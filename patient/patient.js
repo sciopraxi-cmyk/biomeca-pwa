@@ -15,6 +15,7 @@ import {
   motDePasseAcceptable,
   nombreNonLus,
   phraseChrono,
+  seancesAbsentes,
   phraseDocuments,
   reglesMotDePasse,
   salutation,
@@ -651,6 +652,15 @@ function afficherJour() {
           ? 'Votre programme est terminé : voici le dernier jour.'
           : ''
       : '';
+  const absentes = seancesAbsentes(c, jourCourant);
+  if (absentes.length) {
+    const phrases = absentes.map((a) =>
+      a.date
+        ? `${a.titre} : pas de séance ce jour, prochaine le ${dateLongue(a.date)}.`
+        : `${a.titre} : pas de séance ce jour.`
+    );
+    $('info-jour').textContent = [$('info-jour').textContent, ...phrases].filter(Boolean).join(' ');
+  }
   const zone = $('choix-seances');
   zone.textContent = '';
   seanceCourante = 0;
