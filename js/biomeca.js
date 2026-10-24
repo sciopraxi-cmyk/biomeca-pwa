@@ -6614,10 +6614,7 @@ function editPatient(idx) {
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
   modal.innerHTML = `
     <div style="background:var(--card);border-radius:12px;padding:24px;width:96%;max-width:960px;max-height:92vh;overflow-y:auto;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div style="font-weight:700;font-size:16px;color:var(--green);">✏️ Modifier le patient</div>
-        <button id="ep-fermer" onclick="document.getElementById('edit-patient-modal').remove()" aria-label="Fermer" title="Fermer" style="background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--red);font-weight:700;padding:2px 8px;">✕</button>
-      </div>
+      <div style="font-weight:700;font-size:16px;color:var(--green);margin-bottom:16px;">✏️ Modifier le patient</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">
         <!-- #223-C — ordre calé sur l'export Doctolib, champs propres à
              Verticy à la fin. Le motif a été retiré : il vit dans chaque
@@ -6662,6 +6659,17 @@ function editPatient(idx) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  // Croix rouge de fermeture, collée en haut à droite même quand la fenêtre défile (ajoutée ici : le modèle ci-dessus est figé par le test #268).
+  const croix = document.createElement('button');
+  croix.id = 'ep-fermer';
+  croix.type = 'button';
+  croix.textContent = '✕';
+  croix.title = 'Fermer';
+  croix.setAttribute('aria-label', 'Fermer');
+  croix.style.cssText = 'position:sticky;top:0;float:right;z-index:1;background:var(--card);border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--red);font-weight:700;padding:2px 8px;';
+  croix.addEventListener('click', function () { modal.remove(); });
+  const cadre = modal.firstElementChild;
+  if (cadre && typeof cadre.insertBefore === 'function') cadre.insertBefore(croix, cadre.firstChild); // garde : harnais de test sans DOM complet
 }
 
 function saveEditPatient(idx) {
