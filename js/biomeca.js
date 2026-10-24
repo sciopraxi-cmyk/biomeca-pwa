@@ -25913,6 +25913,8 @@ var _exoBibEnCours = false;
 const _EXO_PICTOS = {
   'systeme-visuel': '👁️', 'systeme-vestibulaire': '👂', 'systeme-somesthesique': '🤸', 'reeduc-pied': '🦶',
   'systeme-mandibulaire': '🦷', 'reeduc-terrain': '🏃', 'reeduc-chaines': '⛓️', 'reflexes-archaiques': '🧠',
+  'terrain-terrien': '🏃', 'terrain-aerien': '🏃', 'chaine-flexion': '⛓️', 'chaine-extension': '⛓️', 'chaine-fermeture': '⛓️',
+  'chaine-ouverture': '⛓️', 'chaine-statique-expiration': '⛓️', 'chaine-statique-inspiration': '⛓️',
   'respi-sport': '🌬️', 'reeduc-posturale': '🧍', 'reeduc-articulaire': '🦴', 'pathologies-genou': '🦵',
   'pathologies-hanche': '🦴', 'pathologies-pied': '🦶', 'respi-posture': '🌬️',
 };
@@ -25954,7 +25956,8 @@ function _exoBibConstruire(base, persoCats, perso) {
 // Podopédiatrie : catégories qui ne correspondent pas à ce bilan (décision du 23/10/2026). La respiration
 // « (posture) » reste proposée, la respiration « (sport) » est retirée. Les catégories ajoutées ensuite à la base
 // et les catégories personnelles du praticien restent proposées.
-const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'reeduc-chaines', 'reeduc-posturale', 'reeduc-articulaire', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
+// Terrain moteur et chaînes musculaires ont été découpés en 2 et 6 catégories (24/10/2026) : toutes restent exclues.
+const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-chaines', 'chaine-flexion', 'chaine-extension', 'chaine-fermeture', 'chaine-ouverture', 'chaine-statique-expiration', 'chaine-statique-inspiration', 'reeduc-posturale', 'reeduc-articulaire', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
 // Liste de secours (hors ligne) : exercices de la catégorie ; ceux du pied viennent de EXERCICES_PIED_ENFANT.
 function _exoSubsSecours(slug, cfg) {
   const l = cfg.subs.map(o => ({ value: o, label: o }));

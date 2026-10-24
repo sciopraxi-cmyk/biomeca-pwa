@@ -233,3 +233,35 @@ describe("catégorie « Rééducation du pied » : plus d'exercice « Rééducat
     );
   });
 });
+
+describe('catégories découpées (24/10/2026) : dessins et podopédiatrie', () => {
+  const NOUVELLES = [
+    'terrain-terrien',
+    'terrain-aerien',
+    'chaine-flexion',
+    'chaine-extension',
+    'chaine-fermeture',
+    'chaine-ouverture',
+    'chaine-statique-expiration',
+    'chaine-statique-inspiration',
+  ];
+  it('chaque nouvelle catégorie a son dessin et reste exclue de la podopédiatrie', () => {
+    const f = monter();
+    NOUVELLES.forEach((c) => {
+      expect(f._exoAvecPicto(c, 'Test')).toMatch(/^(🏃|⛓️) Test$/u);
+    });
+    const base = NOUVELLES.map((c, i) => ({
+      categorie_id: 'n' + i,
+      categorie_code: c,
+      categorie_libelle: c,
+      bilans: ['sport', 'posturo'],
+      exercice_id: 'e' + i,
+      exercice_code: 'x|' + i + '|' + c,
+      libelle: 'Exo ' + i,
+    }));
+    base.push({ ...BASE[0] });
+    f.charger(base, [], []);
+    expect(f._exoBibCats('podo').map((c) => c.value)).toEqual([BASE[0].categorie_code]);
+    expect(f._exoBibCats('sport').map((c) => c.value)).toEqual(expect.arrayContaining(NOUVELLES));
+  });
+});

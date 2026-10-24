@@ -699,6 +699,25 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   désactivée par SQL (jamais supprimée). La catégorie garde les 12 exercices du pied (`reeduc-pied|pied-enfant|…`,
   liste de secours = `_exoSubsSecours`). Le fichier PDF reste livré : il sert de source au tableau des 28 jours (e3b).
 
+## Réorganisation des catégories d'exercices (PR « categories-exercices-reorganisation »)
+
+- « Rééducation terrain moteur » est remplacée par `terrain-terrien` et `terrain-aerien` ; « Rééducation chaînes
+  musculaires » par `chaine-flexion`, `chaine-extension`, `chaine-fermeture`, `chaine-ouverture`,
+  `chaine-statique-expiration`, `chaine-statique-inspiration`. Les exercices changent de `categorie_id` par SQL (leur
+  `code` ne change pas, donc la valeur `sub` stockée dans les bilans est le code complet). Les anciennes catégories sont
+  masquées (`actif=false`), pas supprimées, seulement si elles sont vides. Dessins : `_EXO_PICTOS` ; podopédiatrie :
+  `_EXO_PODO_EXCLUES` (toutes les nouvelles catégories y sont exclues).
+- Réflexes archaïques : libellé « Exercice … (réflexe …) » ; « Exercice Palming oculaire » (ancienne faute
+  « palping » corrigée dans la base et dans la fiche PDF). Posturale : titres « Étirement patient antériorisé /
+  postériorisé / latéralisé - … ». Chaque UPDATE de libellé a la garde `libelle = ancien` : un libellé retouché à la
+  main n'est jamais écrasé.
+- 12 fiches PDF (titre + QR) pour les 12 exercices du pied : `assets/fiches/reeduc-pied/1.<k> <exercice>.pdf`,
+  rattachées par SQL (`pdf_fichier IS NULL` seulement). La fiche 28 jours d'origine reste le programme.
+- Les fiches « Stimulation réflexe » dont la 1re photo commençait au-dessus du 1er exercice (RPP, Moro, RTAC, agrippement
+  palmaire, traction des mains, Babkin, RTL) ont été régénérées : une bande grise de l'en-tête était visible.
+- Scripts : `documents/extraction-qr/` (`libelles.py`, `build_pdf.py`, `build_pdf2.py`, `gen_sql2.py`) ; SQL :
+  `documents/sql-reorganisation-categories-exercices.sql` (à coller APRÈS la fusion de cette PR).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
