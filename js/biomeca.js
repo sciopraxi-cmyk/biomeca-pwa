@@ -6613,9 +6613,9 @@ function editPatient(idx) {
   modal.className = 'page-claire'; // #268-L1 — portée claire sur la racine
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
   modal.innerHTML = `
-    <div style="background:var(--card);border-radius:12px;padding:24px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;">
+    <div style="background:var(--card);border-radius:12px;padding:24px;width:96%;max-width:960px;max-height:92vh;overflow-y:auto;">
       <div style="font-weight:700;font-size:16px;color:var(--green);margin-bottom:16px;">✏️ Modifier le patient</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">
         <!-- #223-C — ordre calé sur l'export Doctolib, champs propres à
              Verticy à la fin. Le motif a été retiré : il vit dans chaque
              bilan (p.motif existant conservé, plus éditable ici). -->
@@ -6659,6 +6659,17 @@ function editPatient(idx) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  // Croix rouge de fermeture, collée en haut à droite même quand la fenêtre défile (ajoutée ici : le modèle ci-dessus est figé par le test #268).
+  const croix = document.createElement('button');
+  croix.id = 'ep-fermer';
+  croix.type = 'button';
+  croix.textContent = '✕';
+  croix.title = 'Fermer';
+  croix.setAttribute('aria-label', 'Fermer');
+  croix.style.cssText = 'position:sticky;top:0;float:right;z-index:1;background:var(--card);border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--red);font-weight:700;padding:2px 8px;';
+  croix.addEventListener('click', function () { modal.remove(); });
+  const cadre = modal.firstElementChild;
+  if (cadre && typeof cadre.insertBefore === 'function') cadre.insertBefore(croix, cadre.firstChild); // garde : harnais de test sans DOM complet
 }
 
 function saveEditPatient(idx) {
@@ -36388,7 +36399,7 @@ async function ouvrirPortailPatient(idx) {
   modal.id = 'portail-patient-modal';
   modal.className = 'page-claire';
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
-  modal.innerHTML = '<div style="background:var(--card);border-radius:12px;padding:22px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">Chargement…</div>';
+  modal.innerHTML = '<div style="background:var(--card);border-radius:12px;padding:22px;width:100%;max-width:min(960px,96vw);max-height:92vh;overflow-y:auto;">Chargement…</div>';
   document.body.appendChild(modal);
   if (typeof _horsConnexion === 'function' && _horsConnexion()) { _portailAfficher(idx, null, 'Cette fonction demande une connexion internet.'); return; }
   if (!p._cloudId) {
