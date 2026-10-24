@@ -1508,3 +1508,7 @@ body.printing #rpt-print{display:block!important;}
 .pe-message{ font-size: 11px; font-weight: 600; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 5px 8px; margin-top: 6px; }
 .pe-message:empty{ display: none; }
 /* --- #273 CAPTURES À DROITE DU LECTEUR — FIN --- */
+
+/* Messagerie patient : bouton 💬 de la fiche + pastille de non-lus */
+.btn-msg-fiche { position: relative; background: var(--card); border: 1px solid var(--bord); color: var(--mut); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.btn-msg-fiche .msg-badge { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; line-height: 16px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; }

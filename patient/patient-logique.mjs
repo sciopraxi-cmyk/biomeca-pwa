@@ -384,3 +384,77 @@ export function exosTermines(plan, ecouleMs) {
   if (e.phase === 'prep') return 0;
   return e.phase === 'repos' ? e.exo + 1 : e.exo;
 }
+
+// ─── Messagerie patient ↔ praticien ───
+
+/** Longueur maximale d'un message (même valeur que le serveur). */
+export const MESSAGE_MAX = 1000;
+
+/** Compteur de saisie : caractères restants, dépassement, envoi possible. */
+export function compteurMessage(texte, max = MESSAGE_MAX) {
+  const t = String(texte ?? '').replace(/\r/g, '');
+  const n = [...t.trim()].length;
+  const restant = max - [...t].length;
+  return { restant, trop: restant < 0, vide: n === 0, envoyable: n > 0 && restant >= 0 };
+}
+
+/** Texte lisible pour une erreur de la messagerie (le serveur renvoie un code court dans `message`). */
+export function messageErreurMessagerie(statut, corps) {
+  const code = corps && typeof corps === 'object' ? String(corps.message || '') : '';
+  if (code === 'trop_de_messages')
+    return 'Vous avez beaucoup écrit : réessayez dans quelques minutes.';
+  if (code === 'messagerie_desactivee')
+    return 'La messagerie est fermée pour le moment. Contactez le cabinet par un autre moyen.';
+  if (code === 'texte_invalide') return `Écrivez un message de 1 à ${MESSAGE_MAX} caractères.`;
+  if (code === 'delai_depasse') return 'Ce message ne peut plus être modifié (5 minutes écoulées).';
+  if (code === 'trop_de_modifications') return 'Ce message a déjà été modifié plusieurs fois.';
+  if (statut === 0)
+    return 'Pas de réseau : votre message n’est pas parti. Il reste dans la zone de saisie, réessayez.';
+  if (statut >= 500) return 'Petit souci de notre côté. Réessayez dans un instant.';
+  return 'Impossible d’envoyer pour le moment. Réessayez.';
+}
+
+/** Phrase de la carte d'accueil. */
+export function phraseMessagerie(nonLus, ouverte = true) {
+  if (!ouverte) return 'Messagerie fermée pour le moment';
+  if (nonLus <= 0) return 'Écrire à votre praticien';
+  return nonLus === 1 ? '1 nouveau message' : `${nonLus} nouveaux messages`;
+}
+
+/** Secondes restantes → « 4:32 » (jamais négatif). */
+export function tempsRestantMessage(s) {
+  const v = Math.max(0, Math.floor(Number(s) || 0));
+  return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+}
+
+/** Horodatage d'une bulle : « 14:05 » le jour même, sinon « 22/10 14:05 » (heure locale). */
+export function heureMessage(iso, maintenant = new Date()) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  const h = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  const memeJour =
+    d.getFullYear() === maintenant.getFullYear() &&
+    d.getMonth() === maintenant.getMonth() &&
+    d.getDate() === maintenant.getDate();
+  return memeJour ? h : `${p(d.getDate())}/${p(d.getMonth() + 1)} ${h}`;
+}
+
+/**
+ * Prépare le fil pour l'affichage. `perspective` : 'patient' (le patient écrit ; JAMAIS d'état « Lu »)
+ * ou 'praticien' (aperçu : le praticien écrit en son nom et voit « Lu » sous ses messages).
+ */
+export function preparerFil(lignes, perspective) {
+  const moi = perspective === 'praticien' ? 'praticien' : 'patient';
+  return (Array.isArray(lignes) ? lignes : [])
+    .filter((m) => m && m.id && typeof m.texte === 'string')
+    .map((m) => ({
+      id: m.id,
+      texte: m.texte,
+      cree: m.created_at,
+      modifie: !!m.modifie_at,
+      miens: m.sens === moi,
+      resteS: m.sens === moi ? Math.max(0, Number(m.reste_s) || 0) : 0,
+      lu: moi === 'praticien' && m.sens === 'praticien' ? !!m.lu_at : null,
+    }));
+}

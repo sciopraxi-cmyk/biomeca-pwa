@@ -3,6 +3,12 @@
 // (RLS) ; la connexion passe par l'Edge Function patient-connexion (essais limités côté serveur).
 import {
   apercuDemande,
+  compteurMessage,
+  heureMessage,
+  messageErreurMessagerie,
+  phraseMessagerie,
+  preparerFil,
+  tempsRestantMessage,
   cheminFichierValide,
   cleExo,
   cleValidation,
@@ -73,10 +79,12 @@ const ECRANS = [
   'documents',
   'document',
   'exercices',
+  'messagerie',
 ];
 
 function montrer(nom) {
   if (nom !== 'exercices') reinitialiserChrono(null);
+  if (nom !== 'messagerie') arreterSondageMessagerie();
   for (const e of ECRANS) $('ecran-' + e).hidden = e !== nom;
   document
     .querySelector('.cadre')
@@ -204,6 +212,7 @@ async function ouvrirAccueil() {
   montrer('accueil');
   majPastilleDocuments();
   majCarteExercices();
+  majPastilleMessagerie();
 }
 
 async function ouvrirAccueilApercu() {
@@ -220,6 +229,10 @@ async function ouvrirAccueilApercu() {
   montrer('accueil');
   majPastilleDocuments();
   majCarteExercices();
+  if (ecranInitial === 'messagerie') {
+    ecranInitial = '';
+    ouvrirMessagerie();
+  }
 }
 
 async function seConnecter(ev) {
@@ -1286,6 +1299,249 @@ async function ouvrirExercices() {
   afficherJour();
 }
 
+// ─── Messagerie patient ↔ praticien ───
+// Fil unique, texte seul. Le patient ne voit JAMAIS « Lu » sur ses messages (le serveur ne le lui envoie pas).
+// Dans l'aperçu praticien (?apercu=<fiche>&ecran=messagerie), la même page sert au praticien : il écrit en son nom,
+// voit « Lu » sous ses messages, et les messages du patient sont marqués lus. Rien d'autre n'est enregistré dans l'aperçu.
+const PERSPECTIVE = APERCU ? 'praticien' : 'patient';
+let ecranInitial = new URLSearchParams(location.search).get('ecran') || ''; // aperçu praticien : ouvre la messagerie une seule fois
+let msgFil = [];
+let msgOuverte = true;
+let msgEdition = null; // identifiant du message en cours de modification
+let msgEnvoi = false;
+let msgTimer = null;
+let msgTicks = 0;
+let msgAutres = 0; // nombre de messages de l'autre côté déjà signalés « lus »
+let msgSignature = '';
+const msgEcheances = new Map(); // id → date limite locale de modification
+
+function appelMessagerie(action, args) {
+  const corps = { ...(args || {}) };
+  if (APERCU && action !== 'modifier') corps.p_patient = APERCU;
+  const nom = `messagerie_${action}_${APERCU ? 'praticien' : 'patient'}`;
+  return appelAuth('/rest/v1/rpc/' + nom, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps),
+  });
+}
+async function corpsJson(r) {
+  try {
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+async function majPastilleMessagerie() {
+  if (APERCU) return;
+  const r = await appelMessagerie('resume', {});
+  if (!r || !r.ok) return;
+  const l = await corpsJson(r);
+  const v = Array.isArray(l) && l.length ? l[0] : null;
+  if (!v) return;
+  const n = Number(v.non_lus) || 0;
+  const p = $('pastille-messagerie');
+  p.hidden = n === 0 || !v.ouverte;
+  p.textContent = String(n);
+  $('phrase-messagerie').textContent = phraseMessagerie(n, !!v.ouverte);
+}
+
+function arreterSondageMessagerie() {
+  if (msgTimer) clearInterval(msgTimer);
+  msgTimer = null;
+}
+
+function majCompteurMessage() {
+  const c = compteurMessage($('texte-message').value);
+  const el = $('compteur-message');
+  el.textContent = c.trop
+    ? `${-c.restant} caractère${-c.restant > 1 ? 's' : ''} en trop`
+    : `${c.restant} caractère${c.restant > 1 ? 's' : ''} restant${c.restant > 1 ? 's' : ''}`;
+  el.classList.toggle('depasse', c.trop);
+  $('btn-message-envoyer').disabled =
+    msgEnvoi || !c.envoyable || (msgEdition === null && !msgOuverte);
+}
+
+function finirEdition() {
+  msgEdition = null;
+  $('btn-message-envoyer').textContent = '✉️ Envoyer';
+  $('btn-message-annuler').hidden = true;
+}
+
+function afficherMessagerie(forcer) {
+  const fil = preparerFil(msgFil, PERSPECTIVE);
+  // Le temps restant n'entre pas dans la signature (il baisse à chaque rechargement) : seule sa présence compte.
+  const signature = JSON.stringify(fil.map((m) => ({ ...m, resteS: m.resteS > 0 }))) + msgOuverte;
+  if (!forcer && signature === msgSignature) return;
+  msgSignature = signature;
+  const zone = $('fil-messages');
+  const enBas = zone.scrollHeight - zone.scrollTop - zone.clientHeight < 40;
+  zone.textContent = '';
+  msgEcheances.clear();
+  for (const m of fil) {
+    const b = document.createElement('div');
+    b.className = 'bulle ' + (m.miens ? 'miens' : 'autre');
+    const t = document.createElement('p');
+    t.className = 'bulle-texte';
+    t.textContent = m.texte;
+    b.appendChild(t);
+    const info = document.createElement('div');
+    info.className = 'bulle-info';
+    const h = document.createElement('span');
+    h.textContent = heureMessage(m.cree) + (m.modifie ? ' · modifié' : '');
+    info.appendChild(h);
+    if (m.lu !== null) {
+      const lu = document.createElement('span');
+      lu.className = 'bulle-lu';
+      lu.textContent = m.lu ? '✓ Lu' : 'Non lu';
+      info.appendChild(lu);
+    }
+    if (m.miens && m.resteS > 0 && msgOuverte) {
+      msgEcheances.set(m.id, Date.now() + m.resteS * 1000);
+      const bt = document.createElement('button');
+      bt.type = 'button';
+      bt.className = 'bulle-modifier';
+      bt.dataset.id = m.id;
+      bt.textContent = `✏️ Modifier (${tempsRestantMessage(m.resteS)})`;
+      bt.addEventListener('click', () => commencerEdition(m.id, m.texte));
+      info.appendChild(bt);
+    }
+    b.appendChild(info);
+    zone.appendChild(b);
+  }
+  if (enBas || forcer) zone.scrollTop = zone.scrollHeight;
+  $('vide-messagerie').hidden = fil.length > 0;
+  $('ferme-messagerie').hidden = msgOuverte;
+  $('form-message').hidden = !msgOuverte;
+  majCompteurMessage();
+}
+
+function commencerEdition(id, texte) {
+  msgEdition = id;
+  $('texte-message').value = texte;
+  $('btn-message-envoyer').textContent = '💾 Enregistrer la modification';
+  $('btn-message-annuler').hidden = false;
+  afficherErreur('erreur-messagerie', '');
+  majCompteurMessage();
+  $('texte-message').focus();
+}
+
+// Compte à rebours des boutons « Modifier » (1 s) et rechargement du fil (15 s) tant que l'écran est ouvert.
+function tickMessagerie() {
+  msgTicks += 1;
+  const maintenant = Date.now();
+  for (const bt of document.querySelectorAll('.bulle-modifier')) {
+    const fin = msgEcheances.get(bt.dataset.id) || 0;
+    const reste = Math.ceil((fin - maintenant) / 1000);
+    if (reste <= 0) {
+      bt.remove();
+      msgEcheances.delete(bt.dataset.id);
+      if (msgEdition === bt.dataset.id) {
+        finirEdition();
+        $('texte-message').value = '';
+        afficherErreur(
+          'erreur-messagerie',
+          'Ce message ne peut plus être modifié (5 minutes écoulées).'
+        );
+        majCompteurMessage();
+      }
+    } else bt.textContent = `✏️ Modifier (${tempsRestantMessage(reste)})`;
+  }
+  if (msgTicks % 15 === 0 && document.visibilityState !== 'hidden') chargerMessagerie(false);
+}
+
+async function chargerMessagerie(forcer) {
+  const r = await appelMessagerie('lire', {});
+  if (!r || !r.ok) {
+    if (forcer) {
+      afficherErreur(
+        'erreur-messagerie',
+        r && r.status === 401
+          ? 'Votre session a expiré. Reconnectez-vous.'
+          : 'Impossible de charger vos messages. Vérifiez votre réseau puis réessayez.'
+      );
+    }
+    return;
+  }
+  const l = await corpsJson(r);
+  if (!Array.isArray(l)) return;
+  msgFil = l;
+  if (APERCU) msgOuverte = l.length ? l[0].ouverte !== false : msgOuverte;
+  else {
+    const r2 = await appelMessagerie('resume', {});
+    const v2 = r2 && r2.ok ? await corpsJson(r2) : null;
+    if (Array.isArray(v2) && v2.length) msgOuverte = !!v2[0].ouverte;
+  }
+  if (forcer) afficherErreur('erreur-messagerie', '');
+  afficherMessagerie(forcer);
+  const autres = msgFil.filter((m) => m.sens !== PERSPECTIVE).length;
+  if (autres > msgAutres || forcer) {
+    msgAutres = autres;
+    if (autres > 0) appelMessagerie('lu', {}); // marque lu ; la pastille se met à jour à l'accueil
+  }
+}
+
+async function ouvrirMessagerie() {
+  afficherErreur('erreur-messagerie', '');
+  msgFil = [];
+  msgSignature = '';
+  msgAutres = 0;
+  msgOuverte = true;
+  finirEdition();
+  $('texte-message').value = '';
+  if (APERCU) {
+    $('aide-messagerie').textContent =
+      'Vous écrivez ici au nom du cabinet. Le patient est prévenu par e-mail (sans le contenu de votre message).';
+    const bandeau = document.querySelector('.bandeau-apercu');
+    if (bandeau) {
+      bandeau.textContent =
+        '👁 Aperçu praticien — Messagerie : vos messages partent au nom du cabinet ; ceux du patient sont marqués lus.';
+    }
+  }
+  montrer('messagerie');
+  await chargerMessagerie(true);
+  arreterSondageMessagerie();
+  msgTicks = 0;
+  msgTimer = setInterval(tickMessagerie, 1000);
+  if (msgOuverte) $('texte-message').focus();
+}
+
+async function envoyerMessage(ev) {
+  ev.preventDefault();
+  if (msgEnvoi) return;
+  const c = compteurMessage($('texte-message').value);
+  if (!c.envoyable) return;
+  const texte = $('texte-message').value.replace(/\r/g, '').trim();
+  msgEnvoi = true;
+  majCompteurMessage();
+  afficherErreur('erreur-messagerie', '');
+  const edition = msgEdition;
+  const r = edition
+    ? await appelMessagerie('modifier', { p_id: edition, p_texte: texte })
+    : await appelMessagerie('envoyer', { p_texte: texte });
+  msgEnvoi = false;
+  if (!r || !r.ok) {
+    majCompteurMessage();
+    const corps = r ? await corpsJson(r) : null;
+    afficherErreur('erreur-messagerie', messageErreurMessagerie(r ? r.status : 0, corps));
+    if (corps && corps.message === 'delai_depasse') {
+      finirEdition();
+      $('texte-message').value = '';
+      majCompteurMessage();
+      chargerMessagerie(false);
+    }
+    return;
+  }
+  finirEdition();
+  $('texte-message').value = '';
+  await chargerMessagerie(true);
+  if (!edition && APERCU && window.opener) {
+    // Le praticien vient d'écrire : Verticy consigne l'e-mail d'avertissement (boîte d'essai, sans contenu).
+    window.opener.postMessage({ type: 'verticy-apercu-message-envoye' }, location.origin);
+  }
+}
+
 // ─── Démarrage ───
 $('form-connexion').addEventListener('submit', seConnecter);
 $('form-mdp').addEventListener('submit', choisirMotDePasse);
@@ -1293,6 +1549,22 @@ $('mdp1').addEventListener('input', majRegles);
 $('mdp2').addEventListener('input', majRegles);
 $('btn-deconnexion').addEventListener('click', deconnecter);
 $('carte-documents').addEventListener('click', ouvrirDocuments);
+$('carte-messagerie').addEventListener('click', ouvrirMessagerie);
+$('btn-messagerie-retour').addEventListener('click', ouvrirAccueil);
+$('form-message').addEventListener('submit', envoyerMessage);
+$('texte-message').addEventListener('input', majCompteurMessage);
+$('texte-message').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('form-message').requestSubmit();
+});
+$('btn-message-annuler').addEventListener('click', () => {
+  finirEdition();
+  $('texte-message').value = '';
+  majCompteurMessage();
+});
+setInterval(() => {
+  if (!APERCU && !$('ecran-accueil').hidden && document.visibilityState !== 'hidden')
+    majPastilleMessagerie();
+}, 30000);
 $('carte-exercices').addEventListener('click', ouvrirExercices);
 $('btn-exercices-retour').addEventListener('click', ouvrirAccueil);
 $('btn-chrono-demarrer').addEventListener('click', demarrerChrono);

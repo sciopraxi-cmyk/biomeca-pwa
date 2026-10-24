@@ -40,11 +40,19 @@ describe('fenêtre 🔑 : blocage des notifications', () => {
     const m = monter();
     await m.lire(p);
     expect(m.appels[0]).toContain('notifications_bloquees_at');
+    expect(m.appels[0]).toContain('messagerie_desactivee_at');
     const n = monter();
     n.cfg({ statuts: [400] });
     await n.lire(p);
     expect(n.appels.length).toBe(2);
-    expect(n.appels[1]).not.toContain('notifications_bloquees_at');
+    expect(n.appels[1]).toContain('notifications_bloquees_at'); // le SQL de la messagerie manque : on garde le blocage
+    expect(n.appels[1]).not.toContain('messagerie_desactivee_at');
+    const o = monter();
+    o.cfg({ statuts: [400, 400] });
+    await o.lire(p);
+    expect(o.appels.length).toBe(3);
+    expect(o.appels[2]).not.toContain('notifications_bloquees_at');
+    expect(o.appels[2]).not.toContain('messagerie_desactivee_at');
   });
   it('lecture : une vraie erreur serveur lève une exception', async () => {
     const m = monter();
