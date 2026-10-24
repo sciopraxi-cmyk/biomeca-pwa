@@ -26067,6 +26067,15 @@ function _progDefaut(dateBilanISO) {
   if (j === null) return { debut: '', fin: '' };
   return { debut: _progISO(j + 1), fin: _progISO(j + 28) };
 }
+// Programme du pied : il démarre toujours un lundi (les jours 7, 14, 21 et 28, à un seul exercice, tombent alors un
+// dimanche). Début proposé = prochain lundi STRICTEMENT après le bilan ; fin = début + 27 jours (un dimanche).
+function _progDefautPied(dateBilanISO) {
+  const j = _progJour(dateBilanISO);
+  if (j === null) return { debut: '', fin: '' };
+  let d = j + 1;
+  while ((d + 3) % 7 !== 0) d++; // jour 0 (01/01/1970) = jeudi
+  return { debut: _progISO(d), fin: _progISO(d + 27) };
+}
 const _PROG_LIBELLES = { chauffe: 'Échauffement', express1: 'Express 1', pied: 'programme du pied du jour', express2: 'Express 2' };
 // Programme du pied : jours 1 à 28 dans l'ordre, puis retour en sens inverse (jour 29 = exercices du jour 27,
 // jour 30 = jour 26, …) ; il s'arrête à 55 jours au plus (le jour 55 = exercices du jour 1). Renvoie le numéro (1-28) des exercices du n-ième jour.
@@ -26465,7 +26474,7 @@ function _progChange(pref, k) {
   const c = _progChamp(pref, k + '-on');
   if (c && c.checked && k !== 'circ') {
     const d = _progChamp(pref, k + '-debut'), f = _progChamp(pref, k + '-fin');
-    if (d && f && !d.value && !f.value) { const x = _progDefaut(_progDateBilan(pref)); d.value = x.debut; f.value = x.fin; }
+    if (d && f && !d.value && !f.value) { const x = (k === 'pied' ? _progDefautPied : _progDefaut)(_progDateBilan(pref)); d.value = x.debut; f.value = x.fin; }
   }
   _progMaj(pref);
 }

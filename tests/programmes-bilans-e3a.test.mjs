@@ -15,11 +15,12 @@ function monter() {
     fonction('_progISO'),
     fonction('_progFr'),
     fonction('_progDefaut'),
+    fonction('_progDefautPied'),
     fonction('_progPeriodes'),
     fonction('_progSeances'),
     fonction('_progTexteSeances'),
     fonction('_progLignesRapport'),
-    'return { _progJourPied, _progDefaut, _progSeances, _progTexteSeances, _progLignesRapport };',
+    'return { _progJourPied, _progDefaut, _progDefautPied, _progSeances, _progTexteSeances, _progLignesRapport };',
   ].join('\n');
   // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
   return new Function(corps)();
@@ -32,6 +33,21 @@ describe('programme du patient', () => {
     expect(f._progDefaut('2026-10-23')).toEqual({ debut: '2026-10-24', fin: '2026-11-20' });
     expect(f._progDefaut('2026-12-31')).toEqual({ debut: '2027-01-01', fin: '2027-01-28' });
     expect(f._progDefaut('')).toEqual({ debut: '', fin: '' });
+  });
+
+  it('programme du pied : début = prochain lundi strictement après le bilan, fin = dimanche +27 jours', () => {
+    // samedi 24/10/2026 → lundi 26/10 ; dimanche 25/10 → lundi 26/10 ; lundi 26/10 → lundi 02/11
+    expect(f._progDefautPied('2026-10-24')).toEqual({ debut: '2026-10-26', fin: '2026-11-22' });
+    expect(f._progDefautPied('2026-10-25').debut).toBe('2026-10-26');
+    expect(f._progDefautPied('2026-10-26').debut).toBe('2026-11-02');
+    expect(f._progDefautPied('2026-10-27').debut).toBe('2026-11-02');
+    expect(f._progDefautPied('2026-12-31')).toEqual({ debut: '2027-01-04', fin: '2027-01-31' });
+    expect(f._progDefautPied('')).toEqual({ debut: '', fin: '' });
+    for (const d of ['2026-10-24', '2027-02-28', '2028-02-27']) {
+      const x = f._progDefautPied(d);
+      expect(new Date(x.debut + 'T12:00Z').getUTCDay()).toBe(1);
+      expect(new Date(x.fin + 'T12:00Z').getUTCDay()).toBe(0);
+    }
   });
   it('Express + programme du pied, même période : 3 séances', () => {
     const s = f._progSeances({
