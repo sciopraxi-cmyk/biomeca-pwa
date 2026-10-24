@@ -743,6 +743,32 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
   (860 px) ne sont pas concernés : ils sont faits pour l'impression. Nouvelle page de bilan = ajouter son id à cette règle.
 - Contrôle : mêmes largeurs à 1440 / 1280 / 1024 / 768 px, pas de défilement horizontal (script ad hoc Playwright).
 
+## Programme d'exercices sur le portail patient (lot e3b-2a, PR « portail-programme-e3b2a »)
+
+- **Copie figée par patient** : table `programmes_patient` (une ligne par patient, le nouveau programme remplace l'ancien), écrite
+  uniquement par la fonction `programme_patient_deposer` (SECURITY DEFINER : praticien propriétaire de la fiche, patient avec compte
+  portail, sinon rien n'est copié). L'application envoie des CODES d'exercices ; le serveur ajoute noms, liens vidéo, fiche PDF et
+  texte d'après la bibliothèque. Le praticien ne lit jamais les liens (RLS inchangée) et aucun lien n'est envoyé par le client.
+- Le patient lit sa copie seulement (RLS `portail_patient_actuel()`) et une fiche PDF du bucket privé `exercices-pdf` seulement si elle
+  figure dans SA copie (`portail_peut_lire_pdf_programme`). Aucun accès à `exercices_base`. Le praticien lit les copies de ses patients
+  (aperçu 🔑, vidéos comprises, pour les montrer en consultation).
+- Construction pure côté application : `_progPortailConstruire(flavor, bilanData)` (`flavor` = sport / posturo / podopediatrie ; 3 formats
+  de circuits ramenés à une forme unique par `_progCircuitsDe`). Séance = `{id, titre, chrono, exos:[[code,…]]}` (1 à 3 sous-exercices
+  simultanés, exercice libre = `libre:<hachage>` sans vidéo) ; ordre Échauffement, Express 1, pied du jour, Express 2 ; jours cochés pris en
+  compte. Une séance sans exercice choisi n'est PAS publiée : `_progPortailManques` alimente l'avertissement de la fenêtre 🔑.
+- Publication : à chaque sauvegarde de bilan (`_lancerSauvegardeAutomatique` → `_portailProgrammeAuto`, différée 2,5 s, jamais bloquante,
+  sans nouveau dépôt si le contenu est identique). La fenêtre 🔑 ne publie QUE s'il n'y a aucun programme (jamais d'écrasement) ; le
+  bouton « Republier » force la publication du bilan qui a le plus de séances. Un vieux bilan sport avec le seul programme du pied ne doit
+  jamais masquer un bilan podopédiatrie complet.
+- Page patient `/patient/` : écran « Mes exercices » (jour d'aujourd'hui, flèches, choix de la séance de départ, vidéos par le lecteur
+  `youtube-nocookie` seulement, fiche PDF sur la même page, séances absentes du jour expliquées avec leur prochaine date). CSP : ajout
+  de `frame-src 'self' blob: https://www.youtube-nocookie.com` seulement. Tout lien ou chemin est validé dans `patient-logique.mjs`
+  (`urlLecteurVideo`, `pdfPublic`, `pdfPrive`) ; un lien non reconnu est ignoré. Service worker du portail : `verticy-patient-v6`.
+- Pièges : « je ne vois que le pied » = Express/Échauffement non cochés ce jour de la semaine (jours des circuits) ; tester aussi les
+  autres jours avec les flèches. Le service worker garde l'ancienne version tant qu'un autre onglet Verticy est ouvert.
+- Preuve : `supabase/tests/portail-programme-patient.test.sql` (banc jetable, prélude `prelude-programme-patient.sql`, finit `TOUT_OK`),
+  `tests/programme-portail-e3b2a.test.mjs`. Reste (e3b-2b) : chrono avec pause, validation des séances, « Bravo », notification.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
