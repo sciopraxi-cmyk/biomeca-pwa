@@ -769,3 +769,8 @@ input:focus-visible,
     justify-content: flex-start;
   }
 }
+
+/* Un bouton marqué « caché » doit vraiment disparaître (la règle .bouton { display: block } l'écrasait) */
+.bouton[hidden] {
+  display: none;
+}

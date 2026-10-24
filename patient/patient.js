@@ -1005,7 +1005,7 @@ async function validerSeanceAuto() {
   $('chrono-etat').textContent = '🎉 Séance terminée ! Validation…';
   const ok = await validerSeance();
   $('chrono-etat').textContent = ok
-    ? '🎉 Séance terminée et validée ✅'
+    ? '🎉 Séance terminée et validée ✅ (un mot ? en bas de page)'
     : '🎉 Séance terminée ! La validation n’a pas pu partir : utilisez le bouton en bas de page.';
 }
 
@@ -1045,13 +1045,28 @@ function afficherValidation() {
   const saisie = $('validation-saisie');
   saisie.hidden = true;
   if (v) {
-    const com = v.commentaire ? ` Votre mot : « ${v.commentaire} »` : '';
-    $('validation-etat').textContent = '✅ Séance validée.' + com;
+    if (jour.date === auj && !APERCU) {
+      // Séance validée aujourd'hui : le patient peut écrire (ou corriger) son mot jusqu'à minuit.
+      $('validation-etat').textContent =
+        '✅ Séance validée. Vous pouvez laisser un mot à votre praticien.';
+      saisie.hidden = false;
+      $('btn-valider-seance').hidden = true;
+      $('btn-envoyer-mot').hidden = false;
+      $('btn-envoyer-mot').disabled = false;
+      $('btn-envoyer-mot').textContent = v.commentaire
+        ? '✉️ Modifier mon mot'
+        : '✉️ Envoyer mon mot';
+      $('validation-commentaire').value = v.commentaire || '';
+    } else {
+      const com = v.commentaire ? ` Mot du patient : « ${v.commentaire} »` : '';
+      $('validation-etat').textContent = '✅ Séance validée.' + com;
+    }
   } else if (jour.date === auj && !APERCU) {
     $('validation-etat').textContent =
       'La séance se valide toute seule quand tous ses exercices sont validés (chrono jusqu’au bout, ou « J’ai fait cet exercice sans chrono »).';
     saisie.hidden = false;
     $('validation-commentaire').value = '';
+    $('btn-envoyer-mot').hidden = true;
     $('btn-valider-seance').disabled = false;
     $('btn-valider-seance').hidden = !seanceComplete(); // secours : tout est validé mais l'envoi de la séance a échoué
   } else if (jour.date >= auj) {
@@ -1081,6 +1096,35 @@ function majPastilles() {
     b.textContent = `${faite ? '✓ ' : ''}${i + 1}. ${s.titre}`;
   });
 }
+async function envoyerMot() {
+  const jour = programme.contenu.jours[jourCourant];
+  const seance = jour.seances[seanceCourante];
+  const bouton = $('btn-envoyer-mot');
+  const mot = $('validation-commentaire').value.trim();
+  bouton.disabled = true;
+  afficherErreur('erreur-validation', '');
+  const r = await appelAuth('/rest/v1/rpc/programme_seance_commenter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_jour: jour.date, p_seance: seance.id, p_commentaire: mot || null }),
+  });
+  if (!r || !r.ok) {
+    bouton.disabled = false;
+    return afficherErreur(
+      'erreur-validation',
+      !r
+        ? 'Pas de réseau : votre mot n’est pas parti. Réessayez dans un instant.'
+        : 'Impossible d’envoyer votre mot pour le moment. Réessayez.'
+    );
+  }
+  const v = validations.get(cleValidation(jour.date, seance.id));
+  if (v) v.commentaire = mot || null;
+  afficherValidation();
+  $('validation-etat').textContent = mot
+    ? '✅ Séance validée. Votre mot est envoyé à votre praticien ✉️'
+    : '✅ Séance validée. Votre mot a été retiré.';
+}
+
 async function validerSeance() {
   const jour = programme.contenu.jours[jourCourant];
   const seance = jour.seances[seanceCourante];
@@ -1265,6 +1309,7 @@ $('chk-son').addEventListener('change', (e) => {
   if (e.target.checked) preparerAudio();
 });
 $('btn-valider-seance').addEventListener('click', validerSeance);
+$('btn-envoyer-mot').addEventListener('click', envoyerMot);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && chrono.etat === 'marche') {
     garderEcranAllume();
