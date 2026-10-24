@@ -120,3 +120,75 @@ export function apercuDemande(recherche) {
     ? v.toLowerCase()
     : null;
 }
+
+// ─── Programme d'exercices (lot e3b-2a) ───
+
+/** Identifiant YouTube (11 caractères) d'un lien youtu.be / watch / embed / shorts ; null sinon. */
+export function videoYoutubeId(url) {
+  const m = String(url || '').match(
+    /^https:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
+  );
+  return m ? m[1] : null;
+}
+
+/** Adresse du lecteur sans cookie (la seule adresse externe admise par la CSP) ; null si lien non reconnu. */
+export function urlLecteurVideo(url) {
+  const id = videoYoutubeId(url);
+  return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0` : null;
+}
+
+/** Fiche PDF livrée avec l'application : adresse relative sûre (jamais un chemin libre) ; null sinon. */
+export function pdfPublic(chemin) {
+  const c = String(chemin || '');
+  if (!/^assets\/fiches\/[a-z0-9-]+\/[^/\\]+\.pdf$/.test(c) || c.includes('..')) return null;
+  return '../' + c.split('/').map(encodeURIComponent).join('/');
+}
+
+/** Fiche PDF du stockage privé (bucket exercices-pdf) : chemin attendu ; null sinon. */
+export function pdfPrive(chemin) {
+  const c = String(chemin || '');
+  if (c.length > 200 || c.includes('..') || c.startsWith('/') || !/\.pdf$/.test(c)) return null;
+  return /^base\/[0-9a-f-]{36}\.pdf$/.test(c) || /^[0-9a-f-]{36}\/[^/\\]+\.pdf$/.test(c) ? c : null;
+}
+
+/**
+ * Jour du programme à montrer : celui d'aujourd'hui ; avant le début = le premier jour, après la fin = le
+ * dernier ; un jour sans séance entre deux jours = le prochain. Renvoie { index, etat } (etat : 'avant' | 'jour' | 'apres')
+ * ou null si le programme est vide.
+ */
+export function jourProgramme(contenu, aujourdhui) {
+  const j = contenu && Array.isArray(contenu.jours) ? contenu.jours : [];
+  if (!j.length) return null;
+  if (aujourdhui < j[0].date) return { index: 0, etat: 'avant' };
+  if (aujourdhui > j[j.length - 1].date) return { index: j.length - 1, etat: 'apres' };
+  const i = j.findIndex((x) => x.date >= aujourdhui);
+  return { index: i, etat: 'jour' };
+}
+
+/** « Jour 3 sur 28 » : le rang du programme du pied quand il existe, sinon la position dans la liste. */
+export function libelleJour(contenu, index) {
+  const j = contenu.jours[index];
+  const total = Math.max(...contenu.jours.map((x, i) => x.rang || i + 1));
+  return `Jour ${j.rang || index + 1} sur ${total}`;
+}
+
+/** Phrase du chrono d'une séance (affichage seul dans ce lot). */
+export function phraseChrono(c) {
+  if (!c) return '';
+  if (c.type === 'tabata') return `${c.travail} s d’effort, ${c.repos} s de repos`;
+  return `1 exercice par minute : ${c.travail} s d’effort, ${c.repos} s de repos`;
+}
+
+/** Exercice du catalogue sûr à afficher : nom, vidéos reconnues, fiche PDF, texte. */
+export function exerciceAffichable(catalogue, code) {
+  const e = catalogue && catalogue[code];
+  if (!e || typeof e.nom !== 'string') return null;
+  const videos = (Array.isArray(e.liens) ? e.liens : []).map(urlLecteurVideo).filter(Boolean);
+  return {
+    nom: e.nom,
+    videos,
+    pdfPublic: pdfPublic(e.pdf),
+    pdfPrive: pdfPublic(e.pdf) ? null : pdfPrive(e.pdf),
+    texte: typeof e.texte === 'string' ? e.texte : '',
+  };
+}

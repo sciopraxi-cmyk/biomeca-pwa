@@ -26245,6 +26245,98 @@ function _progSeances(p, jours) {
   }
   return tr.map((t) => ({ debut: _progISO(t.debut), fin: _progISO(t.fin), groupes: t.groupes }));
 }
+// ── Programme sur le portail patient (lot e3b-2a) : construction PURE de la copie envoyée au serveur ──
+// Le serveur ajoute lui-même vidéos, fiches PDF et textes d'après les CODES envoyés (le praticien ne lit jamais
+// les liens de la bibliothèque). Une séance = { id, titre, chrono, exos: [[code, …], …] } (1 à 3 sous-exercices
+// simultanés par exercice) ; un jour = { date, rang (jour du programme du pied), seances }.
+const _PROG_TITRES_PORTAIL = { chauffe: 'Échauffement', express1: 'Express 1', pied: 'Programme du pied', express2: 'Express 2' };
+function _progHashTexte(t) {
+  let h = 5381;
+  const x = String(t || '');
+  for (let i = 0; i < x.length; i++) h = ((h * 33) ^ x.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+// Codes d'un exercice de circuit (1 à 3 sous-exercices) ; l'exercice libre devient un exercice sans vidéo.
+function _progExoCodes(ex) {
+  const codes = [], noms = {};
+  if (!ex) return { codes, noms };
+  const sys = ex.sys || [], sub = ex.sub || [];
+  for (let i = 0; i < sys.length && codes.length < 3; i++) {
+    const s = sys[i], b = sub[i];
+    if (!s || !b) continue;
+    const code = /^perso:/.test(b) ? b : s + '|' + b;
+    codes.push(code);
+    noms[code] = String((ex.subLib || [])[i] || b).slice(0, 200);
+  }
+  const libre = String(ex.libre || '').trim();
+  if (libre && codes.length < 3) {
+    const code = 'libre:' + _progHashTexte(libre);
+    codes.push(code);
+    noms[code] = libre.slice(0, 200);
+  }
+  return { codes, noms };
+}
+// Circuits d'un bilan (3 formats : sport ttt.c1/c2, posturo circ_c?_ex?_*, podopédiatrie circuitsPodo).
+function _progCircuitsDe(flavor, d) {
+  d = d || {};
+  if (flavor === 'podopediatrie') {
+    const c = d.circuitsPodo || {};
+    return { c1: c.c1 || [], c2: c.c2 || [], ratio: c.ratio || ((c.ch || []).find((e) => e && e.ratio) || {}).ratio || '30/30' };
+  }
+  if (flavor === 'posturo') {
+    const lire = (cx) => [1, 2, 3, 4].map((i) => {
+      const k = 'circ_' + cx + '_ex' + i;
+      return { sys: d[k + '_sys'] || [], sub: d[k + '_sub'] || [], sysLib: d[k + '_sysLib'] || [], subLib: d[k + '_subLib'] || [], libre: d[k] || '' };
+    });
+    return { c1: lire('c1'), c2: lire('c2'), ratio: d.circ_ch_ratio || '30/30' };
+  }
+  const t = d.ttt || {};
+  return { c1: t.c1 || [], c2: t.c2 || [], ratio: ((t.ch || []).find((e) => e && e.ratio) || {}).ratio || '30/30' };
+}
+function _progChronoPortail(id, ratio) {
+  if (id === 'express1' || id === 'express2') return { type: 'tabata', travail: 20, repos: 10 };
+  if (id === 'pied') return { type: 'emom', travail: 45, repos: 15 };
+  return ratio === '45/15' ? { type: 'emom', travail: 45, repos: 15 } : { type: 'emom', travail: 30, repos: 30 };
+}
+// Renvoie null s'il n'y a rien à publier (aucun programme actif) ; sinon { debut, fin, jours, noms }.
+function _progPortailConstruire(flavor, d) {
+  d = d || {};
+  const prog = flavor === 'sport' ? (d.ttt || {}).programmes : d.programmes;
+  const joursC = flavor === 'sport' ? (d.ttt || {}).jours : d.joursCircuits;
+  const per = _progPeriodes(prog);
+  const cles = Object.keys(per);
+  if (!cles.length) return null;
+  const jEx = (joursC && Array.isArray(joursC.express) && joursC.express) || [];
+  const jCh = (joursC && Array.isArray(joursC.chauffe) && joursC.chauffe) || [];
+  const circ = _progCircuitsDe(flavor, d);
+  const noms = {};
+  const liste = (arr) => arr.map((ex) => { const r = _progExoCodes(ex); Object.assign(noms, r.noms); return r.codes; }).filter((l) => l.length);
+  const ex1 = liste(circ.c1.slice(0, 4)), ex2 = liste(circ.c2.slice(0, 4)), ech = liste(circ.c1.slice(0, 4).concat(circ.c2.slice(0, 4)));
+  const debut = Math.min.apply(null, cles.map((k) => per[k][0]));
+  const fin = Math.max.apply(null, cles.map((k) => per[k][1]));
+  const actif = (k, j) => per[k] && per[k][0] <= j && per[k][1] >= j;
+  const jours = [];
+  for (let j = debut; j <= fin; j++) {
+    const w = ((j + 3) % 7) + 1; // 1 = lundi … 7 = dimanche
+    const seances = [];
+    const ajoute = (id, exos) => { if (exos.length) seances.push({ id, titre: _PROG_TITRES_PORTAIL[id], chrono: _progChronoPortail(id, circ.ratio), exos }); };
+    let rang = null;
+    if (actif('chauffe', j) && (!jCh.length || jCh.includes(w))) ajoute('chauffe', ech);
+    if (actif('express', j) && (!jEx.length || jEx.includes(w))) ajoute('express1', ex1);
+    if (actif('pied', j)) {
+      rang = j - per.pied[0] + 1;
+      ajoute('pied', _progExosProgramme(prog, rang).map((cle) => {
+        const code = 'reeduc-pied|pied-enfant|' + cle;
+        noms[code] = _piedLib(cle);
+        return [code];
+      }));
+    }
+    if (actif('express', j) && (!jEx.length || jEx.includes(w))) ajoute('express2', ex2);
+    if (seances.length) jours.push(Object.assign({ date: _progISO(j) }, rang ? { rang } : {}, { seances }));
+  }
+  if (!jours.length) return null;
+  return { debut: jours[0].date, fin: jours[jours.length - 1].date, jours, noms };
+}
 function _progTexteSeances(p, jours) {
   const nb = (n) => (n === 1 ? '1 séance' : n + ' séances');
   return _progSeances(p, jours).map((t) => {
@@ -31861,6 +31953,8 @@ let _bilanAutosaveTimer = null;
 let _bilanAutosaveFlavor = null;
 function _lancerSauvegardeAutomatique(flavor) {
   if (globalThis?._modeConsultation) return; // mode consultation : aucune écriture
+  // Programme d'exercices : copie envoyée au portail du patient (différée, jamais bloquante).
+  if (typeof _portailProgrammeAuto === 'function') _portailProgrammeAuto(flavor);
   if (flavor === 'sport' && typeof saveBilanSilent === 'function') return saveBilanSilent();
   else if (flavor === 'posturo' && typeof savePosturoBilan === 'function') return savePosturoBilan(true);
   else if (flavor === 'pedicurie' && typeof savePedicurieBilan === 'function') return savePedicurieBilan(true);
@@ -36189,10 +36283,11 @@ function _portailAfficher(idx, compte, message) {
         ? '<button class="btn" onclick="portailAction(' + idx + ',\'reactiver\')">Rouvrir l\'accès</button>'
         : '<button class="btn" onclick="portailAction(' + idx + ',\'suspendre\')">Fermer l\'accès</button>') +
       '</div>' +
+      '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Programme d\'exercices</div><div id="portail-programme" style="font-size:12px;color:var(--mut);"></div></div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Documents visibles par le patient</div><div id="portail-docs"></div></div>';
   }
   cadre.innerHTML = html;
-  if (compte) _portailChargerDocs(idx);
+  if (compte) { _portailChargerProgramme(idx); _portailChargerDocs(idx); }
 }
 function _portailSecretDdnAffiche(p) {
   return _portailSecretDdn(p) || '—';
@@ -36417,6 +36512,31 @@ function _portailPartagerAuto(genre, p, objet) {
     tache.catch(function (e) { console.warn('[portail documents] partage différé :', e && e.message); });
   } catch (_e) { /* jamais bloquant */ }
 }
+// ── Programme d'exercices sur le portail (lot e3b-2a) : publication automatique, jamais bloquante ──
+const _portailProgrammeMemo = new Map();
+const _PORTAIL_DONNEES_BILAN = { sport: 'bilanData', posturo: 'bilanDataPosturo', podopediatrie: 'bilanDataPodopediatrie' };
+// Construit la copie du programme d'un bilan et la dépose (le serveur ajoute les vidéos). null = rien à publier.
+async function _portailPublierProgramme(p, flavor, force) {
+  if (!_PORTAIL_DONNEES_BILAN[flavor] || !_portailPartagePossible(p) || !(await _portailAvecCompte(p))) return null;
+  const prog = _progPortailConstruire(flavor, p[_PORTAIL_DONNEES_BILAN[flavor]]);
+  if (!prog) return null;
+  const empreinte = JSON.stringify(prog);
+  if (!force && _portailProgrammeMemo.get(p._cloudId) === empreinte) return null;
+  const at = await _portailRpc('programme_patient_deposer', { p_patient: p._cloudId, p_programme: prog });
+  if (at) _portailProgrammeMemo.set(p._cloudId, empreinte);
+  return at || null;
+}
+let _portailProgrammeTimer = null;
+function _portailProgrammeAuto(flavor) {
+  try {
+    clearTimeout(_portailProgrammeTimer);
+    _portailProgrammeTimer = setTimeout(function () {
+      const p = (typeof currentPatient !== 'undefined') ? currentPatient : null;
+      if (!p) return;
+      _portailPublierProgramme(p, flavor).catch(function (e) { console.warn('[portail programme] publication différée :', e && e.message); });
+    }, 2500);
+  } catch (_e) { /* jamais bloquant */ }
+}
 // Rattrapage : partage ce qui ne l'est pas encore (devis/factures émis et ordonnances du dossier).
 const _portailRattrapes = new Set();
 async function _portailRattrapage(p) {
@@ -36538,6 +36658,33 @@ async function portailApercu(idx) {
   }
 }
 // ── Fenêtre 🔑 : liste des documents partagés, retrait / remise ──
+// Bilan dont on publie le programme (le premier qui en a un) ; null s'il n'y en a aucun.
+function _portailFlavorProgramme(p) {
+  const l = ['sport', 'podopediatrie', 'posturo'];
+  for (let i = 0; i < l.length; i++) if (_progPortailConstruire(l[i], p[_PORTAIL_DONNEES_BILAN[l[i]]])) return l[i];
+  return null;
+}
+// Ligne d'état du programme dans la fenêtre 🔑 + rattrapage (publication si un bilan en contient un et qu'il n'est pas encore copié).
+async function _portailChargerProgramme(idx) {
+  const p = patients[idx];
+  const zone = document.getElementById('portail-programme');
+  if (!p || !p._cloudId || !zone) return;
+  const flavor = _portailFlavorProgramme(p);
+  try {
+    if (flavor) await _portailPublierProgramme(p, flavor);
+    const res = await authFetch(SUPA_URL + '/rest/v1/programmes_patient?select=publie_at&patient_id=eq.' + encodeURIComponent(p._cloudId));
+    if (!res.ok) throw new Error('lecture ' + res.status);
+    const l = await res.json();
+    const cible = document.getElementById('portail-programme');
+    if (!cible) return;
+    cible.textContent = l.length
+      ? '✅ Programme publié le ' + new Date(l[0].publie_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) + ', mis à jour à chaque enregistrement du bilan. Visible dans « Mes exercices » (vidéos comprises dans l\'aperçu ci-dessus).'
+      : flavor ? 'Programme prêt, publication en cours…' : 'Aucun programme : cochez « programme du pied » ou « circuits » dans la partie Traitement d\'un bilan.';
+  } catch (_e) {
+    const cible = document.getElementById('portail-programme');
+    if (cible) cible.textContent = 'État du programme indisponible pour le moment.';
+  }
+}
 async function _portailChargerDocs(idx) {
   const p = patients[idx];
   const zone = document.getElementById('portail-docs');

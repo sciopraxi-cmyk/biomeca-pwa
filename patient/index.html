@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://tzivizoacdyopwfzerrb.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://tzivizoacdyopwfzerrb.supabase.co; worker-src 'self'; manifest-src 'self'; frame-src 'self' blob: https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; form-action 'none'"
     />
     <meta name="theme-color" content="#0b1e3d" />
     <meta name="robots" content="noindex, nofollow" />
@@ -76,10 +76,10 @@
         <h1 id="salut">Bonjour 👋</h1>
         <p id="cabinet" class="doux"></p>
         <div class="cartes">
-          <div class="carte carte-bientot">
+          <button id="carte-exercices" class="carte carte-bouton" type="button">
             <span class="emoji">🏃</span>
-            <span><strong>Mes exercices</strong><small>Bientôt disponible</small></span>
-          </div>
+            <span><strong>Mes exercices</strong><small id="phrase-exercices">Votre programme du jour</small></span>
+          </button>
           <button id="carte-documents" class="carte carte-bouton" type="button">
             <span class="emoji">🧾</span>
             <span><strong>Mes documents</strong><small id="phrase-documents">Devis, factures, ordonnances, bilans</small></span>
@@ -111,6 +111,29 @@
         <p id="erreur-document" class="erreur" role="alert" hidden></p>
         <button id="btn-document-imprimer" class="bouton" type="button" hidden>🖨️ Imprimer / enregistrer en PDF</button>
         <button id="btn-document-retour" class="bouton bouton-clair" type="button">← Mes documents</button>
+      </section>
+
+      <!-- Écran 7 : programme d'exercices -->
+      <section id="ecran-exercices" class="ecran" hidden>
+        <h1>🏃 Mes exercices</h1>
+        <p id="vide-exercices" class="doux" hidden>Votre programme n’est pas encore prêt. Il apparaîtra ici après votre rendez-vous ✨</p>
+        <p id="erreur-exercices" class="erreur" role="alert" hidden></p>
+        <div id="zone-exercices" hidden>
+          <div class="nav-jour">
+            <button id="btn-jour-prec" class="bouton bouton-clair" type="button" aria-label="Jour précédent">←</button>
+            <div class="jour-titre">
+              <strong id="titre-jour">Jour 1</strong>
+              <small id="date-jour"></small>
+            </div>
+            <button id="btn-jour-suiv" class="bouton bouton-clair" type="button" aria-label="Jour suivant">→</button>
+          </div>
+          <p id="info-jour" class="doux petit"></p>
+          <p id="aide-seances" class="doux petit" hidden>Plusieurs séances aujourd’hui : commencez par celle que vous voulez.</p>
+          <div id="choix-seances" class="choix-seances" role="tablist"></div>
+          <p id="phrase-chrono" class="doux petit"></p>
+          <div id="liste-exercices"></div>
+        </div>
+        <button id="btn-exercices-retour" class="bouton bouton-clair" type="button">← Retour</button>
       </section>
 
       <!-- Écran 4 : accès fermé / en attente -->

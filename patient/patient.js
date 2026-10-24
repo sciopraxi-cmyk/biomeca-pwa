@@ -5,12 +5,16 @@ import {
   apercuDemande,
   cheminFichierValide,
   dateCourte,
+  exerciceAffichable,
   formaterIdentifiant,
   grouperDocuments,
   identifiantComplet,
+  jourProgramme,
+  libelleJour,
   messageErreur,
   motDePasseAcceptable,
   nombreNonLus,
+  phraseChrono,
   phraseDocuments,
   reglesMotDePasse,
   salutation,
@@ -47,11 +51,22 @@ function demanderJetonApercu() {
     window.opener.postMessage({ type: 'verticy-apercu-demande' }, location.origin);
   });
 }
-const ECRANS = ['chargement', 'connexion', 'mdp', 'accueil', 'ferme', 'documents', 'document'];
+const ECRANS = [
+  'chargement',
+  'connexion',
+  'mdp',
+  'accueil',
+  'ferme',
+  'documents',
+  'document',
+  'exercices',
+];
 
 function montrer(nom) {
   for (const e of ECRANS) $('ecran-' + e).hidden = e !== nom;
-  document.querySelector('.cadre').classList.toggle('large', nom === 'document');
+  document
+    .querySelector('.cadre')
+    .classList.toggle('large', nom === 'document' || nom === 'exercices');
   const premier = { connexion: 'identifiant', mdp: 'mdp1' }[nom];
   if (premier) $(premier).focus();
 }
@@ -174,6 +189,7 @@ async function ouvrirAccueil() {
   $('cabinet').textContent = moi.cabinet ? `Votre praticien : ${moi.cabinet}` : '';
   montrer('accueil');
   majPastilleDocuments();
+  majCarteExercices();
 }
 
 async function ouvrirAccueilApercu() {
@@ -189,6 +205,7 @@ async function ouvrirAccueilApercu() {
   $('btn-deconnexion').style.display = 'none';
   montrer('accueil');
   majPastilleDocuments();
+  majCarteExercices();
 }
 
 async function seConnecter(ev) {
@@ -467,6 +484,214 @@ function imprimerDocument() {
   }
 }
 
+// ─── Mes exercices : programme du patient (lot e3b-2a, lecture seule) ───
+let programme = null; // { contenu, publie_at } ou null
+let jourCourant = 0;
+let seanceCourante = 0;
+
+const MOIS_COURTS = [
+  'janv.',
+  'févr.',
+  'mars',
+  'avr.',
+  'mai',
+  'juin',
+  'juil.',
+  'août',
+  'sept.',
+  'oct.',
+  'nov.',
+  'déc.',
+];
+const JOURS_NOMS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+function dateLongue(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return `${JOURS_NOMS[d.getUTCDay()]} ${+m[3]} ${MOIS_COURTS[+m[2] - 1]} ${m[1]}`;
+}
+function aujourdhuiISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+async function chargerProgramme() {
+  const r = await appelAuth(
+    '/rest/v1/programmes_patient?select=contenu,publie_at' +
+      (APERCU ? '&patient_id=eq.' + APERCU : '')
+  );
+  if (!r || !r.ok) return undefined; // erreur réseau
+  try {
+    const l = await r.json();
+    return Array.isArray(l) && l.length ? l[0] : null;
+  } catch {
+    return undefined;
+  }
+}
+
+async function majCarteExercices() {
+  const p = await chargerProgramme();
+  if (p === undefined) return;
+  programme = p;
+  $('phrase-exercices').textContent =
+    p && p.contenu && p.contenu.jours && p.contenu.jours.length
+      ? 'Votre programme du jour'
+      : 'Programme bientôt disponible';
+}
+
+function elt(tag, classe, texte) {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texte !== undefined) e.textContent = texte;
+  return e;
+}
+
+// Fiche PDF : sur la même page, dans un cadre sous l'exercice (fiche livrée avec l'application ou fiche privée lue
+// avec la session ; jamais un chemin libre : tout est contrôlé dans patient-logique.mjs).
+function boutonFiche(ex) {
+  const zone = elt('div', 'zone-fiche');
+  const b = elt('button', 'btn-fiche', '📄 Fiche PDF (avec QR)');
+  b.type = 'button';
+  let cadre = null;
+  b.addEventListener('click', async () => {
+    if (cadre) {
+      cadre.remove();
+      cadre = null;
+      b.textContent = '📄 Fiche PDF (avec QR)';
+      return;
+    }
+    cadre = document.createElement('iframe');
+    cadre.className = 'cadre-fiche';
+    cadre.setAttribute('title', 'Fiche : ' + ex.nom);
+    if (ex.pdfPublic) {
+      cadre.src = ex.pdfPublic;
+    } else {
+      b.disabled = true;
+      const r = await appelAuth(
+        '/storage/v1/object/authenticated/exercices-pdf/' + ex.pdfPrive + '?v=' + nonce(),
+        { cache: 'no-store' }
+      );
+      b.disabled = false;
+      if (!r || !r.ok) {
+        cadre = null;
+        return afficherErreur('erreur-exercices', 'Impossible d’ouvrir la fiche. Réessayez.');
+      }
+      cadre.src = URL.createObjectURL(
+        new Blob([await r.arrayBuffer()], { type: 'application/pdf' })
+      );
+    }
+    zone.appendChild(cadre);
+    b.textContent = '✖ Fermer la fiche';
+  });
+  zone.appendChild(b);
+  if (ex.pdfPublic) {
+    const a = elt('a', 'btn-fiche', '↗ Ouvrir dans un nouvel onglet');
+    a.href = ex.pdfPublic;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    zone.appendChild(a);
+  }
+  return zone;
+}
+
+function blocSousExercice(ex) {
+  const bloc = elt('div', 'sous-exercice');
+  bloc.appendChild(elt('h3', '', ex.nom));
+  for (const url of ex.videos) {
+    const f = document.createElement('iframe');
+    f.className = 'video';
+    f.src = url;
+    f.setAttribute('title', 'Vidéo : ' + ex.nom);
+    f.setAttribute('loading', 'lazy');
+    f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    f.setAttribute('allow', 'accelerometer; encrypted-media; gyroscope; picture-in-picture');
+    f.setAttribute('allowfullscreen', '');
+    bloc.appendChild(f);
+  }
+  if (ex.texte) bloc.appendChild(elt('p', 'texte-exercice', ex.texte));
+  if (ex.pdfPublic || ex.pdfPrive) bloc.appendChild(boutonFiche(ex));
+  return bloc;
+}
+
+function afficherSeance() {
+  const c = programme.contenu;
+  const seance = c.jours[jourCourant].seances[seanceCourante];
+  $('phrase-chrono').textContent = seance.chrono
+    ? 'Chrono : ' + phraseChrono(seance.chrono) + '.'
+    : '';
+  const liste = $('liste-exercices');
+  liste.textContent = '';
+  seance.exos.forEach((codes, i) => {
+    const carte = elt('section', 'exercice');
+    carte.appendChild(elt('h2', '', `Exercice ${i + 1}`));
+    for (const code of codes) {
+      const ex = exerciceAffichable(c.catalogue, code);
+      if (ex) carte.appendChild(blocSousExercice(ex));
+    }
+    liste.appendChild(carte);
+  });
+  document.querySelectorAll('.pastille-seance').forEach((b, i) => {
+    b.setAttribute('aria-selected', String(i === seanceCourante));
+  });
+}
+
+function afficherJour() {
+  const c = programme.contenu;
+  const jour = c.jours[jourCourant];
+  $('titre-jour').textContent = libelleJour(c, jourCourant);
+  $('date-jour').textContent = dateLongue(jour.date);
+  $('btn-jour-prec').disabled = jourCourant <= 0;
+  $('btn-jour-suiv').disabled = jourCourant >= c.jours.length - 1;
+  const etat = jourProgramme(c, aujourdhuiISO());
+  $('info-jour').textContent =
+    jourCourant === etat.index
+      ? etat.etat === 'avant'
+        ? 'Votre programme commencera bientôt.'
+        : etat.etat === 'apres'
+          ? 'Votre programme est terminé : voici le dernier jour.'
+          : ''
+      : '';
+  const zone = $('choix-seances');
+  zone.textContent = '';
+  seanceCourante = 0;
+  jour.seances.forEach((s, i) => {
+    const b = elt('button', 'pastille-seance', `${i + 1}. ${s.titre}`);
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.addEventListener('click', () => {
+      seanceCourante = i;
+      afficherSeance();
+    });
+    zone.appendChild(b);
+  });
+  $('aide-seances').hidden = jour.seances.length < 2;
+  zone.hidden = jour.seances.length < 2;
+  afficherSeance();
+}
+
+async function ouvrirExercices() {
+  afficherErreur('erreur-exercices', '');
+  $('zone-exercices').hidden = true;
+  $('vide-exercices').hidden = true;
+  montrer('exercices');
+  const p = await chargerProgramme();
+  if (p === undefined && !programme) {
+    return afficherErreur(
+      'erreur-exercices',
+      'Impossible de charger votre programme. Vérifiez votre réseau puis réessayez.'
+    );
+  }
+  if (p !== undefined) programme = p;
+  const c = programme && programme.contenu;
+  if (!c || !Array.isArray(c.jours) || !c.jours.length) {
+    $('vide-exercices').hidden = false;
+    return;
+  }
+  jourCourant = jourProgramme(c, aujourdhuiISO()).index;
+  $('zone-exercices').hidden = false;
+  afficherJour();
+}
+
 // ─── Démarrage ───
 $('form-connexion').addEventListener('submit', seConnecter);
 $('form-mdp').addEventListener('submit', choisirMotDePasse);
@@ -474,6 +699,20 @@ $('mdp1').addEventListener('input', majRegles);
 $('mdp2').addEventListener('input', majRegles);
 $('btn-deconnexion').addEventListener('click', deconnecter);
 $('carte-documents').addEventListener('click', ouvrirDocuments);
+$('carte-exercices').addEventListener('click', ouvrirExercices);
+$('btn-exercices-retour').addEventListener('click', ouvrirAccueil);
+$('btn-jour-prec').addEventListener('click', () => {
+  if (jourCourant > 0) {
+    jourCourant -= 1;
+    afficherJour();
+  }
+});
+$('btn-jour-suiv').addEventListener('click', () => {
+  if (programme && jourCourant < programme.contenu.jours.length - 1) {
+    jourCourant += 1;
+    afficherJour();
+  }
+});
 $('btn-documents-retour').addEventListener('click', ouvrirAccueil);
 $('btn-document-retour').addEventListener('click', () => {
   afficherListeDocuments();
