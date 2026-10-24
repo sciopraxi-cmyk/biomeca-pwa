@@ -393,6 +393,14 @@ body{font-family:var(--f);background:var(--bg);color:var(--txt);font-size:14px;}
 .page{visibility:hidden;height:0;overflow:hidden;pointer-events:none;position:absolute;width:100%;}
 .page.active{visibility:visible;height:auto;overflow:visible;pointer-events:auto;position:relative;}
 
+/* Largeur commune des 4 bilans (sport, posturo, pédicurie, podopédiatrie) : 1100 px au plus, centrée, toute la largeur
+   en dessous (tablette) ; décidé par Joël le 24/10/2026. Le gabarit posturo n'a pas de marge latérale : on la lui donne. */
+#pg-bilan > div:first-child,
+#pg-bilan-posturo > div:first-child,
+#pg-pedicurie > div:first-child,
+#pg-podopediatrie > div:first-child { max-width:1100px !important; width:100%; box-sizing:border-box; margin-left:auto !important; margin-right:auto !important; }
+#pg-bilan-posturo > div:first-child { padding-left:20px !important; padding-right:20px !important; }
+
 /* HOME */
 .home-hdr{padding:20px 20px 12px;border-bottom:1px solid var(--bord);}
 .home-hdr h1{font-size:19px;font-weight:600;margin-bottom:3px;}
