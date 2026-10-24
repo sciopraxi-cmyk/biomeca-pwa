@@ -741,3 +741,31 @@ input:focus-visible,
     font-size: 14px;
   }
 }
+
+/* Case « Son » : une vraie petite case, jamais le grand champ de saisie (règle générale `input`) */
+.case-son {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  cursor: pointer;
+}
+.case-son input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
+  accent-color: var(--marine);
+}
+.bloc-chrono:not(.dans-carte) .case-son {
+  display: flex;
+  justify-content: center;
+}
+@media (min-width: 700px) {
+  .bloc-chrono.dans-carte .case-son {
+    flex: 0 0 100%;
+    justify-content: flex-start;
+  }
+}

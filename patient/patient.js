@@ -919,10 +919,10 @@ function majBadgesExos() {
     const badge = carte.querySelector('.badge-valide');
     if (badge) {
       badge.hidden = !ok && !essai;
-      badge.textContent = ok ? '✓ Validé' : '✓ Fait (essai)';
+      badge.textContent = ok ? '✓ Validé' : APERCU ? '✓ Fait (aperçu)' : '✓ Fait (essai)';
     }
     const bt = carte.querySelector('.btn-sans-chrono');
-    if (bt) bt.hidden = ok || essai || APERCU || !(auj || jour.date > aujourdhuiISO());
+    if (bt) bt.hidden = ok || essai || !(auj || APERCU || jour.date > aujourdhuiISO());
   });
 }
 async function envoyerExo(jour, seance, exo) {
@@ -939,10 +939,11 @@ async function envoyerExo(jour, seance, exo) {
 }
 const exosEssai = new Set(); // jour hors aujourd'hui : « Fait (essai) » à l'écran seulement, rien n'est enregistré
 function validerExo(i) {
-  if (APERCU || !programme) return;
+  if (!programme) return;
   const { jour, seance } = jourSeanceCourants();
   const cle = cleExo(jour.date, seance.id, i);
-  if (jour.date !== aujourdhuiISO()) {
+  // Aperçu praticien ou jour d'essai : on montre le résultat à l'écran, SANS rien enregistrer.
+  if (APERCU || jour.date !== aujourdhuiISO()) {
     // Jour d'essai (ex. programme qui commence lundi, testé samedi) : visible à l'écran, jamais enregistré.
     exosEssai.add(cle);
     majBadgesExos();
@@ -979,8 +980,12 @@ function validerExosTermines() {
   }
 }
 async function validerSeanceAuto() {
-  if (APERCU || !programme) return;
+  if (!programme) return;
   const { jour, seance } = jourSeanceCourants();
+  if (APERCU) {
+    $('chrono-etat').textContent = '🎉 Séance terminée ! (Aperçu : rien n’est enregistré.)';
+    return;
+  }
   if (jour.date !== aujourdhuiISO()) {
     $('chrono-etat').textContent =
       '🎉 Séance terminée ! (Essai : ce n’est pas le jour de cette séance, rien n’est enregistré.)';
