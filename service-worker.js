@@ -10,7 +10,7 @@
 // 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
 // clients sur du code de mois précédents). Toute évolution ultérieure du code
 // applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
-const CACHE_VERSION = 'biomeca-v247';
+const CACHE_VERSION = 'biomeca-v250';
 const CACHE_PREFIX  = 'biomeca-';
 
 // #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur
@@ -46,6 +46,7 @@ const PRECACHE_URLS = [
   './assets/bilans/illus-sport.jpg',
   './assets/bilans/illus-pedicurie.jpg',
   './assets/bilans/illus-podopediatrie.jpg',
+  './assets/bilans/illus-osteopathie.jpg',
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/apple-touch-icon.png',

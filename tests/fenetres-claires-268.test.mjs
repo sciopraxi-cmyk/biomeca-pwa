@@ -80,13 +80,13 @@ describe('#268 lot --mut — texte secondaire lisible en clair', () => {
     expect(f).toContain('font-size:9px;color:var(--mut);font-family:var(--fm);');
   });
 
-  it('M4. --dim ne reste QUE sur les trois boutons désactivés', () => {
+  it('M4. --dim ne reste QUE sur les quatre boutons désactivés', () => {
     // Un composant inactif n'est pas soumis au contraste (WCAG 1.4.3) :
     // --dim reste leur couleur, et seulement la leur.
     expect(HTML_ENTIER).not.toContain('var(--dim)');
     const js = lire('js/biomeca.js');
     const usages = js.split('\n').filter((l) => l.includes('var(--dim)'));
-    expect(usages).toHaveLength(3);
+    expect(usages).toHaveLength(4); // 3 modules + « Bientôt disponible » (Ostéopathie)
     for (const l of usages) expect(l).toMatch(/<button disabled [^>]*color:var\(--dim\)/);
   });
 });

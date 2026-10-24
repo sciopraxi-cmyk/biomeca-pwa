@@ -38,6 +38,8 @@
   --posturo-vif:#2dd4bf;    --posturo-btn:#1D9E75;
   --posturo-sombre:#0d4a32; --posturo-bord:#1a7a52;
   --posturo-contraste:#04342C; --posturo-clair:#7fe0d1;
+  /* Ostéopathie : turquoise quitté par le posturo ; encre = teinte de la photo de la carte (4,95:1 sur blanc). */
+  --osteo-vif:#2dd4bf;      --osteo-encre:#0E7C86;
   --sport-vif:#378ADD;      --sport-btn:#185FA5;
   --sport-sombre:#0d2e5c;   --sport-bord:#1a4a8a;
   --sport-clair:#9cc4ed;
@@ -250,8 +252,8 @@ body.theme-clair .tb-doctolib{ border:1px solid var(--bord); }
    consomment — une seule règle de survol au lieu de quatre.
    Rien ici n'est scopé à .theme-clair : ces composants ne vivent que dans
    pg-patients, qui est toujours en thème clair depuis ce lot. */
-.bl-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-@media (max-width:1100px){ .bl-grid{ grid-template-columns:repeat(2,1fr); } }
+.bl-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+@media (max-width:900px){ .bl-grid{ grid-template-columns:repeat(2,1fr); } }
 @media (max-width:620px){ .bl-grid{ grid-template-columns:1fr; } }
 
 .bl-carte{ background:#fff; border:1px solid var(--bord); border-radius:12px;
@@ -909,17 +911,17 @@ body.printing #rpt-print{display:block!important;}
    #268 — texte des onglets sur --posturo-encre : #0d9488 donnait 3,49:1 sur
    le fond clair, l'encre 5,11:1. Bordure et onglet actif inchangés. */
 #pg-bilan-posturo .posturo-tab{
-  background:transparent; color:var(--posturo-encre); border:1px solid #2dd4bf;
+  background:transparent; color:var(--posturo-encre); border:1px solid var(--posturo-encre);
   border-radius:var(--rs); font-size:11px; padding:4px 10px; cursor:pointer;
   transition:background .12s,color .12s,border-color .12s;
 }
-#pg-bilan-posturo .posturo-tab.act{ background:#2dd4bf; color:#04342C; border-color:#2dd4bf; }
+#pg-bilan-posturo .posturo-tab.act{ background:var(--posturo-encre); color:#fff; border-color:var(--posturo-encre); }
 
 /* #122 Phase 3b — POSTURO : liseré vertical + fond turquoise uniformes sur chaque
    encadré de section (à l'image du liseré bleu uniforme du bilan sport) */
 #pg-bilan-posturo .posturo-section div[style*="border-left:4px solid"]{
-  border-left-color:#2dd4bf !important;
-  background:linear-gradient(135deg,#effbf9,#dbf7f1) !important;
+  border-left-color:var(--posturo-encre) !important;
+  background:linear-gradient(135deg,#f4f9f8,#e9f3f1) !important;
 }
 
 /* #122 Phase 3b (sport) — SPORT : même override large des sous-blocs inline que
