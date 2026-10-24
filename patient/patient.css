@@ -324,3 +324,115 @@ input:focus-visible,
   font-weight: 600;
   text-align: center;
 }
+
+/* ─── Mes exercices (lot e3b-2a) ─── */
+.nav-jour {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.nav-jour .bouton {
+  width: 56px;
+  min-width: 56px;
+  margin: 0;
+  padding: 10px 0;
+}
+.jour-titre {
+  flex: 1;
+  text-align: center;
+}
+.jour-titre strong {
+  display: block;
+  font-size: 20px;
+  color: var(--marine);
+}
+.jour-titre small {
+  color: var(--doux);
+  font-size: 14px;
+}
+.choix-seances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.pastille-seance {
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 14px;
+  color: var(--marine);
+  background: #f4fbfd;
+  border: 2px solid var(--bord);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.pastille-seance[aria-selected='true'] {
+  background: var(--marine);
+  border-color: var(--marine);
+  color: #fff;
+}
+.pastille-seance:focus-visible,
+.btn-fiche:focus-visible {
+  outline: 3px solid var(--marine);
+  outline-offset: 2px;
+}
+.exercice {
+  margin: 14px 0;
+  padding: 14px;
+  background: #f4fbfd;
+  border: 2px solid var(--bord);
+  border-radius: 18px;
+}
+.exercice > h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--marine);
+}
+.sous-exercice {
+  margin: 10px 0;
+}
+.sous-exercice h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--texte);
+}
+.video {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 6px 0;
+  border: 0;
+  border-radius: 12px;
+  background: #000;
+}
+.texte-exercice {
+  margin: 6px 0;
+  color: var(--texte);
+  font-size: 15px;
+  white-space: pre-line;
+}
+.btn-fiche {
+  display: inline-block;
+  margin: 6px 8px 0 0;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--marine);
+  background: #fff;
+  border: 2px solid var(--bord);
+  border-radius: 12px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.cadre-fiche {
+  width: 100%;
+  height: 70vh;
+  margin: 8px 0;
+  border: 2px solid var(--bord);
+  border-radius: 12px;
+  background: #fff;
+}
+.choix-seances[hidden] {
+  display: none;
+}
