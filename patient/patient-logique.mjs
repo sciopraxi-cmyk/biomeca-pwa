@@ -214,3 +214,139 @@ export function seancesAbsentes(contenu, index) {
       return { id: o.id, titre: o.titre, date: suivant ? suivant.date : null };
     });
 }
+
+// ─── Chrono des séances et séances validées (lot e3b-2b) ───
+
+/** Compte à rebours « Prêt ? » avant le premier exercice (secondes). */
+export const PREPARATION_S = 5;
+
+function entierBorne(n, min, max) {
+  return Number.isInteger(n) && n >= min && n <= max;
+}
+
+/**
+ * Plan du chrono d'une séance : « Prêt ? », puis pour chaque exercice un temps d'effort et un temps de repos
+ * (Express 20 s/10 s ; échauffement 30/30 ou 45/15 ; programme du pied 45/15). Renvoie null sans chrono valide.
+ * { etapes: [{ exo, phase: 'prep'|'travail'|'repos', duree }], total } (durées en secondes, exo = rang à partir de 0).
+ */
+export function planChrono(seance) {
+  const c = seance && seance.chrono;
+  const n = seance && Array.isArray(seance.exos) ? seance.exos.length : 0;
+  if (
+    !c ||
+    !entierBorne(c.travail, 1, 600) ||
+    !entierBorne(c.repos, 0, 600) ||
+    !entierBorne(n, 1, 12)
+  )
+    return null;
+  const etapes = [{ exo: 0, phase: 'prep', duree: PREPARATION_S }];
+  for (let i = 0; i < n; i++) {
+    etapes.push({ exo: i, phase: 'travail', duree: c.travail });
+    if (c.repos > 0) etapes.push({ exo: i, phase: 'repos', duree: c.repos });
+  }
+  return { etapes, total: etapes.reduce((s, e) => s + e.duree, 0), nbExos: n };
+}
+
+/** Début (ms) de chaque étape du plan. */
+function debutsEtapes(plan) {
+  let t = 0;
+  return plan.etapes.map((e) => {
+    const d = t;
+    t += e.duree * 1000;
+    return d;
+  });
+}
+
+/**
+ * État du chrono après `ecouleMs` de temps réellement écoulé (la pause ne compte pas).
+ * { termine, index, phase, exo, restantS (arrondi au-dessus), debutMs }
+ */
+export function etatChrono(plan, ecouleMs) {
+  const t = Math.max(0, Number(ecouleMs) || 0);
+  const debuts = debutsEtapes(plan);
+  const fin = plan.total * 1000;
+  if (t >= fin) {
+    const dernier = plan.etapes.length - 1;
+    return {
+      termine: true,
+      index: dernier,
+      phase: plan.etapes[dernier].phase,
+      exo: plan.nbExos - 1,
+      restantS: 0,
+      debutMs: debuts[dernier],
+    };
+  }
+  let i = debuts.length - 1;
+  while (debuts[i] > t) i--;
+  const e = plan.etapes[i];
+  return {
+    termine: false,
+    index: i,
+    phase: e.phase,
+    exo: e.exo,
+    restantS: Math.ceil((debuts[i] + e.duree * 1000 - t) / 1000),
+    debutMs: debuts[i],
+  };
+}
+
+/** « Recommencer l'exercice » : retour au début de l'effort de l'exercice en cours (pendant « Prêt ? » : au début). */
+export function debutExerciceMs(plan, ecouleMs) {
+  const e = etatChrono(plan, ecouleMs);
+  if (e.phase === 'prep') return 0;
+  const debuts = debutsEtapes(plan);
+  return debuts[plan.etapes.findIndex((x) => x.exo === e.exo && x.phase === 'travail')];
+}
+
+/** « Passer » : début de l'effort de l'exercice suivant (pendant « Prêt ? » : du premier) ; après le dernier : fin du chrono. */
+export function exerciceSuivantMs(plan, ecouleMs) {
+  const e = etatChrono(plan, ecouleMs);
+  if (e.termine) return plan.total * 1000;
+  const debuts = debutsEtapes(plan);
+  const cible = e.phase === 'prep' ? 0 : e.exo + 1;
+  const i = plan.etapes.findIndex((x) => x.exo === cible && x.phase === 'travail');
+  return i === -1 ? plan.total * 1000 : debuts[i];
+}
+
+/** « 1:05 » */
+export function formaterTemps(s) {
+  const n = Math.max(0, Math.floor(Number(s) || 0));
+  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+}
+
+/** Clé d'une séance validée : jour + identifiant de séance. */
+export function cleValidation(jour, seanceId) {
+  return `${jour}|${seanceId}`;
+}
+
+/** Séances validées (lignes { jour, seance_id, commentaire, valide_at }) indexées par clé. Les lignes invalides sont ignorées. */
+export function indexerValidations(lignes) {
+  const m = new Map();
+  for (const l of Array.isArray(lignes) ? lignes : []) {
+    if (l && /^\d{4}-\d{2}-\d{2}$/.test(l.jour) && typeof l.seance_id === 'string') {
+      m.set(cleValidation(l.jour, l.seance_id), l);
+    }
+  }
+  return m;
+}
+
+/**
+ * Situation d'un jour du programme : { total, faites, jourMeme, passe, aJour, nonFaites: [id] }.
+ * aJour (« Bravo ») = jour d'aujourd'hui avec toutes ses séances validées.
+ */
+export function situationJour(contenu, index, validations, aujourdhui) {
+  const jour = contenu && Array.isArray(contenu.jours) ? contenu.jours[index] : null;
+  if (!jour)
+    return { total: 0, faites: 0, jourMeme: false, passe: false, aJour: false, nonFaites: [] };
+  const seances = Array.isArray(jour.seances) ? jour.seances : [];
+  const faites = seances.filter((s) => validations.has(cleValidation(jour.date, s.id)));
+  return {
+    total: seances.length,
+    faites: faites.length,
+    jourMeme: jour.date === aujourdhui,
+    passe: jour.date < aujourdhui,
+    aJour: jour.date === aujourdhui && seances.length > 0 && faites.length === seances.length,
+    nonFaites: seances
+      .filter((s) => !validations.has(cleValidation(jour.date, s.id)))
+      .map((s) => s.id),
+  };
+}

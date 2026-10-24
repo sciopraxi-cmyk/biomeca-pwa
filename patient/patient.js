@@ -4,22 +4,31 @@
 import {
   apercuDemande,
   cheminFichierValide,
+  cleValidation,
   dateCourte,
+  debutExerciceMs,
+  etatChrono,
   exerciceAffichable,
+  exerciceSuivantMs,
   formaterIdentifiant,
+  formaterTemps,
   grouperDocuments,
   identifiantComplet,
+  indexerValidations,
   jourProgramme,
   libelleJour,
   messageErreur,
   motDePasseAcceptable,
   nombreNonLus,
   phraseChrono,
+  planChrono,
+  PREPARATION_S,
   seancesAbsentes,
   phraseDocuments,
   reglesMotDePasse,
   salutation,
   sessionAExpirer,
+  situationJour,
 } from './patient-logique.mjs';
 
 const SUPA_URL = 'https://tzivizoacdyopwfzerrb.supabase.co';
@@ -64,6 +73,7 @@ const ECRANS = [
 ];
 
 function montrer(nom) {
+  if (nom !== 'exercices') reinitialiserChrono(null);
   for (const e of ECRANS) $('ecran-' + e).hidden = e !== nom;
   document
     .querySelector('.cadre')
@@ -530,14 +540,35 @@ async function chargerProgramme() {
   }
 }
 
+// Séances validées par le patient (jour|séance → ligne).
+let validations = new Map();
+async function chargerValidations() {
+  const r = await appelAuth(
+    '/rest/v1/programme_validations?select=jour,seance_id,commentaire,valide_at&order=jour.asc' +
+      (APERCU ? '&patient_id=eq.' + APERCU : '')
+  );
+  if (!r || !r.ok) return undefined;
+  try {
+    return indexerValidations(await r.json());
+  } catch {
+    return undefined;
+  }
+}
+
 async function majCarteExercices() {
-  const p = await chargerProgramme();
+  const [p, v] = await Promise.all([chargerProgramme(), chargerValidations()]);
   if (p === undefined) return;
   programme = p;
-  $('phrase-exercices').textContent =
-    p && p.contenu && p.contenu.jours && p.contenu.jours.length
-      ? 'Votre programme du jour'
-      : 'Programme bientôt disponible';
+  if (v !== undefined) validations = v;
+  const c = p && p.contenu;
+  let phrase = 'Programme bientôt disponible';
+  if (c && c.jours && c.jours.length) {
+    const auj = jourProgramme(c, aujourdhuiISO());
+    phrase = situationJour(c, auj.index, validations, aujourdhuiISO()).aJour
+      ? 'Bravo, vous êtes à jour 🎉'
+      : 'Votre programme du jour';
+  }
+  $('phrase-exercices').textContent = phrase;
 }
 
 function elt(tag, classe, texte) {
@@ -614,9 +645,322 @@ function blocSousExercice(ex) {
   return bloc;
 }
 
+// ─── Chrono d'une séance : pause, « Passer », bips du navigateur (lot e3b-2b) ───
+const chrono = {
+  plan: null,
+  seance: null,
+  etat: 'pret',
+  base: 0,
+  depart: null,
+  timer: null,
+  index: -1,
+};
+let audio = null;
+let verrouEcran = null;
+
+function sonActif() {
+  try {
+    return localStorage.getItem('verticy-patient-son') !== '0';
+  } catch {
+    return true;
+  }
+}
+// Le navigateur n'autorise le son qu'après un geste du patient : on prépare l'audio au clic.
+function preparerAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audio = audio || new AC();
+    if (audio.state === 'suspended') audio.resume();
+  } catch {
+    audio = null;
+  }
+}
+function bip(frequence, dureeMs, delaiMs) {
+  if (!sonActif() || !audio) return;
+  try {
+    const t0 = audio.currentTime + (delaiMs || 0) / 1000;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = frequence;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.4, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dureeMs / 1000);
+    osc.connect(gain);
+    gain.connect(audio.destination);
+    osc.start(t0);
+    osc.stop(t0 + dureeMs / 1000 + 0.05);
+  } catch {
+    /* le son est un plus : jamais bloquant */
+  }
+}
+function vibrer(motif) {
+  try {
+    if (navigator.vibrate && sonActif()) navigator.vibrate(motif);
+  } catch {
+    /* sans effet */
+  }
+}
+async function garderEcranAllume() {
+  try {
+    if (navigator.wakeLock && !verrouEcran) {
+      verrouEcran = await navigator.wakeLock.request('screen');
+      verrouEcran.addEventListener('release', () => {
+        verrouEcran = null;
+      });
+    }
+  } catch {
+    verrouEcran = null;
+  }
+}
+function relacherEcran() {
+  try {
+    if (verrouEcran) verrouEcran.release();
+  } catch {
+    /* sans effet */
+  }
+  verrouEcran = null;
+}
+
+function ecouleMs() {
+  return chrono.base + (chrono.depart === null ? 0 : Date.now() - chrono.depart);
+}
+function nomsExercice(i) {
+  const seance = chrono.seance;
+  const codes = (seance && seance.exos[i]) || [];
+  return codes
+    .map((code) => exerciceAffichable(programme.contenu.catalogue, code))
+    .filter(Boolean)
+    .map((e) => e.nom)
+    .join(' + ');
+}
+function surlignerExercice(i, defiler) {
+  document.querySelectorAll('#liste-exercices .exercice').forEach((carte, k) => {
+    carte.classList.toggle('exercice-courant', k === i);
+    if (k === i && defiler) carte.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+}
+function afficherBoutonsChrono() {
+  const e = chrono.etat;
+  const bloc = $('bloc-chrono');
+  const d = $('btn-chrono-demarrer');
+  d.hidden = e === 'marche';
+  d.textContent =
+    { pret: '▶ Lancer le chrono', pause: '▶ Reprendre', fin: '↺ Refaire le chrono' }[e] || '';
+  $('btn-chrono-pause').hidden = e !== 'marche';
+  $('btn-chrono-passer').hidden = e !== 'marche' && e !== 'pause';
+  $('btn-chrono-recommencer').hidden = e !== 'marche' && e !== 'pause';
+  $('btn-chrono-arreter').hidden = e !== 'marche' && e !== 'pause';
+  if (e === 'pret') bloc.dataset.phase = 'prep';
+  if (e === 'fin') bloc.dataset.phase = 'fin';
+}
+function majChrono() {
+  if (!chrono.plan) return;
+  const e = etatChrono(chrono.plan, ecouleMs());
+  if (e.termine) return finirChrono();
+  const bloc = $('bloc-chrono');
+  const total = chrono.plan.nbExos;
+  if (chrono.etat === 'pause') {
+    bloc.dataset.phase = 'pause';
+    $('chrono-etat').textContent = '⏸ En pause';
+  } else {
+    bloc.dataset.phase = e.phase;
+    $('chrono-etat').textContent =
+      e.phase === 'prep'
+        ? 'Préparez-vous…'
+        : e.phase === 'travail'
+          ? '💪 Effort !'
+          : e.exo + 1 < total
+            ? '😮‍💨 Repos — ensuite : exercice ' + (e.exo + 2)
+            : '😮‍💨 Repos — dernier exercice terminé';
+  }
+  $('chrono-temps').textContent = formaterTemps(e.restantS);
+  $('chrono-exo').textContent =
+    e.phase === 'prep'
+      ? `Exercice 1 sur ${total}` + (nomsExercice(0) ? ' : ' + nomsExercice(0) : '')
+      : `Exercice ${e.exo + 1} sur ${total}` +
+        (nomsExercice(e.exo) ? ' : ' + nomsExercice(e.exo) : '');
+  if (e.index !== chrono.index) {
+    const premier = chrono.index === -1;
+    chrono.index = e.index;
+    surlignerExercice(
+      e.phase === 'prep' ? -1 : e.exo,
+      chrono.etat === 'marche' && e.phase === 'travail'
+    );
+    if (!premier || e.phase !== 'prep') {
+      if (e.phase === 'travail') bip(880, 220);
+      if (e.phase === 'repos') bip(520, 220);
+      vibrer(e.phase === 'travail' ? [150] : [80]);
+    }
+  }
+}
+function lancerCompteur() {
+  if (chrono.timer) clearInterval(chrono.timer);
+  chrono.timer = setInterval(majChrono, 200);
+}
+function arreterCompteur() {
+  if (chrono.timer) clearInterval(chrono.timer);
+  chrono.timer = null;
+}
+function demarrerChrono() {
+  if (!chrono.plan) return;
+  preparerAudio();
+  if (chrono.etat === 'fin') {
+    chrono.base = 0;
+    chrono.index = -1;
+  }
+  chrono.depart = Date.now();
+  chrono.etat = 'marche';
+  afficherBoutonsChrono();
+  garderEcranAllume();
+  lancerCompteur();
+  majChrono();
+}
+function pauseChrono() {
+  if (chrono.etat !== 'marche') return;
+  chrono.base = ecouleMs();
+  chrono.depart = null;
+  chrono.etat = 'pause';
+  arreterCompteur();
+  relacherEcran();
+  afficherBoutonsChrono();
+  majChrono();
+}
+function sauterChrono(vers) {
+  if (!chrono.plan || (chrono.etat !== 'marche' && chrono.etat !== 'pause')) return;
+  chrono.base = vers(chrono.plan, ecouleMs());
+  if (chrono.depart !== null) chrono.depart = Date.now();
+  majChrono();
+}
+function finirChrono() {
+  arreterCompteur();
+  relacherEcran();
+  chrono.etat = 'fin';
+  chrono.base = 0;
+  chrono.depart = null;
+  chrono.index = -1;
+  afficherBoutonsChrono();
+  surlignerExercice(-1, false);
+  $('chrono-etat').textContent = '🎉 Séance terminée ! Validez-la ci-dessous.';
+  $('chrono-temps').textContent = formaterTemps(0);
+  $('chrono-exo').textContent = '';
+  bip(880, 160, 0);
+  bip(880, 160, 260);
+  bip(1175, 380, 520);
+  vibrer([200, 100, 200, 100, 400]);
+  const v = $('bloc-validation');
+  if (!v.hidden) v.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+// Remet le chrono à zéro pour la séance affichée (null = on quitte l'écran : tout s'arrête).
+function reinitialiserChrono(seance) {
+  arreterCompteur();
+  relacherEcran();
+  chrono.seance = seance;
+  chrono.plan = seance ? planChrono(seance) : null;
+  chrono.etat = 'pret';
+  chrono.base = 0;
+  chrono.depart = null;
+  chrono.index = -1;
+  const bloc = $('bloc-chrono');
+  bloc.hidden = !chrono.plan;
+  if (!chrono.plan) return;
+  $('chk-son').checked = sonActif();
+  $('chrono-etat').textContent = 'Prêt ? Lancez le chrono quand vous êtes installé.';
+  $('chrono-temps').textContent = formaterTemps(PREPARATION_S);
+  $('chrono-exo').textContent = '';
+  afficherBoutonsChrono();
+}
+
+// ─── Validation d'une séance par le patient ───
+function afficherValidation() {
+  const c = programme.contenu;
+  const jour = c.jours[jourCourant];
+  const seance = jour && jour.seances[seanceCourante];
+  const bloc = $('bloc-validation');
+  bloc.hidden = !seance;
+  afficherErreur('erreur-validation', '');
+  if (!seance) return;
+  const auj = aujourdhuiISO();
+  const v = validations.get(cleValidation(jour.date, seance.id));
+  const saisie = $('validation-saisie');
+  saisie.hidden = true;
+  if (v) {
+    const com = v.commentaire ? ` Votre mot : « ${v.commentaire} »` : '';
+    $('validation-etat').textContent = '✅ Séance validée.' + com;
+  } else if (jour.date === auj && !APERCU) {
+    $('validation-etat').textContent = 'Quand vous avez terminé, validez la séance.';
+    saisie.hidden = false;
+    $('validation-commentaire').value = '';
+    $('btn-valider-seance').disabled = false;
+  } else if (jour.date === auj) {
+    $('validation-etat').textContent = 'Séance pas encore validée par le patient.';
+  } else if (jour.date > auj) {
+    $('validation-etat').textContent = 'Vous pourrez valider cette séance le jour même.';
+  } else {
+    $('validation-etat').textContent =
+      'Séance non faite ce jour-là. Ce n’est pas grave, on continue ! 💪';
+  }
+}
+function afficherBravo() {
+  const c = programme.contenu;
+  const s = situationJour(c, jourCourant, validations, aujourdhuiISO());
+  const el = $('bravo');
+  el.hidden = !s.aJour;
+  el.textContent = s.aJour
+    ? jourCourant === c.jours.length - 1
+      ? '🎉 Bravo, vous avez terminé votre programme !'
+      : '🎉 Bravo, vous êtes à jour !'
+    : '';
+}
+function majPastilles() {
+  const jour = programme.contenu.jours[jourCourant];
+  document.querySelectorAll('.pastille-seance').forEach((b, i) => {
+    const s = jour.seances[i];
+    const faite = validations.has(cleValidation(jour.date, s.id));
+    b.textContent = `${faite ? '✓ ' : ''}${i + 1}. ${s.titre}`;
+  });
+}
+async function validerSeance() {
+  const jour = programme.contenu.jours[jourCourant];
+  const seance = jour.seances[seanceCourante];
+  const bouton = $('btn-valider-seance');
+  const commentaire = $('validation-commentaire').value.trim();
+  bouton.disabled = true;
+  afficherErreur('erreur-validation', '');
+  const r = await appelAuth('/rest/v1/rpc/programme_seance_valider', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_jour: jour.date,
+      p_seance: seance.id,
+      p_commentaire: commentaire || null,
+    }),
+  });
+  if (!r || !r.ok) {
+    bouton.disabled = false;
+    return afficherErreur(
+      'erreur-validation',
+      !r
+        ? 'Pas de réseau : votre séance n’est pas encore validée. Réessayez dans un instant.'
+        : 'Impossible de valider pour le moment. Réessayez.'
+    );
+  }
+  validations.set(cleValidation(jour.date, seance.id), {
+    jour: jour.date,
+    seance_id: seance.id,
+    commentaire: commentaire || null,
+    valide_at: new Date().toISOString(),
+  });
+  majPastilles();
+  afficherValidation();
+  afficherBravo();
+}
+
 function afficherSeance() {
   const c = programme.contenu;
   const seance = c.jours[jourCourant].seances[seanceCourante];
+  reinitialiserChrono(seance);
   $('phrase-chrono').textContent = seance.chrono
     ? 'Chrono : ' + phraseChrono(seance.chrono) + '.'
     : '';
@@ -634,6 +978,9 @@ function afficherSeance() {
   document.querySelectorAll('.pastille-seance').forEach((b, i) => {
     b.setAttribute('aria-selected', String(i === seanceCourante));
   });
+  majPastilles();
+  afficherValidation();
+  afficherBravo();
 }
 
 function afficherJour() {
@@ -676,6 +1023,10 @@ function afficherJour() {
   });
   $('aide-seances').hidden = jour.seances.length < 2;
   zone.hidden = jour.seances.length < 2;
+  if (jour.date === aujourdhuiISO()) {
+    const i = jour.seances.findIndex((s) => !validations.has(cleValidation(jour.date, s.id)));
+    if (i > 0) seanceCourante = i;
+  }
   afficherSeance();
 }
 
@@ -684,7 +1035,8 @@ async function ouvrirExercices() {
   $('zone-exercices').hidden = true;
   $('vide-exercices').hidden = true;
   montrer('exercices');
-  const p = await chargerProgramme();
+  const [p, v] = await Promise.all([chargerProgramme(), chargerValidations()]);
+  if (v !== undefined) validations = v;
   if (p === undefined && !programme) {
     return afficherErreur(
       'erreur-exercices',
@@ -711,6 +1063,26 @@ $('btn-deconnexion').addEventListener('click', deconnecter);
 $('carte-documents').addEventListener('click', ouvrirDocuments);
 $('carte-exercices').addEventListener('click', ouvrirExercices);
 $('btn-exercices-retour').addEventListener('click', ouvrirAccueil);
+$('btn-chrono-demarrer').addEventListener('click', demarrerChrono);
+$('btn-chrono-pause').addEventListener('click', pauseChrono);
+$('btn-chrono-passer').addEventListener('click', () => sauterChrono(exerciceSuivantMs));
+$('btn-chrono-recommencer').addEventListener('click', () => sauterChrono(debutExerciceMs));
+$('btn-chrono-arreter').addEventListener('click', () => reinitialiserChrono(chrono.seance));
+$('chk-son').addEventListener('change', (e) => {
+  try {
+    localStorage.setItem('verticy-patient-son', e.target.checked ? '1' : '0');
+  } catch {
+    /* préférence non mémorisée */
+  }
+  if (e.target.checked) preparerAudio();
+});
+$('btn-valider-seance').addEventListener('click', validerSeance);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && chrono.etat === 'marche') {
+    garderEcranAllume();
+    majChrono();
+  }
+});
 $('btn-jour-prec').addEventListener('click', () => {
   if (jourCourant > 0) {
     jourCourant -= 1;

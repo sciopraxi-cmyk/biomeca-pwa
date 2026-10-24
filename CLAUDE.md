@@ -767,7 +767,30 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - Pièges : « je ne vois que le pied » = Express/Échauffement non cochés ce jour de la semaine (jours des circuits) ; tester aussi les
   autres jours avec les flèches. Le service worker garde l'ancienne version tant qu'un autre onglet Verticy est ouvert.
 - Preuve : `supabase/tests/portail-programme-patient.test.sql` (banc jetable, prélude `prelude-programme-patient.sql`, finit `TOUT_OK`),
-  `tests/programme-portail-e3b2a.test.mjs`. Reste (e3b-2b) : chrono avec pause, validation des séances, « Bravo », notification.
+  `tests/programme-portail-e3b2a.test.mjs`. (Chrono, validation, « Bravo », notification : lot e3b-2b ci-dessous.)
+
+## Chrono, séances validées et notification de fin (lot e3b-2b, PR « portail-chrono-validation-e3b2b »)
+
+- **Chrono (page patient)** : logique pure dans `patient/patient-logique.mjs` (`planChrono`, `etatChrono`, `exerciceSuivantMs`,
+  `debutExerciceMs`) ; le temps écoulé est la seule donnée d'état (`base` + `Date.now() - depart`), la PAUSE gèle `base`. Plan = « Prêt ? »
+  5 s puis, par exercice, effort + repos (Express 20/10, échauffement 30/30 ou 45/15, pied EMOM 45/15) ; « Passer » = effort de l'exercice
+  suivant, « Recommencer l'exercice », « Arrêter ». Bips générés par Web Audio (aucun fichier), triple bip à la fin, case « Son » mémorisée
+  (`verticy-patient-son`), écran gardé allumé (Wake Lock) quand le navigateur le permet. Quitter l'écran arrête tout (`montrer`).
+- **Validation** : table `programme_validations` (patient, jour, séance, commentaire ≤ 500, une ligne par jour et séance, jamais modifiée) et
+  fonction `programme_seance_valider(p_jour, p_seance, p_commentaire)` (patient seulement, jour d'aujourd'hui à l'heure de Paris
+  — `portail_aujourdhui()` —, séance présente dans SA copie). Aucun droit d'écriture direct. « Bravo, vous êtes à jour » = toutes les
+  séances du jour validées ; jours passés non validés : « non faite » sans bouton ni reproche ; aperçu praticien en lecture seule.
+- **Fin de programme** : quand toutes les séances du DERNIER jour du programme publié sont validées, le serveur crée une ligne
+  `programme_fins` (une par programme publié ; un nouveau programme donne une nouvelle fin). L'application praticien la lit
+  (`_portailVerifierFins`, au plus 1/min, via `nav()` et toutes les 5 min), appelle `programme_fin_notifiee` (renvoie `true` UNE seule
+  fois) puis crée `patient_protocole_termine` (identifiant de fiche seulement). Une fiche inconnue sur l'appareil n'est ni marquée ni notifiée.
+  Un jour du programme manqué n'empêche pas la fin : c'est la validation du dernier jour qui la déclenche.
+- **Suivi côté praticien** : fenêtre 🔑 → « Suivi des séances » (`_portailChargerSuivi`, `_suiviSeances`) : validées/prévues sur 7 jours
+  glissants + liste datée avec commentaires (texte seulement, jamais en HTML).
+- Preuve : `supabase/tests/portail-programme-validations.test.sql` (banc jetable : prélude, `portail-programme-patient.sql`,
+  `portail-programme-validations.sql`, puis le test ; finit `TOUT_OK` ; 10 mutations toutes détectées),
+  `tests/portail-chrono-e3b2b.test.mjs`, `tests/portail-suivi-praticien-e3b2b.test.mjs`, E2E `documents/e2e-portail-chrono-e3b2b.mjs`
+  (horloge simulée) et `e2e-portail-suivi-praticien-e3b2b.mjs`. Service workers : `biomeca-v241`, `verticy-patient-v7`.
 
 ## Fin de tâche : mise à jour de la documentation
 

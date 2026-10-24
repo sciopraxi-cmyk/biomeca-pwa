@@ -129,7 +129,7 @@ describe('aperçu praticien — branchements', () => {
     expect(src).toMatch(/Renseignez la date de naissance du patient pour créer l\\'accès/);
   });
   it('service workers incrémentés', () => {
-    expect(lire('patient/sw.js')).toMatch(/verticy-patient-v6/);
-    expect(lire('service-worker.js')).toMatch(/biomeca-v240/);
+    expect(lire('patient/sw.js')).toMatch(/verticy-patient-v7/);
+    expect(lire('service-worker.js')).toMatch(/biomeca-v241/);
   });
 });

@@ -436,3 +436,91 @@ input:focus-visible,
 .choix-seances[hidden] {
   display: none;
 }
+
+/* ─── Chrono, validation et « Bravo » (lot e3b-2b) ─── */
+.bloc-chrono {
+  margin: 12px 0;
+  padding: 14px;
+  text-align: center;
+  background: #fff;
+  border: 2px solid var(--bord);
+  border-radius: 18px;
+}
+.bloc-chrono[hidden],
+.bloc-validation[hidden],
+.bravo[hidden] {
+  display: none;
+}
+.chrono-etat {
+  margin: 0;
+  font-weight: 800;
+  color: var(--marine);
+}
+.chrono-temps {
+  margin: 4px 0;
+  font-size: 64px;
+  font-weight: 900;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--marine);
+}
+.bloc-chrono[data-phase='travail'] {
+  background: #e6fbf6;
+  border-color: var(--turquoise);
+}
+.bloc-chrono[data-phase='repos'] {
+  background: #fff7e6;
+  border-color: #f5b942;
+}
+.bloc-chrono[data-phase='fin'] {
+  background: #e6fbf6;
+  border-color: var(--turquoise);
+}
+.chrono-boutons .bouton[hidden],
+#btn-chrono-demarrer[hidden] {
+  display: none;
+}
+.case-son {
+  display: block;
+  margin-top: 12px;
+  font-size: 15px;
+  color: var(--doux);
+}
+.exercice.exercice-courant {
+  border-color: var(--turquoise);
+  box-shadow: 0 0 0 3px var(--turquoise);
+}
+.bloc-validation {
+  margin: 18px 0 8px;
+  padding: 14px;
+  background: #fff;
+  border: 2px solid var(--bord);
+  border-radius: 18px;
+}
+.validation-etat {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--marine);
+}
+.champ-commentaire {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--texte);
+  border: 2px solid var(--bord);
+  border-radius: 12px;
+  resize: vertical;
+}
+.bravo {
+  margin: 12px 0;
+  padding: 16px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--turquoise-encre);
+  background: var(--turquoise);
+  border-radius: 18px;
+}

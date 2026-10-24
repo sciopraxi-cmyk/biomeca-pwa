@@ -5693,6 +5693,7 @@ function nav(id) {
   if(id === 'pg-sterilisation') renderSterilisationPage();
   if(id === 'pg-notifications') renderNotificationsPage();
   _notifMajPastille();
+  if (typeof _portailVerifierFins === 'function') _portailVerifierFins();
   if(id === 'pg-agenda') initAgendaPage();
   if(id === 'pg-params') {
     renderParamsPratList();
@@ -34286,6 +34287,8 @@ function _notifHtmlDetail(e) {
     if (d) corps += _notifLigneDetail('Durée', _escHtml(d));
   } else if (e.type === 'ordonnance_creee') {
     corps += _notifHtmlOrdonnance(e);
+  } else if (e.type === 'patient_protocole_termine') {
+    corps += _notifLigneDetail('Programme', 'Le patient a validé toutes les séances du dernier jour de son programme. Le détail des séances est dans sa fiche : 🔑 Portail patient → Suivi des séances.');
   } else if (e.type === 'import_doctolib') {
     corps += _notifLigneDetail('Rendez-vous ajoutés', String(e.rdvTotal !== undefined ? e.rdvTotal : (Array.isArray(e.rdv) ? e.rdv.length : 0)));
   } else if (e.detail) {
@@ -36307,10 +36310,11 @@ function _portailAfficher(idx, compte, message) {
         : '<button class="btn" onclick="portailAction(' + idx + ',\'suspendre\')">Fermer l\'accès</button>') +
       '</div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Programme d\'exercices</div><div id="portail-programme" style="font-size:12px;color:var(--mut);"></div></div>' +
+      '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Suivi des séances</div><div id="portail-suivi" style="font-size:12px;color:var(--mut);">Chargement…</div></div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Documents visibles par le patient</div><div id="portail-docs"></div></div>';
   }
   cadre.innerHTML = html;
-  if (compte) { _portailChargerProgramme(idx); _portailChargerDocs(idx); }
+  if (compte) { _portailChargerProgramme(idx); _portailChargerSuivi(idx); _portailChargerDocs(idx); }
 }
 function _portailSecretDdnAffiche(p) {
   return _portailSecretDdn(p) || '—';
@@ -36753,6 +36757,95 @@ async function portailRepublierProgramme(idx) {
   } catch (_e) { alert('Publication impossible pour le moment, réessayez.'); }
   _portailChargerProgramme(idx);
 }
+// ── Suivi des séances validées par le patient (lot e3b-2b) ──
+// Semaine glissante (7 jours finissant aujourd'hui) : séances validées / séances prévues par le programme.
+// jours = [{date, seances:[{id, titre}]}] ; validations = [{jour, seance_id}].
+function _suiviSeances(jours, validations, aujourdhui) {
+  const j = _progJour(aujourdhui);
+  const debut = j === null ? '' : _progISO(j - 6);
+  const faites = new Set((Array.isArray(validations) ? validations : []).map(function (v) { return v.jour + '|' + v.seance_id; }));
+  let prevues = 0, validees = 0;
+  (Array.isArray(jours) ? jours : []).forEach(function (d) {
+    if (!d || !debut || d.date < debut || d.date > aujourdhui) return;
+    (d.seances || []).forEach(function (sc) {
+      prevues++;
+      if (faites.has(d.date + '|' + sc.id)) validees++;
+    });
+  });
+  return { prevues: prevues, validees: validees, debut: debut };
+}
+async function _portailChargerSuivi(idx) {
+  const p = patients[idx];
+  const zone = document.getElementById('portail-suivi');
+  if (!p || !p._cloudId || !zone) return;
+  try {
+    const id = encodeURIComponent(p._cloudId);
+    const [rp, rv] = await Promise.all([
+      authFetch(SUPA_URL + '/rest/v1/programmes_patient?select=jours:contenu->jours&patient_id=eq.' + id),
+      authFetch(SUPA_URL + '/rest/v1/programme_validations?select=jour,seance_id,commentaire,valide_at&order=jour.desc,valide_at.desc&limit=100&patient_id=eq.' + id),
+    ]);
+    if (!rp.ok || !rv.ok) throw new Error('lecture');
+    const prog = await rp.json();
+    const vals = await rv.json();
+    const cible = document.getElementById('portail-suivi');
+    if (!cible) return;
+    cible.textContent = '';
+    if (!Array.isArray(prog) || !prog.length) { cible.textContent = 'Aucun programme publié : pas de suivi.'; return; }
+    const jours = prog[0].jours || [];
+    const titres = {};
+    jours.forEach(function (d) { (d.seances || []).forEach(function (sc) { titres[sc.id] = sc.titre || sc.id; }); });
+    const auj = new Date();
+    const aujISO = auj.getFullYear() + '-' + String(auj.getMonth() + 1).padStart(2, '0') + '-' + String(auj.getDate()).padStart(2, '0');
+    const r = _suiviSeances(jours, vals, aujISO);
+    const resume = document.createElement('div');
+    resume.style.cssText = 'font-weight:700;color:var(--txt);';
+    resume.textContent = 'Cette semaine : ' + r.validees + ' séance' + (r.validees > 1 ? 's' : '') + ' validée' + (r.validees > 1 ? 's' : '') + ' sur ' + r.prevues + ' prévue' + (r.prevues > 1 ? 's' : '') + '.';
+    cible.appendChild(resume);
+    if (!vals.length) {
+      const v = document.createElement('div');
+      v.textContent = 'Aucune séance validée pour le moment.';
+      cible.appendChild(v);
+      return;
+    }
+    vals.forEach(function (v) {
+      const l = document.createElement('div');
+      l.style.cssText = 'margin-top:4px;';
+      const quand = new Date(v.valide_at);
+      // Le commentaire est un texte libre du patient : affiché en texte seulement.
+      l.textContent = _progFr(v.jour) + ' — ' + (titres[v.seance_id] || v.seance_id) + ' — validée à ' +
+        quand.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + (v.commentaire ? ' — « ' + v.commentaire + ' »' : '');
+      cible.appendChild(l);
+    });
+  } catch (_e) {
+    const cible = document.getElementById('portail-suivi');
+    if (cible) cible.textContent = 'Suivi indisponible pour le moment.';
+  }
+}
+// Fin de programme : le patient a validé le dernier jour. La ligne « fin » vient du serveur ; l'application crée la
+// notification (identifiant de la fiche seulement) puis marque la fin comme notifiée — une seule fois, même avec deux onglets.
+let _finsDerniere = 0;
+let _finsEnCours = false;
+async function _portailVerifierFins(force) {
+  if (_finsEnCours || globalThis._modeConsultation || typeof pwaUser === 'undefined' || !pwaUser) return;
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) return;
+  const maintenant = Date.now();
+  if (!force && maintenant - _finsDerniere < 60000) return;
+  _finsDerniere = maintenant;
+  _finsEnCours = true;
+  try {
+    const res = await authFetch(SUPA_URL + '/rest/v1/programme_fins?select=patient_id&notifie_at=is.null');
+    if (!res.ok) return;
+    const l = await res.json();
+    for (const f of Array.isArray(l) ? l : []) {
+      const p = (Array.isArray(patients) ? patients : []).find(function (x) { return x._cloudId === f.patient_id; });
+      if (!p) continue; // fiche inconnue sur cet appareil : elle sera traitée depuis l'appareil qui la connaît
+      if ((await _portailRpc('programme_fin_notifiee', { p_patient: f.patient_id })) === true) {
+        notifierEvenement('patient_protocole_termine', { patientId: p.id });
+      }
+    }
+  } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _finsEnCours = false; }
+}
+setInterval(function () { if (typeof _portailVerifierFins === 'function') _portailVerifierFins(); }, 5 * 60 * 1000);
 async function _portailChargerDocs(idx) {
   const p = patients[idx];
   const zone = document.getElementById('portail-docs');

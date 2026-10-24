@@ -130,8 +130,31 @@
           <p id="info-jour" class="doux petit"></p>
           <p id="aide-seances" class="doux petit" hidden>Plusieurs séances aujourd’hui : commencez par celle que vous voulez.</p>
           <div id="choix-seances" class="choix-seances" role="tablist"></div>
+          <p id="bravo" class="bravo" role="status" hidden></p>
           <p id="phrase-chrono" class="doux petit"></p>
+          <section id="bloc-chrono" class="bloc-chrono" aria-label="Chrono de la séance" hidden>
+            <p id="chrono-etat" class="chrono-etat" role="status" aria-live="polite">Prêt ? Lancez le chrono quand vous êtes installé.</p>
+            <p id="chrono-temps" class="chrono-temps">0:05</p>
+            <p id="chrono-exo" class="doux petit"></p>
+            <button id="btn-chrono-demarrer" class="bouton" type="button">▶ Lancer le chrono</button>
+            <div class="chrono-boutons">
+              <button id="btn-chrono-pause" class="bouton bouton-clair" type="button" hidden>⏸ Pause</button>
+              <button id="btn-chrono-passer" class="bouton bouton-clair" type="button" hidden>⏭ Passer</button>
+              <button id="btn-chrono-recommencer" class="bouton bouton-clair" type="button" hidden>↺ Recommencer l’exercice</button>
+              <button id="btn-chrono-arreter" class="bouton bouton-clair" type="button" hidden>■ Arrêter</button>
+            </div>
+            <label class="case-son"><input id="chk-son" type="checkbox" checked /> Son (bips)</label>
+          </section>
           <div id="liste-exercices"></div>
+          <section id="bloc-validation" class="bloc-validation" aria-label="Validation de la séance" hidden>
+            <p id="validation-etat" class="validation-etat"></p>
+            <div id="validation-saisie" hidden>
+              <label for="validation-commentaire" class="doux petit">Un mot pour votre praticien (facultatif)</label>
+              <textarea id="validation-commentaire" class="champ-commentaire" maxlength="500" rows="3"></textarea>
+              <button id="btn-valider-seance" class="bouton" type="button">✅ J’ai fait cette séance</button>
+            </div>
+            <p id="erreur-validation" class="erreur" role="alert" hidden></p>
+          </section>
         </div>
         <button id="btn-exercices-retour" class="bouton bouton-clair" type="button">← Retour</button>
       </section>
