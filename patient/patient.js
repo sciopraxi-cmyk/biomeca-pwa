@@ -815,9 +815,10 @@ function majChrono() {
         ? 'Préparez-vous…'
         : e.phase === 'travail'
           ? '💪 Effort !'
-          : e.exo + 1 < total
-            ? '😮‍💨 Repos — ensuite : exercice ' + (e.exo + 2)
-            : '😮‍💨 Repos — dernier exercice terminé';
+          : (exosValides.has(cleExo(...cleSeanceCourante(), e.exo)) ? '✓ Exercice validé · ' : '') +
+            (e.exo + 1 < total
+              ? '😮‍💨 Repos — ensuite : exercice ' + (e.exo + 2)
+              : '😮‍💨 Repos — dernier exercice terminé');
   }
   $('chrono-temps').textContent = formaterTemps(e.restantS);
   $('chrono-exo').textContent =
@@ -885,7 +886,7 @@ function finirChrono() {
   chrono.depart = null;
   chrono.index = -1;
   afficherBoutonsChrono();
-  surlignerExercice(-1, false);
+  surlignerExercice(chrono.plan.nbExos - 1, false);
   $('chrono-etat').textContent = '🎉 Séance terminée !';
   $('chrono-temps').textContent = formaterTemps(0);
   $('chrono-exo').textContent = '';
@@ -897,6 +898,10 @@ function finirChrono() {
   validerSeanceAuto();
 }
 // ─── Validation automatique : exercice terminé → badge « Validé » ; dernier exercice → séance validée ───
+function cleSeanceCourante() {
+  const { jour, seance } = jourSeanceCourants();
+  return [jour.date, seance.id];
+}
 function jourSeanceCourants() {
   const jour = programme.contenu.jours[jourCourant];
   return { jour, seance: jour.seances[seanceCourante] };
@@ -904,11 +909,20 @@ function jourSeanceCourants() {
 function majBadgesExos() {
   if (!programme) return;
   const { jour, seance } = jourSeanceCourants();
+  const auj = jour.date === aujourdhuiISO();
   document.querySelectorAll('#liste-exercices .exercice').forEach((carte, i) => {
-    const ok = exosValides.has(cleExo(jour.date, seance.id, i));
+    const cle = cleExo(jour.date, seance.id, i);
+    const ok = exosValides.has(cle);
+    const essai = !ok && exosEssai.has(cle);
     carte.classList.toggle('exercice-valide', ok);
+    carte.classList.toggle('exercice-essai', essai);
     const badge = carte.querySelector('.badge-valide');
-    if (badge) badge.hidden = !ok;
+    if (badge) {
+      badge.hidden = !ok && !essai;
+      badge.textContent = ok ? '✓ Validé' : '✓ Fait (essai)';
+    }
+    const bt = carte.querySelector('.btn-sans-chrono');
+    if (bt) bt.hidden = ok || essai || APERCU || !(auj || jour.date > aujourdhuiISO());
   });
 }
 async function envoyerExo(jour, seance, exo) {
@@ -923,16 +937,39 @@ async function envoyerExo(jour, seance, exo) {
     exosEnAttente.delete(cle); // refus du serveur : inutile de réessayer
   else exosEnAttente.set(cle, { jour, seance, exo }); // pas de réseau : on réessaiera
 }
+const exosEssai = new Set(); // jour hors aujourd'hui : « Fait (essai) » à l'écran seulement, rien n'est enregistré
 function validerExo(i) {
-  if (APERCU || !programme || !chrono.seance) return;
+  if (APERCU || !programme) return;
   const { jour, seance } = jourSeanceCourants();
-  if (jour.date !== aujourdhuiISO()) return; // seul le jour même se valide
   const cle = cleExo(jour.date, seance.id, i);
+  if (jour.date !== aujourdhuiISO()) {
+    // Jour d'essai (ex. programme qui commence lundi, testé samedi) : visible à l'écran, jamais enregistré.
+    exosEssai.add(cle);
+    majBadgesExos();
+    return;
+  }
   if (exosValides.has(cle)) return;
   exosValides.add(cle); // tout de suite à l'écran ; l'envoi suit
   majBadgesExos();
   envoyerExo(jour.date, seance.id, i);
   for (const a of [...exosEnAttente.values()]) envoyerExo(a.jour, a.seance, a.exo);
+}
+// « J'ai fait cet exercice sans chrono » : valide l'exercice affiché ; si c'était le dernier manquant, la séance se valide.
+function validerExoSansChrono(i) {
+  validerExo(i);
+  validerSeanceSiComplete();
+}
+function seanceComplete() {
+  const { jour, seance } = jourSeanceCourants();
+  return seance.exos.every((_, i) => exosValides.has(cleExo(jour.date, seance.id, i)));
+}
+async function validerSeanceSiComplete() {
+  if (APERCU || !programme) return false;
+  const { jour, seance } = jourSeanceCourants();
+  if (jour.date !== aujourdhuiISO() || validations.has(cleValidation(jour.date, seance.id)))
+    return false;
+  if (!seanceComplete()) return false;
+  return validerSeance();
 }
 function validerExosTermines() {
   const n = exosTermines(chrono.plan, ecouleMs());
@@ -944,7 +981,22 @@ function validerExosTermines() {
 async function validerSeanceAuto() {
   if (APERCU || !programme) return;
   const { jour, seance } = jourSeanceCourants();
-  if (jour.date !== aujourdhuiISO() || validations.has(cleValidation(jour.date, seance.id))) return;
+  if (jour.date !== aujourdhuiISO()) {
+    $('chrono-etat').textContent =
+      '🎉 Séance terminée ! (Essai : ce n’est pas le jour de cette séance, rien n’est enregistré.)';
+    return;
+  }
+  if (validations.has(cleValidation(jour.date, seance.id))) return;
+  if (!seanceComplete()) {
+    const manquants = seance.exos
+      .map((_, i) => i + 1)
+      .filter((n) => !exosValides.has(cleExo(jour.date, seance.id, n - 1)));
+    $('chrono-etat').textContent =
+      '🎉 Chrono terminé, mais la séance n’est pas validée : exercice ' +
+      manquants.join(', ') +
+      ' non validé. Utilisez « J’ai fait cet exercice sans chrono ».';
+    return;
+  }
   $('chrono-etat').textContent = '🎉 Séance terminée ! Validation…';
   const ok = await validerSeance();
   $('chrono-etat').textContent = ok
@@ -992,14 +1044,16 @@ function afficherValidation() {
     $('validation-etat').textContent = '✅ Séance validée.' + com;
   } else if (jour.date === auj && !APERCU) {
     $('validation-etat').textContent =
-      'La séance se valide toute seule à la fin du dernier exercice du chrono. Pas de chrono ? Validez-la ici.';
+      'La séance se valide toute seule quand tous ses exercices sont validés (chrono jusqu’au bout, ou « J’ai fait cet exercice sans chrono »).';
     saisie.hidden = false;
     $('validation-commentaire').value = '';
     $('btn-valider-seance').disabled = false;
+    $('btn-valider-seance').hidden = !seanceComplete(); // secours : tout est validé mais l'envoi de la séance a échoué
   } else if (jour.date === auj) {
     $('validation-etat').textContent = 'Séance pas encore validée par le patient.';
   } else if (jour.date > auj) {
-    $('validation-etat').textContent = 'Vous pourrez valider cette séance le jour même.';
+    $('validation-etat').textContent =
+      'Jour d’essai : vous pouvez tester le chrono, mais rien n’est enregistré avant le jour de la séance.';
   } else {
     $('validation-etat').textContent =
       'Séance non faite ce jour-là. Ce n’est pas grave, on continue ! 💪';
@@ -1042,6 +1096,7 @@ async function validerSeance() {
   });
   if (!r || !r.ok) {
     bouton.disabled = false;
+    bouton.hidden = false;
     afficherErreur(
       'erreur-validation',
       !r
@@ -1078,6 +1133,14 @@ function afficherSeance() {
     badge.hidden = true;
     titre.appendChild(badge);
     carte.appendChild(titre);
+    const sans = elt(
+      'button',
+      'bouton bouton-clair btn-sans-chrono',
+      '✋ J’ai fait cet exercice sans chrono'
+    );
+    sans.type = 'button';
+    sans.addEventListener('click', () => validerExoSansChrono(i));
+    carte.appendChild(sans);
     // 2 ou 3 sous-exercices simultanés : côte à côte, sous UN SEUL chrono (celui de la carte).
     const grille = elt('div', 'sous-exercices');
     const fiches = elt('div', 'fiches-carte');
@@ -1088,6 +1151,7 @@ function afficherSeance() {
     grille.dataset.nb = String(Math.min(3, grille.children.length));
     carte.appendChild(grille);
     carte.appendChild(fiches);
+    carte.appendChild(carte.querySelector('.btn-sans-chrono'));
     liste.appendChild(carte);
   });
   document.querySelectorAll('.pastille-seance').forEach((b, i) => {
