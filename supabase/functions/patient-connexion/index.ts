@@ -22,6 +22,7 @@ import {
   ECHECS_IP_MAX,
   ESSAIS_MAX,
   ddnVersSecret,
+  normaliserCodeProvisoire,
   egalConstant,
   ipClient,
   minutesRestantes,
@@ -174,7 +175,11 @@ Deno.serve(async (req) => {
 
     await supaAdmin
       .from('patient_comptes')
-      .update({ statut: 'actif', premier_acces_at: new Date().toISOString() })
+      .update({
+        statut: 'actif',
+        premier_acces_at: new Date().toISOString(),
+        code_provisoire: null, // le code ne sert qu'une fois
+      })
       .eq('id', compte.id);
     await supaAdmin.rpc('portail_succes', { p_compte: compte.id });
     await journal(compte, 'mot_de_passe_defini', ip);
@@ -232,14 +237,24 @@ Deno.serve(async (req) => {
 
   // Compte à choisir : le secret attendu est la date de naissance (usage unique).
   if (compte.statut === 'initial') {
+    // Deux secrets possibles : la date de naissance de la fiche (si elle existe) ou le code provisoire.
     const saisi = normaliserSecretDdn(secretBrut);
+    const saisiCode = normaliserCodeProvisoire(secretBrut);
     const { data: pat } = await supaAdmin
       .from('patients')
       .select('ddn')
       .eq('id', compte.patient_id)
       .maybeSingle();
+    const { data: cp } = await supaAdmin
+      .from('patient_comptes')
+      .select('code_provisoire')
+      .eq('id', c.id)
+      .maybeSingle();
     const attendu = ddnVersSecret(pat?.ddn);
-    if (!saisi || !attendu || !egalConstant(saisi, attendu)) return await refuser('echec_ddn');
+    const attenduCode = typeof cp?.code_provisoire === 'string' ? cp.code_provisoire : null;
+    const okDdn = !!saisi && !!attendu && egalConstant(saisi, attendu);
+    const okCode = !!saisiCode && !!attenduCode && egalConstant(saisiCode, attenduCode);
+    if (!okDdn && !okCode) return await refuser('echec_ddn');
     const nonce = nonceAleatoire();
     await supaAdmin
       .from('patient_comptes')

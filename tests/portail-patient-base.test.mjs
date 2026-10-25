@@ -518,6 +518,55 @@ describe('patient-connexion — parcours complet', () => {
     expect(r.statut).toBe(200);
     expect(r.corps.etape).toBe('choisir_mot_de_passe');
   });
+  describe('code provisoire (fiche sans date de naissance)', () => {
+    beforeEach(() => {
+      db.patients.find((x) => x.id === 'pat-1').ddn = null;
+      compte.code_provisoire = 'ABCD-2345';
+    });
+    it('le bon code (minuscules, espace) ouvre le choix du mot de passe ; le code est effacé une fois le mot de passe choisi', async () => {
+      const r = await conn('abcd 2345');
+      expect(r.statut).toBe(200);
+      expect(r.corps.etape).toBe('choisir_mot_de_passe');
+      expect(db.patient_comptes[0].code_provisoire).toBe('ABCD-2345'); // pas encore : le billet n'est pas consommé
+      const ok = await appeler(h, {
+        action: 'definir',
+        billet: r.corps.billet,
+        mot_de_passe: MDP_PATIENT_OK,
+      });
+      expect(ok.statut).toBe(200);
+      expect(db.patient_comptes[0].statut).toBe('actif');
+      expect(db.patient_comptes[0].code_provisoire).toBeNull();
+    });
+    it('mauvais code : refus avec essais restants, aucun billet', async () => {
+      const r = await conn('ABCD-9999');
+      expect(r.statut).toBe(401);
+      expect(r.corps.restants).toBe(4);
+      expect(JSON.stringify(r.corps)).not.toMatch(/billet|session|token/);
+    });
+    it('sans date sur la fiche, une date « à l’envers » ne passe pas', async () => {
+      expect((await conn('20100517')).statut).toBe(401);
+    });
+    it('pas de code et pas de date : personne ne peut entrer', async () => {
+      compte.code_provisoire = null;
+      expect((await conn('20100517')).statut).toBe(401);
+      expect((await conn('ABCD-2345')).statut).toBe(401);
+    });
+    it('le code compte dans les 5 essais : blocage, même avec le bon code', async () => {
+      for (let i = 0; i < 5; i++) await conn('ZZZZ-2222');
+      expect((await conn('ABCD-2345')).statut).toBe(429);
+    });
+    it('date de naissance saisie plus tard : la date ET le code fonctionnent jusqu’à la première connexion', async () => {
+      db.patients.find((x) => x.id === 'pat-1').ddn = '2010-05-17';
+      expect((await conn('20100517')).statut).toBe(200);
+      expect((await conn('ABCD-2345')).statut).toBe(200);
+    });
+    it('compte actif : le code ne sert plus (c’est le mot de passe qui compte)', async () => {
+      const r = await conn('ABCD-2345');
+      await appeler(h, { action: 'definir', billet: r.corps.billet, mot_de_passe: MDP_PATIENT_OK });
+      expect((await conn('ABCD-2345')).statut).toBe(401);
+      expect((await conn(MDP_PATIENT_OK)).statut).toBe(200);
+    });
+  });
   it('bonne date : billet à usage unique, puis mot de passe choisi → compte actif', async () => {
     const r = await conn('2010 05 17');
     expect(r.statut).toBe(200);
@@ -742,12 +791,44 @@ describe('patient-compte — gestion par le praticien', () => {
     expect(db.patient_comptes).toEqual([]);
     expect(Object.keys(db.users)).toEqual(['prat-1', 'prat-2', 'pat-user']);
   });
-  it('fiche sans date de naissance : refusé (pas de compte à moitié créé)', async () => {
+  it('fiche sans date de naissance : accès créé avec un code provisoire (jamais renvoyé à l’appelant)', async () => {
     db.patients.push({ id: '33333333-3333-3333-3333-333333333333', user_id: 'prat-1', ddn: null });
     const r = await avec({ action: 'creer', patient_id: '33333333-3333-3333-3333-333333333333' });
-    expect(r.statut).toBe(400);
-    expect(r.corps.error).toBe('ddn_manquante');
-    expect(db.patient_comptes).toEqual([]);
+    expect(r.statut).toBe(200);
+    expect(db.patient_comptes.length).toBe(1);
+    expect(db.patient_comptes[0].code_provisoire).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    expect(JSON.stringify(r.corps)).not.toContain(db.patient_comptes[0].code_provisoire);
+  });
+  it('fiche AVEC date de naissance : pas de code provisoire', async () => {
+    db.patients.push({ id: PID, user_id: 'prat-1', ddn: '2010-05-17' });
+    await avec({ action: 'creer', patient_id: PID });
+    expect(db.patient_comptes[0].code_provisoire ?? null).toBeNull();
+  });
+  it('accès déjà créé sans code (fiche sans date) : « creer » en génère un ; un code existant n’est pas remplacé', async () => {
+    const P3 = '33333333-3333-3333-3333-333333333333';
+    db.patients.push({ id: P3, user_id: 'prat-1', ddn: null });
+    await avec({ action: 'creer', patient_id: P3 });
+    db.patient_comptes[0].code_provisoire = null;
+    await avec({ action: 'creer', patient_id: P3 });
+    const c1 = db.patient_comptes[0].code_provisoire;
+    expect(c1).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    await avec({ action: 'creer', patient_id: P3 });
+    expect(db.patient_comptes[0].code_provisoire).toBe(c1);
+  });
+  it('réinitialiser sans date de naissance : nouveau code ; avec date : code effacé', async () => {
+    const P3 = '33333333-3333-3333-3333-333333333333';
+    db.patients.push({ id: P3, user_id: 'prat-1', ddn: null });
+    await avec({ action: 'creer', patient_id: P3 });
+    const ancien = db.patient_comptes[0].code_provisoire;
+    db.patient_comptes[0].statut = 'actif';
+    db.patient_comptes[0].code_provisoire = null;
+    const r = await avec({ action: 'reinitialiser', patient_id: P3 });
+    expect(r.statut).toBe(200);
+    expect(db.patient_comptes[0].code_provisoire).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    expect(db.patient_comptes[0].code_provisoire).not.toBe(ancien);
+    db.patients.find((x) => x.id === P3).ddn = '2010-05-17';
+    await avec({ action: 'reinitialiser', patient_id: P3 });
+    expect(db.patient_comptes[0].code_provisoire).toBeNull();
   });
   const PID = '44444444-4444-4444-4444-444444444444';
   it('création : identifiant lisible, compte Auth marqué patient, mot de passe aléatoire, idempotent', async () => {

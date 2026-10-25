@@ -2265,6 +2265,10 @@ function initAgendaCalendar() {
 }
 
 function _agRange() {
+  if (agCal.view === 'day') {
+    const jour = new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth(), agCal.refDate.getDate());
+    return { start: jour, end: _agAddDays(jour, 1) };
+  }
   if (agCal.view === 'week') {
     const start = _agStartOfWeek(agCal.refDate);
     return { start, end: _agAddDays(start, 7) };
@@ -2374,11 +2378,11 @@ async function loadAgendaCalendarEvents() {
 }
 
 function agCalPrev() {
-  agCal.refDate = agCal.view === 'week' ? _agAddDays(agCal.refDate, -7) : new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth() - 1, 1);
+  agCal.refDate = agCal.view === 'day' ? _agAddDays(agCal.refDate, -1) : agCal.view === 'week' ? _agAddDays(agCal.refDate, -7) : new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth() - 1, 1);
   loadAgendaCalendarEvents();
 }
 function agCalNext() {
-  agCal.refDate = agCal.view === 'week' ? _agAddDays(agCal.refDate, 7) : new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth() + 1, 1);
+  agCal.refDate = agCal.view === 'day' ? _agAddDays(agCal.refDate, 1) : agCal.view === 'week' ? _agAddDays(agCal.refDate, 7) : new Date(agCal.refDate.getFullYear(), agCal.refDate.getMonth() + 1, 1);
   loadAgendaCalendarEvents();
 }
 function agCalToday() {
@@ -2395,8 +2399,12 @@ function renderAgendaCalendar() {
   const box = document.getElementById('agenda-calendar-grid');
   if (!box) return;
   const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   let title;
-  if (agCal.view === 'week') {
+  if (agCal.view === 'day') {
+    const j = agCal.refDate;
+    title = JOURS[j.getDay()] + ' ' + j.getDate() + ' ' + MOIS[j.getMonth()] + ' ' + j.getFullYear();
+  } else if (agCal.view === 'week') {
     const start = _agStartOfWeek(agCal.refDate);
     const end = _agAddDays(start, 6);
     title =
@@ -2424,6 +2432,9 @@ function renderAgendaCalendar() {
     '</div>' +
     '<div style="display:flex;align-items:center;gap:6px;">' +
     '<div class="cal-view-toggle">' +
+    '<button class="' +
+    (agCal.view === 'day' ? 'cal-view-active' : '') +
+    '" onclick="agCalSetView(\'day\')">Jour</button>' +
     '<button class="' +
     (agCal.view === 'week' ? 'cal-view-active' : '') +
     '" onclick="agCalSetView(\'week\')">Semaine</button>' +
@@ -2462,19 +2473,22 @@ function renderAgendaCalendar() {
         '<div style="font-size:11px;margin-top:4px;">Si cela revient chaque semaine, l\'application Google est encore en mode « test » (autorisation limitée à 7 jours) : voir la console Google Cloud, écran de consentement OAuth.</div></div>'
       : '';
 
-  const grid = agCal.view === 'week' ? _agRenderWeekGrid() : _agRenderMonthGrid();
+  const grid = agCal.view === 'day' ? _agRenderTimeGrid([agCal.refDate]) : agCal.view === 'week' ? _agRenderWeekGrid() : _agRenderMonthGrid();
   // #182-ter — préserve la position de défilement de la grille semaine (0h-24h,
   // fenêtre visible par défaut 7h-21h) d'un re-render à l'autre (ex : après
   // création/édition d'un événement) ; sinon chaque rafraîchissement ramènerait
   // l'utilisateur à 7h même s'il avait scrollé vers un rendez-vous matinal/tardif.
   const prevBody = box.querySelector('.cal-week-bodyrow');
-  const prevScrollTop = prevBody ? prevBody.scrollTop : null;
+  const prevScrollTop = prevBody && prevBody.dataset.vue === agCal.view ? prevBody.scrollTop : null; // changer de vue (jour ↔ semaine) repart de l'heure utile
   box.innerHTML = failedBanner + toolbar + grid;
   _agRendreCouleurs();
-  if (agCal.view === 'week') {
+  if (agCal.view === 'week' || agCal.view === 'day') {
     const newBody = box.querySelector('.cal-week-bodyrow');
     if (newBody) {
-      newBody.scrollTop = prevScrollTop !== null ? prevScrollTop : AG_CAL_HOUR_START * AG_CAL_ROW_H;
+      newBody.scrollTop = prevScrollTop !== null ? prevScrollTop : _agScrollInitial();
+      // Les colonnes de jours du corps (défilable) perdent la largeur de la barre de défilement : on la retire aussi des lignes d'en-tête, sinon les traits verticaux se décalent.
+      const sb = newBody.offsetWidth - newBody.clientWidth;
+      box.querySelectorAll('.cal-week-headerrow, .cal-week-alldayrow').forEach(function (r) { r.style.paddingRight = sb + 'px'; });
     }
   }
 }
@@ -2605,7 +2619,7 @@ function _agRenderMonthGrid() {
       '" onclick="' +
       (agCal.googleConnected ? "openAgendaEventModal(null,'" + key + "')" : '') +
       '">' +
-      '<div class="cal-daynum">' +
+      '<div class="cal-daynum" title="Voir ce jour" onclick="event.stopPropagation();agCalOpenDay(\'' + key + '\')">' +
       day.getDate() +
       '</div>' +
       shown
@@ -2626,7 +2640,7 @@ function _agRenderMonthGrid() {
           );
         })
         .join('') +
-      (extra > 0 ? '<div class="cal-more">+' + extra + ' de plus</div>' : '') +
+      (extra > 0 ? '<div class="cal-more" onclick="event.stopPropagation();agCalOpenDay(\'' + key + '\')">+' + extra + ' de plus</div>' : '') +
       '</div>';
   }
   html += '</div>';
@@ -2645,30 +2659,97 @@ function _agRenderMonthGrid() {
 // usuel (#182-ter).
 function _agRenderWeekGrid() {
   const start = _agStartOfWeek(agCal.refDate);
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(_agAddDays(start, i));
+  return _agRenderTimeGrid(days);
+}
+
+// Position de défilement à l'ouverture : 7h, ou une heure avant le 1er rendez-vous s'il est plus tôt (jamais caché hors de l'écran).
+function _agScrollInitial() {
+  const { start, end } = _agRange();
+  let h = AG_CAL_HOUR_START;
+  agCal.events.forEach(function (e) {
+    if (!e.start || !e.start.includes('T')) return;
+    const d = new Date(e.start);
+    if (d >= start && d < end && !_agEstBandeau(e)) h = Math.min(h, Math.max(0, d.getHours() - 1));
+  });
+  return h * AG_CAL_ROW_H;
+}
+
+// « Bandeau » : événement sur journée entière, ou horodaté de 20 h et plus (séjours, déplacements…). Il va dans la rangée du haut,
+// pas dans la grille des heures, sinon il écrase tous les rendez-vous du jour.
+function _agEstBandeau(e) {
+  if (!e.start) return false;
+  if (!e.start.includes('T')) return true;
+  const fin = e.end && e.end.includes('T') ? new Date(e.end) : null;
+  return !!fin && fin - new Date(e.start) >= 20 * 3600000;
+}
+function _agBandeauxDuJour(d) {
+  const key = _agDateKey(d);
+  return agCal.events.filter(function (e) {
+    if (!_agEstBandeau(e)) return false;
+    if (e.start.includes('T')) return _agEventSegmentOnDay(e, d) !== null;
+    const fin = e.end && !e.end.includes('T') ? e.end : null; // fin exclusive pour les journées entières
+    return fin ? e.start <= key && key < fin : e.start === key;
+  });
+}
+// Largeur / décalage d'un rendez-vous parmi ceux qui se chevauchent : partage égal jusqu'à 2 (4 en vue jour), puis en cascade
+// (comme Google Agenda : le dernier posé passe devant, tout reste cliquable et lisible).
+function _agGeomEvenement(col, cols, enJour) {
+  const partage = enJour ? 4 : 2;
+  if (cols <= partage) return { left: (col / cols) * 100, width: 100 / cols };
+  const width = enJour ? Math.max(100 / cols, 30) : 55;
+  return { left: col * ((100 - width) / (cols - 1)), width: width };
+}
+function agCalOpenDay(key) {
+  const m = String(key).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return;
+  agCal.refDate = new Date(+m[1], +m[2] - 1, +m[3]);
+  agCal.view = 'day';
+  loadAgendaCalendarEvents();
+}
+
+// Grille horaire (semaine : 7 jours, jour : 1 seul). Structure flex : en-tête, rangée « bandeaux », corps défilable.
+function _agRenderTimeGrid(days) {
+  const enJour = days.length === 1;
   const todayKey = _agDateKey(new Date());
   const DOW = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-  // Grille réelle (défilable) : 24h. Fenêtre visible par défaut au chargement
-  // (hauteur figée du conteneur de scroll) : AG_CAL_HOUR_START→AG_CAL_HOUR_END,
-  // inchangée visuellement pour qui ne scrolle pas.
+  const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const totalHours = AG_CAL_GRID_END - AG_CAL_GRID_START;
   const gridHeight = totalHours * AG_CAL_ROW_H;
   const viewportHeight = (AG_CAL_HOUR_END - AG_CAL_HOUR_START) * AG_CAL_ROW_H;
-
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(_agAddDays(start, i));
+  const pad2 = function (n) { return String(n).padStart(2, '0'); };
+  const clic = function (e) {
+    return 'event.stopPropagation();openAgendaEventModal(\'' + e.id + '\')';
+  };
 
   let headerRow = '<div class="cal-week-corner"></div>';
-  days.forEach(function (d, idx) {
+  days.forEach(function (d) {
     const key = _agDateKey(d);
+    const idx = (d.getDay() + 6) % 7;
     headerRow +=
-      '<div class="cal-week-head' +
-      (key === todayKey ? ' cal-week-head-today' : '') +
-      '">' +
-      DOW[idx] +
-      ' <b>' +
-      d.getDate() +
-      '</b></div>';
+      '<div class="cal-week-head' + (key === todayKey ? ' cal-week-head-today' : '') + '" style="cursor:pointer;" title="Voir ce jour seul" onclick="agCalOpenDay(\'' + key + '\')">' +
+      (enJour ? JOURS[d.getDay()] : DOW[idx]) + ' <b>' + d.getDate() + '</b></div>';
   });
+
+  // Rangée des bandeaux (journées entières et événements de 20 h et plus) : jamais dans la grille des heures.
+  const bandeaux = days.map(function (d) { return _agBandeauxDuJour(d); });
+  let alldayRow = '';
+  if (bandeaux.some(function (l) { return l.length; })) {
+    const maxVus = enJour ? 8 : 3;
+    alldayRow = '<div class="cal-week-alldayrow"><div class="cal-week-corner cal-week-corner-allday"></div>';
+    bandeaux.forEach(function (liste) {
+      alldayRow += '<div class="cal-week-allday-cell">';
+      liste.slice(0, maxVus).forEach(function (e) {
+        alldayRow +=
+          '<div class="cal-week-allday' + (e.source === 'apple' ? ' cal-week-allday-apple' : '') + (e.source === 'doctolib' ? ' cal-week-allday-doctolib' : '') +
+          '" style="' + _agEventAccentStyle(e) + '" onclick="' + clic(e) + '" title="' + _agTitleAttr(e) + '">' + _escHtml(_agLabel(e)) + '</div>';
+      });
+      if (liste.length > maxVus) alldayRow += '<div class="cal-more" onclick="agCalOpenDay(\'' + _agDateKey(days[bandeaux.indexOf(liste)]) + '\')">+' + (liste.length - maxVus) + ' de plus</div>';
+      alldayRow += '</div>';
+    });
+    alldayRow += '</div>';
+  }
 
   let hourCol = '';
   for (let h = AG_CAL_GRID_START; h < AG_CAL_GRID_END; h++) {
@@ -2678,112 +2759,50 @@ function _agRenderWeekGrid() {
   let dayCols = '';
   days.forEach(function (d) {
     const key = _agDateKey(d);
-    // #182-bis — recoupement du jour (pas seulement jour de départ), pour
-    // que la portion après-minuit d'un événement horodaté reste visible.
-    const dayEvents = _agTimedEventsOverlappingDay(d);
-    const allDay = _agEventsOnDay(key).filter(function (e) {
-      return !e.start || !e.start.includes('T');
-    });
-
+    // Recoupement du jour (pas seulement le jour de départ) : la portion après minuit d'un événement horodaté reste visible (#182-bis).
+    const dayEvents = _agTimedEventsOverlappingDay(d).filter(function (e) { return !_agEstBandeau(e); });
     let colInner = '';
     for (let h = AG_CAL_GRID_START; h < AG_CAL_GRID_END; h++) {
       colInner += '<div class="cal-week-hourline" style="height:' + AG_CAL_ROW_H + 'px;"></div>';
     }
-    allDay.forEach(function (e) {
-      colInner +=
-        '<div class="cal-week-allday' +
-        (e.source === 'apple' ? ' cal-week-allday-apple' : '') +
-        (e.source === 'doctolib' ? ' cal-week-allday-doctolib' : '') +
-        '" style="' +
-        _agEventAccentStyle(e) +
-        '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
-        e.id +
-        '\')" title="' +
-        _agTitleAttr(e) +
-        '">' +
-        _escHtml(_agLabel(e)) +
-        '</div>';
-    });
-    // #192 — segments du jour + calage anti-recouvrement (côte à côte plutôt
-    // que superposés) avant rendu.
     const daySegs = dayEvents
       .map(function (e) {
         const seg = _agEventSegmentOnDay(e, d);
         return seg ? { e: e, segStart: seg.segStart, segEnd: seg.segEnd } : null;
       })
-      .filter(function (x) {
-        return x !== null;
-      });
+      .filter(function (x) { return x !== null; });
     _agLayoutOverlaps(daySegs).forEach(function (it) {
       const e = it.e;
-      const s = it.segStart;
+      const s0 = it.segStart;
       const en = it.segEnd;
-      // Grille = 24h entières (AG_CAL_GRID_START=0) : plus de clamp/rejet
-      // ici, un rendez-vous avant 7h ou après 21h reste positionné à sa
-      // vraie heure, simplement hors de la fenêtre visible par défaut —
-      // atteignable en scrollant (#182-ter).
-      const startMin = (s.getHours() - AG_CAL_GRID_START) * 60 + s.getMinutes();
-      const rawDurMin = Math.max(15, (en.getTime() - s.getTime()) / 60000);
-      const durMin = Math.min(rawDurMin, totalHours * 60 - startMin); // ne déborde pas la grille
+      const startMin = (s0.getHours() - AG_CAL_GRID_START) * 60 + s0.getMinutes();
+      const rawDurMin = Math.max(15, (en.getTime() - s0.getTime()) / 60000);
+      const durMin = Math.min(rawDurMin, totalHours * 60 - startMin);
       const top = (startMin / 60) * AG_CAL_ROW_H;
-      const height = Math.max(18, (durMin / 60) * AG_CAL_ROW_H);
-      // it._cols = nb de rendez-vous simultanés dans ce créneau (1 si seul) ;
-      // it._col = sa position parmi eux — se partagent la largeur de colonne
-      // au lieu de se recouvrir. right:auto nécessaire pour que width prenne
-      // le dessus sur le left:2px;right:2px par défaut de .cal-week-event.
+      const height = Math.max(20, (durMin / 60) * AG_CAL_ROW_H - 1);
       const cols = it._cols || 1;
       const col = it._col || 0;
-      const leftPct = (col / cols) * 100;
-      const widthPct = 100 / cols;
+      const g = _agGeomEvenement(col, cols, enJour);
+      const heure = pad2(s0.getHours()) + ':' + pad2(s0.getMinutes());
       colInner +=
-        '<div class="cal-week-event' +
-        (e.source === 'apple' ? ' cal-week-event-apple' : '') +
-        (e.source === 'doctolib' ? ' cal-week-event-doctolib' : '') +
-        '" style="top:' +
-        top +
-        'px;height:' +
-        height +
-        'px;left:calc(' +
-        leftPct +
-        '% + 2px);right:auto;width:calc(' +
-        widthPct +
-        '% - 4px);' +
-        _agEventAccentStyle(e) +
-        '" onclick="event.stopPropagation();openAgendaEventModal(\'' +
-        e.id +
-        '\')" title="' +
-        _agTitleAttr(e) +
-        '">' +
-        _escHtml(_agLabel(e)) +
-        '</div>';
+        '<div class="cal-week-event' + (enJour ? ' cal-week-event-jour' : '') + (e.source === 'apple' ? ' cal-week-event-apple' : '') + (e.source === 'doctolib' ? ' cal-week-event-doctolib' : '') +
+        '" style="top:' + top + 'px;height:' + height + 'px;left:calc(' + g.left + '% + 2px);right:auto;width:calc(' + g.width + '% - 4px);z-index:' + (col + 1) + ';' + _agEventAccentStyle(e) +
+        '" onclick="' + clic(e) + '" title="' + _agTitleAttr(e) + '">' +
+        '<b>' + heure + '</b> ' + _escHtml(_agLabel(e)) + '</div>';
     });
-
     dayCols +=
-      '<div class="cal-week-col" style="height:' +
-      gridHeight +
-      'px;" onclick="' +
+      '<div class="cal-week-col" style="height:' + gridHeight + 'px;" onclick="' +
       (agCal.googleConnected ? "openAgendaEventModal(null,'" + key + 'T' + String(AG_CAL_HOUR_START).padStart(2, '0') + ":00')" : '') +
-      '">' +
-      colInner +
-      '</div>';
+      '">' + colInner + '</div>';
   });
 
   return (
-    '<div class="cal-week-wrap">' +
-    '<div class="cal-week-headerrow">' +
-    headerRow +
-    '</div>' +
-    // Hauteur figée = fenêtre 7h-21h par défaut ; le contenu réel (24h) déborde
-    // et devient consultable au scroll (overflow-y:auto), cf. renderAgendaCalendar()
-    // pour le scrollTop initial/préservé.
-    '<div class="cal-week-bodyrow" style="max-height:' +
-    viewportHeight +
-    'px;overflow-y:auto;">' +
-    '<div class="cal-week-hourcol">' +
-    hourCol +
-    '</div>' +
-    dayCols +
-    '</div>' +
+    '<div class="cal-week-wrap' + (enJour ? ' cal-day-wrap' : '') + '">' +
+    '<div class="cal-week-headerrow">' + headerRow + '</div>' +
+    alldayRow +
+    // Hauteur figée = fenêtre 7h-21h par défaut ; le contenu réel (24h) déborde et se consulte au défilement.
+    '<div class="cal-week-bodyrow" data-vue="' + (enJour ? 'day' : 'week') + '" style="max-height:' + viewportHeight + 'px;overflow-y:auto;">' +
+    '<div class="cal-week-hourcol">' + hourCol + '</div>' + dayCols + '</div>' +
     '</div>'
   );
 }
@@ -2884,7 +2903,7 @@ function openAgendaEventModal(eventId, prefillLocal) {
     if (ev.target === overlay) closeAgendaEventModal();
   };
   overlay.innerHTML =
-    '<div class="cal-event-modal">' +
+    '<div class="cal-event-modal cal-event-modal-large">' +
     '<div class="stitle">' +
     (existing ? 'Modifier l\'événement' : 'Nouvel événement') +
     '</div>' +
@@ -2893,6 +2912,7 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '<label><input type="radio" name="agenda-ev-mode" value="nouveau" onchange="agEvMode()"/> RDV nouveau patient</label>' +
     '<label><input type="radio" name="agenda-ev-mode" value="libre" onchange="agEvMode()"' + (patientLie ? '' : ' checked') + '/> Texte libre</label>' +
     '</div>' +
+    '<div class="cal-ev-cols"><div class="cal-ev-col">' +
     '<div id="agenda-ev-libre"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div>' +
     '<input class="inp" id="agenda-ev-title" placeholder="Consultation..." value="' +
     (existing ? _escHtml(existing.summary) : '') +
@@ -2904,7 +2924,7 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">' +
     '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom *</div><input class="inp" id="agenda-ev-nom" type="text" autocomplete="off"/></div>' +
     '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prénom *</div><input class="inp" id="agenda-ev-prenom" type="text" autocomplete="off"/></div>' +
-    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance *</div><input class="inp" id="agenda-ev-ddn" type="date" autocomplete="off"/></div>' +
+    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance</div><input class="inp" id="agenda-ev-ddn" type="date" autocomplete="off"/></div>' +
     '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Téléphone</div><input class="inp" id="agenda-ev-tel" type="tel" autocomplete="off"/></div>' +
     '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">E-mail *</div><input class="inp" id="agenda-ev-email" type="email" autocomplete="off"/></div>' +
     '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Adresse</div><input class="inp" id="agenda-ev-adresse" type="text" autocomplete="off"/></div>' +
@@ -2914,8 +2934,9 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '<datalist id="agenda-ev-motifs">' + _rdvMotifsPropose().map(function (m) { return '<option value="' + _escHtml(m) + '"></option>'; }).join('') + '</datalist>' +
     '<div id="agenda-ev-info" style="font-size:12px;margin-top:6px;"></div>' +
     '<div style="font-size:10px;color:var(--mut);margin-top:4px;">Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy.</div>' +
-    '<div style="font-size:11px;color:var(--mut);margin-top:6px;">À l\u2019enregistrement, si le nom, le prénom, la date de naissance et l\u2019e-mail sont renseignés : fiche, accès portail et devis (si le motif est un de vos actes) partent tout de suite, et le questionnaire est programmé 3 jours avant le rendez-vous. Sinon rien n\u2019est envoyé et une notification vous le dit.</div>' +
+    '<div style="font-size:11px;color:var(--mut);margin-top:6px;">À l\u2019enregistrement, si le nom, le prénom et l\u2019e-mail sont renseignés (sans date de naissance, un code provisoire est généré pour la 1re connexion) : fiche, accès portail et devis (si le motif est un de vos actes) partent tout de suite, et le questionnaire est programmé 3 jours avant le rendez-vous. Sinon rien n\u2019est envoyé et une notification vous le dit.</div>' +
     '</div>' +
+    '</div><div class="cal-ev-col">' +
     // #187 — sélecteur de compte Google cible, uniquement à la création et
     // seulement s'il y a un vrai choix à faire (>1 compte connecté). En
     // édition, l'événement reste sur son compte d'origine (existing.connectionId,
@@ -2941,6 +2962,7 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '<div style="margin-top:6px;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Description</div><textarea class="inp" id="agenda-ev-desc" rows="2">' +
     (existing ? _escHtml(existing.description || '') : '') +
     '</textarea></div>' +
+    '</div></div>' +
     '<div style="display:flex;gap:8px;margin-top:12px;">' +
     '<button class="btn btn-blue" onclick="saveAgendaEvent()" style="flex:1;">✓ Enregistrer</button>' +
     (existing ? '<button class="btn btn-red" onclick="deleteAgendaEvent()">🗑</button>' : '') +
@@ -34564,11 +34586,12 @@ async function _notifChargerMot(notifId, e) {
 async function _notifChargerMail(notifId, e) {
   const p = (Array.isArray(patients) ? patients : []).find((x) => x.id == e.cible.patientId);
   let identifiant = '';
+  let code = '';
   if (p && p._cloudId && (e.mail === 'acces' || e.mail === 'acces_devis')) {
-    try { const c = await _portailLireCompte(p); identifiant = c && c.identifiant ? c.identifiant : ''; } catch (_err) { identifiant = ''; }
+    try { const c = await _portailLireCompte(p); identifiant = c && c.identifiant ? c.identifiant : ''; code = c && c.code_provisoire ? c.code_provisoire : ''; } catch (_err) { identifiant = ''; }
   }
   const lien = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') + 'patient/' : '';
-  const texte = p ? _rdvTexteMail(e.mail, { prenom: p.prenom || '', cabinet: _portailCabinet(p), identifiant: identifiant, lien: lien }) : 'Fiche patient introuvable sur cet appareil.';
+  const texte = p ? _rdvTexteMail(e.mail, { prenom: p.prenom || '', cabinet: _portailCabinet(p), identifiant: identifiant, code: code, lien: lien }) : 'Fiche patient introuvable sur cet appareil.';
   const cible = document.getElementById('notif-mail-corps');
   if (cible && _notifDetailId === notifId) cible.textContent = texte;
 }
@@ -36601,7 +36624,15 @@ async function _portailLireCompte(p) {
   if (res.status === 400) res = await requete(base); // le SQL du blocage n'est pas encore posé : la fenêtre reste utilisable
   if (!res.ok) throw new Error('lecture ' + res.status);
   const l = await res.json();
-  return Array.isArray(l) && l.length ? l[0] : null;
+  const compte = Array.isArray(l) && l.length ? l[0] : null;
+  // Code provisoire (fiche sans date de naissance) : lu par une fonction réservée au praticien, tant que l'accès n'a pas servi.
+  if (compte && compte.statut === 'initial') {
+    try {
+      const c = await _portailRpc('portail_code_provisoire', { p_patient: p._cloudId });
+      if (typeof c === 'string' && c) compte.code_provisoire = c;
+    } catch (_e) { /* SQL pas encore posé : la fenêtre reste utilisable */ }
+  }
+  return compte;
 }
 function _portailFermer() {
   const m = document.getElementById('portail-patient-modal');
@@ -36618,16 +36649,14 @@ function _portailAfficher(idx, compte, message) {
     '<div style="font-size:12px;color:var(--mut);margin-bottom:12px;">' + _escHtml((p.prenom || '') + ' ' + (p.nom || '')) + '</div>';
   if (message) html += '<div id="portail-msg" role="alert" style="margin-bottom:12px;padding:10px;border-radius:8px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:13px;">' + _escHtml(message) + '</div>';
   if (!compte) {
-    html += '<div style="font-size:13px;color:var(--txt);line-height:1.5;margin-bottom:14px;">Le patient aura un <strong>identifiant</strong> à lui. À sa première connexion, son mot de passe est sa <strong>date de naissance à l\'envers</strong> (année, mois, jour), puis il choisit le sien.</div>' +
+    html += '<div style="font-size:13px;color:var(--txt);line-height:1.5;margin-bottom:14px;">Le patient aura un <strong>identifiant</strong> à lui. À sa première connexion, son mot de passe est sa <strong>date de naissance à l\'envers</strong> (année, mois, jour), puis il choisit le sien. Sans date de naissance sur la fiche, un <strong>code provisoire</strong> est généré à la place.</div>' +
       '<button class="btn btn-blue" id="portail-creer" onclick="portailCreerAcces(' + idx + ')">Créer l\'accès</button>';
   } else {
     html += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:12px;">' +
       '<div style="font-size:11px;color:var(--mut);">Identifiant du patient</div>' +
       '<div id="portail-identifiant" style="font-size:24px;font-weight:700;letter-spacing:2px;color:var(--txt);">' + _escHtml(compte.identifiant) + '</div>' +
       '<div style="font-size:12px;color:var(--mut);margin-top:6px;">' + _escHtml(_portailLibelleStatut(compte)) + '</div>' +
-      (compte.statut === 'initial'
-        ? '<div style="font-size:12px;color:var(--txt);margin-top:8px;">Mot de passe de la 1<sup>re</sup> connexion : date de naissance à l\'envers → <strong>' + _escHtml(_portailSecretDdnAffiche(p)) + '</strong> (à usage unique)</div>'
-        : '') +
+      (compte.statut === 'initial' ? _portailHtmlPremiereConnexion(p, compte) : '') +
       (compte.bloque_jusqu && new Date(compte.bloque_jusqu) > new Date()
         ? '<div style="font-size:12px;color:#991b1b;margin-top:6px;">🔒 Bloqué temporairement après des essais incorrects.</div>' : '') +
       '</div>';
@@ -36654,6 +36683,17 @@ function _portailAfficher(idx, compte, message) {
   }
   cadre.innerHTML = html;
   if (compte) { _portailChargerProgramme(idx); _portailChargerSuivi(idx); _portailChargerDocs(idx); _portailChargerQuestionnaire(idx); }
+}
+// 1re connexion : date de naissance à l'envers (si la fiche en a une) et/ou code provisoire (fiche sans date, ou accès créé sans date).
+function _portailHtmlPremiereConnexion(p, compte) {
+  const ligne = (t) => '<div style="font-size:12px;color:var(--txt);margin-top:8px;">' + t + '</div>';
+  const ddn = _portailSecretDdn(p);
+  const code = compte && compte.code_provisoire ? compte.code_provisoire : '';
+  let h = '';
+  if (code) h += ligne('Mot de passe de la 1<sup>re</sup> connexion : <strong>code provisoire</strong> → <strong id="portail-code-provisoire" style="font-size:18px;letter-spacing:2px;">' + _escHtml(code) + '</strong> (à usage unique, à donner au patient s\'il a perdu l\'e-mail)');
+  if (ddn) h += ligne((code ? 'Ou, tant que le code n\'a pas servi : ' : 'Mot de passe de la 1<sup>re</sup> connexion : ') + 'date de naissance à l\'envers → <strong>' + _escHtml(ddn) + '</strong>' + (code ? '' : ' (à usage unique)'));
+  if (!ddn && !code) h += ligne('⚠️ Pas de date de naissance sur la fiche et pas de code : cliquez sur « Réinitialiser l\'accès » pour générer un code provisoire.');
+  return h;
 }
 function _portailSecretDdnAffiche(p) {
   return _portailSecretDdn(p) || '—';
@@ -36703,7 +36743,6 @@ async function portailCreerAcces(idx) {
   const p = patients[idx];
   if (!p) return;
   if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
-  if (!_portailSecretDdn(p)) { _portailAfficher(idx, null, 'Renseignez la date de naissance du patient pour créer l\'accès.'); return; }
   const b = document.getElementById('portail-creer');
   if (b) b.disabled = true;
   try {
@@ -36718,7 +36757,7 @@ async function portailAction(idx, action) {
   const p = patients[idx];
   if (!p) return;
   if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
-  if (action === 'reinitialiser' && !confirm('Réinitialiser l\'accès ? Le patient devra se reconnecter avec sa date de naissance et choisir un nouveau mot de passe.')) return;
+  if (action === 'reinitialiser' && !confirm('Réinitialiser l\'accès ? Le patient devra se reconnecter avec sa date de naissance (ou un nouveau code provisoire si la fiche n\'en a pas) et choisir un nouveau mot de passe.')) return;
   if (action === 'suspendre' && !confirm('Fermer l\'accès de ce patient au portail ?')) return;
   try {
     const r = await _portailAppeler(action, p);
@@ -37752,7 +37791,6 @@ async function portailApercu(idx, ecran) {
     if (!r0.ok) { echec(r0.message); return; }
     let compte = await _portailLireCompte(p);
     if (!compte) {
-      if (!_portailSecretDdn(p)) { echec('Renseignez la date de naissance du patient pour créer l\'accès.'); return; }
       const r = await _portailAppeler('creer', p, { cabinet: _portailCabinet(p) });
       if (!(r.status === 200 && r.body && r.body.ok)) { echec((r.body && r.body.message) || 'Création de l\'accès impossible, réessayez.'); return; }
       _portailCompteCache.delete(p._cloudId);
@@ -38017,7 +38055,8 @@ function _rdvManque(s) {
   const m = [];
   if (!_rdvTexte(x.nom)) m.push('nom');
   if (!_rdvTexte(x.prenom)) m.push('prénom');
-  if (!_rdvTexte(x.ddn) || validerFichePatient({ ddn: _rdvTexte(x.ddn) })) m.push('date de naissance');
+  // Date de naissance facultative (sans elle : code provisoire généré par le serveur) ; si elle est saisie, elle doit être valide.
+  if (_rdvTexte(x.ddn) && validerFichePatient({ ddn: _rdvTexte(x.ddn) })) m.push('date de naissance');
   if (!_rdvTexte(x.email) || validerFichePatient({ email: _rdvTexte(x.email) })) m.push('e-mail');
   return m;
 }
@@ -38042,7 +38081,7 @@ function _rdvPreparerFiche(s, existante) {
     if (modifs.length) { try { savePatients(); } catch (_e) { /* repris au prochain enregistrement */ } }
     return { patient: existante, creee: false, completee: modifs.length > 0 };
   }
-  const identite = _rdvTexte(x.nom) && _rdvTexte(x.prenom) && _rdvTexte(x.ddn) && !validerFichePatient({ ddn: _rdvTexte(x.ddn) });
+  const identite = _rdvTexte(x.nom) && _rdvTexte(x.prenom) && !(_rdvTexte(x.ddn) && validerFichePatient({ ddn: _rdvTexte(x.ddn) }));
   if (!identite) return { patient: null, creee: false, completee: false };
   const doublon = _rdvTrouverFiche(x);
   if (doublon) return _rdvPreparerFiche(x, doublon);
@@ -38113,10 +38152,11 @@ async function _rdvDevis(o, p) {
 }
 // Cœur du dispositif. o = { source, debut (date-heure locale « AAAA-MM-JJTHH:MM »), motif, patient (fiche), manuel, modif }.
 async function _rdvOrganiser(o) {
-  const res = { patient: o.patient || null, manque: [], acces: '', devis: { etat: '' }, mail: '', questionnaire: '', visibleLe: '', erreurs: [] };
+  const res = { patient: o.patient || null, sansDdn: false, manque: [], acces: '', devis: { etat: '' }, mail: '', questionnaire: '', visibleLe: '', erreurs: [] };
   const p = o.patient;
   const s = o.saisie || {};
   const manque = p ? _rdvManque({ nom: p.nom, prenom: p.prenom, ddn: p.ddn, email: p.email }) : _rdvManque(s);
+  if (!p && !manque.length) manque.push('identité du patient');
   if (manque.length) {
     res.manque = manque;
     _rdvSansEnvoi(o, p, 'Il manque : ' + manque.join(', '), 'informations manquantes');
@@ -38142,6 +38182,7 @@ async function _rdvOrganiser(o) {
   }
   _portailCompteCache.delete(p._cloudId);
   const jamaisConnecte = r.body.statut === 'initial';
+  res.sansDdn = !_rdvTexte(p.ddn);
   res.acces = r.body.existe ? 'existant' : 'cree';
   res.devis = await _rdvDevis(o, p);
   const devisCree = res.devis.etat === 'cree';
@@ -38176,6 +38217,7 @@ function _rdvResume(res, fiche) {
   else if (fiche && fiche.completee) l.push('• Fiche patient complétée.');
   if (res.acces) {
     l.push(res.acces === 'cree' ? '• Accès portail créé.' : '• Accès portail déjà existant.');
+    if (res.sansDdn) l.push('• Pas de date de naissance : un code provisoire a été généré pour la 1re connexion. Vous le retrouvez sous la clé 🔑 de la fiche.');
     if (res.mail === 'acces') l.push('• Identifiants + information devis : e-mail généré en boîte d\u2019essai (Notifications).');
     else if (res.mail === 'devis') l.push('• E-mail « un devis vous attend » généré en boîte d\u2019essai (Notifications).');
     else l.push('• Pas de nouveaux identifiants (déjà envoyés ou déjà utilisés).');
@@ -38203,7 +38245,9 @@ function _rdvTexteMail(genre, ctx) {
     return 'Objet : Votre espace patient' + (c.cabinet ? ' — ' + c.cabinet : '') + '\n\n' + sal + '\n\nVotre rendez-vous est enregistré et votre espace patient est prêt.' +
       (genre === 'acces_devis' ? '\nUn devis vous attend dans « Mes documents » : vous pouvez le lire et le signer depuis votre espace.' : '') +
       '\n\nVotre identifiant : ' + (c.identifiant || '(indisponible)') +
-      '\nPremière connexion : tapez votre date de naissance à l\u2019envers, sans espace (année, mois, jour). Exemple : 17 mai 2010 → 20100517. Vous choisirez ensuite votre propre mot de passe.' + lien +
+      (c.code
+        ? '\nPremière connexion : tapez ce code provisoire à la place du mot de passe : ' + c.code + '\nVous choisirez ensuite votre propre mot de passe.'
+        : '\nPremière connexion : tapez votre date de naissance à l\u2019envers, sans espace (année, mois, jour). Exemple : 17 mai 2010 → 20100517. Vous choisirez ensuite votre propre mot de passe.') + lien +
       '\n\nUn questionnaire à remplir avant le rendez-vous apparaîtra aussi dans votre espace quelques jours avant la consultation.' + pied;
   }
   if (genre === 'devis') return 'Objet : Un devis vous attend\n\n' + sal + '\n\nUn devis est disponible dans « Mes documents » de votre espace patient. Vous pouvez le lire et le signer depuis votre espace.' + lien + pied;

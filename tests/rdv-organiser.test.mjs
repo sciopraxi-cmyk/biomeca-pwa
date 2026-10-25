@@ -189,9 +189,10 @@ const org = (f, p, o) =>
   );
 
 describe('informations obligatoires', () => {
-  it('liste ce qui manque (nom, prénom, naissance, e-mail)', () => {
+  it('liste ce qui manque (nom, prénom, e-mail ; la date de naissance est facultative mais doit être valide)', () => {
     const { f } = monter();
-    expect(f._rdvManque({})).toEqual(['nom', 'prénom', 'date de naissance', 'e-mail']);
+    expect(f._rdvManque({})).toEqual(['nom', 'prénom', 'e-mail']);
+    expect(f._rdvManque({ ...SAISIE, ddn: '' })).toEqual([]);
     expect(f._rdvManque(SAISIE)).toEqual([]);
     expect(f._rdvManque({ ...SAISIE, email: 'pas-un-mail' })).toEqual(['e-mail']);
     expect(f._rdvManque({ ...SAISIE, ddn: '2999-01-01' })).toEqual(['date de naissance']);
@@ -209,15 +210,44 @@ describe('informations obligatoires', () => {
     expect(srv.notifs[0][1].detail).toMatch(/e-mail/);
     expect(f._rdvResume(res, null)).toMatch(/RIEN n.a été envoyé/);
   });
-  it('saisie incomplète sans fiche (nouveau patient sans naissance) : rien non plus', async () => {
+  it('nouveau patient SANS date de naissance : fiche créée, accès + devis + questionnaire partent, code provisoire annoncé', async () => {
+    const { f, srv } = monter({ actes: ACTES });
+    const saisie = {
+      nom: 'Sans',
+      prenom: 'Date',
+      ddn: '',
+      tel: '',
+      email: 'sd@exemple.fr',
+      adresse: '',
+    };
+    const fiche = f._rdvPreparerFiche(saisie, null);
+    expect(fiche.creee).toBe(true);
+    expect(fiche.patient.ddn).toBe('');
+    const res = await org(f, fiche.patient, { source: 'ag:e2', saisie });
+    expect(res.manque).toEqual([]);
+    expect(res.sansDdn).toBe(true);
+    expect(srv.appels.length).toBe(1);
+    expect(srv.docs.length).toBe(1);
+    expect(srv.rpc.some((r) => r[0] === 'questionnaire_demander')).toBe(true);
+    const txt = f._rdvResume(res, fiche);
+    expect(txt).toMatch(/Pas de date de naissance : un code provisoire/);
+    expect(txt).toMatch(/clé 🔑/);
+  });
+  it('avec date de naissance : pas de mention du code provisoire', async () => {
+    const p = fiche();
+    const { f } = monter({ patients: [p], actes: ACTES });
+    const res = await org(f, p, { source: 'ag:e2b' });
+    expect(res.sansDdn).toBe(false);
+    expect(f._rdvResume(res, null)).not.toMatch(/code provisoire/);
+  });
+  it('aucune fiche et saisie complète : garde-fou (pas de plantage)', async () => {
     const { f, srv } = monter({ actes: ACTES });
     const res = await org(f, null, {
-      source: 'ag:e2',
+      source: 'ag:e2c',
       saisie: { nom: 'A', prenom: 'B', email: 'a@b.fr' },
     });
-    expect(res.manque).toEqual(['date de naissance']);
+    expect(res.manque).toEqual(['identité du patient']);
     expect(srv.appels).toEqual([]);
-    expect(types(srv)).toEqual(['rdv_sans_envoi']);
   });
 });
 
@@ -412,7 +442,10 @@ describe('fiche patient', () => {
   });
   it('identité incomplète : aucune fiche créée', () => {
     const { f } = monter();
-    expect(f._rdvPreparerFiche({ nom: 'A', prenom: 'B', ddn: '' }, null).patient).toBe(null);
+    expect(f._rdvPreparerFiche({ nom: 'A', prenom: '', ddn: '2010-01-01' }, null).patient).toBe(
+      null
+    );
+    expect(f._rdvPreparerFiche({ nom: 'A', prenom: 'B', ddn: '' }, null).creee).toBe(true); // sans naissance : créée
     expect(f._rdvPreparerFiche({ nom: 'A', prenom: 'B', ddn: '2999-01-01' }, null).patient).toBe(
       null
     );
@@ -455,6 +488,19 @@ describe('textes des e-mails d\u2019essai', () => {
     expect(t).toMatch(/date de naissance à l.envers/);
     expect(t).toMatch(/20100517/);
     expect(t).toMatch(/https:\/\/x\.invalid\/patient\//);
+  });
+  it('fiche sans date de naissance : le texte donne le code provisoire, pas la date à l’envers', () => {
+    const { f } = monter();
+    const t = f._rdvTexteMail('acces', {
+      prenom: 'Léa',
+      identifiant: 'abc-123',
+      code: 'ABCD-2345',
+    });
+    expect(t).toMatch(/code provisoire/);
+    expect(t).toMatch(/ABCD-2345/);
+    expect(t).not.toMatch(/à l.envers/);
+    expect(f._rdvTexteMail('acces_devis', { code: 'ABCD-2345' })).toMatch(/ABCD-2345/);
+    expect(f._rdvTexteMail('acces', { identifiant: 'z' })).toMatch(/à l.envers/);
   });
   it('accès seul : pas de devis ; les 5 genres produisent un texte', () => {
     const { f } = monter();

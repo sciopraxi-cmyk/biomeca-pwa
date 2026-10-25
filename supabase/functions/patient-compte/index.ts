@@ -14,6 +14,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   ddnVersSecret,
+  genererCodeProvisoire,
   emailTechnique,
   genererIdentifiant,
   ipClient,
@@ -86,7 +87,9 @@ Deno.serve(async (req) => {
   const ip = ipClient(req.headers);
   const { data: existant } = await supaAdmin
     .from('patient_comptes')
-    .select('id, praticien_id, auth_user_id, identifiant, statut, premier_acces_at')
+    .select(
+      'id, praticien_id, auth_user_id, identifiant, statut, premier_acces_at, code_provisoire'
+    )
     .eq('patient_id', patientId)
     .maybeSingle();
 
@@ -104,6 +107,12 @@ Deno.serve(async (req) => {
       const cabinet = typeof body.cabinet === 'string' ? body.cabinet.trim().slice(0, 120) : '';
       if (cabinet)
         await supaAdmin.from('patient_comptes').update({ cabinet }).eq('id', existant.id);
+      // Fiche sans date de naissance, accès jamais utilisé et sans code : on en génère un (visible via la clé 🔑).
+      if (existant.statut === 'initial' && !ddnVersSecret(pat.ddn) && !existant.code_provisoire)
+        await supaAdmin
+          .from('patient_comptes')
+          .update({ code_provisoire: genererCodeProvisoire() })
+          .eq('id', existant.id);
       return json({
         ok: true,
         identifiant: existant.identifiant,
@@ -111,15 +120,8 @@ Deno.serve(async (req) => {
         existe: true,
       });
     }
-    if (!ddnVersSecret(pat.ddn)) {
-      return json(
-        {
-          error: 'ddn_manquante',
-          message: 'La date de naissance de la fiche est nécessaire pour créer l’accès.',
-        },
-        400
-      );
-    }
+    // Sans date de naissance : code provisoire généré par le logiciel (remplace la date à la 1re connexion).
+    const codeProvisoire = ddnVersSecret(pat.ddn) ? null : genererCodeProvisoire();
     const cabinet = typeof body.cabinet === 'string' ? body.cabinet.trim().slice(0, 120) : null;
     for (let essai = 0; essai < 5; essai++) {
       const identifiant = genererIdentifiant();
@@ -148,6 +150,7 @@ Deno.serve(async (req) => {
           auth_user_id: cree.user.id,
           identifiant,
           cabinet: cabinet || null,
+          code_provisoire: codeProvisoire,
         })
         .select('id, statut')
         .single();
@@ -189,12 +192,7 @@ Deno.serve(async (req) => {
     return json({ error: 'compte_inexistant', message: 'Aucun accès créé pour ce patient.' }, 404);
 
   if (action === 'reinitialiser') {
-    if (!ddnVersSecret(pat.ddn)) {
-      return json(
-        { error: 'ddn_manquante', message: 'La date de naissance de la fiche est nécessaire.' },
-        400
-      );
-    }
+    const codeProvisoire = ddnVersSecret(pat.ddn) ? null : genererCodeProvisoire();
     // Nouveau mot de passe Supabase aléatoire : l'ancien mot de passe choisi ne marche plus.
     const { error: mErr } = await supaAdmin.auth.admin.updateUserById(existant.auth_user_id, {
       password: motDePasseAleatoire(),
@@ -208,6 +206,7 @@ Deno.serve(async (req) => {
         bloque_jusqu: null,
         ticket_nonce: null,
         premier_acces_at: null,
+        code_provisoire: codeProvisoire,
       })
       .eq('id', existant.id);
     await journal('reinitialise', existant.id);

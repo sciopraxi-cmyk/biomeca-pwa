@@ -125,11 +125,12 @@ describe('aperçu praticien — branchements', () => {
     expect(src).not.toMatch(/Enregistrez d\\'abord la fiche du patient/);
     expect((src.match(/_portailAssurerFiche\(p\)/g) || []).length).toBeGreaterThanOrEqual(3);
   });
-  it('date de naissance manquante : message clair, pas de création', () => {
-    expect(src).toMatch(/Renseignez la date de naissance du patient pour créer l\\'accès/);
+  it('date de naissance manquante : plus de blocage, le serveur génère un code provisoire', () => {
+    expect(src).not.toMatch(/Renseignez la date de naissance du patient pour créer l\\'accès/);
+    expect(src).toMatch(/_portailHtmlPremiereConnexion/);
   });
   it('service workers incrémentés', () => {
     expect(lire('patient/sw.js')).toMatch(/verticy-patient-v20/);
-    expect(lire('service-worker.js')).toMatch(/biomeca-v260/);
+    expect(lire('service-worker.js')).toMatch(/biomeca-v261/);
   });
 });
