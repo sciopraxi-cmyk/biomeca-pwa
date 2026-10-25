@@ -839,7 +839,7 @@
    3,
    "label",
    [],
-   "Rendez-vous patient"
+   "RDV patient existant"
   ],
   [
    4,
@@ -860,6 +860,35 @@
     [
      "value",
      "patient"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "RDV nouveau patient"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "nouveau"
     ]
    ],
    ""
@@ -951,11 +980,22 @@
   [
    3,
    "div",
+   [
+    [
+     "id",
+     "agenda-ev-choix"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
    [],
    "Patient *"
   ],
   [
-   3,
+   4,
    "input",
    [
     [
@@ -990,12 +1030,228 @@
    ""
   ],
   [
-   3,
+   4,
    "datalist",
    [
     [
      "id",
      "agenda-ev-patients"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Nom *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-nom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Prénom *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-prenom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Date de naissance *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-ddn"
+    ],
+    [
+     "type",
+     "date"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Téléphone"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-tel"
+    ],
+    [
+     "type",
+     "tel"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "E-mail *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-email"
+    ],
+    [
+     "type",
+     "email"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Adresse"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-adresse"
+    ],
+    [
+     "type",
+     "text"
     ]
    ],
    ""
@@ -1064,6 +1320,12 @@
    "div",
    [],
    "Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy."
+  ],
+  [
+   3,
+   "div",
+   [],
+   "À l’enregistrement, si le nom, le prénom, la date de naissance et l’e-mail sont renseignés : fiche, accès portail et devis (si le motif est un de vos actes) partent tout de suite, et le questionnaire est programmé 3 jours avant le rendez-vous. Sinon rien n’est envoyé et une notification vous le dit."
   ],
   [
    2,
@@ -1262,7 +1524,7 @@
    3,
    "label",
    [],
-   "Rendez-vous patient"
+   "RDV patient existant"
   ],
   [
    4,
@@ -1287,6 +1549,35 @@
     [
      "value",
      "patient"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "RDV nouveau patient"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "nouveau"
     ]
    ],
    ""
@@ -1374,11 +1665,22 @@
   [
    3,
    "div",
+   [
+    [
+     "id",
+     "agenda-ev-choix"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
    [],
    "Patient *"
   ],
   [
-   3,
+   4,
    "input",
    [
     [
@@ -1413,12 +1715,228 @@
    ""
   ],
   [
-   3,
+   4,
    "datalist",
    [
     [
      "id",
      "agenda-ev-patients"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "div",
+   [],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Nom *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-nom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Prénom *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-prenom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Date de naissance *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-ddn"
+    ],
+    [
+     "type",
+     "date"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Téléphone"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-tel"
+    ],
+    [
+     "type",
+     "tel"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "E-mail *"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-email"
+    ],
+    [
+     "type",
+     "email"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [],
+   ""
+  ],
+  [
+   5,
+   "div",
+   [],
+   "Adresse"
+  ],
+  [
+   5,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-adresse"
+    ],
+    [
+     "type",
+     "text"
     ]
    ],
    ""
@@ -1487,6 +2005,12 @@
    "div",
    [],
    "Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy."
+  ],
+  [
+   3,
+   "div",
+   [],
+   "À l’enregistrement, si le nom, le prénom, la date de naissance et l’e-mail sont renseignés : fiche, accès portail et devis (si le motif est un de vos actes) partent tout de suite, et le questionnaire est programmé 3 jours avant le rendez-vous. Sinon rien n’est envoyé et une notification vous le dit."
   ],
   [
    2,

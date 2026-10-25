@@ -2174,7 +2174,7 @@ function _agLien(eventId) {
   const l = pr && pr.agendaLiens && typeof pr.agendaLiens === 'object' ? pr.agendaLiens[eventId] : null;
   return l && typeof l === 'object' ? l : null;
 }
-function _agEcrireLien(eventId, patientId, motif) {
+function _agEcrireLien(eventId, patientId, motif, sansAccesAuto) {
   const pr = _agPrat();
   if (!pr || !eventId) return;
   if (patientId == null && !_agLien(eventId)) return; // rien à retirer : aucune écriture
@@ -2183,7 +2183,7 @@ function _agEcrireLien(eventId, patientId, motif) {
   else liens[eventId] = { patientId: patientId, motif: String(motif || '').slice(0, 80) };
   pr.agendaLiens = liens;
   savePraticiens();
-  if (patientId != null && typeof _portailCreerAccesAuto === 'function') _portailCreerAccesAuto(patientId);
+  if (patientId != null && !sansAccesAuto && typeof _portailCreerAccesAuto === 'function') _portailCreerAccesAuto(patientId);
 }
 // Texte affiché dans la grille : nom complet pour un événement lié à un patient, sinon le titre.
 function _agEnrichir(events) {
@@ -2888,8 +2888,9 @@ function openAgendaEventModal(eventId, prefillLocal) {
     '<div class="stitle">' +
     (existing ? 'Modifier l\'événement' : 'Nouvel événement') +
     '</div>' +
-    '<div style="display:flex;gap:14px;margin-bottom:8px;font-size:13px;">' +
-    '<label><input type="radio" name="agenda-ev-mode" value="patient" onchange="agEvMode()"' + (patientLie ? ' checked' : '') + '/> Rendez-vous patient</label>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px;font-size:13px;">' +
+    '<label><input type="radio" name="agenda-ev-mode" value="patient" onchange="agEvMode()"' + (patientLie ? ' checked' : '') + '/> RDV patient existant</label>' +
+    '<label><input type="radio" name="agenda-ev-mode" value="nouveau" onchange="agEvMode()"/> RDV nouveau patient</label>' +
     '<label><input type="radio" name="agenda-ev-mode" value="libre" onchange="agEvMode()"' + (patientLie ? '' : ' checked') + '/> Texte libre</label>' +
     '</div>' +
     '<div id="agenda-ev-libre"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Titre *</div>' +
@@ -2897,14 +2898,23 @@ function openAgendaEventModal(eventId, prefillLocal) {
     (existing ? _escHtml(existing.summary) : '') +
     '"/></div>' +
     '<div id="agenda-ev-pat" style="display:none;">' +
-    '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Patient *</div>' +
+    '<div id="agenda-ev-choix"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Patient *</div>' +
     '<input class="inp" id="agenda-ev-patient" list="agenda-ev-patients" autocomplete="off" placeholder="Taper un nom pour rechercher…" oninput="agEvPatientInfo()" value="' + _escHtml(libelleLie) + '"/>' +
-    '<datalist id="agenda-ev-patients">' + choix.map(function (c) { return '<option value="' + _escHtml(c.label) + '"></option>'; }).join('') + '</datalist>' +
+    '<datalist id="agenda-ev-patients">' + choix.map(function (c) { return '<option value="' + _escHtml(c.label) + '"></option>'; }).join('') + '</datalist></div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">' +
+    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Nom *</div><input class="inp" id="agenda-ev-nom" type="text" autocomplete="off"/></div>' +
+    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Prénom *</div><input class="inp" id="agenda-ev-prenom" type="text" autocomplete="off"/></div>' +
+    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Date de naissance *</div><input class="inp" id="agenda-ev-ddn" type="date" autocomplete="off"/></div>' +
+    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Téléphone</div><input class="inp" id="agenda-ev-tel" type="tel" autocomplete="off"/></div>' +
+    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">E-mail *</div><input class="inp" id="agenda-ev-email" type="email" autocomplete="off"/></div>' +
+    '<div style="flex:1 1 200px;min-width:0;"><div style="font-size:10px;color:var(--mut);margin-bottom:3px;">Adresse</div><input class="inp" id="agenda-ev-adresse" type="text" autocomplete="off"/></div>' +
+    '</div>' +
     '<div style="font-size:10px;color:var(--mut);margin:6px 0 3px;">Motif de consultation</div>' +
     '<input class="inp" id="agenda-ev-motif" list="agenda-ev-motifs" autocomplete="off" placeholder="Choisir ou écrire un motif" value="' + _escHtml(lien ? lien.motif || '' : '') + '"/>' +
-    '<datalist id="agenda-ev-motifs">' + AG_MOTIFS.map(function (m) { return '<option value="' + _escHtml(m) + '"></option>'; }).join('') + '</datalist>' +
+    '<datalist id="agenda-ev-motifs">' + _rdvMotifsPropose().map(function (m) { return '<option value="' + _escHtml(m) + '"></option>'; }).join('') + '</datalist>' +
     '<div id="agenda-ev-info" style="font-size:12px;margin-top:6px;"></div>' +
     '<div style="font-size:10px;color:var(--mut);margin-top:4px;">Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy.</div>' +
+    '<div style="font-size:11px;color:var(--mut);margin-top:6px;">À l\u2019enregistrement, si le nom, le prénom, la date de naissance et l\u2019e-mail sont renseignés : fiche, accès portail et devis (si le motif est un de vos actes) partent tout de suite, et le questionnaire est programmé 3 jours avant le rendez-vous. Sinon rien n\u2019est envoyé et une notification vous le dit.</div>' +
     '</div>' +
     // #187 — sélecteur de compte Google cible, uniquement à la création et
     // seulement s'il y a un vrai choix à faire (>1 compte connecté). En
@@ -2940,16 +2950,24 @@ function openAgendaEventModal(eventId, prefillLocal) {
   document.body.appendChild(overlay);
   agEvMode();
   agEvPatientInfo();
+  _agRafraichirMotifs();
 }
 
-// Bascule « Rendez-vous patient » / « Texte libre » dans la fenêtre d'événement.
+// Bascule « RDV patient existant » / « RDV nouveau patient » / « Texte libre » dans la fenêtre d'événement.
 function agEvMode() {
   const r = document.querySelector('input[name="agenda-ev-mode"]:checked');
-  const patient = !!r && r.value === 'patient';
+  const mode = r ? r.value : 'libre';
   const pat = document.getElementById('agenda-ev-pat');
   const libre = document.getElementById('agenda-ev-libre');
-  if (pat) pat.style.display = patient ? '' : 'none';
-  if (libre) libre.style.display = patient ? 'none' : '';
+  const choix = document.getElementById('agenda-ev-choix');
+  if (pat) pat.style.display = mode === 'libre' ? 'none' : '';
+  if (libre) libre.style.display = mode === 'libre' ? '' : 'none';
+  if (choix) choix.style.display = mode === 'patient' ? '' : 'none';
+  ['agenda-ev-nom', 'agenda-ev-prenom'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.readOnly = mode === 'patient'; // l'identité d'une fiche existante ne se modifie pas depuis l'agenda
+  });
+  agEvPatientInfo();
 }
 function _agPatientDuChamp() {
   const el = document.getElementById('agenda-ev-patient');
@@ -2960,11 +2978,52 @@ function _agPatientDuChamp() {
   });
   return c ? _agPatientParId(c.id) : null;
 }
-// Téléphone du patient choisi, affiché sous le champ (lien « appeler »).
+const _AG_CHAMPS_IDENTITE = { nom: 'agenda-ev-nom', prenom: 'agenda-ev-prenom', ddn: 'agenda-ev-ddn', tel: 'agenda-ev-tel', email: 'agenda-ev-email', adresse: 'agenda-ev-adresse' };
+// Identité saisie (ou affichée) dans la fenêtre : sert à créer / compléter la fiche.
+function _agSaisiePatient() {
+  const o = {};
+  Object.keys(_AG_CHAMPS_IDENTITE).forEach(function (k) {
+    const el = document.getElementById(_AG_CHAMPS_IDENTITE[k]);
+    o[k] = el ? el.value.trim() : '';
+  });
+  return o;
+}
+function _agMotifs() {
+  return typeof _rdvMotifsPropose === 'function' ? _rdvMotifsPropose() : AG_MOTIFS;
+}
+// Les actes (dont les actes personnalisés) arrivent après l'ouverture : on rafraîchit le menu des motifs.
+function _agRafraichirMotifs() {
+  const maj = function () {
+    const dl = document.getElementById('agenda-ev-motifs');
+    if (dl) dl.innerHTML = _agMotifs().map(function (m) { return '<option value="' + _escHtml(m) + '"></option>'; }).join('');
+  };
+  maj();
+  if (typeof chargerActes === 'function' && !(Array.isArray(_actesCache) && _actesCache.length)) chargerActes().then(maj).catch(function () { /* menu de base conservé */ });
+}
+// Patient existant : l'identité de la fiche remplit les champs (nom et prénom en lecture seule) ; nouveau patient : champs vides.
 function agEvPatientInfo() {
   const box = document.getElementById('agenda-ev-info');
+  const r = document.querySelector('input[name="agenda-ev-mode"]:checked');
+  const mode = r ? r.value : 'libre';
+  const el = function (k) { return document.getElementById(_AG_CHAMPS_IDENTITE[k]); };
+  const nom = el('nom');
+  if (mode === 'nouveau') {
+    if (nom && nom.dataset.deFiche === '1') {
+      Object.keys(_AG_CHAMPS_IDENTITE).forEach(function (k) { if (el(k)) { el(k).value = ''; delete el(k).dataset.deFiche; } });
+    }
+    if (box) box.innerHTML = '';
+    return;
+  }
+  const p = mode === 'patient' ? _agPatientDuChamp() : null;
+  if (mode === 'patient' && nom) {
+    Object.keys(_AG_CHAMPS_IDENTITE).forEach(function (k) {
+      const e = el(k);
+      if (!e) return;
+      if (p) { e.value = p[k] == null ? '' : String(p[k]); e.dataset.deFiche = '1'; }
+      else if (e.dataset.deFiche === '1') { e.value = ''; delete e.dataset.deFiche; }
+    });
+  }
   if (!box) return;
-  const p = _agPatientDuChamp();
   box.innerHTML = p ? _agBlocContact({ tel: p.tel }) || '<span style="color:var(--mut);">Pas de téléphone sur la fiche.</span>' : '';
 }
 
@@ -2980,15 +3039,24 @@ async function saveAgendaEvent() {
   const endEl = document.getElementById('agenda-ev-end');
   const descEl = document.getElementById('agenda-ev-desc');
   const modeEl = document.querySelector('input[name="agenda-ev-mode"]:checked');
-  const modePatient = !!modeEl && modeEl.value === 'patient';
+  const mode = modeEl ? modeEl.value : 'libre';
+  const modeExistant = mode === 'patient';
+  const modeNouveau = mode === 'nouveau';
+  const modePatient = modeExistant || modeNouveau;
   const motifEl = document.getElementById('agenda-ev-motif');
   const motif = motifEl ? motifEl.value.trim() : '';
-  const patient = modePatient ? _agPatientDuChamp() : null;
-  if (modePatient && !patient) {
+  const saisie = modePatient ? _agSaisiePatient() : null;
+  let patient = modeExistant ? _agPatientDuChamp() : null;
+  if (modeExistant && !patient) {
     alert('Choisissez un patient dans la liste (tapez le début du nom, puis cliquez sur la ligne proposée).');
     return;
   }
-  const title = modePatient ? _agTitrePatient(patient, motif) : titleEl ? titleEl.value.trim() : '';
+  if (modeNouveau && (!saisie.nom || !saisie.prenom)) {
+    alert('Pour un nouveau patient, le nom et le prénom sont obligatoires.');
+    return;
+  }
+  const titrePatient = patient || (modeNouveau ? { nom: saisie.nom, prenom: saisie.prenom } : null);
+  const title = modePatient ? _agTitrePatient(titrePatient, motif) : titleEl ? titleEl.value.trim() : '';
   const start = startEl ? startEl.value : '';
   const end = endEl ? endEl.value : '';
   const desc = descEl ? descEl.value : '';
@@ -3040,15 +3108,31 @@ async function saveAgendaEvent() {
     }
     if (!res.ok) throw new Error('save ' + res.status);
     // Lien patient ↔ événement (local) : posé, mis à jour ou retiré selon le mode choisi.
+    let evId = agCal.editingId || '';
+    let corpsLu = false;
     try {
       const data = await res.json();
-      const evId = (data && data.event && data.event.id) || agCal.editingId;
-      if (evId && (patient || agCal.editingId)) _agEcrireLien(evId, patient ? patient.id : null, motif);
+      evId = (data && data.event && data.event.id) || agCal.editingId;
+      corpsLu = true;
     } catch (_e) {
       /* réponse sans corps : l'événement est créé, seul le lien patient manque */
     }
+    // Patient : fiche créée ou complétée avec ce qui est saisi (jamais de doublon), puis lien.
+    let fiche = null;
+    if (modePatient && corpsLu) fiche = _rdvPreparerFiche(saisie, patient);
+    if (fiche && fiche.patient) patient = fiche.patient;
+    const avait = evId ? _agLien(evId) : null;
+    if (evId && (patient || agCal.editingId)) _agEcrireLien(evId, patient ? patient.id : null, motif, !!patient);
+    if (avait && !patient && evId) _rdvRpc('questionnaire_retirer_source', { p_source: 'ag:' + String(evId).slice(0, 77) }); // l'événement n'est plus un RDV patient
     closeAgendaEventModal();
     await loadAgendaCalendarEvents();
+    // Dispositif « arrivée d'un RDV » : accès portail, devis, e-mail d'essai, questionnaire à J-3 (rendez-vous à venir seulement).
+    if (modePatient && corpsLu && evId && new Date(start).getTime() > Date.now()) {
+      const o = { source: 'ag:' + String(evId).slice(0, 77), debut: start, motif: motif, patient: patient, saisie: saisie, manuel: true, modif: !!avait };
+      let bilan;
+      try { bilan = await _rdvOrganiser(o); } catch (_e) { bilan = { manque: [], erreurs: ['Une erreur est survenue : rien n\u2019a été envoyé.'], devis: {}, questionnaire: '' }; }
+      alert(_rdvResume(bilan, fiche));
+    }
   } catch (e) {
     console.error('[agenda] saveAgendaEvent failed:', e);
     alert("L'enregistrement de l'événement a échoué. Réessaie plus tard.");
@@ -3071,7 +3155,9 @@ async function deleteAgendaEvent() {
       { method: 'DELETE' }
     );
     if (!res.ok) throw new Error('delete ' + res.status);
+    const avaitLien = !!_agLien(agCal.editingId);
     _agEcrireLien(agCal.editingId, null, '');
+    if (avaitLien) _rdvRpc('questionnaire_retirer_source', { p_source: 'ag:' + String(agCal.editingId).slice(0, 77) }); // RDV annulé : le questionnaire programmé est retiré
     closeAgendaEventModal();
     await loadAgendaCalendarEvents();
   } catch (e) {
@@ -34263,6 +34349,7 @@ const NOTIF_TYPES = {
   devis_emis: { icone: '📄', titre: 'Devis émis', systeme: true },
   devis_auto_ignores: { icone: '⚠️', titre: 'Rendez-vous sans devis automatique', systeme: true },
   email_essai: { icone: '📧', titre: 'E-mail au patient généré (boîte d\u2019essai, non envoyé)', systeme: true },
+  rdv_sans_envoi: { icone: '⚠️', titre: 'Rendez-vous sans envoi au patient', systeme: true },
   ordonnance_creee: { icone: '💊', titre: 'Ordonnance créée', systeme: false },
   patient_message: { icone: '✉️', titre: 'Nouveau message d\u2019un patient', systeme: false },
   patient_devis_signe: { icone: '✍️', titre: 'Devis signé par un patient', systeme: false },
@@ -34328,6 +34415,7 @@ function notifierEvenement(type, opts) {
     if (o.documentId) e.documentId = _notifTexte(o.documentId, 60); // identifiant seul : le document est relu à l'affichage
     if (o.seance && typeof o.seance === 'object') e.seance = { jour: _notifTexte(o.seance.jour, 10), id: _notifTexte(o.seance.id, 40) }; // identifiants seuls : le mot est relu à l'affichage
     if (o.ordonnanceId) e.ordonnanceId = _notifTexte(o.ordonnanceId, 60); // identifiant seul : le contenu est relu à l'affichage
+    if (typeof o.mail === 'string' && _RDV_MAILS.indexOf(o.mail) >= 0) e.mail = o.mail; // genre d'e-mail d'essai : le texte est reconstitué à l'affichage, jamais stocké
     if (Array.isArray(o.rdv)) {
       // Détail d'un import : identifiant, début et motif seulement (le nom est relu à l'affichage).
       e.rdv = o.rdv.slice(0, NOTIF_RDV_MAX).map((x) => { const r = { id: _notifTexte(x && x.id, 60), debut: _notifTexte(x && x.debut, 16), motif: _notifTexte(x && x.motif, 60) }; if (x && x.raison) r.raison = _notifTexte(x.raison, 40); return r; });
@@ -34402,7 +34490,7 @@ function _notifHtmlRdv(e) {
   if (!liste.length) return '<div style="font-size:13px;color:var(--mut);padding:8px 0;">Aucun nouveau rendez-vous dans cet import (les rendez-vous déjà connus ont été mis à jour).</div>';
   const lignes = liste.map((r) => {
     const a = actuels.find((x) => x && x.id === r.id);
-    const nom = a ? [a.prenom, a.nom].filter(Boolean).join(' ') : '';
+    const nom = a ? [a.prenom, a.nom].filter(Boolean).join(' ') : (e.cible && liste.length === 1 ? _notifNomPatient(e) || '' : '');
     const hh = /T(\d{2}:\d{2})/.exec(r.debut || '');
     return '<tr><td style="padding:4px 8px;white-space:nowrap;">' + _escHtml(_notifDateFr(r.debut)) + (hh ? ' ' + hh[1] : '') + '</td><td style="padding:4px 8px;">' +
       (nom ? _escHtml(nom) : '<span style="color:var(--mut);">plus dans l\u2019agenda</span>') + '</td><td style="padding:4px 8px;">' + _escHtml(r.motif || '—') + (r.raison ? ' <span style="color:var(--encours-encre);font-weight:600;">— ' + _escHtml(r.raison) + '</span>' : '') + '</td></tr>';
@@ -34473,6 +34561,17 @@ async function _notifChargerMot(notifId, e) {
   cible.style.whiteSpace = 'pre-wrap';
   cible.textContent = erreur ? 'Mot indisponible (hors connexion ?). Rien n\u2019a été modifié.' : texte || 'Le patient a retiré son mot.';
 }
+async function _notifChargerMail(notifId, e) {
+  const p = (Array.isArray(patients) ? patients : []).find((x) => x.id == e.cible.patientId);
+  let identifiant = '';
+  if (p && p._cloudId && (e.mail === 'acces' || e.mail === 'acces_devis')) {
+    try { const c = await _portailLireCompte(p); identifiant = c && c.identifiant ? c.identifiant : ''; } catch (_err) { identifiant = ''; }
+  }
+  const lien = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') + 'patient/' : '';
+  const texte = p ? _rdvTexteMail(e.mail, { prenom: p.prenom || '', cabinet: _portailCabinet(p), identifiant: identifiant, lien: lien }) : 'Fiche patient introuvable sur cet appareil.';
+  const cible = document.getElementById('notif-mail-corps');
+  if (cible && _notifDetailId === notifId) cible.textContent = texte;
+}
 function _notifHtmlDetail(e) {
   const t = NOTIF_TYPES[e.type];
   const nom = _notifNomPatient(e);
@@ -34509,6 +34608,10 @@ function _notifHtmlDetail(e) {
   } else if (e.type === 'email_essai') {
     corps += _notifLigneDetail('Détail', e.detail ? _escHtml(e.detail) : 'E-mail généré, non envoyé (boîte d\u2019essai).');
     corps += _notifLigneDetail('Envoi', 'Boîte d\u2019essai : rien n\u2019est envoyé pour l\u2019instant.');
+    if (e.mail && e.cible) corps += '<div style="font-size:11px;color:var(--mut);margin-top:10px;">Message qui serait envoyé (reconstitué, non conservé) :</div><div id="notif-mail-corps" style="margin-top:4px;border:1px dashed var(--bord);border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--txt);">Chargement du message…</div>';
+  } else if (e.type === 'rdv_sans_envoi') {
+    corps += _notifLigneDetail('Raison', e.detail ? _escHtml(e.detail) : 'Informations manquantes.');
+    corps += _notifLigneDetail('Que faire', 'Complétez la fiche du patient (e-mail, date de naissance…) puis réenregistrez le rendez-vous : le dispositif repart sans doublon.');
   } else if (e.type === 'patient_protocole_termine') {
     corps += _notifLigneDetail('Programme', 'Le patient a validé toutes les séances du dernier jour de son programme. Le détail des séances est dans sa fiche : 🔑 Portail patient → Suivi des séances.');
   } else if (e.type === 'import_doctolib') {
@@ -34519,7 +34622,7 @@ function _notifHtmlDetail(e) {
   if (e.cible) corps += _notifLigneDetail('Patient', nom ? '<b>' + _escHtml(nom) + '</b>' : '<span style="color:var(--mut);">fiche introuvable</span>');
   return '<div style="margin-bottom:10px;"><button class="btn" style="font-size:12px;padding:5px 12px;" onclick="fermerDetailNotification()">← Retour à la liste</button></div>' +
     '<div style="border:1px solid var(--bord);border-radius:8px;padding:12px 14px;"><div style="font-size:15px;font-weight:600;margin-bottom:8px;">' + t.icone + ' ' + _escHtml(t.titre) + '</div>' + corps +
-    ((e.type === 'import_doctolib' || e.type === 'devis_auto_ignores') ? _notifHtmlRdv(e) : '') +
+    ((e.type === 'import_doctolib' || e.type === 'devis_auto_ignores' || e.type === 'rdv_sans_envoi') ? _notifHtmlRdv(e) : '') +
     (e.cible && nom ? '<div style="margin-top:12px;"><button class="btn btn-blue" style="font-size:12px;padding:5px 12px;" onclick="ouvrirPatientNotification(' + e.id + ')">Ouvrir la fiche de ' + _escHtml(nom) + ' →</button></div>' : '') + '</div>';
 }
 function fermerDetailNotification() {
@@ -34548,6 +34651,7 @@ function renderNotificationsPage() {
       if (e.documentId && (e.type === 'devis_emis' || e.type === 'facture_editee' || e.type === 'patient_devis_signe')) _notifChargerDocument(e.id, e.documentId);
       if (e.documentId && e.type === 'patient_devis_signe') _notifChargerSignature(e.id, e);
       if (e.type === 'patient_ressenti' && e.seance) _notifChargerMot(e.id, e);
+      if (e.type === 'email_essai' && e.mail && e.cible) _notifChargerMail(e.id, e);
       return;
     }
     _notifDetailId = null;
@@ -37894,6 +37998,238 @@ async function _portailVerifierQuestionnaires() {
     }
   } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _qstEnCours = false; }
 }
+// ═══ Arrivée d'un RDV : fiche, accès portail, devis, e-mail d'essai, questionnaire programmé (lot c, étape 4) ═══
+// Un seul moteur pour la saisie manuelle dans l'agenda (et, plus tard, pour l'import CSV Doctolib) :
+//   1. informations obligatoires (nom, prénom, date de naissance, e-mail) : sinon RIEN n'est envoyé + notification `rdv_sans_envoi` ;
+//   2. fiche patient (créée si inconnue, jamais de doublon nom + prénom + date de naissance) ;
+//   3. accès portail (idempotent) ; identifiants = e-mail d'essai UNE seule fois (compte jamais connecté) ;
+//   4. devis immédiat si le motif correspond à un acte (sinon notification `devis_auto_ignores`) ;
+//   5. questionnaire programmé côté serveur (visible 3 jours avant le RDV), rappel J-1 par e-mail d'essai.
+// Les e-mails sont des NOTIFICATIONS « boîte d'essai » : aucun envoi réel avant l'hébergeur HDS ; le texte est reconstitué à l'affichage
+// (jamais stocké : la notification ne garde ni nom, ni identifiant, ni contenu).
+const _RDV_MAILS = ['acces', 'acces_devis', 'devis', 'questionnaire', 'rappel'];
+function _rdvTexte(v) {
+  return String(v == null ? '' : v).trim();
+}
+// Informations qui manquent pour tout envoyer (libellés lisibles).
+function _rdvManque(s) {
+  const x = s || {};
+  const m = [];
+  if (!_rdvTexte(x.nom)) m.push('nom');
+  if (!_rdvTexte(x.prenom)) m.push('prénom');
+  if (!_rdvTexte(x.ddn) || validerFichePatient({ ddn: _rdvTexte(x.ddn) })) m.push('date de naissance');
+  if (!_rdvTexte(x.email) || validerFichePatient({ email: _rdvTexte(x.email) })) m.push('e-mail');
+  return m;
+}
+function _rdvTrouverFiche(s) {
+  const x = s || {};
+  const n = (t) => _importNormName(t);
+  return (Array.isArray(patients) ? patients : []).find((p) => n(p.nom) === n(x.nom) && n(p.prenom) === n(x.prenom) && _rdvTexte(p.ddn) === _rdvTexte(x.ddn)) || null;
+}
+// Fiche du patient : créée si elle n'existe pas (identité complète), complétée sinon (téléphone, e-mail, adresse ; date de naissance seulement si vide).
+function _rdvPreparerFiche(s, existante) {
+  const x = s || {};
+  if (existante) {
+    const modifs = [];
+    if (!_rdvTexte(existante.ddn) && _rdvTexte(x.ddn) && !validerFichePatient({ ddn: _rdvTexte(x.ddn) })) { existante.ddn = _rdvTexte(x.ddn); modifs.push('ddn'); }
+    ['tel', 'email', 'adresse'].forEach((k) => {
+      const v = _rdvTexte(x[k]);
+      if (!v || v === _rdvTexte(existante[k])) return;
+      if (k === 'email' && validerFichePatient({ email: v })) return;
+      existante[k] = v;
+      modifs.push(k);
+    });
+    if (modifs.length) { try { savePatients(); } catch (_e) { /* repris au prochain enregistrement */ } }
+    return { patient: existante, creee: false, completee: modifs.length > 0 };
+  }
+  const identite = _rdvTexte(x.nom) && _rdvTexte(x.prenom) && _rdvTexte(x.ddn) && !validerFichePatient({ ddn: _rdvTexte(x.ddn) });
+  if (!identite) return { patient: null, creee: false, completee: false };
+  const doublon = _rdvTrouverFiche(x);
+  if (doublon) return _rdvPreparerFiche(x, doublon);
+  let id = Date.now();
+  while (patients.some((p) => p.id === id)) id++;
+  const mail = _rdvTexte(x.email);
+  const p = {
+    id: id, nom: _rdvTexte(x.nom), prenom: _rdvTexte(x.prenom), ddn: _rdvTexte(x.ddn), sport: '', metier: '', typeBilan: 'initial', lat: '', poids: '', taille: '',
+    pratId: praticiens[0] ? praticiens[0].id : '', civilite: '', email: validerFichePatient({ email: mail }) ? '' : mail, tel: _rdvTexte(x.tel), adresse: _rdvTexte(x.adresse),
+    cp: '', ville: '', medecinTraitant: '', assurance: '', provenance: '', antecedents: '', examens: '', date: new Date().toLocaleDateString('fr-FR'), mesures: {},
+  };
+  patients.push(p);
+  try { savePatients(); } catch (_e) { /* repris au prochain enregistrement */ }
+  return { patient: p, creee: true, completee: false };
+}
+// Appel d'une fonction SQL avec le message d'erreur du serveur (`_portailRpc` ne le garde pas).
+async function _rdvRpc(nom, corps) {
+  try {
+    const res = await authFetch(SUPA_URL + '/rest/v1/rpc/' + nom, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+    let json = null;
+    try { json = await res.json(); } catch (_e) { json = null; }
+    return { ok: res.ok, status: res.status, valeur: json, message: json && typeof json === 'object' && json.message ? String(json.message) : '' };
+  } catch (_e) {
+    return { ok: false, status: 0, valeur: null, message: 'reseau' };
+  }
+}
+// Actes proposés comme motif et reconnus pour le devis : « Synchronisation Doctolib » cochée, ou acte personnalisé du praticien (saisie manuelle).
+function _rdvActesEligibles(manuel) {
+  return (Array.isArray(_actesCache) ? _actesCache : [])
+    .filter((a) => a && a.actif !== false && (a.sync_doctolib === true || (manuel && a.perso === true)))
+    .map((a) => Object.assign({}, a, { sync_doctolib: true }));
+}
+// Motifs du menu déroulant de l'agenda : motifs usuels + actes personnalisés + actes « Synchronisation Doctolib », sans doublon.
+function _rdvMotifsPropose() {
+  const vus = new Set();
+  const liste = [];
+  (typeof AG_MOTIFS !== 'undefined' ? AG_MOTIFS : []).concat(_rdvActesEligibles(true).map((a) => a.libelle)).forEach((m) => {
+    const t = _rdvTexte(m);
+    const k = _importNormName(t);
+    if (t && !vus.has(k)) { vus.add(k); liste.push(t); }
+  });
+  return liste;
+}
+function _rdvSansEnvoi(o, p, detail, raison) {
+  notifierEvenement('rdv_sans_envoi', { patientId: p ? p.id : undefined, detail: detail, rdv: [{ id: o.source, debut: String(o.debut || '').slice(0, 16), motif: o.motif, raison: raison }] });
+}
+// Devis immédiat : { etat: 'cree' | 'deja' | 'ignore' | 'passe' | 'echec', numero?, raison? }
+async function _rdvDevis(o, p) {
+  if (!_accessPermetCreationDocument()) return { etat: 'ignore', raison: 'accès limité' };
+  try {
+    await chargerActes();
+    const plan = _devisAutoPlanifier([{ id: o.source, debut: o.debut, motif: o.motif, patientId: p.id }], { actes: _rdvActesEligibles(!!o.manuel), patients: patients, deja: new Set(), aujourdhui: _todayISO() });
+    if (plan.ignores.length) {
+      const raison = plan.ignores[0].raison;
+      notifierEvenement('devis_auto_ignores', { patientId: p.id, detail: '1 rendez-vous sans devis', rdv: [{ id: o.source, debut: String(o.debut || '').slice(0, 16), motif: o.motif, raison: raison }] });
+      return { etat: 'ignore', raison: raison };
+    }
+    if (!plan.creer.length) return { etat: 'passe' };
+    const r = await _devisAutoCreerUn(plan.creer[0]);
+    if (!r.ok) {
+      notifierEvenement('devis_auto_ignores', { patientId: p.id, detail: '1 rendez-vous sans devis', rdv: [{ id: o.source, debut: String(o.debut || '').slice(0, 16), motif: o.motif, raison: r.raison }] });
+      return { etat: 'echec', raison: r.raison };
+    }
+    return r.dejaFait ? { etat: 'deja' } : { etat: 'cree', numero: r.numero };
+  } catch (_e) {
+    return { etat: 'echec', raison: 'réseau' };
+  }
+}
+// Cœur du dispositif. o = { source, debut (date-heure locale « AAAA-MM-JJTHH:MM »), motif, patient (fiche), manuel, modif }.
+async function _rdvOrganiser(o) {
+  const res = { patient: o.patient || null, manque: [], acces: '', devis: { etat: '' }, mail: '', questionnaire: '', visibleLe: '', erreurs: [] };
+  const p = o.patient;
+  const s = o.saisie || {};
+  const manque = p ? _rdvManque({ nom: p.nom, prenom: p.prenom, ddn: p.ddn, email: p.email }) : _rdvManque(s);
+  if (manque.length) {
+    res.manque = manque;
+    _rdvSansEnvoi(o, p, 'Il manque : ' + manque.join(', '), 'informations manquantes');
+    return res;
+  }
+  if (globalThis._modeConsultation || (typeof _horsConnexion === 'function' && _horsConnexion())) {
+    res.erreurs.push('Hors connexion ou mode consultation : rien n\u2019a été envoyé.');
+    _rdvSansEnvoi(o, p, 'Hors connexion : rien d\u2019envoyé', 'hors connexion');
+    return res;
+  }
+  const ass = await _portailAssurerFiche(p);
+  if (!ass.ok) {
+    res.erreurs.push(ass.message || 'La fiche n\u2019a pas pu être enregistrée.');
+    _rdvSansEnvoi(o, p, 'Fiche non enregistrée dans le cloud', 'fiche non enregistrée');
+    return res;
+  }
+  let r = null;
+  try { r = await _portailAppeler('creer', p, { cabinet: _portailCabinet(p) }); } catch (_e) { r = null; }
+  if (!r || r.status !== 200 || !r.body || !r.body.ok) {
+    res.erreurs.push('L\u2019accès portail n\u2019a pas pu être créé : rien n\u2019a été envoyé.');
+    _rdvSansEnvoi(o, p, 'Accès portail impossible : rien d\u2019envoyé', 'accès impossible');
+    return res;
+  }
+  _portailCompteCache.delete(p._cloudId);
+  const jamaisConnecte = r.body.statut === 'initial';
+  res.acces = r.body.existe ? 'existant' : 'cree';
+  res.devis = await _rdvDevis(o, p);
+  const devisCree = res.devis.etat === 'cree';
+  if (jamaisConnecte && !p.accesEnvoyeLe) {
+    notifierEvenement('email_essai', { patientId: p.id, mail: devisCree ? 'acces_devis' : 'acces', detail: devisCree ? 'Identifiants + devis disponible' : 'Identifiants d\u2019accès' });
+    p.accesEnvoyeLe = new Date().toISOString();
+    try { savePatients(); } catch (_e) { /* repris au prochain enregistrement */ }
+    res.mail = 'acces';
+  } else if (devisCree) {
+    notifierEvenement('email_essai', { patientId: p.id, mail: 'devis', detail: 'Un devis vous attend' });
+    res.mail = 'devis';
+  }
+  const iso = new Date(o.debut).toISOString();
+  if (o.modif) await _rdvRpc('questionnaire_replanifier', { p_source: o.source, p_rdv: iso });
+  const q = await _rdvRpc('questionnaire_demander', { p_patient: p._cloudId, p_rdv: iso, p_source: o.source });
+  if (q.ok) {
+    res.questionnaire = 'programme';
+    const j3 = new Date(new Date(o.debut).getTime() - 3 * 864e5);
+    res.visibleLe = j3.getTime() > Date.now() ? j3.toLocaleDateString('fr-FR') : '';
+  } else if (/questionnaire_deja_ouvert/.test(q.message)) res.questionnaire = 'deja';
+  else if (/rdv_passe/.test(q.message)) res.questionnaire = 'passe';
+  else { res.questionnaire = 'echec'; res.erreurs.push('Le questionnaire n\u2019a pas pu être programmé.'); }
+  return res;
+}
+// Message de fin affiché au praticien (lignes courtes, rien de médical).
+function _rdvResume(res, fiche) {
+  if (res.manque.length) {
+    return '⚠️ Rendez-vous enregistré, mais RIEN n\u2019a été envoyé au patient : il manque ' + res.manque.join(', ') + '.\nComplétez la fiche (ou les champs), puis réenregistrez le rendez-vous. Détail dans Notifications.';
+  }
+  const l = ['✅ Rendez-vous enregistré.'];
+  if (fiche && fiche.creee) l.push('• Fiche patient créée.');
+  else if (fiche && fiche.completee) l.push('• Fiche patient complétée.');
+  if (res.acces) {
+    l.push(res.acces === 'cree' ? '• Accès portail créé.' : '• Accès portail déjà existant.');
+    if (res.mail === 'acces') l.push('• Identifiants + information devis : e-mail généré en boîte d\u2019essai (Notifications).');
+    else if (res.mail === 'devis') l.push('• E-mail « un devis vous attend » généré en boîte d\u2019essai (Notifications).');
+    else l.push('• Pas de nouveaux identifiants (déjà envoyés ou déjà utilisés).');
+  }
+  const d = res.devis || {};
+  if (d.etat === 'cree') l.push('• Devis ' + (d.numero ? 'n° ' + d.numero + ' ' : '') + 'émis et partagé avec le patient.');
+  else if (d.etat === 'deja') l.push('• Devis déjà créé pour ce rendez-vous.');
+  else if (d.etat === 'ignore') l.push('• Pas de devis : ' + (d.raison || 'motif non reconnu') + ' (voir Notifications).');
+  else if (d.etat === 'passe') l.push('• Pas de devis : rendez-vous passé.');
+  else if (d.etat === 'echec') l.push('• ⚠️ Devis non créé (' + (d.raison || 'erreur') + ') : voir Notifications.');
+  if (res.questionnaire === 'programme') l.push(res.visibleLe ? '• Questionnaire programmé : le patient le verra à partir du ' + res.visibleLe + '.' : '• Questionnaire disponible tout de suite pour le patient.');
+  else if (res.questionnaire === 'deja') l.push('• Un questionnaire est déjà en cours pour ce patient : rien de nouveau.');
+  else if (res.questionnaire === 'passe') l.push('• Pas de questionnaire : rendez-vous passé.');
+  res.erreurs.forEach((e) => l.push('• ⚠️ ' + e));
+  l.push('Aucun vrai e-mail n\u2019est envoyé pour l\u2019instant (boîte d\u2019essai).');
+  return l.join('\n');
+}
+// Texte d'un e-mail d'essai, reconstitué à l'affichage. ctx = { prenom, cabinet, identifiant, lien }.
+function _rdvTexteMail(genre, ctx) {
+  const c = ctx || {};
+  const sal = 'Bonjour' + (c.prenom ? ' ' + c.prenom : '') + ',';
+  const lien = c.lien ? '\nVotre espace : ' + c.lien : '';
+  const pied = '\n\nCordialement,\n' + (c.cabinet || 'Votre praticien');
+  if (genre === 'acces' || genre === 'acces_devis') {
+    return 'Objet : Votre espace patient' + (c.cabinet ? ' — ' + c.cabinet : '') + '\n\n' + sal + '\n\nVotre rendez-vous est enregistré et votre espace patient est prêt.' +
+      (genre === 'acces_devis' ? '\nUn devis vous attend dans « Mes documents » : vous pouvez le lire et le signer depuis votre espace.' : '') +
+      '\n\nVotre identifiant : ' + (c.identifiant || '(indisponible)') +
+      '\nPremière connexion : tapez votre date de naissance à l\u2019envers, sans espace (année, mois, jour). Exemple : 17 mai 2010 → 20100517. Vous choisirez ensuite votre propre mot de passe.' + lien +
+      '\n\nUn questionnaire à remplir avant le rendez-vous apparaîtra aussi dans votre espace quelques jours avant la consultation.' + pied;
+  }
+  if (genre === 'devis') return 'Objet : Un devis vous attend\n\n' + sal + '\n\nUn devis est disponible dans « Mes documents » de votre espace patient. Vous pouvez le lire et le signer depuis votre espace.' + lien + pied;
+  if (genre === 'questionnaire') return 'Objet : Votre questionnaire avant le rendez-vous\n\n' + sal + '\n\nVotre questionnaire est disponible dans votre espace patient (« Mon questionnaire »). Il prend quelques minutes et aide votre praticien à préparer votre rendez-vous. Merci de le remplir avant la consultation.' + lien + pied;
+  if (genre === 'rappel') return 'Objet : Rappel — votre questionnaire\n\n' + sal + '\n\nPetit rappel : votre questionnaire n\u2019est pas encore rempli. Il prend quelques minutes, dans votre espace patient (« Mon questionnaire »).' + lien + pied;
+  return '';
+}
+
+// Questionnaires programmés : e-mail d'essai « questionnaire disponible » dès que le patient peut le voir (J-3), puis « rappel » à J-1 s'il
+// n'est pas rempli. Chaque e-mail n'est signalé qu'une fois (le serveur marque) ; la fiche inconnue sur cet appareil est laissée à l'autre appareil.
+let _qprogEnCours = false;
+async function _portailVerifierQuestionnairesProgrammes() {
+  if (_qprogEnCours || globalThis._modeConsultation || typeof pwaUser === 'undefined' || !pwaUser) return;
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) return;
+  _qprogEnCours = true;
+  try {
+    for (const [liste, genre, mail, detail] of [['questionnaire_envois_a_signaler', 'envoi', 'questionnaire', 'Questionnaire disponible'], ['questionnaire_rappels_a_faire', 'rappel', 'rappel', 'Rappel du questionnaire']]) {
+      const l = await _portailRpc(liste, {});
+      for (const x of Array.isArray(l) ? l : []) {
+        const p = (Array.isArray(patients) ? patients : []).find(function (y) { return y._cloudId === x.patient_id; });
+        if (!p) continue;
+        if ((await _portailRpc('questionnaire_marquer_mail', { p_id: x.id, p_genre: genre })) === true) notifierEvenement('email_essai', { patientId: p.id, mail: mail, detail: detail });
+      }
+    }
+  } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _qprogEnCours = false; }
+}
 // Signatures de devis par les patients : la liste vient du serveur (jamais pour un patient bloqué) ; on retrouve d'abord le devis réel
 // (source_ref de la copie partagée) AVANT de marquer « notifié », pour réessayer à la prochaine vérification si la lecture échoue.
 let _sigEnCours = false;
@@ -37925,6 +38261,7 @@ function _portailVerifierNotifications() {
   if (typeof _portailVerifierMessages === 'function') _portailVerifierMessages();
   if (typeof _portailVerifierSignatures === 'function') _portailVerifierSignatures();
   if (typeof _portailVerifierQuestionnaires === 'function') _portailVerifierQuestionnaires();
+  if (typeof _portailVerifierQuestionnairesProgrammes === 'function') _portailVerifierQuestionnairesProgrammes();
 }
 setInterval(_portailVerifierNotifications, 30 * 1000);
 if (typeof document !== 'undefined' && document.addEventListener) {
