@@ -953,6 +953,11 @@
         <div>
           <input class="inp pedicurie-field" data-field="ped_allergies_txt" placeholder="Latex, iode, pansements, antiseptiques... (ou « aucune connue »)"/>
         </div>
+        <!-- Lot c (questionnaire) : notes libres de l'anamnèse (même rôle que « Notes complémentaires » du bilan sportif). -->
+        <div class="field-lbl" style="margin-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:3px;margin-bottom:8px;color:var(--pedicurie-encre);">Notes complémentaires</div>
+        <div>
+          <textarea class="inp pedicurie-field" rows="2" data-field="ped_notes_generales" placeholder="..."></textarea>
+        </div>
       </div>
     </div>
 
@@ -1731,6 +1736,9 @@
             <label class="podo-radio-btn"><input type="radio" name="podo_trait_podo" value="oui">Oui</label>
             <label class="podo-radio-btn"><input type="radio" name="podo_trait_podo" value="non">Non</label>
           </div>
+          <!-- Lot c (questionnaire) : notes libres de l'anamnèse (même rôle que « Notes complémentaires » du bilan sportif). -->
+          <div class="podo-field-lbl">Notes complémentaires</div>
+          <textarea class="podopediatrie-field podo-inline-input" rows="2" data-field="podo_notes_generales" placeholder="..." style="max-width:520px;font-family:inherit;resize:vertical;"></textarea>
 
           <!-- #140 Phase 1b — Le bloc « Protocole réflexe archaïque » a été déplacé
                vers un onglet dédié « 🧠 Réflexes » (pdpsec-1), avec 15 cases. -->

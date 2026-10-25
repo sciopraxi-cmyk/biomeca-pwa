@@ -906,3 +906,96 @@ input:focus-visible,
 .zone-signature [hidden] {
   display: none;
 }
+
+/* Questionnaire de pré-consultation */
+.section-q {
+  margin: 18px 0;
+  padding: 14px 14px 6px;
+  border: 2px solid var(--bord);
+  border-radius: 18px;
+  background: var(--carte);
+}
+.section-q legend {
+  padding: 0 8px;
+  font-weight: 800;
+  color: var(--marine);
+}
+.q-question {
+  margin: 0 0 16px;
+}
+.q-libelle {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--texte);
+}
+.q-champ {
+  width: 100%;
+  font: inherit;
+  padding: 12px;
+  border: 2px solid var(--bord);
+  border-radius: 12px;
+  background: #fff;
+}
+.q-nombre {
+  max-width: 160px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.chip span {
+  display: inline-block;
+  padding: 10px 14px;
+  border: 2px solid var(--bord);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--texte);
+  font-size: 16px;
+}
+.chip input:checked + span {
+  background: var(--turquoise);
+  border-color: var(--turquoise);
+  color: var(--turquoise-encre);
+  font-weight: 700;
+}
+.chip input:focus-visible + span {
+  outline: 3px solid var(--marine);
+  outline-offset: 2px;
+}
+.chips-eva .chip span {
+  min-width: 44px;
+  text-align: center;
+  padding: 10px 6px;
+}
+.fiche-q {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f4fbfd;
+  border: 1px dashed var(--bord);
+}
+.fiche-q-titre {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: var(--marine);
+}
+.fiche-q-ligne {
+  margin: 0 0 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chip {
+  margin: 0;
+}
