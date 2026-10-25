@@ -21,6 +21,16 @@ export function genererIdentifiant(): string {
   return c.slice(0, 4) + '-' + c.slice(4);
 }
 
+/** Code provisoire (fiche sans date de naissance) : même forme lisible que l'identifiant, « XXXX-XXXX ». */
+export function genererCodeProvisoire(): string {
+  return genererIdentifiant();
+}
+
+/** Saisie du patient (« k7m2 9qxp ») → « K7M2-9QXP », ou null si ce n'est pas un code. */
+export function normaliserCodeProvisoire(saisie: unknown): string | null {
+  return normaliserIdentifiant(saisie);
+}
+
 /** Forme canonique d'une saisie (« k7m2 9qxp » → « K7M2-9QXP ») ou null si invalide. */
 export function normaliserIdentifiant(saisie: unknown): string | null {
   if (typeof saisie !== 'string' || saisie.length > 40) return null;

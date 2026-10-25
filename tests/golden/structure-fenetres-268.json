@@ -813,7 +813,7 @@
    [
     [
      "class",
-     "cal-event-modal"
+     "cal-event-modal cal-event-modal-large"
     ]
    ],
    ""
@@ -839,7 +839,7 @@
    3,
    "label",
    [],
-   "Rendez-vous patient"
+   "RDV patient existant"
   ],
   [
    4,
@@ -860,6 +860,35 @@
     [
      "value",
      "patient"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "RDV nouveau patient"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "nouveau"
     ]
    ],
    ""
@@ -902,8 +931,8 @@
    "div",
    [
     [
-     "id",
-     "agenda-ev-libre"
+     "class",
+     "cal-ev-cols"
     ]
    ],
    ""
@@ -911,11 +940,33 @@
   [
    3,
    "div",
+   [
+    [
+     "class",
+     "cal-ev-col"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-libre"
+    ]
+   ],
+   ""
+  ],
+  [
+   5,
+   "div",
    [],
    "Titre *"
   ],
   [
-   3,
+   5,
    "input",
    [
     [
@@ -938,7 +989,7 @@
    ""
   ],
   [
-   2,
+   4,
    "div",
    [
     [
@@ -949,13 +1000,24 @@
    ""
   ],
   [
-   3,
+   5,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-choix"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
    "div",
    [],
    "Patient *"
   ],
   [
-   3,
+   6,
    "input",
    [
     [
@@ -990,7 +1052,7 @@
    ""
   ],
   [
-   3,
+   6,
    "datalist",
    [
     [
@@ -1001,13 +1063,229 @@
    ""
   ],
   [
-   3,
+   5,
+   "div",
+   [],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Nom *"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-nom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Prénom *"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-prenom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Date de naissance"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-ddn"
+    ],
+    [
+     "type",
+     "date"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Téléphone"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-tel"
+    ],
+    [
+     "type",
+     "tel"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "E-mail *"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-email"
+    ],
+    [
+     "type",
+     "email"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Adresse"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-adresse"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   5,
    "div",
    [],
    "Motif de consultation"
   ],
   [
-   3,
+   5,
    "input",
    [
     [
@@ -1038,7 +1316,7 @@
    ""
   ],
   [
-   3,
+   5,
    "datalist",
    [
     [
@@ -1049,7 +1327,7 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [
     [
@@ -1060,13 +1338,30 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    "Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy."
   ],
   [
-   2,
+   5,
+   "div",
+   [],
+   "À l’enregistrement, si le nom, le prénom et l’e-mail sont renseignés (sans date de naissance, un code provisoire est généré pour la 1re connexion) : fiche, accès portail et devis (si le motif est un de vos actes) partent tout de suite, et le questionnaire est programmé 3 jours avant le rendez-vous. Sinon rien n’est envoyé et une notification vous le dit."
+  ],
+  [
+   3,
+   "div",
+   [
+    [
+     "class",
+     "cal-ev-col"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
    "div",
    [
     [
@@ -1077,19 +1372,19 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    ""
   ],
   [
-   4,
+   6,
    "div",
    [],
    "Début *"
   ],
   [
-   4,
+   6,
    "input",
    [
     [
@@ -1112,19 +1407,19 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    ""
   ],
   [
-   4,
+   6,
    "div",
    [],
    "Fin *"
   ],
   [
-   4,
+   6,
    "input",
    [
     [
@@ -1147,19 +1442,19 @@
    ""
   ],
   [
-   2,
+   4,
    "div",
    [],
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    "Description"
   ],
   [
-   3,
+   5,
    "textarea",
    [
     [
@@ -1236,7 +1531,7 @@
    [
     [
      "class",
-     "cal-event-modal"
+     "cal-event-modal cal-event-modal-large"
     ]
    ],
    ""
@@ -1262,7 +1557,7 @@
    3,
    "label",
    [],
-   "Rendez-vous patient"
+   "RDV patient existant"
   ],
   [
    4,
@@ -1287,6 +1582,35 @@
     [
      "value",
      "patient"
+    ]
+   ],
+   ""
+  ],
+  [
+   3,
+   "label",
+   [],
+   "RDV nouveau patient"
+  ],
+  [
+   4,
+   "input",
+   [
+    [
+     "name",
+     "agenda-ev-mode"
+    ],
+    [
+     "onchange",
+     "agEvMode()"
+    ],
+    [
+     "type",
+     "radio"
+    ],
+    [
+     "value",
+     "nouveau"
     ]
    ],
    ""
@@ -1325,8 +1649,8 @@
    "div",
    [
     [
-     "id",
-     "agenda-ev-libre"
+     "class",
+     "cal-ev-cols"
     ]
    ],
    ""
@@ -1334,11 +1658,33 @@
   [
    3,
    "div",
+   [
+    [
+     "class",
+     "cal-ev-col"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-libre"
+    ]
+   ],
+   ""
+  ],
+  [
+   5,
+   "div",
    [],
    "Titre *"
   ],
   [
-   3,
+   5,
    "input",
    [
     [
@@ -1361,7 +1707,7 @@
    ""
   ],
   [
-   2,
+   4,
    "div",
    [
     [
@@ -1372,13 +1718,24 @@
    ""
   ],
   [
-   3,
+   5,
+   "div",
+   [
+    [
+     "id",
+     "agenda-ev-choix"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
    "div",
    [],
    "Patient *"
   ],
   [
-   3,
+   6,
    "input",
    [
     [
@@ -1413,7 +1770,7 @@
    ""
   ],
   [
-   3,
+   6,
    "datalist",
    [
     [
@@ -1424,13 +1781,229 @@
    ""
   ],
   [
-   3,
+   5,
+   "div",
+   [],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Nom *"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-nom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Prénom *"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-prenom"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Date de naissance"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-ddn"
+    ],
+    [
+     "type",
+     "date"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Téléphone"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-tel"
+    ],
+    [
+     "type",
+     "tel"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "E-mail *"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-email"
+    ],
+    [
+     "type",
+     "email"
+    ]
+   ],
+   ""
+  ],
+  [
+   6,
+   "div",
+   [],
+   ""
+  ],
+  [
+   7,
+   "div",
+   [],
+   "Adresse"
+  ],
+  [
+   7,
+   "input",
+   [
+    [
+     "autocomplete",
+     "off"
+    ],
+    [
+     "class",
+     "inp"
+    ],
+    [
+     "id",
+     "agenda-ev-adresse"
+    ],
+    [
+     "type",
+     "text"
+    ]
+   ],
+   ""
+  ],
+  [
+   5,
    "div",
    [],
    "Motif de consultation"
   ],
   [
-   3,
+   5,
    "input",
    [
     [
@@ -1461,7 +2034,7 @@
    ""
   ],
   [
-   3,
+   5,
    "datalist",
    [
     [
@@ -1472,7 +2045,7 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [
     [
@@ -1483,13 +2056,30 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    "Google Agenda ne reçoit que les initiales (ex. « L.D. – motif ») ; le nom complet et le téléphone restent dans Verticy."
   ],
   [
-   2,
+   5,
+   "div",
+   [],
+   "À l’enregistrement, si le nom, le prénom et l’e-mail sont renseignés (sans date de naissance, un code provisoire est généré pour la 1re connexion) : fiche, accès portail et devis (si le motif est un de vos actes) partent tout de suite, et le questionnaire est programmé 3 jours avant le rendez-vous. Sinon rien n’est envoyé et une notification vous le dit."
+  ],
+  [
+   3,
+   "div",
+   [
+    [
+     "class",
+     "cal-ev-col"
+    ]
+   ],
+   ""
+  ],
+  [
+   4,
    "div",
    [
     [
@@ -1500,19 +2090,19 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    ""
   ],
   [
-   4,
+   6,
    "div",
    [],
    "Début *"
   ],
   [
-   4,
+   6,
    "input",
    [
     [
@@ -1535,19 +2125,19 @@
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    ""
   ],
   [
-   4,
+   6,
    "div",
    [],
    "Fin *"
   ],
   [
-   4,
+   6,
    "input",
    [
     [
@@ -1570,19 +2160,19 @@
    ""
   ],
   [
-   2,
+   4,
    "div",
    [],
    ""
   ],
   [
-   3,
+   5,
    "div",
    [],
    "Description"
   ],
   [
-   3,
+   5,
    "textarea",
    [
     [

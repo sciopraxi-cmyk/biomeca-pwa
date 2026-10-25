@@ -227,7 +227,7 @@ describe('contrat', () => {
   it('le titre envoyé à Google passe par les initiales (pas de nom complet dans le corps de requête)', () => {
     const i = SRC_BIOMECA.indexOf('async function saveAgendaEvent()');
     const corps = SRC_BIOMECA.slice(i, SRC_BIOMECA.indexOf('async function deleteAgendaEvent()'));
-    expect(corps).toMatch(/_agTitrePatient\(patient, motif\)/);
+    expect(corps).toMatch(/_agTitrePatient\(titrePatient, motif\)/);
     expect(corps).not.toMatch(/patient\.nom|patient\.prenom|patient\.tel/);
   });
 });
