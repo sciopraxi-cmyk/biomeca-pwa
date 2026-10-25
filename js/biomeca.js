@@ -34493,6 +34493,8 @@ function _notifHtmlDetail(e) {
   } else if (e.type === 'patient_message') {
     corps += _notifLigneDetail('Message', 'Le patient vous a écrit. Le contenu n\u2019est pas copié dans la notification : ouvrez la conversation.');
     corps += e.cible && nom ? '<div style="margin-top:10px;"><button class="btn btn-blue" style="font-size:12px;padding:5px 12px;" onclick="ouvrirConversationNotification(' + e.id + ')">💬 Ouvrir la conversation de ' + _escHtml(nom) + '</button></div>' : '';
+  } else if (e.type === 'patient_questionnaire') {
+    corps += _notifLigneDetail('Questionnaire', 'Le patient a rempli son questionnaire avant le rendez-vous. Les réponses ne sont pas copiées dans la notification : elles sont dans sa fiche (🔑 Portail patient).');
   } else if (e.type === 'email_essai') {
     corps += _notifLigneDetail('Détail', e.detail ? _escHtml(e.detail) : 'E-mail généré, non envoyé (boîte d\u2019essai).');
     corps += _notifLigneDetail('Envoi', 'Boîte d\u2019essai : rien n\u2019est envoyé pour l\u2019instant.');
@@ -36531,11 +36533,12 @@ function _portailAfficher(idx, compte, message) {
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Programme d\'exercices</div><div id="portail-programme" style="font-size:12px;color:var(--mut);"></div></div>' +
       _portailHtmlBlocage(idx, compte) +
       _portailHtmlMessagerie(idx, compte) +
+      _portailHtmlQuestionnaire() +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Suivi des séances</div><div id="portail-suivi" style="font-size:12px;color:var(--mut);">Chargement…</div></div>' +
       '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Documents visibles par le patient</div><div id="portail-docs"></div></div>';
   }
   cadre.innerHTML = html;
-  if (compte) { _portailChargerProgramme(idx); _portailChargerSuivi(idx); _portailChargerDocs(idx); }
+  if (compte) { _portailChargerProgramme(idx); _portailChargerSuivi(idx); _portailChargerDocs(idx); _portailChargerQuestionnaire(idx); }
 }
 function _portailSecretDdnAffiche(p) {
   return _portailSecretDdn(p) || '—';
@@ -36635,6 +36638,76 @@ function _portailHtmlMessagerie(idx, compte) {
     '<button class="btn btn-blue" onclick="portailApercu(' + idx + ',\'messagerie\')">💬 Ouvrir la conversation</button>' +
     '<button class="btn" onclick="portailBasculerMessagerie(' + idx + ',' + (off ? 'false' : 'true') + ')">' +
     (off ? '💬 Réactiver la messagerie' : '🚫 Désactiver la messagerie') + '</button></div></div>';
+}
+// Questionnaire de pré-consultation (lot c, étape 1) : le praticien l'envoie (RDV facultatif = date limite de modification pour le
+// patient), voit s'il est rempli et peut le retirer. La lecture des réponses et l'intégration au bilan viennent aux étapes suivantes.
+function _portailHtmlQuestionnaire() {
+  return '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;">Questionnaire avant le rendez-vous</div>' +
+    '<div id="portail-questionnaire" style="font-size:12px;color:var(--mut);">Chargement…</div></div>';
+}
+function _portailDateHeureFr(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+async function _portailChargerQuestionnaire(idx) {
+  const p = patients[idx];
+  const zone = document.getElementById('portail-questionnaire');
+  if (!p || !p._cloudId || !zone) return;
+  try {
+    const l = await _portailRpc('questionnaire_lire_praticien', { p_patient: p._cloudId });
+    const cible = document.getElementById('portail-questionnaire');
+    if (!cible) return;
+    const q = (Array.isArray(l) ? l : []).find(function (x) { return !x.integre_at && !x.retire_at; });
+    if (q) {
+      cible.innerHTML = '<div>📋 Questionnaire ' + (q.type === 'enfant' ? 'enfant' : 'adulte') + ' envoyé le ' + _escHtml(_portailDateHeureFr(q.envoye_at)) +
+        (q.rdv_at ? ' · modifiable par le patient jusqu\u2019au ' + _escHtml(_portailDateHeureFr(q.rdv_at)) : '') + '</div>' +
+        '<div style="margin-top:4px;color:' + (q.rempli_at ? 'var(--green)' : 'var(--mut)') + ';">' +
+        (q.rempli_at ? '✅ Rempli le ' + _escHtml(_portailDateHeureFr(q.rempli_at)) + (q.modifie_at ? ' (modifié le ' + _escHtml(_portailDateHeureFr(q.modifie_at)) + ')' : '') : '⏳ En attente du patient') + '</div>' +
+        '<div style="margin-top:6px;"><button class="btn" onclick="portailRetirerQuestionnaire(' + idx + ",'" + _escHtml(q.id) + '\')">Retirer ce questionnaire</button></div>';
+    } else {
+      cible.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+        '<label style="font-size:12px;">Rendez-vous (facultatif) <input class="inp" id="portail-q-rdv" type="datetime-local" style="width:auto;"/></label>' +
+        '<button class="btn btn-blue" onclick="portailEnvoyerQuestionnaire(' + idx + ')">📋 Envoyer le questionnaire</button></div>' +
+        '<div style="margin-top:4px;">Le patient le trouve dans son espace (carte « Mon questionnaire »). Sans date de rendez-vous, il reste modifiable jusqu\u2019à son intégration au bilan.</div>';
+    }
+  } catch (_e) {
+    zone.textContent = 'Lecture impossible pour le moment.';
+  }
+}
+async function portailEnvoyerQuestionnaire(idx) {
+  const p = patients[idx];
+  if (!p || !p._cloudId) return;
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  const v = document.getElementById('portail-q-rdv');
+  const rdv = v && v.value ? new Date(v.value).toISOString() : null;
+  const zone = document.getElementById('portail-questionnaire');
+  try {
+    const res = await authFetch(SUPA_URL + '/rest/v1/rpc/questionnaire_demander', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_patient: p._cloudId, p_rdv: rdv }),
+    });
+    if (!res.ok) {
+      let m = '';
+      try { m = String((await res.json()).message || ''); } catch (_e) { m = ''; }
+      const t = m.indexOf('rdv_passe') >= 0 ? 'La date du rendez-vous est déjà passée.'
+        : m.indexOf('questionnaire_deja_ouvert') >= 0 ? 'Un questionnaire est déjà en cours pour ce patient.'
+        : 'Envoi impossible pour le moment. Réessayez dans un instant.';
+      if (zone) zone.insertAdjacentHTML('beforeend', '<div style="color:var(--red);margin-top:6px;">' + _escHtml(t) + '</div>');
+      return;
+    }
+    await _portailChargerQuestionnaire(idx);
+  } catch (_e) {
+    if (zone) zone.insertAdjacentHTML('beforeend', '<div style="color:var(--red);margin-top:6px;">Envoi impossible : vérifiez votre connexion.</div>');
+  }
+}
+async function portailRetirerQuestionnaire(idx, id) {
+  if (globalThis._modeConsultation) { showAccessRestrictedModal('create_portail'); return; }
+  if (!confirm('Retirer ce questionnaire ? Le patient ne le verra plus et ses réponses ne seront plus proposées pour le bilan.')) return;
+  try {
+    await _portailRpc('questionnaire_retirer', { p_id: id });
+  } catch (_e) { /* la liste est rechargée : elle montre l'état réel */ }
+  await _portailChargerQuestionnaire(idx);
 }
 async function portailBasculerMessagerie(idx, desactiver) {
   const p = patients[idx];
@@ -37233,6 +37306,22 @@ async function _portailMessagesNonLus() {
     });
   } catch (_e) { /* silencieux */ }
 }
+// Questionnaires remplis par les patients (notification `patient_questionnaire`, identifiants seuls ; jamais pour un patient bloqué,
+// le serveur les inscrit « déjà notifiés »). Une seule notification par questionnaire, même s'il est modifié ensuite.
+let _qstEnCours = false;
+async function _portailVerifierQuestionnaires() {
+  if (_qstEnCours || globalThis._modeConsultation || typeof pwaUser === 'undefined' || !pwaUser) return;
+  if (typeof _horsConnexion === 'function' && _horsConnexion()) return;
+  _qstEnCours = true;
+  try {
+    const l = await _portailRpc('questionnaire_a_notifier', {});
+    for (const x of Array.isArray(l) ? l : []) {
+      const p = (Array.isArray(patients) ? patients : []).find(function (y) { return y._cloudId === x.patient_id; });
+      if (!p) continue; // fiche inconnue sur cet appareil : traitée depuis l'appareil qui la connaît
+      if ((await _portailRpc('questionnaire_notifie', { p_id: x.id })) === true) notifierEvenement('patient_questionnaire', { patientId: p.id });
+    }
+  } catch (_e) { /* réessayé à la prochaine vérification */ } finally { _qstEnCours = false; }
+}
 // Signatures de devis par les patients : la liste vient du serveur (jamais pour un patient bloqué) ; on retrouve d'abord le devis réel
 // (source_ref de la copie partagée) AVANT de marquer « notifié », pour réessayer à la prochaine vérification si la lecture échoue.
 let _sigEnCours = false;
@@ -37263,6 +37352,7 @@ function _portailVerifierNotifications() {
   if (typeof _portailVerifierMots === 'function') _portailVerifierMots(true);
   if (typeof _portailVerifierMessages === 'function') _portailVerifierMessages();
   if (typeof _portailVerifierSignatures === 'function') _portailVerifierSignatures();
+  if (typeof _portailVerifierQuestionnaires === 'function') _portailVerifierQuestionnaires();
 }
 setInterval(_portailVerifierNotifications, 30 * 1000);
 if (typeof document !== 'undefined' && document.addEventListener) {

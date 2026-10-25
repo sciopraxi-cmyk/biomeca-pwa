@@ -49,6 +49,15 @@ import {
   sessionAExpirer,
   situationJour,
 } from './patient-logique.mjs';
+import {
+  erreursReponses,
+  messageErreurQuestionnaire,
+  modeleDe,
+  nettoyerReponses,
+  phraseQuestionnaire,
+  questionVisible,
+  valeursDepart,
+} from './questionnaire-modele.mjs';
 
 const SUPA_URL = 'https://tzivizoacdyopwfzerrb.supabase.co';
 // Clé publique (anon / publishable) : la même que l'application praticien, protégée par la RLS.
@@ -90,6 +99,7 @@ const ECRANS = [
   'document',
   'exercices',
   'messagerie',
+  'questionnaire',
 ];
 
 function montrer(nom) {
@@ -223,6 +233,7 @@ async function ouvrirAccueil() {
   majPastilleDocuments();
   majCarteExercices();
   majPastilleMessagerie();
+  majCarteQuestionnaire();
 }
 
 async function ouvrirAccueilApercu() {
@@ -239,6 +250,7 @@ async function ouvrirAccueilApercu() {
   montrer('accueil');
   majPastilleDocuments();
   majCarteExercices();
+  majCarteQuestionnaire();
   if (ecranInitial === 'messagerie') {
     ecranInitial = '';
     ouvrirMessagerie();
@@ -1783,6 +1795,234 @@ async function envoyerMessage(ev) {
   }
 }
 
+// ─── Questionnaire de pré-consultation ───
+let qEtat = null; // questionnaire ouvert du patient (ou null)
+let qRep = {}; // réponses en cours de saisie
+let qDependances = new Set(); // clés dont dépend l'affichage d'une autre question
+
+function rpcQuestionnaire(nom, corps) {
+  return appelAuth('/rest/v1/rpc/' + nom, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps || {}),
+  });
+}
+
+async function majCarteQuestionnaire() {
+  if (APERCU) {
+    $('phrase-questionnaire').textContent = 'Aperçu : se remplit côté patient';
+    return;
+  }
+  const r = await rpcQuestionnaire('questionnaire_etat_patient');
+  if (!r || !r.ok) return;
+  const e = await corpsJson(r);
+  qEtat = e && e.id ? e : null;
+  $('phrase-questionnaire').textContent = phraseQuestionnaire(qEtat);
+  $('pastille-questionnaire').hidden = !(qEtat && !qEtat.rempli_at && qEtat.modifiable);
+}
+
+function blocFicheQuestionnaire(types) {
+  const f = (qEtat && qEtat.fiche) || {};
+  const lignes = [];
+  if (types.includes('antecedents') && f.antecedents) lignes.push(['Antécédents', f.antecedents]);
+  if (types.includes('examens') && f.examens) lignes.push(['Examens', f.examens]);
+  if (types.includes('poids_taille') && (f.poids || f.taille)) {
+    lignes.push(['Poids et taille', `${f.poids || '—'} kg · ${f.taille || '—'} cm`]);
+  }
+  if (types.includes('metier') && f.metier) lignes.push(['Métier', f.metier]);
+  if (!lignes.length) return null;
+  const bloc = elt('div', 'fiche-q');
+  bloc.append(elt('p', 'fiche-q-titre', '📁 Dans votre dossier (lecture seule)'));
+  for (const [t, v] of lignes) {
+    const p = elt('p', 'fiche-q-ligne');
+    p.append(elt('strong', '', t + ' : '), document.createTextNode(String(v)));
+    bloc.append(p);
+  }
+  if (types.includes('antecedents') || types.includes('examens')) {
+    bloc.append(
+      elt('p', 'doux petit', 'Qu’est-ce qui a changé depuis ? Dites-le simplement ci-dessous.')
+    );
+  }
+  return bloc;
+}
+
+function modifierReponse(qu, valeur) {
+  if (valeur === undefined || valeur === '' || (Array.isArray(valeur) && valeur.length === 0)) {
+    delete qRep[qu.cle];
+  } else {
+    qRep[qu.cle] = valeur;
+  }
+  if (qDependances.has(qu.cle)) dessinerQuestionnaire();
+}
+
+function champQuestionnaire(qu) {
+  const bloc = elt('div', 'q-question');
+  bloc.append(elt('p', 'q-libelle', qu.libelle));
+  const valeur = qRep[qu.cle];
+  if (qu.type === 'texte') {
+    const el = elt(qu.long ? 'textarea' : 'input', 'q-champ');
+    if (qu.long) el.rows = 3;
+    else el.type = 'text';
+    el.maxLength = 1000;
+    el.value = valeur || '';
+    el.setAttribute('aria-label', qu.libelle);
+    el.addEventListener('input', () => modifierReponse(qu, el.value));
+    bloc.append(el);
+  } else if (qu.type === 'nombre') {
+    const el = elt('input', 'q-champ q-nombre');
+    el.type = 'text';
+    el.inputMode = 'decimal';
+    el.value = valeur === undefined ? '' : String(valeur);
+    el.setAttribute('aria-label', qu.libelle);
+    el.addEventListener('input', () => modifierReponse(qu, el.value));
+    bloc.append(el);
+  } else if (qu.type === 'multi') {
+    const liste = elt('div', 'chips');
+    for (const o of qu.options) {
+      const lab = elt('label', 'chip');
+      const c = elt('input');
+      c.type = 'checkbox';
+      c.checked = Array.isArray(valeur) && valeur.includes(o.v);
+      c.addEventListener('change', () => {
+        const cur = new Set(Array.isArray(qRep[qu.cle]) ? qRep[qu.cle] : []);
+        if (c.checked) cur.add(o.v);
+        else cur.delete(o.v);
+        modifierReponse(
+          qu,
+          qu.options.map((x) => x.v).filter((v) => cur.has(v))
+        );
+      });
+      lab.append(c, elt('span', '', o.l));
+      liste.append(lab);
+    }
+    bloc.append(liste);
+  } else {
+    // oui_non, choix, eva : un seul choix (radio)
+    const choix =
+      qu.type === 'eva'
+        ? Array.from({ length: 11 }, (_, i) => ({ v: i, l: String(i) }))
+        : qu.options;
+    const liste = elt('div', 'chips' + (qu.type === 'eva' ? ' chips-eva' : ''));
+    for (const o of choix) {
+      const lab = elt('label', 'chip');
+      const c = elt('input');
+      c.type = 'radio';
+      c.name = 'q-' + qu.cle;
+      c.checked = valeur === o.v;
+      c.addEventListener('change', () => modifierReponse(qu, o.v));
+      lab.append(c, elt('span', '', o.l));
+      liste.append(lab);
+    }
+    bloc.append(liste);
+  }
+  return bloc;
+}
+
+function dessinerQuestionnaire() {
+  const zone = $('zone-questionnaire');
+  const defilement = window.scrollY;
+  zone.textContent = '';
+  for (const sec of modeleDe(qEtat.type)) {
+    const fs = elt('fieldset', 'section-q');
+    fs.append(elt('legend', '', sec.titre));
+    if (sec.fiche) {
+      const f = blocFicheQuestionnaire(sec.fiche);
+      if (f) fs.append(f);
+    }
+    for (const qu of sec.questions) {
+      if (questionVisible(qu, qRep)) fs.append(champQuestionnaire(qu));
+    }
+    zone.append(fs);
+  }
+  window.scrollTo(0, defilement);
+}
+
+async function ouvrirQuestionnaire() {
+  afficherErreur('erreur-questionnaire', '');
+  $('merci-questionnaire').hidden = true;
+  $('form-questionnaire').hidden = false;
+  $('btn-questionnaire-envoyer').hidden = true;
+  $('zone-questionnaire').textContent = '';
+  if (APERCU) {
+    $('intro-questionnaire').textContent =
+      'Aperçu praticien : le patient remplit ce questionnaire depuis son propre espace. Ses réponses apparaîtront dans sa fiche.';
+    $('form-questionnaire').hidden = true;
+    return montrer('questionnaire');
+  }
+  $('intro-questionnaire').textContent = 'Un instant…';
+  montrer('questionnaire');
+  await majCarteQuestionnaire();
+  if (!qEtat) {
+    $('intro-questionnaire').textContent =
+      'Rien à remplir pour l’instant. Votre praticien vous enverra un questionnaire avant votre rendez-vous ✨';
+    $('form-questionnaire').hidden = true;
+    return;
+  }
+  if (!qEtat.modifiable) {
+    $('intro-questionnaire').textContent = qEtat.rempli_at
+      ? 'Merci, votre questionnaire a bien été transmis. Le rendez-vous est passé : il ne peut plus être modifié.'
+      : 'Le rendez-vous est passé : ce questionnaire ne peut plus être rempli.';
+    $('form-questionnaire').hidden = true;
+    return;
+  }
+  qRep = valeursDepart(qEtat.type, qEtat.reponses, qEtat.fiche);
+  qDependances = new Set();
+  for (const sec of modeleDe(qEtat.type))
+    for (const qu of sec.questions) if (qu.si) qDependances.add(qu.si.cle);
+  $('intro-questionnaire').textContent = qEtat.rempli_at
+    ? 'Vos réponses sont envoyées. Vous pouvez les modifier jusqu’au rendez-vous.'
+    : qEtat.type === 'enfant'
+      ? 'Ces questions aident votre praticien à préparer le rendez-vous de votre enfant. Répondez simplement ; tout est facultatif.'
+      : 'Ces questions aident votre praticien à préparer votre rendez-vous. Répondez simplement ; tout est facultatif.';
+  $('btn-questionnaire-envoyer').hidden = false;
+  $('btn-questionnaire-envoyer').disabled = false;
+  dessinerQuestionnaire();
+  window.scrollTo(0, 0);
+}
+
+async function envoyerQuestionnaire(ev) {
+  ev.preventDefault();
+  if (!qEtat || APERCU) return;
+  afficherErreur('erreur-questionnaire', '');
+  $('merci-questionnaire').hidden = true;
+  const erreurs = erreursReponses(qEtat.type, qRep);
+  if (erreurs.length) return afficherErreur('erreur-questionnaire', erreurs.join(' '));
+  const reponses = nettoyerReponses(qEtat.type, qRep);
+  if (Object.keys(reponses).length === 0) {
+    return afficherErreur(
+      'erreur-questionnaire',
+      'Répondez à au moins une question avant d’envoyer.'
+    );
+  }
+  const bouton = $('btn-questionnaire-envoyer');
+  bouton.disabled = true;
+  const r = await rpcQuestionnaire('questionnaire_enregistrer', {
+    p_id: qEtat.id,
+    p_reponses: reponses,
+  });
+  bouton.disabled = false;
+  if (!r) return afficherErreur('erreur-questionnaire', messageErreurQuestionnaire(0, null));
+  if (!r.ok) {
+    return afficherErreur(
+      'erreur-questionnaire',
+      messageErreurQuestionnaire(r.status, await corpsJson(r))
+    );
+  }
+  const dejaEnvoye = !!qEtat.rempli_at;
+  await majCarteQuestionnaire();
+  if (qEtat) {
+    qEtat.rempli_at = qEtat.rempli_at || new Date().toISOString();
+    $('intro-questionnaire').textContent =
+      'Vos réponses sont envoyées. Vous pouvez les modifier jusqu’au rendez-vous.';
+  }
+  const merci = $('merci-questionnaire');
+  merci.textContent = dejaEnvoye
+    ? 'Vos modifications sont enregistrées 👍'
+    : 'Merci ! Votre questionnaire est envoyé 🎉';
+  merci.hidden = false;
+  merci.scrollIntoView({ block: 'center' });
+}
+
 // ─── Démarrage ───
 $('form-connexion').addEventListener('submit', seConnecter);
 $('form-mdp').addEventListener('submit', choisirMotDePasse);
@@ -1792,6 +2032,9 @@ $('btn-deconnexion').addEventListener('click', deconnecter);
 $('carte-documents').addEventListener('click', ouvrirDocuments);
 $('carte-messagerie').addEventListener('click', ouvrirMessagerie);
 $('btn-messagerie-retour').addEventListener('click', ouvrirAccueil);
+$('carte-questionnaire').addEventListener('click', ouvrirQuestionnaire);
+$('btn-questionnaire-retour').addEventListener('click', ouvrirAccueil);
+$('form-questionnaire').addEventListener('submit', envoyerQuestionnaire);
 $('form-message').addEventListener('submit', envoyerMessage);
 $('texte-message').addEventListener('input', majCompteurMessage);
 $('texte-message').addEventListener('keydown', (e) => {
