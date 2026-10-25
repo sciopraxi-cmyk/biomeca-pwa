@@ -778,22 +778,28 @@ describe('intégration : scénario de Joël (sport, bilan de contrôle)', () => 
       '(déclaré le ' + new Date('2026-10-28T10:00:00Z').toLocaleDateString('fr-FR') + ')'
     );
   });
-  it('jamais d’écrasement : radio / EVA déjà renseignés autrement → listés « à saisir à la main »', () => {
+  it('jamais d’écrasement : radio / EVA déjà renseignés autrement → une ligne dans les notes, rien d’écrasé', () => {
     const pg = faussePage({ 'radio:douleur_oui_non': 'non', 'range:eva': '4' });
     const p = plan('sport', QA(rep), pg);
     expect(bil(p, 'douleur_oui_non')).toEqual([]);
     expect(bil(p, 'eva')).toEqual([]);
-    expect(
-      p.hors
-        .filter((h) => /déjà renseigné/.test(h.raison))
-        .map((h) => h.libelle)
-        .sort()
-    ).toEqual(['Douleur présente', 'EVA douleur']);
+    const notes = bil(p, 'notes_generales').pop().apres;
+    expect(notes).toContain(
+      'Douleur présente (questionnaire) : Oui — le bilan indique autre chose'
+    );
+    expect(notes).toContain('EVA douleur (questionnaire) : 6/10 — le bilan indique 4/10');
+    expect(p.hors).toEqual([]);
   });
-  it('un champ absent de la page n’est jamais proposé : il est listé', () => {
+  it('un champ absent de la page n’est jamais proposé : son information va dans les notes', () => {
     const pg = faussePage({}, ['appareillage']);
     const p = plan('sport', QA(rep), pg);
     expect(bil(p, 'appareillage')).toEqual([]);
+    expect(bil(p, 'notes_generales').pop().apres).toContain('Appareillage : Semelles 2024');
+    expect(p.hors).toEqual([]);
+  });
+  it('repli : si le champ de notes lui-même est introuvable, l’information est listée « à saisir à la main »', () => {
+    const pg = faussePage({}, ['appareillage', 'notes_generales']);
+    const p = plan('sport', QA(rep), pg);
     expect(p.hors.some((h) => h.libelle === 'Appareillage' && /aucune case/.test(h.raison))).toBe(
       true
     );
@@ -814,11 +820,11 @@ describe('intégration : scénario de Joël (sport, bilan de contrôle)', () => 
     expect(p.fiche).toEqual([]);
     expect(p.bilan.filter((o) => o.genre !== 'radio')).toEqual([]);
   });
-  it('sport « non » alors que la fiche en indique un : jamais effacé, signalé', () => {
+  it('sport « non » alors que la fiche en indique un : jamais effacé, signalé dans les notes', () => {
     const p = plan('sport', QA({ sport_pratique: 'non' }), page());
     expect(fic(p, 'sport')).toBeUndefined();
-    expect(p.hors.some((h) => h.libelle === 'Sport' && /ne plus pratiquer/.test(h.valeur))).toBe(
-      true
+    expect(bil(p, 'notes_generales').pop().apres).toMatch(
+      /Sport : le patient indique ne plus pratiquer de sport \(la fiche indique « Course à pied »\)/
     );
   });
   it('poids de la fiche avec virgule ou égal : pas de changement ; fiche sans poids : ajouté', () => {
@@ -921,9 +927,10 @@ describe('intégration : les autres bilans', () => {
     expect(bil(p, 'podo_atcd_txt').pop().apres).toContain('Fracture bras');
     expect(fic(p, 'poids').apres).toBe('21');
     expect(fic(p, 'taille').apres).toBe('115');
-    expect(p.hors.some((h) => h.libelle === 'Chaussures : Sport')).toBe(true);
+    expect(bil(p, 'podo_notes_generales').pop().apres).toContain('Chaussures : Sport');
+    expect(p.hors).toEqual([]);
   });
-  it('pédicurie : cases (diabète, talon haut, station debout, sport), texte (profession, allergies) et le reste est listé', () => {
+  it('pédicurie : cases (diabète, talon haut, station debout, sport), texte (profession, allergies) et tout le reste dans les notes', () => {
     const q = QA({
       motif: ['douleur', 'semelles'],
       chg_maladie_types: ['diabete', 'circulation'],
@@ -959,11 +966,14 @@ describe('intégration : les autres bilans', () => {
     expect(bil(p, 'ped_allergies_txt')[0].apres).toBe('Latex');
     expect(bil(p, 'ped_ttt_autre_txt')[0].apres).toBe('Metformine');
     expect(bil(p, 'ped_chaussage_autre_txt')[0].apres).toBe('Trop étroites');
-    const horsLib = p.hors.map((h) => h.libelle);
-    expect(horsLib).toContain('Nouveau diagnostic : Circulation');
-    expect(horsLib).toContain('Antécédent');
-    expect(horsLib).toContain('Douleur');
-    expect(horsLib).toContain('Message du patient');
+    const notes = bil(p, 'ped_notes_generales').pop().apres;
+    expect(notes).toContain(
+      'Nouveau diagnostic : Circulation : à saisir à la main'.replace(' : à saisir à la main', '')
+    );
+    expect(notes).toContain('Hallux 2026');
+    expect(notes).toContain('Douleur : oui');
+    expect(notes).toContain('Message du patient : RAS');
+    expect(p.hors).toEqual([]);
   });
   it('aucune information n’est perdue : tout ce que le patient a écrit est soit intégré, soit listé', () => {
     const q = QA({
@@ -1048,5 +1058,85 @@ describe('câblage de l’intégration (garde de source)', () => {
     expect(lire('supabase/migrations/portail-questionnaire-d-integration.sql').length).toBeLessThan(
       4000
     );
+  });
+});
+
+describe('relecture après intégration (garde de source)', () => {
+  it('le bandeau reste après l’intégration (30 jours) et « Voir les réponses » lit aussi le dernier questionnaire intégré', () => {
+    expect(biomeca).toMatch(/_QST_INTEGRE_JOURS = 30/);
+    const f = extraireFonction(biomeca, '_qstAfficherReponsesDe');
+    expect(f).toMatch(/_qstDernierIntegre/);
+    const b = extraireFonction(biomeca, '_qstInjecterBouton');
+    expect(b).toMatch(/_qstDernierIntegre/);
+    expect(b).toMatch(/data-qst-etat/);
+  });
+  it('la fenêtre finale répète la liste « à saisir à la main » et propose « Voir les réponses »', () => {
+    const v = extraireFonction(biomeca, 'qstValiderIntegration');
+    expect(v).toMatch(/À saisir à la main/);
+    expect(v).toMatch(/qstVoirReponses\(\)/);
+    expect(v.indexOf('_qstInjecterBouton')).toBeGreaterThan(v.indexOf('_qstFenetre'));
+  });
+  it('l’en-tête des réponses mentionne l’intégration', () => {
+    expect(extraireFonction(biomeca, '_qstHtmlReponses')).toMatch(/intégré au bilan le/);
+  });
+});
+
+describe('« Notes complémentaires » dans l’anamnèse des 4 bilans', () => {
+  it('le champ existe dans les 4 bilans, avec enregistrement et rapport', () => {
+    const html = lire('index.html');
+    expect(html).toMatch(/data-field="notes_generales"/);
+    expect(html).toMatch(/class="inp pedicurie-field"[^>]*data-field="ped_notes_generales"/);
+    expect(html).toMatch(/class="podopediatrie-field[^"]*"[^>]*data-field="podo_notes_generales"/);
+    expect(biomeca).toMatch(/id="po-notes"/);
+    expect(biomeca).toMatch(/d\.notes=getPoVal\('po-notes'\)/);
+    expect(biomeca).toMatch(/setPoVal\('po-notes',d\.notes\)/);
+    expect(biomeca).toMatch(/txtItem\('ped_notes_generales'\)/);
+    expect(biomeca).toMatch(/txtItem\('podo_notes_generales', 'Notes complémentaires'\)/);
+    expect(biomeca).toMatch(/anam\.push\(\['Notes complémentaires', d\.notes\]\)/);
+  });
+  it('avec un champ de notes présent, plus rien n’est « à saisir à la main », dans les 4 bilans', () => {
+    const q = QA({
+      motif: ['douleur', 'semelles'],
+      chg_blessure: 'oui',
+      chg_blessure_txt: 'Entorse',
+      chg_maladie_types: ['diabete', 'circulation'],
+      chg_traitements_txt: 'Doliprane',
+      allergies_txt: 'Pollen',
+      chaussures: ['sport', 'bottes', 'securite'],
+      chaussures_gene_txt: 'Étroites',
+      appareillage: 'oui',
+      appareillage_txt: 'Orthèse',
+      douleur: 'oui',
+      eva: 5,
+      notes_txt: 'Merci',
+    });
+    for (const module of ['sport', 'posturo', 'podopediatrie', 'pedicurie']) {
+      const p = QST._qstPlan(MODELE, module, q, faussePage({}).lire, {
+        antecedents: '',
+        examens: '',
+        sport: '',
+        metier: '',
+        poids: '',
+        taille: '',
+      });
+      expect(p.hors, module).toEqual([]);
+      const tout = JSON.stringify(p);
+      for (const mot of ['Doliprane', 'Pollen', 'Merci', 'Orthèse'])
+        expect(tout, module + ' / ' + mot).toContain(mot);
+    }
+  });
+  it('les notes s’écrivent sans doublon : un second plan après écriture ne propose rien de plus', () => {
+    const q = QA({
+      chg_maladie_types: ['circulation'],
+      chaussures_gene_txt: 'Étroites',
+      notes_txt: 'Merci',
+    });
+    const pg = faussePage({});
+    const vide = { antecedents: '', examens: '', sport: '', metier: '', poids: '', taille: '' };
+    const p1 = QST._qstPlan(MODELE, 'pedicurie', q, pg.lire, vide);
+    expect(bil(p1, 'ped_notes_generales').length).toBeGreaterThan(0);
+    pg.ecrire(p1.bilan);
+    const p2 = QST._qstPlan(MODELE, 'pedicurie', q, pg.lire, vide);
+    expect(p2.bilan.filter((o) => o.champ === 'ped_notes_generales')).toEqual([]);
   });
 });

@@ -18341,6 +18341,7 @@ function _extractPosturoSections(d) {
   // #226-C — label court : l'ancien « Douleur — localisation/horaire »
   // débordait de la colonne label du rapport (retour terrain, texte collé).
   if(d.douleurDetail) anam.push(['Localisation douleur', d.douleurDetail]);
+  if(d.notes) anam.push(['Notes complémentaires', d.notes]);
   if(anam.length) sections.push({titre:'1. Anamnèse', items:anam, color:'#2a7a4e'});
 
   // 2. Morphostatique (texte — les silhouettes sont gérées séparément par
@@ -23247,7 +23248,8 @@ function _collectPodopediatrieSyntheseSections(srcData) {
     boxItems(pfx('podo_doul_')).length ? ['<strong>Douleur — localisation / horaire</strong> : ' + boxItems(pfx('podo_doul_')).join(', ')] : []
   ).concat([
     radioItem('podo_douleur_eva', 'Douleur EVA'),
-    txtItem('podo_sport',         'Sport pratiqué')
+    txtItem('podo_sport',         'Sport pratiqué'),
+    txtItem('podo_notes_generales', 'Notes complémentaires')
   ]) });
 
   // Réflexes archaïques (préfixe podo_reflexe_)
@@ -23729,7 +23731,7 @@ function applyPedicurieGradeSuggestion() {
 // dépendance à bilanDataPedicurie (le DOM est l'état de vérité au moment de
 // la génération, après le balayage save/load). Aucune écriture parasite.
 function _pedEscapeHtml(s){ if(s==null)return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-var _PED_TXT_LABELS={ped_date_consult:'Date de consultation',ped_allergies_txt:'Allergies',ped_motif_autre_txt:'Autre motif',ped_hba1c:'HbA1c',ped_chaussage_autre_txt:'Chaussage (autre)',ped_profession:'Profession',ped_ttt_autre_txt:'Traitement (autre)',ped_derm_eva:'Douleur (EVA)',ped_derm_autre_txt:'Dermato (précisions)',ped_chaussex_autre_txt:'Chaussage (autre)',ped_suivi_freq:'Fréquence de suivi',ped_suivi_rdv:'Prochain RDV',ped_adress_motif:"Motif d'adressage",ped_soin_autre_txt:'Précisions'};
+var _PED_TXT_LABELS={ped_date_consult:'Date de consultation',ped_allergies_txt:'Allergies',ped_notes_generales:'Notes complémentaires',ped_motif_autre_txt:'Autre motif',ped_hba1c:'HbA1c',ped_chaussage_autre_txt:'Chaussage (autre)',ped_profession:'Profession',ped_ttt_autre_txt:'Traitement (autre)',ped_derm_eva:'Douleur (EVA)',ped_derm_autre_txt:'Dermato (précisions)',ped_chaussex_autre_txt:'Chaussage (autre)',ped_suivi_freq:'Fréquence de suivi',ped_suivi_rdv:'Prochain RDV',ped_adress_motif:"Motif d'adressage",ped_soin_autre_txt:'Précisions'};
 var _PED_RADIO_LABELS={ped_diabete_type:'Diabète — type',ped_diabete_equilibre:'Diabète — équilibre',ped_autonomie:'Autonomie soin des pieds',ped_vue:'Vue',ped_derm_cor_type:'Cor — type',ped_derm_etat:'État cutané',ped_derm_trophicite:'Coloration (trophicité)',ped_vasc_pedieux_d:'Pouls pédieux (D)',ped_vasc_pedieux_g:'Pouls pédieux (G)',ped_vasc_tibial_d:'Pouls tibial post. (D)',ped_vasc_tibial_g:'Pouls tibial post. (G)',ped_vasc_trc:'TRC',ped_vasc_temp:'Température des téguments',ped_vasc_conclusion:'Conclusion vasculaire',ped_neuro_mono_d:'Monofilament 10 g (D)',ped_neuro_mono_g:'Monofilament 10 g (G)',ped_neuro_vibra_d:'Sensibilité vibratoire (D)',ped_neuro_vibra_g:'Sensibilité vibratoire (G)',ped_neuro_conclusion:'Conclusion neuro'};
 var _PED_ONGLE_LABELS={mycose:'Onychomycose',epaissi:'Onychauxis',decolle:'Onycholyse',incarne:'Onychocryptose',hematome:'Hématome',courb:'Hypercourbure',perionyxis:'Périonyxis',suspect:'Lésion suspecte'};
 var _PED_ONGLE_ORDER=['mycose','epaissi','decolle','incarne','hematome','courb','perionyxis','suspect'];
@@ -23774,7 +23776,7 @@ function _collectPedicurieSections(srcData){
   function ongleItems(){var items=[];var orteilLabel={1:'O1 (Hallux)',2:'O2',3:'O3',4:'O4',5:'O5'};[['d','Pied D'],['g','Pied G']].forEach(function(pied){var side=pied[0],sideLbl=pied[1];for(var o=1;o<=5;o++){var anomalies=[];_PED_ONGLE_ORDER.forEach(function(suf){var f='ped_ongle_'+side+o+'_'+suf;if(boxOn(f)){var lbl=_PED_ONGLE_LABELS[suf];anomalies.push(suf==='suspect'?'<span style="color:#c0392b;font-weight:600;">⚠ '+lbl+'</span>':lbl);}});if(anomalies.length){items.push('<strong>'+sideLbl+' — '+orteilLabel[o]+'</strong> : '+anomalies.join(', '));}}var prec=fieldVal('ped_ongle_'+side+'_autre_txt');if(prec)items.push('<em>'+sideLbl+' — précisions</em> : '+_pedEscapeHtml(prec));});return items;}
   var sections=[];
   function pushSection(titre,items){var real=items.filter(function(x){return x&&x.trim()!=='';});if(real.length)sections.push({titre:titre,items:real});}
-  pushSection('📋 Anamnèse',[].concat([txtItem('ped_date_consult')],boxesItems(pfx('ped_motif_')).length?['<strong>Motif</strong> : '+boxesItems(pfx('ped_motif_')).join(', ')]:[],[txtItem('ped_motif_autre_txt')],boxesItems(pfx('ped_atcd_')).length?['<strong>ATCD médicaux</strong> : '+boxesItems(pfx('ped_atcd_')).join(', ')]:[],[radioItem('ped_diabete_type'),radioItem('ped_diabete_equilibre'),txtItem('ped_hba1c')],boxesItems(pfx('ped_atcdp_')).length?['<strong>ATCD podologiques</strong> : '+boxesItems(pfx('ped_atcdp_')).join(', ')]:[],[radioItem('ped_autonomie'),radioItem('ped_vue')],boxesItems(pfx('ped_hygiene_')).length?['<strong>Hygiène</strong> : '+boxesItems(pfx('ped_hygiene_')).join(', ')]:[],boxesItems(pfx('ped_chaussage_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussage_')).join(', ')]:[],[txtItem('ped_chaussage_autre_txt')],boxesItems(pfx('ped_activite_')).length?['<strong>Activité</strong> : '+boxesItems(pfx('ped_activite_')).join(', ')]:[],[txtItem('ped_profession')],boxesItems(pfx('ped_ttt_')).length?['<strong>Traitements</strong> : '+boxesItems(pfx('ped_ttt_')).join(', ')]:[],[txtItem('ped_ttt_autre_txt'),txtItem('ped_allergies_txt')]));
+  pushSection('📋 Anamnèse',[].concat([txtItem('ped_date_consult')],boxesItems(pfx('ped_motif_')).length?['<strong>Motif</strong> : '+boxesItems(pfx('ped_motif_')).join(', ')]:[],[txtItem('ped_motif_autre_txt')],boxesItems(pfx('ped_atcd_')).length?['<strong>ATCD médicaux</strong> : '+boxesItems(pfx('ped_atcd_')).join(', ')]:[],[radioItem('ped_diabete_type'),radioItem('ped_diabete_equilibre'),txtItem('ped_hba1c')],boxesItems(pfx('ped_atcdp_')).length?['<strong>ATCD podologiques</strong> : '+boxesItems(pfx('ped_atcdp_')).join(', ')]:[],[radioItem('ped_autonomie'),radioItem('ped_vue')],boxesItems(pfx('ped_hygiene_')).length?['<strong>Hygiène</strong> : '+boxesItems(pfx('ped_hygiene_')).join(', ')]:[],boxesItems(pfx('ped_chaussage_')).length?['<strong>Chaussage</strong> : '+boxesItems(pfx('ped_chaussage_')).join(', ')]:[],[txtItem('ped_chaussage_autre_txt')],boxesItems(pfx('ped_activite_')).length?['<strong>Activité</strong> : '+boxesItems(pfx('ped_activite_')).join(', ')]:[],[txtItem('ped_profession')],boxesItems(pfx('ped_ttt_')).length?['<strong>Traitements</strong> : '+boxesItems(pfx('ped_ttt_')).join(', ')]:[],[txtItem('ped_ttt_autre_txt'),txtItem('ped_allergies_txt'),txtItem('ped_notes_generales')]));
   pushSection('🔬 Examen dermatologique',[].concat(boxesItems(pfx('ped_derm_')),[radioItem('ped_derm_cor_type'),txtItem('ped_derm_eva'),radioItem('ped_derm_etat'),radioItem('ped_derm_trophicite'),txtItem('ped_derm_autre_txt')]));
   pushSection('🦶 Examen unguéal',ongleItems());
   pushSection('🩸 Dépistage vasculaire',[radioItem('ped_vasc_pedieux_d'),radioItem('ped_vasc_pedieux_g'),radioItem('ped_vasc_tibial_d'),radioItem('ped_vasc_tibial_g'),radioItem('ped_vasc_trc'),radioItem('ped_vasc_temp')].concat(boxesItems(pfx('ped_vasc_')).length?['<strong>Autres signes</strong> : '+boxesItems(pfx('ped_vasc_')).join(', ')]:[],[radioItem('ped_vasc_conclusion')]));
@@ -26851,6 +26853,11 @@ function getBilanPosturoHTML() {
         </div>
         <div style="text-align:center;font-size:16px;font-weight:700;color:#222;margin-top:6px;">Score : <span id="po-eva-val">0</span>/10</div>
       </div>
+      <!-- Lot c (questionnaire) : notes libres de l'anamnèse (même rôle que « Notes complémentaires » du bilan sportif) : reçoit tout ce que le questionnaire apporte sans case dédiée. -->
+      <div style="margin-top:12px;">
+        <div class="field-lbl">Notes complémentaires</div>
+        <textarea class="inp" id="po-notes" rows="2" placeholder="..."></textarea>
+      </div>
     </div>
   </div>
 
@@ -28624,6 +28631,8 @@ async function genererSynthese() {
   if(anamTerrainPred) anamParts.push('Terrain prédominant: '+anamTerrainPred);
   const anamTerrain = document.querySelector('input[name="po-terrain"]:checked')?.value;
   if(anamTerrain) anamParts.push('Terrain: '+anamTerrain);
+  const anamNotes = document.getElementById('po-notes')?.value?.trim();
+  if(anamNotes) anamParts.push('Notes: '+anamNotes);
   const anamTension = document.getElementById('po-tension-principal')?.value?.trim();
   if(anamTension) anamParts.push('Tension principale: '+anamTension);
   if(anamParts.length) sections.push({titre:'🩺 Anamnèse', items:[anamParts.join(' · ')]});
@@ -31185,7 +31194,7 @@ function _balayerBilanPosturo(d) {
   d.activiteQuot=getPoVal('po-activite-quot'); d.motif=getPoVal('po-motif');
   // #226-B — traitements en cours, chaussage, localisation/horaire douleur.
   d.tttCours=getPoVal('po-ttt-cours'); d.chaussage=getPoVal('po-chaussage');
-  d.douleurDetail=getPoVal('po-douleur-detail');
+  d.douleurDetail=getPoVal('po-douleur-detail'); d.notes=getPoVal('po-notes');
   d.douleur=getPosturoRadio('po-douleur'); d.eva=getPoVal('po-eva');
   d.terrainPred=getPosturoRadio('po-terrain-pred'); d.tactique=getPosturoRadio('po-tactique');
   d.terrain=getPosturoRadio('po-terrain'); d.tensionPrincipal=getPoVal('po-tension-principal');
@@ -31511,7 +31520,7 @@ function loadPosturoBilan() {
   setPoVal('po-activite-quot',d.activiteQuot); setPoVal('po-motif',d.motif);
   // #226-B — traitements en cours, chaussage, localisation/horaire douleur.
   setPoVal('po-ttt-cours',d.tttCours); setPoVal('po-chaussage',d.chaussage);
-  setPoVal('po-douleur-detail',d.douleurDetail);
+  setPoVal('po-douleur-detail',d.douleurDetail); setPoVal('po-notes',d.notes);
   setPosturoRadio('po-douleur',d.douleur);
   if(d.eva!==undefined){setPoVal('po-eva',d.eva);const ev=document.getElementById('po-eva-val');if(ev)ev.textContent=d.eva;}
   setPosturoRadio('po-terrain-pred',d.terrainPred); setPosturoRadio('po-tactique',d.tactique);
@@ -31772,7 +31781,7 @@ var _micActive = false;
 var _micTargetId = null;
 
 function _injectMicButtons() {
-  var poIds = ['po-motif','po-atcd','po-appareillage','po-examens','po-activite',
+  var poIds = ['po-motif','po-atcd','po-appareillage','po-examens','po-activite','po-notes',
     'po-travail','po-activite-quot','po-tension-principal','po-comp1','po-comp2',
     'po-comp3','po-comp-critique','po-bilan-dyn','po-course','po-test-flex-ant',
     'po-epines-loc','po-chaussure-type','po-hetero-h-uni','po-hetero-h-bi',
@@ -36671,7 +36680,7 @@ async function _portailChargerQuestionnaire(idx) {
         (q.rempli_at ? '<div style="margin-top:4px;">Pour l\u2019intégrer : ouvrez un bilan en cours (initial ou contrôle), le bouton « Intégrer le questionnaire » est en haut de l\u2019anamnèse.</div>' : '');
     } else {
       const dernier = (Array.isArray(l) ? l : []).find(function (x) { return x.integre_at; });
-      cible.innerHTML = (dernier ? '<div style="margin-bottom:6px;">✅ Dernier questionnaire intégré au bilan le ' + _escHtml(_portailDateHeureFr(dernier.integre_at)) + '.</div>' : '') + '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+      cible.innerHTML = (dernier ? '<div style="margin-bottom:6px;">✅ Dernier questionnaire intégré au bilan le ' + _escHtml(_portailDateHeureFr(dernier.integre_at)) + '. <button class="btn" onclick="portailVoirQuestionnaire(' + idx + ')">👁 Voir les réponses</button></div>' : '') + '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
         '<label style="font-size:12px;">Rendez-vous (facultatif) <input class="inp" id="portail-q-rdv" type="datetime-local" style="width:auto;"/></label>' +
         '<button class="btn btn-blue" onclick="portailEnvoyerQuestionnaire(' + idx + ')">📋 Envoyer le questionnaire</button></div>' +
         '<div style="margin-top:4px;">Le patient le trouve dans son espace (carte « Mon questionnaire »). Sans date de rendez-vous, il reste modifiable jusqu\u2019à son intégration au bilan.</div>';
@@ -36877,13 +36886,28 @@ function _qstPlan(M, module, q, lire, fiche) {
   const hors = [];
   const travail = {};
   const cur = function (champ) { if (!(champ in travail)) travail[champ] = lire(champ, 'texte'); return travail[champ]; };
-  const absent = function (libelle, valeur) { hors.push({ libelle: libelle, valeur: valeur, raison: 'aucune case correspondante dans ce bilan' }); };
+  const NOTES = { sport: 'notes_generales', posturo: 'po-notes', podopediatrie: 'podo_notes_generales', pedicurie: 'ped_notes_generales' }[module];
+  // Tout ce qui n'a pas de case dédiée est écrit dans « Notes complémentaires » (une ligne par information) : plus rien à saisir à la main.
+  // Repli (« hors ») seulement si le champ de notes lui-même est introuvable à l'écran.
+  const absent = function (libelle, valeur, champ) {
+    if (champ !== NOTES && lire(NOTES, 'texte') !== null) return note(libelle, valeur === 'à cocher' ? '' : valeur);
+    hors.push({ libelle: libelle, valeur: valeur, raison: 'aucune case correspondante dans ce bilan' });
+  };
+  const note = function (libelle, valeur) {
+    const ligne = String(libelle) + (valeur ? ' : ' + valeur : '');
+    const avant = cur(NOTES);
+    if (avant === null) return;
+    const apres = _qstAjouter(avant, ligne, '\n', sfx);
+    if (apres === null) return;
+    travail[NOTES] = apres;
+    bilan.push({ genre: 'texte', champ: NOTES, libelle: 'Notes complémentaires', avant: String(avant || ''), apres: apres });
+  };
   const txt = function (champ, libelle, info, o) {
     o = o || {};
     const i = String(info == null ? '' : info).trim();
     if (!i) return;
     const avant = cur(champ);
-    if (avant === null) return absent(libelle, i);
+    if (avant === null) return absent(libelle, i, champ);
     const apres = o.remplace ? _qstRemplacer(avant, i, o.ancien, o.sep) : _qstAjouter(avant, i, o.sep, o.suffixe);
     if (apres === null) return;
     travail[champ] = apres;
@@ -36891,7 +36915,7 @@ function _qstPlan(M, module, q, lire, fiche) {
   };
   const coche = function (champ, libelle) {
     const a = lire(champ, 'coche');
-    if (a === null) return absent(libelle, 'à cocher');
+    if (a === null) return absent(libelle, 'à cocher', champ);
     if (a || travail['c:' + champ]) return;
     travail['c:' + champ] = true;
     bilan.push({ genre: 'coche', champ: champ, libelle: libelle });
@@ -36899,17 +36923,17 @@ function _qstPlan(M, module, q, lire, fiche) {
   const radio = function (champ, libelle, valeur, aff) {
     if (valeur === undefined || valeur === '') return;
     const a = lire(champ, 'radio');
-    if (a === null) return absent(libelle, aff);
+    if (a === null) return absent(libelle, aff, champ);
     if (a === valeur) return;
-    if (a) { hors.push({ libelle: libelle, valeur: aff, raison: 'déjà renseigné autrement dans le bilan' }); return; }
+    if (a) return note(libelle + ' (questionnaire)', aff + ' — le bilan indique autre chose');
     bilan.push({ genre: 'radio', champ: champ, libelle: libelle, apres: valeur, aff: aff });
   };
   const plage = function (champ, libelle, n) {
     if (!(n > 0)) return;
     const a = lire(champ, 'range');
-    if (a === null) return absent(libelle, n + '/10');
+    if (a === null) return absent(libelle, n + '/10', champ);
     if (Number(a) === n) return;
-    if (Number(a) > 0) { hors.push({ libelle: libelle, valeur: n + '/10', raison: 'déjà renseigné autrement dans le bilan' }); return; }
+    if (Number(a) > 0) return note(libelle + ' (questionnaire)', n + '/10 — le bilan indique ' + a + '/10');
     bilan.push({ genre: 'range', champ: champ, libelle: libelle, apres: n });
   };
   const hb = function (libelle, valeur) { if (valeur) absent(libelle, valeur); };
@@ -36940,7 +36964,7 @@ function _qstPlan(M, module, q, lire, fiche) {
   fRempl('metier', 'Métier', F.metier);
   fNum('poids', 'Poids (kg)', F.poids);
   fNum('taille', 'Taille (cm)', F.taille);
-  if (F.sportPratique === 'non' && String(fi.sport || '').trim()) hors.push({ libelle: 'Sport', valeur: 'Le patient indique ne plus pratiquer de sport (la fiche indique « ' + String(fi.sport).trim() + ' ») — à vérifier avec lui', raison: 'jamais effacé automatiquement' });
+  if (F.sportPratique === 'non' && String(fi.sport || '').trim()) note('Sport', 'le patient indique ne plus pratiquer de sport (la fiche indique « ' + String(fi.sport).trim() + ' ») — à vérifier avec lui ; jamais effacé automatiquement');
   const notesPatient = F.notes ? 'Message du patient : ' + F.notes : '';
   const quotidien = [F.chaussures ? 'Chaussures du quotidien : ' + F.chaussures : '', F.chaussuresGene ? 'Gêne : ' + F.chaussuresGene : ''].filter(Boolean).join(' ; ');
   const ttt = [F.traitements ? 'Traitements : ' + F.traitements : '', F.allergies ? 'Allergies : ' + F.allergies : ''].filter(Boolean).join(' ; ');
@@ -36975,7 +36999,7 @@ function _qstPlan(M, module, q, lire, fiche) {
     txt('po-activite', 'Activité physique', F.sportObjectif ? 'Objectif : ' + F.sportObjectif : '');
     txt('po-activite-quot', 'Activité quotidienne', F.position ? 'Position dans la journée : ' + F.position : '');
     txt('po-travail', 'Travail / profession', F.metier, { remplace: true, ancien: fi.metier });
-    txt('po-motif', 'Motif de consultation', notesPatient);
+    hb('Message du patient', F.notes);
   } else if (module === 'podopediatrie') {
     F.motifVals.forEach(function (v) {
       const champ = _QST_PODO_MOTIF[v];
@@ -37093,7 +37117,7 @@ function qstFermer() {
 function _qstHtmlReponses(M, q, nom) {
   const secs = _qstFormaterReponses(M, q.type, q.reponses);
   let h = '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">📋 Questionnaire ' + (q.type === 'enfant' ? 'enfant' : 'adulte') + (nom ? ' — ' + _escHtml(nom) : '') + '</div>' +
-    '<div style="color:var(--mut);margin-bottom:12px;">Rempli le ' + _escHtml(_qstDateFr(q.rempli_at)) + (q.modifie_at ? ' · modifié le ' + _escHtml(_qstDateFr(q.modifie_at)) : '') + ' · lecture seule</div>';
+    '<div style="color:var(--mut);margin-bottom:12px;">Rempli le ' + _escHtml(_qstDateFr(q.rempli_at)) + (q.modifie_at ? ' · modifié le ' + _escHtml(_qstDateFr(q.modifie_at)) : '') + (q.integre_at ? ' · intégré au bilan le ' + _escHtml(_qstDateFr(q.integre_at)) : '') + ' · lecture seule</div>';
   if (!secs.length) h += '<div style="color:var(--mut);">Aucune réponse enregistrée.</div>';
   secs.forEach(function (s) {
     h += '<div style="margin-top:12px;font-weight:700;border-bottom:1px solid var(--bord);padding-bottom:3px;">' + _escHtml(s.titre) + '</div>';
@@ -37131,14 +37155,25 @@ function _qstHtmlApercu(plan, module, nom, q) {
     '<div id="qst-erreur" style="color:var(--red);margin-top:8px;"></div>';
   return h;
 }
-// ── Lecture du questionnaire du patient ouvert (cache 20 s) ──
-let _qstCache = { id: null, ts: 0, q: null };
+// ── Lecture des questionnaires du patient (cache 20 s) : ouvert, ou dernier intégré (consultable après l'intégration) ──
+let _qstCache = { id: null, ts: 0, l: [] };
+async function _qstListe(p, force) {
+  if (!force && _qstCache.id === p._cloudId && Date.now() - _qstCache.ts < 20000) return _qstCache.l;
+  const r = await _portailRpc('questionnaire_lire_praticien', { p_patient: p._cloudId });
+  const l = Array.isArray(r) ? r : [];
+  _qstCache = { id: p._cloudId, ts: Date.now(), l: l };
+  return l;
+}
 async function _qstOuvert(p, force) {
-  if (!force && _qstCache.id === p._cloudId && Date.now() - _qstCache.ts < 20000) return _qstCache.q;
-  const l = await _portailRpc('questionnaire_lire_praticien', { p_patient: p._cloudId });
-  const q = (Array.isArray(l) ? l : []).find(function (x) { return !x.integre_at && !x.retire_at; }) || null;
-  _qstCache = { id: p._cloudId, ts: Date.now(), q: q };
-  return q;
+  return (await _qstListe(p, force)).find(function (x) { return !x.integre_at && !x.retire_at; }) || null;
+}
+// Dernier questionnaire intégré depuis moins de 30 jours (et pas retiré), s'il n'y en a pas d'ouvert : le praticien peut encore le relire.
+const _QST_INTEGRE_JOURS = 30;
+async function _qstDernierIntegre(p, force, sansLimite) {
+  const l = await _qstListe(p, force);
+  const lim = Date.now() - _QST_INTEGRE_JOURS * 864e5;
+  const x = l.find(function (y) { return y.integre_at && !y.retire_at && y.rempli_at; });
+  return x && (sansLimite || new Date(x.integre_at).getTime() >= lim) ? x : null;
 }
 const _QST_ANCRES = {
   sport: function () { return document.getElementById('ssec-0'); },
@@ -37158,17 +37193,24 @@ async function _qstInjecterBouton(module) {
     const existant = ancre.querySelector(':scope > [data-qst-bouton]');
     if (!cfg.enCours()) { if (existant) existant.remove(); return; }
     const q = await _qstOuvert(p);
+    const integre = q ? null : await _qstDernierIntegre(p);
     const ancre2 = _QST_ANCRES[module]();
     if (!ancre2 || currentPatient !== p || !cfg.enCours()) return;
     const deja = ancre2.querySelector(':scope > [data-qst-bouton]');
-    if (!q || !q.rempli_at) { if (deja) deja.remove(); return; }
-    if (deja) return;
+    const etat = q && q.rempli_at ? 'ouvert' : integre ? 'integre' : '';
+    if (!etat) { if (deja) deja.remove(); return; }
+    if (deja && deja.getAttribute('data-qst-etat') === etat) return;
+    if (deja) deja.remove();
     const d = document.createElement('div');
     d.setAttribute('data-qst-bouton', module);
+    d.setAttribute('data-qst-etat', etat);
     d.style.cssText = 'margin:0 0 12px;padding:10px 12px;border:1px solid var(--bord);border-radius:10px;background:rgba(45,212,191,0.10);display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;';
-    d.innerHTML = '<span>📋 Le patient a rempli son questionnaire le ' + _escHtml(_qstDateFr(q.rempli_at)) + '.</span>' +
-      '<button class="btn btn-blue" style="font-size:12px;padding:5px 12px;" onclick="qstOuvrirIntegration(\'' + module + '\')">Intégrer le questionnaire</button>' +
-      '<button class="btn" style="font-size:12px;padding:5px 12px;" onclick="qstVoirReponses()">Voir les réponses</button>';
+    d.innerHTML = etat === 'ouvert'
+      ? '<span>📋 Le patient a rempli son questionnaire le ' + _escHtml(_qstDateFr(q.rempli_at)) + '.</span>' +
+        '<button class="btn btn-blue" style="font-size:12px;padding:5px 12px;" onclick="qstOuvrirIntegration(\'' + module + '\')">Intégrer le questionnaire</button>' +
+        '<button class="btn" style="font-size:12px;padding:5px 12px;" onclick="qstVoirReponses()">Voir les réponses</button>'
+      : '<span>✅ Questionnaire du patient intégré le ' + _escHtml(_qstDateFr(integre.integre_at)) + '.</span>' +
+        '<button class="btn" style="font-size:12px;padding:5px 12px;" onclick="qstVoirReponses()">Voir les réponses</button>';
     ancre2.insertBefore(d, ancre2.firstChild);
   } catch (_e) { /* silencieux : le bouton n'apparaît simplement pas */ }
 }
@@ -37181,7 +37223,7 @@ async function qstVoirReponses() {
 async function _qstAfficherReponsesDe(p) {
   try {
     const M = await _qstModele();
-    const q = await _qstOuvert(p, true);
+    const q = (await _qstOuvert(p, true)) || (await _qstDernierIntegre(p, false, true));
     if (!q || !q.rempli_at) return;
     _qstFenetre(_qstHtmlReponses(M, q, ((p.prenom || '') + ' ' + (p.nom || '')).trim()));
   } catch (_e) {
@@ -37220,13 +37262,19 @@ async function qstValiderIntegration() {
     try { savePatients(); } catch (_e) { /* best-effort : repris au prochain enregistrement */ }
     let marque = false;
     try { marque = (await _portailRpc('questionnaire_integrer', { p_id: e.q.id })) === true; } catch (_e) { marque = false; }
-    _qstCache = { id: null, ts: 0, q: null };
+    _qstCache = { id: null, ts: 0, l: [] };
     document.querySelectorAll('[data-qst-bouton]').forEach(function (n) { n.remove(); });
     const lignes = ['✅ Intégration faite : ' + e.plan.fiche.length + ' mise(s) à jour dans la fiche, ' + e.plan.bilan.length + ' dans l\u2019anamnèse du bilan.'];
     if (manquants.length) lignes.push('⚠️ Champs introuvables à l\u2019écran (à saisir à la main) : ' + manquants.join(', ') + '.');
     if (!marque) lignes.push('⚠️ Le questionnaire n\u2019a pas pu être marqué « intégré » côté serveur : le bouton restera visible, sans risque (rien ne sera ajouté en double).');
-    if (e.plan.hors.length) lignes.push('ℹ️ ' + e.plan.hors.length + ' information(s) à saisir à la main (voir l\u2019aperçu précédent).');
-    _qstFenetre(lignes.map(function (l) { return '<div style="margin-bottom:8px;">' + _escHtml(l) + '</div>'; }).join('') + '<div style="margin-top:12px;text-align:right;"><button class="btn btn-blue" onclick="qstFermer()">Fermer</button></div>');
+    let reste = '';
+    if (e.plan.hors.length) {
+      reste = '<div style="margin-top:12px;font-weight:700;">À saisir à la main (' + e.plan.hors.length + ')</div><ul style="margin:6px 0 0 18px;padding:0;">' +
+        e.plan.hors.map(function (x) { return '<li style="margin-bottom:4px;"><strong>' + _escHtml(x.libelle) + '</strong> : ' + _escHtml(x.valeur) + ' <span style="color:var(--mut);">— ' + _escHtml(x.raison) + '</span></li>'; }).join('') + '</ul>' +
+        '<div style="margin-top:8px;color:var(--mut);">Vous pourrez relire toutes les réponses avec « Voir les réponses » (bandeau en haut de l\u2019anamnèse, ou 🔑 Portail patient) pendant ' + _QST_INTEGRE_JOURS + ' jours.</div>';
+    }
+    _qstFenetre(lignes.map(function (l) { return '<div style="margin-bottom:8px;">' + _escHtml(l) + '</div>'; }).join('') + reste + '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;"><button class="btn" onclick="qstVoirReponses()">Voir les réponses</button><button class="btn btn-blue" onclick="qstFermer()">Fermer</button></div>');
+    _qstInjecterBouton(e.module);
     _qstEtat = null;
   } catch (_e) {
     bouton.disabled = false;
