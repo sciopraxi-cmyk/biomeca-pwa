@@ -170,6 +170,7 @@ SET request.jwt.claims = :PRA; SET ROLE authenticated;
 SELECT essai.ctrl(public.questionnaire_demander(:'A2') IS NOT NULL, 'un nouveau questionnaire possible après retrait');
 RESET ROLE;
 
+
 -- ═══ Patient suspendu et blocage des notifications ═══
 UPDATE public.patient_comptes SET statut = 'suspendu' WHERE patient_id = :'A3';
 SET request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000a3","app_metadata":{"role":"patient"}}'; SET ROLE authenticated;
@@ -186,6 +187,40 @@ UPDATE public.patient_comptes SET notifications_bloquees_at = NULL WHERE patient
 UPDATE public.questionnaires_patient SET notifie_at = NULL WHERE patient_id = :'A1';
 UPDATE public.patient_comptes SET notifications_bloquees_at = now() WHERE patient_id = :'A1';
 SELECT essai.ctrl((SELECT notifie_at IS NOT NULL FROM public.questionnaires_patient WHERE patient_id = :'A1'), 'blocage posé après coup : purge');
+
+-- ═══ Intégration au bilan ═══
+SET request.jwt.claims = :PRB; SET ROLE authenticated;
+SELECT essai.refuse_msg('SELECT public.questionnaire_integrer((SELECT id FROM ids WHERE nom=''adulte''))', 'non autorisé', 'praticien B ne peut pas intégrer');
+RESET ROLE;
+SET request.jwt.claims = :PA; SET ROLE authenticated;
+SELECT essai.refuse_msg('SELECT public.questionnaire_integrer((SELECT id FROM ids WHERE nom=''adulte''))', 'non autorisé', 'le patient ne peut pas intégrer');
+RESET ROLE;
+-- A2 a un nouveau questionnaire (créé après le retrait) NON rempli : on ne peut pas l'intégrer
+SET request.jwt.claims = :PRA; SET ROLE authenticated;
+SELECT essai.refuse_msg('SELECT public.questionnaire_integrer((SELECT id FROM public.questionnaires_patient WHERE patient_id = ''10000000-0000-0000-0000-0000000000a2'' AND retire_at IS NULL))', 'non autorisé', 'questionnaire non rempli : intégration refusée');
+SELECT essai.ctrl(public.questionnaire_integrer((SELECT id FROM ids WHERE nom='adulte')), 'intégration (1re fois)');
+SELECT essai.ctrl(NOT public.questionnaire_integrer((SELECT id FROM ids WHERE nom='adulte')), 'intégration une seule fois');
+RESET ROLE;
+SELECT essai.ctrl((SELECT integre_at IS NOT NULL FROM public.questionnaires_patient WHERE patient_id = :'A1'), 'integre_at posé');
+SET request.jwt.claims = :PA; SET ROLE authenticated;
+SELECT essai.ctrl(public.questionnaire_etat_patient() IS NULL, 'intégré = fermé pour le patient');
+SELECT essai.refuse_msg('SELECT public.questionnaire_enregistrer((SELECT id FROM ids WHERE nom=''adulte''), ''{"douleur":"oui"}'')', 'questionnaire_introuvable', 'intégré = non modifiable');
+RESET ROLE;
+SET request.jwt.claims = :PRA; SET ROLE authenticated;
+SELECT essai.ctrl((SELECT count(*) FROM public.questionnaire_a_notifier() WHERE patient_id = :'A1') >= 0, 'lecture des notifications toujours possible');
+INSERT INTO ids SELECT 'nouveau', public.questionnaire_demander(:'A1');
+SELECT essai.ctrl((SELECT count(*) FROM ids WHERE nom = 'nouveau') = 1, 'un nouveau questionnaire est possible après intégration');
+SELECT essai.ctrl((SELECT count(*) FROM public.questionnaire_lire_praticien(:'A1') WHERE integre_at IS NOT NULL) = 1, 'l''historique garde le questionnaire intégré');
+RESET ROLE;
+-- rempli puis retiré : non intégrable (renvoie false, intégré_at reste vide)
+SET request.jwt.claims = :PA; SET ROLE authenticated;
+SELECT public.questionnaire_enregistrer((SELECT id FROM ids WHERE nom = 'nouveau'), '{"douleur":"oui"}');
+RESET ROLE;
+SET request.jwt.claims = :PRA; SET ROLE authenticated;
+SELECT public.questionnaire_retirer((SELECT id FROM ids WHERE nom = 'nouveau'));
+SELECT essai.ctrl(NOT public.questionnaire_integrer((SELECT id FROM public.questionnaires_patient WHERE patient_id = :'A1' AND retire_at IS NOT NULL AND rempli_at IS NOT NULL ORDER BY retire_at DESC LIMIT 1)), 'retiré : non intégrable');
+RESET ROLE;
+SELECT essai.ctrl((SELECT count(*) FROM public.questionnaires_patient WHERE patient_id = :'A1' AND retire_at IS NOT NULL AND integre_at IS NOT NULL) = 0, 'retiré : jamais marqué intégré');
 
 -- ═══ Suppression du patient = cascade ═══
 DELETE FROM public.patients WHERE id = :'B1';

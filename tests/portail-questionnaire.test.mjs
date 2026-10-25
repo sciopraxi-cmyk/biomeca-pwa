@@ -573,3 +573,480 @@ describe('praticien : envoi et retrait (vraies fonctions)', () => {
     expect(oui.j.rpc[0].corps).toEqual({ p_id: 'q-1' });
   });
 });
+
+// ── Étapes 2 et 3 : lecture des réponses et intégration au bilan (vraies fonctions de js/biomeca.js) ──
+import * as MODELE from '../patient/questionnaire-modele.mjs';
+
+function extraireConst(src, nom) {
+  const m = new RegExp('const ' + nom + ' = \\{[^\\n]*\\};').exec(src);
+  if (!m) throw new Error('constante absente : ' + nom);
+  return m[0];
+}
+const NOMS_QST = [
+  '_qstNorm',
+  '_qstDateFr',
+  '_qstAjouter',
+  '_qstRemplacer',
+  '_qstOpt',
+  '_qstLib',
+  '_qstFormaterReponses',
+  '_qstFaits',
+  '_qstPlan',
+];
+const CONSTS_QST = [
+  '_QST_PODO_MOTIF',
+  '_QST_PODO_ZONE',
+  '_QST_PODO_QUAND',
+  '_QST_PODO_EXAM',
+  '_QST_PODO_CHAUSS',
+  '_QST_PED_MOTIF',
+  '_QST_PED_ATCD',
+  '_QST_PED_CHAUSS',
+  '_QST_PED_POS',
+];
+const codeQst = [
+  ...CONSTS_QST.map((c) => extraireConst(biomeca, c)),
+  ...NOMS_QST.map((n) => extraireFonction(biomeca, n)),
+].join('\n');
+const QST = new Function(`${codeQst}\nreturn { ${NOMS_QST.join(', ')} };`)();
+
+// Faux bilan : un dictionnaire { 'genre:champ': valeur } ; null = champ absent de la page.
+function faussePage(init, absents) {
+  const etat = { ...(init || {}) };
+  const lire = (champ, genre) => {
+    if ((absents || []).includes(champ)) return null;
+    const cle = genre + ':' + champ;
+    if (genre === 'coche') return !!etat[cle];
+    return etat[cle] === undefined ? '' : etat[cle];
+  };
+  const ecrire = (bilan) =>
+    bilan.forEach((o) => {
+      etat[o.genre + ':' + o.champ] = o.genre === 'coche' ? true : o.apres;
+    });
+  return { etat, lire, ecrire };
+}
+const REMPLI = '2026-10-26T09:16:00Z';
+const D = new Date(REMPLI).toLocaleDateString('fr-FR');
+const QA = (reponses, o) => ({
+  type: 'adulte',
+  rempli_at: REMPLI,
+  modifie_at: null,
+  reponses,
+  ...(o || {}),
+});
+const FICHE = {
+  antecedents: 'Entorse 2015',
+  examens: 'Radio 2019',
+  sport: 'Course à pied',
+  metier: 'Infirmier',
+  poids: '72',
+  taille: '178',
+};
+const plan = (module, q, page, fiche) =>
+  QST._qstPlan(MODELE, module, q, page.lire, fiche === undefined ? FICHE : fiche);
+const fic = (p, champ) => p.fiche.filter((o) => o.champ === champ).pop(); // le dernier gagne (comme à l'écriture)
+const bil = (p, champ, genre) =>
+  p.bilan.filter((o) => o.champ === champ && (!genre || o.genre === genre));
+
+describe('intégration : fonctions de texte', () => {
+  it('_qstAjouter : ajoute à la suite, daté, sans doublon (accents et casse ignorés)', () => {
+    expect(
+      QST._qstAjouter('Entorse 2015', 'Blessure : cheville', ' ; ', ' (déclaré le 26/10/2026)')
+    ).toBe('Entorse 2015 ; Blessure : cheville (déclaré le 26/10/2026)');
+    expect(QST._qstAjouter('', 'Blessure : cheville', ' ; ', ' (x)')).toBe(
+      'Blessure : cheville (x)'
+    );
+    expect(
+      QST._qstAjouter(
+        'blessure : CHEVILLE (déclaré le 01/01/2026)',
+        'Blessure : chevillé',
+        ' ; ',
+        ' (x)'
+      )
+    ).toBeNull();
+    expect(QST._qstAjouter('abc', '   ')).toBeNull();
+    expect(QST._qstAjouter('abc', null)).toBeNull();
+    expect(QST._qstAjouter('a', 'b', '\n')).toBe('a\nb');
+  });
+  it('_qstRemplacer : vide → remplit ; copie de la fiche → met à jour ; saisie du praticien → ajoute', () => {
+    expect(QST._qstRemplacer('', 'Trail', 'Course')).toBe('Trail');
+    expect(QST._qstRemplacer('Course', 'Trail', 'course')).toBe('Trail');
+    expect(QST._qstRemplacer('Course + yoga (saisi par le praticien)', 'Trail', 'Course')).toBe(
+      'Course + yoga (saisi par le praticien) ; Trail'
+    );
+    expect(QST._qstRemplacer('Trail', 'Trail', 'Course')).toBeNull();
+    expect(QST._qstRemplacer('Trail 3 fois', 'trail', 'Course')).toBeNull();
+    expect(QST._qstRemplacer('x', '', 'Course')).toBeNull();
+  });
+});
+
+describe('intégration : scénario de Joël (sport, bilan de contrôle)', () => {
+  const rep = {
+    motif: ['semelles'],
+    premiere_fois: 'non',
+    douleur: 'oui',
+    douleur_zones: ['talon', 'genou'],
+    douleur_quand: ['matin', 'effort'],
+    eva: 6,
+    chg_blessure: 'oui',
+    chg_blessure_txt: 'Entorse cheville D',
+    chg_operation: 'oui',
+    chg_operation_txt: 'Ménisque genou G',
+    chg_examens: ['irm'],
+    chg_examens_txt: 'IRM genou 2026',
+    chg_traitements_txt: 'Anti-inflammatoires',
+    allergies_txt: 'Pénicilline',
+    poids: 74.5,
+    taille: 178,
+    metier_txt: 'Infirmier',
+    position: 'debout',
+    chaussures: ['ville', 'sport'],
+    appareillage: 'oui',
+    appareillage_txt: 'Semelles 2024',
+    sport_pratique: 'oui',
+    sport_txt: 'Trail',
+    sport_freq_txt: '3',
+    sport_niveau: 'loisir',
+    sport_objectif_txt: 'Marathon en mars',
+    sport_chaussures_txt: 'Hoka Speedgoat',
+    notes_txt: 'Douleur en descente',
+  };
+  const page = () =>
+    faussePage({
+      'texte:antecedents': 'Entorse 2015',
+      'texte:examens': 'Radio 2019',
+      'texte:sport_detail': 'Course à pied',
+      'texte:travail': 'Infirmier',
+    });
+
+  it('fiche : antécédents AJOUTÉS (datés), poids REMPLACÉ, sport REMPLACÉ, taille et métier inchangés', () => {
+    const p = plan('sport', QA(rep), page());
+    expect(fic(p, 'antecedents').apres).toBe(
+      `Entorse 2015 ; Blessure : Entorse cheville D (déclaré le ${D}) ; Opération : Ménisque genou G (déclaré le ${D})`
+    );
+    expect(fic(p, 'examens').apres).toBe(
+      `Radio 2019 ; Examens : IRM — IRM genou 2026 (déclaré le ${D})`
+    );
+    expect(fic(p, 'poids')).toMatchObject({ avant: '72', apres: '74.5' });
+    expect(fic(p, 'sport')).toMatchObject({ avant: 'Course à pied', apres: 'Trail' });
+    expect(fic(p, 'taille')).toBeUndefined();
+    expect(fic(p, 'metier')).toBeUndefined();
+  });
+  it('bilan sport : anamnèse remplie (motif, douleur, EVA, 1re intention, antécédents ajoutés, sport remplacé)', () => {
+    const p = plan('sport', QA(rep), page());
+    expect(bil(p, 'motif')[0].apres).toBe('Semelles à renouveler');
+    expect(bil(p, 'douleur_oui_non')[0]).toMatchObject({ genre: 'radio', apres: 'oui' });
+    expect(bil(p, 'douleur', 'texte')[0].apres).toBe(
+      'Zones : Talon, Genou · Moments : Le matin, À l’effort'
+    );
+    expect(bil(p, 'eva')[0]).toMatchObject({ genre: 'range', apres: 6 });
+    expect(bil(p, '1ere_intention')[0]).toMatchObject({ apres: 'non' });
+    const atcd = bil(p, 'antecedents');
+    expect(atcd.length).toBe(2);
+    expect(atcd[atcd.length - 1].apres).toBe(
+      `Entorse 2015\nBlessure : Entorse cheville D (déclaré le ${D})\nOpération : Ménisque genou G (déclaré le ${D})`
+    );
+    expect(bil(p, 'sport_detail').pop().apres).toBe(
+      'Trail ; fréquence par semaine : 3 ; niveau : Loisir'
+    );
+    expect(bil(p, 'objectif_sportif')[0].apres).toBe('Marathon en mars');
+    expect(bil(p, 'chaussage_sportif')[0].apres).toBe('Hoka Speedgoat');
+    expect(bil(p, 'appareillage')[0].apres).toBe('Semelles 2024');
+    expect(bil(p, 'activite_quot')[0].apres).toBe('Position dans la journée : Debout');
+    expect(bil(p, 'travail')).toEqual([]);
+  });
+  it('bilan sport : ce qui n’a pas de champ (chaussures du quotidien, traitements, allergies, message) va dans les notes', () => {
+    const p = plan('sport', QA(rep), page());
+    const notes = bil(p, 'notes_generales').pop().apres;
+    expect(notes).toContain('Chaussures du quotidien : Ville, Sport');
+    expect(notes).toContain('Traitements : Anti-inflammatoires ; Allergies : Pénicilline');
+    expect(notes).toContain('Message du patient : Douleur en descente');
+  });
+  it('idempotence : après écriture, un second plan ne propose plus rien (aucun doublon)', () => {
+    const pg = page();
+    const p1 = plan('sport', QA(rep), pg);
+    pg.ecrire(p1.bilan);
+    const fiche2 = { ...FICHE };
+    p1.fiche.forEach((o) => (fiche2[o.champ] = o.apres));
+    const p2 = QST._qstPlan(MODELE, 'sport', QA(rep), pg.lire, fiche2);
+    expect(p2.bilan).toEqual([]);
+    expect(p2.fiche).toEqual([]);
+  });
+  it('la date de déclaration est celle de la dernière modification du patient', () => {
+    const p = plan('sport', QA(rep, { modifie_at: '2026-10-28T10:00:00Z' }), page());
+    expect(fic(p, 'antecedents').apres).toContain(
+      '(déclaré le ' + new Date('2026-10-28T10:00:00Z').toLocaleDateString('fr-FR') + ')'
+    );
+  });
+  it('jamais d’écrasement : radio / EVA déjà renseignés autrement → listés « à saisir à la main »', () => {
+    const pg = faussePage({ 'radio:douleur_oui_non': 'non', 'range:eva': '4' });
+    const p = plan('sport', QA(rep), pg);
+    expect(bil(p, 'douleur_oui_non')).toEqual([]);
+    expect(bil(p, 'eva')).toEqual([]);
+    expect(
+      p.hors
+        .filter((h) => /déjà renseigné/.test(h.raison))
+        .map((h) => h.libelle)
+        .sort()
+    ).toEqual(['Douleur présente', 'EVA douleur']);
+  });
+  it('un champ absent de la page n’est jamais proposé : il est listé', () => {
+    const pg = faussePage({}, ['appareillage']);
+    const p = plan('sport', QA(rep), pg);
+    expect(bil(p, 'appareillage')).toEqual([]);
+    expect(p.hors.some((h) => h.libelle === 'Appareillage' && /aucune case/.test(h.raison))).toBe(
+      true
+    );
+  });
+  it('« rien de nouveau » : « non » partout ne propose rien', () => {
+    const p = plan(
+      'sport',
+      QA({
+        douleur: 'non',
+        chg_blessure: 'non',
+        chg_operation: 'non',
+        appareillage: 'non',
+        sport_pratique: 'non',
+      }),
+      faussePage({}),
+      { antecedents: '', examens: '', sport: '', metier: '', poids: '', taille: '' }
+    );
+    expect(p.fiche).toEqual([]);
+    expect(p.bilan.filter((o) => o.genre !== 'radio')).toEqual([]);
+  });
+  it('sport « non » alors que la fiche en indique un : jamais effacé, signalé', () => {
+    const p = plan('sport', QA({ sport_pratique: 'non' }), page());
+    expect(fic(p, 'sport')).toBeUndefined();
+    expect(p.hors.some((h) => h.libelle === 'Sport' && /ne plus pratiquer/.test(h.valeur))).toBe(
+      true
+    );
+  });
+  it('poids de la fiche avec virgule ou égal : pas de changement ; fiche sans poids : ajouté', () => {
+    expect(fic(plan('sport', QA({ poids: 72 }), faussePage({})), 'poids')).toBeUndefined();
+    expect(
+      fic(plan('sport', QA({ poids: 72 }), faussePage({}), { ...FICHE, poids: '72,0' }), 'poids')
+    ).toBeUndefined();
+    expect(
+      fic(plan('sport', QA({ poids: 72 }), faussePage({}), { ...FICHE, poids: '' }), 'poids')
+    ).toMatchObject({ avant: '', apres: '72' });
+  });
+  it('saisie du praticien conservée : sport déjà modifié dans le bilan → la nouvelle info est AJOUTÉE', () => {
+    const pg = faussePage({ 'texte:sport_detail': 'Course + yoga (praticien)' });
+    const p = plan('sport', QA({ sport_pratique: 'oui', sport_txt: 'Trail' }), pg);
+    expect(bil(p, 'sport_detail')[0].apres).toBe('Course + yoga (praticien)\nTrail');
+  });
+});
+
+describe('intégration : les autres bilans', () => {
+  it('posturo : champs po-* (texte sur une ligne, ajout daté)', () => {
+    const pg = faussePage({
+      'texte:po-atcd': 'Entorse 2015',
+      'texte:po-activite': 'Course à pied',
+    });
+    const p = plan(
+      'posturo',
+      QA({
+        motif: ['douleur'],
+        douleur: 'oui',
+        eva: 3,
+        chg_blessure: 'oui',
+        chg_blessure_txt: 'Fracture poignet',
+        sport_pratique: 'oui',
+        sport_txt: 'Natation',
+        chg_traitements_txt: 'Aucun nouveau',
+      }),
+      pg
+    );
+    expect(bil(p, 'po-motif')[0].apres).toBe('Douleur au pied');
+    expect(bil(p, 'po-douleur')[0].apres).toBe('oui');
+    expect(bil(p, 'po-eva')[0].apres).toBe(3);
+    expect(bil(p, 'po-atcd')[0].apres).toBe(
+      `Entorse 2015 ; Blessure : Fracture poignet (déclaré le ${D})`
+    );
+    expect(bil(p, 'po-activite')[0].apres).toBe('Natation');
+    expect(bil(p, 'po-ttt-cours')[0].apres).toBe('Traitements : Aucun nouveau');
+  });
+  it('podopédiatrie (enfant) : cases cochées, EVA arrondie au pair, antécédents, âge de marche, prématurité', () => {
+    const q = {
+      type: 'enfant',
+      rempli_at: REMPLI,
+      modifie_at: null,
+      reponses: {
+        motif: ['pieds_plats', 'chutes'],
+        douleur: 'oui',
+        douleur_zones: ['talon', 'dos'],
+        douleur_quand: ['effort'],
+        eva: 5,
+        age_marche_mois: 14,
+        premature: 'oui',
+        terme_sa: 32,
+        atcd_medicaux_txt: 'Asthme',
+        chg_blessure: 'oui',
+        chg_blessure_txt: 'Fracture bras',
+        chg_examens: ['radio'],
+        poids: 21,
+        taille: 115,
+        chaussures: ['sport'],
+      },
+    };
+    const pg = faussePage({}, ['podo_chauss_type_sport']);
+    const p = QST._qstPlan(MODELE, 'podopediatrie', q, pg.lire, {
+      antecedents: '',
+      examens: '',
+      sport: '',
+      metier: '',
+      poids: '',
+      taille: '',
+    });
+    const coches = p.bilan
+      .filter((o) => o.genre === 'coche')
+      .map((o) => o.champ)
+      .sort();
+    expect(coches).toEqual([
+      'podo_atcd_medicaux',
+      'podo_atcd_prematurite',
+      'podo_atcd_traumatiques',
+      'podo_doul_horaire_effort',
+      'podo_doul_loc_arrierepied',
+      'podo_doul_loc_autre',
+      'podo_exam_radio',
+      'podo_motif_chutes',
+      'podo_motif_piedsplats',
+    ]);
+    expect(bil(p, 'podo_douleur_eva')[0].apres).toBe(
+      '4'.replace('4', String(Math.round(5 / 2) * 2))
+    );
+    expect(bil(p, 'podo_age_marche')[0].apres).toBe('14');
+    expect(bil(p, 'podo_terme')[0].apres).toBe('32');
+    expect(bil(p, 'podo_atcd_txt').pop().apres).toContain('Fracture bras');
+    expect(fic(p, 'poids').apres).toBe('21');
+    expect(fic(p, 'taille').apres).toBe('115');
+    expect(p.hors.some((h) => h.libelle === 'Chaussures : Sport')).toBe(true);
+  });
+  it('pédicurie : cases (diabète, talon haut, station debout, sport), texte (profession, allergies) et le reste est listé', () => {
+    const q = QA({
+      motif: ['douleur', 'semelles'],
+      chg_maladie_types: ['diabete', 'circulation'],
+      chaussures: ['talons', 'ville'],
+      chaussures_gene_txt: 'Trop étroites',
+      position: 'debout',
+      sport_pratique: 'oui',
+      metier_txt: 'Coiffeur',
+      allergies_txt: 'Latex',
+      chg_traitements_txt: 'Metformine',
+      chg_operation: 'oui',
+      chg_operation_txt: 'Hallux 2026',
+      douleur: 'oui',
+      eva: 4,
+      notes_txt: 'RAS',
+    });
+    const pg = faussePage({});
+    const p = QST._qstPlan(MODELE, 'pedicurie', q, pg.lire, { ...FICHE, metier: '' });
+    const coches = p.bilan
+      .filter((o) => o.genre === 'coche')
+      .map((o) => o.champ)
+      .sort();
+    expect(coches).toEqual([
+      'ped_activite_sport',
+      'ped_activite_station',
+      'ped_atcd_diabete',
+      'ped_chaussage_talon',
+      'ped_motif_autre',
+      'ped_motif_douleur',
+    ]);
+    expect(bil(p, 'ped_motif_autre_txt')[0].apres).toBe('Semelles à renouveler');
+    expect(bil(p, 'ped_profession')[0].apres).toBe('Coiffeur');
+    expect(bil(p, 'ped_allergies_txt')[0].apres).toBe('Latex');
+    expect(bil(p, 'ped_ttt_autre_txt')[0].apres).toBe('Metformine');
+    expect(bil(p, 'ped_chaussage_autre_txt')[0].apres).toBe('Trop étroites');
+    const horsLib = p.hors.map((h) => h.libelle);
+    expect(horsLib).toContain('Nouveau diagnostic : Circulation');
+    expect(horsLib).toContain('Antécédent');
+    expect(horsLib).toContain('Douleur');
+    expect(horsLib).toContain('Message du patient');
+  });
+  it('aucune information n’est perdue : tout ce que le patient a écrit est soit intégré, soit listé', () => {
+    const q = QA({
+      chg_blessure: 'oui',
+      chg_blessure_txt: 'Entorse',
+      chg_traitements_txt: 'Doliprane',
+      allergies_txt: 'Pollen',
+      notes_txt: 'Merci',
+      appareillage: 'oui',
+      appareillage_txt: 'Orthèse',
+    });
+    for (const module of ['sport', 'posturo', 'podopediatrie', 'pedicurie']) {
+      const p = QST._qstPlan(MODELE, module, q, faussePage({}).lire, {
+        antecedents: '',
+        examens: '',
+        sport: '',
+        metier: '',
+        poids: '',
+        taille: '',
+      });
+      const tout = JSON.stringify(p);
+      for (const mot of ['Doliprane', 'Pollen', 'Merci', 'Orthèse'])
+        expect(tout, module + ' / ' + mot).toContain(mot);
+    }
+  });
+});
+
+describe('lecture des réponses', () => {
+  it('_qstFormaterReponses : sections et libellés lisibles, rien d’inventé', () => {
+    const s = QST._qstFormaterReponses(MODELE, 'adulte', {
+      motif: ['douleur', 'suivi'],
+      douleur: 'oui',
+      eva: 6,
+      poids: 74.5,
+      sport_pratique: 'oui',
+      cle_inconnue: 'x',
+    });
+    expect(s.map((x) => x.titre)).toEqual(['Votre consultation', 'Votre quotidien', 'Votre sport']);
+    const flat = s.flatMap((x) => x.lignes);
+    expect(flat.find((l) => /Pourquoi/.test(l.q)).r).toBe('Douleur au pied, Suivi');
+    expect(flat.find((l) => /Avez-vous mal/.test(l.q)).r).toBe('Oui');
+    expect(flat.find((l) => /Intensité/.test(l.q)).r).toBe('6/10');
+    expect(flat.find((l) => /poids/.test(l.q)).r).toBe('74.5');
+    expect(JSON.stringify(s)).not.toContain('cle_inconnue');
+  });
+  it('réponses vides ou absentes : aucune section', () => {
+    expect(QST._qstFormaterReponses(MODELE, 'adulte', {})).toEqual([]);
+    expect(QST._qstFormaterReponses(MODELE, 'adulte', undefined)).toEqual([]);
+    expect(QST._qstFormaterReponses(MODELE, 'inconnu', { a: 1 })).toEqual([]);
+  });
+});
+
+describe('câblage de l’intégration (garde de source)', () => {
+  it('le bouton est injecté par JS dans le bilan EN COURS (jamais dans index.html : golden de structure)', () => {
+    expect(lire('index.html')).not.toMatch(/data-qst-bouton/);
+    const i = biomeca.indexOf('function _fichePrefillApply(');
+    expect(i).toBeGreaterThan(-1);
+    expect(biomeca.slice(i, i + 800)).toMatch(/_qstInjecterBouton\(module\)/);
+    const f = extraireFonction(biomeca, '_qstInjecterBouton');
+    expect(f).toMatch(/cfg\.enCours\(\)/);
+    expect(f).toMatch(/_modeConsultation/);
+  });
+  it('rien n’est écrit avant le clic de validation : l’aperçu ne modifie ni le DOM du bilan ni la fiche', () => {
+    const f = extraireFonction(biomeca, 'qstOuvrirIntegration');
+    expect(f).not.toMatch(/_qstEcrireBilan|savePatients|questionnaire_integrer/);
+    const v = extraireFonction(biomeca, 'qstValiderIntegration');
+    expect(v.indexOf('_qstEcrireBilan')).toBeGreaterThan(-1);
+    expect(v.indexOf('_qstEcrireBilan')).toBeLessThan(v.indexOf('questionnaire_integrer'));
+  });
+  it('les textes du patient sont toujours échappés dans les fenêtres', () => {
+    for (const n of [
+      '_qstHtmlReponses',
+      '_qstHtmlApercu',
+      '_qstAffichageOp',
+      '_qstAffichageFiche',
+    ]) {
+      const f = extraireFonction(biomeca, n);
+      expect(f, n).toMatch(/_escHtml/);
+    }
+  });
+  it('bloc SQL D : moins de 4000 caractères', () => {
+    expect(lire('supabase/migrations/portail-questionnaire-d-integration.sql').length).toBeLessThan(
+      4000
+    );
+  });
+});
