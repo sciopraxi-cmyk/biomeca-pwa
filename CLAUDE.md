@@ -830,6 +830,34 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **Prochain lot** : signature du devis par le patient dans `/patient/` (tracé, IP serveur, horodatage, empreinte SHA-256 de la copie
   figée, code e-mail pour les mineurs) ; la notification `patient_devis_signe` est déjà déclarée.
 
+## Signature du devis par le patient — acquis (PR #331)
+
+- **Parcours patient** : dans « Mes documents », un devis valide porte « ✍️ À signer » (puis « ✓ Signé », ou « Expiré »). Le patient lit le
+  devis, coche « J'ai lu ce devis et je l'accepte », trace sa signature au doigt (canvas, PNG) et signe. Jamais d'e-mail du devis ; aucune
+  signature dans l'aperçu praticien (lecture seule).
+- **Mineur** (moins de 18 ans d'après la date de naissance de la fiche, ou date inconnue) : code à 6 chiffres, valable 10 minutes, 3 codes
+  par 15 minutes, 5 essais puis code invalidé ; un nouveau code invalide le précédent. Le code part à l'adresse du COMPTE patient (le parent
+  qui prend le rendez-vous). Mode essai (aucun e-mail réel avant l'hébergement HDS) : le serveur rend le code et l'écran l'affiche dans un
+  bandeau « Mode essai » ; réglage `portail_reglages.signature_code_essai` à '0' quand l'envoi réel existera.
+- **Serveur** (6 blocs SQL `portail-devis-signature-*.sql`, chacun < 4000 caractères) : fonctions `devis_etats_patient`,
+  `devis_signature_code_demander`, `devis_signer` (SECURITY DEFINER, aucun droit direct sur les tables). IP et date sont lues côté serveur
+  (`request.headers`), jamais envoyées par le client. L'empreinte SHA-256 porte sur `documents_partages.contenu` (copie figée) ; elle est
+  recalculée à la signature et comparée à celle que le patient a vue (`devis_modifie` sinon). Signature unique et non modifiable ;
+  un devis signé est figé (contenu, fichier, titre) et `documents_partager_facturation` ne l'écrase plus. Devis expiré
+  (`valide_jusqu_au`) ou retiré via 🔑 : non signable (la preuve d'un devis signé reste lisible du praticien).
+- **Piège** : un RAISE annulerait le décompte des essais d'un mauvais code ; `devis_signer` RENVOIE `{ok:false, restants}` pour ce cas
+  seulement. Le patient et le praticien partagent le rôle `authenticated` : la table des signatures est lisible par sa politique
+  `praticien_id = auth.uid()` (le patient voit 0 ligne). Toute migration qui redéfinit `documents_partager_facturation` doit partir de la
+  version du bloc D.
+- **Praticien** : « ✍️ signé le … » dans la liste 🧾, la fenêtre du devis et la fenêtre 🔑 ; bloc de preuve (date, IP, empreinte, tracé) dans
+  la fenêtre et sur l'impression ; notification `patient_devis_signe` (identifiants seuls, polling 30 s via `_portailVerifierSignatures`,
+  jamais pour un patient bloqué). Les harnais qui extraient `chargerDocuments` / `_htmlDocumentEmis` doivent lister
+  `_chargerSignaturesDevis`, `_notifDateHeure`, `_htmlBlocSignature` et la variable `_docSignatures`.
+- **Preuve** : `supabase/tests/portail-devis-signature.test.sql` (83 contrôles, 31 sabotages), `tests/portail-devis-signature.test.mjs`,
+  E2E navigateur `e2e-portail-devis-signature.mjs` (39 contrôles). Service workers `biomeca-v255`, `verticy-patient-v19`.
+- **À faire avant le réel** : faire valider la valeur légale de la signature ; décider de la conservation légale (la suppression d'une
+  fiche patient supprime en cascade ses signatures) ; envoi réel du code par e-mail après HDS.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
