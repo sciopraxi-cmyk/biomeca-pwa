@@ -37,6 +37,9 @@ const NOMS = [
   '_docRequete',
   '_praticienParDefaut',
   '_praticienDuDocument',
+  '_chargerSignaturesDevis',
+  '_notifDateHeure',
+  '_htmlBlocSignature',
   'chargerDocuments',
   'nouveauDocument',
   'ouvrirDocument',
@@ -203,7 +206,7 @@ function monter(o = {}) {
   const corps = [
     'const SUPA_URL = "https://x.supabase.co";',
     'const ACTE_MONTANT_MAX_CENTS = 10000000;',
-    'let _actesCache = __actes, _docListe = __liste, _docEdition = null, _docVue = null, _docApercu = false;',
+    'let _actesCache = __actes, _docListe = __liste, _docEdition = null, _docVue = null, _docApercu = false, _docSignatures = {};',
     'let currentPatient = __patient; const praticiens = __prats;',
     'const _escHtml = (s) => String(s ?? "").replace(/[&<>"\']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;", "\'": "&#39;" }[c]));',
     'const window = { _accessLevel: __acces }; const _accessPermetImpression = () => { const l = window._accessLevel; return !l || l === "full" || l === "readonly"; }; const showAccessRestrictedModal = (r) => __modales.push(r);',

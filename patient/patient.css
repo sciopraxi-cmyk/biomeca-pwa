@@ -830,3 +830,79 @@ input:focus-visible,
   color: #b91c1c;
   font-weight: 700;
 }
+
+/* ─── Signature du devis ─── */
+.ligne-document .badges {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ligne-document .badges .badge-nouveau {
+  margin-left: 0;
+}
+.badge-statut {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  background: #ffedd5;
+  color: #7c2d12;
+}
+.badge-statut.signe {
+  background: #dcfce7;
+  color: #14532d;
+}
+.badge-statut.expire {
+  background: #e5e7eb;
+  color: #374151;
+}
+.zone-signature {
+  margin-top: 14px;
+}
+.signature-statut {
+  margin: 8px 0;
+  font-weight: 800;
+  color: var(--marine);
+}
+.signature-canvas {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 600 / 220;
+  margin: 12px 0;
+  background: #fff;
+  border: 3px dashed var(--marine);
+  border-radius: 14px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.signature-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.case-accord {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+.case-accord input {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+}
+.bandeau-essai {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7d6;
+  border: 2px solid #e8c547;
+  font-size: 16px;
+}
+.zone-signature [hidden] {
+  display: none;
+}

@@ -12,6 +12,16 @@ import {
   cheminFichierValide,
   cleExo,
   cleValidation,
+  codeConfirmationValide,
+  dateHeureFr,
+  indexerEtatsDevis,
+  libelleStatutDevis,
+  longueurTrace,
+  messageCodeInvalide,
+  messageErreurSignature,
+  nettoyerCode,
+  statutDevis,
+  traceSuffisant,
   dateCourte,
   debutExerciceMs,
   etatChrono,
@@ -343,6 +353,8 @@ async function deconnecter() {
 
 // ─── Documents partagés (lecture seule) ───
 let documents = [];
+let etatsDevis = {}; // état de signature des devis, par id de document (devis_etats_patient)
+let documentOuvertId = null;
 
 /** Valeur aléatoire à usage unique (aucune donnée personnelle). */
 function nonce() {
@@ -397,6 +409,8 @@ async function majPastilleDocuments() {
     documents = l;
     afficherPastille();
   }
+  const e = await chargerEtatsDevis();
+  if (e) etatsDevis = e;
 }
 
 function ligneDocument(d) {
@@ -414,12 +428,23 @@ function ligneDocument(d) {
     texte.appendChild(sm);
   }
   b.appendChild(texte);
+  const badges = document.createElement('span');
+  badges.className = 'badges';
+  const statut = statutDevis(d, etatsDevis[d.id]);
+  const libelle = libelleStatutDevis(statut);
+  if (libelle) {
+    const st = document.createElement('span');
+    st.className = 'badge-statut ' + (statut === 'a_signer' ? 'a-signer' : statut);
+    st.textContent = libelle;
+    badges.appendChild(st);
+  }
   if (!d.lu_at) {
     const n = document.createElement('span');
     n.className = 'badge-nouveau';
     n.textContent = 'Nouveau';
-    b.appendChild(n);
+    badges.appendChild(n);
   }
+  if (badges.childNodes.length) b.appendChild(badges);
   b.addEventListener('click', () => ouvrirDocument(d));
   return b;
 }
@@ -442,6 +467,8 @@ async function ouvrirDocuments() {
   afficherErreur('erreur-documents', '');
   montrer('documents');
   const l = await chargerDocuments();
+  const e = await chargerEtatsDevis();
+  if (e) etatsDevis = e;
   if (l) documents = l;
   else if (!documents.length) {
     afficherErreur(
@@ -453,6 +480,8 @@ async function ouvrirDocuments() {
 }
 
 async function ouvrirDocument(d) {
+  documentOuvertId = d.id;
+  fermerSignature();
   afficherErreur('erreur-document', '');
   $('titre-document').textContent = d.titre;
   $('btn-document-imprimer').hidden = true;
@@ -498,6 +527,7 @@ async function ouvrirDocument(d) {
     });
     afficherPastille();
   }
+  preparerSignature(d);
 }
 
 function imprimerDocument() {
@@ -510,6 +540,217 @@ function imprimerDocument() {
     afficherErreur('erreur-document', 'Impression impossible. Essayez depuis un ordinateur.');
   }
 }
+
+// ─── Signature du devis (patient seulement ; jamais dans l'aperçu praticien) ───
+// Le serveur décide de tout (devis_signer) : adulte sans code, mineur avec un code à 6 chiffres, IP et date prises
+// côté serveur, empreinte du devis relue et comparée. Ici : affichage, tracé au doigt, envoi.
+let signatureCourante = null; // { doc, etat }
+let traceSegments = [];
+let traceDernier = null;
+let codeDemande = false;
+
+async function chargerEtatsDevis() {
+  if (APERCU) return null;
+  const r = await appelAuth('/rest/v1/rpc/devis_etats_patient', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!r || !r.ok) return null;
+  const l = await corpsJson(r);
+  return Array.isArray(l) ? indexerEtatsDevis(l) : null;
+}
+
+function effacerTrace() {
+  const c = $('signature-canvas');
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#0b1e3d';
+  traceSegments = [];
+  traceDernier = null;
+}
+
+function pointTrace(ev) {
+  const c = $('signature-canvas');
+  const r = c.getBoundingClientRect();
+  return [
+    ((ev.clientX - r.left) * c.width) / r.width,
+    ((ev.clientY - r.top) * c.height) / r.height,
+  ];
+}
+
+function fermerSignature() {
+  signatureCourante = null;
+  codeDemande = false;
+  $('zone-signature').hidden = true;
+  $('signature-panneau').hidden = true;
+  $('btn-signature-ouvrir').hidden = true;
+  $('signature-code-bloc').hidden = true;
+  $('signature-code-essai').hidden = true;
+  $('signature-code').value = '';
+  $('signature-accord').checked = false;
+  afficherErreur('erreur-signature', '');
+  effacerTrace();
+}
+
+function majStatutSignature() {
+  if (!signatureCourante) return;
+  const { doc, etat } = signatureCourante;
+  const st = statutDevis(doc, etat);
+  const t = $('signature-statut');
+  if (st === 'signe')
+    t.textContent = `✓ Vous avez signé ce devis le ${dateHeureFr(etat.signe_at)}.`;
+  else if (st === 'expire')
+    t.textContent = 'Ce devis a expiré. Demandez-en un nouveau à votre praticien.';
+  else t.textContent = 'Ce devis attend votre signature.';
+  $('btn-signature-ouvrir').hidden = st !== 'a_signer' || !$('signature-panneau').hidden;
+}
+
+async function preparerSignature(d) {
+  if (APERCU || d.type !== 'devis') return;
+  const e = await chargerEtatsDevis();
+  if (e) etatsDevis = e;
+  if (documentOuvertId !== d.id) return; // le patient a quitté ce document pendant le chargement
+  const etat = etatsDevis[d.id];
+  if (!statutDevis(d, etat)) return;
+  signatureCourante = { doc: d, etat };
+  $('zone-signature').hidden = false;
+  majStatutSignature();
+}
+
+function ouvrirPanneauSignature() {
+  if (!signatureCourante) return;
+  afficherErreur('erreur-signature', '');
+  effacerTrace();
+  $('signature-panneau').hidden = false;
+  $('btn-signature-ouvrir').hidden = true;
+  $('signature-code-bloc').hidden = !signatureCourante.etat.mineur;
+}
+
+async function demanderCodeSignature() {
+  if (!signatureCourante) return;
+  afficherErreur('erreur-signature', '');
+  const b = $('btn-signature-code');
+  b.disabled = true;
+  const r = await appelAuth('/rest/v1/rpc/devis_signature_code_demander', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_document: signatureCourante.doc.id }),
+  });
+  b.disabled = false;
+  if (!r) return afficherErreur('erreur-signature', messageErreurSignature(0, null));
+  const j = await corpsJson(r);
+  if (!r.ok) return afficherErreur('erreur-signature', messageErreurSignature(r.status, j));
+  codeDemande = true;
+  const essai = $('signature-code-essai');
+  // Mode essai (aucun e-mail réel avant l'hébergement HDS) : le serveur rend le code, on l'affiche ; sinon rien.
+  if (j && j.code_essai) {
+    essai.textContent = `Mode essai : aucun e-mail n’est envoyé pour le moment. Votre code est ${j.code_essai}.`;
+    essai.hidden = false;
+  } else {
+    essai.textContent = 'Un code vous a été envoyé. Il est valable 10 minutes.';
+    essai.hidden = false;
+  }
+  $('signature-code').focus();
+}
+
+async function signerDevis() {
+  if (!signatureCourante) return;
+  const { doc, etat } = signatureCourante;
+  afficherErreur('erreur-signature', '');
+  if (!$('signature-accord').checked)
+    return afficherErreur(
+      'erreur-signature',
+      'Cochez la case pour confirmer que vous avez lu le devis.'
+    );
+  if (!traceSuffisant(longueurTrace(traceSegments)))
+    return afficherErreur(
+      'erreur-signature',
+      'Dessinez votre signature dans le cadre avec le doigt.'
+    );
+  const corps = {
+    p_document: doc.id,
+    p_empreinte: etat.empreinte,
+    p_trace: $('signature-canvas').toDataURL('image/png'),
+  };
+  if (etat.mineur) {
+    const code = nettoyerCode($('signature-code').value);
+    if (!codeConfirmationValide(code))
+      return afficherErreur(
+        'erreur-signature',
+        codeDemande ? 'Saisissez le code à 6 chiffres.' : 'Demandez d’abord un code.'
+      );
+    corps.p_code = code;
+  }
+  const b = $('btn-signature-valider');
+  b.disabled = true;
+  const r = await appelAuth('/rest/v1/rpc/devis_signer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps),
+  });
+  b.disabled = false;
+  if (!r) return afficherErreur('erreur-signature', messageErreurSignature(0, null));
+  const j = await corpsJson(r);
+  if (!r.ok) return afficherErreur('erreur-signature', messageErreurSignature(r.status, j));
+  if (!j || j.ok !== true) {
+    $('signature-code').value = '';
+    return afficherErreur('erreur-signature', messageCodeInvalide(j && j.restants));
+  }
+  etatsDevis[doc.id] = { ...etat, signe_at: j.signe_at, signable: false };
+  signatureCourante = { doc, etat: etatsDevis[doc.id] };
+  $('signature-panneau').hidden = true;
+  $('signature-code-essai').hidden = true;
+  majStatutSignature();
+  const e = await chargerEtatsDevis();
+  if (e) etatsDevis = e;
+}
+
+(() => {
+  const c = $('signature-canvas');
+  let dessin = false;
+  c.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    c.setPointerCapture(ev.pointerId);
+    dessin = true;
+    traceDernier = pointTrace(ev);
+    const ctx = c.getContext('2d');
+    ctx.beginPath();
+    ctx.arc(traceDernier[0], traceDernier[1], 1.5, 0, 2 * Math.PI);
+    ctx.fillStyle = '#0b1e3d';
+    ctx.fill();
+  });
+  c.addEventListener('pointermove', (ev) => {
+    if (!dessin) return;
+    ev.preventDefault();
+    const p = pointTrace(ev);
+    const ctx = c.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(traceDernier[0], traceDernier[1]);
+    ctx.lineTo(p[0], p[1]);
+    ctx.stroke();
+    traceSegments.push([traceDernier[0], traceDernier[1], p[0], p[1]]);
+    traceDernier = p;
+  });
+  const fin = () => {
+    dessin = false;
+  };
+  c.addEventListener('pointerup', fin);
+  c.addEventListener('pointercancel', fin);
+  c.addEventListener('pointerleave', fin);
+  $('btn-signature-ouvrir').addEventListener('click', ouvrirPanneauSignature);
+  $('btn-signature-effacer').addEventListener('click', effacerTrace);
+  $('btn-signature-code').addEventListener('click', demanderCodeSignature);
+  $('btn-signature-valider').addEventListener('click', signerDevis);
+  $('signature-code').addEventListener('input', (e) => {
+    e.target.value = nettoyerCode(e.target.value);
+  });
+  effacerTrace();
+})();
 
 // ─── Mes exercices : programme du patient (lot e3b-2a, lecture seule) ───
 let programme = null; // { contenu, publie_at } ou null

@@ -458,3 +458,101 @@ export function preparerFil(lignes, perspective) {
       lu: moi === 'praticien' && m.sens === 'praticien' ? !!m.lu_at : null,
     }));
 }
+
+// ─── Signature du devis par le patient ───
+
+/** Longueur minimale de tracé (en pixels du cadre) pour ne pas accepter un cadre vide ou un simple point. */
+export const TRACE_MIN_PX = 120;
+
+export function traceSuffisant(longueurPx) {
+  return Number(longueurPx) >= TRACE_MIN_PX;
+}
+
+/** Lignes de devis_etats_patient() → { <id du document>: état }. */
+export function indexerEtatsDevis(lignes) {
+  const carte = {};
+  for (const l of Array.isArray(lignes) ? lignes : []) {
+    if (l && l.document_id) carte[l.document_id] = l;
+  }
+  return carte;
+}
+
+/** État affichable d'un devis : « signe », « a_signer », « expire » ; null pour tout autre document. */
+export function statutDevis(doc, etat) {
+  if (!doc || doc.type !== 'devis' || !etat) return null;
+  if (etat.signe_at) return 'signe';
+  if (etat.signable) return 'a_signer';
+  return 'expire';
+}
+
+/** Libellé court du badge d'un devis (null = pas de badge). */
+export function libelleStatutDevis(statut) {
+  if (statut === 'a_signer') return '✍️ À signer';
+  if (statut === 'signe') return '✓ Signé';
+  if (statut === 'expire') return 'Expiré';
+  return null;
+}
+
+/** Code de confirmation reçu par un mineur : exactement 6 chiffres (espaces tolérés à la saisie). */
+export function codeConfirmationValide(saisie) {
+  return /^[0-9]{6}$/.test(String(saisie || '').replace(/\s+/g, ''));
+}
+export function nettoyerCode(saisie) {
+  return String(saisie || '')
+    .replace(/[^0-9]/g, '')
+    .slice(0, 6);
+}
+
+/** « 2026-10-25T14:03:00Z » → « 25/10/2026 à 15:03 » (heure de Paris) ; vide si illisible. */
+export function dateHeureFr(iso) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(d);
+  const v = (t) => parts.find((p) => p.type === t).value;
+  return `${v('day')}/${v('month')}/${v('year')} à ${v('hour')}:${v('minute')}`;
+}
+
+/** Texte lisible pour une erreur de signature (le serveur renvoie un code court dans `message`). */
+export function messageErreurSignature(statut, corps) {
+  const code =
+    corps && typeof corps === 'object' ? String(corps.message || corps.erreur || '') : '';
+  if (code === 'devis_expire')
+    return 'Ce devis a expiré. Demandez-en un nouveau à votre praticien.';
+  if (code === 'devis_introuvable')
+    return 'Ce devis n’est plus disponible. Contactez votre praticien.';
+  if (code === 'deja_signe') return 'Ce devis est déjà signé.';
+  if (code === 'devis_modifie')
+    return 'Ce devis a été modifié pendant que vous le lisiez. Rouvrez-le avant de signer.';
+  if (code === 'trace_invalide')
+    return 'Votre signature n’a pas pu être lue. Dessinez-la à nouveau.';
+  if (code === 'code_requis')
+    return 'Le code a expiré ou n’est plus valable. Demandez un nouveau code.';
+  if (code === 'trop_de_codes')
+    return 'Trop de codes demandés. Patientez quelques minutes avant d’en redemander un.';
+  if (statut === 0) return 'Pas de réseau : rien n’a été signé. Réessayez.';
+  if (statut >= 500) return 'Petit souci de notre côté. Réessayez dans un instant.';
+  return 'Impossible de signer pour le moment. Réessayez.';
+}
+
+/** Phrase après un code faux (le serveur compte les essais). */
+export function messageCodeInvalide(restants) {
+  const r = Number(restants);
+  if (r > 0) return `Code incorrect. Il vous reste ${r} essai${r > 1 ? 's' : ''}.`;
+  return 'Code incorrect. Demandez un nouveau code.';
+}
+
+/** Longueur cumulée d'un tracé (liste de segments [x1, y1, x2, y2]). */
+export function longueurTrace(segments) {
+  let total = 0;
+  for (const s of Array.isArray(segments) ? segments : []) {
+    if (Array.isArray(s) && s.length === 4) total += Math.hypot(s[2] - s[0], s[3] - s[1]);
+  }
+  return total;
+}
