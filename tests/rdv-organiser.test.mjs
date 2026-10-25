@@ -4,21 +4,65 @@ import { describe, it, expect } from 'vitest';
 import { fonction, ligneConst, objet } from './helpers/extraire-biomeca.mjs';
 
 const FONCTIONS = [
-  '_importNormName', 'validerFichePatient', '_rdvTexte', '_rdvManque', '_rdvTrouverFiche', '_rdvPreparerFiche', '_rdvRpc', '_rdvActesEligibles',
-  '_rdvMotifsPropose', '_rdvSansEnvoi', '_rdvDevis', '_rdvOrganiser', '_rdvResume', '_rdvTexteMail',
-  '_ligneDepuisActe', '_praticienParDefaut', '_centimesVersEuros', '_dateFr', '_doctolibDateFr', '_eurosVersCentimes', '_devisAutoPlanifier',
-  '_ligneBaseDocument', '_emetteurDepuisPraticien', '_patientInstantane', '_mentionTva', '_calculerDocument', '_partsRemboursement', '_validerDocument',
-  '_erreurCoordonneesBancaires', '_normaliserIban', '_praticienDuDocument', '_docRequete', '_devisAutoCreerUn',
+  '_importNormName',
+  'validerFichePatient',
+  '_rdvTexte',
+  '_rdvManque',
+  '_rdvTrouverFiche',
+  '_rdvPreparerFiche',
+  '_rdvRpc',
+  '_rdvActesEligibles',
+  '_rdvMotifsPropose',
+  '_rdvSansEnvoi',
+  '_rdvDevis',
+  '_rdvOrganiser',
+  '_rdvResume',
+  '_rdvTexteMail',
+  '_ligneDepuisActe',
+  '_praticienParDefaut',
+  '_centimesVersEuros',
+  '_dateFr',
+  '_doctolibDateFr',
+  '_eurosVersCentimes',
+  '_devisAutoPlanifier',
+  '_ligneBaseDocument',
+  '_emetteurDepuisPraticien',
+  '_patientInstantane',
+  '_mentionTva',
+  '_calculerDocument',
+  '_partsRemboursement',
+  '_validerDocument',
+  '_erreurCoordonneesBancaires',
+  '_normaliserIban',
+  '_praticienDuDocument',
+  '_docRequete',
+  '_devisAutoCreerUn',
 ];
 const AUJOURDHUI = '2026-10-26';
 
 function monter(o = {}) {
-  const srv = { docs: [], numero: 0, notifs: [], rpc: [], appels: [], partages: [], creer: o.creer || 'nouveau', questionnaire: o.questionnaire || 'ok' };
+  const srv = {
+    docs: [],
+    numero: 0,
+    notifs: [],
+    rpc: [],
+    appels: [],
+    partages: [],
+    creer: o.creer || 'nouveau',
+    questionnaire: o.questionnaire || 'ok',
+  };
   const corps = [
     'const ACTE_MONTANT_MAX_CENTS = 10000000;',
-    ligneConst('MENTION_TVA_DEFAUT'), ligneConst('FRANCHISE_ACTE_CENTS'), ligneConst('FRANCHISE_JOUR_MAX_CENTS'), ligneConst('DOC_LIGNES_MAX'),
-    objet('REGIMES_REMBOURSEMENT'), ligneConst('_chiffresSeuls'), ligneConst('AG_MOTIFS'), ligneConst('_RDV_MAILS'),
-    'const _ENTETES_JSON = {};', 'const SUPA_URL = "https://x.invalid";',
+    ligneConst('MENTION_TVA_DEFAUT'),
+    ligneConst('FRANCHISE_ACTE_CENTS'),
+    ligneConst('FRANCHISE_JOUR_MAX_CENTS'),
+    ligneConst('DOC_LIGNES_MAX'),
+    objet('REGIMES_REMBOURSEMENT'),
+    ligneConst('_chiffresSeuls'),
+    ligneConst('AG_MOTIFS'),
+    ligneConst('_RDV_MAILS'),
+    'const _ENTETES_JSON = {};',
+    'const SUPA_URL = "https://x.invalid";',
     'const praticiens = __prats; const patients = __patients; let _actesCache = [];',
     `const _todayISO = () => "${AUJOURDHUI}";`,
     `const _accessPermetCreationDocument = () => ${o.accesLimite ? 'false' : 'true'};`,
@@ -35,7 +79,11 @@ function monter(o = {}) {
     ...FONCTIONS.map(fonction),
     `return { ${FONCTIONS.join(', ')}, AG_MOTIFS };`,
   ].join('\n');
-  const reponse = (status, data) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
+  const reponse = (status, data) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => data,
+  });
   const authFetch = async (url, opt = {}) => {
     const m = opt.method || 'GET';
     if (url.includes('/rpc/emettre_document')) {
@@ -47,7 +95,8 @@ function monter(o = {}) {
     }
     if (url.endsWith('/documents_facturation') && m === 'POST') {
       const b = JSON.parse(opt.body);
-      if (b.source_rdv && srv.docs.some((d) => d.source_rdv === b.source_rdv)) return reponse(409, { message: 'duplicate' });
+      if (b.source_rdv && srv.docs.some((d) => d.source_rdv === b.source_rdv))
+        return reponse(409, { message: 'duplicate' });
       const d = Object.assign({ id: 'doc' + (srv.docs.length + 1), statut: 'brouillon' }, b);
       srv.docs.push(d);
       return reponse(201, [d]);
@@ -57,7 +106,8 @@ function monter(o = {}) {
       const b = JSON.parse(opt.body);
       srv.rpc.push([nom, b]);
       if (nom === 'questionnaire_demander') {
-        if (srv.questionnaire === 'deja') return reponse(400, { message: 'questionnaire_deja_ouvert' });
+        if (srv.questionnaire === 'deja')
+          return reponse(400, { message: 'questionnaire_deja_ouvert' });
         if (srv.questionnaire === 'passe') return reponse(400, { message: 'rdv_passe' });
         if (srv.questionnaire === 'panne') return reponse(500, { message: 'boum' });
         return reponse(200, 'q1');
@@ -66,7 +116,15 @@ function monter(o = {}) {
     }
     return reponse(404, {});
   };
-  const f = new Function('__prats', '__patients', '__actes', '__srv', '__authFetch', 'pwaUser', corps)(
+  const f = new Function(
+    '__prats',
+    '__patients',
+    '__actes',
+    '__srv',
+    '__authFetch',
+    'pwaUser',
+    corps
+  )(
     [{ id: 7, nom: 'Dr Fictif', titre: 'Podologue', siret: '12345678901234', rpps: '12345678901' }],
     o.patients || [],
     o.actes || [],
@@ -78,20 +136,57 @@ function monter(o = {}) {
 }
 
 const ACTES = [
-  { id: 'a1', libelle: 'Consultation de podologie', montant_cents: 3500, sync_doctolib: true, actif: true },
+  {
+    id: 'a1',
+    libelle: 'Consultation de podologie',
+    montant_cents: 3500,
+    sync_doctolib: true,
+    actif: true,
+  },
   { id: 'a2', libelle: 'Bilan sur mesure', montant_cents: 9000, perso: true, actif: true },
   { id: 'a3', libelle: 'Acte inactif', montant_cents: 100, perso: true, actif: false },
 ];
-const SAISIE = { nom: 'Martin', prenom: 'Léa', ddn: '2010-05-17', tel: '0600000000', email: 'lea@exemple.fr', adresse: '' };
+const SAISIE = {
+  nom: 'Martin',
+  prenom: 'Léa',
+  ddn: '2010-05-17',
+  tel: '0600000000',
+  email: 'lea@exemple.fr',
+  adresse: '',
+};
 const dansJours = (n) => {
   const d = new Date(Date.now() + n * 864e5);
   const p = (x) => String(x).padStart(2, '0');
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T10:00';
 };
-const fiche = (o = {}) => Object.assign({ id: 1, nom: 'Martin', prenom: 'Léa', ddn: '2010-05-17', email: 'lea@exemple.fr', tel: '', pratId: 7 }, o);
+const fiche = (o = {}) =>
+  Object.assign(
+    {
+      id: 1,
+      nom: 'Martin',
+      prenom: 'Léa',
+      ddn: '2010-05-17',
+      email: 'lea@exemple.fr',
+      tel: '',
+      pratId: 7,
+    },
+    o
+  );
 const types = (srv) => srv.notifs.map((n) => n[0]).filter((t) => t !== 'devis_emis'); // devis_emis : notification propre à l'émission du devis
 const mails = (srv) => srv.notifs.filter((n) => n[0] === 'email_essai').map((n) => n[1].mail);
-const org = (f, p, o) => f._rdvOrganiser(Object.assign({ debut: dansJours(7), motif: 'Consultation de podologie', patient: p, saisie: SAISIE, manuel: true }, o));
+const org = (f, p, o) =>
+  f._rdvOrganiser(
+    Object.assign(
+      {
+        debut: dansJours(7),
+        motif: 'Consultation de podologie',
+        patient: p,
+        saisie: SAISIE,
+        manuel: true,
+      },
+      o
+    )
+  );
 
 describe('informations obligatoires', () => {
   it('liste ce qui manque (nom, prénom, naissance, e-mail)', () => {
@@ -116,7 +211,10 @@ describe('informations obligatoires', () => {
   });
   it('saisie incomplète sans fiche (nouveau patient sans naissance) : rien non plus', async () => {
     const { f, srv } = monter({ actes: ACTES });
-    const res = await org(f, null, { source: 'ag:e2', saisie: { nom: 'A', prenom: 'B', email: 'a@b.fr' } });
+    const res = await org(f, null, {
+      source: 'ag:e2',
+      saisie: { nom: 'A', prenom: 'B', email: 'a@b.fr' },
+    });
     expect(res.manque).toEqual(['date de naissance']);
     expect(srv.appels).toEqual([]);
     expect(types(srv)).toEqual(['rdv_sans_envoi']);
@@ -135,10 +233,17 @@ describe('accès, devis, e-mail, questionnaire', () => {
     expect(srv.docs[0].source_rdv).toBe('ag:e3');
     expect(srv.partages.length).toBe(1);
     expect(types(srv)).toEqual(['email_essai']);
-    expect(srv.notifs.find((n) => n[0] === 'email_essai')[1]).toMatchObject({ mail: 'acces_devis', patientId: 1 });
+    expect(srv.notifs.find((n) => n[0] === 'email_essai')[1]).toMatchObject({
+      mail: 'acces_devis',
+      patientId: 1,
+    });
     expect(p.accesEnvoyeLe).toBeTruthy();
     const q = srv.rpc.find((r) => r[0] === 'questionnaire_demander');
-    expect(q[1]).toEqual({ p_patient: 'cloud-1', p_rdv: new Date(debut).toISOString(), p_source: 'ag:e3' });
+    expect(q[1]).toEqual({
+      p_patient: 'cloud-1',
+      p_rdv: new Date(debut).toISOString(),
+      p_source: 'ag:e3',
+    });
     expect(res.questionnaire).toBe('programme');
     expect(res.visibleLe).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
     const txt = f._rdvResume(res, { creee: true });
@@ -189,10 +294,15 @@ describe('accès, devis, e-mail, questionnaire', () => {
     expect(JSON.stringify(m.srv.docs[0])).toMatch(/Bilan sur mesure/);
     const p2 = fiche({ id: 2 });
     const m2 = monter({ patients: [p2], actes: ACTES });
-    expect((await org(m2.f, p2, { source: 'ag:e9', motif: 'Bilan sur mesure', manuel: false })).devis.etat).toBe('ignore');
+    expect(
+      (await org(m2.f, p2, { source: 'ag:e9', motif: 'Bilan sur mesure', manuel: false })).devis
+        .etat
+    ).toBe('ignore');
     const p3 = fiche({ id: 3 });
     const m3 = monter({ patients: [p3], actes: ACTES });
-    expect((await org(m3.f, p3, { source: 'ag:e10', motif: 'Acte inactif' })).devis.etat).toBe('ignore');
+    expect((await org(m3.f, p3, { source: 'ag:e10', motif: 'Acte inactif' })).devis.etat).toBe(
+      'ignore'
+    );
   });
   it('rejouer le même RDV : un seul devis, un seul questionnaire, identifiants une seule fois', async () => {
     const p = fiche();
@@ -211,7 +321,10 @@ describe('accès, devis, e-mail, questionnaire', () => {
     const p = fiche({ accesEnvoyeLe: 'x' });
     const { f, srv } = monter({ patients: [p], actes: ACTES, creer: 'existant' });
     await org(f, p, { source: 'ag:e12', debut: dansJours(9), motif: 'Autre', modif: true });
-    expect(srv.rpc.map((r) => r[0])).toEqual(['questionnaire_replanifier', 'questionnaire_demander']);
+    expect(srv.rpc.map((r) => r[0])).toEqual([
+      'questionnaire_replanifier',
+      'questionnaire_demander',
+    ]);
   });
   it('accès portail impossible : ni devis, ni e-mail, ni questionnaire', async () => {
     const p = fiche();
@@ -253,13 +366,23 @@ describe('fiche patient', () => {
     const { f, srv } = monter();
     const r = f._rdvPreparerFiche(SAISIE, null);
     expect(r.creee).toBe(true);
-    expect(r.patient).toMatchObject({ nom: 'Martin', prenom: 'Léa', ddn: '2010-05-17', email: 'lea@exemple.fr', tel: '0600000000', pratId: 7 });
+    expect(r.patient).toMatchObject({
+      nom: 'Martin',
+      prenom: 'Léa',
+      ddn: '2010-05-17',
+      email: 'lea@exemple.fr',
+      tel: '0600000000',
+      pratId: 7,
+    });
     expect(srv.sauve).toBe(1);
   });
   it('jamais de doublon (nom + prénom + naissance, sans tenir compte de la casse)', () => {
     const existant = fiche({ id: 5 });
     const { f } = monter({ patients: [existant] });
-    const r = f._rdvPreparerFiche({ ...SAISIE, nom: 'MARTIN', prenom: 'léa', tel: '0611111111' }, null);
+    const r = f._rdvPreparerFiche(
+      { ...SAISIE, nom: 'MARTIN', prenom: 'léa', tel: '0611111111' },
+      null
+    );
     expect(r.creee).toBe(false);
     expect(r.patient).toBe(existant);
     expect(existant.tel).toBe('0611111111');
@@ -273,7 +396,10 @@ describe('fiche patient', () => {
   it('fiche existante : complétée sans écraser la naissance ni l\u2019identité', () => {
     const p = fiche({ email: '' });
     const { f } = monter({ patients: [p] });
-    const r = f._rdvPreparerFiche({ ...SAISIE, ddn: '1999-01-01', nom: 'Autre', email: 'neuf@exemple.fr' }, p);
+    const r = f._rdvPreparerFiche(
+      { ...SAISIE, ddn: '1999-01-01', nom: 'Autre', email: 'neuf@exemple.fr' },
+      p
+    );
     expect(r.completee).toBe(true);
     expect(p).toMatchObject({ ddn: '2010-05-17', nom: 'Martin', email: 'neuf@exemple.fr' });
   });
@@ -287,7 +413,9 @@ describe('fiche patient', () => {
   it('identité incomplète : aucune fiche créée', () => {
     const { f } = monter();
     expect(f._rdvPreparerFiche({ nom: 'A', prenom: 'B', ddn: '' }, null).patient).toBe(null);
-    expect(f._rdvPreparerFiche({ nom: 'A', prenom: 'B', ddn: '2999-01-01' }, null).patient).toBe(null);
+    expect(f._rdvPreparerFiche({ nom: 'A', prenom: 'B', ddn: '2999-01-01' }, null).patient).toBe(
+      null
+    );
   });
 });
 
@@ -298,7 +426,10 @@ describe('menu « motif de consultation »', () => {
   });
   it('après chargement : + actes personnalisés actifs + actes Doctolib, sans doublon', async () => {
     const p = fiche();
-    const { f } = monter({ patients: [p], actes: [...ACTES, { id: 'a4', libelle: 'bilan podologique', perso: true, actif: true }] });
+    const { f } = monter({
+      patients: [p],
+      actes: [...ACTES, { id: 'a4', libelle: 'bilan podologique', perso: true, actif: true }],
+    });
     await org(f, p, { source: 'ag:m', motif: 'x' }); // charge les actes
     const l = f._rdvMotifsPropose();
     expect(l).toContain('Bilan sur mesure');
@@ -312,7 +443,12 @@ describe('menu « motif de consultation »', () => {
 describe('textes des e-mails d\u2019essai', () => {
   it('accès + devis : identifiant, première connexion, lien', () => {
     const { f } = monter();
-    const t = f._rdvTexteMail('acces_devis', { prenom: 'Léa', cabinet: 'Cabinet Fictif', identifiant: 'abc-123', lien: 'https://x.invalid/patient/' });
+    const t = f._rdvTexteMail('acces_devis', {
+      prenom: 'Léa',
+      cabinet: 'Cabinet Fictif',
+      identifiant: 'abc-123',
+      lien: 'https://x.invalid/patient/',
+    });
     expect(t).toMatch(/Bonjour Léa/);
     expect(t).toMatch(/abc-123/);
     expect(t).toMatch(/devis vous attend/);
@@ -323,11 +459,17 @@ describe('textes des e-mails d\u2019essai', () => {
   it('accès seul : pas de devis ; les 5 genres produisent un texte', () => {
     const { f } = monter();
     expect(f._rdvTexteMail('acces', { identifiant: 'z' })).not.toMatch(/devis/);
-    ['acces', 'acces_devis', 'devis', 'questionnaire', 'rappel'].forEach((g) => expect(f._rdvTexteMail(g, {}).length).toBeGreaterThan(40));
+    ['acces', 'acces_devis', 'devis', 'questionnaire', 'rappel'].forEach((g) =>
+      expect(f._rdvTexteMail(g, {}).length).toBeGreaterThan(40)
+    );
     expect(f._rdvTexteMail('inconnu', {})).toBe('');
   });
   it('questionnaire et rappel : ni question ni réponse', () => {
     const { f } = monter();
-    ['questionnaire', 'rappel'].forEach((g) => expect(f._rdvTexteMail(g, { prenom: 'Léa' })).not.toMatch(/douleur|antécédent|opér|traitement/i));
+    ['questionnaire', 'rappel'].forEach((g) =>
+      expect(f._rdvTexteMail(g, { prenom: 'Léa' })).not.toMatch(
+        /douleur|antécédent|opér|traitement/i
+      )
+    );
   });
 });
