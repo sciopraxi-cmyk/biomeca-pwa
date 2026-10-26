@@ -23,6 +23,8 @@ export async function login(
 
   await page.goto('/index.html');
   await expect(page.locator('#pwa-login')).toBeVisible();
+  // L'accueil propose deux pancartes : la connexion se trouve derrière « Je suis un praticien ».
+  await page.click('#lp-carte-praticien');
   await page.fill('#pwa-email', email);
   await page.fill('#pwa-pwd', password);
   await page.click('#pwa-login-btn');

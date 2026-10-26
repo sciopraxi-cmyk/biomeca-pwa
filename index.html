@@ -285,61 +285,55 @@
 
 <div class="lp-nav">
   <div class="lp-nav-logo">
-    <!-- Lockup Verticy horizontal : pictogramme + wordmark (image) alignés
-         dans le cadre blanc arrondi (règle fond clair pour surface sombre). -->
-    <span style="display:inline-flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:6px 14px;">
+    <!-- Lockup Verticy horizontal : pictogramme + wordmark (image) ; « by » + logo Sciopraxi sous le wordmark. -->
+    <a href="#" onclick="lpVue('accueil');return false;" class="lp-logo-lien" aria-label="Accueil Verticy">
       <img src="assets/verticy-mark.png" alt="Verticy" style="height:34px;display:block;"/>
       <span style="display:flex;flex-direction:column;align-items:stretch;">
         <img src="assets/verticy-wordmark.png" alt="Verticy" style="height:15px;display:block;"/>
         <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;line-height:1;margin-top:4px;"><span style="font-size:10px;color:#6b7280;font-family:Arial,sans-serif;">by</span><img src="assets/by-sciopraxi.png" alt="Sciopraxi" style="height:18px;display:block;"/></span>
       </span>
-    </span>
+    </a>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;">
-    <button onclick="document.getElementById('pwa-login-form').scrollIntoView({behavior:'smooth'})" style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);padding:9px 20px;border-radius:8px;font-size:13px;cursor:pointer;">Se connecter</button>
-    <button class="lp-btn-connect" onclick="document.getElementById('lp-pricing-section').scrollIntoView({behavior:'smooth'})">Nos offres</button>
+  <div class="lp-nav-liens">
+    <button id="lp-nav-tarifs" type="button" onclick="lpAllerTarifs()">Tarifs</button>
+    <button id="lp-nav-connexion" type="button" class="lp-btn-connect" onclick="lpVue('praticien',{scroll:'pwa-login-form'})">Se connecter</button>
   </div>
 </div>
 
-<div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+<div class="lp-defil" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">
 <div class="lp-hero">
-  <h1>L'outil de référence<br>pour vos <em>bilans cliniques</em></h1>
-  <p>Bilan postural, podologie du sport, podopédiatrie et pédicurie — des outils professionnels pensés pour optimiser votre pratique et valoriser votre expertise.</p>
-  <div class="lp-pills">
-    <div class="lp-pill">🧍 Bilan postural</div>
-    <div class="lp-pill">🦶 Podologie du sport</div>
-    <div class="lp-pill">👶 Podopédiatrie</div>
-    <div class="lp-pill">✂️ Pédicurie</div>
-    <div class="lp-pill">📄 Rapport PDF auto</div>
-  </div>
-  <div class="lp-stats">
-    <div class="lp-stat"><div class="lp-stat-n">3</div><div class="lp-stat-l">Spécialités</div></div>
-    <div class="lp-stat"><div class="lp-stat-n">PDF</div><div class="lp-stat-l">1 clic</div></div>
-    <div class="lp-stat"><div class="lp-stat-n">100%</div><div class="lp-stat-l">Digital</div></div>
-  </div>
+  <span class="lp-hero-sur">Logiciel de bilans pour podologues</span>
+  <h1>Des bilans cliniques <em>complets</em>,<br>un rapport <em>automatique</em></h1>
+  <p>Verticy est le logiciel des pédicures-podologues : bilan postural, podologie du sport, podopédiatrie, pédicurie et ostéopathie, agenda, devis et espace patient, au même endroit.</p>
+  <div class="lp-hero-choix">Vous êtes…</div>
 </div>
 
-<!-- Portail patient (lot b) : deux portes d'entrée. Styles en ligne : la refonte de la landing les remplacera. -->
-<div id="lp-profils" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;max-width:760px;margin:0 auto;padding:8px 20px 28px;">
-  <a id="lp-carte-patient" href="patient/" style="flex:1 1 280px;display:block;text-decoration:none;background:rgba(45,212,191,0.12);border:2px solid #2dd4bf;border-radius:16px;padding:22px 20px;text-align:center;color:#fff;">
-    <div style="font-size:38px;line-height:1.2;">🙋</div>
-    <div style="font-size:20px;font-weight:700;margin-top:6px;">Je suis un patient</div>
-    <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:6px;">Accéder à mon espace : exercices, documents, rendez-vous</div>
+<!-- Deux portes d'entrée : patient (portail) / praticien (connexion, offres, essai). -->
+<div id="lp-profils">
+  <a id="lp-carte-patient" href="patient/" class="lp-carte lp-carte-patient">
+    <span class="lp-carte-icone">🙋</span>
+    <span class="lp-carte-titre">Je suis un patient</span>
+    <span class="lp-carte-texte">Accéder à mon espace : exercices, documents, rendez-vous, messagerie</span>
+    <span class="lp-carte-bouton">Accéder à mon espace →</span>
   </a>
-  <button id="lp-carte-praticien" type="button" onclick="document.getElementById('pwa-login-form').scrollIntoView({behavior:'smooth'})" style="flex:1 1 280px;display:block;cursor:pointer;font:inherit;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.35);border-radius:16px;padding:22px 20px;text-align:center;color:#fff;">
-    <div style="font-size:38px;line-height:1.2;">🩺</div>
-    <div style="font-size:20px;font-weight:700;margin-top:6px;">Je suis un praticien</div>
-    <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:6px;">Me connecter ou créer mon compte Verticy</div>
+  <button id="lp-carte-praticien" type="button" onclick="lpVue('praticien',{scroll:'pwa-login-form'})" class="lp-carte lp-carte-praticien">
+    <span class="lp-carte-icone">🩺</span>
+    <span class="lp-carte-titre">Je suis un praticien</span>
+    <span class="lp-carte-texte">Me connecter, découvrir les offres ou créer mon compte Verticy</span>
+    <span class="lp-carte-bouton">Accéder à Verticy →</span>
   </button>
 </div>
+<div class="lp-pied-accueil">Verticy · by Sciopraxi</div>
 
-<div class="lp-section">
-  <div class="lp-sec-head"><div class="lp-sec-title">4 modules cliniques</div><div class="lp-sec-sub">3 spécialités au choix, la pédicurie offerte avec chaque formule</div></div>
+
+<div class="lp-section lp-prat">
+  <div class="lp-sec-head"><div class="lp-sec-title">5 modules cliniques</div><div class="lp-sec-sub">3 spécialités au choix, la pédicurie et l'ostéopathie offertes avec chaque formule</div></div>
   <div class="lp-modules">
-    <div class="lp-mod" style="--mc:#1D9E75;"><div class="lp-mod-icon">🧍</div><div class="lp-mod-name">Bilan postural</div><div class="lp-mod-desc">Analyse complète en 9 sections, silhouettes annotées, rapport PDF.</div><span class="lp-mod-badge" style="background:rgba(45,212,191,0.15);color:#2dd4bf;">Disponible</span></div>
-    <div class="lp-mod" style="--mc:#185FA5;"><div class="lp-mod-icon">🦶</div><div class="lp-mod-name">Podologie du sport</div><div class="lp-mod-desc">Analyse cinématique, bilan sportif, suivi de performance.</div><span class="lp-mod-badge" style="background:rgba(55,138,221,0.15);color:#85B7EB;">Disponible</span></div>
-    <div class="lp-mod" style="--mc:#f472b6;"><div class="lp-mod-icon">👶</div><div class="lp-mod-name">Podopédiatrie</div><div class="lp-mod-desc">Bilan pédiatrique spécialisé, suivi de croissance.</div><span class="lp-mod-badge" style="background:rgba(244,114,182,0.15);color:#f9a8d4;">Disponible</span></div>
+    <div class="lp-mod" style="--mc:#1D9E75;"><div class="lp-mod-icon">🧍</div><div class="lp-mod-name">Bilan postural</div><div class="lp-mod-desc">Analyse complète en 9 sections, rapport PDF automatique.</div><span class="lp-mod-badge" style="background:rgba(45,212,191,0.15);color:#2dd4bf;">Disponible</span></div>
+    <div class="lp-mod" style="--mc:#185FA5;"><div class="lp-mod-icon">🦶</div><div class="lp-mod-name">Podologie du sport</div><div class="lp-mod-desc">Analyse cinématique complète, bilan sportif, suivi de performance.</div><span class="lp-mod-badge" style="background:rgba(55,138,221,0.15);color:#85B7EB;">Disponible</span></div>
+    <div class="lp-mod" style="--mc:#f472b6;"><div class="lp-mod-icon">👶</div><div class="lp-mod-name">Podopédiatrie</div><div class="lp-mod-desc">Bilan ajusté automatiquement à l'âge de l'enfant, suivi de croissance.</div><span class="lp-mod-badge" style="background:rgba(244,114,182,0.15);color:#f9a8d4;">Disponible</span></div>
     <div class="lp-mod" style="--mc:#f0a500;"><div class="lp-mod-icon">✂️</div><div class="lp-mod-name">Pédicurie</div><div class="lp-mod-desc">Bilan de pédicurie complet, soins et appareillage.</div><span class="lp-mod-badge" style="background:rgba(240,165,0,0.15);color:#f0c674;">Offert avec toutes les formules</span></div>
+    <div class="lp-mod" style="--mc:#8b5cf6;"><div class="lp-mod-icon">🖐️</div><div class="lp-mod-name">Bilan ostéopathique</div><div class="lp-mod-desc">Dictée IA : le rapport est généré automatiquement.</div><span class="lp-mod-badge" style="background:rgba(139,92,246,0.15);color:#7c3aed;">À venir · offert avec toutes les formules</span></div>
   </div>
 
   <div id="lp-pricing-section" class="lp-sec-head"><div class="lp-sec-title">Tarifs</div><div class="lp-sec-sub">Sans engagement — résiliez à tout moment</div></div>

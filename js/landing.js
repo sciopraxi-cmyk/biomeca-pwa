@@ -1,9 +1,35 @@
+// ─── Vues de la landing : « accueil » (titre + 2 pancartes) / « praticien » (connexion, offres, essai) ───
+// Les formulaires restent dans la page ; seule la visibilité change (classe sur #pwa-login).
+function lpVue(vue, opts) {
+  var racine = document.getElementById('pwa-login');
+  if (!racine) return;
+  racine.classList.toggle('lp-accueil', vue !== 'praticien');
+  racine.classList.toggle('lp-praticien', vue === 'praticien');
+  var defil = racine.querySelector('.lp-defil');
+  if (defil) defil.scrollTop = 0;
+  if (opts && opts.scroll) {
+    var cible = document.getElementById(opts.scroll);
+    if (cible) setTimeout(function () { cible.scrollIntoView({ behavior: 'smooth' }); }, 50);
+  }
+}
+function lpAllerTarifs() { lpVue('praticien', { scroll: 'lp-pricing-section' }); }
+// Ouverture : accueil, sauf retour d'un lien de réinitialisation du mot de passe, verrouillage
+// par inactivité ou retour vers les tarifs (le praticien doit alors voir sa page).
+(function () {
+  var hash = window.location.hash || '';
+  var praticien = hash.indexOf('type=recovery') !== -1
+    || sessionStorage.getItem('locked_by_idle') === '1'
+    || !!sessionStorage.getItem('scroll_tarifs');
+  lpVue(praticien ? 'praticien' : 'accueil');
+})();
 function showRegisterForm() {
+  lpVue('praticien');
   document.getElementById('pwa-register-form').style.display = 'block';
   document.getElementById('pwa-login-form').style.display = 'none';
   document.getElementById('pwa-register-form').scrollIntoView({behavior:'smooth'});
 }
 function showLoginForm() {
+  lpVue('praticien');
   document.getElementById('pwa-login-form').style.display = 'block';
   document.getElementById('pwa-register-form').style.display = 'none';
   document.getElementById('pwa-login-form').scrollIntoView({behavior:'smooth'});

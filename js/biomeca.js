@@ -497,6 +497,7 @@ function handleRecoveryToken() {
   // Cleanup URL (retire le hash pour ne pas re-trigger au refresh)
   window.history.replaceState({}, '', window.location.pathname);
   // Affiche modal reset, masque login form
+  if (typeof lpVue === 'function') lpVue('praticien');
   var loginForm = document.getElementById('pwa-login-form');
   var resetForm = document.getElementById('pwa-reset-password-form');
   if (loginForm) loginForm.style.display = 'none';
@@ -4917,6 +4918,7 @@ async function _lockSession() {
 function _showLockedByIdleMessageIfNeeded() {
   if (sessionStorage.getItem('locked_by_idle') !== '1') return;
   sessionStorage.removeItem('locked_by_idle');
+  if (typeof lpVue === 'function') lpVue('praticien');
   var msg = document.getElementById('pwa-idle-locked-msg');
   if (msg) msg.style.display = 'block';
 }
@@ -4943,6 +4945,8 @@ async function pwaLogout() {
   renderPatientList();
   document.getElementById('biomeca-app').style.display = 'none';
   document.getElementById('pwa-login').style.display = 'flex';
+  // Un praticien qui se déconnecte retrouve sa page (connexion), pas l'accueil à deux pancartes.
+  if (typeof lpVue === 'function') lpVue('praticien');
   // Scroll vers tarifs si demandé
   if(sessionStorage.getItem('scroll_tarifs')) {
     sessionStorage.removeItem('scroll_tarifs');

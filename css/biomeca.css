@@ -1526,3 +1526,84 @@ body.printing #rpt-print{display:block!important;}
 /* Messagerie patient : bouton 💬 de la fiche + pastille de non-lus */
 .btn-msg-fiche { position: relative; background: var(--card); border: 1px solid var(--bord); color: var(--mut); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 13px; }
 .btn-msg-fiche .msg-badge { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; line-height: 16px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; }
+
+
+/* ==========================================================================
+   Landing — accueil à deux pancartes, thème clair (inspiration : Omneon, 4Foot Lab).
+   Tout est borné à #pwa-login : les classes .lp-* sont aussi utilisées par la
+   fenêtre de choix de formule (thème de l'application), qui ne doit pas bouger.
+   Deux vues : #pwa-login.lp-accueil (titre + 2 pancartes) et .lp-praticien
+   (connexion, offres, essai). Bascule : lpVue() dans js/landing.js.
+   ========================================================================== */
+#pwa-login{ background:#f5f8fe !important; color:#14213d; }
+#pwa-login .lp-nav{ background:#fff; border-bottom:1px solid #e3e9f5; padding:12px 28px; }
+#pwa-login .lp-logo-lien{ display:inline-flex; align-items:center; gap:10px; text-decoration:none; padding:2px 0; }
+#pwa-login .lp-nav-liens{ display:flex; gap:10px; align-items:center; }
+#pwa-login .lp-nav-liens button{ background:none; border:none; color:#14213d; font-size:14px; font-weight:600; padding:9px 14px; border-radius:8px; cursor:pointer; }
+#pwa-login .lp-nav-liens button:hover{ background:#eef4ff; }
+#pwa-login .lp-nav-liens button{ white-space:nowrap; }
+#pwa-login .lp-nav-liens .lp-btn-connect{ background:#2563EB; color:#fff; padding:10px 22px; }
+#pwa-login .lp-nav-liens .lp-btn-connect:hover{ background:#1d4fc4; }
+#pwa-login .lp-hero{ padding:30px 24px 6px; max-width:860px; margin:0 auto; }
+#pwa-login .lp-hero-sur{ display:inline-block; background:#eef4ff; color:#2563EB; border:1px solid #bbd0f7; font-size:12px; font-weight:700; letter-spacing:.4px; padding:5px 14px; border-radius:20px; margin-bottom:12px; }
+#pwa-login .lp-hero h1{ color:#14213d; font-size:clamp(28px,5vw,46px); line-height:1.15; letter-spacing:-1px; margin-bottom:16px; }
+#pwa-login .lp-hero h1 em{ color:#2563EB; }
+#pwa-login .lp-hero p{ color:#4b5873; font-size:16px; max-width:600px; line-height:1.6; margin:0 auto 14px; }
+#pwa-login .lp-hero-choix{ font-size:13px; font-weight:700; color:#6b7a99; text-transform:uppercase; letter-spacing:1.2px; }
+#lp-profils{ display:flex; flex-wrap:wrap; gap:20px; justify-content:center; max-width:860px; margin:0 auto; padding:10px 24px 20px; }
+#lp-profils .lp-carte{ flex:1 1 320px; display:flex; flex-direction:column; align-items:center; text-align:center; text-decoration:none; font:inherit; cursor:pointer; background:#fff; border:2px solid #dbe5f7; border-radius:20px; padding:20px 24px 20px; color:#14213d; box-shadow:0 6px 24px rgba(37,99,235,.07); transition:transform .15s, box-shadow .15s, border-color .15s; }
+#lp-profils .lp-carte:hover, #lp-profils .lp-carte:focus-visible{ transform:translateY(-3px); box-shadow:0 12px 32px rgba(37,99,235,.16); border-color:#2563EB; outline:none; }
+#lp-profils .lp-carte-patient:hover{ border-color:#14b8a6; }
+#lp-profils .lp-carte-icone{ font-size:38px; line-height:1.1; }
+#lp-profils .lp-carte-titre{ font-size:22px; font-weight:800; margin-top:10px; }
+#lp-profils .lp-carte-texte{ font-size:14px; color:#4b5873; line-height:1.55; margin-top:8px; flex:1; }
+#lp-profils .lp-carte-bouton{ margin-top:18px; font-size:14px; font-weight:700; padding:11px 22px; border-radius:10px; background:#2563EB; color:#fff; }
+#lp-profils .lp-carte-patient .lp-carte-bouton{ background:#14b8a6; color:#fff; }
+#pwa-login .lp-pied-accueil{ text-align:center; color:#8a97b3; font-size:12px; padding:6px 0 36px; }
+/* Vue accueil : on ne montre que le titre et les pancartes. */
+#pwa-login.lp-accueil .lp-prat{ display:none !important; }
+#pwa-login.lp-praticien #lp-profils, #pwa-login.lp-praticien .lp-hero, #pwa-login.lp-praticien .lp-pied-accueil{ display:none; }
+/* Vue praticien : sections en thème clair. */
+#pwa-login .lp-section{ padding-top:36px; }
+#pwa-login .lp-sec-title{ color:#14213d; font-size:24px; }
+#pwa-login .lp-sec-sub{ color:#6b7a99; }
+#pwa-login .lp-mod{ background:#fff; border:1px solid #e3e9f5; border-top:3px solid var(--mc,#2563EB); box-shadow:0 2px 10px rgba(20,33,61,.05); }
+#pwa-login .lp-mod-name{ color:#14213d; }
+#pwa-login .lp-mod-desc{ color:#5b6987; }
+#pwa-login .lp-toggle-label{ color:#8a97b3; }
+#pwa-login .lp-toggle-label.on{ color:#14213d; }
+#pwa-login .lp-toggle{ background:#2563EB; }
+#pwa-login .lp-save{ background:#dcfce7; color:#166534; }
+#pwa-login .lp-pc{ background:#fff; border:1px solid #e3e9f5; box-shadow:0 2px 10px rgba(20,33,61,.05); }
+#pwa-login .lp-pc.pop{ border:2px solid #2563EB; background:#f5f9ff; }
+#pwa-login .lp-pop-badge{ background:#2563EB; color:#fff; }
+#pwa-login .lp-plan{ color:#6b7a99; }
+#pwa-login .lp-price{ color:#14213d; }
+#pwa-login .lp-period, #pwa-login .lp-pdesc, #pwa-login .lp-feats{ color:#5b6987; }
+#pwa-login .lp-pc > div[style*="font-size:9px"]{ color:#2563EB !important; font-size:10px !important; }
+#pwa-login .lp-feats li::before{ color:#14b8a6; }
+#pwa-login .tg{ background:#d1fae5; color:#047857; }
+#pwa-login .tb{ background:#dbeafe; color:#1d4ed8; }
+#pwa-login .tp{ background:#ede9fe; color:#6d28d9; }
+#pwa-login .lp-pb-main{ background:#2563EB; color:#fff; }
+#pwa-login .lp-pb-sec{ background:#eef4ff; color:#1d4ed8; }
+#pwa-login .lp-cta{ background:#14213d; border:none; }
+#pwa-login .lp-cta h2{ color:#fff; }
+#pwa-login .lp-cta p{ color:rgba(255,255,255,.75); }
+#pwa-login .lp-primary{ background:#2563EB; color:#fff; }
+@media (max-width:640px){
+  #pwa-login .lp-nav{ padding:10px 14px; }
+  #pwa-login .lp-hero{ padding-top:34px; }
+  #pwa-login .lp-pricing{ grid-template-columns:1fr; }
+}
+#pwa-login .lp-modules{ grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+@media (min-width:1000px){ #pwa-login .lp-section{ max-width:1080px; } #pwa-login .lp-modules{ grid-template-columns:repeat(5,1fr); } }
+#pwa-login .lp-mod-badge{ background:#e6f4ef !important; color:#0f6e56 !important; }
+#pwa-login .lp-mod-badge[style*="240,165,0"]{ background:#fff3d6 !important; color:#8a5a00 !important; }
+#pwa-login .lp-mod-badge[style*="139,92,246"]{ background:#ede9fe !important; color:#5b21b6 !important; }
+/* Les tarifs sont réservés aux praticiens : ni lien ni section sur l'accueil (le patient n'a pas à les voir). */
+#pwa-login.lp-accueil #lp-nav-tarifs{ display:none; }
+/* Ni « Se connecter » ni « Assistant » sur l'accueil : l'assistant explique le logiciel praticien, le patient n'en a pas l'usage.
+   L'assistant reste masqué tant que l'écran de connexion est affiché (accueil ET vue praticien). */
+#pwa-login.lp-accueil #lp-nav-connexion{ display:none; }
+body:has(#pwa-login:not([style*="display: none"]):not([style*="display:none"])) #help-float{ display:none !important; }
