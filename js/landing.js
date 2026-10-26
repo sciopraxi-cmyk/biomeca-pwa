@@ -3,8 +3,13 @@
 function lpVue(vue, opts) {
   var racine = document.getElementById('pwa-login');
   if (!racine) return;
-  racine.classList.toggle('lp-accueil', vue !== 'praticien');
-  racine.classList.toggle('lp-praticien', vue === 'praticien');
+  // 'fonction' = pages de description des fonctionnalités (même univers que la vue praticien).
+  var prat = vue === 'praticien' || vue === 'fonction';
+  racine.classList.toggle('lp-accueil', !prat);
+  racine.classList.toggle('lp-praticien', prat);
+  racine.classList.toggle('lp-fonction', vue === 'fonction');
+  var menu = document.getElementById('lpf-menu');
+  if (menu) menu.classList.remove('ouvert');
   var defil = racine.querySelector('.lp-defil');
   if (defil) defil.scrollTop = 0;
   if (opts && opts.scroll) {
