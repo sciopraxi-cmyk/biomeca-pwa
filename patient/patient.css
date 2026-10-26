@@ -1011,3 +1011,10 @@ input:focus-visible,
   font-weight: 800;
   vertical-align: middle;
 }
+.bouton-decouvrir {
+  min-height: 46px;
+  margin: 0 0 14px;
+  padding: 10px 6px;
+  font-size: 14px;
+  text-wrap: balance;
+}

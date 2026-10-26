@@ -99,6 +99,10 @@ describe('portail patient — présentation avant connexion', () => {
   const bloc = html.slice(html.indexOf('id="ecran-fonctions"'), html.indexOf('id="ecran-mdp"'));
   it('écran branché : bouton depuis la connexion, retour, écran déclaré', () => {
     expect(html).toMatch(/id="btn-fonctions"/);
+    // Placé en haut de l'écran de connexion, avant « Bienvenue », avec le libellé voulu par Joël.
+    expect(html).toMatch(
+      /id="btn-fonctions"[\s\S]*?Découvrez vos fonctionnalités ici[\s\S]*?<h1>Bienvenue/
+    );
     expect(lire('patient/patient.js')).toMatch(/'fonctions',/);
     expect(lire('patient/patient.js')).toMatch(/btn-fonctions-retour'\)\.addEventListener/);
   });
