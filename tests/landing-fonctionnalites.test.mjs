@@ -193,3 +193,12 @@ describe('landing — en-tête', () => {
     expect(idx).toMatch(/verticy-wordmark\.png" alt="Verticy" style="height:15px/);
   });
 });
+
+describe('landing — « by Sciopraxi » de la carte de connexion', () => {
+  it('légèrement réduit (32 px) dans la carte de connexion uniquement', () => {
+    const idx = lire('index.html');
+    const debut = idx.indexOf('id="pwa-login-form"');
+    const carte = idx.slice(debut, debut + 2500);
+    expect(carte).toMatch(/by-sciopraxi\.png" alt="Sciopraxi" style="height:32px/);
+  });
+});
