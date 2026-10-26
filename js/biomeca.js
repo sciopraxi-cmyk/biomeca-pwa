@@ -589,6 +589,7 @@ async function pwaLogin() {
       const isAdmin = email.toLowerCase() === VERTICY_ADMIN_EMAIL; // #229-C
       pwaUser = { email, token: body.access_token, id: body.user?.id, isAdmin, user_metadata: body.user?.user_metadata || {}, app_metadata: body.user?.app_metadata || {} };
       savePwaSession(body.access_token, body.refresh_token, pwaUser);
+      if (typeof lpMemoriserEmail === 'function') lpMemoriserEmail(email);  // case « Se souvenir de moi » (adresse seulement)
       await onPwaLoginSuccess();
     } else {
       // #127 — 2 branches : vrai échec identifiants → message flou
@@ -4957,6 +4958,7 @@ async function pwaLogout() {
   }
   document.getElementById('pwa-email').value = '';
   document.getElementById('pwa-pwd').value = '';
+  if (typeof lpRestaurerEmail === 'function') lpRestaurerEmail();  // « Se souvenir de moi » : l'adresse mémorisée revient
   document.getElementById('pwa-login-btn').disabled = false;
   document.getElementById('pwa-login-btn').textContent = 'Se connecter';
   const mc = document.getElementById('modal-mon-compte');

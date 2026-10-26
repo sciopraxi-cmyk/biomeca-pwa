@@ -12,13 +12,61 @@ function lpVue(vue, opts) {
   if (menu) menu.classList.remove('ouvert');
   var defil = racine.querySelector('.lp-defil');
   if (defil) defil.scrollTop = 0;
-  if (opts && opts.scroll) {
+  // Sur grand écran le formulaire de connexion est déjà dans l'en-tête de la page : on reste en haut
+  // (sinon le titre se retrouve coupé sous la barre). Sur téléphone il est plus bas : on y descend.
+  var versFormulaire = opts && opts.scroll === 'pwa-login-form' && window.innerWidth > 1040;
+  if (opts && opts.scroll && !versFormulaire) {
     var cible = document.getElementById(opts.scroll);
     if (cible) setTimeout(function () { cible.scrollIntoView({ behavior: 'smooth' }); }, 50);
   }
 }
 function lpScroller(id) { var c = document.getElementById(id); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 function lpAllerTarifs() { lpVue('praticien', { scroll: 'lp-pricing-section' }); }
+// ─── Confort de connexion : « Se souvenir de moi » (adresse e-mail SEULEMENT) et œil du mot de passe ───
+// Jamais de mot de passe stocké par Verticy : c'est le gestionnaire de mots de passe du navigateur qui s'en charge.
+var LP_CLE_EMAIL = 'verticy_email_memorise';
+function lpRestaurerEmail() {
+  var champ = document.getElementById('pwa-email');
+  var case_ = document.getElementById('pwa-remember-cb');
+  var mem = '';
+  try { mem = localStorage.getItem(LP_CLE_EMAIL) || ''; } catch (_e) { mem = ''; }
+  if (case_) case_.checked = !!mem;
+  if (champ && mem && !champ.value) champ.value = mem;
+}
+function lpMemoriserEmail(email) {
+  var case_ = document.getElementById('pwa-remember-cb');
+  try {
+    if (case_ && case_.checked && email) localStorage.setItem(LP_CLE_EMAIL, String(email).trim());
+    else localStorage.removeItem(LP_CLE_EMAIL);
+  } catch (_e) { /* stockage indisponible : on ne mémorise simplement pas */ }
+}
+var LP_OEIL = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+var LP_OEIL_BARRE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 8 10 8a18 18 0 0 1-2.16 3.19M6.61 6.61A13.5 13.5 0 0 0 2 12s3.6 8 10 8a9.7 9.7 0 0 0 5.39-1.61M2 2l20 20"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>';
+function lpInstallerOeil(idChamp) {
+  var champ = document.getElementById(idChamp);
+  if (!champ || champ.getAttribute('data-oeil')) return;
+  var zone = champ.parentNode;
+  if (!zone) return;
+  champ.setAttribute('data-oeil', '1');
+  zone.style.position = 'relative';
+  champ.style.paddingRight = '46px';
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'lp-oeil';
+  b.setAttribute('aria-label', 'Afficher le mot de passe');
+  b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = LP_OEIL;
+  b.onclick = function () {
+    var visible = champ.type === 'password';
+    champ.type = visible ? 'text' : 'password';
+    b.innerHTML = visible ? LP_OEIL_BARRE : LP_OEIL;
+    b.setAttribute('aria-pressed', visible ? 'true' : 'false');
+    b.setAttribute('aria-label', visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+  };
+  zone.appendChild(b);
+}
+['pwa-pwd', 'reg-pwd', 'reset-pwd-new', 'reset-pwd-confirm'].forEach(lpInstallerOeil);
+lpRestaurerEmail();
 // Ouverture : accueil, sauf retour d'un lien de réinitialisation du mot de passe, verrouillage
 // par inactivité ou retour vers les tarifs (le praticien doit alors voir sa page).
 (function () {

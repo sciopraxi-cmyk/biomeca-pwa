@@ -140,3 +140,65 @@ describe('landing — refonte design (vue praticien)', () => {
     }
   });
 });
+
+describe('landing — fond pleine largeur', () => {
+  const css = lire('css/biomeca.css');
+  it('dégradé et points sont portés par la vue entière (.lpx-prat), pas par le héros borné à 1200 px', () => {
+    expect(css).toMatch(/\.lpx-prat::before\{[^}]*left:0; right:0/);
+    expect(css).toMatch(/\.lpx-prat::after\{[^}]*left:0; right:0/);
+    expect(css).not.toMatch(/\.lpx-hero::before/);
+    expect(css).not.toMatch(/\.lpx-hero::after/);
+  });
+});
+
+describe('landing — confort de connexion', () => {
+  const idx = lire('index.html');
+  const land = lire('js/landing.js');
+  const bm = lire('js/biomeca.js');
+  it("case « Se souvenir de moi » : mémorise l'adresse e-mail SEULEMENT, jamais le mot de passe", () => {
+    expect(idx).toMatch(/id="pwa-remember-cb" type="checkbox"/);
+    expect(idx).toMatch(/Se souvenir de moi/);
+    const mem = land.slice(
+      land.indexOf('function lpMemoriserEmail'),
+      land.indexOf('var LP_OEIL =')
+    );
+    expect(mem).toMatch(/localStorage\.setItem\(LP_CLE_EMAIL, String\(email\)/);
+    expect(mem).not.toMatch(/pwd|password|mot de passe/i);
+  });
+  it('branchements : mémorisation après connexion réussie, restauration après déconnexion', () => {
+    expect(bm).toMatch(/lpMemoriserEmail\(email\)/);
+    expect(bm).toMatch(/lpRestaurerEmail\(\)/);
+  });
+  it('œil du mot de passe sur connexion, inscription et réinitialisation', () => {
+    expect(land).toMatch(
+      /\['pwa-pwd', 'reg-pwd', 'reset-pwd-new', 'reset-pwd-confirm'\]\.forEach\(lpInstallerOeil\)/
+    );
+    expect(land).toMatch(/Afficher le mot de passe/);
+  });
+});
+
+describe('landing — logo de connexion transparent', () => {
+  it('les trois cartes de la landing utilisent la version à fond transparent, préchargée par le service worker', () => {
+    const idx = lire('index.html');
+    expect(idx.split('assets/verticy-logo-simple-transparent.png').length - 1).toBe(3);
+    expect(lire('service-worker.js')).toMatch(/verticy-logo-simple-transparent\.png/);
+    expect(lire('patient/index.html')).toMatch(/verticy-logo-simple\.png/);
+  });
+});
+
+describe('landing — en-tête', () => {
+  it('le pictogramme (bonhomme) est plus grand que le mot Verticy, qui garde sa taille', () => {
+    const idx = lire('index.html');
+    expect(idx).toMatch(/verticy-mark\.png" alt="Verticy" style="height:50px/);
+    expect(idx).toMatch(/verticy-wordmark\.png" alt="Verticy" style="height:15px/);
+  });
+});
+
+describe('landing — « by Sciopraxi » de la carte de connexion', () => {
+  it('légèrement réduit (32 px) dans la carte de connexion uniquement', () => {
+    const idx = lire('index.html');
+    const debut = idx.indexOf('id="pwa-login-form"');
+    const carte = idx.slice(debut, debut + 2500);
+    expect(carte).toMatch(/by-sciopraxi\.png" alt="Sciopraxi" style="height:32px/);
+  });
+});
