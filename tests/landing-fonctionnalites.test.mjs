@@ -26,7 +26,7 @@ describe('landing — fonctionnalités', () => {
     const ids = R.flatMap((r) => r.items.map((i) => i.id));
     expect(new Set(ids).size).toBe(ids.length);
     for (const i of R.flatMap((r) => r.items)) {
-      expect(i.titre && i.resume && i.icone).toBeTruthy();
+      expect(i.titre && i.resume && i.ic).toBeTruthy();
       expect(i.points.length).toBeGreaterThan(0);
     }
   });
@@ -109,5 +109,34 @@ describe('portail patient — présentation avant connexion', () => {
   it('aucun tarif ni sujet praticien ; « Mes rendez-vous » marqué à venir', () => {
     expect(bloc).not.toMatch(/€|tarif|abonnement|facturation|licence/i);
     expect(bloc).toMatch(/Mes rendez-vous <em class="avenir">À venir<\/em>/);
+  });
+});
+
+describe('landing — refonte design (vue praticien)', () => {
+  const idx = lire('index.html');
+  it('le titre est rappelé en tête de la vue praticien, avec essai et connexion à portée', () => {
+    const hero = idx.slice(idx.indexOf('class="lpx-hero"'), idx.indexOf('id="lpx-bilans"'));
+    expect(hero).toMatch(/Des bilans cliniques <em>complets<\/em>/);
+    expect(hero).toMatch(/id="pwa-login-form"/);
+    expect(hero).toMatch(/id="pwa-register-form"/);
+    expect(hero).toMatch(/lpScroller\('lpx-explorer'\)/);
+  });
+  it('les formulaires et les 5 prix existent une seule fois (liens Stripe intacts)', () => {
+    for (const id of [
+      'pwa-login-form',
+      'pwa-register-form',
+      'pwa-reset-password-form',
+      'lpp1',
+      'lpp5',
+    ]) {
+      expect(idx.split('id="' + id + '"').length - 1, id).toBe(1);
+    }
+    expect(lire('js/landing.js').match(/buy\.stripe\.com/g).length).toBe(10);
+  });
+  it('les pages de fonctionnalité utilisent les photos des bilans déjà présentes', () => {
+    const js = lire('js/landing-fonctions.js');
+    for (const f of ['postural', 'sport', 'podopediatrie', 'pedicurie', 'osteopathie']) {
+      expect(js).toContain('assets/bilans/illus-' + f + '.jpg');
+    }
   });
 });

@@ -17,6 +17,7 @@ function lpVue(vue, opts) {
     if (cible) setTimeout(function () { cible.scrollIntoView({ behavior: 'smooth' }); }, 50);
   }
 }
+function lpScroller(id) { var c = document.getElementById(id); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 function lpAllerTarifs() { lpVue('praticien', { scroll: 'lp-pricing-section' }); }
 // Ouverture : accueil, sauf retour d'un lien de réinitialisation du mot de passe, verrouillage
 // par inactivité ou retour vers les tarifs (le praticien doit alors voir sa page).
