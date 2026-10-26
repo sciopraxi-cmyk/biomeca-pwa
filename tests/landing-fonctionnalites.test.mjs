@@ -85,3 +85,11 @@ describe('landing — branchements', () => {
     expect(css).toMatch(/#pwa-login\.lp-accueil #lp-nav-tarifs\s*\{\s*display:none/);
   });
 });
+
+describe("landing — mention d'engagement des tarifs", () => {
+  it('la phrase suit le curseur mensuel / annuel (jamais « sans engagement » en annuel)', () => {
+    expect(lire('index.html')).toMatch(/id="lp-engagement">Mensuel : sans engagement/);
+    expect(lire('index.html')).not.toMatch(/>Sans engagement — résiliez à tout moment</);
+    expect(lire('js/landing.js')).toMatch(/lpAnnual \? 'Annuel : engagement de 12 mois'/);
+  });
+});
