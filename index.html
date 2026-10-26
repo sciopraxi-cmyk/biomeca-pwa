@@ -295,9 +295,12 @@
     </a>
   </div>
   <div class="lp-nav-liens">
+    <button id="lp-nav-fonctions" type="button" aria-haspopup="true" onclick="lpMenuBascule()">Fonctionnalités ▾</button>
     <button id="lp-nav-tarifs" type="button" onclick="lpAllerTarifs()">Tarifs</button>
     <button id="lp-nav-connexion" type="button" class="lp-btn-connect" onclick="lpVue('praticien',{scroll:'pwa-login-form'})">Se connecter</button>
   </div>
+  <!-- Menu « Fonctionnalités » (rempli par js/landing-fonctions.js), réservé à la vue praticien. -->
+  <div id="lpf-menu" class="lpf-menu" role="menu"></div>
 </div>
 
 <div class="lp-defil" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">
@@ -326,6 +329,8 @@
 <div class="lp-pied-accueil">Verticy · by Sciopraxi</div>
 
 
+<div id="lp-fonctions" class="lp-fonctions"></div>
+
 <div class="lp-section lp-prat">
   <div class="lp-sec-head"><div class="lp-sec-title">5 modules cliniques</div><div class="lp-sec-sub">3 spécialités au choix, la pédicurie et l'ostéopathie offertes avec chaque formule</div></div>
   <div class="lp-modules">
@@ -336,7 +341,7 @@
     <div class="lp-mod" style="--mc:#8b5cf6;"><div class="lp-mod-icon">🖐️</div><div class="lp-mod-name">Bilan ostéopathique</div><div class="lp-mod-desc">Dictée IA : le rapport est généré automatiquement.</div><span class="lp-mod-badge" style="background:rgba(139,92,246,0.15);color:#7c3aed;">À venir · offert avec toutes les formules</span></div>
   </div>
 
-  <div id="lp-pricing-section" class="lp-sec-head"><div class="lp-sec-title">Tarifs</div><div class="lp-sec-sub">Sans engagement — résiliez à tout moment</div></div>
+  <div id="lp-pricing-section" class="lp-sec-head"><div class="lp-sec-title">Tarifs</div><div class="lp-sec-sub" id="lp-engagement">Mensuel : sans engagement, résiliez à tout moment</div></div>
   <div class="lp-toggle-wrap">
     <span class="lp-toggle-label on" id="lbl-m">Mensuel</span>
     <button class="lp-toggle" id="lp-tog" onclick="lpToggle()"><div class="lp-toggle-dot"></div></button>
@@ -448,6 +453,7 @@
 </div>
 
 <script src="js/landing.js"></script>
+ <script src="js/landing-fonctions.js"></script>
 </div>
 
 <div id="modal-mon-compte" class="page-claire" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:none;align-items:center;justify-content:center;">

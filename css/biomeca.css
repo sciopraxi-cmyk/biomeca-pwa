@@ -1607,3 +1607,48 @@ body.printing #rpt-print{display:block!important;}
    L'assistant reste masqué tant que l'écran de connexion est affiché (accueil ET vue praticien). */
 #pwa-login.lp-accueil #lp-nav-connexion{ display:none; }
 body:has(#pwa-login:not([style*="display: none"]):not([style*="display:none"])) #help-float{ display:none !important; }
+
+/* ==========================================================================
+   Landing — menu « Fonctionnalités » et pages de description (vue praticien).
+   ========================================================================== */
+#pwa-login .lp-nav{ position:relative; z-index:5; }
+#pwa-login.lp-accueil #lp-nav-fonctions{ display:none; }
+#pwa-login .lp-fonctions{ display:none; }
+#pwa-login.lp-fonction .lp-fonctions{ display:block; }
+#pwa-login.lp-fonction .lp-prat{ display:none !important; }
+.lpf-menu{ display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border-bottom:1px solid #e3e9f5; box-shadow:0 14px 30px rgba(20,33,61,.12); padding:18px 28px 22px; grid-template-columns:repeat(5,minmax(0,1fr)); gap:18px; max-height:calc(100vh - 70px); overflow-y:auto; }
+.lpf-menu.ouvert{ display:grid; }
+#pwa-login.lp-accueil .lpf-menu{ display:none !important; }
+.lpf-col{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.lpf-col-titre{ text-align:left; background:none; border:none; font:inherit; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:#2563EB; padding:4px 6px 8px; cursor:pointer; }
+.lpf-lien{ display:flex; justify-content:space-between; align-items:center; gap:6px; text-align:left; background:none; border:none; font:inherit; font-size:13px; color:#14213d; padding:6px; border-radius:6px; cursor:pointer; }
+.lpf-lien:hover{ background:#eef4ff; }
+.lpf-lien em{ font-style:normal; font-size:10px; font-weight:700; color:#5b21b6; background:#ede9fe; padding:1px 6px; border-radius:8px; white-space:nowrap; }
+.lpf-page{ max-width:980px; margin:0 auto; padding:22px 24px 40px; color:#14213d; }
+.lpf-fil button{ background:none; border:none; font:inherit; font-size:13px; font-weight:700; color:#2563EB; cursor:pointer; padding:6px 0; }
+.lpf-titre{ font-size:clamp(22px,3.4vw,30px); font-weight:800; letter-spacing:-.5px; margin:10px 0 14px; }
+.lpf-grille{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; margin-bottom:26px; }
+.lpf-carte{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; font:inherit; background:#fff; border:1px solid #e3e9f5; border-radius:14px; padding:16px; cursor:pointer; box-shadow:0 2px 10px rgba(20,33,61,.05); transition:transform .12s, border-color .12s; color:#14213d; }
+.lpf-carte:hover{ transform:translateY(-2px); border-color:#2563EB; }
+.lpf-carte-ico{ font-size:26px; }
+.lpf-carte-nom{ font-size:15px; font-weight:800; }
+.lpf-carte-txt{ font-size:13px; color:#4b5873; line-height:1.5; flex:1; }
+.lpf-badge{ display:inline-block; font-size:11px; font-weight:700; padding:2px 9px; border-radius:10px; vertical-align:middle; }
+.lpf-avenir{ background:#ede9fe; color:#5b21b6; }
+.lpf-partiel{ background:#fff3d6; color:#8a5a00; }
+.lpf-detail{ display:flex; gap:20px; align-items:flex-start; background:#fff; border:1px solid #e3e9f5; border-radius:18px; padding:24px; margin-bottom:26px; box-shadow:0 4px 18px rgba(20,33,61,.06); }
+.lpf-detail-ico{ font-size:54px; line-height:1; background:#eef4ff; border-radius:16px; padding:18px; }
+.lpf-resume{ font-size:16px; color:#33415f; line-height:1.55; margin:0 0 12px; }
+.lpf-points{ margin:0; padding-left:20px; font-size:14px; line-height:1.8; color:#33415f; }
+.lpf-note{ margin:14px 0 0; font-size:13px; color:#5b21b6; background:#f5f0ff; border-radius:10px; padding:10px 12px; }
+.lpf-cta{ display:flex; flex-wrap:wrap; gap:14px; justify-content:space-between; align-items:center; background:#14213d; color:#fff; border-radius:16px; padding:20px 24px; }
+.lpf-cta strong{ display:block; font-size:16px; }
+.lpf-cta span{ display:block; font-size:13px; color:rgba(255,255,255,.75); margin-top:3px; }
+.lpf-cta-btns{ display:flex; gap:10px; flex-wrap:wrap; }
+.lpf-ghost{ background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.3); }
+@media (max-width:860px){ .lpf-menu{ grid-template-columns:1fr 1fr; padding:14px; } }
+@media (max-width:560px){ .lpf-menu{ grid-template-columns:1fr; } .lpf-detail{ flex-direction:column; } #pwa-login .lp-nav-liens button{ padding:8px 8px; font-size:13px; } }
+@media (max-width:560px){
+  #pwa-login .lp-nav{ flex-wrap:wrap; row-gap:6px; }
+  #pwa-login .lp-nav-liens{ width:100%; justify-content:space-between; gap:4px; }
+}

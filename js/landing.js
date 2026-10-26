@@ -3,8 +3,13 @@
 function lpVue(vue, opts) {
   var racine = document.getElementById('pwa-login');
   if (!racine) return;
-  racine.classList.toggle('lp-accueil', vue !== 'praticien');
-  racine.classList.toggle('lp-praticien', vue === 'praticien');
+  // 'fonction' = pages de description des fonctionnalités (même univers que la vue praticien).
+  var prat = vue === 'praticien' || vue === 'fonction';
+  racine.classList.toggle('lp-accueil', !prat);
+  racine.classList.toggle('lp-praticien', prat);
+  racine.classList.toggle('lp-fonction', vue === 'fonction');
+  var menu = document.getElementById('lpf-menu');
+  if (menu) menu.classList.remove('ouvert');
   var defil = racine.querySelector('.lp-defil');
   if (defil) defil.scrollTop = 0;
   if (opts && opts.scroll) {
@@ -82,6 +87,9 @@ function lpToggle() {
   var sv = document.getElementById('lp-save');
   if(lpAnnual) { tog.classList.add('ann'); lm.classList.remove('on'); la.classList.add('on'); sv.style.display='inline-block'; }
   else { tog.classList.remove('ann'); lm.classList.add('on'); la.classList.remove('on'); sv.style.display='none'; }
+  // La mention d'engagement suit le choix : le mensuel est sans engagement, l'annuel engage pour 12 mois.
+  var eng = document.getElementById('lp-engagement');
+  if(eng) eng.textContent = lpAnnual ? 'Annuel : engagement de 12 mois' : 'Mensuel : sans engagement, résiliez à tout moment';
   lpPrices.forEach(function(p,i) {
     var el = document.getElementById('lpp'+(i+1));
     if(el) el.textContent = lpAnnual ? p.a : p.m;

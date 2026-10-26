@@ -44,7 +44,13 @@ export default [
   // et no-empty pour éviter de faire exploser la CI sur ces globals inter-fichiers
   // et les catch silencieux idiomatiques (storage, speech API, network).
   {
-    files: ['js/landing.js', 'js/biomeca.js', 'js/storage.js', 'js/admin.js'],
+    files: [
+      'js/landing.js',
+      'js/landing-fonctions.js',
+      'js/biomeca.js',
+      'js/storage.js',
+      'js/admin.js',
+    ],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'script',
