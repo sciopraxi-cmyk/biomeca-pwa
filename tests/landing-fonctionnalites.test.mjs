@@ -202,3 +202,27 @@ describe('landing — « by Sciopraxi » de la carte de connexion', () => {
     expect(carte).toMatch(/by-sciopraxi\.png" alt="Sciopraxi" style="height:32px/);
   });
 });
+
+describe('logiciel praticien — refonte du socle (CSS seulement)', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Refonte « premium » du logiciel praticien'));
+  it('le bloc est ajouté en fin de feuille et borné au thème clair', () => {
+    expect(bloc.length).toBeGreaterThan(500);
+    const regles = bloc.split('\n').filter((l) => /^[.#a-z@]/.test(l) && l.includes('{'));
+    for (const l of regles.filter((x) => !x.startsWith('@media'))) {
+      expect(
+        l.startsWith('body.theme-clair') ||
+          l.startsWith('#pwa-login') ||
+          l.startsWith('.lpx') ||
+          l.startsWith('.lpf')
+      ).toBe(true);
+    }
+  });
+  it("aucune couleur d'identité des bilans n'est redéfinie par la refonte", () => {
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo)-/);
+  });
+  it('la barre du haut ne déborde plus : une ligne dès 1251 px, deux rangées en dessous', () => {
+    expect(bloc).toMatch(/@media \(max-width:1250px\)/);
+    expect(bloc).toMatch(/flex-wrap:wrap !important/);
+  });
+});
