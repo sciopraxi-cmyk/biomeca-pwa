@@ -1601,3 +1601,5 @@ body.printing #rpt-print{display:block!important;}
 #pwa-login .lp-mod-badge{ background:#e6f4ef !important; color:#0f6e56 !important; }
 #pwa-login .lp-mod-badge[style*="240,165,0"]{ background:#fff3d6 !important; color:#8a5a00 !important; }
 #pwa-login .lp-mod-badge[style*="139,92,246"]{ background:#ede9fe !important; color:#5b21b6 !important; }
+/* Les tarifs sont réservés aux praticiens : ni lien ni section sur l'accueil (le patient n'a pas à les voir). */
+#pwa-login.lp-accueil #lp-nav-tarifs{ display:none; }
