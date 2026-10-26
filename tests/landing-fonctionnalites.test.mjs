@@ -219,10 +219,54 @@ describe('logiciel praticien — refonte du socle (CSS seulement)', () => {
     }
   });
   it("aucune couleur d'identité des bilans n'est redéfinie par la refonte", () => {
-    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo)-/);
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo)-[a-z-]*\s*:/);
   });
-  it('la barre du haut ne déborde plus : une ligne dès 1251 px, deux rangées en dessous', () => {
-    expect(bloc).toMatch(/@media \(max-width:1250px\)/);
-    expect(bloc).toMatch(/flex-wrap:wrap !important/);
+  it('la barre du haut : onglets flexibles, boutons de droite fixes (plus de bouton repoussé sous le logo)', () => {
+    expect(bloc).toMatch(/\.topbar > \.tnav\{ flex:1 1 0; min-width:0;/);
+  });
+});
+
+describe('logiciel praticien — lot 2 : liste et fiche patient (CSS seulement)', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Refonte « premium » — lot 2'));
+  it("sélecteurs structurels sur #pt-list-el, couleurs d'identité des bilans non redéfinies", () => {
+    expect(bloc).toMatch(/\.main #pt-list-el > div > div:first-child/);
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo|encours)-[a-z-]*\s*:/);
+    expect(bloc).not.toMatch(/background:\s*var\(--(posturo|sport|pedicurie|podo)-/);
+  });
+  it("le rendu JavaScript de la liste n'a pas été touché", () => {
+    const bm = lire('js/biomeca.js');
+    expect(bm).toMatch(
+      /class="bl-grid" style="margin-bottom:\$\{_hasAnyExpandedBilan\?'4px':'0'\};"/
+    );
+  });
+});
+
+describe('logiciel praticien — photos des bilans et barre étroite', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Refonte « premium » — lot 2'));
+  it('les photos des cartes de bilan ne sont jamais recadrées', () => {
+    expect(bloc).not.toMatch(/\.bl-carte > img\s*\{/);
+    expect(bloc).not.toMatch(/object-fit:\s*cover/);
+  });
+  it('barre du haut : boutons de droite fixes sur la rangée du haut, onglets flexibles qui se replient entre eux', () => {
+    expect(css).toMatch(
+      /body\.theme-clair \.topbar > \.tnav\{ flex:1 1 0; min-width:0; flex-wrap:wrap;/
+    );
+    expect(css).toMatch(
+      /\.topbar > \.tb-doctolib, body\.theme-clair \.topbar > \.tb-btn, body\.theme-clair \.topbar > \.tb-lien\{ flex:0 0 auto; \}/
+    );
+    expect(css).toMatch(/body\.theme-clair \.topbar\{ flex-wrap:nowrap;/);
+  });
+  it('Déconnexion est un vrai bouton visible (bordure, texte rouge)', () => {
+    expect(css).toMatch(
+      /body\.theme-clair \.tb-lien\{ color:#b91c1c !important; background:#fff !important; border:1px solid #f3c5c5/
+    );
+  });
+});
+
+describe('logiciel praticien — bas de page', () => {
+  it('de la place est réservée sous le contenu pour le bouton flottant « Assistant »', () => {
+    expect(lire('css/biomeca.css')).toMatch(/body\.theme-clair \.main\{ padding-bottom:96px; \}/);
   });
 });
