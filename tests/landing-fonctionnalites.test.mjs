@@ -140,3 +140,13 @@ describe('landing — refonte design (vue praticien)', () => {
     }
   });
 });
+
+describe('landing — fond pleine largeur', () => {
+  const css = lire('css/biomeca.css');
+  it('dégradé et points sont portés par la vue entière (.lpx-prat), pas par le héros borné à 1200 px', () => {
+    expect(css).toMatch(/\.lpx-prat::before\{[^}]*left:0; right:0/);
+    expect(css).toMatch(/\.lpx-prat::after\{[^}]*left:0; right:0/);
+    expect(css).not.toMatch(/\.lpx-hero::before/);
+    expect(css).not.toMatch(/\.lpx-hero::after/);
+  });
+});

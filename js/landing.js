@@ -12,7 +12,10 @@ function lpVue(vue, opts) {
   if (menu) menu.classList.remove('ouvert');
   var defil = racine.querySelector('.lp-defil');
   if (defil) defil.scrollTop = 0;
-  if (opts && opts.scroll) {
+  // Sur grand écran le formulaire de connexion est déjà dans l'en-tête de la page : on reste en haut
+  // (sinon le titre se retrouve coupé sous la barre). Sur téléphone il est plus bas : on y descend.
+  var versFormulaire = opts && opts.scroll === 'pwa-login-form' && window.innerWidth > 1040;
+  if (opts && opts.scroll && !versFormulaire) {
     var cible = document.getElementById(opts.scroll);
     if (cible) setTimeout(function () { cible.scrollIntoView({ behavior: 'smooth' }); }, 50);
   }
