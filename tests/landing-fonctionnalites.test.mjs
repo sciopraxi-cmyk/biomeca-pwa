@@ -346,3 +346,27 @@ describe('logiciel praticien — accueil du module sport : toutes les étiquette
     expect((page.match(/class="tc-cat"/g) || []).length).toBe(4);
   });
 });
+
+describe('logiciel praticien — lot 5 : rapports, devis et factures, ordonnances, stérilisation, actes', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('/* Refonte « premium » — lot 5'));
+  const sansCom = bloc.replace(/\/\*[\s\S]*?\*\//g, '');
+  const hors = sansCom.replace(/@(media|supports)[^{]*\{/g, '');
+  it('chaque règle du lot est bornée à body.theme-clair', () => {
+    const regles = hors.split('}').map((r) => r.trim()).filter((r) => r.includes('{'));
+    expect(regles.length).toBeGreaterThan(20);
+    for (const r of regles) {
+      const sel = r.slice(0, r.indexOf('{'));
+      for (const s of sel.split(',')) expect(s.trim().startsWith('body.theme-clair')).toBe(true);
+    }
+  });
+  it('couvre les 6 pages et ne touche à aucune couleur d’identité', () => {
+    for (const id of ['pg-documents', 'pg-ordonnances', 'pg-sterilisation', 'pg-actes', 'pg-rapport', 'pg-rapport-posturo']) {
+      expect(bloc).toContain('#' + id);
+    }
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo|encours)-[a-z-]*\s*:/);
+  });
+  it('les contenus imprimés (iframes) ne sont pas ciblés', () => {
+    expect(sansCom).not.toMatch(/iframe|@media print|ordo-impression/);
+  });
+});
