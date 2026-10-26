@@ -184,7 +184,9 @@ describe('landing et application praticien — branchements', () => {
   it('landing : deux cartes, patient vers /patient/, praticien vers la connexion', () => {
     expect(idx).toMatch(/id="lp-carte-patient" href="patient\/"/);
     expect(idx).toMatch(/Je suis un patient/);
-    expect(idx).toMatch(/id="lp-carte-praticien"[^>]*pwa-login-form/);
+    expect(idx).toMatch(
+      /id="lp-carte-praticien"[^>]*lpVue\('praticien',\{scroll:'pwa-login-form'\}\)/
+    );
     expect(idx).toMatch(/Je suis un praticien/);
   });
   it('un compte patient est refusé à la connexion praticien et par les fonctions praticien', () => {
