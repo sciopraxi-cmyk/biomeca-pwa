@@ -1603,3 +1603,7 @@ body.printing #rpt-print{display:block!important;}
 #pwa-login .lp-mod-badge[style*="139,92,246"]{ background:#ede9fe !important; color:#5b21b6 !important; }
 /* Les tarifs sont réservés aux praticiens : ni lien ni section sur l'accueil (le patient n'a pas à les voir). */
 #pwa-login.lp-accueil #lp-nav-tarifs{ display:none; }
+/* Ni « Se connecter » ni « Assistant » sur l'accueil : l'assistant explique le logiciel praticien, le patient n'en a pas l'usage.
+   L'assistant reste masqué tant que l'écran de connexion est affiché (accueil ET vue praticien). */
+#pwa-login.lp-accueil #lp-nav-connexion{ display:none; }
+body:has(#pwa-login:not([style*="display: none"]):not([style*="display:none"])) #help-float{ display:none !important; }
