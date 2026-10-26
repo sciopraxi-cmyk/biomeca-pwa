@@ -858,6 +858,50 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **À faire avant le réel** : faire valider la valeur légale de la signature ; décider de la conservation légale (la suppression d'une
   fiche patient supprime en cascade ses signatures) ; envoi réel du code par e-mail après HDS.
 
+## Questionnaire patient et arrivée d'un RDV — acquis (PR #333, #334)
+
+- **Questionnaire** (PR #333) : table `questionnaires_patient` (un seul questionnaire ouvert par patient, RLS), adulte (20 questions, 5 blocs)
+  ou enfant (11) d'après l'âge ; le parent remplit avec son compte (pas de code). Le patient modifie jusqu'au RDV, la fiche reste en lecture
+  seule pour lui. Fonctions SECURITY DEFINER `questionnaire_demander / _lire_praticien / _retirer / _integrer / _a_notifier / _notifie` ;
+  validation par liste blanche de clés et bornes (`questionnaire_valider`). Jamais de contenu médical dans une notification ou un e-mail.
+- **Intégration au bilan** (`_qstFaits`, `_qstPlan`, `_qstEcrireBilan`, `_qstInjecterBouton`, bouton dans la 1re section du bilan) avec aperçu
+  puis validation du praticien : antécédents, examens, traitements, appareillage = ajout daté « (déclaré le …) » sans doublon ; poids,
+  taille, sport, métier = remplacement dans la fiche ; motif, douleur, EVA = bilan seulement ; jamais d'écrasement d'une saisie du
+  praticien. Intégré une seule fois ; relecture des réponses pendant 30 jours (`_qstListe`). Tout ce qui n'a pas de case va dans
+  « Notes complémentaires » (`po-notes`, `ped_notes_generales`, `podo_notes_generales`, `notes_generales` en sport).
+- **Arrivée d'un RDV** (PR #334, saisie manuelle de l'agenda ; l'import CSV Doctolib reste à faire) : moteur unique `_rdvOrganiser`
+  (fiche sans doublon nom+prénom+naissance, accès portail idempotent, devis immédiat si le motif est un acte, e-mail d'essai, questionnaire
+  programmé). Obligatoires : nom, prénom, e-mail ; la date de naissance est facultative (valide si saisie). Il manque quelque chose, ou
+  l'accès est impossible : RIEN n'est envoyé et la notification `rdv_sans_envoi` le dit. RDV passé : dispositif non lancé. Déplacé :
+  `questionnaire_replanifier` ; supprimé : `questionnaire_retirer_source`. Source du RDV = `ag:<id de l'événement>`.
+- **Programmation** (SQL `portail-questionnaire-e1..e4`) : `visible_des` = RDV − 3 jours (vide = visible tout de suite), `source_rdv`
+  (index unique praticien+source), `envoi_signale_at`. Le patient ne voit ni n'écrit avant `visible_des` (règle côté serveur, indépendante
+  de l'ouverture de Verticy). E-mails d'essai « questionnaire disponible » (J-3) et « rappel » (J-1, non rempli, au moins 12 h après l'envoi)
+  signalés par `_portailVerifierQuestionnairesProgrammes` (30 s, Verticy ouvert) ; le serveur marque chaque envoi une seule fois.
+  **Limite** : sans planificateur serveur, ces deux e-mails n'apparaissent que Verticy ouvert (à lever après l'hébergeur HDS).
+- **E-mails d'essai** : notification `email_essai` avec champ `mail` (`acces`, `acces_devis`, `devis`, `questionnaire`, `rappel`) ; le texte est
+  reconstitué à l'affichage (`_rdvTexteMail`, `_notifChargerMail`), jamais stocké. Identifiants une seule fois par compte
+  (`patient.accesEnvoyeLe`, compte jamais connecté).
+- **Code provisoire** (fiche sans date de naissance) : `patient_comptes.code_provisoire` (XXXX-XXXX, aucun droit de colonne, effacé par un
+  trigger dès que le statut n'est plus « initial »), généré par `patient-compte` (creer, reinitialiser), accepté par `patient-connexion` à la
+  place de la date tant que le compte est « initial », effacé au choix du mot de passe. Le praticien le lit par `portail_code_provisoire`
+  (clé 🔑 de la fiche et texte de l'e-mail d'essai) ; jamais renvoyé dans une réponse de fonction. Déployer `patient-connexion` AVANT
+  `patient-compte` (verify_jwt : connexion false, compte true).
+- **Fenêtre « Nouvel événement »** : 3 choix (RDV patient existant / nouveau patient / texte libre), 2 colonnes (980 px), motifs = usuels +
+  actes personnalisés + actes « Synchronisation Doctolib » (`_rdvMotifsPropose`). **Vues de l'agenda** : Jour / Semaine / Mois partagent
+  `_agRenderTimeGrid` ; les événements de journée entière ou de 20 h et plus (« bandeaux ») vont dans une rangée du haut (`_agEstBandeau`) ;
+  au-delà de 2 RDV simultanés (4 en vue Jour) ils se mettent en cascade (`_agGeomEvenement`) ; l'en-tête compense la barre de défilement du corps.
+- **Pièges** : le golden `tests/golden/structure-fenetres-268.json` se régénère SEULEMENT pour les clés touchées (`JSON.stringify(…, null, 1)`),
+  sinon diff de milliers de lignes ; un nouveau libellé « _ » dans « Nouveau patient » le modifie aussi. Les harnais qui extraient les
+  fonctions `\_rdv_`doivent lister les dépendances (voir`tests/rdv-organiser.test.mjs`). La suite vitest complète dure ~5 min : ne rien lancer
+  en parallèle (délais de 5 s dépassés sinon).
+- **Preuve** : `supabase/tests/portail-questionnaire*.test.sql` (79 + 57 contrôles) et `portail-code-provisoire.test.sql` (14), mutations SQL et
+  JS (aucun survivant utile), `tests/rdv-organiser.test.mjs`, `tests/agenda-vues.test.mjs`, E2E navigateur (`e2e-portail-questionnaire*.mjs`,
+  `e2e-agenda-rdv-organiser.mjs` 43, `e2e-agenda-vues.mjs` 19), banc réel `attaques-code-provisoire.py` (21 contrôles, patients fictifs).
+  Service workers `biomeca-v261`, `verticy-patient-v20`.
+- **À faire** : import CSV Doctolib qui crée les fiches inconnues (format de l'export à confirmer), e-mail d'accès réel et envoi planifié
+  après l'hébergeur HDS, landing.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
