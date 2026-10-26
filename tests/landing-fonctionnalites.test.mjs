@@ -150,3 +150,29 @@ describe('landing — fond pleine largeur', () => {
     expect(css).not.toMatch(/\.lpx-hero::after/);
   });
 });
+
+describe('landing — confort de connexion', () => {
+  const idx = lire('index.html');
+  const land = lire('js/landing.js');
+  const bm = lire('js/biomeca.js');
+  it("case « Se souvenir de moi » : mémorise l'adresse e-mail SEULEMENT, jamais le mot de passe", () => {
+    expect(idx).toMatch(/id="pwa-remember-cb" type="checkbox"/);
+    expect(idx).toMatch(/Se souvenir de moi/);
+    const mem = land.slice(
+      land.indexOf('function lpMemoriserEmail'),
+      land.indexOf('var LP_OEIL =')
+    );
+    expect(mem).toMatch(/localStorage\.setItem\(LP_CLE_EMAIL, String\(email\)/);
+    expect(mem).not.toMatch(/pwd|password|mot de passe/i);
+  });
+  it('branchements : mémorisation après connexion réussie, restauration après déconnexion', () => {
+    expect(bm).toMatch(/lpMemoriserEmail\(email\)/);
+    expect(bm).toMatch(/lpRestaurerEmail\(\)/);
+  });
+  it('œil du mot de passe sur connexion, inscription et réinitialisation', () => {
+    expect(land).toMatch(
+      /\['pwa-pwd', 'reg-pwd', 'reset-pwd-new', 'reset-pwd-confirm'\]\.forEach\(lpInstallerOeil\)/
+    );
+    expect(land).toMatch(/Afficher le mot de passe/);
+  });
+});
