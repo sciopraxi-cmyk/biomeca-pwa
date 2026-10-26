@@ -185,3 +185,11 @@ describe('landing — logo de connexion transparent', () => {
     expect(lire('patient/index.html')).toMatch(/verticy-logo-simple\.png/);
   });
 });
+
+describe('landing — en-tête', () => {
+  it('le pictogramme (bonhomme) est plus grand que le mot Verticy, qui garde sa taille', () => {
+    const idx = lire('index.html');
+    expect(idx).toMatch(/verticy-mark\.png" alt="Verticy" style="height:50px/);
+    expect(idx).toMatch(/verticy-wordmark\.png" alt="Verticy" style="height:15px/);
+  });
+});
