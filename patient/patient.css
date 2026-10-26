@@ -999,3 +999,22 @@ input:focus-visible,
 .chip {
   margin: 0;
 }
+.avenir {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  vertical-align: middle;
+}
+.bouton-decouvrir {
+  min-height: 46px;
+  margin: 0 0 14px;
+  padding: 10px 6px;
+  font-size: 14px;
+  text-wrap: balance;
+}

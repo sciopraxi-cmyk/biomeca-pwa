@@ -93,3 +93,21 @@ describe("landing — mention d'engagement des tarifs", () => {
     expect(lire('js/landing.js')).toMatch(/lpAnnual \? 'Annuel : engagement de 12 mois'/);
   });
 });
+
+describe('portail patient — présentation avant connexion', () => {
+  const html = lire('patient/index.html');
+  const bloc = html.slice(html.indexOf('id="ecran-fonctions"'), html.indexOf('id="ecran-mdp"'));
+  it('écran branché : bouton depuis la connexion, retour, écran déclaré', () => {
+    expect(html).toMatch(/id="btn-fonctions"/);
+    // Placé en haut de l'écran de connexion, avant « Bienvenue », avec le libellé voulu par Joël.
+    expect(html).toMatch(
+      /id="btn-fonctions"[\s\S]*?Découvrez vos fonctionnalités ici[\s\S]*?<h1>Bienvenue/
+    );
+    expect(lire('patient/patient.js')).toMatch(/'fonctions',/);
+    expect(lire('patient/patient.js')).toMatch(/btn-fonctions-retour'\)\.addEventListener/);
+  });
+  it('aucun tarif ni sujet praticien ; « Mes rendez-vous » marqué à venir', () => {
+    expect(bloc).not.toMatch(/€|tarif|abonnement|facturation|licence/i);
+    expect(bloc).toMatch(/Mes rendez-vous <em class="avenir">À venir<\/em>/);
+  });
+});

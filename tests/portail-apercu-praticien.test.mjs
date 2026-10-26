@@ -130,7 +130,7 @@ describe('aperçu praticien — branchements', () => {
     expect(src).toMatch(/_portailHtmlPremiereConnexion/);
   });
   it('service workers incrémentés', () => {
-    expect(lire('patient/sw.js')).toMatch(/verticy-patient-v20/);
+    expect(lire('patient/sw.js')).toMatch(/verticy-patient-v21/);
     expect(lire('service-worker.js')).toMatch(/biomeca-v265/);
   });
 });

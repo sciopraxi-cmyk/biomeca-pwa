@@ -31,6 +31,9 @@
 
       <!-- Écran 1 : connexion -->
       <section id="ecran-connexion" class="ecran" hidden>
+        <button id="btn-fonctions" class="bouton bouton-clair bouton-decouvrir" type="button">
+          ✨ Découvrez vos fonctionnalités ici
+        </button>
         <h1>Bienvenue 👋</h1>
         <p class="doux">Entrez les informations reçues de votre praticien.</p>
         <form id="form-connexion" autocomplete="on" novalidate>
@@ -54,6 +57,56 @@
           <button id="btn-connexion" class="bouton" type="submit">Se connecter</button>
         </form>
         <p id="erreur-connexion" class="erreur" role="alert" hidden></p>
+      </section>
+
+      <!-- Écran : présentation de l'espace patient (avant connexion). Aucun tarif, rien sur le logiciel praticien. -->
+      <section id="ecran-fonctions" class="ecran" hidden>
+        <h1>✨ Votre espace patient</h1>
+        <p class="doux">Tout ce que votre praticien met à votre disposition, au même endroit.</p>
+        <div class="cartes">
+          <div class="carte">
+            <span class="emoji">🏃</span>
+            <span
+              ><strong>Mes exercices</strong
+              ><small>Votre programme avec une vidéo par exercice et un chrono. Vous validez chaque séance.</small></span
+            >
+          </div>
+          <div class="carte">
+            <span class="emoji">🧾</span>
+            <span
+              ><strong>Mes documents</strong
+              ><small>Vos devis, ordonnances et rapports de bilan, partagés par votre praticien.</small></span
+            >
+          </div>
+          <div class="carte">
+            <span class="emoji">✍️</span>
+            <span
+              ><strong>Signer mon devis</strong><small>Signez au doigt, directement sur votre téléphone.</small></span
+            >
+          </div>
+          <div class="carte">
+            <span class="emoji">📋</span>
+            <span
+              ><strong>Mon questionnaire</strong
+              ><small>Répondez avant votre rendez-vous : votre praticien gagne du temps pour vous.</small></span
+            >
+          </div>
+          <div class="carte">
+            <span class="emoji">💬</span>
+            <span
+              ><strong>Messagerie</strong><small>Écrivez à votre praticien, en toute simplicité.</small></span
+            >
+          </div>
+          <div class="carte carte-bientot">
+            <span class="emoji">📆</span>
+            <span
+              ><strong>Mes rendez-vous <em class="avenir">À venir</em></strong
+              ><small>Retrouvez vos rendez-vous passés et à venir.</small></span
+            >
+          </div>
+        </div>
+        <p class="doux petit">Vos identifiants vous sont remis par votre praticien.</p>
+        <button id="btn-fonctions-retour" class="bouton" type="button">← Me connecter</button>
       </section>
 
       <!-- Écran 2 : choix du mot de passe (première connexion) -->

@@ -93,6 +93,7 @@ const ECRANS = [
   'chargement',
   'connexion',
   'mdp',
+  'fonctions',
   'accueil',
   'ferme',
   'documents',
@@ -2091,6 +2092,8 @@ $('btn-document-retour').addEventListener('click', () => {
 });
 $('btn-document-imprimer').addEventListener('click', imprimerDocument);
 $('btn-retour').addEventListener('click', () => montrer('connexion'));
+$('btn-fonctions').addEventListener('click', () => montrer('fonctions'));
+$('btn-fonctions-retour').addEventListener('click', () => montrer('connexion'));
 $('identifiant').addEventListener('input', (e) => {
   e.target.value = formaterIdentifiant(e.target.value);
 });
