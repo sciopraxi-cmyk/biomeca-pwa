@@ -307,3 +307,42 @@ describe('logiciel praticien — lot 4 : pages des bilans (CSS seulement)', () =
     expect(bloc).toMatch(/#pg-sport \.home-hdr > button:first-child\{ position:static !important;/);
   });
 });
+
+describe('logiciel praticien — lot 4 (suite) : bilan postural, pédicurie, podopédiatrie', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Lot 4 (suite) — page du bilan POSTURAL'));
+  it('le titre du bilan postural (un <div> construit par le JS) est agrandi', () => {
+    expect(bloc).toMatch(
+      /justify-content:space-between"\] > div:nth-child\(2\)\{ font-size:28px !important/
+    );
+    expect(lire('js/biomeca.js')).toMatch(/🧍 Bilan Global de la Posture<\/div>/);
+  });
+  it('onglets en pastilles pour posturo, pédicurie et podopédiatrie, sans changer leurs couleurs', () => {
+    expect(bloc).toMatch(/\.posturo-tab\{ border-radius:999px !important;/);
+    expect(bloc).toMatch(
+      /#pedicurie-tabs button, body\.theme-clair #podopediatrie-tabs button\{ border-radius:999px !important;/
+    );
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo|encours)-[a-z-]*\s*:/);
+    expect(bloc).not.toMatch(/border-left-color|\.posturo-tab\.act\{[^}]*background:\s*#/);
+  });
+});
+
+describe('logiciel praticien — accueil du module sport : toutes les étiquettes visibles', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Accueil du module SPORT (ordinateur'));
+  const idx = lire('index.html');
+  it('ordinateur (≥ 1100 px) : une colonne par catégorie, titre en ligne 3, étiquettes en ligne 4', () => {
+    expect(bloc).toMatch(/@media \(min-width:1100px\)/);
+    expect(bloc).toMatch(
+      /#pg-sport\.active\{ display:grid !important; grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/
+    );
+    expect(bloc).toMatch(/> \.tc-cat\{ grid-row:3;/);
+    expect(bloc).toMatch(/> \.tgrid\{ grid-row:4;/);
+  });
+  it('les 9 étiquettes et leurs 4 catégories existent toujours dans la page (aucun HTML modifié)', () => {
+    const debut = idx.indexOf('id="pg-sport"');
+    const page = idx.slice(debut, idx.indexOf('id="pg-rapport-posturo"'));
+    expect((page.match(/class="tcard"/g) || []).length).toBe(9);
+    expect((page.match(/class="tc-cat"/g) || []).length).toBe(4);
+  });
+});
