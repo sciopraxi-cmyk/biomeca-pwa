@@ -209,7 +209,7 @@ describe('logiciel praticien — refonte du socle (CSS seulement)', () => {
   it('le bloc est ajouté en fin de feuille et borné au thème clair', () => {
     expect(bloc.length).toBeGreaterThan(500);
     const regles = bloc.split('\n').filter((l) => /^[.#a-z@]/.test(l) && l.includes('{'));
-    for (const l of regles.filter((x) => !x.startsWith('@media'))) {
+    for (const l of regles.filter((x) => !x.startsWith('@'))) {
       expect(
         l.startsWith('body.theme-clair') ||
           l.startsWith('#pwa-login') ||
@@ -268,5 +268,24 @@ describe('logiciel praticien — photos des bilans et barre étroite', () => {
 describe('logiciel praticien — bas de page', () => {
   it('de la place est réservée sous le contenu pour le bouton flottant « Assistant »', () => {
     expect(lire('css/biomeca.css')).toMatch(/body\.theme-clair \.main\{ padding-bottom:96px; \}/);
+  });
+});
+
+describe('logiciel praticien — lot 3 : agenda (CSS seulement)', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Refonte « premium » — lot 3'));
+  it('le calendrier passe en premier ; les trois encadrés de connexion sont rangés en colonnes dessous', () => {
+    expect(bloc).toMatch(/#agenda-calendar-card\{ order:1;/);
+    expect(bloc).toMatch(/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  });
+  it('le jour sélectionné et le bouton actif sont lisibles (texte blanc sur bleu, ou bleu sur blanc)', () => {
+    expect(bloc).toMatch(/\.cal-day-today \.cal-daynum\{ background:#2563eb; color:#fff; \}/);
+    expect(bloc).toMatch(/\.cal-view-active\{ background:#fff; color:#1d4ed8;/);
+  });
+  it('les couleurs par compte (--ev-bg / --ev-fg) ne sont pas redéfinies', () => {
+    expect(bloc).not.toMatch(/--ev-(bg|fg|fg-hover)\s*:/);
+  });
+  it("aucun HTML ni JavaScript de l'agenda n'a été modifié", () => {
+    expect(lire('js/biomeca.js')).toMatch(/'<div class="cal-view-toggle">'/);
   });
 });

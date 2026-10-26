@@ -1962,3 +1962,52 @@ body.theme-clair .bl-ligne button:not(.bl-x){ font-size:12px !important; padding
 body.theme-clair .bl-ligne > span{ font-size:13.5px !important; }
 /* Le bouton flottant « Assistant » ne doit plus masquer le bas des fiches : on réserve sa hauteur en bas de page. */
 body.theme-clair .main{ padding-bottom:96px; }
+
+/* ==========================================================================
+   Refonte « premium » — lot 3 : Agenda (CSS seulement, aucun HTML ni JS modifié).
+   Le calendrier passe EN PREMIER (il était relégué sous trois longs encadrés de connexion) ;
+   les trois encadrés Doctolib / Google / Apple sont rangés en colonnes dessous.
+   Les couleurs par compte (variables --ev-bg / --ev-fg posées par le code) ne sont pas touchées.
+   ========================================================================== */
+body.theme-clair .main #pg-agenda > div{ max-width:1320px !important; display:flex; flex-direction:column; padding:22px 28px 40px !important; }
+body.theme-clair .main #pg-agenda > div > h2{ order:0; }
+body.theme-clair .main #pg-agenda > div > #agenda-calendar-card{ order:1; margin-bottom:22px; }
+body.theme-clair .main #pg-agenda > div > .card:not(#agenda-calendar-card){ order:2; }
+/* Les trois encadrés de connexion côte à côte */
+@supports (display:grid){
+  body.theme-clair .main #pg-agenda > div{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; align-items:start; }
+  body.theme-clair .main #pg-agenda > div > h2{ grid-column:1 / -1; margin-bottom:0 !important; }
+  body.theme-clair .main #pg-agenda > div > #agenda-calendar-card{ grid-column:1 / -1; }
+  body.theme-clair .main #pg-agenda > div > .card:not(#agenda-calendar-card){ margin-bottom:0 !important; height:100%; box-sizing:border-box; }
+}
+@media (max-width:1100px){ body.theme-clair .main #pg-agenda > div{ grid-template-columns:1fr; } }
+body.theme-clair #pg-agenda .card{ padding:20px 22px; border-radius:20px; }
+body.theme-clair #pg-agenda .card p{ font-size:12.5px !important; line-height:1.55; }
+body.theme-clair #pg-agenda #agenda-calendar-card{ padding:22px 24px 26px; box-shadow:var(--ombre-haute); }
+/* Barre d'outils du calendrier */
+body.theme-clair .cal-toolbar{ margin:6px 0 16px; gap:14px; }
+body.theme-clair .cal-title{ font-size:20px; font-weight:800; letter-spacing:-.02em; color:var(--ink); margin-left:10px; text-transform:capitalize; }
+body.theme-clair .cal-nav-btn{ padding:8px 13px; font-size:16px; border-radius:11px; }
+body.theme-clair .cal-view-toggle{ background:#eef3fc; border:0; border-radius:12px; padding:3px; gap:2px; }
+body.theme-clair .cal-view-toggle button{ background:transparent; color:#52617d; font-size:13px; font-weight:600; padding:7px 16px; border-radius:9px; transition:background .15s,color .15s; }
+body.theme-clair .cal-view-toggle button:hover:not(.cal-view-active){ color:var(--ink); background:#e3ebf9; }
+body.theme-clair .cal-view-toggle button.cal-view-active{ background:#fff; color:#1d4ed8; font-weight:800; box-shadow:0 1px 3px rgba(11,27,58,.18); }
+/* Grilles */
+body.theme-clair .cal-week-wrap, body.theme-clair .cal-grid-month{ border-color:#e3e9f5; border-radius:16px; }
+body.theme-clair .cal-week-head, body.theme-clair .cal-dow{ background:#f6f9fe; color:#52617d; font-size:11px; font-weight:700; letter-spacing:.06em; padding:9px 2px; }
+body.theme-clair .cal-week-head-today{ color:#fff; }
+body.theme-clair .cal-week-head-today{ background:#2563eb !important; }
+body.theme-clair .cal-week-hourlabel{ font-size:10.5px; color:#6b7a99; }
+body.theme-clair .cal-day{ min-height:96px; padding:6px; }
+body.theme-clair .cal-day:hover{ background:#f6f9fe; }
+body.theme-clair .cal-daynum{ font-size:12px; min-width:24px; height:24px; line-height:24px; }
+body.theme-clair .cal-day-today .cal-daynum{ background:#2563eb; color:#fff; }
+/* Rendez-vous : coins arrondis, texte plus net, ombre légère ; la couleur par compte reste celle du code */
+body.theme-clair .cal-week-event, body.theme-clair .cal-evchip, body.theme-clair .cal-week-allday{ border-radius:8px; font-size:11.5px; font-weight:500; }
+body.theme-clair .cal-week-event{ font-size:11px; line-height:1.2; padding:3px 6px; box-shadow:0 1px 2px rgba(11,27,58,.12), 0 0 0 1px #fff; transition:box-shadow .15s, transform .12s; }
+body.theme-clair .cal-week-event:hover{ box-shadow:0 8px 18px -8px rgba(11,27,58,.5), 0 0 0 1px #fff; z-index:5; }
+body.theme-clair .cal-evchip{ padding:2px 6px; font-size:11px; }
+body.theme-clair .cal-more{ font-size:11px; font-weight:700; color:#2563eb; }
+/* Boutons Doctolib / connexions */
+body.theme-clair #pg-agenda .btn{ border-radius:11px; padding:9px 16px; font-size:13px !important; }
+@media (prefers-reduced-motion:reduce){ body.theme-clair .cal-week-event, body.theme-clair .cal-view-toggle button{ transition:none !important; } }
