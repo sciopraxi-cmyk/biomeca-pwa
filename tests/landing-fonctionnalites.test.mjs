@@ -289,3 +289,21 @@ describe('logiciel praticien — lot 3 : agenda (CSS seulement)', () => {
     expect(lire('js/biomeca.js')).toMatch(/'<div class="cal-view-toggle">'/);
   });
 });
+
+describe('logiciel praticien — lot 4 : pages des bilans (CSS seulement)', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Refonte « premium » — lot 4'));
+  it("aucune couleur clinique n'est redéfinie : ni variables de bilan, ni blocs colorés sport-card-*, ni c-*", () => {
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo|encours)-[a-z-]*\s*:/);
+    expect(bloc).not.toMatch(/\.sport-card-[a-z]+\s*\{/);
+    expect(bloc).not.toMatch(/\.sport-block-title\.c-[a-z]+/);
+    expect(bloc).not.toMatch(/\.sport-tab\.act\s*\{[^}]*background\s*:\s*#/);
+  });
+  it('le bandeau patient vide est masqué ; les onglets deviennent des pastilles', () => {
+    expect(bloc).toMatch(/#bilan-header-sport:empty/);
+    expect(bloc).toMatch(/\.sport-tab\{ border-radius:999px !important;/);
+  });
+  it("le bouton « ← Patients » de l'accueil sport ne chevauche plus le titre", () => {
+    expect(bloc).toMatch(/#pg-sport \.home-hdr > button:first-child\{ position:static !important;/);
+  });
+});

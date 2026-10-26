@@ -2011,3 +2011,45 @@ body.theme-clair .cal-more{ font-size:11px; font-weight:700; color:#2563eb; }
 /* Boutons Doctolib / connexions */
 body.theme-clair #pg-agenda .btn{ border-radius:11px; padding:9px 16px; font-size:13px !important; }
 @media (prefers-reduced-motion:reduce){ body.theme-clair .cal-week-event, body.theme-clair .cal-view-toggle button{ transition:none !important; } }
+
+/* ==========================================================================
+   Refonte « premium » — lot 4 : pages des bilans (CSS seulement, aucun HTML ni JS modifié).
+   RÈGLE CLINIQUE : une couleur qui porte un sens clinique ne change pas. Ce lot ne redéfinit AUCUNE variable
+   --posturo-*, --sport-*, --pedicurie-*, --podo-*, --osteo-*, ni les classes sport-card-*, c-vert/rouge/orange/violet/bleu :
+   il ne touche que le cadre (rayons, ombres, espacements, typographie, forme des onglets).
+   ========================================================================== */
+/* Pages de bilan : largeur et respiration */
+body.theme-clair #pg-bilan > div:first-child, body.theme-clair #pg-bilan-posturo > div:first-child,
+body.theme-clair #pg-pedicurie > div:first-child, body.theme-clair #pg-podopediatrie > div:first-child{ padding-top:22px !important; padding-bottom:40px !important; }
+/* Bandeau patient vide (aucun nom affiché) : on ne montre pas une barre bleue sans texte */
+body.theme-clair #bilan-header-sport:empty, body.theme-clair #bilan-header-sport-landing:empty{ display:none !important; }
+body.theme-clair #bilan-header-sport, body.theme-clair #bilan-header-sport-landing{ border-radius:14px !important; padding:11px 18px !important; font-size:15px !important; letter-spacing:-.01em; }
+/* Titre de page de bilan */
+body.theme-clair #pg-bilan > div:first-child > div[style*="justify-content:space-between"] > div:first-child{ font-size:24px !important; font-weight:800 !important; letter-spacing:-.03em; }
+body.theme-clair #pg-bilan > div:first-child > div[style*="justify-content:space-between"] .btn{ border-radius:11px; padding:9px 16px; font-size:13px; }
+/* Onglets de sections : pastilles nettes, même couleur d'identité (variable --blue inchangée) */
+body.theme-clair .sport-tabs{ gap:8px; padding-bottom:14px; margin-bottom:20px; border-bottom:1px solid #e3e9f5; }
+body.theme-clair .sport-tab{ border-radius:999px !important; padding:7px 14px !important; font-size:12.5px !important; font-weight:600; border-width:1.5px; transition:background .15s, color .15s, transform .12s; }
+body.theme-clair .sport-tab:not(.act):hover{ transform:translateY(-1px); }
+body.theme-clair .sport-tab.act{ font-weight:800; box-shadow:0 8px 18px -10px var(--blue); }
+/* Cartes de saisie (la teinte de fond/liseré par bloc vient de sport-card-*, inchangée) */
+body.theme-clair #pg-bilan .card, body.theme-clair #pg-pedicurie .card, body.theme-clair #pg-podopediatrie .card, body.theme-clair #pg-bilan-posturo .card{ border-radius:18px; padding:20px 22px; }
+body.theme-clair .sport-block-title{ font-size:17px; font-weight:800; letter-spacing:-.02em; margin-bottom:14px; }
+body.theme-clair .field-lbl{ font-size:11px; letter-spacing:.05em; color:#52617d; margin-bottom:5px; }
+body.theme-clair #pg-bilan .inp, body.theme-clair #pg-pedicurie .inp, body.theme-clair #pg-podopediatrie .inp, body.theme-clair #pg-bilan-posturo .inp{ border-radius:11px; padding:10px 13px; font-size:14px; }
+body.theme-clair #pg-bilan textarea.inp, body.theme-clair #pg-pedicurie textarea.inp, body.theme-clair #pg-podopediatrie textarea.inp, body.theme-clair #pg-bilan-posturo textarea.inp{ line-height:1.5; }
+/* Accueil du module sport : en-tête propre (le bouton « ← Patients » ne chevauche plus le titre) */
+body.theme-clair #pg-sport .home-hdr{ padding:22px 24px 16px; text-align:center; }
+body.theme-clair #pg-sport .home-hdr > button:first-child{ position:static !important; display:block; margin:0 0 8px -8px; padding:7px 12px !important; border-radius:10px; font-weight:600; }
+body.theme-clair #pg-sport .home-hdr h1{ font-size:28px; font-weight:800; letter-spacing:-.03em; }
+body.theme-clair #pg-sport .home-hdr p{ font-size:14px; margin-top:4px; }
+body.theme-clair #pg-sport .home-hdr .btn{ border-radius:12px !important; padding:10px 20px !important; font-size:14px !important; }
+body.theme-clair .tc-cat{ font-size:12px; font-weight:800; letter-spacing:.08em; color:#52617d; padding:20px 24px 8px; }
+body.theme-clair .tgrid{ gap:14px; padding:6px 24px; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); }
+body.theme-clair .tcard{ border-radius:18px; padding:16px; gap:9px; }
+body.theme-clair .tcard-title{ font-size:14px; font-weight:800; letter-spacing:-.01em; }
+body.theme-clair .tcard-sub{ font-size:12px; line-height:1.4; }
+/* Pages « Étude de la posture » / pédicurie / podopédiatrie : titres et boutons d'en-tête */
+body.theme-clair #pg-posturo h1, body.theme-clair #pg-pedicurie h1, body.theme-clair #pg-podopediatrie h1{ letter-spacing:-.03em; }
+@media (max-width:760px){ body.theme-clair .sport-tab{ padding:6px 11px !important; font-size:12px !important; } body.theme-clair #pg-bilan .card{ padding:16px; } }
+@media (prefers-reduced-motion:reduce){ body.theme-clair .sport-tab, body.theme-clair .tcard{ transition:none !important; transform:none !important; } }
