@@ -1677,7 +1677,7 @@ body:has(#pwa-login:not([style*="display: none"]):not([style*="display:none"])) 
 .lpx-garanties li{ display:inline-flex; align-items:center; gap:7px; }
 .lpx-garanties svg{ color:#0d9488; }
 .lpx-hero-forms > div{ max-width:430px !important; width:100%; margin:0 auto !important; padding:30px !important; border-radius:22px !important; border:1px solid var(--line) !important; box-shadow:0 30px 70px -28px rgba(11,27,58,.38), 0 2px 6px rgba(11,27,58,.05) !important; }
-.lpx-hero-forms img[src*="verticy-logo-simple"]{ height:84px !important; width:auto; margin-bottom:0 !important; mix-blend-mode:multiply; }
+.lpx-hero-forms img[src*="verticy-logo-simple"]{ height:84px !important; width:auto; margin-bottom:0 !important; }
 .lpx-hero-forms #pwa-login-btn, .lpx-hero-forms #reg-btn, .lpx-hero-forms #reset-btn{ background:var(--bleu) !important; color:#fff !important; border-radius:12px !important; }
 .lpx-hero-forms input{ border-radius:11px !important; border-color:#d3dcee !important; }
 .lpx-hero-forms span[onclick]{ color:var(--bleu) !important; font-weight:600; }
@@ -1834,4 +1834,4 @@ body:has(#pwa-login:not([style*="display: none"]):not([style*="display:none"])) 
 #pwa-login .lp-oeil{ position:absolute; right:6px; bottom:5px; width:38px; height:38px; display:grid; place-items:center; background:none; border:0; border-radius:10px; color:#6b7a99; cursor:pointer; }
 #pwa-login .lp-oeil:hover{ background:#eef3fc; color:#0b1b3a; }
 #pwa-login .lp-oeil:focus-visible{ outline:3px solid rgba(37,99,235,.35); outline-offset:1px; }
-.lpx-hero-forms img[src*="verticy-logo-simple"]{ height:124px !important; }
+.lpx-hero-forms img[src*="verticy-logo-simple"]{ height:128px !important; margin-bottom:6px !important; }

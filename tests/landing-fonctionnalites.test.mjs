@@ -176,3 +176,12 @@ describe('landing — confort de connexion', () => {
     expect(land).toMatch(/Afficher le mot de passe/);
   });
 });
+
+describe('landing — logo de connexion transparent', () => {
+  it('les trois cartes de la landing utilisent la version à fond transparent, préchargée par le service worker', () => {
+    const idx = lire('index.html');
+    expect(idx.split('assets/verticy-logo-simple-transparent.png').length - 1).toBe(3);
+    expect(lire('service-worker.js')).toMatch(/verticy-logo-simple-transparent\.png/);
+    expect(lire('patient/index.html')).toMatch(/verticy-logo-simple\.png/);
+  });
+});
