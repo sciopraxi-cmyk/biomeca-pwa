@@ -219,10 +219,46 @@ describe('logiciel praticien — refonte du socle (CSS seulement)', () => {
     }
   });
   it("aucune couleur d'identité des bilans n'est redéfinie par la refonte", () => {
-    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo)-/);
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo)-[a-z-]*\s*:/);
   });
   it('la barre du haut ne déborde plus : une ligne dès 1251 px, deux rangées en dessous', () => {
-    expect(bloc).toMatch(/@media \(max-width:1250px\)/);
+    expect(bloc).toMatch(/@media \(max-width:1320px\)/);
     expect(bloc).toMatch(/flex-wrap:wrap !important/);
+  });
+});
+
+describe('logiciel praticien — lot 2 : liste et fiche patient (CSS seulement)', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Refonte « premium » — lot 2'));
+  it("sélecteurs structurels sur #pt-list-el, couleurs d'identité des bilans non redéfinies", () => {
+    expect(bloc).toMatch(/\.main #pt-list-el > div > div:first-child/);
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo|encours)-[a-z-]*\s*:/);
+    expect(bloc).not.toMatch(/background:\s*var\(--(posturo|sport|pedicurie|podo)-/);
+  });
+  it("le rendu JavaScript de la liste n'a pas été touché", () => {
+    const bm = lire('js/biomeca.js');
+    expect(bm).toMatch(
+      /class="bl-grid" style="margin-bottom:\$\{_hasAnyExpandedBilan\?'4px':'0'\};"/
+    );
+  });
+});
+
+describe('logiciel praticien — photos des bilans et barre étroite', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('Refonte « premium » — lot 2'));
+  it('les photos des cartes de bilan ne sont jamais recadrées', () => {
+    expect(bloc).not.toMatch(/\.bl-carte > img\s*\{/);
+    expect(bloc).not.toMatch(/object-fit:\s*cover/);
+  });
+  it('barre étroite : Déconnexion reste à droite sur la rangée du logo, onglets dessous', () => {
+    const etroit = css.slice(css.indexOf('@media (max-width:1320px){\n  body.theme-clair .topbar'));
+    expect(etroit).toMatch(/\.topbar > \.logo-wrap\{ order:1; \}/);
+    expect(etroit).toMatch(/\.topbar > \.tnav\{ order:3; width:100%/);
+  });
+});
+
+describe('logiciel praticien — bas de page', () => {
+  it('de la place est réservée sous le contenu pour le bouton flottant « Assistant »', () => {
+    expect(lire('css/biomeca.css')).toMatch(/body\.theme-clair \.main\{ padding-bottom:96px; \}/);
   });
 });
