@@ -1835,3 +1835,84 @@ body:has(#pwa-login:not([style*="display: none"]):not([style*="display:none"])) 
 #pwa-login .lp-oeil:hover{ background:#eef3fc; color:#0b1b3a; }
 #pwa-login .lp-oeil:focus-visible{ outline:3px solid rgba(37,99,235,.35); outline-offset:1px; }
 .lpx-hero-forms img[src*="verticy-logo-simple"]{ height:128px !important; margin-bottom:6px !important; }
+
+/* ==========================================================================
+   Refonte « premium » du logiciel praticien — lot 1 : socle (CSS seulement).
+   Aligne l'intérieur sur la nouvelle landing : DM Sans, rayons généreux, ombres douces,
+   boutons et champs soignés, barre du haut aérée. Aucun HTML ni aucune logique changés.
+   Périmètre : body.theme-clair (toutes les pages de l'application sont claires).
+   Les COULEURS D'IDENTITÉ des bilans (posturo, sport, pédicurie, podo) ne sont pas touchées :
+   on ne modifie ici que le cadre (rayon, ombre, espacement, typographie).
+   Ajouté EN FIN de feuille, sans modifier les blocs existants (tests de marqueurs #257/#258/#263/#268).
+   ========================================================================== */
+body.theme-clair{
+  --r:14px; --rs:10px;
+  --ink:#0b1b3a; --txt2:#3b4a68;
+  --ombre-carte:0 1px 2px rgba(11,27,58,.04), 0 12px 28px -20px rgba(11,27,58,.28);
+  --ombre-haute:0 2px 4px rgba(11,27,58,.05), 0 24px 48px -26px rgba(11,27,58,.38);
+  background:linear-gradient(180deg,#eef3fc 0,#f4f7fc 280px,#f4f7fc 100%) no-repeat, #f4f7fc;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+body.theme-clair .main{ scroll-behavior:smooth; }
+/* Les boutons et champs n'héritent pas de la police par défaut du navigateur : on impose DM Sans (sinon Arial sur les boutons à style en ligne). */
+body.theme-clair button, body.theme-clair input, body.theme-clair select, body.theme-clair textarea{ font-family:var(--f); }
+/* Barre du haut */
+body.theme-clair .topbar{
+  height:62px; padding:0 24px; gap:12px; position:relative; z-index:20;
+  background:rgba(255,255,255,.9); backdrop-filter:saturate(1.5) blur(14px); -webkit-backdrop-filter:saturate(1.5) blur(14px);
+  border-bottom:1px solid #e3e9f5; box-shadow:0 8px 24px -22px rgba(11,27,58,.45);
+}
+body.theme-clair .tnav{ gap:2px; margin-left:8px; }
+body.theme-clair .tnav button{ padding:8px 12px; border-radius:10px; font-size:13px; font-weight:600; color:var(--txt2); transition:background .15s,color .15s; }
+body.theme-clair .tnav button:hover:not(.act){ background:#eef3fc; color:var(--ink); }
+body.theme-clair .tnav button.act{ background:#e8f0ff; color:#1d4ed8; font-weight:700; box-shadow:inset 0 0 0 1px #c9daf8; }
+body.theme-clair .tb-doctolib{ border:1px solid #dbe5f7 !important; border-radius:10px !important; padding:7px 13px !important; font-size:12.5px !important; box-shadow:0 1px 2px rgba(11,27,58,.05); }
+body.theme-clair .tb-btn{ border-radius:10px !important; font-size:12.5px !important; font-weight:600 !important; padding:8px 14px !important; transition:background .15s,border-color .15s; }
+body.theme-clair .tb-btn:hover{ background:#eef3fc !important; border-color:#c9daf8 !important; }
+body.theme-clair .tb-lien{ font-size:12.5px !important; font-weight:600; border-radius:10px !important; padding:8px 10px !important; }
+body.theme-clair .tb-lien:hover{ background:#f1f4fa !important; }
+/* Sur écran d'ordinateur courant (≤ 1440 px) tout doit tenir sur UNE ligne : « Mon compte » et « Déconnexion » ne doivent pas passer dessous. */
+/* Écran étroit (≤ 1250 px) : la barre passe sur deux rangées plutôt que de déborder. */
+@media (max-width:1250px){
+  body.theme-clair .topbar{ height:auto !important; min-height:62px; flex-wrap:wrap !important; padding:8px 14px !important; row-gap:6px; }
+}
+@media (min-width:1001px) and (max-width:1440px){
+  body.theme-clair .topbar{ padding:0 14px; gap:6px; flex-wrap:nowrap; }
+  body.theme-clair .tnav{ margin-left:2px; gap:0; }
+  body.theme-clair .tnav button{ padding:7px 6px; font-size:12.5px; white-space:nowrap; }
+  body.theme-clair .tb-doctolib{ padding:6px 10px !important; margin-right:2px !important; font-size:12px !important; }
+  body.theme-clair .tb-btn{ padding:7px 10px !important; font-size:12px !important; }
+  body.theme-clair .tb-lien{ padding:7px 6px !important; font-size:12px !important; }
+}
+@media (min-width:1251px) and (max-width:1360px){
+  body.theme-clair .tnav button{ padding:7px 4px; font-size:12px; }
+  body.theme-clair .tb-btn{ padding:7px 8px !important; font-size:11.5px !important; }
+  body.theme-clair .tb-doctolib{ padding:6px 8px !important; font-size:11.5px !important; }
+}
+/* Titres de page et d'intertitre */
+body.theme-clair .page > div > h2, body.theme-clair .page > .section > h2, body.theme-clair .page > div > div > h2{ font-size:26px !important; font-weight:800 !important; letter-spacing:-.03em; line-height:1.1; color:var(--ink) !important; margin-bottom:18px !important; }
+body.theme-clair .stitle{ font-size:11px; font-weight:800; letter-spacing:.1em; color:#52617d; margin-bottom:12px; }
+/* Cartes, boutons, champs */
+body.theme-clair .card{ border-color:#e3e9f5; box-shadow:var(--ombre-carte); }
+body.theme-clair .card[class*="sport-card-"], body.theme-clair .card[class*="posturo-"]{ box-shadow:0 1px 2px rgba(11,27,58,.04); }
+body.theme-clair .btn{ padding:8px 16px; font-size:13px; font-weight:600; letter-spacing:-.005em; transition:transform .12s, box-shadow .15s, background .15s, border-color .15s; }
+body.theme-clair .btn:hover{ transform:translateY(-1px); box-shadow:0 8px 18px -12px rgba(11,27,58,.45); }
+body.theme-clair .btn:active{ transform:translateY(0); box-shadow:none; }
+body.theme-clair .btn:focus-visible, body.theme-clair .tnav button:focus-visible, body.theme-clair .tb-btn:focus-visible{ outline:3px solid rgba(37,99,235,.35); outline-offset:2px; }
+body.theme-clair .inp{ padding:9px 12px; font-size:13px; border-color:#d3dcee; background:#fff; transition:border-color .15s, box-shadow .15s; }
+body.theme-clair .inp:hover{ border-color:#b7c5e2; }
+body.theme-clair .inp:focus{ border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.16); }
+body.theme-clair .note{ border-radius:0 12px 12px 0; padding:10px 14px; font-size:12.5px; }
+body.theme-clair .badge{ border-radius:999px; padding:3px 9px; font-size:10.5px; }
+body.theme-clair .tcard{ box-shadow:var(--ombre-carte); }
+body.theme-clair .tcard:hover{ box-shadow:var(--ombre-haute); }
+body.theme-clair .section{ padding:22px 24px; }
+/* Assistant flottant : même langage visuel que la landing */
+body.theme-clair #help-float{ background:var(--ink) !important; border-radius:16px !important; height:46px !important; padding:0 20px !important; font-weight:700 !important; font-size:13.5px !important; letter-spacing:-.005em; box-shadow:0 14px 30px -12px rgba(11,27,58,.65) !important; transition:transform .15s, box-shadow .15s; }
+body.theme-clair #help-float:hover{ transform:translateY(-2px); box-shadow:0 20px 36px -14px rgba(11,27,58,.7) !important; }
+/* Défilement discret */
+body.theme-clair *{ scrollbar-width:thin; scrollbar-color:#c3cee6 transparent; }
+body.theme-clair ::selection{ background:#cfe0ff; }
+@media (prefers-reduced-motion:reduce){ body.theme-clair .btn, body.theme-clair .tcard, body.theme-clair #help-float{ transition:none !important; transform:none !important; } body.theme-clair .main{ scroll-behavior:auto; } }
+/* Titre posé dans une rangée flex (bouton « ← Patients » + titre) : pas de marge basse, sinon il se décale. */
+body.theme-clair .page div[style*="display:flex"] > h2{ margin-bottom:0 !important; }
