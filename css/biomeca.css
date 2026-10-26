@@ -1871,28 +1871,29 @@ body.theme-clair .tb-btn{ border-radius:10px !important; font-size:12.5px !impor
 body.theme-clair .tb-btn:hover{ background:#eef3fc !important; border-color:#c9daf8 !important; }
 body.theme-clair .tb-lien{ font-size:12.5px !important; font-weight:600; border-radius:10px !important; padding:8px 10px !important; }
 body.theme-clair .tb-lien:hover{ background:#f1f4fa !important; }
-/* Sur écran d'ordinateur courant (≤ 1440 px) tout doit tenir sur UNE ligne : « Mon compte » et « Déconnexion » ne doivent pas passer dessous. */
-/* Écran étroit (≤ 1320 px, onglet « Paramètres » compris) : la barre passe sur deux rangées plutôt que de déborder. */
-@media (max-width:1320px){
-  body.theme-clair .topbar{ height:auto !important; min-height:62px; flex-wrap:wrap !important; padding:8px 14px !important; row-gap:6px; }
-  /* Logo à gauche ; Doctolib, Aide, Mon compte et Déconnexion restent À DROITE sur la même rangée ; les onglets passent dessous. */
-  body.theme-clair .topbar > *{ order:2; }
-  body.theme-clair .topbar > .logo-wrap{ order:1; }
-  body.theme-clair .topbar > .tnav{ order:3; width:100%; flex-wrap:wrap; margin-left:0; }
-}
-@media (min-width:1001px) and (max-width:1440px){
-  body.theme-clair .topbar{ padding:0 14px; gap:6px; flex-wrap:nowrap; }
-  body.theme-clair .tnav{ margin-left:2px; gap:0; }
-  body.theme-clair .tnav button{ padding:7px 6px; font-size:12.5px; white-space:nowrap; }
-  body.theme-clair .tb-doctolib{ padding:6px 10px !important; margin-right:2px !important; font-size:12px !important; }
+/* Barre du haut — règle unique, valable à TOUTE largeur d'ordinateur : le logo et les boutons de droite (Doctolib, Aide,
+   Mon compte, Déconnexion) gardent leur taille et restent sur la rangée du haut, à droite ; ce sont les onglets, au milieu,
+   qui prennent la place restante et passent à la ligne entre eux si besoin. Plus jamais de bouton repoussé sous le logo. */
+body.theme-clair .topbar{ flex-wrap:nowrap; height:auto; min-height:62px; padding:8px 16px; gap:8px; align-items:center; }
+body.theme-clair .topbar > .logo-wrap{ flex:0 0 auto; }
+body.theme-clair .topbar > div[style*="flex:1"]{ display:none; }
+body.theme-clair .topbar > .tnav{ flex:1 1 0; min-width:0; flex-wrap:wrap; margin-left:4px; row-gap:2px; }
+body.theme-clair .topbar > .tb-doctolib, body.theme-clair .topbar > .tb-btn, body.theme-clair .topbar > .tb-lien{ flex:0 0 auto; }
+body.theme-clair .tnav button{ white-space:nowrap; }
+@media (max-width:1440px){
+  body.theme-clair .tnav button{ padding:7px 7px; font-size:12.5px; }
+  body.theme-clair .tb-doctolib{ padding:6px 10px !important; font-size:12px !important; }
   body.theme-clair .tb-btn{ padding:7px 10px !important; font-size:12px !important; }
-  body.theme-clair .tb-lien{ padding:7px 6px !important; font-size:12px !important; }
 }
-@media (min-width:1321px) and (max-width:1360px){
-  body.theme-clair .tnav button{ padding:7px 4px; font-size:12px; }
-  body.theme-clair .tb-btn{ padding:7px 8px !important; font-size:11.5px !important; }
-  body.theme-clair .tb-doctolib{ padding:6px 8px !important; font-size:11.5px !important; }
+/* « Déconnexion » : un vrai bouton visible, tout à droite (c'était un simple texte gris). */
+body.theme-clair .tb-lien{ color:#b91c1c !important; background:#fff !important; border:1px solid #f3c5c5 !important; font-weight:700 !important; padding:8px 14px !important; border-radius:10px !important; font-size:12.5px !important; }
+body.theme-clair .tb-lien:hover{ background:#fef2f2 !important; border-color:#e8a0a0 !important; }
+/* Très petit écran (tablette étroite, téléphone) : on autorise le retour à la ligne de toute la barre. */
+@media (max-width:900px){
+  body.theme-clair .topbar{ flex-wrap:wrap; }
+  body.theme-clair .topbar > .tnav{ flex:1 1 100%; order:5; margin-left:0; }
 }
+
 /* Titres de page et d'intertitre */
 body.theme-clair .page > div > h2, body.theme-clair .page > .section > h2, body.theme-clair .page > div > div > h2{ font-size:26px !important; font-weight:800 !important; letter-spacing:-.03em; line-height:1.1; color:var(--ink) !important; margin-bottom:18px !important; }
 body.theme-clair .stitle{ font-size:11px; font-weight:800; letter-spacing:.1em; color:#52617d; margin-bottom:12px; }
