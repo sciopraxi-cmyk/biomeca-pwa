@@ -268,7 +268,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png"/>
 <link rel="shortcut icon" href="favicon.ico"/>
 <title>Verticy</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
@@ -331,39 +331,25 @@
 
 <div id="lp-fonctions" class="lp-fonctions"></div>
 
-<div class="lp-section lp-prat">
-  <div class="lp-sec-head"><div class="lp-sec-title">5 modules cliniques</div><div class="lp-sec-sub">3 spécialités au choix, la pédicurie et l'ostéopathie offertes avec chaque formule</div></div>
-  <div class="lp-modules">
-    <div class="lp-mod" style="--mc:#1D9E75;"><div class="lp-mod-icon">🧍</div><div class="lp-mod-name">Bilan postural</div><div class="lp-mod-desc">Analyse complète en 9 sections, rapport PDF automatique.</div><span class="lp-mod-badge" style="background:rgba(45,212,191,0.15);color:#2dd4bf;">Disponible</span></div>
-    <div class="lp-mod" style="--mc:#185FA5;"><div class="lp-mod-icon">🦶</div><div class="lp-mod-name">Podologie du sport</div><div class="lp-mod-desc">Analyse cinématique complète, bilan sportif, suivi de performance.</div><span class="lp-mod-badge" style="background:rgba(55,138,221,0.15);color:#85B7EB;">Disponible</span></div>
-    <div class="lp-mod" style="--mc:#f472b6;"><div class="lp-mod-icon">👶</div><div class="lp-mod-name">Podopédiatrie</div><div class="lp-mod-desc">Bilan ajusté automatiquement à l'âge de l'enfant, suivi de croissance.</div><span class="lp-mod-badge" style="background:rgba(244,114,182,0.15);color:#f9a8d4;">Disponible</span></div>
-    <div class="lp-mod" style="--mc:#f0a500;"><div class="lp-mod-icon">✂️</div><div class="lp-mod-name">Pédicurie</div><div class="lp-mod-desc">Bilan de pédicurie complet, soins et appareillage.</div><span class="lp-mod-badge" style="background:rgba(240,165,0,0.15);color:#f0c674;">Offert avec toutes les formules</span></div>
-    <div class="lp-mod" style="--mc:#8b5cf6;"><div class="lp-mod-icon">🖐️</div><div class="lp-mod-name">Bilan ostéopathique</div><div class="lp-mod-desc">Dictée IA : le rapport est généré automatiquement.</div><span class="lp-mod-badge" style="background:rgba(139,92,246,0.15);color:#7c3aed;">À venir · offert avec toutes les formules</span></div>
-  </div>
+<div class="lp-prat lpx-prat">
 
-  <div id="lp-pricing-section" class="lp-sec-head"><div class="lp-sec-title">Tarifs</div><div class="lp-sec-sub" id="lp-engagement">Mensuel : sans engagement, résiliez à tout moment</div></div>
-  <div class="lp-toggle-wrap">
-    <span class="lp-toggle-label on" id="lbl-m">Mensuel</span>
-    <button class="lp-toggle" id="lp-tog" onclick="lpToggle()"><div class="lp-toggle-dot"></div></button>
-    <span class="lp-toggle-label" id="lbl-a">Annuel</span>
-    <span class="lp-save" id="lp-save" style="display:none;">2 mois offerts</span>
-  </div>
-  <div class="lp-pricing">
-    <div class="lp-pc"><div class="lp-plan">Essentiel</div><div class="lp-price"><span id="lpp1">30</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">1 module au choix</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">ou Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Rapports PDF</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(0)">Choisir</button></div>
-    <div class="lp-pc"><div class="lp-plan">Sport</div><div class="lp-price"><span id="lpp2">40</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo sport + analyse ciné.</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tb">Ciné.</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. complète</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(1)">Choisir</button></div>
-    <div class="lp-pc pop"><div class="lp-pop-badge">Le plus choisi</div><div class="lp-plan">Duo</div><div class="lp-price"><span id="lpp3">50</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Postural + Podopédiatrie</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>2 modules inclus</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-main" onclick="choisirOffre(2)">Choisir</button></div>
-    <div class="lp-pc"><div class="lp-plan">Duo Sport</div><div class="lp-price"><span id="lpp4">60</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo Sport + Postural ou Podopédia</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tg">+ 1 module</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. incluse</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(3)">Choisir</button></div>
-    <div class="lp-pc"><div class="lp-plan">Intégral</div><div class="lp-price"><span id="lpp5">70</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Les 3 modules complets</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tb">Sport</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Tout inclus</li><li>Multi-praticiens</li><li>Support prioritaire</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(4)">Choisir</button></div>
-  </div>
-
-  <div class="lp-cta">
-    <h2>Essayez gratuitement 14 jours</h2>
-    <p>Aucune carte bancaire requise — accès complet dès l'inscription</p>
-    <div class="lp-cta-btns">
-      <button class="lp-primary" onclick="showRegisterForm()">Démarrer l'essai gratuit — 14 jours offerts</button>
+  <!-- Entrée de la vue praticien : on redonne le contexte (titre) et on garde connexion / inscription à portée. -->
+  <section class="lpx-hero">
+    <div class="lpx-hero-txt">
+      <span class="lpx-eyebrow lpx-eyebrow-pt">Logiciel de bilans pour podologues</span>
+      <h1>Des bilans cliniques <em>complets</em>,<br>un rapport <em>automatique</em></h1>
+      <p>Verticy est le logiciel des pédicures-podologues : bilan postural, podologie du sport, podopédiatrie, pédicurie et ostéopathie, agenda, devis et espace patient, au même endroit.</p>
+      <div class="lpx-hero-btns">
+        <button type="button" class="lpx-btn lpx-btn-plein lpx-btn-gros" onclick="showRegisterForm()">Démarrer l'essai gratuit</button>
+        <button type="button" class="lpx-btn lpx-btn-contour lpx-btn-gros" onclick="lpScroller('lpx-explorer')">Découvrir les fonctionnalités</button>
+      </div>
+      <ul class="lpx-garanties">
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>14 jours offerts</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sans carte bancaire</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Rapport PDF automatique</li>
+      </ul>
     </div>
-  </div>
-
+    <div id="lp-forms" class="lpx-hero-forms">
   <!-- Carte connexion sur fond blanc : palette claire cohérente (fond #fff,
        bord #dfe3ec, ombre douce). Textes recolorés exhaustivement pour
        lisibilité — cf. Vérification finale du diff. Champs input : classe
@@ -449,6 +435,59 @@
     <div id="reg-ok" style="display:none;margin-top:10px;background:#ecfeff;border:1px solid #67e8f9;color:#0e7490;border-radius:8px;padding:10px;font-size:13px;text-align:center;"></div>
     <div style="text-align:center;margin-top:16px;font-size:12px;color:#6b7280;">Déjà un compte ? <span onclick="showLoginForm()" style="color:#0d9488;cursor:pointer;">Se connecter</span></div>
   </div>
+    </div>
+  </section>
+
+  <section class="lpx-bloc lpx-bilans" id="lpx-bilans">
+    <div class="lpx-tete"><span class="lpx-sur">Les bilans</span><h2>Cinq bilans cliniques, une même méthode</h2><p>Trois spécialités au choix ; la pédicurie et l'ostéopathie sont offertes avec chaque formule.</p></div>
+    <div class="lpx-bil-grille">
+      <button type="button" class="lpx-bil" style="--c:#0D9488" onclick="lpFonction('bilan-postural')"><span class="lpx-bil-img" style="background-image:url(assets/bilans/illus-postural.jpg)"></span><span class="lpx-bil-corps"><strong>Bilan postural</strong><small>Analyse complète en 9 sections, rapport PDF automatique.</small><em class="lpx-pastille">Disponible</em></span></button>
+      <button type="button" class="lpx-bil" style="--c:#2563EB" onclick="lpFonction('bilan-sport')"><span class="lpx-bil-img" style="background-image:url(assets/bilans/illus-sport.jpg)"></span><span class="lpx-bil-corps"><strong>Podologie du sport</strong><small>Analyse cinématique complète, suivi de performance.</small><em class="lpx-pastille">Disponible</em></span></button>
+      <button type="button" class="lpx-bil" style="--c:#DB2777" onclick="lpFonction('bilan-podopediatrie')"><span class="lpx-bil-img" style="background-image:url(assets/bilans/illus-podopediatrie.jpg)"></span><span class="lpx-bil-corps"><strong>Podopédiatrie</strong><small>Bilan ajusté automatiquement à l'âge de l'enfant.</small><em class="lpx-pastille">Disponible</em></span></button>
+      <button type="button" class="lpx-bil" style="--c:#D97706" onclick="lpFonction('bilan-pedicurie')"><span class="lpx-bil-img" style="background-image:url(assets/bilans/illus-pedicurie.jpg)"></span><span class="lpx-bil-corps"><strong>Pédicurie</strong><small>Soins et appareillage, bilan complet.</small><em class="lpx-pastille lpx-pastille-offert">Offert avec chaque formule</em></span></button>
+      <button type="button" class="lpx-bil" style="--c:#7C3AED" onclick="lpFonction('bilan-osteopathique')"><span class="lpx-bil-img" style="background-image:url(assets/bilans/illus-osteopathie.jpg)"></span><span class="lpx-bil-corps"><strong>Bilan ostéopathique</strong><small>Dictée IA : le rapport est généré automatiquement.</small><em class="lpx-pastille lpx-pastille-avenir">À venir · offert</em></span></button>
+    </div>
+  </section>
+
+  <section class="lpx-bloc lpx-explore" id="lpx-explorer-bloc">
+    <div class="lpx-tete"><span class="lpx-sur">Fonctionnalités</span><h2>Tout votre cabinet dans un seul outil</h2><p>Cliquez sur une fonction pour la découvrir en détail. Les évolutions prévues sont signalées « à venir ».</p></div>
+    <div id="lpx-explorer" class="lpx-explorer"></div>
+  </section>
+
+  <section class="lpx-bloc lpx-parcours">
+    <div class="lpx-tete"><span class="lpx-sur">Le parcours</span><h2>Du rendez-vous au suivi à domicile</h2></div>
+    <ol class="lpx-etapes">
+      <li><span class="lpx-num">1</span><strong>Le rendez-vous est saisi</strong><small>Fiche, accès patient et devis sont préparés tout de suite.</small></li>
+      <li><span class="lpx-num">2</span><strong>Trois jours avant</strong><small>Le patient remplit son questionnaire ; un rappel part la veille.</small></li>
+      <li><span class="lpx-num">3</span><strong>Le bilan</strong><small>Vous dictez et saisissez, le bilan s'adapte à votre spécialité.</small></li>
+      <li><span class="lpx-num">4</span><strong>Le rapport</strong><small>Le PDF se génère automatiquement et se partage dans l'espace patient.</small></li>
+      <li><span class="lpx-num">5</span><strong>Le suivi</strong><small>Exercices vidéo chronométrés, messagerie, signature du devis.</small></li>
+    </ol>
+  </section>
+
+  <section class="lpx-bloc lpx-tarifs">
+  <div id="lp-pricing-section" class="lp-sec-head lpx-tete lpx-tete-c"><div class="lp-sec-title">Tarifs</div><div class="lp-sec-sub" id="lp-engagement">Mensuel : sans engagement, résiliez à tout moment</div></div>
+  <div class="lp-toggle-wrap">
+    <span class="lp-toggle-label on" id="lbl-m">Mensuel</span>
+    <button class="lp-toggle" id="lp-tog" onclick="lpToggle()"><div class="lp-toggle-dot"></div></button>
+    <span class="lp-toggle-label" id="lbl-a">Annuel</span>
+    <span class="lp-save" id="lp-save" style="display:none;">2 mois offerts</span>
+  </div>
+  <div class="lp-pricing">
+    <div class="lp-pc"><div class="lp-plan">Essentiel</div><div class="lp-price"><span id="lpp1">30</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">1 module au choix</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">ou Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Rapports PDF</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(0)">Choisir</button></div>
+    <div class="lp-pc"><div class="lp-plan">Sport</div><div class="lp-price"><span id="lpp2">40</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo sport + analyse ciné.</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tb">Ciné.</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. complète</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(1)">Choisir</button></div>
+    <div class="lp-pc pop"><div class="lp-pop-badge">Le plus choisi</div><div class="lp-plan">Duo</div><div class="lp-price"><span id="lpp3">50</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Postural + Podopédiatrie</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Patients illimités</li><li>2 modules inclus</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-main" onclick="choisirOffre(2)">Choisir</button></div>
+    <div class="lp-pc"><div class="lp-plan">Duo Sport</div><div class="lp-price"><span id="lpp4">60</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Podo Sport + Postural ou Podopédia</div><div class="lp-tags"><span class="lp-tag tb">Podo Sport</span><span class="lp-tag tg">+ 1 module</span></div><ul class="lp-feats"><li>Patients illimités</li><li>Analyse ciné. incluse</li><li>1 praticien</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(3)">Choisir</button></div>
+    <div class="lp-pc"><div class="lp-plan">Intégral</div><div class="lp-price"><span id="lpp5">70</span>€ <span class="lp-period">/ mois</span></div><div style="font-size:9px;color:rgba(45,212,191,0.7);margin-top:4px;">+ 299€ licence & mises à jour</div><div class="lp-pdesc">Les 3 modules complets</div><div class="lp-tags"><span class="lp-tag tg">Postural</span><span class="lp-tag tb">Sport</span><span class="lp-tag tp">Podopédia</span></div><ul class="lp-feats"><li>Tout inclus</li><li>Multi-praticiens</li><li>Support prioritaire</li></ul><button class="lp-pc-btn lp-pb-sec" onclick="choisirOffre(4)">Choisir</button></div>
+  </div>
+
+  </section>
+
+  <section class="lpx-cta lpx-cta-bas"><div><h2>Essayez gratuitement 14 jours</h2><p>Aucune carte bancaire requise — accès complet dès l'inscription.</p></div>
+    <div class="lpx-cta-btns"><button class="lpx-btn lpx-btn-clair lpx-btn-gros" onclick="showRegisterForm()">Démarrer l'essai gratuit — 14 jours offerts</button></div>
+  </section>
+
+  <footer class="lpx-pied">Verticy · by Sciopraxi</footer>
 </div>
 </div>
 
