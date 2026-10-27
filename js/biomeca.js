@@ -35929,6 +35929,52 @@ const _FAQ_DATA = [
       { q: 'Le numéro de sécurité sociale est-il stocké ?', a: "Non, jamais — choix délibéré : Verticy n'en a pas l'usage (pas de télétransmission) et cette donnée exige des précautions particulières. Les imports CSV qui en contiennent l'ignorent explicitement." },
     ],
   },
+  {
+    theme: '🧾 Devis et factures',
+    items: [
+      { q: 'Comment créer un devis ou une facture ?', a: "Sélectionnez un patient dans la liste, puis <strong>🧾 Devis et factures</strong> → <strong>+ Nouveau devis</strong> (ou Nouvelle facture). Ajoutez des lignes depuis votre catalogue d'actes, ou saisissez un montant libre. Le brouillon est modifiable tant qu'il n'est pas émis." },
+      { q: 'Comment sont numérotés les devis et factures ?', a: "À l'émission, le numéro <strong>D-AAAA-NNNN</strong> (devis) ou <strong>F-AAAA-NNNN</strong> (facture) est attribué automatiquement par la base, sans trou dans la séquence. Le document devient alors figé." },
+      { q: 'Comment paramétrer mes actes et mes tarifs ?', a: "<strong>🧾 Paramètres facturation</strong> : créez vos actes personnalisés (titre, montant sans TVA, cotation). Importez le référentiel POD/AMP. Les montants sont modifiables (les tarifs conventionnels changent par avenant)." },
+      { q: 'Le devis est-il automatique à l\'import Doctolib ?', a: "Oui si l'acte est coché <strong>« Devis automatique à l'import Doctolib »</strong> et que son titre est identique au motif du RDV. Le devis est créé à l'import du CSV Doctolib." },
+    ],
+  },
+  {
+    theme: '✍️ Signature du devis par le patient',
+    items: [
+      { q: 'Comment le patient signe-t-il un devis ?', a: "Dans son <strong>portail patient</strong> (Mes documents), le patient lit le devis, coche <strong>« J'ai lu ce devis et je l'accepte »</strong>, trace sa signature au doigt et valide. La signature est horodatée côté serveur (IP, empreinte SHA-256)." },
+      { q: 'Et pour un patient mineur ?', a: "Un <strong>code à 6 chiffres</strong> est envoyé à l'adresse du compte parent, valable 10 minutes. Le parent le saisit pour signer à la place du mineur. En mode essai (avant HDS), le code s'affiche à l'écran." },
+      { q: 'Où voir la preuve de signature ?', a: "Dans la liste 🧾 Devis et factures (« ✍️ signé le … »), dans la fenêtre du devis, et dans la fenêtre 🔑 Accès au portail : un bloc de preuve (date, IP, empreinte, tracé)." },
+    ],
+  },
+  {
+    theme: '📝 Ordonnances',
+    items: [
+      { q: 'Comment créer une ordonnance ?', a: "Sélectionnez un patient, puis <strong>📝 Ordonnances</strong> → <strong>+ Nouvelle ordonnance</strong>. Choisissez une catégorie (topiques, antalgiques, semelles…), saisissez les lignes, puis imprimez. L'ordonnance est stockée dans le dossier du patient." },
+      { q: 'Mon logo, ma signature et mon tampon apparaissent-ils ?', a: "Oui. Remplissez votre fiche dans <strong>Praticiens</strong> : logo du cabinet, signature et tampon (images PNG/JPEG). Ils sont imprimés automatiquement sur chaque ordonnance." },
+    ],
+  },
+  {
+    theme: '🧼 Stérilisation',
+    items: [
+      { q: 'Comment tracer mes cycles de stérilisation ?', a: "<strong>🧼 Traçabilité de stérilisation</strong> : enregistrez vos appareils (autoclave, etc.), vos sets, puis vos cycles. Un numéro est attribué automatiquement. Les soins sont liés aux cycles." },
+      { q: 'Quelle est la valeur réglementaire ?', a: "Le registre suit les recommandations de l'Ordre national des pédicures-podologues (cahier de stérilisation, conservation 5 ans). Les mentions réglementaires sont des avertissements, jamais des blocages." },
+    ],
+  },
+  {
+    theme: '🔑 Portail patient',
+    items: [
+      { q: 'Comment donner accès au portail à un patient ?', a: "Fiche patient → <strong>🔑 Accès au portail</strong> → <strong>Créer l'accès</strong>. Un identifiant est généré, le mot de passe initial est la date de naissance (AAAAMMJJ). Le patient se connecte sur le site Verticy, rubrique patient." },
+      { q: 'Que peut faire le patient sur son portail ?', a: "Consulter ses documents partagés (devis, factures), <strong>signer un devis</strong>, échanger par messagerie avec le praticien, suivre son <strong>programme d'exercices</strong> avec vidéos et chronomètre, remplir un questionnaire de santé." },
+      { q: 'Puis-je bloquer ou retirer l\'accès ?', a: "Oui, dans la même fenêtre 🔑 : bloquer l'accès (le patient ne peut plus se connecter), ou le retirer définitivement. Vous pouvez aussi bloquer les notifications de ressenti par patient." },
+    ],
+  },
+  {
+    theme: '🏠 Mode domicile (hors connexion)',
+    items: [
+      { q: 'Verticy fonctionne-t-il sans Internet ?', a: "Oui. La consultation et la saisie fonctionnent <strong>hors connexion</strong>. La synchronisation cloud reprend automatiquement au retour du réseau. Évitez de générer des rapports avec photos hors ligne." },
+      { q: 'Combien de temps puis-je rester hors connexion ?', a: "Votre session et votre abonnement sont conservés <strong>7 jours hors connexion</strong>. Au-delà, une reconnexion est demandée — vous ne perdez aucune donnée." },
+    ],
+  },
 ];
 
 function _renderHelpList(filter) {
