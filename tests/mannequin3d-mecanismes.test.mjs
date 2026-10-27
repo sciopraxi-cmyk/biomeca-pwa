@@ -109,14 +109,26 @@ describe('déclenchement des règles', () => {
 });
 
 describe('rendu HTML', () => {
-  it('le rapport contient la prudence, le niveau de preuve, les sources et les tests ; rien pour un mannequin neutre', () => {
+  it('le rapport ne contient QUE les hypothèses retenues par le praticien', () => {
+    const v = TABLEAUX.genu_valgum_bilat.valeurs;
     expect(htmlRapport({})).toBe('');
-    const h = htmlRapport(TABLEAUX.genu_valgum_bilat.valeurs);
+    expect(htmlRapport(v, [])).toBe(''); // rien de retenu : rien dans le rapport
+    expect(htmlRapport(v)).toBe('');
+    const h = htmlRapport(v, ['R09']);
+    expect(h).toContain('R09');
+    expect(h).not.toContain('R01');
     expect(h).toContain('pas un diagnostic');
     expect(h).toContain('Niveau de preuve');
     expect(h).toContain('Tests pour confirmer');
     expect(h).toContain('Risque d’aggravation');
     expect(h).toMatch(/S\d+/);
+    expect(htmlRapport(v, ['R17'])).toBe(''); // retenue mais non déclenchée : ignorée
+  });
+  it('à l’écran : case « Inclure au rapport » cochée selon la sélection', () => {
+    const hy = evaluer(TABLEAUX.genu_valgum_bilat.valeurs).find((x) => x.regle.id === 'R09');
+    expect(htmlHypothese(hy, { coche: true, retenue: true })).toMatch(/data-meca="R09" checked/);
+    expect(htmlHypothese(hy, { coche: true })).not.toContain('checked');
+    expect(htmlHypothese(hy)).not.toContain('checkbox');
   });
   it('le texte est échappé (aucune balise injectée)', () => {
     const hyp = {

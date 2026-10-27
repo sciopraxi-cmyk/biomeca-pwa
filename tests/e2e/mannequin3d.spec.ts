@@ -63,6 +63,27 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   await expect(meca).toContainText('Mécanismes lésionnels possibles');
   await expect(meca).toContainText('pas un diagnostic');
   await expect(meca.locator('details.m3d-hyp').first()).toBeVisible();
+  // sélection pour le rapport : rien de coché par défaut ; on coche une hypothèse ; elle est stockée et seule elle va au rapport
+  const cases = meca.locator('input[data-meca]');
+  expect(await cases.count()).toBeGreaterThan(0);
+  expect(await meca.locator('input[data-meca]:checked').count()).toBe(0);
+  const idRetenue = (await cases.first().getAttribute('data-meca')) as string;
+  await cases.first().check();
+  await page.waitForTimeout(2500);
+  expect(await page.evaluate('currentPatient.bilanDataPosturo.mannequin3d.retenues')).toEqual([
+    idRetenue,
+  ]);
+  const rapM: any = await page.evaluate('_m3dVuesRapport(currentPatient.bilanDataPosturo)');
+  expect(rapM.meca).toContain(idRetenue);
+  expect((rapM.meca.match(/Niveau de preuve/g) || []).length).toBe(1);
+  // compte rendu et mécanismes sur toute la largeur de la zone mannequin
+  const lg = await page.evaluate(() => {
+    const r = (e: Element | null) => (e ? e.getBoundingClientRect() : null);
+    const m3d = r(document.querySelector('.m3d'));
+    const cr = r(document.querySelector('.m3d-meca'));
+    return { m3d: m3d && [m3d.left, m3d.width], cr: cr && [cr.left, cr.width] };
+  });
+  expect((lg.cr as number[])[1]).toBeGreaterThan((lg.m3d as number[])[1] * 0.9);
   // curseurs du bassin : repères activés → le bassin s'incline, les épaules et la tête non
   await page.click('.m3d-btn:has-text("Repères")');
   const ang = async () => page.evaluate('_m3dPosturo.api.angles()');
@@ -101,12 +122,18 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
       titre: h.includes('Mannequin 3D'),
       imgs: sec ? sec.querySelectorAll('img').length : 0,
       liste: h.includes('Hyperlordose lombaire : lordose 15'),
+      meca: h.includes('Hypothèses de mécanisme lésionnel'),
+      reperes: h.includes('Repères :') && h.includes('fil à plomb'),
+      nbPreuves: (h.match(/Niveau de preuve/g) || []).length,
     };
   });
 
   expect(rap.titre).toBe(true);
   expect(rap.imgs).toBeGreaterThanOrEqual(4);
   expect(rap.liste).toBe(true);
+  expect(rap.meca).toBe(true); // seule l'hypothèse cochée figure dans le rapport
+  expect(rap.nbPreuves).toBe(1);
+  expect(rap.reperes).toBe(true);
   expect(erreurs, erreurs.join(' | ')).toEqual([]);
   // anciens dessins : sans dessin la zone est masquée, avec un dessin enregistré elle réapparaît telle quelle
   const hauteur = () =>

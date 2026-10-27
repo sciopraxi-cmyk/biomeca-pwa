@@ -367,13 +367,10 @@ export async function creerMoteur(canvas, opts = {}) {
     };
     reperes.lignes = [];
     for (const k in defs) {
-      const geo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(),
-        new THREE.Vector3(),
-      ]);
-      const ligne = new THREE.Line(
-        geo,
-        new THREE.LineBasicMaterial({ color: COUL_REP[k], depthTest: false, transparent: true })
+      // trait épais (cylindre de 4 mm de rayon) : lisible aussi sur les vignettes du rapport
+      const ligne = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.004, 0.004, 1, 6),
+        new THREE.MeshBasicMaterial({ color: COUL_REP[k], depthTest: false, transparent: true })
       );
       ligne.renderOrder = 20;
       ligne.frustumCulled = false;
@@ -410,7 +407,9 @@ export async function creerMoteur(canvas, opts = {}) {
         ext = 0.12;
       const p1 = a.clone().addScaledVector(dir, -ext),
         p2 = b.clone().addScaledVector(dir, ext);
-      r.ligne.geometry.setFromPoints([p1, p2]);
+      r.ligne.position.copy(p1).add(p2).multiplyScalar(0.5);
+      r.ligne.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      r.ligne.scale.set(1, p1.distanceTo(p2), 1);
       out[r.k] =
         Math.round(((Math.atan2(a.y - b.y, Math.abs(b.x - a.x)) * 180) / Math.PI) * 10) / 10;
     }
@@ -484,7 +483,7 @@ export async function creerMoteur(canvas, opts = {}) {
 // Rendu hors écran des 4 vues pour le rapport (mêmes valeurs → mêmes images, échelle identique)
 export async function rendreVues(
   valeurs,
-  { sexe = 'homme', peau = true, largeur = 360, hauteur = 640 } = {}
+  { sexe = 'homme', peau = true, largeur = 360, hauteur = 640, reperes: avecReperes = true } = {}
 ) {
   const c = document.createElement('canvas');
   const m = await creerMoteur(c, { preserve: true });
@@ -493,11 +492,14 @@ export async function rendreVues(
   await m.chargerSexe(sexe);
   m.peau(peau);
   m.pose(valeurs);
+  // repères cliniques (épaules, bassin, oreilles, genoux, fil à plomb) tracés sur les 4 vues du rapport
+  const angles = avecReperes ? m.montrerReperes(true) : null;
   const out = {};
   for (const k of ['face', 'dos', 'profilD', 'profilG']) {
     m.vue(k);
     out[k] = m.png();
   }
   m.liberer();
+  if (angles) out.angles = angles;
   return out;
 }

@@ -19287,6 +19287,10 @@ function _doBuildRapport(p, d, prat, logo, sections) {
           bodyHtml += '<div style="text-align:center;"><div style="font-size:9px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">'+k[1]+'</div><img src="'+mq.imgs[k[0]]+'" style="max-width:100%;border-radius:4px;"/></div>';
         });
         bodyHtml += '</div>';
+        if (mq.imgs.angles) {
+          var an3d = mq.imgs.angles;
+          bodyHtml += '<div style="font-size:10px;color:#4b5563;margin:0 0 8px;line-height:1.5;">Repères : <b style="color:#2563eb;">— épaules</b> · <b style="color:#dc2626;">— bassin</b> · <b style="color:#16a34a;">— oreilles</b> · <b style="color:#ea580c;">— genoux</b> · <b style="color:#6b7280;">fil à plomb</b>. Inclinaison vue de face (° ; + = côté droit du patient plus haut) : épaules ' + an3d.epaules + ' · bassin ' + an3d.bassin + ' · oreilles ' + an3d.tete + ' · genoux ' + an3d.genoux + '.</div>';
+        }
       }
       if (mq.lignes && mq.lignes.length) {
         bodyHtml += '<ul style="margin:4px 0 8px 18px;padding:0;font-size:11px;color:#374151;">';
@@ -31035,7 +31039,7 @@ async function _m3dVuesRapport(d) {
   try {
     const mod = await import('./mannequin3d/index.js');
     const imgs = await mod.rendreVues(m.valeurs, { sexe: m.sexe || 'homme', peau: m.peau !== false });
-    return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false, meca: mod.htmlRapport(m.valeurs) };
+    return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false, meca: mod.htmlRapport(m.valeurs, m.retenues) };
   } catch (e) {
     return { imgs: null, lignes: [], erreur: true };
   }

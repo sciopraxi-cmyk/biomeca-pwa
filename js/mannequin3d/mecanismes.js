@@ -159,7 +159,7 @@ function ligne(titre, texte) {
 }
 
 // HTML d'une hypothèse ; ouvert = détails dépliés (rapport) ou repliés (écran)
-export function htmlHypothese(h, { ouvert = false } = {}) {
+export function htmlHypothese(h, { ouvert = false, coche = false, retenue = false } = {}) {
   const r = h.regle;
   const badges = r.niveaux
     .map(
@@ -209,7 +209,23 @@ export function htmlHypothese(h, { ouvert = false } = {}) {
       corps +
       '</div>'
     );
-  return '<details class="m3d-hyp"><summary>' + titre + '</summary>' + corps + '</details>';
+  const case_ = coche
+    ? '<label class="m3d-inc" style="margin-right:8px;white-space:nowrap"><input type="checkbox" data-meca="' +
+      esc(r.id) +
+      '"' +
+      (retenue ? ' checked' : '') +
+      '> Inclure au rapport</label>'
+    : '';
+  return (
+    '<details class="m3d-hyp" data-id="' +
+    esc(r.id) +
+    '"><summary>' +
+    case_ +
+    titre +
+    '</summary>' +
+    corps +
+    '</details>'
+  );
 }
 
 export function htmlPrudence() {
@@ -242,11 +258,11 @@ export function htmlSynthese(res) {
   );
 }
 
-// Bloc complet pour le rapport (tout déplié) ; chaîne vide si rien ne se déclenche
-export function htmlRapport(valeurs) {
-  const res = evaluer(valeurs);
+// Bloc pour le rapport (tout déplié) : UNIQUEMENT les hypothèses retenues par le praticien (et encore déclenchées) ;
+// chaîne vide si aucune n'est retenue.
+export function htmlRapport(valeurs, retenues) {
+  const ids = new Set(Array.isArray(retenues) ? retenues : []);
+  const res = evaluer(valeurs).filter((h) => ids.has(h.regle.id));
   if (!res.length) return '';
-  return (
-    htmlPrudence() + htmlSynthese(res) + res.map((h) => htmlHypothese(h, { ouvert: true })).join('')
-  );
+  return htmlPrudence() + res.map((h) => htmlHypothese(h, { ouvert: true })).join('');
 }

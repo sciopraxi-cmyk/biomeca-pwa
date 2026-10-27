@@ -70,6 +70,9 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     sexe: (etat && etat.sexe) || sexeParDefaut,
     peau: etat ? etat.peau !== false : true,
     valeurs: Object.assign({}, etat && etat.valeurs),
+    retenues: Array.isArray(etat && etat.retenues)
+      ? etat.retenues.filter((x) => typeof x === 'string')
+      : [],
   };
   let moteur = null,
     detruit = false;
@@ -297,7 +300,9 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     ),
     liste
   );
-  racine.append(el('div', { style: 'flex:1 1 440px;min-width:300px' }, dic, panel, cr, hyp));
+  racine.append(el('div', { style: 'flex:1 1 440px;min-width:300px' }, dic, panel));
+  // compte rendu et mécanismes : sur toute la largeur, sous le mannequin et les curseurs
+  racine.append(el('div', { style: 'flex:1 1 100%;min-width:0' }, cr, hyp));
   conteneur.append(racine);
 
   function majLigne(id) {
@@ -470,6 +475,12 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
   // Hypothèses de mécanisme lésionnel sur les valeurs VALIDÉES (pas sur l'aperçu d'une dictée)
   function majMeca() {
     const res = evaluer(nettoyerValeurs(S.valeurs));
+    const ouverts = new Set(
+      [...hyp.querySelectorAll('details.m3d-hyp[open]')].map((d) => d.dataset.id)
+    );
+    // une règle retenue qui ne se déclenche plus est retirée de la sélection
+    const actives = new Set(res.map((x) => x.regle.id));
+    S.retenues = S.retenues.filter((id) => actives.has(id));
     let h = '<h4>🔗 Mécanismes lésionnels possibles (hypothèses)</h4>' + htmlPrudence();
     if (!res.length) {
       h +=
@@ -479,7 +490,17 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
           : ' (mannequin neutre)') +
         '.</div>';
     } else {
-      h += htmlSynthese(res) + res.map((x) => htmlHypothese(x)).join('');
+      h += htmlSynthese(res);
+      h +=
+        '<div style="font-size:12px;margin:6px 0">Cochez les hypothèses à <b>inclure dans le rapport</b> (' +
+        S.retenues.length +
+        ' retenue' +
+        (S.retenues.length > 1 ? 's' : '') +
+        ') : ' +
+        '<button type="button" class="m3d-btn" data-meca-tout="1">Tout retenir</button> <button type="button" class="m3d-btn" data-meca-tout="0">Aucune</button></div>';
+      h += res
+        .map((x) => htmlHypothese(x, { coche: true, retenue: S.retenues.includes(x.regle.id) }))
+        .join('');
     }
     const man = reglesManuelles();
     h +=
@@ -491,9 +512,35 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
         .join('') +
       '</ul></details>';
     hyp.innerHTML = h;
+    hyp.querySelectorAll('details.m3d-hyp').forEach((d) => {
+      if (ouverts.has(d.dataset.id)) d.open = true;
+    });
   }
+  hyp.addEventListener('change', (ev) => {
+    const c = ev.target && ev.target.dataset && ev.target.dataset.meca;
+    if (!c) return;
+    S.retenues = ev.target.checked
+      ? [...new Set([...S.retenues, c])]
+      : S.retenues.filter((x) => x !== c);
+    majMeca();
+    if (onChange) onChange(etatCourant());
+  });
+  hyp.addEventListener('click', (ev) => {
+    const b = ev.target && ev.target.closest && ev.target.closest('[data-meca-tout]');
+    if (!b) return;
+    S.retenues =
+      b.dataset.mecaTout === '1' ? evaluer(nettoyerValeurs(S.valeurs)).map((x) => x.regle.id) : [];
+    majMeca();
+    if (onChange) onChange(etatCourant());
+  });
   function etatCourant() {
-    return { v: 1, sexe: S.sexe, peau: S.peau, valeurs: nettoyerValeurs(S.valeurs) };
+    return {
+      v: 1,
+      sexe: S.sexe,
+      peau: S.peau,
+      valeurs: nettoyerValeurs(S.valeurs),
+      retenues: S.retenues.slice(),
+    };
   }
   async function changerSexe(k) {
     S.sexe = k;
