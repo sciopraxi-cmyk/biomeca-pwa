@@ -133,10 +133,40 @@ describe('landing — refonte design (vue praticien)', () => {
     }
     expect(lire('js/landing.js').match(/buy\.stripe\.com/g).length).toBe(10);
   });
-  it('les pages de fonctionnalité utilisent les photos des bilans déjà présentes', () => {
+  it("la photo du bilan ostéopathique (à venir) reste l'illustration d'origine", () => {
     const js = lire('js/landing-fonctions.js');
-    for (const f of ['postural', 'sport', 'podopediatrie', 'pedicurie', 'osteopathie']) {
-      expect(js).toContain('assets/bilans/illus-' + f + '.jpg');
+    expect(js).toContain('assets/bilans/illus-osteopathie.jpg');
+  });
+  it('les captures réelles de Verticy sont référencées pour les fonctionnalités', () => {
+    const js = lire('js/landing-fonctions.js');
+    const captures = [
+      'agenda-semaine',
+      'import-doctolib',
+      'dossier-patient',
+      'arrivee-rdv',
+      'bonhomme-postural',
+      'bilan-sport',
+      'bilan-podopediatrie',
+      'bilan-pedicurie',
+      'ordonnances',
+      'sterilisation',
+      'rapport-pdf',
+      'devis-factures',
+      'patient-documents-a-signer',
+      'patient-accueil',
+      'patient-exercices',
+      'patient-questionnaire',
+      'patient-messagerie',
+      'mode-domicile',
+      'notifications',
+    ];
+    for (const f of captures) {
+      expect(js).toContain('assets/landing/' + f + '.png');
+    }
+    // Précachées par le service worker
+    const sw = lire('service-worker.js');
+    for (const f of captures) {
+      expect(sw).toContain('./assets/landing/' + f + '.png');
     }
   });
 });

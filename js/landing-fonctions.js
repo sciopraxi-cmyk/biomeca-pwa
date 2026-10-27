@@ -393,35 +393,36 @@
     cabinet: { ic: 'shield', c: '#0369A1', accroche: 'Un cabinet fiable, même sans réseau.' },
   };
   // Photos : illustrations déjà présentes dans l'application (assets/bilans), une par bilan.
+  // Captures d'écran réelles de Verticy pour les autres fonctionnalités (assets/landing).
   var ITEM_META = {
-    'agenda-vues': { ic: 'calendar' },
-    'import-doctolib': { ic: 'download' },
-    'dossier-patient': { ic: 'folder' },
-    'arrivee-rdv': { ic: 'calcheck' },
-    'bilan-postural': { ic: 'person', img: 'assets/bilans/illus-postural.jpg' },
-    'bilan-sport': { ic: 'pulse', img: 'assets/bilans/illus-sport.jpg' },
-    'bilan-podopediatrie': { ic: 'heart', img: 'assets/bilans/illus-podopediatrie.jpg' },
-    'bilan-pedicurie': { ic: 'scissors', img: 'assets/bilans/illus-pedicurie.jpg' },
+    'agenda-vues': { ic: 'calendar', img: 'assets/landing/agenda-semaine.png' },
+    'import-doctolib': { ic: 'download', img: 'assets/landing/import-doctolib.png' },
+    'dossier-patient': { ic: 'folder', img: 'assets/landing/dossier-patient.png' },
+    'arrivee-rdv': { ic: 'calcheck', img: 'assets/landing/arrivee-rdv.png' },
+    'bilan-postural': { ic: 'person', img: 'assets/landing/bonhomme-postural.png' },
+    'bilan-sport': { ic: 'pulse', img: 'assets/landing/bilan-sport.png' },
+    'bilan-podopediatrie': { ic: 'heart', img: 'assets/landing/bilan-podopediatrie.png' },
+    'bilan-pedicurie': { ic: 'scissors', img: 'assets/landing/bilan-pedicurie.png' },
     'bilan-osteopathique': { ic: 'hand', img: 'assets/bilans/illus-osteopathie.jpg' },
     'dictee-vocale': { ic: 'mic' },
     'dictee-ia': { ic: 'spark' },
     'visualisation-3d': { ic: 'cube' },
     'mecanismes-lesionnels': { ic: 'search' },
     'exercices-automatiques': { ic: 'target' },
-    ordonnances: { ic: 'file' },
+    ordonnances: { ic: 'file', img: 'assets/landing/ordonnances.png' },
     'semelles-3d': { ic: 'layers' },
-    sterilisation: { ic: 'drop' },
-    'rapports-pdf': { ic: 'file' },
-    'devis-factures': { ic: 'receipt' },
-    'signature-devis': { ic: 'pen' },
-    'espace-patient': { ic: 'user' },
-    'exercices-video': { ic: 'video' },
-    questionnaire: { ic: 'clip' },
-    messagerie: { ic: 'msg' },
+    sterilisation: { ic: 'drop', img: 'assets/landing/sterilisation.png' },
+    'rapports-pdf': { ic: 'file', img: 'assets/landing/rapport-pdf.png' },
+    'devis-factures': { ic: 'receipt', img: 'assets/landing/devis-factures.png' },
+    'signature-devis': { ic: 'pen', img: 'assets/landing/patient-documents-a-signer.png' },
+    'espace-patient': { ic: 'user', img: 'assets/landing/patient-accueil.png' },
+    'exercices-video': { ic: 'video', img: 'assets/landing/patient-exercices.png' },
+    questionnaire: { ic: 'clip', img: 'assets/landing/patient-questionnaire.png' },
+    messagerie: { ic: 'msg', img: 'assets/landing/patient-messagerie.png' },
     'mes-rendez-vous': { ic: 'clock' },
     sauvegardes: { ic: 'db' },
-    'mode-domicile': { ic: 'car' },
-    notifications: { ic: 'bell' },
+    'mode-domicile': { ic: 'car', img: 'assets/landing/mode-domicile.png' },
+    notifications: { ic: 'bell', img: 'assets/landing/notifications.png' },
     comptabilite: { ic: 'trend' },
     'multi-praticiens': { ic: 'users' },
     hds: { ic: 'lock' },
@@ -671,7 +672,13 @@
       '<div class="lpx-fp-btns"><button type="button" class="lpx-btn lpx-btn-plein" onclick="showRegisterForm()">Essayer gratuitement</button><button type="button" class="lpx-btn lpx-btn-contour" onclick="lpAllerTarifs()">Voir les tarifs</button></div></div>';
     h += '<div class="lpx-fp-visuel' + (it.img ? ' avec-photo' : '') + '">';
     h += it.img
-      ? '<img src="' + it.img + '" alt="' + esc(it.titre) + '" loading="lazy"/>'
+      ? '<img src="' +
+        it.img +
+        '" alt="' +
+        esc(it.titre) +
+        '" loading="lazy"' +
+        (it.img.indexOf('assets/landing/') === 0 ? ' class="capture"' : '') +
+        '/>'
       : '<div class="lpx-fp-motif"></div><div class="lpx-fp-medaillon">' +
         ico(it.ic, 64) +
         '</div>';

@@ -1780,6 +1780,7 @@ body:has(#pwa-login:not([style*="display: none"]):not([style*="display:none"])) 
 .lpx-fp-visuel{ position:relative; aspect-ratio:5/4.6; border-radius:32px; overflow:hidden; display:grid; place-items:center; background:linear-gradient(150deg,#e6eefc,#f4f8ff); background:linear-gradient(150deg,color-mix(in srgb,var(--c) 16%,#fff),color-mix(in srgb,var(--c) 4%,#fff)); border:1px solid color-mix(in srgb,var(--c) 18%,#fff); box-shadow:0 40px 80px -40px color-mix(in srgb,var(--c) 70%,#0b1b3a); }
 .lpx-fp-visuel.avec-photo{ display:block; }
 .lpx-fp-visuel img{ width:100%; height:100%; object-fit:cover; display:block; }
+.lpx-fp-visuel img.capture{ object-fit:contain; background:#fff; }
 .lpx-fp-motif{ position:absolute; inset:0; background-image:radial-gradient(color-mix(in srgb,var(--c) 28%,#fff) 1.2px, transparent 1.6px); background-size:22px 22px; -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 0%,transparent 72%); mask-image:radial-gradient(circle at 50% 50%,#000 0%,transparent 72%); }
 .lpx-fp-medaillon{ position:relative; display:grid; place-items:center; width:168px; height:168px; border-radius:50%; background:#fff; color:var(--c); box-shadow:0 0 0 14px color-mix(in srgb,var(--c) 10%,transparent), 0 0 0 34px color-mix(in srgb,var(--c) 6%,transparent), 0 30px 50px -20px color-mix(in srgb,var(--c) 60%,#0b1b3a); }
 .lpx-fp-ruban{ position:absolute; top:18px; right:18px; background:#fff; color:#5b21b6; font-weight:800; font-size:13px; padding:6px 14px; border-radius:999px; box-shadow:0 8px 20px -8px rgba(0,0,0,.35); }
