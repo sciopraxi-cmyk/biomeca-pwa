@@ -396,7 +396,7 @@
   // Captures d'écran réelles de Verticy pour les autres fonctionnalités (assets/landing).
   var ITEM_META = {
     'agenda-vues': { ic: 'calendar', img: 'assets/landing/agenda-semaine.png' },
-    'import-doctolib': { ic: 'download', img: 'assets/landing/import-csv.png' },
+    'import-doctolib': { ic: 'download', img: 'assets/landing/import-doctolib.png' },
     'dossier-patient': { ic: 'folder', img: 'assets/landing/dossier-patient.png' },
     'arrivee-rdv': { ic: 'calcheck', img: 'assets/landing/arrivee-rdv.png' },
     'bilan-postural': { ic: 'person', img: 'assets/landing/bilan-postural-interieur.png' },
@@ -414,7 +414,7 @@
     sterilisation: { ic: 'drop', img: 'assets/landing/sterilisation.png' },
     'rapports-pdf': { ic: 'file', img: 'assets/landing/rapport-pdf.png' },
     'devis-factures': { ic: 'receipt', img: 'assets/landing/devis-factures.png' },
-    'signature-devis': { ic: 'pen', img: 'assets/landing/patient-signature.png' },
+    'signature-devis': { ic: 'pen', img: 'assets/landing/patient-documents-a-signer.png' },
     'espace-patient': { ic: 'user', img: 'assets/landing/patient-accueil.png' },
     'exercices-video': { ic: 'video', img: 'assets/landing/patient-exercices.png' },
     questionnaire: { ic: 'clip', img: 'assets/landing/patient-questionnaire.png' },

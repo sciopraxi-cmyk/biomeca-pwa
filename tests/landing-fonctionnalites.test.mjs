@@ -141,7 +141,7 @@ describe('landing — refonte design (vue praticien)', () => {
     const js = lire('js/landing-fonctions.js');
     const captures = [
       'agenda-semaine',
-      'import-csv',
+      'import-doctolib',
       'dossier-patient',
       'arrivee-rdv',
       'bilan-postural-interieur',
@@ -152,7 +152,7 @@ describe('landing — refonte design (vue praticien)', () => {
       'sterilisation',
       'rapport-pdf',
       'devis-factures',
-      'patient-signature',
+      'patient-documents-a-signer',
       'patient-accueil',
       'patient-exercices',
       'patient-questionnaire',
