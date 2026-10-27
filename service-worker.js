@@ -10,7 +10,7 @@
 // 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
 // clients sur du code de mois précédents). Toute évolution ultérieure du code
 // applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
-const CACHE_VERSION = 'biomeca-v283';
+const CACHE_VERSION = 'biomeca-v285';
 const CACHE_PREFIX  = 'biomeca-';
 
 // #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur
@@ -49,6 +49,14 @@ const PRECACHE_URLS = [
   './assets/bilans/illus-pedicurie.jpg',
   './assets/bilans/illus-podopediatrie.jpg',
   './assets/bilans/illus-osteopathie.jpg',
+  // Captures d'écran réelles de Verticy pour les pages de fonctionnalités de la landing.
+  './assets/landing/agenda-semaine.png',
+  './assets/landing/dossier-patient.png',
+  './assets/landing/bilan-sport.png',
+  './assets/landing/devis-factures.png',
+  './assets/landing/portail-patient.png',
+  './assets/landing/exercices.png',
+  './assets/landing/parametres.png',
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/apple-touch-icon.png',

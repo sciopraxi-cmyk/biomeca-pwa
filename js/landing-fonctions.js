@@ -393,10 +393,11 @@
     cabinet: { ic: 'shield', c: '#0369A1', accroche: 'Un cabinet fiable, même sans réseau.' },
   };
   // Photos : illustrations déjà présentes dans l'application (assets/bilans), une par bilan.
+  // Captures d'écran réelles de Verticy pour les autres fonctionnalités (assets/landing).
   var ITEM_META = {
-    'agenda-vues': { ic: 'calendar' },
+    'agenda-vues': { ic: 'calendar', img: 'assets/landing/agenda-semaine.png' },
     'import-doctolib': { ic: 'download' },
-    'dossier-patient': { ic: 'folder' },
+    'dossier-patient': { ic: 'folder', img: 'assets/landing/dossier-patient.png' },
     'arrivee-rdv': { ic: 'calcheck' },
     'bilan-postural': { ic: 'person', img: 'assets/bilans/illus-postural.jpg' },
     'bilan-sport': { ic: 'pulse', img: 'assets/bilans/illus-sport.jpg' },
@@ -412,16 +413,16 @@
     'semelles-3d': { ic: 'layers' },
     sterilisation: { ic: 'drop' },
     'rapports-pdf': { ic: 'file' },
-    'devis-factures': { ic: 'receipt' },
-    'signature-devis': { ic: 'pen' },
-    'espace-patient': { ic: 'user' },
-    'exercices-video': { ic: 'video' },
+    'devis-factures': { ic: 'receipt', img: 'assets/landing/devis-factures.png' },
+    'signature-devis': { ic: 'pen', img: 'assets/landing/portail-patient.png' },
+    'espace-patient': { ic: 'user', img: 'assets/landing/portail-patient.png' },
+    'exercices-video': { ic: 'video', img: 'assets/landing/exercices.png' },
     questionnaire: { ic: 'clip' },
     messagerie: { ic: 'msg' },
     'mes-rendez-vous': { ic: 'clock' },
-    sauvegardes: { ic: 'db' },
+    sauvegardes: { ic: 'db', img: 'assets/landing/parametres.png' },
     'mode-domicile': { ic: 'car' },
-    notifications: { ic: 'bell' },
+    notifications: { ic: 'bell', img: 'assets/landing/parametres.png' },
     comptabilite: { ic: 'trend' },
     'multi-praticiens': { ic: 'users' },
     hds: { ic: 'lock' },
@@ -671,7 +672,13 @@
       '<div class="lpx-fp-btns"><button type="button" class="lpx-btn lpx-btn-plein" onclick="showRegisterForm()">Essayer gratuitement</button><button type="button" class="lpx-btn lpx-btn-contour" onclick="lpAllerTarifs()">Voir les tarifs</button></div></div>';
     h += '<div class="lpx-fp-visuel' + (it.img ? ' avec-photo' : '') + '">';
     h += it.img
-      ? '<img src="' + it.img + '" alt="' + esc(it.titre) + '" loading="lazy"/>'
+      ? '<img src="' +
+        it.img +
+        '" alt="' +
+        esc(it.titre) +
+        '" loading="lazy"' +
+        (it.img.indexOf('assets/landing/') === 0 ? ' class="capture"' : '') +
+        '/>'
       : '<div class="lpx-fp-motif"></div><div class="lpx-fp-medaillon">' +
         ico(it.ic, 64) +
         '</div>';

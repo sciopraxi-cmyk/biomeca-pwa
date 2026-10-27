@@ -139,6 +139,31 @@ describe('landing — refonte design (vue praticien)', () => {
       expect(js).toContain('assets/bilans/illus-' + f + '.jpg');
     }
   });
+  it('les captures réelles de Verticy sont référencées pour les autres fonctionnalités', () => {
+    const js = lire('js/landing-fonctions.js');
+    for (const f of [
+      'agenda-semaine',
+      'dossier-patient',
+      'devis-factures',
+      'portail-patient',
+      'exercices',
+      'parametres',
+    ]) {
+      expect(js).toContain('assets/landing/' + f + '.png');
+    }
+    // Précachées par le service worker
+    const sw = lire('service-worker.js');
+    for (const f of [
+      'agenda-semaine',
+      'dossier-patient',
+      'devis-factures',
+      'portail-patient',
+      'exercices',
+      'parametres',
+    ]) {
+      expect(sw).toContain('./assets/landing/' + f + '.png');
+    }
+  });
 });
 
 describe('landing — fond pleine largeur', () => {
