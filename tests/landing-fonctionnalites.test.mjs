@@ -133,34 +133,39 @@ describe('landing — refonte design (vue praticien)', () => {
     }
     expect(lire('js/landing.js').match(/buy\.stripe\.com/g).length).toBe(10);
   });
-  it('les pages de fonctionnalité utilisent les photos des bilans déjà présentes', () => {
+  it("la photo du bilan ostéopathique (à venir) reste l'illustration d'origine", () => {
     const js = lire('js/landing-fonctions.js');
-    for (const f of ['postural', 'sport', 'podopediatrie', 'pedicurie', 'osteopathie']) {
-      expect(js).toContain('assets/bilans/illus-' + f + '.jpg');
-    }
+    expect(js).toContain('assets/bilans/illus-osteopathie.jpg');
   });
-  it('les captures réelles de Verticy sont référencées pour les autres fonctionnalités', () => {
+  it('les captures réelles de Verticy sont référencées pour les fonctionnalités', () => {
     const js = lire('js/landing-fonctions.js');
-    for (const f of [
+    const captures = [
       'agenda-semaine',
+      'import-csv',
       'dossier-patient',
+      'arrivee-rdv',
+      'bilan-postural-interieur',
+      'bilan-sport-interieur',
+      'bilan-podopediatrie-interieur',
+      'bilan-pedicurie-interieur',
+      'ordonnances',
+      'sterilisation',
+      'rapport-pdf',
       'devis-factures',
-      'portail-patient',
-      'exercices',
-      'parametres',
-    ]) {
+      'patient-signature',
+      'patient-accueil',
+      'patient-exercices',
+      'patient-questionnaire',
+      'patient-messagerie',
+      'mode-domicile',
+      'notifications',
+    ];
+    for (const f of captures) {
       expect(js).toContain('assets/landing/' + f + '.png');
     }
     // Précachées par le service worker
     const sw = lire('service-worker.js');
-    for (const f of [
-      'agenda-semaine',
-      'dossier-patient',
-      'devis-factures',
-      'portail-patient',
-      'exercices',
-      'parametres',
-    ]) {
+    for (const f of captures) {
       expect(sw).toContain('./assets/landing/' + f + '.png');
     }
   });
