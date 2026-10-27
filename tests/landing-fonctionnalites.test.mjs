@@ -353,7 +353,10 @@ describe('logiciel praticien — lot 5 : rapports, devis et factures, ordonnance
   const sansCom = bloc.replace(/\/\*[\s\S]*?\*\//g, '');
   const hors = sansCom.replace(/@(media|supports)[^{]*\{/g, '');
   it('chaque règle du lot est bornée à body.theme-clair', () => {
-    const regles = hors.split('}').map((r) => r.trim()).filter((r) => r.includes('{'));
+    const regles = hors
+      .split('}')
+      .map((r) => r.trim())
+      .filter((r) => r.includes('{'));
     expect(regles.length).toBeGreaterThan(20);
     for (const r of regles) {
       const sel = r.slice(0, r.indexOf('{'));
@@ -361,7 +364,14 @@ describe('logiciel praticien — lot 5 : rapports, devis et factures, ordonnance
     }
   });
   it('couvre les 6 pages et ne touche à aucune couleur d’identité', () => {
-    for (const id of ['pg-documents', 'pg-ordonnances', 'pg-sterilisation', 'pg-actes', 'pg-rapport', 'pg-rapport-posturo']) {
+    for (const id of [
+      'pg-documents',
+      'pg-ordonnances',
+      'pg-sterilisation',
+      'pg-actes',
+      'pg-rapport',
+      'pg-rapport-posturo',
+    ]) {
       expect(bloc).toContain('#' + id);
     }
     expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo|encours)-[a-z-]*\s*:/);
