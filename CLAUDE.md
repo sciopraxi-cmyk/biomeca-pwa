@@ -902,6 +902,33 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **À faire** : import CSV Doctolib qui crée les fiches inconnues (format de l'export à confirmer), e-mail d'accès réel et envoi planifié
   après l'hébergeur HDS, landing.
 
+## Landing page — acquis (PR #336)
+
+- **Structure** : `js/landing-fonctions.js` (données RUBRIQUES + icônes SVG + menu + pages), vue `lpVue('accueil'|'praticien'|'fonction')` dans `js/landing.js`.
+- **Vue praticien** (connecté) : titre en tête, formulaires de connexion/inscription/réinitialisation à portée, 5 prix (liens Stripe intacts, 10 au total).
+- **Vue patient** (avant connexion) : pas de tarif, pas de sujet praticien.
+- **Pages de fonctionnalités** : 5 rubriques validées, photos des bilans `assets/bilans/illus-*.jpg` (ratio 0,834, jamais recadrées), fonctions futures marquées `avenir:true`.
+- **Confort** : case « Se souvenir de moi » (e-mail seul en localStorage, jamais le mot de passe), œil du mot de passe sur les 3 formulaires.
+- **Logo** : version transparente `verticy-logo-simple-transparent.png` sur les 3 cartes de la landing, préchargée par le service worker. Pictogramme (50 px) plus grand que le wordmark (15 px).
+- **Service workers** : `biomeca-v262`.
+
+## Refonte du design intérieur (logiciel praticien) — acquis (PR #342 à #347)
+
+Refonte CSS seulement, par lots, chaque bloc ajouté en fin de `css/biomeca.css` sous `/* Refonte « premium » — lot N */`, tout borné à `body.theme-clair`. Aucun HTML ni JS modifié, aucune couleur d'identité des bilans (`--posturo-*`, `--sport-*`, etc.) redéfinie.
+
+- **Lot 1 — socle** (#342) : barre du haut (onglets flexibles, boutons de droite fixes), fond de page, cartes, boutons, champs, titres.
+- **Lot 2 — liste et fiche patient** (#342) : cartes patients, fiche détaillée, photos non recadrées, barre du haut (Déconnexion en bouton rouge visible).
+- **Lot 3 — agenda** (#343) : calendrier en premier, 3 encadrés de connexion en colonnes, jour sélectionné lisible (blanc sur bleu), couleurs par compte (`--ev-bg`/`--ev-fg`) non redéfinies.
+- **Lot 4 — pages des bilans** (#344) : titres agrandis (y compris bilan postural construit par JS), onglets en pastilles, accueil sport en grille 4 colonnes (≥ 1100 px), étiquettes compactes, bandeau patient vide masqué.
+- **Lot 5 — pages de gestion** (#345, #346) : devis/factures, ordonnances, stérilisation, catalogue d'actes, rapports (sport et postural). Barre de titre séparée, cartes, boutons, libellés à 11,5 px. Fenêtre « Accès au portail patient » en cartes distinctes, 2 colonnes dès 900 px, en-tête fixe.
+- **Lot 6 — paramètres, notifications, praticiens, exercices, Assistant** (#347) : cartes uniformes, titres bleus distinctifs, notifications en lignes aérées avec ombre au survol, FAQ en fond clair avec recherche, Assistant (chat) stylé.
+
+**Piège** : `/tmp` est un tmpfs de 512 Mo — le remplir (profils Chromium, captures) fait planter Chrome (« Target crashed »). `df -h /tmp` avant chaque session de captures.
+
+**Piège** : `palette-bilans.test.mjs` analyse toutes les règles CSS contenant `border:` — utiliser `border:0; box-shadow:0 0 0 1px <couleur>` pour les contours de cartes dans un nouveau bloc. Les tests de bornage doivent ancrer sur `/* Refonte « premium » — lot N` et borner la fin du bloc au début du lot suivant.
+
+**Piège** : ne jamais `pkill -f chrome` (exit 143). Chrome headless : `args:['--no-sandbox','--disable-gpu']`.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
