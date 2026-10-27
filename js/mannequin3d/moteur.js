@@ -1,7 +1,7 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs, CURSEURS } from './parametres.js';
+import { poseDepuisValeurs } from './parametres.js';
 
 const CHEMIN = (sexe) =>
   new URL(
@@ -168,11 +168,6 @@ export async function creerMoteur(canvas, opts = {}) {
           });
         } else if (o.name === 'muscles' || o.name === 'Muscles') {
           o.userData.role = 'muscles';
-          o.material = new THREE.MeshStandardMaterial({
-            vertexColors: true,
-            roughness: 0.42,
-            metalness: 0,
-          });
         }
       }
     });
@@ -190,7 +185,32 @@ export async function creerMoteur(canvas, opts = {}) {
     });
   }
 
-  // ── pose : cinématique directe (curseurs) puis cinématique inverse (pieds au sol)
+  // ── pose : cinématique directe (curseurs), rotation du bassin autour des hanches, hanches épinglées, torsion d'avant-bras
+  const _v = new THREE.Vector3(),
+    _q = new THREE.Quaternion(),
+    _q2 = new THREE.Quaternion(),
+    _m = new THREE.Matrix4();
+  function monde(b) {
+    return b.getWorldPosition(new THREE.Vector3());
+  }
+  function tournerMonde(b, qDelta) {
+    b.parent.getWorldQuaternion(_q);
+    b.getWorldQuaternion(_q2);
+    _q2.premultiply(qDelta);
+    b.quaternion.copy(_q.invert().multiply(_q2));
+    b.updateMatrixWorld(true);
+  }
+  function repere() {
+    // positions de repos (monde) : pivot du bassin (L5/S1) et hanches
+    for (const n in etat.bones) {
+      const b = etat.bones[n];
+      b.position.copy(etat.repos[n].p);
+      b.quaternion.copy(etat.repos[n].q);
+    }
+    etat.racine.updateMatrixWorld(true);
+    etat.pivot = monde(etat.bones.spine05);
+    etat.hanche = { L: monde(etat.bones['upperleg01.L']), R: monde(etat.bones['upperleg01.R']) };
+  }
   function poserBrut(P) {
     for (const n in etat.bones) {
       const b = etat.bones[n],
@@ -202,92 +222,55 @@ export async function creerMoteur(canvas, opts = {}) {
       const d = P.pos[n];
       if (d) b.position.add(new THREE.Vector3(d[0], d[1], d[2]));
     }
+    // le bassin tourne autour du point L5/S1 (la colonne au-dessus reste en place grâce à la contre-rotation de spine05)
+    const root = etat.bones.root,
+      r = etat.repos.root;
+    root.position.copy(r.p).sub(etat.pivot).applyQuaternion(root.quaternion).add(etat.pivot);
     etat.racine.updateMatrixWorld(true);
-  }
-  const _v = new THREE.Vector3(),
-    _q = new THREE.Quaternion(),
-    _q2 = new THREE.Quaternion();
-  function monde(b) {
-    return b.getWorldPosition(new THREE.Vector3());
-  }
-  function tournerMonde(b, qDelta) {
-    b.parent.getWorldQuaternion(_q);
-    b.getWorldQuaternion(_q2);
-    _q2.premultiply(qDelta);
-    b.quaternion.copy(_q.invert().multiply(_q2));
-    b.updateMatrixWorld(true);
-  }
-  // Résolution analytique à deux os (hanche → genou → cheville) : la cheville rejoint la cible sans étirer le modèle
-  function pieds(hanche, genou, cheville, cible) {
-    const H = monde(hanche),
-      K = monde(genou),
-      A = monde(cheville);
-    const l1 = H.distanceTo(K),
-      l2 = K.distanceTo(A);
-    const dv = cible.clone().sub(H);
-    let d = dv.length();
-    const u = dv.clone().normalize();
-    d = Math.min(Math.max(d, Math.abs(l1 - l2) + 1e-4), l1 + l2 - 1e-4);
-    const cosA = (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d),
-      alpha = Math.acos(Math.max(-1, Math.min(1, cosA)));
-    const pole = new THREE.Vector3(0, 0, 1);
-    pole.sub(u.clone().multiplyScalar(pole.dot(u))).normalize();
-    const Kd = H.clone()
-      .add(u.clone().multiplyScalar(Math.cos(alpha) * l1))
-      .add(pole.multiplyScalar(Math.sin(alpha) * l1));
-    tournerMonde(
-      hanche,
-      new THREE.Quaternion().setFromUnitVectors(
-        K.clone().sub(H).normalize(),
-        Kd.clone().sub(H).normalize()
-      )
-    );
-    const K2 = monde(genou),
-      A2 = monde(cheville),
-      T = H.clone().add(u.multiplyScalar(d));
-    tournerMonde(
-      genou,
-      new THREE.Quaternion().setFromUnitVectors(
-        A2.clone().sub(K2).normalize(),
-        T.clone().sub(K2).normalize()
-      )
-    );
+    // hanches épinglées : les jambes restent exactement où elles étaient (pieds au sol, genoux non fléchis)
+    for (const s of ['L', 'R']) {
+      const pel = etat.bones['pelvis.' + s];
+      const delta = etat.hanche[s].clone().sub(monde(etat.bones['upperleg01.' + s]));
+      if (delta.lengthSq() > 1e-12) {
+        pel.parent.getWorldQuaternion(_q);
+        pel.position.add(delta.applyQuaternion(_q.invert()));
+      }
+    }
+    etat.racine.updateMatrixWorld(true);
+    // pronation / supination : torsion autour de l'axe coude → poignet, répartie sur les deux os de l'avant-bras
+    for (const s of ['L', 'R']) {
+      const deg = P.twist[s];
+      if (!deg) continue;
+      const axe = monde(etat.bones['wrist.' + s])
+        .sub(monde(etat.bones['lowerarm01.' + s]))
+        .normalize();
+      const sens = s === 'L' ? 1 : -1; // + = pronation (dos de la main vers l'avant), - = supination (paume vers l'avant)
+      tournerMonde(
+        etat.bones['lowerarm01.' + s],
+        new THREE.Quaternion().setFromAxisAngle(axe, (sens * deg * 0.3 * Math.PI) / 180)
+      );
+      tournerMonde(
+        etat.bones['lowerarm02.' + s],
+        new THREE.Quaternion().setFromAxisAngle(axe, (sens * deg * 0.7 * Math.PI) / 180)
+      );
+    }
+    etat.racine.updateMatrixWorld(true);
+    // déformations locales (blend shapes) : courbures du dos, fessiers, genoux
+    etat.racine.traverse((o) => {
+      if (!o.morphTargetDictionary) return;
+      o.morphTargetInfluences.fill(0);
+      for (const k in P.morph) {
+        const i = o.morphTargetDictionary[k];
+        if (i !== undefined) o.morphTargetInfluences[i] = P.morph[k];
+      }
+    });
   }
 
   function pose(valeurs) {
     etat.valeurs = valeurs || {};
     if (!etat.racine) return;
-    const P = poseDepuisValeurs(etat.valeurs);
-    const bassinNeutre =
-      Math.abs(P.bassin[0]) + Math.abs(P.bassin[1]) + Math.abs(P.bassin[2]) < 1e-6;
-    let cibles = null;
-    if (!bassinNeutre) {
-      // 1) pose des curseurs SANS le bassin : on mémorise où se trouvent les pieds (au sol)
-      const sans = {};
-      for (const c of CURSEURS)
-        if (!c.id.startsWith('bassin_') && etat.valeurs[c.id]) sans[c.id] = etat.valeurs[c.id];
-      poserBrut(poseDepuisValeurs(sans));
-      cibles = {};
-      for (const s of ['L', 'R']) {
-        const f = etat.bones['foot.' + s];
-        cibles[s] = { pos: monde(f), q: f.getWorldQuaternion(new THREE.Quaternion()) };
-      }
-    }
-    poserBrut(P);
-    if (cibles) {
-      for (const s of ['L', 'R']) {
-        pieds(
-          etat.bones['upperleg01.' + s],
-          etat.bones['lowerleg01.' + s],
-          etat.bones['foot.' + s],
-          cibles[s].pos
-        );
-        const f = etat.bones['foot.' + s];
-        f.parent.getWorldQuaternion(_q);
-        f.quaternion.copy(_q.invert().multiply(cibles[s].q));
-        f.updateMatrixWorld(true);
-      }
-    }
+    if (!etat.pivot) repere();
+    poserBrut(poseDepuisValeurs(etat.valeurs));
   }
 
   function vue(nom) {

@@ -46,8 +46,9 @@ describe('curseurs', () => {
       expect(c.min <= 0 && c.max >= 0).toBe(true);
       expect(GROUPES.map((g) => g[0])).toContain(c.groupe);
       expect(c.fin).toHaveLength(2);
+      expect(c.court).toBeTruthy();
     }
-    expect(CURSEURS.length).toBeGreaterThanOrEqual(40);
+    expect(CURSEURS.length).toBeGreaterThanOrEqual(45);
   });
   it('chaque curseur latéralisé D a son jumeau G (même plage, même libellé de fin)', () => {
     for (const c of CURSEURS.filter((x) => x.cote === 'D')) {
@@ -98,12 +99,47 @@ describe('pose', () => {
     const P = poseDepuisValeurs({ bassin_inegalite: 22 });
     expect(Math.round(((2 * Math.asin(P.bassin[2]) * 180) / Math.PI) * 10) / 10).toBe(5.7);
   });
-  it('lordose : courbe sans bascule globale (somme des flexions = 0 sur le rachis)', () => {
-    const P = poseDepuisValeurs({ tronc_lordose: 20 });
-    let s = 0;
-    for (const n of ['spine05', 'spine04', 'spine03', 'spine02', 'spine01'])
-      s += (2 * Math.asin(P.rot[n][0]) * 180) / Math.PI;
-    expect(Math.abs(s)).toBeLessThan(1e-6);
+  it('courbures du dos : déformation locale (blend shape), aucun os du tronc ne tourne', () => {
+    const P = poseDepuisValeurs({ tronc_lordose: 15, tronc_cyphose: 20 });
+    expect(P.morph.lordose).toBeCloseTo(0.5, 9);
+    expect(P.morph.cyphose).toBeCloseTo(0.5, 9);
+    for (const n of ['spine01', 'spine02', 'spine03', 'spine04', 'spine05'])
+      expect(proche(P.rot[n] || [0, 0, 0, 1], [0, 0, 0, 1])).toBe(true);
+  });
+  it('bassin : la colonne au-dessus ne suit pas (contre-rotation de spine05) et les jambes restent d’aplomb', () => {
+    const P = poseDepuisValeurs({ bassin_bascule: 7, bassin_antev: 12, bassin_rot: -9 });
+    expect(proche(qMul(P.rot.root, P.rot.spine05), [0, 0, 0, 1])).toBe(true);
+    for (const n of ['pelvis.L', 'pelvis.R'])
+      expect(proche(qMul(P.rot.root, P.rot[n]), [0, 0, 0, 1])).toBe(true);
+    expect(P.rot.neck02).toBeUndefined();
+  });
+  it('antéversion : les fessiers bombent (poids > 0), rétroversion : ils s’aplatissent (poids < 0), sans flexion des genoux', () => {
+    expect(poseDepuisValeurs({ bassin_antev: 25 }).morph.fessiers).toBeCloseTo(1, 9);
+    const R = poseDepuisValeurs({ bassin_antev: -10 });
+    expect(R.morph.fessiers).toBeLessThan(0);
+    expect(Object.keys(R.morph).filter((k) => k.startsWith('genou'))).toHaveLength(0);
+  });
+  it('genou : seule la déformation locale du genou bouge (flessum + = en avant, recurvatum − = en arrière)', () => {
+    const P = poseDepuisValeurs({ genou_flex_D: 15, genou_flex_G: -15, genou_valgus_D: 15 });
+    expect(P.morph.genou_flex_R).toBeCloseTo(0.5, 9);
+    expect(P.morph.genou_flex_L).toBeCloseTo(-0.5, 9);
+    expect(P.morph.genou_valgus_R).toBeCloseTo(1, 9);
+    expect(P.rot['lowerleg01.R']).toBeUndefined();
+    expect(P.rot['foot.R']).toBeUndefined();
+  });
+  it('ceinture scapulaire : seules les clavicules bougent, pas la tête ni le tronc', () => {
+    const P = poseDepuisValeurs({ ceinture_incl: 6, ceinture_rot: 10 });
+    expect(P.rot['clavicle.L']).toBeTruthy();
+    expect(P.rot['clavicle.R']).toBeTruthy();
+    for (const n of ['neck01', 'neck02', 'neck03', 'head', 'spine01', 'spine02'])
+      expect(P.rot[n]).toBeUndefined();
+  });
+  it('pronation / supination : torsion pure (aucune rotation du coude), + = pronation', () => {
+    const P = poseDepuisValeurs({ avbras_pron_D: 40, avbras_pron_G: -30 });
+    expect(P.twist).toEqual({ R: 40, L: -30 });
+    const N = poseDepuisValeurs({}).rot;
+    expect(P.rot['lowerarm01.R']).toEqual(N['lowerarm01.R']);
+    expect(P.rot['lowerarm02.R']).toBeUndefined();
   });
   it('côtés du patient : abduction identique D/G = mouvement symétrique (z opposés)', () => {
     const P = poseDepuisValeurs({ bras_abd_D: 20, bras_abd_G: 20 });
@@ -170,6 +206,49 @@ describe('isolation du module (règle CLAUDE.md : import dynamique, hors précac
         expect.arrayContaining(['Corps', 'Muscles', 'root', 'upperarm01.L', 'foot.R', 'neck03'])
       );
       expect(j.skins[0].joints.length).toBeGreaterThan(90);
+    }
+  });
+});
+
+describe('dictée', () => {
+  it('« genu valgum bilatéral marqué » → deux genoux, 11° (amplitude propre au curseur)', async () => {
+    const { interpreter } = await import('../js/mannequin3d/dictee.js');
+    const r = interpreter('genu valgum bilatéral marqué');
+    expect(r.propositions.map((p) => [p.id, p.valeur])).toEqual([
+      ['genou_valgus_D', 11],
+      ['genou_valgus_G', 11],
+    ]);
+  });
+  it('côté, qualificatif, chiffre dicté (le chiffre l’emporte), niveau par défaut signalé', async () => {
+    const { interpreter } = await import('../js/mannequin3d/dictee.js');
+    const r = interpreter(
+      'bascule du bassin à droite légère, tête penchée à gauche de 8 degrés, épaule droite haute, recurvatum du genou gauche sévère'
+    );
+    const m = Object.fromEntries(r.propositions.map((p) => [p.id, p]));
+    expect(m.bassin_bascule.valeur).toBe(2);
+    expect(m.tete_incl.valeur).toBe(-8);
+    expect(m.epaule_elev_D.valeur).toBe(5);
+    expect(m.epaule_elev_D.defaut).toBe(true);
+    expect(m.genou_flex_G.valeur).toBe(-15);
+  });
+  it('inégalité de longueur : la jambe nommée courte ou longue donne le bon signe', async () => {
+    const { interpreter } = await import('../js/mannequin3d/dictee.js');
+    expect(interpreter('jambe droite plus courte de 12 mm').propositions[0].valeur).toBe(12);
+    expect(interpreter('jambe droite plus longue de 12 mm').propositions[0].valeur).toBe(-12);
+  });
+  it('côté manquant sur un curseur non latéralisé : rien n’est deviné', async () => {
+    const { interpreter } = await import('../js/mannequin3d/dictee.js');
+    const r = interpreter('bascule du bassin marquée, phrase incompréhensible');
+    expect(r.propositions).toEqual([]);
+    expect(r.ignorees.length).toBe(2);
+  });
+  it('toutes les propositions respectent les bornes des curseurs', async () => {
+    const { interpreter } = await import('../js/mannequin3d/dictee.js');
+    const t =
+      'genu valgum bilatéral sévère, hyperlordose sévère, pieds en dedans sévère, tête en avant 99 cm, rotation interne des cuisses marquée';
+    for (const p of interpreter(t).propositions) {
+      expect(p.valeur).toBeGreaterThanOrEqual(PAR_ID[p.id].min);
+      expect(p.valeur).toBeLessThanOrEqual(PAR_ID[p.id].max);
     }
   });
 });

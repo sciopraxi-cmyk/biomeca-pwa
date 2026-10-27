@@ -42,16 +42,22 @@ export const POSE_NEUTRE = [
 
 const cote = (c) => (c === 'G' ? 1 : -1); // signe de x pour le côté du patient
 const os = (n, c) => n + (c === 'G' ? '.L' : '.R');
+const sd = (c) => (c === 'G' ? 'L' : 'R');
 
 // ─── Curseurs ─────────────────────────────────────────────────────────────────────────
-// ops(v, c) → liste d'opérations {os, axe, deg} (rotation) ou {os, pos:[dx,dy,dz]} (m) ou {bassin:{axe,deg}}.
-// fin = libellés des extrémités (valeur négative → positive).
+// ops(v) → opérations : {os, axe, deg} rotation d'un os ; {os, pos:[dx,dy,dz]} translation (m) ;
+// {bassin:{axe,deg}} rotation du bassin autour des hanches (le haut du corps et les jambes ne suivent pas) ;
+// {morph, w} déformation locale (blend shape, poids = valeur / unité) ; {twist, cote, deg} torsion de l'avant-bras.
+// fin = libellés des extrémités (valeur négative → positive). qual = amplitudes léger/modéré/marqué/sévère (dictée).
 function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
-  return Object.assign({ id, groupe, label, min, max, unite, fin, ops, pas: 1, defaut: 0 }, extra);
+  return Object.assign(
+    { id, groupe, label, court: label, min, max, unite, fin, ops, pas: 1, defaut: 0 },
+    extra
+  );
 }
 export const GROUPES = [
   ['tete', 'Tête et cou'],
-  ['epaules', 'Épaules'],
+  ['epaules', 'Épaules et ceinture scapulaire'],
   ['bras', 'Membres supérieurs'],
   ['tronc', 'Tronc et rachis'],
   ['bassin', 'Bassin'],
@@ -60,6 +66,23 @@ export const GROUPES = [
 ];
 export const CURSEURS = [];
 const add = (c) => CURSEURS.push(c);
+// curseur latéralisé : crée D et G ; « court » = libellé sans le côté (colonnes de l'interface)
+function lat(base, groupe, court, min, max, unite, fin, opsDe, extra = {}) {
+  for (const c of ['D', 'G'])
+    add(
+      C(
+        base + '_' + c,
+        groupe,
+        court + ' ' + c,
+        min,
+        max,
+        unite,
+        fin,
+        (v) => opsDe(v, c),
+        Object.assign({ cote: c, court }, extra)
+      )
+    );
+}
 
 add(
   C('tete_incl', 'tete', 'Inclinaison de la tête', -20, 20, '°', ['G', 'D'], (v) =>
@@ -77,9 +100,17 @@ add(
   )
 );
 add(
-  C('tete_antep', 'tete', 'Antépulsion de la tête', -2, 8, 'cm', ['rétro', 'antépulsion'], (v) => [
-    { os: 'neck02', pos: [0, 0, v / 100] },
-  ])
+  C(
+    'tete_antep',
+    'tete',
+    'Antépulsion de la tête',
+    -2,
+    8,
+    'cm',
+    ['rétro', 'antépulsion'],
+    (v) => [{ os: 'neck02', pos: [0, 0, v / 100] }],
+    { qual: [1, 3, 5, 8] }
+  )
 );
 add(
   C('tete_transl', 'tete', 'Translation latérale de la tête', -4, 4, 'cm', ['G', 'D'], (v) => [
@@ -87,99 +118,82 @@ add(
   ])
 );
 
-for (const c of ['D', 'G']) {
-  add(
-    C(
-      'epaule_elev_' + c,
-      'epaules',
-      'Élévation épaule ' + c,
-      -10,
-      10,
-      '°',
-      ['abaissée', 'élevée'],
-      (v) => [{ os: os('clavicle', c), axe: 'z', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'epaule_antep_' + c,
-      'epaules',
-      'Antépulsion épaule ' + c,
-      -20,
-      20,
-      '°',
-      ['rétropulsion', 'antépulsion'],
-      (v) => [{ os: os('clavicle', c), axe: 'y', deg: -v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'bras_abd_' + c,
-      'bras',
-      'Abduction du bras ' + c,
-      -10,
-      45,
-      '°',
-      ['adduction', 'abduction'],
-      (v) => [{ os: os('upperarm01', c), axe: 'z', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'bras_antep_' + c,
-      'bras',
-      'Antépulsion du bras ' + c,
-      -20,
-      30,
-      '°',
-      ['rétropulsion', 'antépulsion'],
-      (v) => [{ os: os('upperarm01', c), axe: 'x', deg: -v }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'bras_rot_' + c,
-      'bras',
-      'Rotation du bras ' + c,
-      -45,
-      45,
-      '°',
-      ['RI', 'RE'],
-      (v) => [{ os: os('upperarm01', c), axe: 'y', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'coude_flex_' + c,
-      'bras',
-      'Flexion du coude ' + c,
-      0,
-      140,
-      '°',
-      ['', 'flexion'],
-      (v) => [{ os: os('lowerarm01', c), axe: 'x', deg: -v }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'avbras_pron_' + c,
-      'bras',
-      'Pronation / supination ' + c,
-      -60,
-      60,
-      '°',
-      ['supination', 'pronation'],
-      (v) => [{ os: os('lowerarm02', c), axe: 'y', deg: v * cote(c) * -1 }],
-      { cote: c }
-    )
-  );
-}
+// Ceinture scapulaire : les deux clavicules tournent ensemble ; la tête et le tronc ne bougent pas
+add(
+  C(
+    'ceinture_incl',
+    'epaules',
+    'Inclinaison de la ceinture scapulaire',
+    -10,
+    10,
+    '°',
+    ['G (épaule G basse)', 'D (épaule D basse)'],
+    (v) => ['clavicle.L', 'clavicle.R'].map((n) => ({ os: n, axe: 'z', deg: v }))
+  )
+);
+add(
+  C(
+    'ceinture_rot',
+    'epaules',
+    'Rotation de la ceinture scapulaire',
+    -20,
+    20,
+    '°',
+    ['G', 'D'],
+    (v) => ['clavicle.L', 'clavicle.R'].map((n) => ({ os: n, axe: 'y', deg: -v }))
+  )
+);
+lat(
+  'epaule_elev',
+  'epaules',
+  "Élévation de l'épaule",
+  -10,
+  10,
+  '°',
+  ['abaissée', 'élevée'],
+  (v, c) => [{ os: os('clavicle', c), axe: 'z', deg: v * cote(c) }]
+);
+lat(
+  'epaule_antep',
+  'epaules',
+  "Antépulsion de l'épaule",
+  -20,
+  20,
+  '°',
+  ['rétropulsion', 'antépulsion'],
+  (v, c) => [{ os: os('clavicle', c), axe: 'y', deg: -v * cote(c) }]
+);
+
+lat('bras_abd', 'bras', 'Abduction du bras', -10, 45, '°', ['adduction', 'abduction'], (v, c) => [
+  { os: os('upperarm01', c), axe: 'z', deg: v * cote(c) },
+]);
+lat(
+  'bras_antep',
+  'bras',
+  'Antépulsion du bras',
+  -20,
+  30,
+  '°',
+  ['rétropulsion', 'antépulsion'],
+  (v, c) => [{ os: os('upperarm01', c), axe: 'x', deg: -v }]
+);
+lat('bras_rot', 'bras', 'Rotation du bras', -45, 45, '°', ['RI', 'RE'], (v, c) => [
+  { os: os('upperarm01', c), axe: 'y', deg: v * cote(c) },
+]);
+lat('coude_flex', 'bras', 'Flexion du coude', 0, 140, '°', ['', 'flexion'], (v, c) => [
+  { os: os('lowerarm01', c), axe: 'x', deg: -v },
+]);
+// torsion pure de l'avant-bras et de la main autour de l'axe de l'avant-bras (le coude ne plie pas)
+lat(
+  'avbras_pron',
+  'bras',
+  'Pronation / supination',
+  -60,
+  60,
+  '°',
+  ['supination (paume)', 'pronation (dos de la main)'],
+  (v, c) => [{ twist: true, cote: c, deg: v }]
+);
 
 add(
   C('tronc_incl', 'tronc', 'Inclinaison du tronc', -20, 20, '°', ['G', 'D'], (v) =>
@@ -191,29 +205,31 @@ add(
     RACHIS.map((n) => ({ os: n, axe: 'y', deg: -v / 5 }))
   )
 );
+// courbures : déformation locale du dos uniquement, le reste du corps ne bouge pas
 add(
-  C('tronc_cyphose', 'tronc', 'Hypercyphose dorsale', 0, 40, '°', ['', 'cyphose'], (v) =>
-    [
-      ['spine03', 0.25],
-      ['spine02', 0.35],
-      ['spine01', 0.4],
-    ].map(([n, k]) => ({ os: n, axe: 'x', deg: v * k }))
+  C(
+    'tronc_cyphose',
+    'tronc',
+    'Hypercyphose dorsale',
+    0,
+    40,
+    '°',
+    ['', 'cyphose'],
+    (v) => [{ morph: 'cyphose', w: v / 40 }],
+    { qual: [8, 15, 25, 40] }
   )
 );
-// courbe, pas cassure : l'extension lombaire est rattrapée au-dessus pour que le tronc reste vertical
 add(
-  C('tronc_lordose', 'tronc', 'Hyperlordose lombaire', 0, 30, '°', ['', 'lordose'], (v) =>
-    [].concat(
-      [
-        ['spine05', 0.5],
-        ['spine04', 0.5],
-      ].map(([n, k]) => ({ os: n, axe: 'x', deg: -v * k })),
-      [
-        ['spine03', 0.34],
-        ['spine02', 0.33],
-        ['spine01', 0.33],
-      ].map(([n, k]) => ({ os: n, axe: 'x', deg: v * k }))
-    )
+  C(
+    'tronc_lordose',
+    'tronc',
+    'Hyperlordose lombaire',
+    0,
+    30,
+    '°',
+    ['', 'lordose'],
+    (v) => [{ morph: 'lordose', w: v / 30 }],
+    { qual: [8, 15, 22, 30] }
   )
 );
 add(
@@ -236,7 +252,8 @@ add(
     10,
     '°',
     ['G bas', 'D bas'],
-    (v) => [{ bassin: { axe: 'z', deg: v } }]
+    (v) => [{ bassin: { axe: 'z', deg: v } }],
+    { qual: [2, 4, 7, 10] }
   )
 );
 add(
@@ -244,16 +261,18 @@ add(
     { bassin: { axe: 'y', deg: -v } },
   ])
 );
+// antéversion : le haut du bassin part en avant, les fesses bombent, les lombaires se creusent ;
+// rétroversion : l'inverse (fesses plus plates), sans flexion des genoux
 add(
   C(
     'bassin_antev',
     'bassin',
-    'Antéversion du bassin',
+    'Antéversion / rétroversion du bassin',
     -15,
     25,
     '°',
     ['rétroversion', 'antéversion'],
-    (v) => [{ bassin: { axe: 'x', deg: v } }]
+    (v) => [{ bassin: { axe: 'x', deg: v } }, { morph: 'fessiers', w: v / 25 }]
   )
 );
 add(
@@ -269,137 +288,199 @@ add(
   )
 );
 
-for (const c of ['D', 'G']) {
-  add(
-    C(
-      'cuisse_abd_' + c,
-      'jambes',
-      'Abduction de la cuisse ' + c,
-      -15,
-      30,
-      '°',
-      ['adduction', 'abduction'],
-      (v) => [{ os: os('upperleg01', c), axe: 'z', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'cuisse_rot_' + c,
-      'jambes',
-      'Rotation de la cuisse ' + c,
-      -30,
-      30,
-      '°',
-      ['RI', 'RE'],
-      (v) => [{ os: os('upperleg01', c), axe: 'y', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'genou_flex_' + c,
-      'jambes',
-      'Flessum / recurvatum du genou ' + c,
-      -15,
-      30,
-      '°',
-      ['recurvatum', 'flessum'],
-      (v) => [{ os: os('lowerleg01', c), axe: 'x', deg: v }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'genou_valgus_' + c,
-      'jambes',
-      'Valgus / varus du genou ' + c,
-      -15,
-      15,
-      '°',
-      ['varus', 'valgus'],
-      (v) => [{ os: os('lowerleg01', c), axe: 'z', deg: v * cote(c) * -1 }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'tibia_rot_' + c,
-      'jambes',
-      'Rotation du tibia ' + c,
-      -20,
-      20,
-      '°',
-      ['RI', 'RE'],
-      (v) => [{ os: os('lowerleg01', c), axe: 'y', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'pied_ouverture_' + c,
-      'pieds',
-      'Ouverture du pas ' + c,
-      -10,
-      30,
-      '°',
-      ['en dedans', 'en dehors'],
-      (v) => [{ os: os('foot', c), axe: 'y', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-  add(
-    C(
-      'pied_valgus_' + c,
-      'pieds',
-      'Valgus / varus du pied ' + c,
-      -15,
-      15,
-      '°',
-      ['varus', 'valgus'],
-      (v) => [{ os: os('foot', c), axe: 'z', deg: v * cote(c) }],
-      { cote: c }
-    )
-  );
-}
+lat(
+  'cuisse_abd',
+  'jambes',
+  'Abduction de la cuisse',
+  -15,
+  30,
+  '°',
+  ['adduction', 'abduction'],
+  (v, c) => [{ os: os('upperleg01', c), axe: 'z', deg: v * cote(c) }]
+);
+lat('cuisse_rot', 'jambes', 'Rotation de la cuisse', -30, 30, '°', ['RI', 'RE'], (v, c) => [
+  { os: os('upperleg01', c), axe: 'y', deg: v * cote(c) },
+]);
+// genou : seul l'angle du genou bouge (hanche et cheville fixes, le pied reste au sol)
+lat(
+  'genou_flex',
+  'jambes',
+  'Flessum / recurvatum du genou',
+  -15,
+  30,
+  '°',
+  ['recurvatum', 'flessum'],
+  (v, c) => [{ morph: 'genou_flex_' + sd(c), w: v / 30 }]
+);
+lat(
+  'genou_valgus',
+  'jambes',
+  'Valgus / varus du genou',
+  -15,
+  15,
+  '°',
+  ['varus', 'valgus'],
+  (v, c) => [{ morph: 'genou_valgus_' + sd(c), w: v / 15 }],
+  { qual: [3, 7, 11, 15] }
+);
+lat('tibia_rot', 'jambes', 'Rotation du tibia', -20, 20, '°', ['RI', 'RE'], (v, c) => [
+  { os: os('lowerleg01', c), axe: 'y', deg: v * cote(c) },
+]);
+lat(
+  'pied_ouverture',
+  'pieds',
+  'Ouverture du pas',
+  -10,
+  30,
+  '°',
+  ['en dedans', 'en dehors'],
+  (v, c) => [{ os: os('foot', c), axe: 'y', deg: v * cote(c) }],
+  { qual: [8, 15, 22, 30] }
+);
+lat('pied_valgus', 'pieds', 'Valgus / varus du pied', -15, 15, '°', ['varus', 'valgus'], (v, c) => [
+  { os: os('foot', c), axe: 'z', deg: v * cote(c) },
+]);
 
 export const PAR_ID = Object.fromEntries(CURSEURS.map((c) => [c.id, c]));
 
 // ─── Tableaux types ───────────────────────────────────────────────────────────────────────
+// Tableaux types : points de départ INDICATIFS, à ajuster par le praticien (aucune valeur n'est une norme).
+// Chaque valeur est une amplitude « moyenne » située dans la plage du curseur ; les niveaux léger / modéré / marqué /
+// sévère de la dictée donnent d'autres amplitudes. `ref` : à compléter avec les sources cliniques.
+const bil = (base, v) => ({ [base + '_D']: v, [base + '_G']: v });
 export const TABLEAUX = {
   neutre: { label: 'Neutre', valeurs: {} },
-  bascule_bassin: {
-    label: 'Bascule du bassin',
+  genu_valgum_bilat: {
+    label: 'Genu valgum bilatéral',
     valeurs: {
-      bassin_bascule: 6,
-      tronc_incl: -4,
-      tete_incl: 3,
-      epaule_elev_D: -3,
-      epaule_elev_G: 3,
+      ...bil('genou_valgus', 9),
+      ...bil('pied_valgus', 6),
+      ...bil('cuisse_rot', -6),
+      ...bil('tibia_rot', 6),
     },
   },
-  iml: {
-    label: 'Inégalité de longueur (D courte)',
-    valeurs: { bassin_inegalite: 15, tronc_incl: -4, tete_incl: 3 },
+  genu_valgum_D: {
+    label: 'Genu valgum unilatéral D',
+    valeurs: {
+      genou_valgus_D: 9,
+      pied_valgus_D: 6,
+      cuisse_rot_D: -6,
+      tibia_rot_D: 6,
+      bassin_bascule: -3,
+    },
   },
-  genu_valgum: {
-    label: 'Genu valgum bilatéral',
-    valeurs: { genou_valgus_D: 9, genou_valgus_G: 9, pied_valgus_D: 6, pied_valgus_G: 6 },
+  genu_valgum_G: {
+    label: 'Genu valgum unilatéral G',
+    valeurs: {
+      genou_valgus_G: 9,
+      pied_valgus_G: 6,
+      cuisse_rot_G: -6,
+      tibia_rot_G: 6,
+      bassin_bascule: 3,
+    },
   },
-  hyperlordose: { label: 'Hyperlordose', valeurs: { tronc_lordose: 18, bassin_antev: 12 } },
+  genu_varum_bilat: {
+    label: 'Genu varum bilatéral',
+    valeurs: { ...bil('genou_valgus', -8), ...bil('pied_valgus', -5), ...bil('cuisse_rot', 5) },
+  },
+  recurvatum_bilat: {
+    label: 'Genu recurvatum bilatéral',
+    valeurs: { ...bil('genou_flex', -10), bassin_antev: 8 },
+  },
+  flessum_bilat: {
+    label: 'Flessum de genou bilatéral',
+    valeurs: { ...bil('genou_flex', 15), bassin_antev: 8, tronc_lordose: 8 },
+  },
+  pied_plat_valgus: {
+    label: 'Pieds plats valgus bilatéraux',
+    valeurs: {
+      ...bil('pied_valgus', 10),
+      ...bil('pied_ouverture', 15),
+      ...bil('tibia_rot', -6),
+      ...bil('genou_valgus', 4),
+    },
+  },
+  pied_creux_varus: {
+    label: 'Pieds creux varus bilatéraux',
+    valeurs: { ...bil('pied_valgus', -8), ...bil('pied_ouverture', 3), ...bil('genou_valgus', -4) },
+  },
+  rotation_interne_mi: {
+    label: 'Rotation interne des membres inférieurs (pieds en dedans)',
+    valeurs: { ...bil('cuisse_rot', -12), ...bil('pied_ouverture', -8), ...bil('genou_valgus', 3) },
+  },
+  pied_en_dehors: {
+    label: 'Pieds en dehors (ouverture du pas)',
+    valeurs: { ...bil('pied_ouverture', 20), ...bil('cuisse_rot', 8) },
+  },
+  bascule_bassin_D: {
+    label: 'Bascule du bassin, côté D bas',
+    valeurs: { bassin_bascule: 6, tronc_incl: -4, ceinture_incl: -3, tete_incl: 3 },
+  },
+  bascule_bassin_G: {
+    label: 'Bascule du bassin, côté G bas',
+    valeurs: { bassin_bascule: -6, tronc_incl: 4, ceinture_incl: 3, tete_incl: -3 },
+  },
+  iml_D_courte: {
+    label: 'Inégalité de longueur, jambe D courte (15 mm)',
+    valeurs: { bassin_inegalite: 15, tronc_incl: -4, ceinture_incl: -3, tete_incl: 3 },
+  },
+  iml_G_courte: {
+    label: 'Inégalité de longueur, jambe G courte (15 mm)',
+    valeurs: { bassin_inegalite: -15, tronc_incl: 4, ceinture_incl: 3, tete_incl: -3 },
+  },
+  hyperlordose: {
+    label: 'Hyperlordose avec antéversion',
+    valeurs: { tronc_lordose: 18, bassin_antev: 12, tronc_antero: 2 },
+  },
+  dos_plat: {
+    label: 'Dos plat (rétroversion du bassin)',
+    valeurs: { bassin_antev: -10, tronc_lordose: 0, tronc_cyphose: 5 },
+  },
   hypercyphose: {
-    label: 'Hypercyphose',
-    valeurs: { tronc_cyphose: 25, tete_antep: 4, epaule_antep_D: 10, epaule_antep_G: 10 },
+    label: 'Hypercyphose dorsale (dos rond)',
+    valeurs: { tronc_cyphose: 25, tete_antep: 4, ...bil('epaule_antep', 10) },
+  },
+  croise_sup: {
+    label: 'Syndrome croisé supérieur (Janda)',
+    valeurs: {
+      tete_antep: 5,
+      tete_flex: -6,
+      tronc_cyphose: 20,
+      ...bil('epaule_antep', 12),
+      ...bil('epaule_elev', 3),
+    },
+  },
+  croise_inf: {
+    label: 'Syndrome croisé inférieur (Janda)',
+    valeurs: { bassin_antev: 15, tronc_lordose: 16, tronc_antero: 2 },
+  },
+  attitude_scoliotique: {
+    label: 'Attitude scoliotique (fonctionnelle)',
+    valeurs: {
+      tronc_incl: 6,
+      thorax_transl: -2,
+      ceinture_incl: 4,
+      bassin_bascule: 3,
+      tete_incl: -3,
+    },
+  },
+  anteriorisation: {
+    label: 'Antériorisation globale',
+    valeurs: { tronc_antero: 6, tete_antep: 4, bassin_antev: 6, ...bil('genou_flex', 5) },
   },
 };
 
 // ─── Pose complète à partir des valeurs ────────────────────────────────────────────────────
-// Renvoie { rot: {os:[x,y,z,w]}, pos: {os:[dx,dy,dz]}, bassin:[x,y,z,w] }.
-// Le bassin est appliqué à l'os « root » ; les jambes (pelvis.L/R) reçoivent la rotation inverse :
-// le bassin bascule sur des jambes qui restent verticales (la résolution « pieds au sol » est faite par le moteur).
+// Renvoie { rot, pos, bassin, morph, twist }.
+//  - rot  : {os → quaternion} ; pos : {os → [dx,dy,dz]} ;
+//  - bassin : rotation du bassin ; le moteur la fait tourner AUTOUR DES HANCHES, remet la colonne en place
+//    (le haut du corps ne suit pas) et laisse les jambes d'aplomb (rotation inverse sur pelvis.L/R) ;
+//  - morph : {nom → poids} ; twist : {L,R} torsion de l'avant-bras en degrés.
 export function poseDepuisValeurs(valeurs) {
   const rot = {},
-    pos = {};
+    pos = {},
+    morph = {},
+    twist = { L: 0, R: 0 };
   let bassin = [0, 0, 0, 1];
   const rotAdd = (nom, q) => {
     rot[nom] = qMul(q, rot[nom] || [0, 0, 0, 1]);
@@ -410,6 +491,8 @@ export function poseDepuisValeurs(valeurs) {
     if (!v || !isFinite(v)) continue;
     for (const o of c.ops(v)) {
       if (o.bassin) bassin = qMul(qAxe(o.bassin.axe, o.bassin.deg), bassin);
+      else if (o.morph) morph[o.morph] = (morph[o.morph] || 0) + o.w;
+      else if (o.twist) twist[sd(o.cote)] += o.deg;
       else if (o.pos) {
         const p = pos[o.os] || (pos[o.os] = [0, 0, 0]);
         p[0] += o.pos[0];
@@ -421,8 +504,9 @@ export function poseDepuisValeurs(valeurs) {
   rot.root = bassin;
   const inv = qInv(bassin);
   rotAdd('pelvis.L', inv);
-  rotAdd('pelvis.R', inv);
-  return { rot, pos, bassin };
+  rotAdd('pelvis.R', inv); // jambes d'aplomb
+  rotAdd('spine05', inv); // la colonne au-dessus du bassin reste en place : seul le bassin bouge
+  return { rot, pos, bassin, morph, twist };
 }
 
 // Valeurs nettoyées (bornées, arrondies, zéros retirés) : ce qui est enregistré dans le bilan.
@@ -444,8 +528,7 @@ export function decrire(valeurs) {
     const x = Number(valeurs && valeurs[c.id]);
     if (!x || !isFinite(x)) continue;
     const mot = x < 0 ? c.fin[0] : c.fin[1];
-    const cote_ = c.cote ? '' : '';
-    lignes.push(c.label + ' : ' + (mot ? mot + ' ' : '') + Math.abs(x) + ' ' + c.unite + cote_);
+    lignes.push(c.label + ' : ' + (mot ? mot + ' ' : '') + Math.abs(x) + ' ' + c.unite);
   }
   return lignes;
 }

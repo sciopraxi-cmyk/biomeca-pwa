@@ -1,6 +1,7 @@
 // Mannequin postural 3D — interface praticien (curseurs, vues, peau / muscles).
-import { CURSEURS, GROUPES, TABLEAUX, decrire, nettoyerValeurs } from './parametres.js';
+import { CURSEURS, GROUPES, TABLEAUX, PAR_ID, decrire, nettoyerValeurs } from './parametres.js';
 import { creerMoteur, VUES } from './moteur.js';
+import { interpreter } from './dictee.js';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -11,7 +12,13 @@ const CSS = `
 .m3d-vues,.m3d-barre{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .m3d-btn{border:1px solid var(--bord,#c9d1da);background:#fff;color:#223;border-radius:16px;padding:4px 12px;font-size:12px;cursor:pointer}
 .m3d-btn.on{background:#2a7a4e;color:#fff;border-color:#2a7a4e}
-.m3d-panel{flex:1 1 360px;min-width:300px;max-height:560px;overflow:auto}
+.m3d-panel{flex:1 1 440px;min-width:300px;max-height:560px;overflow:auto}
+.m3d-cols{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:0 10px 4px}
+.m3d-colhead{font-size:11px;font-weight:700;color:#456;text-align:center;border-bottom:1px solid var(--bord,#d8dee5);padding:2px 0;margin-bottom:2px}
+.m3d-cols .m3d-row{padding:3px 0 6px;min-width:0}
+.m3d-cols .m3d-row-top{font-size:11px;line-height:1.2}
+.m3d-cols .m3d-fin{font-size:9px}
+.m3d-cols input[type=number]{width:46px}
 .m3d-grp{border:1px solid var(--bord,#d8dee5);border-radius:8px;margin-bottom:6px;background:#fff}
 .m3d-grp>summary{cursor:pointer;padding:7px 10px;font-weight:600;font-size:13px;color:#2a7a4e;display:flex;justify-content:space-between;align-items:center}
 .m3d-row{padding:4px 10px 8px}
@@ -21,6 +28,13 @@ const CSS = `
 .m3d-fin{display:flex;justify-content:space-between;font-size:10px;color:#667}
 .m3d-row.act .m3d-row-top span:first-child{font-weight:700;color:#b45309}
 .m3d-cr{font-size:12px;color:#223;margin-top:8px;background:#f6faf7;border-radius:8px;padding:8px 10px}
+.m3d-dic{border:1px solid var(--bord,#d8dee5);border-radius:8px;background:#fff;padding:8px 10px;margin-bottom:8px}
+.m3d-dic textarea{width:100%;box-sizing:border-box;font-size:12px}
+.m3d-dic small{color:#667;font-size:10px;display:block;margin-top:3px}
+.m3d-prop{margin-top:6px;font-size:12px;color:#223}
+.m3d-prop label{display:flex;gap:6px;align-items:flex-start;padding:2px 0}
+.m3d-prop em{color:#92400e;font-style:normal;font-size:10px}
+.m3d-row.prop{outline:2px dashed #b45309;background:#fff7ed;border-radius:6px}
 .m3d-cr ul{margin:4px 0 0 16px;padding:0}
 `;
 
@@ -114,6 +128,8 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
       type: 'button',
       onclick: () => {
         S.valeurs = {};
+        S.prop = null;
+        majProp();
         majCurseurs();
         maj();
       },
@@ -162,7 +178,7 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
       );
     }
     d.append(sum);
-    for (const c of cs) {
+    const faireLigne = (c, libelle) => {
       const rng = el('input', { type: 'range', min: c.min, max: c.max, step: c.pas, value: 0 });
       const num = el('input', { type: 'number', min: c.min, max: c.max, step: c.pas, value: 0 });
       const set = (v) => {
@@ -177,11 +193,11 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
       rng.addEventListener('dblclick', () => set(0));
       const row = el(
         'div',
-        { class: 'm3d-row' },
+        { class: 'm3d-row', 'data-id': c.id },
         el(
           'div',
           { class: 'm3d-row-top' },
-          el('span', {}, c.label),
+          el('span', {}, libelle),
           el('span', {}, num, ' ' + c.unite)
         ),
         rng,
@@ -189,16 +205,68 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
           'div',
           { class: 'm3d-fin' },
           el('span', {}, (c.fin[0] || '') + ' ←'),
-          el('span', {}, '0'),
           el('span', {}, '→ ' + (c.fin[1] || ''))
         )
       );
       lignes[c.id] = { row, rng, num };
-      d.append(row);
+      return row;
+    };
+    cs.filter((c) => !c.cote).forEach((c) => d.append(faireLigne(c, c.label)));
+    const lat = cs.filter((c) => c.cote);
+    if (lat.length) {
+      const grille = el(
+        'div',
+        { class: 'm3d-cols' },
+        el('div', { class: 'm3d-colhead' }, 'Gauche (patient)'),
+        el('div', { class: 'm3d-colhead' }, 'Droite (patient)')
+      );
+      for (const c of lat.filter((x) => x.cote === 'G')) {
+        const dr = PAR_ID[c.id.slice(0, -1) + 'D'];
+        grille.append(faireLigne(c, c.court), faireLigne(dr, c.court));
+      }
+      d.append(grille);
     }
+    d.append(el('div', { style: 'height:4px' }));
     panel.append(d);
   }
-  racine.append(el('div', { style: 'flex:1 1 360px;min-width:300px' }, panel, cr));
+  const zone = el('textarea', {
+    class: 'inp',
+    rows: '2',
+    placeholder:
+      'Dictez ou écrivez ce que vous observez, ex. « genu valgum bilatéral marqué, bascule du bassin à droite légère, tête penchée à gauche de 8 degrés »',
+  });
+  const SR =
+    typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+  let reco = null;
+  const btnMic = el(
+    'button',
+    { class: 'm3d-btn', type: 'button', onclick: () => basculerMicro() },
+    '🎤 Dicter'
+  );
+  if (!SR) {
+    btnMic.disabled = true;
+    btnMic.title = 'Dictée non disponible sur ce navigateur : saisissez le texte';
+  }
+  const btnInterp = el(
+    'button',
+    { class: 'm3d-btn', type: 'button', onclick: () => proposer() },
+    '🔍 Interpréter'
+  );
+  const liste = el('div', { class: 'm3d-prop' });
+  const dic = el(
+    'div',
+    { class: 'm3d-dic' },
+    el('strong', { style: 'font-size:12px' }, '🎙️ Dictée : le mannequin se déforme, vous validez'),
+    zone,
+    el('div', { class: 'm3d-barre' }, btnMic, btnInterp),
+    el(
+      'small',
+      {},
+      'Niveaux : léger, modéré, marqué, sévère (ou un chiffre). La reconnaissance vocale est celle de votre navigateur : ne dictez aucune donnée identifiante.'
+    ),
+    liste
+  );
+  racine.append(el('div', { style: 'flex:1 1 440px;min-width:300px' }, dic, panel, cr));
   conteneur.append(racine);
 
   function majLigne(id) {
@@ -218,11 +286,118 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     for (const k in btnSexe) btnSexe[k].classList.toggle('on', S.sexe === k);
     btnPeau.textContent = S.peau ? '💪 Retirer la peau (muscles)' : '🧍 Remettre la peau';
   }
+  function fusion() {
+    const m = Object.assign({}, S.valeurs);
+    if (S.prop) for (const p of S.prop) if (p.coche) m[p.id] = p.valeur;
+    return m;
+  }
+  function majProp() {
+    for (const id in lignes) lignes[id].row.classList.remove('prop');
+    liste.textContent = '';
+    if (!S.prop) return;
+    if (!S.prop.length) {
+      liste.append(
+        el('div', {}, 'Rien de compris : reformulez avec le nom du mouvement et le côté.')
+      );
+      return;
+    }
+    for (const p of S.prop) {
+      const cb = el('input', { type: 'checkbox' });
+      cb.checked = p.coche;
+      cb.addEventListener('change', () => {
+        p.coche = cb.checked;
+        majProp();
+        maj();
+      });
+      liste.append(
+        el(
+          'label',
+          {},
+          cb,
+          el(
+            'span',
+            {},
+            p.texte + ' ',
+            p.defaut ? el('em', {}, '(niveau modéré par défaut)') : '',
+            p.remarque ? el('em', {}, ' ' + p.remarque) : ''
+          )
+        )
+      );
+      if (lignes[p.id]) {
+        lignes[p.id].row.classList.toggle('prop', p.coche);
+        const d = lignes[p.id].row.closest('details');
+        if (d && p.coche) d.open = true;
+      }
+    }
+    const ok = el(
+      'button',
+      {
+        class: 'm3d-btn on',
+        type: 'button',
+        onclick: () => {
+          S.valeurs = fusion();
+          S.prop = null;
+          majCurseurs();
+          majProp();
+          maj();
+        },
+      },
+      '✔ Appliquer'
+    );
+    const non = el(
+      'button',
+      {
+        class: 'm3d-btn',
+        type: 'button',
+        onclick: () => {
+          S.prop = null;
+          majProp();
+          maj();
+        },
+      },
+      '✖ Annuler'
+    );
+    liste.append(el('div', { class: 'm3d-barre' }, ok, non));
+  }
+  function proposer() {
+    const r = interpreter(zone.value);
+    S.prop = r.propositions.map((p) => Object.assign({ coche: true }, p));
+    majProp();
+    maj();
+    if (r.ignorees.length) liste.append(el('small', {}, 'Non compris : ' + r.ignorees.join(' / ')));
+  }
+  function basculerMicro() {
+    if (reco) {
+      reco.stop();
+      return;
+    }
+    reco = new SR();
+    reco.lang = 'fr-FR';
+    reco.continuous = true;
+    reco.interimResults = false;
+    reco.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++)
+        if (e.results[i].isFinal)
+          zone.value += (zone.value ? ', ' : '') + e.results[i][0].transcript.trim();
+    };
+    reco.onend = () => {
+      reco = null;
+      btnMic.textContent = '🎤 Dicter';
+      btnMic.classList.remove('on');
+      if (zone.value.trim()) proposer();
+    };
+    reco.onerror = () => {
+      /* micro refusé ou coupé : le texte déjà reconnu reste utilisable */
+    };
+    btnMic.textContent = '⏹ Arrêter';
+    btnMic.classList.add('on');
+    reco.start();
+  }
   function maj() {
     majBoutons();
     if (moteur) {
       moteur.peau(S.peau);
-      moteur.pose(S.valeurs);
+      moteur.pose(fusion());
       moteur.afficher();
     }
     const l = decrire(S.valeurs);

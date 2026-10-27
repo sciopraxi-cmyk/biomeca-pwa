@@ -45,33 +45,49 @@ def build(gender,out,**kw):
     skin={'joints':[nid[n] for n in names],'inverseBindMatrices':g.accessor(ibm,5126,'MAT4'),'skeleton':0}
     g.skins.append(skin)
     P=pos*S
-    mi=g.mesh('peau',P,normals(P,idx),uvs*[1,1],idx,mat,J[src],W[src])
+    from build_morph import build_morphs
+    Jd0=np.zeros((len(pos),len(BONES)),'f4')
+    for k in range(4): np.add.at(Jd0,(np.arange(len(pos)),J[src][:,k]),W[src][:,k])
+    Hm=(P[:,1].max()-P[:,1].min())
+    mph=build_morphs(P,idx,Jd0,BONES,bp,Hm)
+    mi=g.mesh('peau',P,normals(P,idx),uvs*[1,1],idx,mat,J[src],W[src],morphs=mph)
     g.nodes.append({'name':'Corps','mesh':mi,'skin':0})
     top=[0,len(g.nodes)-1]
     if kw.get('muscles',True):
-        from build_muscle import muscle_layer
         from geom import subdivide, vnormals
-        # poids denses pour sous-division
+        from bake import bake
+        import os, io
+        from PIL import Image
         Jd=np.zeros((len(pos),len(BONES)),'f4')
         for k in range(4): np.add.at(Jd,(np.arange(len(pos)),J[src][:,k]),W[src][:,k])
-        P2,t2,at=subdivide(pos,idx,{'w':Jd,'pnb':posnb})
+        P2,t2,at=subdivide(pos,idx,{'w':Jd,'pnb':posnb,'uv':uvs})
         Wd=at['w']
         top4=np.argsort(-Wd,axis=1)[:,:4]
         J4=top4.astype('u2');W4=np.take_along_axis(Wd,top4,1);W4/=W4.sum(1,keepdims=True)
-        L={'Sh':bp['upperarm01.L'][0],'El':bp['lowerarm01.L'][0],'Wr':bp['wrist.L'][0],'Hip':bp['upperleg01.L'][0],'Kn':bp['lowerleg01.L'][0],'An':bp['foot.L'][0],'NeckB':bp['neck01'][0],'HeadB':bp['head'][0]}
-        L={k:np.array(vv)*10*0.1*10/10 for k,vv in L.items()}  # dm -> cm : *10
-        L={k:np.array(bp_)*10 for k,bp_ in {'Sh':bp['upperarm01.L'][0],'El':bp['lowerarm01.L'][0],'Wr':bp['wrist.L'][0],'Hip':bp['upperleg01.L'][0],'Kn':bp['lowerleg01.L'][0],'An':bp['foot.L'][0],'NeckB':bp['neck01'][0],'HeadB':bp['head'][0]}.items()}
         height=(pos[:,1].max()-pos[:,1].min())*10
-        # cm = dm*10
-        Pm,col,Wm,names,owner=muscle_layer(at['pnb']*10,t2,None,L,height,Wd=Wd,BONES=BONES)
-        Pm=Pm/10*S*0+Pm*0.01
-        mm=g.material(name='muscles',pbrMetallicRoughness={'baseColorFactor':[1,1,1,1],'metallicFactor':0,'roughnessFactor':.42},doubleSided=False)
-        mi2=g.mesh('muscles',Pm,normals(Pm,t2),None,t2,mm,J4,W4,color=col)
+        sx=bp['upperarm01.L'][0][0]*10/18.8
+        pn_cm=posnb*10
+        Nv=vnormals(pn_cm,idx)
+        R=int(os.environ.get('BAKE_RES','2048'))
+        cache='/root/outils/mannequin/tex_%s_%d%s.jpg'%(out.split('_')[-1].split('.')[0],R,'_dbg' if os.environ.get('ECORCHE_DEBUG') else '')
+        img,nrm,names,_=bake(pn_cm,Nv,uvs,idx,Jd,BONES,bp,height,sx,R=R,debug=bool(os.environ.get('ECORCHE_DEBUG')))
+        bio=io.BytesIO(); Image.fromarray(img).save(bio,'JPEG',quality=88); jpg=bio.getvalue(); open(cache,'wb').write(jpg)
+        print('  texture',len(jpg)//1024,'Ko',flush=True)
+        bio2=io.BytesIO(); Image.fromarray(nrm).save(bio2,'JPEG',quality=90); jn=bio2.getvalue()
+        print('  normales',len(jn)//1024,'Ko',flush=True)
+        tex=g.texture(jpg); texn=g.texture(jn)
+        N2=vnormals(at['pnb']*10,t2)
+        Pm=(at['pnb']*10-N2*0.25)*0.01
+        uv2=at['uv']*np.array([1,-1])+np.array([0,1])
+        mm=g.material(name='muscles',pbrMetallicRoughness={'baseColorTexture':{'index':tex},'metallicFactor':0,'roughnessFactor':.38},normalTexture={'index':texn,'scale':1.0},doubleSided=False)
+        mph2=build_morphs(Pm,t2,Wd,BONES,bp,Hm)
+        mi2=g.mesh('muscles',Pm,normals(Pm,t2),uv2,t2,mm,J4,W4,morphs=mph2)
         g.nodes.append({'name':'Muscles','mesh':mi2,'skin':0})
         top.append(len(g.nodes)-1)
-        build.last=(names,owner)
     g.write(out,top)
     return v,pos,idx,src,bp
 if __name__=='__main__':
+    import os
     for n,gd in (('homme',1),('femme',0)):
+        if os.environ.get('SEXES') and n not in os.environ['SEXES'].split(','): continue
         build(gd,f'/root/outils/mannequin/out_{n}.glb'); print(n,'ok')

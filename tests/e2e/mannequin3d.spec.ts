@@ -110,6 +110,29 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   ).toBe('visible');
   await expect(page.locator('#po-silh-legacy-titre')).toBeVisible();
   await page.evaluate('delete currentPatient.bilanDataPosturo._bodyCanvas');
+  // membres supérieurs : deux colonnes (gauche / droite du patient)
+  const bras = page.locator('details', {
+    has: page.locator('summary', { hasText: 'Membres supérieurs' }),
+  });
+  await bras.locator('summary').click();
+  await expect(bras.locator('.m3d-colhead', { hasText: 'Gauche' })).toBeVisible();
+  await expect(bras.locator('.m3d-colhead', { hasText: 'Droite' })).toBeVisible();
+  // dictée : le mannequin propose, le praticien valide
+  await page.fill(
+    '.m3d-dic textarea',
+    'genu valgum bilatéral marqué, tête penchée à gauche de 6 degrés'
+  );
+  await page.click('.m3d-btn:has-text("Interpréter")');
+  await expect(page.locator('.m3d-prop label')).toHaveCount(3);
+  expect(
+    await page.evaluate('currentPatient.bilanDataPosturo.mannequin3d.valeurs.genou_valgus_D')
+  ).toBeUndefined();
+  await page.click('.m3d-btn:has-text("Appliquer")');
+  await page.waitForTimeout(2500);
+  const apres = await page.evaluate('currentPatient.bilanDataPosturo.mannequin3d.valeurs');
+  expect(apres.genou_valgus_D).toBe(11);
+  expect(apres.genou_valgus_G).toBe(11);
+  expect(apres.tete_incl).toBe(-6);
   // nettoyage
   await page.evaluate(() => (window as any).nav('pg-patients'));
   await page.waitForTimeout(500);
