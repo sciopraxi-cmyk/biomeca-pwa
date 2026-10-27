@@ -30986,6 +30986,8 @@ async function _m3dPosturoInit() {
     host.id = 'm3d-posturo';
     host.style.margin = '12px 0';
     zoneDessin.before(host);
+    // le bloc mannequin passe en 1re position de la section Morphostatique (avant « Analyse posturale — captures 4 vues »)
+    if (carte.parentElement && carte.parentElement.firstElementChild !== carte) carte.parentElement.prepend(carte);
     const entete = carte.firstElementChild;
     if (entete && entete.children.length >= 2) {
       entete.children[0].textContent = '🧍 Bilan morphostatique — Mannequin 3D';

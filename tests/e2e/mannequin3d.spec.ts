@@ -36,6 +36,12 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
     null,
     { timeout: 90_000 }
   );
+  // le bloc mannequin est en 1re position de la section Morphostatique
+  expect(
+    await page.evaluate(
+      "document.getElementById('m3d-posturo').parentElement === document.getElementById('psec-1').firstElementChild"
+    )
+  ).toBe(true);
   // sexe par défaut d'après la civilité
   await expect(page.locator('.m3d-btn.on', { hasText: 'Femme' })).toBeVisible();
   // curseurs : on ouvre Tronc et Bassin
