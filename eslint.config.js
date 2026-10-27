@@ -65,6 +65,16 @@ export default [
     },
   },
 
+  // js/mannequin3d/ : modules ES du mannequin 3D (navigateur, chargés à la demande par import dynamique).
+  {
+    files: ['js/mannequin3d/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.browser },
+    },
+  },
+
   // js/*.mjs : ES modules clean (calc.mjs pour les calculs cliniques,
   // access.mjs pour le gating). Peuvent tourner en navigateur (chargement
   // futur via import) ou Node (tests Vitest) → on autorise les globals

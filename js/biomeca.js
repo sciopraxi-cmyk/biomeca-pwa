@@ -18932,6 +18932,12 @@ async function buildRapportPosturo() {
   // (branche `bonhommes`) via makeSliceComposite L10868.
   const beforeDynIdx = sections.findIndex(s => s.titre && s.titre.startsWith('3.'));
   let visualAnchor = beforeDynIdx >= 0 ? beforeDynIdx : sections.length;
+  // #265 — Mannequin 3D : 4 vues rendues à l'échelle identique + compte rendu des valeurs non nulles.
+  const mannequinRapport = await _m3dVuesRapport(d);
+  if (mannequinRapport) {
+    sections.splice(visualAnchor, 0, {titre:'2. Morphostatique — Mannequin 3D', color:'#3498db', type:'mannequin3d', mannequin: mannequinRapport});
+    visualAnchor++;
+  }
   if(visuals.bodyCanvas.status !== 'nu') {
     var bgIds3 = ['imgjs-morpho-profilG','imgjs-morpho-face2','imgjs-morpho-face','imgjs-morpho-profilD'];
     // Fix #149 défaut 2 — bodyCanvasData vient désormais de visuals (résolution
@@ -19270,7 +19276,24 @@ function _doBuildRapport(p, d, prat, logo, sections) {
     bodyHtml += '<div class="section">';
     bodyHtml += '<div class="section-title"><div class="section-num">'+num+'</div><div class="section-label">'+s.titre+'</div><div class="section-line"></div></div>';
     bodyHtml += '<div class="section-body">';
-    if(s.type === 'bonhommes') {
+    if(s.type === 'mannequin3d') {
+      var mq = s.mannequin;
+      if (!mq.imgs) {
+        bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Mannequin 3D non rendu (WebGL indisponible) — les valeurs restent enregistrées.</div>';
+      } else {
+        var lab3d = [['profilD','Profil D'],['dos','Dos'],['face','Face'],['profilG','Profil G']];
+        bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;">';
+        lab3d.forEach(function(k) {
+          bodyHtml += '<div style="text-align:center;"><div style="font-size:9px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">'+k[1]+'</div><img src="'+mq.imgs[k[0]]+'" style="max-width:100%;border-radius:4px;"/></div>';
+        });
+        bodyHtml += '</div>';
+      }
+      if (mq.lignes && mq.lignes.length) {
+        bodyHtml += '<ul style="margin:4px 0 8px 18px;padding:0;font-size:11px;color:#374151;">';
+        mq.lignes.forEach(function(t) { bodyHtml += '<li>'+_escHtml(t)+'</li>'; });
+        bodyHtml += '</ul>';
+      }
+    } else if(s.type === 'bonhommes') {
       // Fix #149 — mention rouge sur status 'ko' (annotations Storage introuvables).
       if (s.ko) {
         bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Annotations non chargées sur les silhouettes — vérifiez votre connexion avant d\'imprimer.</div>';
@@ -30935,6 +30958,87 @@ function updateSchemaMoteursTotals() {
   applyTendanceToTerrain(profil);
 }
 
+// ═══ #265 — Mannequin postural 3D (module isolé js/mannequin3d/, import dynamique) ═══
+// Les valeurs des curseurs sont stockées comme DONNÉES dans bilanDataPosturo.mannequin3d
+// ({v, sexe, peau, valeurs}) : synchronisées comme le reste du bilan, comparables entre bilans.
+// Les anciens dessins (_bodyCanvas / Path) restent affichés tels quels sous le mannequin.
+let _m3dPosturo = null;
+async function _m3dPosturoInit() {
+  const canvas = document.getElementById('posturo-body-canvas');
+  const p = currentPatient;
+  if (!canvas || !p) return;
+  // Le gabarit de la page est figé (test de structure #268) : tout est inséré/modifié par script.
+  const zoneDessin = canvas.parentElement; // bloc « 4 silhouettes + canevas »
+  const barreOutils = zoneDessin ? zoneDessin.nextElementSibling : null;
+  const carte = zoneDessin ? zoneDessin.parentElement : null;
+  if (!zoneDessin || !carte) return;
+  if (!p.bilanDataPosturo) p.bilanDataPosturo = {};
+  const d = p.bilanDataPosturo;
+  let host = document.getElementById('m3d-posturo');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'm3d-posturo';
+    host.style.margin = '12px 0';
+    zoneDessin.before(host);
+    const entete = carte.firstElementChild;
+    if (entete && entete.children.length >= 2) {
+      entete.children[0].textContent = '🧍 Bilan morphostatique — Mannequin 3D';
+      entete.children[1].textContent = 'Réglez les curseurs : le mannequin se déforme en temps réel (face, dos, profils). « Retirer la peau » affiche les muscles.';
+    }
+  }
+  // Anciens dessins : conservés et affichés tels quels s'ils existent ; sinon masqués (le canevas reste dans la page).
+  const ancien = !!(d._bodyCanvas || d._bodyCanvasPath);
+  // Masquage sans toucher à la mise en page du canevas (il garde ses dimensions) : hors flux, invisible.
+  if (ancien) {
+    zoneDessin.style.position = 'relative'; zoneDessin.style.visibility = ''; zoneDessin.style.pointerEvents = '';
+    if (barreOutils) barreOutils.style.display = '';
+  } else {
+    carte.style.position = 'relative';
+    zoneDessin.style.cssText += ';position:absolute;top:0;left:0;right:0;visibility:hidden;pointer-events:none;';
+    if (barreOutils) barreOutils.style.display = 'none';
+  }
+  if (ancien && !document.getElementById('po-silh-legacy-titre')) {
+    const t = document.createElement('div');
+    t.id = 'po-silh-legacy-titre';
+    t.style.cssText = 'font-size:11px;font-weight:600;color:#6b7280;margin-top:6px;';
+    t.textContent = 'Anciennes silhouettes (dessin conservé tel quel)';
+    zoneDessin.before(t);
+  }
+  if (_m3dPosturo && _m3dPosturo.hote === host && _m3dPosturo.bilan === d) return;
+  if (_m3dPosturo && _m3dPosturo.api) { try { _m3dPosturo.api.detruire(); } catch (e) { /* hôte déjà remplacé */ } }
+  _m3dPosturo = { hote: host, bilan: d, api: null };
+  const ref = _m3dPosturo;
+  try {
+    const mod = await import('./mannequin3d/index.js');
+    if (_m3dPosturo !== ref) return;
+    const sexeDef = p.civilite === 'Mme' ? 'femme' : 'homme';
+    ref.api = mod.monter(host, {
+      etat: d.mannequin3d || null,
+      sexeParDefaut: sexeDef,
+      onChange: function (e) {
+        if (globalThis?._modeConsultation) return;
+        const avant = JSON.stringify(d.mannequin3d || null);
+        d.mannequin3d = e;
+        if (JSON.stringify(e) !== avant && ref.api) _scheduleBilanAutosave('posturo');
+      }
+    });
+  } catch (e) {
+    host.textContent = 'Mannequin 3D indisponible : ' + (e && e.message ? e.message : e);
+  }
+}
+// Rapport : les 4 vues du mannequin, rendues hors écran à partir des valeurs enregistrées.
+async function _m3dVuesRapport(d) {
+  const m = d && d.mannequin3d;
+  if (!m || !m.valeurs || !Object.keys(m.valeurs).length) return null;
+  try {
+    const mod = await import('./mannequin3d/index.js');
+    const imgs = await mod.rendreVues(m.valeurs, { sexe: m.sexe || 'homme', peau: m.peau !== false });
+    return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false };
+  } catch (e) {
+    return { imgs: null, lignes: [], erreur: true };
+  }
+}
+
 function showPosturoSection(idx) {
   document.querySelectorAll('.posturo-section').forEach((s,i) => {
     s.style.display = i === idx ? 'block' : 'none';
@@ -30947,6 +31051,7 @@ function showPosturoSection(idx) {
     // Attendre que psec-1 soit visible avant d'initialiser le canvas
     const psec1 = document.getElementById('psec-1');
     if(psec1) psec1.style.display = '';
+    _m3dPosturoInit(); // #265 — mannequin 3D (module chargé à la demande)
     // Fix #78 — garde idempotente, motif !_baseSnapshot déjà en place côté
     // sport (showSportBilanSection ssec-1 L21053, ssec-9 L21101). Sans elle,
     // initPosturoBodyCanvas est DESTRUCTIVE (canvas.width=... efface les
