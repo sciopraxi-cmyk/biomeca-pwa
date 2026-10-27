@@ -380,3 +380,41 @@ describe('logiciel praticien — lot 5 : rapports, devis et factures, ordonnance
     expect(sansCom).not.toMatch(/iframe|@media print|ordo-impression/);
   });
 });
+
+describe('logiciel praticien — fenêtre « Accès au portail patient » (lot 5, suite)', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('/* Refonte « premium » — lot 5 (suite)'));
+  const sansCom = bloc.replace(/\/\*[\s\S]*?\*\//g, '');
+  const hors = sansCom.replace(/@(media|supports)[^{]*\{/g, '');
+  it('chaque règle est bornée à body.theme-clair #portail-patient-modal', () => {
+    const regles = hors
+      .split('}')
+      .map((r) => r.trim())
+      .filter((r) => r.includes('{'));
+    expect(regles.length).toBeGreaterThan(20);
+    for (const r of regles) {
+      for (const s of r.slice(0, r.indexOf('{')).split(',')) {
+        expect(s.trim().startsWith('body.theme-clair #portail-patient-modal')).toBe(true);
+      }
+    }
+  });
+  it('deux colonnes seulement dès 900 px ; suivi et documents en pleine largeur', () => {
+    expect(bloc).toMatch(/@media \(min-width:900px\)/);
+    expect(bloc).toMatch(/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+    expect(bloc).toMatch(/has\(> #portail-suivi\)/);
+    expect(bloc).toMatch(/has\(> #portail-docs\)/);
+  });
+  it('le HTML de la fenêtre garde ses identifiants utilisés par les chargeurs', () => {
+    const js = lire('js/biomeca.js');
+    for (const id of [
+      'portail-programme',
+      'portail-suivi',
+      'portail-docs',
+      'portail-questionnaire',
+      'portail-rep-nom',
+      'portail-identifiant',
+    ]) {
+      expect(js).toMatch(new RegExp('id=\\\\?"' + id + '\\\\?"'));
+    }
+  });
+});

@@ -2141,3 +2141,47 @@ body.theme-clair #pg-rapport-posturo > div:first-child button{ border-radius:11p
 body.theme-clair #pg-rapport-posturo > div:first-child > button:first-child{ font-weight:600; padding:7px 12px !important; }
 body.theme-clair #rapport-posturo-body{ border-radius:22px; box-shadow:0 18px 44px -26px rgba(11,27,58,.28); overflow:hidden; margin-top:22px !important; margin-bottom:30px !important; }
 @media (max-width:760px){ body.theme-clair #pg-documents > div, body.theme-clair #pg-ordonnances > div, body.theme-clair #pg-sterilisation > div, body.theme-clair #pg-actes > div{ padding:16px 14px 32px !important; } body.theme-clair #pg-rapport .rapport-page{ padding:8px 12px 30px; } }
+/* Refonte « premium » — lot 5 (suite) : fenêtre « 🔑 Accès au portail patient ».
+   CSS seulement. Chaque thème de la fenêtre (identité, représentant légal, actions, programme, notifications, messagerie,
+   questionnaire, suivi, documents) devient une carte distincte, avec son titre en bleu ; deux colonnes dès 900 px. */
+body.theme-clair #portail-patient-modal > div{ background:#f1f5fc !important; border-radius:24px !important; padding:0 26px 26px !important; max-width:min(1000px,96vw) !important; display:grid; grid-template-columns:1fr; gap:16px; align-content:start; box-shadow:0 40px 90px -30px rgba(11,27,58,.6); }
+body.theme-clair #portail-patient-modal > div > *{ min-width:0; }
+/* En-tête fixe : titre, nom du patient en pastille, bouton de fermeture */
+body.theme-clair #portail-patient-modal > div > div:first-child{ position:sticky; top:0; z-index:3; margin:0 -26px !important; padding:18px 26px 14px; background:#fff; border-bottom:1px solid #e3e9f5; border-radius:24px 24px 0 0; box-shadow:0 10px 22px -20px rgba(11,27,58,.45); }
+body.theme-clair #portail-patient-modal > div > div:first-child > div{ font-size:19px !important; font-weight:800 !important; letter-spacing:-.02em; }
+body.theme-clair #portail-patient-modal > div > div:first-child > button{ border-radius:11px !important; width:36px; height:36px; padding:0 !important; }
+body.theme-clair #portail-patient-modal > div > div:nth-child(2){ justify-self:start; margin:4px 0 0 !important; padding:6px 14px; border-radius:999px; background:#dbe7fd; color:#1d4ed8 !important; font-size:13.5px !important; font-weight:700; }
+body.theme-clair #portail-patient-modal #portail-msg{ border-radius:14px !important; padding:12px 16px !important; margin:0 !important; }
+/* Cartes : identité (pleine largeur), représentant légal, actions, puis chaque thème */
+body.theme-clair #portail-patient-modal > div > div[style*="border-radius:10px"], body.theme-clair #portail-patient-modal > div > div:has(#portail-rep-nom), body.theme-clair #portail-patient-modal > div > div[style*="flex-wrap:wrap"], body.theme-clair #portail-patient-modal > div > div[style*="margin-top:16px"]{ background:#fff !important; border:0 !important; border-radius:20px !important; padding:20px 22px !important; margin:0 !important; box-shadow:0 0 0 1px #e3e9f5, 0 14px 34px -26px rgba(11,27,58,.5); font-size:13px; line-height:1.55; }
+body.theme-clair #portail-patient-modal > div > div[style*="border-radius:10px"]{ border-left:6px solid #2563eb !important; background:linear-gradient(135deg,#f3f7ff,#fff 60%) !important; }
+body.theme-clair #portail-patient-modal #portail-identifiant{ font-size:34px !important; letter-spacing:5px !important; font-weight:800 !important; color:#1e3a8a !important; line-height:1.15; }
+body.theme-clair #portail-patient-modal > div > div[style*="border-radius:10px"] > div:first-child{ font-size:11.5px !important; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#52617d !important; }
+/* Titres de cartes : petit titre bleu net, trait sous le titre */
+body.theme-clair #portail-patient-modal > div > div:has(#portail-rep-nom) > div:first-child, body.theme-clair #portail-patient-modal > div > div[style*="margin-top:16px"] > div:first-child{ font-size:12px !important; font-weight:800 !important; letter-spacing:.09em; text-transform:uppercase; color:#1d4ed8 !important; padding-bottom:10px; margin-bottom:12px !important; border-bottom:2px solid #dbe7fd; }
+body.theme-clair #portail-patient-modal > div > div[style*="flex-wrap:wrap"]{ display:flex; align-content:flex-start; gap:10px !important; }
+body.theme-clair #portail-patient-modal > div > div[style*="flex-wrap:wrap"]::before{ content:"Actions sur l'accès"; flex-basis:100%; font-size:12px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#1d4ed8; padding-bottom:10px; border-bottom:2px solid #dbe7fd; margin-bottom:2px; }
+/* Boutons et champs de la fenêtre */
+body.theme-clair #portail-patient-modal .btn{ border-radius:11px !important; padding:9px 15px !important; font-size:12.5px !important; font-weight:700; }
+body.theme-clair #portail-patient-modal .inp{ border-radius:11px; padding:10px 13px; }
+body.theme-clair #portail-patient-modal > div > div:has(#portail-rep-nom) .btn{ margin-top:12px !important; }
+/* Programme, suivi, documents : lignes lisibles */
+body.theme-clair #portail-patient-modal #portail-programme > div:first-child, body.theme-clair #portail-patient-modal #portail-blocage, body.theme-clair #portail-patient-modal #portail-messagerie{ padding:10px 14px; border-radius:12px; background:#f4f7fd; font-size:12.5px; line-height:1.5; margin-bottom:4px; }
+body.theme-clair #portail-patient-modal #portail-suivi{ font-size:12.5px !important; line-height:1.5; }
+body.theme-clair #portail-patient-modal #portail-suivi > div:first-child{ padding:10px 14px; border-radius:12px; background:#eaf0fc; margin-bottom:8px; color:#1e3a8a !important; }
+body.theme-clair #portail-patient-modal #portail-suivi > div:not(:first-child){ padding:8px 14px; border-left:3px solid #bcd0f5; margin:0 0 6px !important; }
+body.theme-clair #portail-patient-modal #portail-docs > div{ padding:11px 14px !important; margin-bottom:8px; background:#f4f7fd; border:0 !important; box-shadow:0 0 0 1px #e3e9f5; border-radius:13px; }
+body.theme-clair #portail-patient-modal #portail-docs > div > div{ font-size:12.5px !important; }
+body.theme-clair #portail-patient-modal #portail-questionnaire{ font-size:12.5px !important; line-height:1.55; }
+/* Deux colonnes sur ordinateur ; suivi et documents (listes longues) en pleine largeur */
+@media (min-width:900px){
+  body.theme-clair #portail-patient-modal > div{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  body.theme-clair #portail-patient-modal > div > div:first-child, body.theme-clair #portail-patient-modal > div > div:nth-child(2), body.theme-clair #portail-patient-modal #portail-msg, body.theme-clair #portail-patient-modal > div > div[style*="border-radius:10px"], body.theme-clair #portail-patient-modal > div > div:has(> #portail-suivi), body.theme-clair #portail-patient-modal > div > div:has(> #portail-docs){ grid-column:1 / -1; }
+  body.theme-clair #portail-patient-modal > div > div:nth-child(2){ justify-self:start; }
+}
+body.theme-clair #portail-patient-modal > div > div:has(#portail-rep-nom) > div[style*="grid-template-columns"]{ grid-template-columns:1fr !important; gap:10px !important; }
+/* Patient sans accès : simple bloc (texte d'explication puis bouton « Créer l'accès ») */
+body.theme-clair #portail-patient-modal > div:not(:has(#portail-identifiant)){ display:block; padding-bottom:26px !important; }
+body.theme-clair #portail-patient-modal > div:not(:has(#portail-identifiant)) > div:nth-child(n+3){ font-size:13.5px !important; line-height:1.6; background:#fff; border:0; box-shadow:0 0 0 1px #e3e9f5; border-radius:18px; padding:16px 20px; margin:16px 0 14px !important; }
+body.theme-clair #portail-patient-modal #portail-creer{ padding:12px 24px !important; font-size:13.5px !important; }
+body.theme-clair #portail-patient-modal > div:not(:has(#portail-identifiant)) > div:nth-child(2){ margin-top:16px !important; }
