@@ -2,4 +2,4 @@
 export { monter } from './ui.js';
 export { rendreVues } from './moteur.js';
 export { decrire, nettoyerValeurs, CURSEURS, TABLEAUX } from './parametres.js';
-export { evaluer, htmlRapport, synthese } from './mecanismes.js';
+export { evaluer, htmlRapport, synthese, definirSeuils } from './mecanismes.js';

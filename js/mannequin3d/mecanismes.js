@@ -8,6 +8,24 @@ import { PAR_ID } from './parametres.js';
 
 export { SOURCES, PRUDENCE, REGLES };
 
+// Seuils du cabinet (Paramètres → « Seuils — analyse posturale », enregistrés côté serveur) : quand une règle a une
+// clé de seuil équivalente (ex. « face.valgumVarum »), la valeur du cabinet remplace le seuil par défaut du logiciel.
+let SEUILS = null;
+export function definirSeuils(t) {
+  SEUILS = t && typeof t === 'object' ? t : null;
+}
+export function seuilCabinet(cle) {
+  if (!SEUILS || !cle) return null;
+  const v = cle.split('.').reduce((o, k) => (o == null ? o : o[k]), SEUILS);
+  return typeof v === 'number' && isFinite(v) && v >= 0 ? v : null;
+}
+// seuil effectif d'un terme : la valeur du cabinet (en valeur absolue) prend le signe de l'opérateur
+function seuilTerme(t) {
+  const c = seuilCabinet(t.s);
+  if (c == null) return t.v;
+  return t.op === '<=' || t.op === '<' ? -c : c;
+}
+
 const ORDRE_NIVEAU = { F: 0, M: 1, f: 2, CC: 3 };
 export const LIBELLE_NIVEAU = {
   F: 'preuve forte',
@@ -56,7 +74,7 @@ export function evaluer(valeurs) {
     if (c.lat) {
       const sides = [];
       for (const S of ['D', 'G']) {
-        const termes = c.lat.every((t) => ok(val(valeurs, t.base + '_' + S), t.op, t.v));
+        const termes = c.lat.every((t) => ok(val(valeurs, t.base + '_' + S), t.op, seuilTerme(t)));
         let bas = true;
         if (c.bascule === 'ipsi') {
           const b = val(valeurs, 'bassin_bascule');
@@ -76,7 +94,7 @@ export function evaluer(valeurs) {
       for (const t of c.sym) {
         const d = val(valeurs, t.base + '_D'),
           g = val(valeurs, t.base + '_G');
-        if (Math.abs(d - g) >= t.v) {
+        if (Math.abs(d - g) >= seuilTerme(t)) {
           decl.push(
             fmt(t.base + '_D', d) +
               ' / ' +
@@ -91,7 +109,7 @@ export function evaluer(valeurs) {
     }
     if (valide && c.glob) {
       for (const t of c.glob) {
-        if (!ok(val(valeurs, t.id), t.op, t.v)) {
+        if (!ok(val(valeurs, t.id), t.op, seuilTerme(t))) {
           valide = false;
           break;
         }
@@ -100,13 +118,13 @@ export function evaluer(valeurs) {
     }
     if (valide && c.any) {
       const hit = c.any.filter((t) =>
-        ['D', 'G'].some((S) => ok(val(valeurs, t.base + '_' + S), t.op, t.v))
+        ['D', 'G'].some((S) => ok(val(valeurs, t.base + '_' + S), t.op, seuilTerme(t)))
       );
       if (!hit.length) valide = false;
       else
         for (const t of hit)
           for (const S of ['D', 'G'])
-            if (ok(val(valeurs, t.base + '_' + S), t.op, t.v))
+            if (ok(val(valeurs, t.base + '_' + S), t.op, seuilTerme(t)))
               decl.push(fmt(t.base + '_' + S, val(valeurs, t.base + '_' + S)));
     }
     if (!valide) continue;

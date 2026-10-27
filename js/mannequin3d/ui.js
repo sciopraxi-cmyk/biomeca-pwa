@@ -46,7 +46,9 @@ const CSS = `
 .m3d-meca h4{margin:0 0 4px;font-size:13px;color:#7c2d12}
 .m3d-hyp{border:1px solid #e2e8f0;border-radius:6px;margin:5px 0;padding:4px 8px;background:#fafafa}
 .m3d-hyp>summary{cursor:pointer;font-size:12px}
-.m3d-cr ul{margin:4px 0 0 16px;padding:0}
+.m3d-cr ul{margin:4px 0 0 16px;padding:0;column-count:2;column-gap:32px}
+.m3d-cr li{break-inside:avoid;margin-bottom:2px}
+@media(max-width:640px){.m3d-cr ul{column-count:1}}
 `;
 
 function el(tag, attrs = {}, ...kids) {

@@ -31019,6 +31019,7 @@ async function _m3dPosturoInit() {
   try {
     const mod = await import('./mannequin3d/index.js');
     if (_m3dPosturo !== ref) return;
+    mod.definirSeuils(POSTURE_THRESHOLDS); // seuils du cabinet (compte admin) → règles de mécanismes
     const sexeDef = p.civilite === 'Mme' ? 'femme' : 'homme';
     ref.api = mod.monter(host, {
       etat: d.mannequin3d || null,
@@ -31040,6 +31041,7 @@ async function _m3dVuesRapport(d) {
   if (!m || !m.valeurs || !Object.keys(m.valeurs).length) return null;
   try {
     const mod = await import('./mannequin3d/index.js');
+    mod.definirSeuils(POSTURE_THRESHOLDS);
     const imgs = await mod.rendreVues(m.valeurs, { sexe: m.sexe || 'homme', peau: m.peau !== false });
     return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false, meca: mod.htmlRapport(m.valeurs, m.retenues) };
   } catch (e) {

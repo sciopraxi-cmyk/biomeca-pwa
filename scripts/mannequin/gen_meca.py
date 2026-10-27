@@ -15,49 +15,56 @@ def liste(t):
     if cur.strip(): out.append(cur.strip())
     return [x for x in out if x and x != '—']
 # --- conditions (curseur, opérateur, seuil) ; side=lat : évalué par côté ; sym=asymétrie |D-G|
-Lat = lambda base, op, v: {'base': base, 'op': op, 'v': v}
-Gl = lambda cid, op, v: {'id': cid, 'op': op, 'v': v}
+# s = clé du seuil du cabinet (Paramètres → Seuils analyse posturale) qui remplace v quand elle existe
+def Lat(base, op, v, s=None):
+    d = {'base': base, 'op': op, 'v': v}
+    if s: d['s'] = s
+    return d
+def Gl(cid, op, v, s=None):
+    d = {'id': cid, 'op': op, 'v': v}
+    if s: d['s'] = s
+    return d
 COND = {
- 'R01': {'lat': [Lat('pied_valgus', '>=', 5)]},
- 'R02': {'lat': [Lat('pied_valgus', '<=', -5)]},
+ 'R01': {'lat': [Lat('pied_valgus', '>=', 5, 'dos.calcaneen')]},
+ 'R02': {'lat': [Lat('pied_valgus', '<=', -5, 'dos.calcaneen')]},
  'R05': {'lat': [Lat('pied_ouverture', '>', 15)]},
  'R06': {'lat': [Lat('pied_ouverture', '<', -5)]},
  'R07': {'lat': [Lat('tibia_rot', '<=', -5)]},
  'R08': {'lat': [Lat('tibia_rot', '>=', 5)]},
- 'R09': {'lat': [Lat('genou_valgus', '>=', 5)]},
- 'R10': {'lat': [Lat('genou_valgus', '<=', -5)]},
- 'R11': {'lat': [Lat('genou_flex', '<=', -5)]},
- 'R12': {'lat': [Lat('genou_flex', '>=', 5)]},
+ 'R09': {'lat': [Lat('genou_valgus', '>=', 5, 'face.valgumVarum')]},
+ 'R10': {'lat': [Lat('genou_valgus', '<=', -5, 'face.valgumVarum')]},
+ 'R11': {'lat': [Lat('genou_flex', '<=', -5, 'neutralite.genou')]},
+ 'R12': {'lat': [Lat('genou_flex', '>=', 5, 'neutralite.genou')]},
  'R13': {'glob': [Gl('bassin_inegalite', 'abs>=', 10), Gl('bassin_inegalite', 'abs<', 20)]},
  'R14': {'glob': [Gl('bassin_inegalite', 'abs>=', 20)]},
- 'R15': {'glob': [Gl('bassin_bascule', 'abs>=', 3)]},
+ 'R15': {'glob': [Gl('bassin_bascule', 'abs>=', 3, 'face.bassin')]},
  'R16': {'glob': [Gl('bassin_rot', 'abs>=', 5)]},
- 'R17': {'glob': [Gl('bassin_antev', '>=', 3)]},
- 'R18': {'glob': [Gl('bassin_antev', '<=', -5)]},
+ 'R17': {'glob': [Gl('bassin_antev', '>=', 3, 'neutralite.bassin')]},
+ 'R18': {'glob': [Gl('bassin_antev', '<=', -5, 'neutralite.bassin')]},
  'R19': {'glob': [Gl('tronc_lordose', '>=', 15)]},
  'R20': {'glob': [Gl('tronc_cyphose', '>=', 20)]},
  'R21': {'glob': [Gl('tronc_antero', '>=', 2)]},
  'R22': {'glob': [Gl('tete_antep', '>=', 3)]},
- 'R23': {'glob': [Gl('tete_incl', 'abs>=', 3)]},
- 'R24': {'glob': [Gl('tete_rot', 'abs>=', 5)]},
+ 'R23': {'glob': [Gl('tete_incl', 'abs>=', 3, 'face.tete')]},
+ 'R24': {'glob': [Gl('tete_rot', 'abs>=', 5, 'face.tete')]},
  'R25': {'glob': [Gl('tete_flex', 'abs>=', 8)]},
- 'R26': {'sym': [{'base': 'epaule_elev', 'v': 3}]},
+ 'R26': {'sym': [{'base': 'epaule_elev', 'v': 3, 's': 'face.epaules'}]},
  'R27': {'lat': [Lat('epaule_antep', '>=', 8)]},
- 'R28': {'glob': [Gl('ceinture_incl', 'abs>=', 3)]},
+ 'R28': {'glob': [Gl('ceinture_incl', 'abs>=', 3, 'face.epaules')]},
  'R29': {'glob': [Gl('ceinture_rot', 'abs>=', 5)]},
  'R30': {'sym': [{'base': 'bras_abd', 'v': 8}]},
  'R31': {'lat': [Lat('bras_rot', '<=', -10)]},
  'R32': {'sym': [{'base': 'coude_flex', 'v': 15}]},
- 'R33': {'glob': [Gl('tronc_incl', 'abs>=', 3)]},
+ 'R33': {'glob': [Gl('tronc_incl', 'abs>=', 3, 'face.lateralisation')]},
  'R34': {'glob': [Gl('tronc_rot', 'abs>=', 5)]},
- 'R35': {'glob': [Gl('bassin_antev', '>=', 3), Gl('tronc_lordose', '>=', 10)]},
+ 'R35': {'glob': [Gl('bassin_antev', '>=', 3, 'neutralite.bassin'), Gl('tronc_lordose', '>=', 10)]},
  'R36': {'glob': [Gl('tete_antep', '>=', 3), Gl('tronc_cyphose', '>=', 15)], 'any': [Lat('epaule_antep', '>=', 5)]},
- 'R37': {'lat': [Lat('pied_valgus', '>=', 5), Lat('genou_valgus', '>=', 5)], 'bascule': 'ipsi'},
- 'R38': {'lat': [Lat('pied_valgus', '<=', -5), Lat('genou_valgus', '<=', -5)]},
+ 'R37': {'lat': [Lat('pied_valgus', '>=', 5, 'dos.calcaneen'), Lat('genou_valgus', '>=', 5, 'face.valgumVarum')], 'bascule': 'ipsi'},
+ 'R38': {'lat': [Lat('pied_valgus', '<=', -5, 'dos.calcaneen'), Lat('genou_valgus', '<=', -5, 'face.valgumVarum')]},
  'R39': {'sym': [{'base': 'cuisse_abd', 'v': 5}]},
  'R40': {'lat': [Lat('cuisse_rot', '<=', -10)]},
  'R41': {'lat': [Lat('cuisse_rot', '>=', 10)]},
- 'R43': {'lat': [Lat('pied_valgus', '>=', 5)], 'glob': [Gl('bassin_antev', '>=', 3)]},
+ 'R43': {'lat': [Lat('pied_valgus', '>=', 5, 'dos.calcaneen')], 'glob': [Gl('bassin_antev', '>=', 3, 'neutralite.bassin')]},
 }
 rules = []
 for r in [l for l in s[a:b].split('\n') if re.match(r'^\| R\d+', l)]:
