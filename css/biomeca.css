@@ -2185,3 +2185,91 @@ body.theme-clair #portail-patient-modal > div:not(:has(#portail-identifiant)){ d
 body.theme-clair #portail-patient-modal > div:not(:has(#portail-identifiant)) > div:nth-child(n+3){ font-size:13.5px !important; line-height:1.6; background:#fff; border:0; box-shadow:0 0 0 1px #e3e9f5; border-radius:18px; padding:16px 20px; margin:16px 0 14px !important; }
 body.theme-clair #portail-patient-modal #portail-creer{ padding:12px 24px !important; font-size:13.5px !important; }
 body.theme-clair #portail-patient-modal > div:not(:has(#portail-identifiant)) > div:nth-child(2){ margin-top:16px !important; }
+/* Refonte « premium » — lot 6 : paramètres, notifications, praticiens, exercices, Assistant.
+   CSS seulement, tout borné à body.theme-clair. Aucun HTML, aucun script, aucune couleur d'identité modifiés. */
+
+/* ── Socle commun aux pages de gestion du lot 6 (mêmes espacements, mêmes cartes) ── */
+body.theme-clair #pg-params > div, body.theme-clair #pg-notifications > div, body.theme-clair #pg-exercices > div{ max-width:880px !important; padding:22px 24px 40px !important; }
+body.theme-clair #pg-params > div > h2, body.theme-clair #pg-notifications > div > h2, body.theme-clair #pg-exercices > div > div:first-child > h2{ font-size:22px !important; font-weight:800 !important; letter-spacing:-.03em; margin-bottom:20px !important; }
+body.theme-clair #pg-params .card, body.theme-clair #pg-praticiens .card, body.theme-clair #pg-exercices #exercices-contenu .card{ border-radius:20px !important; padding:18px 22px !important; margin-bottom:16px !important; border:0; box-shadow:0 0 0 1px #e3e9f5, 0 12px 30px -22px rgba(11,27,58,.45); }
+body.theme-clair #pg-params .stitle, body.theme-clair #pg-praticiens .stitle, body.theme-clair #pg-exercices #exercices-contenu .stitle{ font-size:12px !important; font-weight:800 !important; letter-spacing:.09em; text-transform:uppercase; color:#1d4ed8 !important; margin-bottom:14px !important; padding-bottom:10px; border-bottom:2px solid #dbe7fd; }
+body.theme-clair #pg-params .btn, body.theme-clair #pg-praticiens .btn, body.theme-clair #pg-exercices .btn, body.theme-clair #pg-notifications .btn{ border-radius:11px !important; padding:8px 14px !important; font-size:12.5px !important; font-weight:600; transition:background .15s, box-shadow .15s; }
+body.theme-clair #pg-params .btn:hover, body.theme-clair #pg-praticiens .btn:hover, body.theme-clair #pg-exercices .btn:hover, body.theme-clair #pg-notifications .btn:hover{ background:#eaf0fc !important; }
+body.theme-clair #pg-params .btn-blue, body.theme-clair #pg-praticiens .btn-blue, body.theme-clair #pg-exercices .btn-blue{ border-radius:12px !important; padding:10px 20px !important; font-weight:700; }
+body.theme-clair #pg-params .inp, body.theme-clair #pg-praticiens .inp, body.theme-clair #pg-exercices .inp{ border-radius:11px; padding:10px 13px; }
+body.theme-clair #pg-params .g2, body.theme-clair #pg-praticiens .g2, body.theme-clair #pg-exercices .g2{ gap:14px 16px; margin-bottom:12px !important; }
+
+/* ── Barre de titre (← Patients + h2) commune ── */
+body.theme-clair #pg-notifications > div > div:first-child, body.theme-clair #pg-exercices > div > div:first-child{ gap:14px !important; padding-bottom:14px; margin-bottom:18px !important; border-bottom:1px solid #e3e9f5; align-items:center !important; }
+body.theme-clair #pg-notifications > div > div:first-child > button:first-child, body.theme-clair #pg-exercices > div > div:first-child > button:first-child{ font-weight:600; border-radius:10px !important; padding:7px 12px !important; }
+
+/* ── Page Paramètres (pg-params) ── */
+body.theme-clair #pg-params p{ font-size:12.5px !important; line-height:1.55; }
+body.theme-clair #pg-params #params-bloc-acces a.btn{ display:inline-block; border-radius:11px !important; padding:9px 16px !important; font-weight:600; text-decoration:none; }
+body.theme-clair #pg-params #admin-panel > div:first-child{ background:#fff; border:0; box-shadow:0 0 0 1px #e3e9f5; border-radius:18px; padding:18px 22px; }
+body.theme-clair #pg-params #admin-panel label{ font-size:12.5px; }
+
+/* ── Page Notifications (pg-notifications) ── */
+body.theme-clair #pg-notifications #notif-contenu{ font-size:13px; }
+body.theme-clair #pg-notifications .notif-filtre{ padding:6px 14px !important; }
+body.theme-clair #pg-notifications .notif-ligne{ border:0 !important; border-radius:16px !important; padding:14px 16px !important; margin-bottom:8px !important; box-shadow:0 0 0 1px #e3e9f5, 0 8px 22px -18px rgba(11,27,58,.38); transition:box-shadow .15s, transform .1s; background:#fff; }
+body.theme-clair #pg-notifications .notif-ligne:hover{ box-shadow:0 0 0 1px #bcd0f5, 0 14px 32px -18px rgba(11,27,58,.5); transform:translateY(-1px); }
+body.theme-clair #pg-notifications .notif-ligne[style*="border-left"]{ border-left:5px solid #2563eb !important; }
+/* Détail d'une notification */
+body.theme-clair #pg-notifications #notif-contenu > div[style*="padding:14px"]{ background:#fff; border:0 !important; box-shadow:0 0 0 1px #e3e9f5; border-radius:20px; padding:22px 24px !important; }
+body.theme-clair #pg-notifications #notif-contenu > div[style*="padding:14px"] > div:first-child{ font-size:18px !important; font-weight:800 !important; letter-spacing:-.02em; margin-bottom:4px !important; }
+body.theme-clair #pg-notifications #notif-contenu > div[style*="padding:14px"] > div[style*="display:flex;gap:10px;font-size:13px"]{ padding:8px 0 !important; border-bottom:1px solid #eef2f9 !important; }
+
+/* ── Page Praticiens (pg-praticiens) — structure différente (.section) ── */
+body.theme-clair #pg-praticiens .section{ max-width:880px; margin:0 auto; padding:22px 24px 40px; }
+body.theme-clair #pg-praticiens .section > .stitle{ font-size:22px !important; font-weight:800 !important; letter-spacing:-.03em; color:var(--blue) !important; margin-bottom:20px !important; border-bottom:none; padding-bottom:0; text-transform:none; }
+body.theme-clair #pg-praticiens .prat-row{ display:flex; gap:10px; align-items:center; padding:12px 16px; margin-bottom:6px; border:0; box-shadow:0 0 0 1px #e3e9f5; border-radius:14px; background:#fff; transition:box-shadow .15s; }
+body.theme-clair #pg-praticiens .prat-row:hover{ box-shadow:0 0 0 1px #bcd0f5, 0 6px 18px -12px rgba(11,27,58,.35); }
+body.theme-clair #pg-praticiens .prat-row > div:first-child{ font-size:13px !important; }
+body.theme-clair #pg-praticiens .prat-row > div:first-child > div:first-child{ font-size:13.5px !important; font-weight:700 !important; }
+body.theme-clair #pg-praticiens .card:last-child .stitle{ margin-top:6px; }
+/* Libellés des champs */
+body.theme-clair #pg-praticiens div[style*="font-size:10px"]{ font-size:11.5px !important; font-weight:600; letter-spacing:.01em; margin-bottom:5px !important; }
+body.theme-clair #pg-praticiens textarea.inp{ line-height:1.5; }
+body.theme-clair #pg-praticiens .btn-full{ width:100%; margin-top:14px; text-align:center; }
+
+/* ── Page Exercices (pg-exercices) ── */
+body.theme-clair #pg-exercices #exercices-contenu details{ border:0 !important; border-radius:14px; padding:0 14px; margin-bottom:8px; box-shadow:0 0 0 1px #e3e9f5; background:#fff; }
+body.theme-clair #pg-exercices #exercices-contenu details[open]{ box-shadow:0 0 0 1px #bcd0f5, 0 6px 22px -14px rgba(11,27,58,.28); }
+body.theme-clair #pg-exercices #exercices-contenu summary{ font-size:13px !important; font-weight:700 !important; padding:11px 0 !important; cursor:pointer; }
+body.theme-clair #pg-exercices #exercices-contenu details > div[style*="border-top"]{ border-top:1px solid #eef2f9 !important; padding:8px 0 !important; }
+body.theme-clair #pg-exercices #exercices-contenu .card p{ font-size:12px !important; line-height:1.5; }
+
+/* ── Assistant / Aide (modal-help) — fond clair, carte nette ── */
+body.theme-clair #modal-help > div{ background:#fff !important; border-radius:22px !important; padding:0 24px 22px !important; max-width:min(660px,94vw) !important; box-shadow:0 36px 80px -28px rgba(11,27,58,.55); border:0; }
+/* En-tête */
+body.theme-clair #modal-help > div > div:first-child{ padding:20px 0 14px !important; margin-bottom:10px !important; border-bottom:1px solid #eef2f9; }
+body.theme-clair #modal-help > div > div:first-child > div:first-child{ font-size:18px !important; font-weight:800 !important; letter-spacing:-.02em; }
+body.theme-clair #modal-help > div > div:first-child > button{ border-radius:10px !important; width:32px; height:32px; font-size:18px; }
+/* Barre de recherche */
+body.theme-clair #modal-help #help-search{ border-radius:12px !important; padding:10px 14px !important; border:0 !important; box-shadow:0 0 0 1px #dbe5f7; background:#f8fafd; margin-bottom:8px !important; }
+body.theme-clair #modal-help #help-search:focus{ box-shadow:0 0 0 2px #93b5f5; background:#fff; }
+/* Bouton assistant */
+body.theme-clair #modal-help #help-chat-toggle{ border-radius:12px !important; padding:9px 14px !important; font-weight:600 !important; border:0 !important; box-shadow:0 0 0 1px #dbe5f7; background:#f3f7ff !important; margin-bottom:8px !important; }
+body.theme-clair #modal-help #help-chat-toggle:hover{ background:#e3edfd !important; }
+/* Chat */
+body.theme-clair #modal-help #help-chat{ border:0 !important; border-radius:16px !important; padding:10px !important; background:#f8fafd !important; box-shadow:inset 0 0 0 1px #e3e9f5; }
+body.theme-clair #modal-help #help-chat-input{ border-radius:11px !important; padding:9px 13px !important; }
+body.theme-clair #modal-help #help-chat-send{ border-radius:11px !important; padding:7px 16px !important; font-weight:700; }
+/* FAQ : thèmes et questions */
+body.theme-clair #modal-help #help-list > div[style*="font-size:11px"]{ font-size:11.5px !important; letter-spacing:.07em; color:#52617d !important; margin:16px 0 8px !important; }
+body.theme-clair #modal-help #help-list details{ border:0 !important; border-radius:14px; margin-bottom:6px; box-shadow:0 0 0 1px #e3e9f5; background:#fff; transition:box-shadow .15s; }
+body.theme-clair #modal-help #help-list details[open]{ box-shadow:0 0 0 1px #bcd0f5, 0 6px 24px -16px rgba(11,27,58,.25); }
+body.theme-clair #modal-help #help-list summary{ padding:12px 14px !important; font-size:13px !important; font-weight:600 !important; border-radius:14px; }
+body.theme-clair #modal-help #help-list details[open] summary{ border-radius:14px 14px 0 0; background:#f8fafd; }
+body.theme-clair #modal-help #help-list details > div{ padding:0 14px 12px !important; font-size:13px !important; line-height:1.6 !important; }
+/* Lien support */
+body.theme-clair #modal-help a[href*="contact@verticy.fr"]{ border-radius:14px !important; padding:11px !important; font-weight:600 !important; border:0 !important; box-shadow:0 0 0 1px #dbe5f7; background:#f3f7ff !important; text-decoration:none !important; margin-top:16px !important; display:block; text-align:center; color:var(--txt) !important; }
+body.theme-clair #modal-help a[href*="contact@verticy.fr"]:hover{ background:#e3edfd !important; }
+
+/* ── Responsive ── */
+@media (max-width:760px){
+  body.theme-clair #pg-params > div, body.theme-clair #pg-notifications > div, body.theme-clair #pg-exercices > div, body.theme-clair #pg-praticiens .section{ padding:16px 14px 32px !important; }
+  body.theme-clair #pg-praticiens .g2{ grid-template-columns:1fr !important; }
+  body.theme-clair #modal-help > div{ padding:0 16px 18px !important; }
+}
