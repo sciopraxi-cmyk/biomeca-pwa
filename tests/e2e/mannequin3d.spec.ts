@@ -6,6 +6,14 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   requireCredentials();
   const erreurs: string[] = [];
   page.on('pageerror', (e) => erreurs.push(e.message));
+  // politique de sécurité de l'application : aucune texture / ressource du mannequin ne doit être bloquée
+  page.on('console', (m) => {
+    if (
+      m.type() === 'error' &&
+      /Content Security Policy|Couldn't load texture|GLTFLoader/.test(m.text())
+    )
+      erreurs.push(m.text());
+  });
   const nom = `Mannequin${Date.now()}`;
   await login(page);
   await page.click('button:has-text("Nouveau patient")');
@@ -45,6 +53,32 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   const stocke = await page.evaluate('currentPatient.bilanDataPosturo.mannequin3d');
 
   expect(stocke.valeurs).toEqual({ tronc_incl: -8, bassin_bascule: 7, tronc_lordose: 15 });
+  // « Retirer la peau » : la couche musculaire est visible ET possède sa texture (dans l'application réelle, avec sa CSP)
+  await page.click('.m3d-btn:has-text("Retirer la peau")');
+  const d = await page.evaluate('_m3dPosturo.api.diag()');
+  expect(d).toEqual({ peauVisible: false, muscleVisible: true, textureMuscle: true });
+  await page.click('.m3d-btn:has-text("Remettre la peau")');
+  // curseurs du bassin : repères activés → le bassin s'incline, les épaules et la tête non
+  await page.click('.m3d-btn:has-text("Repères")');
+  const ang = async () => page.evaluate('_m3dPosturo.api.angles()');
+  const setv = async (lbl: string, v: string) => {
+    const c = page.locator('.m3d-row', { hasText: lbl }).locator('input[type=number]').first();
+    await c.fill(v);
+    await c.dispatchEvent('change');
+  };
+  await setv('Bascule du bassin', '0');
+  const a0 = await ang();
+  await setv('Bascule du bassin', '9');
+  const a1 = await ang();
+  expect(Math.abs(a1.bassin - a0.bassin)).toBeGreaterThan(6);
+  expect(Math.abs(a1.epaules - a0.epaules)).toBeLessThan(1.5);
+  expect(Math.abs(a1.tete - a0.tete)).toBeLessThan(1.5);
+  await page.locator('summary', { hasText: 'Global' }).click();
+  await setv('Antériorisation globale depuis les chevilles', '6');
+  await page.waitForTimeout(300);
+  await setv('Antériorisation globale depuis les chevilles', '0');
+  await setv('Bascule du bassin', '7');
+  await page.click('.m3d-btn:has-text("Repères")');
   await page.click('.m3d-btn:has-text("Retirer la peau")');
   await page.click('.m3d-btn:has-text("Profil G")');
   await page.waitForTimeout(500);

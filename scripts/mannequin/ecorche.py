@@ -4,7 +4,7 @@ from anat import Limb, limb_member, signed_dist_poly, thick_line
 from geom import smooth
 
 MUSCLE_RED = np.array([0.62, 0.14, 0.12]); TENDON = np.array([0.90, 0.83, 0.70]); BONE = np.array([0.82, 0.76, 0.64])
-FASCIA = np.array([0.80, 0.63, 0.56]); FOND = np.array([0.34, 0.09, 0.08])
+FASCIA = np.array([0.78, 0.70, 0.60]); FOND = np.array([0.34, 0.09, 0.08])
 
 class Sink:
     """Résolution incrémentale des territoires (mémoire bornée) : le plus prioritaire gagne."""
@@ -59,17 +59,27 @@ def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
         T.add(name, i, w, fibc(U[i], V[i], fib), kind, prio)
 
     # ---------- TRONC, face ----------
-    poly('pectoral_grand', [(0.7, 146.2), (9.5, 145.4), (15, 143.8), (19.5, 138.6), (21.3, 134), (21.2, 131.2), (16.8, 127.2), (12, 124.3), (7, 122.3), (2, 121.2), (0.7, 121)], 'f', prio=6, fib=('fan', 21.5, 133.0), nthr=-0.2)
+    poly('pectoral_claviculaire', [(1.6, 146.0), (9.5, 145.4), (15, 143.8), (19.2, 139.0), (16.6, 136.0), (10.5, 138.6), (4.2, 140.6), (1.8, 141.4)], 'f', prio=7, fib=('fan', 21.5, 134.0), nthr=-0.2)
+    poly('pectoral_sternocostal', [(0.7, 141.2), (4.2, 140.4), (10.5, 138.4), (16.8, 135.8), (20.3, 134.6), (21.2, 131.2), (16.8, 127.2), (12, 124.3), (7, 122.3), (2, 121.2), (0.7, 121)], 'f', prio=6, fib=('fan', 21.5, 133.0), nthr=-0.2)
     poly('sternum', [(0.0, 146.5), (0.45, 146.0), (0.45, 121.5), (0.0, 121)], 'f', prio=5, kind='tendon', feather=0.25)
-    poly('dentele_ant', [(15.0, 129.5), (20.6, 130.6), (21.6, 124), (20.2, 116.5), (17.2, 113.0), (14.6, 114.8), (15.0, 121), (14.2, 125.5)], 'f', prio=4, fib=('dir', 55), nthr=-0.6)
+    line('dentele_dig0', [(21.2, 130.2), (15.4, 127.2)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
+    line('dentele_dig1', [(21.1, 128.0), (15.4, 125.0)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
+    line('dentele_dig2', [(21.0, 125.9), (15.4, 122.9)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
+    line('dentele_dig3', [(20.8, 123.7), (15.4, 120.8)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
+    line('dentele_dig4', [(20.7, 121.6), (15.4, 118.6)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
+    line('dentele_dig5', [(20.6, 119.4), (15.4, 116.5)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
+    line('dentele_dig6', [(20.5, 117.3), (15.4, 114.3)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
+    line('dentele_dig7', [(20.4, 115.1), (15.4, 112.2)], 1.35, 'f', prio=5, fib=('dir', 62), nthr=-0.6)
     poly('oblique_ext', [(8.8, 121.6), (14.2, 122.0), (17.4, 118.6), (18.3, 113), (17.6, 107), (16.0, 103.2), (13.2, 103.6), (11.6, 110), (10, 116)], 'f', prio=3, fib=('dir', -55), nthr=-0.6)
-    poly('oblique_apo', [(6.9, 121.0), (8.8, 121.6), (10, 116), (11.6, 110), (13.2, 103.6), (12, 100.6), (9.8, 99.5), (7.0, 101.0), (6.9, 108)], 'f', prio=3, kind='fascia', fib=('dir', 90), nthr=-0.2)
+    poly('oblique_apo', [(7.0, 114.0), (8.3, 113.4), (9.6, 108), (11.0, 103.8), (10.0, 101.0), (8.2, 100.4), (7.0, 102.0), (6.9, 108)], 'f', prio=3, kind='fascia', fib=('dir', 90), nthr=-0.2)
     poly('droit_abdo', [(0.7, 123.5), (8.3, 122.8), (7.2, 115), (6.9, 105), (5.7, 97), (4.5, 92.0), (0.7, 92.0)], 'f', prio=4, fib=('dir', 90), nthr=-0.2)
     for i, yy in enumerate((119.0, 113.2, 107.4, 101.8)):
         poly('inscription%d' % i, [(0.7, yy + 0.45), (7.9 - i * 0.4, yy + 0.45), (7.9 - i * 0.4, yy - 0.45), (0.7, yy - 0.45)], 'f', prio=5, kind='tendon', feather=0.25, nthr=-0.2)
     poly('ligne_blanche', [(0.0, 121), (0.45, 121), (0.45, 91), (0.0, 91)], 'f', prio=5, kind='tendon', feather=0.3, nthr=-0.2)
     line('ligament_inguinal', [(14.6, 101.8), (9, 96.4), (3.5, 91.8)], 0.8, 'f', prio=5, kind='tendon', fib=('dir', -35), nthr=-0.2)
     line('sterno_cleido', [(2.4, 146.8), (4.2, 150.8), (6.0, 155.8), (7.3, 160.2)], 3.0, 'f', prio=7, fib=('dir', 62), nthr=-0.4)
+    line('sterno_hyoidien', [(0.35, 146.2), (0.35, 151.4)], 1.3, 'f', prio=6, fib=('dir', 90), nthr=-0.2)
+    poly('trapeze_sup_face_cou', [(4.8, 150.6), (7.6, 156.4), (9.6, 153.2), (8.0, 149.6)], 'f', prio=3, fib=('dir', 70), nthr=-0.9)
     poly('deltoide_ant_projection', [(15, 144.5), (23.8, 142.6), (25.5, 138), (21.5, 134), (19.5, 139)], 'f', prio=2, fib=('dir', -50), nthr=0.1)
 
     poly('trapeze_sup_face', [(5.4, 152.5), (11, 149.2), (16, 146.6), (22.2, 144.2), (21, 142.4), (15, 144.8), (8.5, 147.8), (4.8, 150.6)], 'f', prio=2, fib=('dir', -20), nthr=-0.95)
@@ -89,6 +99,10 @@ def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
     poly('rhombe_epine', [(0.0, 150), (0.5, 150), (0.5, 119), (0.0, 119)], 'b', prio=6, kind='fascia', feather=0.3)
 
     # ---------- TÊTE (projection de face) ----------
+    poly('galea_face', [(0.0, 174.6), (7.4, 173.6), (8.8, 169.0), (0.0, 169.0)], 'f', prio=1, kind='fascia', feather=0.5, nthr=-0.2)
+    poly('galea_dos', [(0.0, 175.5), (7.8, 172.8), (9.2, 164.5), (7.0, 160.6), (0.0, 160.0)], 'b', prio=1, kind='fascia', feather=0.5, nthr=-0.3)
+    poly('occipital', [(0.4, 164.0), (5.4, 163.0), (6.2, 159.6), (0.4, 159.8)], 'b', prio=2, fib=('dir', 90))
+    poly('sterno_cleido_dos', [(4.8, 160.0), (8.0, 159.0), (7.2, 152.6), (4.6, 153.4)], 'b', prio=2, fib=('dir', 60), nthr=-0.2)
     poly('frontal', [(0.4, 173.6), (7.8, 172.2), (8.4, 168.9), (4.2, 169.6), (0.4, 169.6)], 'f', prio=3, fib=('dir', 90))
     poly('orbiculaire_oeil', [(1.3, 168.4), (3.2, 169.4), (5.2, 168.6), (5.4, 166.6), (3.4, 165.6), (1.5, 166.4)], 'f', prio=4, fib=('dir', 0))
     poly('masseter', [(6.6, 160.0), (8.6, 160.6), (8.9, 155.5), (6.8, 154.0), (5.6, 156.8)], 'f', prio=3, fib=('dir', 80), nthr=-0.5)

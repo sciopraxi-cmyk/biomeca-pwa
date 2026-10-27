@@ -71,9 +71,9 @@ def bake(Pv_cm, Nv, uvs, tri, Wd, bones, bp, Hcm, sx, R=2048, debug=False):
     seam = gaussian_filter(edge.astype(np.float32), 1.1); seam = np.clip(seam * 3.2, 0, 1)
     if not debug:
         k = (flag == 0.0)
-        stripe = 0.5 + 0.5 * np.sin(fib * (2 * np.pi / 0.42) + ph[np.clip(own, 0, None)])
+        stripe = 0.5 + 0.5 * np.sin(fib * (2 * np.pi / 0.30) + ph[np.clip(own, 0, None)]) * (0.75 + 0.25 * np.sin(fib * 1.3))
         stripe2 = 0.5 + 0.5 * np.sin(fib * (2 * np.pi / 1.7) + 1.3 * ph[np.clip(own, 0, None)])
-        mod = np.where(k, 0.80 + 0.14 * stripe + 0.10 * stripe2, np.where(flag == 1.0, 0.94 + 0.06 * stripe, 1.0))
+        mod = np.where(k, 0.72 + 0.22 * stripe + 0.12 * stripe2, np.where(flag == 1.0, 0.94 + 0.06 * stripe, 1.0))
         edgedark = 0.80 + 0.20 * smooth(0.45, 0.9, wq)
         img = img * (mod * edgedark)[..., None]
     img = img * (1 - 0.62 * seam)[..., None]
@@ -95,10 +95,10 @@ def bake(Pv_cm, Nv, uvs, tri, Wd, bones, bp, Hcm, sx, R=2048, debug=False):
     amp = np.where(flag == 0.0, 1.0, np.where(flag == 1.0, 0.35, np.where(flag == 2.0, 0.15, 0.6)))
     h = amp * smooth(0, 9, dist)
     if not debug:
-        h = h + np.where(flag == 0.0, 0.05 * stripe, 0.0)
+        h = h + np.where(flag == 0.0, 0.10 * stripe, 0.0)
     h = gaussian_filter(h.astype(np.float32), 0.8)
     gy, gx = np.gradient(h)
-    k = 5.0
+    k = 9.0
     nx, ny = -gx * k, gy * k
     nz = np.ones_like(nx); ln = np.sqrt(nx * nx + ny * ny + nz * nz)
     nrm = np.stack([nx / ln, ny / ln, nz / ln], -1) * 0.5 + 0.5

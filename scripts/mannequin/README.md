@@ -12,6 +12,8 @@ Les fichiers `assets/mannequin/homme.glb.gz` et `femme.glb.gz` sont produits par
   d'après les repères de la peau du modèle et les planches de Gray's Anatomy (1918, domaine public, usage
   comme référence visuelle seulement). `bake.py` cuit ces territoires en texture (couleur par muscle, fibres,
   tendons, coutures) et en carte de normales (volume des ventres, rainures). Aucun modèle anatomique tiers.
+- Relief géométrique : `relief.py` creuse les sillons entre muscles et bombe les ventres (distance à la frontière
+  de chaque territoire, le long de la surface) ; tendons, fascias et os affleurants restent plats.
 - Déformations locales (blend shapes) : `build_morph.py` (cyphose, lordose, fessiers, genoux).
 - Lancement : `python3 build_skin.py` (écrit `out_homme.glb` et `out_femme.glb`, ~1 min), puis `gzip -9`.
   Variables : `SEXES=homme`, `BAKE_RES=1024`, `ECORCHE_DEBUG=1` (couleur distincte par muscle).

@@ -77,7 +77,12 @@ def build(gender,out,**kw):
         print('  normales',len(jn)//1024,'Ko',flush=True)
         tex=g.texture(jpg); texn=g.texture(jn)
         N2=vnormals(at['pnb']*10,t2)
-        Pm=(at['pnb']*10-N2*0.25)*0.01
+        from relief import vertex_relief
+        import ecorche as E
+        P2cm=at['pnb']*10
+        SV=E.build_territories(P2cm,N2,Wd,BONES,bp,height,sx)
+        depth,_=vertex_relief(SV.owner.astype(int),SV.flag,SV.names,P2cm,t2)
+        Pm=(P2cm+N2*depth[:,None])*0.01
         uv2=at['uv']*np.array([1,-1])+np.array([0,1])
         mm=g.material(name='muscles',pbrMetallicRoughness={'baseColorTexture':{'index':tex},'metallicFactor':0,'roughnessFactor':.38},normalTexture={'index':texn,'scale':1.0},doubleSided=False)
         mph2=build_morphs(Pm,t2,Wd,BONES,bp,Hm)

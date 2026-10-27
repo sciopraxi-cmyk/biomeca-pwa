@@ -22,6 +22,16 @@ export function qMul(a, b) {
     a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
   ];
 }
+export function qPow(q, t) {
+  // q^t (même axe, angle × t) ; les puissances d'un même quaternion commutent
+  const w = Math.max(-1, Math.min(1, q[3])),
+    ang = 2 * Math.acos(w),
+    sn = Math.sqrt(1 - w * w);
+  if (sn < 1e-9) return [0, 0, 0, 1];
+  const h = (ang * t) / 2,
+    k = Math.sin(h) / sn;
+  return [q[0] * k, q[1] * k, q[2] * k, Math.cos(h)];
+}
 export function qInv(a) {
   return [-a[0], -a[1], -a[2], a[3]];
 }
@@ -63,6 +73,7 @@ export const GROUPES = [
   ['bassin', 'Bassin'],
   ['jambes', 'Membres inférieurs'],
   ['pieds', 'Pieds'],
+  ['global', 'Global : antériorisation / postériorisation du corps entier'],
 ];
 export const CURSEURS = [];
 const add = (c) => CURSEURS.push(c);
@@ -272,7 +283,11 @@ add(
     25,
     '°',
     ['rétroversion', 'antéversion'],
-    (v) => [{ bassin: { axe: 'x', deg: v } }, { morph: 'fessiers', w: v / 25 }]
+    (v) => [
+      { bassin: { axe: 'x', deg: v } },
+      { morph: 'fessiers', w: v > 0 ? v / 25 : v / 15 },
+      { morph: 'lordose', w: v > 0 ? v / 25 : v / 15 },
+    ]
   )
 );
 add(
@@ -340,6 +355,49 @@ lat(
 lat('pied_valgus', 'pieds', 'Valgus / varus du pied', -15, 15, '°', ['varus', 'valgus'], (v, c) => [
   { os: os('foot', c), axe: 'z', deg: v * cote(c) },
 ]);
+
+// Antériorisation / postériorisation GLOBALE : tout le corps au-dessus de l'articulation choisie bascule en bloc
+// (aucune cassure au niveau du bassin) ; les segments situés en dessous restent fixes, les pieds restent à plat.
+const GLOBAL_FIN = ['postériorisation', 'antériorisation'];
+add(
+  C(
+    'glob_chev',
+    'global',
+    'Antériorisation globale depuis les chevilles',
+    -10,
+    10,
+    '°',
+    GLOBAL_FIN,
+    (v) => [{ glob: 'a', deg: v }],
+    { qual: [2, 4, 6, 9] }
+  )
+);
+add(
+  C(
+    'glob_gen',
+    'global',
+    'Antériorisation globale depuis les genoux',
+    -10,
+    10,
+    '°',
+    GLOBAL_FIN,
+    (v) => [{ glob: 'k', deg: v }],
+    { qual: [2, 4, 6, 9] }
+  )
+);
+add(
+  C(
+    'glob_bassin',
+    'global',
+    'Antériorisation globale depuis le bassin (hanches)',
+    -10,
+    10,
+    '°',
+    GLOBAL_FIN,
+    (v) => [{ glob: 'h', deg: v }],
+    { qual: [2, 4, 6, 9] }
+  )
+);
 
 export const PAR_ID = Object.fromEntries(CURSEURS.map((c) => [c.id, c]));
 
@@ -480,7 +538,8 @@ export function poseDepuisValeurs(valeurs) {
   const rot = {},
     pos = {},
     morph = {},
-    twist = { L: 0, R: 0 };
+    twist = { L: 0, R: 0 },
+    glob = { a: 0, k: 0, h: 0 };
   let bassin = [0, 0, 0, 1];
   const rotAdd = (nom, q) => {
     rot[nom] = qMul(q, rot[nom] || [0, 0, 0, 1]);
@@ -491,6 +550,7 @@ export function poseDepuisValeurs(valeurs) {
     if (!v || !isFinite(v)) continue;
     for (const o of c.ops(v)) {
       if (o.bassin) bassin = qMul(qAxe(o.bassin.axe, o.bassin.deg), bassin);
+      else if (o.glob) glob[o.glob] += o.deg;
       else if (o.morph) morph[o.morph] = (morph[o.morph] || 0) + o.w;
       else if (o.twist) twist[sd(o.cote)] += o.deg;
       else if (o.pos) {
@@ -501,12 +561,35 @@ export function poseDepuisValeurs(valeurs) {
       } else rotAdd(o.os, qAxe(o.axe, o.deg));
     }
   }
-  rot.root = bassin;
-  const inv = qInv(bassin);
-  rotAdd('pelvis.L', inv);
-  rotAdd('pelvis.R', inv); // jambes d'aplomb
-  rotAdd('spine05', inv); // la colonne au-dessus du bassin reste en place : seul le bassin bouge
-  return { rot, pos, bassin, morph, twist };
+  return { rot, pos, bassin, morph, twist, glob };
+}
+
+// Assemblage des rotations du squelette (fonction pure, testée ; le moteur ne fait que l'appliquer).
+//  - root : rotation monde du bassin = rotation globale (axe x) × bascule/rotation/version du bassin ;
+//  - contre-rotations (locales, à gauche de la rotation propre de l'os) :
+//      colonne : le mouvement du bassin se fond progressivement le long du rachis (75 % / 50 % / 25 % / 8 % / 0 % du
+//      mouvement restent à chaque niveau), épaules et tête ne bougent pas ;
+//      cuisses : restent d'aplomb sauf si le corps bascule depuis les genoux ou les chevilles ;
+//      jambes : fixes sauf si bascule depuis les chevilles ; pieds toujours à plat.
+export const REPARTITION_RACHIS = [
+  ['spine05', 0.25],
+  ['spine04', 0.25],
+  ['spine03', 0.25],
+  ['spine02', 0.17],
+  ['spine01', 0.08],
+];
+export function assemblage(P) {
+  const { a, k, h } = P.glob;
+  const g = qAxe('x', a + k + h);
+  const root = qMul(g, P.bassin);
+  const counters = {};
+  for (const [n, f] of REPARTITION_RACHIS) counters[n] = qInv(qPow(P.bassin, f));
+  for (const c of ['L', 'R']) {
+    counters['upperleg01.' + c] = qMul(qInv(P.bassin), qAxe('x', -h));
+    counters['lowerleg01.' + c] = qAxe('x', -k);
+    counters['foot.' + c] = qAxe('x', -a);
+  }
+  return { root, counters, global: g };
 }
 
 // Valeurs nettoyées (bornées, arrondies, zéros retirés) : ce qui est enregistré dans le bilan.

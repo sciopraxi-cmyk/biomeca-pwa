@@ -1,7 +1,7 @@
 // Mannequin postural 3D — interface praticien (curseurs, vues, peau / muscles).
 import { CURSEURS, GROUPES, TABLEAUX, PAR_ID, decrire, nettoyerValeurs } from './parametres.js';
 import { creerMoteur, VUES } from './moteur.js';
-import { interpreter } from './dictee.js';
+import { interpreter, EXEMPLES } from './dictee.js';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -90,6 +90,24 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     },
   });
   barreSexe.append(btnPeau);
+  const btnRep = el(
+    'button',
+    {
+      class: 'm3d-btn',
+      type: 'button',
+      title: 'Lignes de repère : épaules, bassin, oreilles, genoux, fil à plomb',
+      onclick: () => {
+        S.reperes = !S.reperes;
+        maj();
+      },
+    },
+    '📐 Repères'
+  );
+  const infoRep = el('div', {
+    class: 'm3d-cr',
+    style: 'display:none;font-size:11px;margin:6px 0 0',
+  });
+  barreSexe.append(btnRep);
   const barreVues = el('div', { class: 'm3d-vues' });
   for (const k of ['face', 'profilD', 'dos', 'profilG']) {
     btnVue[k] = el(
@@ -144,6 +162,7 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
       barreSexe,
       boxCanvas,
       barreVues,
+      infoRep,
       el('div', { class: 'm3d-barre' }, selTab, btnRaz)
     )
   );
@@ -297,8 +316,17 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     if (!S.prop) return;
     if (!S.prop.length) {
       liste.append(
-        el('div', {}, 'Rien de compris : reformulez avec le nom du mouvement et le côté.')
+        el(
+          'div',
+          {},
+          'Rien de reconnu dans ce texte. Nommez le mouvement ou la déformation et le côté, par exemple :'
+        )
       );
+      const ul = el('ul', { style: 'margin:4px 0 0 16px;padding:0' });
+      EXEMPLES.forEach((x) => ul.append(el('li', {}, '« ' + x + ' »')));
+      liste.append(ul);
+      if (S.ignorees && S.ignorees.length)
+        liste.append(el('small', {}, 'Parties non comprises : ' + S.ignorees.join(' / ')));
       return;
     }
     for (const p of S.prop) {
@@ -362,9 +390,11 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
   function proposer() {
     const r = interpreter(zone.value);
     S.prop = r.propositions.map((p) => Object.assign({ coche: true }, p));
+    S.ignorees = r.ignorees;
     majProp();
     maj();
-    if (r.ignorees.length) liste.append(el('small', {}, 'Non compris : ' + r.ignorees.join(' / ')));
+    if (S.prop.length && r.ignorees.length)
+      liste.append(el('small', {}, 'Non compris : ' + r.ignorees.join(' / ')));
   }
   function basculerMicro() {
     if (reco) {
@@ -398,6 +428,19 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     if (moteur) {
       moteur.peau(S.peau);
       moteur.pose(fusion());
+      const ang = moteur.montrerReperes(!!S.reperes);
+      btnRep.classList.toggle('on', !!S.reperes);
+      infoRep.style.display = S.reperes ? 'block' : 'none';
+      if (S.reperes && ang)
+        infoRep.textContent =
+          'Inclinaison vue de face (° ; + = côté droit du patient plus haut) — épaules : ' +
+          ang.epaules +
+          ' · bassin : ' +
+          ang.bassin +
+          ' · oreilles : ' +
+          ang.tete +
+          ' · genoux : ' +
+          ang.genoux;
       moteur.afficher();
     }
     const l = decrire(S.valeurs);
@@ -476,6 +519,8 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
 
   return {
     etat: etatCourant,
+    diag: () => (moteur ? moteur.diag() : null),
+    angles: () => (moteur ? moteur.angles() : null),
     definir(e) {
       S.sexe = (e && e.sexe) || sexeParDefaut;
       S.peau = e ? e.peau !== false : true;

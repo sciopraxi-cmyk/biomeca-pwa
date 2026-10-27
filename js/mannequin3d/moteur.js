@@ -1,7 +1,7 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs } from './parametres.js';
+import { poseDepuisValeurs, assemblage } from './parametres.js';
 
 const CHEMIN = (sexe) =>
   new URL(
@@ -23,7 +23,16 @@ async function lireGlb(sexe) {
       } else {
         throw new Error('Navigateur trop ancien pour le mannequin 3D');
       }
-      return await new Promise((ok, ko) => new GLTFLoader().parse(buf, '', ok, ko));
+      // La politique de sécurité de l'application (connect-src sans blob:) interdit à ImageBitmapLoader de lire les
+      // textures du GLB : on lui fait choisir le chargeur par balise <img> (img-src autorise blob:). Le choix se fait
+      // dans le constructeur du parseur, appelé de façon synchrone par parse().
+      const cib = globalThis.createImageBitmap;
+      globalThis.createImageBitmap = undefined;
+      try {
+        return await new Promise((ok, ko) => new GLTFLoader().parse(buf, '', ok, ko));
+      } finally {
+        globalThis.createImageBitmap = cib;
+      }
     })();
     cacheModeles[sexe].catch(() => {
       delete cacheModeles[sexe];
@@ -102,6 +111,7 @@ export async function creerMoteur(canvas, opts = {}) {
   fill.target.position.set(0, 0, -5);
   cam.add(fill.target);
 
+  const reperes = { groupe: null, actif: false, lignes: [] };
   const etat = {
     sexe: null,
     racine: null,
@@ -174,6 +184,8 @@ export async function creerMoteur(canvas, opts = {}) {
     scene.add(racine);
     peau(etat.peau);
     pose(etat.valeurs);
+    creerReperes();
+    majReperes();
   }
 
   function peau(oui) {
@@ -201,17 +213,47 @@ export async function creerMoteur(canvas, opts = {}) {
     b.updateMatrixWorld(true);
   }
   function repere() {
-    // positions de repos (monde) : pivot du bassin (L5/S1) et hanches
+    // positions de repos (monde) : hanches, genoux, chevilles et centre des hanches (pivot du bassin)
     for (const n in etat.bones) {
       const b = etat.bones[n];
       b.position.copy(etat.repos[n].p);
       b.quaternion.copy(etat.repos[n].q);
     }
     etat.racine.updateMatrixWorld(true);
-    etat.pivot = monde(etat.bones.spine05);
-    etat.hanche = { L: monde(etat.bones['upperleg01.L']), R: monde(etat.bones['upperleg01.R']) };
+    const R = { hanche: {}, genou: {}, cheville: {} };
+    for (const c of ['L', 'R']) {
+      R.hanche[c] = monde(etat.bones['upperleg01.' + c]);
+      R.genou[c] = monde(etat.bones['lowerleg01.' + c]);
+      R.cheville[c] = monde(etat.bones['foot.' + c]);
+    }
+    const mid = (o) => o.L.clone().add(o.R).multiplyScalar(0.5);
+    R.hancheC = mid(R.hanche);
+    R.genouC = mid(R.genou);
+    R.chevilleC = mid(R.cheville);
+    R.root = monde(etat.bones.root);
+    etat.pivot = R;
+  }
+  // rotation d'angle (rad) autour de l'axe x passant par le point c (plan sagittal y-z)
+  function tourneX(p, c, rad) {
+    const dy = p.y - c.y,
+      dz = p.z - c.z,
+      co = Math.cos(rad),
+      si = Math.sin(rad);
+    return new THREE.Vector3(p.x, c.y + dy * co - dz * si, c.z + dy * si + dz * co);
+  }
+  function epingler(os, cible) {
+    const b = etat.bones[os];
+    const delta = cible.clone().sub(monde(b));
+    if (delta.lengthSq() < 1e-14) return;
+    b.parent.getWorldQuaternion(_q);
+    b.position.add(delta.applyQuaternion(_q.invert()));
+    b.updateMatrixWorld(true);
   }
   function poserBrut(P) {
+    const A = assemblage(P),
+      R = etat.pivot,
+      rad = (d) => (d * Math.PI) / 180;
+    const qc = new THREE.Quaternion();
     for (const n in etat.bones) {
       const b = etat.bones[n],
         r = etat.repos[n];
@@ -219,22 +261,29 @@ export async function creerMoteur(canvas, opts = {}) {
       b.quaternion.copy(r.q);
       const q = P.rot[n];
       if (q) b.quaternion.set(q[0], q[1], q[2], q[3]).multiply(r.q);
+      const c = A.counters[n];
+      if (c) b.quaternion.premultiply(qc.set(c[0], c[1], c[2], c[3]));
       const d = P.pos[n];
       if (d) b.position.add(new THREE.Vector3(d[0], d[1], d[2]));
     }
-    // le bassin tourne autour du point L5/S1 (la colonne au-dessus reste en place grâce à la contre-rotation de spine05)
-    const root = etat.bones.root,
-      r = etat.repos.root;
-    root.position.copy(r.p).sub(etat.pivot).applyQuaternion(root.quaternion).add(etat.pivot);
+    // bassin : rotation autour du centre des hanches ; puis bascule globale (chevilles, genoux, hanches) en bloc
+    const root = etat.bones.root;
+    root.quaternion.set(A.root[0], A.root[1], A.root[2], A.root[3]).multiply(etat.repos.root.q);
+    const Qb = new THREE.Quaternion(P.bassin[0], P.bassin[1], P.bassin[2], P.bassin[3]);
+    let p0 = R.root.clone().sub(R.hancheC).applyQuaternion(Qb).add(R.hancheC);
+    p0 = tourneX(p0, R.hancheC, rad(P.glob.h));
+    p0 = tourneX(p0, R.genouC, rad(P.glob.k));
+    p0 = tourneX(p0, R.chevilleC, rad(P.glob.a));
+    root.position.copy(p0);
     etat.racine.updateMatrixWorld(true);
-    // hanches épinglées : les jambes restent exactement où elles étaient (pieds au sol, genoux non fléchis)
-    for (const s of ['L', 'R']) {
-      const pel = etat.bones['pelvis.' + s];
-      const delta = etat.hanche[s].clone().sub(monde(etat.bones['upperleg01.' + s]));
-      if (delta.lengthSq() > 1e-12) {
-        pel.parent.getWorldQuaternion(_q);
-        pel.position.add(delta.applyQuaternion(_q.invert()));
-      }
+    // segments inférieurs épinglés : cuisses (hanches), jambes (genoux) et pieds (chevilles) gardent leur place
+    // au sol ; seuls les corps situés au-dessus d'une articulation « globale » active se déplacent avec elle.
+    for (const c of ['L', 'R']) {
+      let h = tourneX(R.hanche[c], R.genouC, rad(P.glob.k));
+      h = tourneX(h, R.chevilleC, rad(P.glob.a));
+      epingler('upperleg01.' + c, h);
+      epingler('lowerleg01.' + c, tourneX(R.genou[c], R.chevilleC, rad(P.glob.a)));
+      epingler('foot.' + c, R.cheville[c]);
     }
     etat.racine.updateMatrixWorld(true);
     // pronation / supination : torsion autour de l'axe coude → poignet, répartie sur les deux os de l'avant-bras
@@ -271,6 +320,116 @@ export async function creerMoteur(canvas, opts = {}) {
     if (!etat.racine) return;
     if (!etat.pivot) repere();
     poserBrut(poseDepuisValeurs(etat.valeurs));
+    if (reperes.groupe) {
+      etat.racine.updateMatrixWorld(true);
+      majReperes();
+    }
+  }
+
+  // ── repères cliniques (optionnels) : lignes bi-acromiales, bi-iliaques, bi-auriculaires, bi-genoux, fil à plomb
+  const COUL_REP = {
+    epaules: 0x2563eb,
+    bassin: 0xdc2626,
+    tete: 0x16a34a,
+    genoux: 0xea580c,
+    plomb: 0x6b7280,
+  };
+  function creerReperes() {
+    if (reperes.groupe) etat.racine.remove(reperes.groupe);
+    const g = new THREE.Group();
+    g.visible = reperes.actif;
+    const pt = (os, local) => {
+      const o = new THREE.Object3D();
+      o.position.copy(local);
+      etat.bones[os].add(o);
+      return o;
+    };
+    const W = (os) => monde(etat.bones[os]);
+    // les os sont au repos : positions monde de repos → décalages locaux (axes identiques au repos)
+    etat.racine.updateMatrixWorld(true);
+    const off = (os, ref, d) => W(ref).clone().add(d).sub(W(os));
+    const defs = {
+      epaules: [
+        pt('clavicle.R', off('clavicle.R', 'upperarm01.R', new THREE.Vector3(0.0, 0.05, 0.0))),
+        pt('clavicle.L', off('clavicle.L', 'upperarm01.L', new THREE.Vector3(0.0, 0.05, 0.0))),
+      ],
+      bassin: [
+        pt('pelvis.R', off('pelvis.R', 'upperleg01.R', new THREE.Vector3(0.05, 0.1, 0.0))),
+        pt('pelvis.L', off('pelvis.L', 'upperleg01.L', new THREE.Vector3(-0.05, 0.1, 0.0))),
+      ],
+      tete: [
+        pt('head', off('head', 'head', new THREE.Vector3(-0.075, 0.075, 0.0))),
+        pt('head', off('head', 'head', new THREE.Vector3(0.075, 0.075, 0.0))),
+      ],
+      genoux: [
+        pt('lowerleg01.R', new THREE.Vector3(0, 0, 0)),
+        pt('lowerleg01.L', new THREE.Vector3(0, 0, 0)),
+      ],
+    };
+    reperes.lignes = [];
+    for (const k in defs) {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(),
+        new THREE.Vector3(),
+      ]);
+      const ligne = new THREE.Line(
+        geo,
+        new THREE.LineBasicMaterial({ color: COUL_REP[k], depthTest: false, transparent: true })
+      );
+      ligne.renderOrder = 20;
+      ligne.frustumCulled = false;
+      g.add(ligne);
+      reperes.lignes.push({ k, a: defs[k][0], b: defs[k][1], ligne });
+    }
+    // fil à plomb : vertical passant par le milieu des chevilles
+    const gp = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const plomb = new THREE.Line(
+      gp,
+      new THREE.LineDashedMaterial({
+        color: COUL_REP.plomb,
+        dashSize: 0.03,
+        gapSize: 0.02,
+        depthTest: false,
+        transparent: true,
+      })
+    );
+    plomb.renderOrder = 20;
+    plomb.frustumCulled = false;
+    g.add(plomb);
+    reperes.plomb = plomb;
+    reperes.groupe = g;
+    etat.racine.add(g);
+  }
+  // angles (°) vus de face : + = côté droit du patient plus haut (côté gauche de l'écran monte)
+  function majReperes() {
+    if (!reperes.groupe) return null;
+    const out = {};
+    for (const r of reperes.lignes) {
+      const a = r.a.getWorldPosition(new THREE.Vector3()),
+        b = r.b.getWorldPosition(new THREE.Vector3());
+      const dir = b.clone().sub(a).normalize(),
+        ext = 0.12;
+      const p1 = a.clone().addScaledVector(dir, -ext),
+        p2 = b.clone().addScaledVector(dir, ext);
+      r.ligne.geometry.setFromPoints([p1, p2]);
+      out[r.k] =
+        Math.round(((Math.atan2(a.y - b.y, Math.abs(b.x - a.x)) * 180) / Math.PI) * 10) / 10;
+    }
+    const c = etat.pivot ? etat.pivot.chevilleC : new THREE.Vector3();
+    reperes.plomb.geometry.setFromPoints([
+      new THREE.Vector3(0, 0.0, c.z),
+      new THREE.Vector3(0, 1.95, c.z),
+    ]);
+    reperes.plomb.computeLineDistances();
+    reperes.angles = out;
+    return out;
+  }
+  function montrerReperes(oui) {
+    reperes.actif = !!oui;
+    if (reperes.groupe) reperes.groupe.visible = reperes.actif;
+    if (reperes.actif) majReperes();
+    afficher();
+    return reperes.angles;
   }
 
   function vue(nom) {
@@ -291,7 +450,36 @@ export async function creerMoteur(canvas, opts = {}) {
     renderer.dispose();
   }
 
-  return { chargerSexe, peau, pose, vue, tourner, taille, afficher, png, liberer, etat, THREE };
+  // Diagnostic (tests) : la couche musculaire a-t-elle sa texture, quelle couche est visible ?
+  function diag() {
+    const r = { peauVisible: false, muscleVisible: false, textureMuscle: false };
+    if (etat.racine)
+      etat.racine.traverse((o) => {
+        if (o.userData.role === 'peau') r.peauVisible = o.visible;
+        if (o.userData.role === 'muscles') {
+          r.muscleVisible = o.visible;
+          const m = o.material.map;
+          r.textureMuscle = !!(m && m.image && m.image.width > 0);
+        }
+      });
+    return r;
+  }
+  return {
+    chargerSexe,
+    peau,
+    pose,
+    montrerReperes,
+    angles: () => reperes.angles || null,
+    vue,
+    tourner,
+    taille,
+    afficher,
+    png,
+    liberer,
+    etat,
+    diag,
+    THREE,
+  };
 }
 
 // Rendu hors écran des 4 vues pour le rapport (mêmes valeurs → mêmes images, échelle identique)

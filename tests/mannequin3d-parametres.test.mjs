@@ -8,6 +8,8 @@ import {
   GROUPES,
   POSE_NEUTRE,
   poseDepuisValeurs,
+  assemblage,
+  REPARTITION_RACHIS,
   nettoyerValeurs,
   decrire,
   qAxe,
@@ -90,11 +92,6 @@ describe('pose', () => {
       ang += (2 * Math.asin(P.rot[n][2]) * 180) / Math.PI;
     expect(Math.round(ang)).toBe(15);
   });
-  it('bascule du bassin : les jambes reçoivent la rotation inverse (jambes verticales)', () => {
-    const P = poseDepuisValeurs({ bassin_bascule: 8, bassin_antev: 10 });
-    expect(proche(qMul(P.rot.root, P.rot['pelvis.L']), [0, 0, 0, 1], 1e-9)).toBe(true);
-    expect(proche(qMul(P.rot.root, P.rot['pelvis.R']), [0, 0, 0, 1], 1e-9)).toBe(true);
-  });
   it('inégalité de 22 mm sur 220 mm de large ≈ 5,7° de bascule', () => {
     const P = poseDepuisValeurs({ bassin_inegalite: 22 });
     expect(Math.round(((2 * Math.asin(P.bassin[2]) * 180) / Math.PI) * 10) / 10).toBe(5.7);
@@ -106,17 +103,55 @@ describe('pose', () => {
     for (const n of ['spine01', 'spine02', 'spine03', 'spine04', 'spine05'])
       expect(proche(P.rot[n] || [0, 0, 0, 1], [0, 0, 0, 1])).toBe(true);
   });
-  it('bassin : la colonne au-dessus ne suit pas (contre-rotation de spine05) et les jambes restent d’aplomb', () => {
+  it('bassin : le mouvement se répartit sur le rachis et revient à zéro au sommet ; les cuisses restent d’aplomb', () => {
     const P = poseDepuisValeurs({ bassin_bascule: 7, bassin_antev: 12, bassin_rot: -9 });
-    expect(proche(qMul(P.rot.root, P.rot.spine05), [0, 0, 0, 1])).toBe(true);
-    for (const n of ['pelvis.L', 'pelvis.R'])
-      expect(proche(qMul(P.rot.root, P.rot[n]), [0, 0, 0, 1])).toBe(true);
+    const A = assemblage(P);
+    // rotation nette de chaque niveau = root × contre-rotations cumulées
+    let net = A.root;
+    const nets = {};
+    for (const [n] of REPARTITION_RACHIS) {
+      net = qMul(net, A.counters[n]);
+      nets[n] = net;
+    }
+    expect(proche(nets.spine01, [0, 0, 0, 1])).toBe(true); // épaules, cou et tête ne bougent pas
+    expect(Math.abs((2 * Math.asin(nets.spine05[2]) * 180) / Math.PI)).toBeGreaterThan(
+      Math.abs((2 * Math.asin(nets.spine03[2]) * 180) / Math.PI)
+    ); // fondu décroissant
+    for (const c of ['L', 'R'])
+      expect(proche(qMul(A.root, A.counters['upperleg01.' + c]), [0, 0, 0, 1])).toBe(true);
     expect(P.rot.neck02).toBeUndefined();
+    expect(REPARTITION_RACHIS.reduce((s, x) => s + x[1], 0)).toBeCloseTo(1, 9);
+  });
+  it('antériorisation globale : en bloc au-dessus de l’articulation choisie, segments inférieurs fixes, pieds à plat', () => {
+    for (const [id, cle] of [
+      ['glob_chev', 'a'],
+      ['glob_gen', 'k'],
+      ['glob_bassin', 'h'],
+    ]) {
+      const P = poseDepuisValeurs({ [id]: 6 });
+      expect(P.glob[cle]).toBe(6);
+      const A = assemblage(P);
+      expect((2 * Math.asin(A.root[0]) * 180) / Math.PI).toBeCloseTo(6, 6); // tout le haut du corps s’incline de 6°
+      // pieds : orientation monde nulle quelle que soit l’articulation ; jambes / cuisses selon le pivot
+      const mondeFoot = qMul(
+        qMul(qMul(A.root, A.counters['upperleg01.L']), A.counters['lowerleg01.L']),
+        A.counters['foot.L']
+      );
+      expect(proche(mondeFoot, [0, 0, 0, 1])).toBe(true);
+    }
+    const ch = assemblage(poseDepuisValeurs({ glob_chev: 6 }));
+    const cuisse = qMul(ch.root, ch.counters['upperleg01.L']);
+    expect((2 * Math.asin(cuisse[0]) * 180) / Math.PI).toBeCloseTo(6, 6); // depuis les chevilles : les cuisses s’inclinent aussi
+    const ba = assemblage(poseDepuisValeurs({ glob_bassin: 6 }));
+    expect(proche(qMul(ba.root, ba.counters['upperleg01.L']), [0, 0, 0, 1])).toBe(true); // depuis le bassin : cuisses fixes
+    expect(poseDepuisValeurs({ glob_chev: -4 }).glob.a).toBe(-4); // postériorisation
   });
   it('antéversion : les fessiers bombent (poids > 0), rétroversion : ils s’aplatissent (poids < 0), sans flexion des genoux', () => {
     expect(poseDepuisValeurs({ bassin_antev: 25 }).morph.fessiers).toBeCloseTo(1, 9);
+    expect(poseDepuisValeurs({ bassin_antev: 25 }).morph.lordose).toBeCloseTo(1, 9); // antéversion : bas du dos creusé
     const R = poseDepuisValeurs({ bassin_antev: -10 });
     expect(R.morph.fessiers).toBeLessThan(0);
+    expect(R.morph.lordose).toBeLessThan(0); // rétroversion : lombaires moins creusées
     expect(Object.keys(R.morph).filter((k) => k.startsWith('genou'))).toHaveLength(0);
   });
   it('genou : seule la déformation locale du genou bouge (flessum + = en avant, recurvatum − = en arrière)', () => {
@@ -250,5 +285,54 @@ describe('dictée', () => {
       expect(p.valeur).toBeGreaterThanOrEqual(PAR_ID[p.id].min);
       expect(p.valeur).toBeLessThanOrEqual(PAR_ID[p.id].max);
     }
+  });
+});
+
+describe('dictée : phrases libres, vocabulaire médical', () => {
+  const val = async (t) => {
+    const { interpreter } = await import('../js/mannequin3d/dictee.js');
+    return Object.fromEntries(interpreter(t).propositions.map((p) => [p.id, p.valeur]));
+  };
+  it('phrase de compte rendu complète, mots dans le désordre, nombre en lettres', async () => {
+    const m = await val(
+      'Le patient présente un genu valgum bilatéral marqué, une bascule du bassin à droite légère et la tête penchée à gauche de huit degrés.'
+    );
+    expect(m).toEqual({ genou_valgus_D: 11, genou_valgus_G: 11, bassin_bascule: 2, tete_incl: -8 });
+  });
+  it('comparatif « plus haute que la gauche » : seul le premier côté est concerné', async () => {
+    const m = await val('épaule droite plus haute que la gauche');
+    expect(Object.keys(m)).toEqual(['epaule_elev_D']);
+  });
+  it('un chiffre ou un niveau isolé après une virgule se rattache à la phrase précédente', async () => {
+    expect(await val('antériorisation globale à partir des genoux, 6 degrés')).toEqual({
+      glob_gen: 6,
+    });
+    expect(await val('hyperlordose, sévère')).toEqual({ tronc_lordose: 30 });
+  });
+  it('unités : 1 centimètre = 10 mm ; « un centimètre » écrit en toutes lettres', async () => {
+    expect(await val('jambe gauche plus courte de 1 cm')).toEqual({ bassin_inegalite: -10 });
+    expect(await val("la jambe gauche est plus courte d'un centimètre")).toEqual({
+      bassin_inegalite: -10,
+    });
+  });
+  it('antériorisation / postériorisation globale : pivot et sens', async () => {
+    expect(await val('antériorisation globale depuis les chevilles marquée')).toEqual({
+      glob_chev: 6,
+    });
+    expect(await val('postériorisation globale depuis le bassin modérée')).toEqual({
+      glob_bassin: -5,
+    });
+    expect(await val('le corps penche en bloc vers l’avant depuis les genoux')).toEqual({
+      glob_gen: 4,
+    });
+  });
+  it('« coude » ne déclenche pas la tête (le mot cou n’est pas lu dans coude)', async () => {
+    expect(await val('flexion du coude droit marquée')).toEqual({ coude_flex_D: 105 });
+  });
+  it('une proposition à niveau explicite l’emporte sur un doublon à niveau par défaut', async () => {
+    expect(await val('rétroversion du bassin marquée, dos plat')).toEqual({ bassin_antev: -11 });
+  });
+  it('texte sans rapport : rien n’est proposé', async () => {
+    expect(await val('bonjour docteur ceci est un test')).toEqual({});
   });
 });

@@ -22,8 +22,8 @@ def build_morphs(P,tri,Wd,bones,bp,H):
     out={}
     D=np.zeros_like(P); D[:,2]=-0.030*s*bump(y,1.20*s,1.47*s)*(0.12+0.88*back)*(1-arm); out['cyphose']=D
     D=np.zeros_like(P); legs=sum(Wd[:,idx(p)].sum(1) for p in ('upperleg','lowerleg'))
-    D[:,2]=0.022*s*bump(y,0.97*s,1.20*s)*(0.30+0.70*back)*(1-arm)*(1-np.clip(legs,0,1)); out['lordose']=D
-    D=np.zeros_like(P); D[:,2]=-0.016*s*bump(y,0.80*s,1.03*s)*back*smooth(0.30,0.05,np.abs(x)/s); out['fessiers']=D
+    D[:,2]=0.050*s*bump(y,0.95*s,1.22*s)*(0.20+0.80*back)*(1-arm)*(1-np.clip(legs,0,1)); out['lordose']=D
+    D=np.zeros_like(P); D[:,2]=-0.040*s*bump(y,0.78*s,1.04*s)*back*smooth(0.30,0.05,np.abs(x)/s); out['fessiers']=D
     for side,sg in (('L',1),('R',-1)):
         hip=bp['upperleg01.'+side][0]*0.1; kn=bp['lowerleg01.'+side][0]*0.1; an=bp['foot.'+side][0]*0.1
         t=np.clip((y-an[1])/(hip[1]-an[1]),0,1); tk=(kn[1]-an[1])/(hip[1]-an[1])
