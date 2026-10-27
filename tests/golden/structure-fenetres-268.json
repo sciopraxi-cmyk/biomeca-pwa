@@ -4673,6 +4673,444 @@
    "Non, jamais — choix délibéré : Verticy n'en a pas l'usage (pas de télétransmission) et cette donnée exige des précautions particulières. Les imports CSV qui en contiennent l'ignorent explicitement."
   ],
   [
+   3,
+   "div",
+   [],
+   "🧾 Devis et factures"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Comment créer un devis ou une facture ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Sélectionnez un patient dans la liste, puis → (ou Nouvelle facture). Ajoutez des lignes depuis votre catalogue d'actes, ou saisissez un montant libre. Le brouillon est modifiable tant qu'il n'est pas émis."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "🧾 Devis et factures"
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "+ Nouveau devis"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Comment sont numérotés les devis et factures ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "À l'émission, le numéro (devis) ou (facture) est attribué automatiquement par la base, sans trou dans la séquence. Le document devient alors figé."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "D-AAAA-NNNN"
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "F-AAAA-NNNN"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Comment paramétrer mes actes et mes tarifs ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   ": créez vos actes personnalisés (titre, montant sans TVA, cotation). Importez le référentiel POD/AMP. Les montants sont modifiables (les tarifs conventionnels changent par avenant)."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "🧾 Paramètres facturation"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Le devis est-il automatique à l'import Doctolib ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Oui si l'acte est coché et que son titre est identique au motif du RDV. Le devis est créé à l'import du CSV Doctolib."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "« Devis automatique à l'import Doctolib »"
+  ],
+  [
+   3,
+   "div",
+   [],
+   "✍️ Signature du devis par le patient"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Comment le patient signe-t-il un devis ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Dans son (Mes documents), le patient lit le devis, coche , trace sa signature au doigt et valide. La signature est horodatée côté serveur (IP, empreinte SHA-256)."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "portail patient"
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "« J'ai lu ce devis et je l'accepte »"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Et pour un patient mineur ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Un est envoyé à l'adresse du compte parent, valable 10 minutes. Le parent le saisit pour signer à la place du mineur. En mode essai (avant HDS), le code s'affiche à l'écran."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "code à 6 chiffres"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Où voir la preuve de signature ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Dans la liste 🧾 Devis et factures (« ✍️ signé le … »), dans la fenêtre du devis, et dans la fenêtre 🔑 Accès au portail : un bloc de preuve (date, IP, empreinte, tracé)."
+  ],
+  [
+   3,
+   "div",
+   [],
+   "📝 Ordonnances"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Comment créer une ordonnance ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Sélectionnez un patient, puis → . Choisissez une catégorie (topiques, antalgiques, semelles…), saisissez les lignes, puis imprimez. L'ordonnance est stockée dans le dossier du patient."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "📝 Ordonnances"
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "+ Nouvelle ordonnance"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Mon logo, ma signature et mon tampon apparaissent-ils ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Oui. Remplissez votre fiche dans : logo du cabinet, signature et tampon (images PNG/JPEG). Ils sont imprimés automatiquement sur chaque ordonnance."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "Praticiens"
+  ],
+  [
+   3,
+   "div",
+   [],
+   "🧼 Stérilisation"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Comment tracer mes cycles de stérilisation ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   ": enregistrez vos appareils (autoclave, etc.), vos sets, puis vos cycles. Un numéro est attribué automatiquement. Les soins sont liés aux cycles."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "🧼 Traçabilité de stérilisation"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Quelle est la valeur réglementaire ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Le registre suit les recommandations de l'Ordre national des pédicures-podologues (cahier de stérilisation, conservation 5 ans). Les mentions réglementaires sont des avertissements, jamais des blocages."
+  ],
+  [
+   3,
+   "div",
+   [],
+   "🔑 Portail patient"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Comment donner accès au portail à un patient ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Fiche patient → → . Un identifiant est généré, le mot de passe initial est la date de naissance (AAAAMMJJ). Le patient se connecte sur le site Verticy, rubrique patient."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "🔑 Accès au portail"
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "Créer l'accès"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Que peut faire le patient sur son portail ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Consulter ses documents partagés (devis, factures), , échanger par messagerie avec le praticien, suivre son avec vidéos et chronomètre, remplir un questionnaire de santé."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "signer un devis"
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "programme d'exercices"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Puis-je bloquer ou retirer l'accès ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Oui, dans la même fenêtre 🔑 : bloquer l'accès (le patient ne peut plus se connecter), ou le retirer définitivement. Vous pouvez aussi bloquer les notifications de ressenti par patient."
+  ],
+  [
+   3,
+   "div",
+   [],
+   "🏠 Mode domicile (hors connexion)"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Verticy fonctionne-t-il sans Internet ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Oui. La consultation et la saisie fonctionnent . La synchronisation cloud reprend automatiquement au retour du réseau. Évitez de générer des rapports avec photos hors ligne."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "hors connexion"
+  ],
+  [
+   3,
+   "details",
+   [],
+   ""
+  ],
+  [
+   4,
+   "summary",
+   [],
+   "Combien de temps puis-je rester hors connexion ?"
+  ],
+  [
+   4,
+   "div",
+   [],
+   "Votre session et votre abonnement sont conservés . Au-delà, une reconnexion est demandée — vous ne perdez aucune donnée."
+  ],
+  [
+   5,
+   "strong",
+   [],
+   "7 jours hors connexion"
+  ],
+  [
    2,
    "a",
    [
