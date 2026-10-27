@@ -104,7 +104,7 @@ describe('pose', () => {
       expect(proche(P.rot[n] || [0, 0, 0, 1], [0, 0, 0, 1])).toBe(true);
   });
   it('bassin : le mouvement se répartit sur le rachis et revient à zéro au sommet ; les cuisses restent d’aplomb', () => {
-    const P = poseDepuisValeurs({ bassin_bascule: 7, bassin_antev: 12, bassin_rot: -9 });
+    const P = poseDepuisValeurs({ bassin_bascule: 7, bassin_antev: 5, bassin_rot: -9 });
     const A = assemblage(P);
     // rotation nette de chaque niveau = root × contre-rotations cumulées
     let net = A.root;
@@ -147,8 +147,8 @@ describe('pose', () => {
     expect(poseDepuisValeurs({ glob_chev: -4 }).glob.a).toBe(-4); // postériorisation
   });
   it('antéversion : les fessiers bombent (poids > 0), rétroversion : ils s’aplatissent (poids < 0), sans flexion des genoux', () => {
-    expect(poseDepuisValeurs({ bassin_antev: 25 }).morph.fessiers).toBeCloseTo(1, 9);
-    expect(poseDepuisValeurs({ bassin_antev: 25 }).morph.lordose).toBeCloseTo(1, 9); // antéversion : bas du dos creusé
+    expect(poseDepuisValeurs({ bassin_antev: 6 }).morph.fessiers).toBeCloseTo(1, 9);
+    expect(poseDepuisValeurs({ bassin_antev: 6 }).morph.lordose).toBeCloseTo(1, 9); // antéversion : bas du dos creusé
     const R = poseDepuisValeurs({ bassin_antev: -10 });
     expect(R.morph.fessiers).toBeLessThan(0);
     expect(R.morph.lordose).toBeLessThan(0); // rétroversion : lombaires moins creusées
@@ -330,7 +330,7 @@ describe('dictée : phrases libres, vocabulaire médical', () => {
     expect(await val('flexion du coude droit marquée')).toEqual({ coude_flex_D: 105 });
   });
   it('une proposition à niveau explicite l’emporte sur un doublon à niveau par défaut', async () => {
-    expect(await val('rétroversion du bassin marquée, dos plat')).toEqual({ bassin_antev: -11 });
+    expect(await val('rétroversion du bassin marquée, dos plat')).toEqual({ bassin_antev: -9 });
   });
   it('texte sans rapport : rien n’est proposé', async () => {
     expect(await val('bonjour docteur ceci est un test')).toEqual({});

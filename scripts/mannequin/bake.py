@@ -73,10 +73,10 @@ def bake(Pv_cm, Nv, uvs, tri, Wd, bones, bp, Hcm, sx, R=2048, debug=False):
         k = (flag == 0.0)
         stripe = 0.5 + 0.5 * np.sin(fib * (2 * np.pi / 0.30) + ph[np.clip(own, 0, None)]) * (0.75 + 0.25 * np.sin(fib * 1.3))
         stripe2 = 0.5 + 0.5 * np.sin(fib * (2 * np.pi / 1.7) + 1.3 * ph[np.clip(own, 0, None)])
-        mod = np.where(k, 0.72 + 0.22 * stripe + 0.12 * stripe2, np.where(flag == 1.0, 0.94 + 0.06 * stripe, 1.0))
+        mod = np.where(k, 0.80 + 0.16 * stripe + 0.08 * stripe2, np.where(flag == 1.0, 0.94 + 0.06 * stripe, 1.0))
         edgedark = 0.80 + 0.20 * smooth(0.45, 0.9, wq)
         img = img * (mod * edgedark)[..., None]
-    img = img * (1 - 0.62 * seam)[..., None]
+    img = img * (1 - 0.40 * seam)[..., None]
     # remplissage des bords (padding) : évite les liserés aux coutures UV
     filled = valid.copy()
     for _ in range(6):

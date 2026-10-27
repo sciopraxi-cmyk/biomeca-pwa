@@ -2,6 +2,13 @@
 import { CURSEURS, GROUPES, TABLEAUX, PAR_ID, decrire, nettoyerValeurs } from './parametres.js';
 import { creerMoteur, VUES } from './moteur.js';
 import { interpreter, EXEMPLES } from './dictee.js';
+import {
+  evaluer,
+  htmlHypothese,
+  htmlPrudence,
+  htmlSynthese,
+  reglesManuelles,
+} from './mecanismes.js';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -35,6 +42,10 @@ const CSS = `
 .m3d-prop label{display:flex;gap:6px;align-items:flex-start;padding:2px 0}
 .m3d-prop em{color:#92400e;font-style:normal;font-size:10px}
 .m3d-row.prop{outline:2px dashed #b45309;background:#fff7ed;border-radius:6px}
+.m3d-meca{margin-top:8px;border:1px solid var(--bord,#d8dee5);border-radius:8px;background:#fff;padding:8px 10px}
+.m3d-meca h4{margin:0 0 4px;font-size:13px;color:#7c2d12}
+.m3d-hyp{border:1px solid #e2e8f0;border-radius:6px;margin:5px 0;padding:4px 8px;background:#fafafa}
+.m3d-hyp>summary{cursor:pointer;font-size:12px}
 .m3d-cr ul{margin:4px 0 0 16px;padding:0}
 `;
 
@@ -155,6 +166,7 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     '↺ Neutre'
   );
   const cr = el('div', { class: 'm3d-cr' });
+  const hyp = el('div', { class: 'm3d-meca' });
   racine.append(
     el(
       'div',
@@ -285,7 +297,7 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     ),
     liste
   );
-  racine.append(el('div', { style: 'flex:1 1 440px;min-width:300px' }, dic, panel, cr));
+  racine.append(el('div', { style: 'flex:1 1 440px;min-width:300px' }, dic, panel, cr, hyp));
   conteneur.append(racine);
 
   function majLigne(id) {
@@ -452,7 +464,33 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
       l.forEach((t) => ul.append(el('li', {}, t)));
       cr.append(ul);
     }
+    majMeca();
     if (onChange) onChange(etatCourant());
+  }
+  // Hypothèses de mécanisme lésionnel sur les valeurs VALIDÉES (pas sur l'aperçu d'une dictée)
+  function majMeca() {
+    const res = evaluer(nettoyerValeurs(S.valeurs));
+    let h = '<h4>🔗 Mécanismes lésionnels possibles (hypothèses)</h4>' + htmlPrudence();
+    if (!res.length) {
+      h +=
+        '<div style="font-size:12px;color:#475569">Aucune règle ne se déclenche avec les valeurs actuelles' +
+        (Object.keys(S.valeurs).length
+          ? ' (écarts sous les seuils d’activation)'
+          : ' (mannequin neutre)') +
+        '.</div>';
+    } else {
+      h += htmlSynthese(res) + res.map((x) => htmlHypothese(x)).join('');
+    }
+    const man = reglesManuelles();
+    h +=
+      '<details style="margin-top:6px;font-size:11px;color:#475569"><summary>' +
+      man.length +
+      ' règles non calculées automatiquement (elles demandent le contexte clinique : douleur, sport, chaussage, tests)</summary><ul style="margin:4px 0 0 16px;padding:0">' +
+      man
+        .map((m) => '<li><b>' + m.id + '</b> ' + m.titre.replace(/[<>&]/g, '') + '</li>')
+        .join('') +
+      '</ul></details>';
+    hyp.innerHTML = h;
   }
   function etatCourant() {
     return { v: 1, sexe: S.sexe, peau: S.peau, valeurs: nettoyerValeurs(S.valeurs) };

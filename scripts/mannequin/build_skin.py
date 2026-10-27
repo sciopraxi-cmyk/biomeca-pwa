@@ -84,7 +84,7 @@ def build(gender,out,**kw):
         depth,_=vertex_relief(SV.owner.astype(int),SV.flag,SV.names,P2cm,t2)
         Pm=(P2cm+N2*depth[:,None])*0.01
         uv2=at['uv']*np.array([1,-1])+np.array([0,1])
-        mm=g.material(name='muscles',pbrMetallicRoughness={'baseColorTexture':{'index':tex},'metallicFactor':0,'roughnessFactor':.38},normalTexture={'index':texn,'scale':1.0},doubleSided=False)
+        mm=g.material(name='muscles',pbrMetallicRoughness={'baseColorTexture':{'index':tex},'metallicFactor':0,'roughnessFactor':.95},normalTexture={'index':texn,'scale':0.8},doubleSided=False)
         mph2=build_morphs(Pm,t2,Wd,BONES,bp,Hm)
         mi2=g.mesh('muscles',Pm,normals(Pm,t2),uv2,t2,mm,J4,W4,morphs=mph2)
         g.nodes.append({'name':'Muscles','mesh':mi2,'skin':0})

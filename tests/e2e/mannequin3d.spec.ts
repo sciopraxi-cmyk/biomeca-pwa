@@ -58,6 +58,11 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   const d = await page.evaluate('_m3dPosturo.api.diag()');
   expect(d).toEqual({ peauVisible: false, muscleVisible: true, textureMuscle: true });
   await page.click('.m3d-btn:has-text("Remettre la peau")');
+  // hypothèses de mécanisme lésionnel : bascule 7° + lordose 15° déclenchent des règles, avec preuve et sources
+  const meca = page.locator('.m3d-meca');
+  await expect(meca).toContainText('Mécanismes lésionnels possibles');
+  await expect(meca).toContainText('pas un diagnostic');
+  await expect(meca.locator('details.m3d-hyp').first()).toBeVisible();
   // curseurs du bassin : repères activés → le bassin s'incline, les épaules et la tête non
   await page.click('.m3d-btn:has-text("Repères")');
   const ang = async () => page.evaluate('_m3dPosturo.api.angles()');

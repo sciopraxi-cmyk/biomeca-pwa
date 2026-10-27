@@ -3,8 +3,8 @@ import numpy as np
 from anat import Limb, limb_member, signed_dist_poly, thick_line
 from geom import smooth
 
-MUSCLE_RED = np.array([0.62, 0.14, 0.12]); TENDON = np.array([0.90, 0.83, 0.70]); BONE = np.array([0.82, 0.76, 0.64])
-FASCIA = np.array([0.78, 0.70, 0.60]); FOND = np.array([0.34, 0.09, 0.08])
+MUSCLE_RED = np.array([0.88, 0.47, 0.47]); TENDON = np.array([0.93, 0.88, 0.78]); BONE = np.array([0.90, 0.86, 0.77])
+FASCIA = np.array([0.88, 0.78, 0.70]); FOND = np.array([0.62, 0.34, 0.34])
 
 class Sink:
     """Résolution incrémentale des territoires (mémoire bornée) : le plus prioritaire gagne."""
@@ -114,15 +114,21 @@ def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
     def bpos(n): return np.array(bp[n][0]) * 10.0   # dm → cm
     def mk_limb(side, kind):
         sd = 'L' if side > 0 else 'R'
+        FRONT = (0, 0, 1); LAT = (side, 0, 0); MED = (-side, 0, 0)
         if kind == 'leg':
             J = [bpos('upperleg01.' + sd), bpos('lowerleg01.' + sd), bpos('foot.' + sd)]
             names = ['upperleg01.' + sd, 'upperleg02.' + sd, 'lowerleg01.' + sd, 'lowerleg02.' + sd]
-            return Limb(Pv, Wd, bones, names, J, (0, 0, 1), (side, 0, 0))
+            return Limb(Pv, Wd, bones, names, J, FRONT, LAT)
         if kind == 'arm':
             J = [bpos('upperarm01.' + sd), bpos('lowerarm01.' + sd), bpos('wrist.' + sd)]
-            names = ['upperarm01.' + sd, 'upperarm02.' + sd, 'lowerarm01.' + sd, 'lowerarm02.' + sd, 'wrist.' + sd]
-            return Limb(Pv, Wd, bones, names, J, (0, 0, 1), (side * 0.77, 0.64, 0))
-    Rm = {'thigh': 7.5, 'shank': 5.2, 'arm': 4.3, 'fore': 3.4}
+            lim = Limb(Pv, Wd, bones, ['upperarm01.' + sd, 'upperarm02.' + sd], J[:2], FRONT, LAT)
+            fore = Limb(Pv, Wd, bones, ['lowerarm01.' + sd, 'lowerarm02.' + sd], J[1:], MED, FRONT)
+            return lim, fore
+        if kind == 'hand':
+            hb = ['wrist.' + sd] + ['metacarpal%d.%s' % (i, sd) for i in range(1, 5)] + ['finger%d-%d.%s' % (i, j, sd) for i in range(1, 6) for j in range(1, 4)]
+            J = [bpos('wrist.' + sd), np.array(bp['finger3-3.' + sd][1]) * 10.0]
+            return Limb(Pv, Wd, bones, hb, J, MED, FRONT, gate=(Pv[:, 0] * side > 42) & (Pv[:, 1] < 108.5))
+    Rm = {'thigh': 7.5, 'shank': 5.2, 'arm': 4.3, 'fore': 3.4, 'hand': 3.3}
     cache = {}
     def lm(name, limb, seg, pts, key, prio=0, kind='muscle', fibsc=1.0, feather=0.55, tone=1.0, gate=None):
         ck = (id(limb), seg, id(gate))
@@ -177,7 +183,8 @@ def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
         lm('tendon_rotulien.' + sd, leg, 1, [(-0.06, -9), (0.0, -9), (.11, -6), (.11, 6), (0.0, 9), (-0.06, 9)], 'shank', 7, kind='tendon', gate=gl)
         lm('rotule.' + sd, leg, 0, [(.97, -14), (1.04, -12), (1.06, 0), (1.04, 12), (.97, 14), (.95, 0)], 'thigh', 7, kind='bone', gate=gl)
         # --- bras
-        arm = mk_limb(side, 'arm')
+        arm, fore = mk_limb(side, 'arm')
+        hand = mk_limb(side, 'hand')
         ga = ((x * side) > 8.0)
         lm('deltoide_ant.' + sd, arm, 0, [(-.30, -12), (-.05, -22), (.20, -4), (.42, 36), (.40, 52), (.15, 48), (-.05, 38), (-.30, 24)], 'arm', 5, gate=ga)
         lm('deltoide_moy.' + sd, arm, 0, [(-.32, 40), (-.05, 38), (.15, 50), (.42, 52), (.44, 94), (.40, 120), (.15, 130), (-.05, 128), (-.32, 118)], 'arm', 5, gate=ga)
@@ -191,14 +198,80 @@ def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
         lm('triceps_med.' + sd, arm, 0, [(.55, -150), (.8, -140), (.92, -150), (.92, -182), (.62, -182)], 'arm', 3, gate=ga)
         lm('tendon_triceps.' + sd, arm, 0, [(.80, 160), (1.0, 168), (1.0, 192), (.80, 200)], 'arm', 6, kind='tendon', gate=ga)
         # --- avant-bras (θ = 0 : face palmaire ; + : côté radial ; 180 : dos)
-        lm('brachio_radial.' + sd, arm, 1, [(.0, 76), (.25, 84), (.5, 92), (.6, 98), (.55, 118), (.25, 112), (.0, 106)], 'fore', 5, gate=ga)
-        lm('rond_pronateur.' + sd, arm, 1, [(0.0, 12), (.15, 24), (.4, 54), (.4, 70), (.15, 56), (0.0, 36)], 'fore', 5, gate=ga)
-        lm('flechisseurs_radial.' + sd, arm, 1, [(0.0, -12), (.2, -6), (.55, 14), (.55, 28), (.2, 10), (0.0, 4)], 'fore', 5, gate=ga)
-        lm('flechisseurs_superf.' + sd, arm, 1, [(.0, -48), (.25, -34), (.58, -14), (.58, -4), (.25, -18), (.0, -30)], 'fore', 4, gate=ga)
-        lm('flechisseur_ulnaire.' + sd, arm, 1, [(.0, -80), (.25, -74), (.6, -62), (.6, -42), (.25, -52), (.0, -52)], 'fore', 5, gate=ga)
-        lm('extenseurs_radiaux.' + sd, arm, 1, [(.0, 110), (.25, 118), (.55, 130), (.55, 150), (.25, 140), (.0, 132)], 'fore', 5, gate=ga)
-        lm('extenseur_commun.' + sd, arm, 1, [(.0, 138), (.3, 152), (.6, 162), (.6, 180), (.3, 184), (.0, 195)], 'fore', 5, gate=ga)
-        lm('extenseur_ulnaire.' + sd, arm, 1, [(.0, -148), (.3, -136), (.6, -116), (.6, -96), (.3, -108), (.0, -126)], 'fore', 5, gate=ga)
-        lm('tendons_avant_bras_palmaire.' + sd, arm, 1, [(.60, -16), (1.04, -9), (1.04, 8), (.60, 12)], 'fore', 6, kind='tendon', gate=ga)
-        lm('tendons_avant_bras_dorsal.' + sd, arm, 1, [(.62, 166), (1.04, 172), (1.04, 188), (.62, 194)], 'fore', 6, kind='tendon', gate=ga)
+        lm('brachio_radial.' + sd, fore, 0, [(.0, 76), (.25, 84), (.5, 92), (.6, 98), (.55, 118), (.25, 112), (.0, 106)], 'fore', 5, gate=ga)
+        lm('rond_pronateur.' + sd, fore, 0, [(0.0, 12), (.15, 24), (.4, 54), (.4, 70), (.15, 56), (0.0, 36)], 'fore', 5, gate=ga)
+        lm('flechisseurs_radial.' + sd, fore, 0, [(0.0, -12), (.2, -6), (.55, 14), (.55, 28), (.2, 10), (0.0, 4)], 'fore', 5, gate=ga)
+        lm('flechisseurs_superf.' + sd, fore, 0, [(.0, -48), (.25, -34), (.58, -14), (.58, -4), (.25, -18), (.0, -30)], 'fore', 4, gate=ga)
+        lm('flechisseur_ulnaire.' + sd, fore, 0, [(.0, -80), (.25, -74), (.6, -62), (.6, -42), (.25, -52), (.0, -52)], 'fore', 5, gate=ga)
+        lm('extenseurs_radiaux.' + sd, fore, 0, [(.0, 110), (.25, 118), (.55, 130), (.55, 150), (.25, 140), (.0, 132)], 'fore', 5, gate=ga)
+        lm('extenseur_commun.' + sd, fore, 0, [(.0, 138), (.3, 152), (.6, 162), (.6, 180), (.3, 184), (.0, 195)], 'fore', 5, gate=ga)
+        lm('extenseur_ulnaire.' + sd, fore, 0, [(.0, -148), (.3, -136), (.6, -116), (.6, -96), (.3, -108), (.0, -126)], 'fore', 5, gate=ga)
+        lm('tendons_avant_bras_palmaire.' + sd, fore, 0, [(.60, -16), (1.04, -9), (1.04, 8), (.60, 12)], 'fore', 6, kind='tendon', gate=ga)
+        lm('tendons_avant_bras_dorsal.' + sd, fore, 0, [(.62, 166), (1.04, 172), (1.04, 188), (.62, 194)], 'fore', 6, kind='tendon', gate=ga)
+
+    # ---------- MAINS (limb « hand » : θ = 0 face palmaire, +90 radial / pouce, 180 dorsal) ----------
+    for side in (1, -1):
+        sd = 'L' if side > 0 else 'R'
+        hand = mk_limb(side, 'hand'); gh = ((x * side) > 42.0) & (y < 108.5)
+        H = lambda nm, seg_pts, pr=5, kind='muscle', f=0.4: lm(nm + '.' + sd, hand, 0, seg_pts, 'hand', pr, kind=kind, feather=f, gate=gh)
+        H('doigts', [(.44, -180), (1.2, -180), (1.2, 180), (.44, 180)], 1, 'tendon')
+        H('thenar', [(.03, 25), (.18, 18), (.34, 38), (.38, 72), (.24, 96), (.06, 84)], 6)
+        H('hypothenar', [(.06, -30), (.22, -26), (.36, -52), (.34, -86), (.18, -92), (.06, -70)], 6)
+        H('aponevrose_palmaire', [(.04, -24), (.42, -24), (.46, 18), (.04, 22)], 5, 'fascia')
+        H('tendons_flechisseurs_doigts', [(.42, -14), (1.2, -10), (1.2, 10), (.42, 14)], 7, 'tendon', 0.3)
+        H('retinaculum_extenseurs', [(-.10, 112), (.10, 112), (.10, 248), (-.10, 248)], 6, 'fascia')
+        for k, c in enumerate((138, 164, 196, 222)):
+            H('tendon_extenseur_doigt%d' % k, [(.10, c - 6), (1.2, c - 9), (1.2, c + 9), (.10, c + 6)], 7, 'tendon', 0.3)
+        for k, (c1, c2) in enumerate(((138, 164), (164, 196), (196, 222))):
+            H('interosseux_dorsal%d' % k, [(.12, c1 + 7), (.42, c1 + 9), (.42, c2 - 9), (.12, c2 - 7)], 5)
+        H('interosseux_dorsal_pouce', [(.10, 96), (.38, 100), (.38, 128), (.10, 130)], 5)
+    # ---------- PIEDS (repère local : v = |x| − x cheville, latéral > 0 ; u = z) ----------
+    xa = abs(bpos('foot.L')[0]); za = bpos('foot.L')[2]
+    v = ax - xa; u = z - za + 1.9
+    gf = np.nonzero((y < 11.5) & (ax > xa - 9) & (ax < xa + 9) & (z > -9) & (z < 28))[0]
+    toes = []
+    for t in range(1, 6):
+        nm = [b for b in bones if b.startswith('toe%d-' % t) and b.endswith('.L')]
+        last = sorted(nm)[-1]; tp = np.array(bp[last][1]) * 10.0
+        toes.append((abs(tp[0]) - xa, tp[2] - za + 1.9))
+    def fp(name, pts, prio=5, kind='muscle', fib=(0, 1), top=None, feather=0.35):
+        pts = np.asarray(pts, float)
+        V = v[gf]; U = u[gf]
+        sd = signed_dist_poly(V, U, pts)
+        w = smooth(0, feather, sd)
+        if top is True: w = w * smooth(0.1, 0.5, N[gf, 1])
+        elif top is False: w = w * smooth(-0.1, -0.5, N[gf, 1])
+        T.add(name, gf, w, fib[0] * V + fib[1] * U, kind, prio)
+    def fl(name, pts, wd, prio=7, kind='tendon', top=True):
+        p = np.asarray(pts, float); V = v[gf]; U = u[gf]
+        sd = thick_line(V, U, p, wd)
+        w = smooth(0, 0.3, sd)
+        if top: w = w * smooth(0.1, 0.5, N[gf, 1])
+        T.add(name, gf, w, U, kind, prio)
+    fp('pied_dos_fascia', [(-6, -1.5), (7, -1.5), (7, 16), (-6, 16)], 1, 'fascia', top=True)
+    fp('orteils', [(-7, 15.4), (9, 15.4), (9, 28), (-7, 28)], 2, 'tendon')
+    fp('retinaculum_cheville', [(-3.8, 0), (3.8, 0), (3.6, 4.8), (-3.6, 4.8)], 4, 'fascia', top=True)
+    fl('tendon_tibial_ant_pied', [(-1.6, 2.0), (-2.6, 6.0), (-3.6, 10.2)], 1.1)
+    fl('tendon_ext_hallux', [(-0.5, 2.0), (-1.4, 8.0), toes[0]], 0.9)
+    for k in range(1, 5):
+        fl('tendon_ext_orteil%d' % (k + 1), [(0.9, 2.0), (0.9 + 0.2 * k, 7.0), toes[k]], 0.65)
+    fp('court_extenseur_orteils', [(1.3, 4.6), (4.2, 6.4), (3.6, 11.8), (1.1, 10.2)], 5, top=True)
+    fp('abducteur_hallux', [(-5.2, 3.0), (-2.2, 3.0), (-2.0, 13.5), (-5.0, 13.5)], 5, top=None)
+    fp('abducteur_petit_orteil', [(2.6, 3.2), (6.2, 3.2), (6.0, 14.2), (2.8, 14.2)], 5, top=None)
+    fp('fascia_plantaire', [(-2.8, 2.0), (3.0, 2.0), (3.2, 15.0), (-3.0, 15.0)], 4, 'fascia', top=False)
+    # ---------- VISAGE, COU (complément) ----------
+    poly('procerus', [(0.0, 169.2), (0.9, 169.0), (0.9, 166.0), (0.0, 166.0)], 'f', prio=5, fib=('dir', 90), feather=0.3)
+    line('corrugateur', [(1.0, 168.0), (3.4, 169.0)], 0.9, 'f', prio=5, fib=('dir', 20), nthr=0.2)
+    poly('nasalis', [(1.0, 163.4), (2.9, 163.6), (3.1, 161.4), (1.2, 160.9)], 'f', prio=5, fib=('dir', 20), nthr=0.1)
+    line('releveur_levre_sup', [(2.7, 165.2), (2.5, 160.8)], 1.2, 'f', prio=5, fib=('dir', 90), nthr=0.1)
+    line('zygomatique_majeur', [(7.0, 163.6), (3.9, 158.4)], 1.5, 'f', prio=6, fib=('dir', 55), nthr=-0.1)
+    line('zygomatique_mineur', [(5.8, 164.4), (3.2, 160.0)], 1.0, 'f', prio=5, fib=('dir', 55), nthr=-0.1)
+    line('risorius', [(6.8, 157.8), (4.2, 157.6)], 0.9, 'f', prio=5, fib=('dir', 0), nthr=-0.2)
+    poly('abaisseur_angle_bouche', [(3.6, 157.0), (5.2, 157.0), (4.4, 153.4), (3.4, 154.4)], 'f', prio=5, fib=('dir', 90), nthr=-0.1)
+    poly('abaisseur_levre_inf', [(0.7, 155.2), (3.0, 155.2), (3.2, 153.0), (0.7, 152.8)], 'f', prio=4, fib=('dir', 80), nthr=0.0)
+    poly('buccinateur', [(4.3, 160.0), (6.6, 160.2), (6.4, 156.6), (4.4, 157.4)], 'f', prio=4, fib=('dir', 0), nthr=-0.2)
+    poly('platysma', [(0.6, 152.0), (8.6, 151.8), (11.0, 146.2), (6.4, 146.6), (0.6, 147.0)], 'f', prio=2, fib=('dir', 62), nthr=-0.2)
+    poly('globe_oculaire', [(1.9, 167.8), (4.6, 167.6), (4.8, 166.2), (4.0, 165.5), (2.2, 165.7)], 'f', prio=8, kind='bone', feather=0.25, nthr=0.2)
+    poly('pavillon_oreille', [(8.0, 166.4), (9.8, 165.6), (10.0, 160.6), (8.4, 159.6)], 'f', prio=2, kind='fascia', feather=0.3, nthr=-0.7)
+
     return T

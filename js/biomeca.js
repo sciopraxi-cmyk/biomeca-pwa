@@ -19293,6 +19293,8 @@ function _doBuildRapport(p, d, prat, logo, sections) {
         mq.lignes.forEach(function(t) { bodyHtml += '<li>'+_escHtml(t)+'</li>'; });
         bodyHtml += '</ul>';
       }
+      // #265 — hypothèses de mécanisme lésionnel (HTML produit par le module, textes échappés)
+      if (mq.meca) bodyHtml += '<div style="margin-top:10px;font-size:11px;font-weight:700;color:#1f4e79;">Hypothèses de mécanisme lésionnel</div>' + mq.meca;
     } else if(s.type === 'bonhommes') {
       // Fix #149 — mention rouge sur status 'ko' (annotations Storage introuvables).
       if (s.ko) {
@@ -31033,7 +31035,7 @@ async function _m3dVuesRapport(d) {
   try {
     const mod = await import('./mannequin3d/index.js');
     const imgs = await mod.rendreVues(m.valeurs, { sexe: m.sexe || 'homme', peau: m.peau !== false });
-    return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false };
+    return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false, meca: mod.htmlRapport(m.valeurs) };
   } catch (e) {
     return { imgs: null, lignes: [], erreur: true };
   }

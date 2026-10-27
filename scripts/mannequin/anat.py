@@ -34,12 +34,16 @@ def thick_line(U, V, pts, width):
 
 # ---------- repères de membres ----------
 class Limb:
-    """Segment(s) en chaîne ; centres de coupe recalés sur la peau (barycentre des sommets du segment)."""
-    def __init__(self, P, Wd, bones, names, joints, anterior, lateral_sign, ref_dir=None):
+    """Segment(s) en chaîne ; centres de coupe recalés sur la peau (barycentre des sommets du segment).
+    Repère angulaire : θ = 0 selon ref1, θ = +90° selon ref2 (orthonormalisés autour de l'axe du segment).
+      cuisse, jambe, bras : ref1 = devant (0,0,1), ref2 = latéral  → θ>0 = latéral ;
+      avant-bras, main    : ref1 = médial (face palmaire), ref2 = devant (côté radial, pouce)."""
+    def __init__(self, P, Wd, bones, names, joints, ref1, ref2, gate=None):
         self.joints = [np.asarray(j, float) for j in joints]
         self.seg_len = [np.linalg.norm(self.joints[i + 1] - self.joints[i]) for i in range(len(joints) - 1)]
-        idx = [bones.index(n) for n in names]
+        idx = [bones.index(n) for n in names if n in bones]
         m = Wd[:, idx].sum(1) > 0.5
+        if gate is not None: m = m & gate
         self.centres = []
         V = P[m]
         for i in range(len(joints) - 1):
@@ -50,20 +54,24 @@ class Limb:
                 sel = np.abs(u - t) * L < 1.4
                 cs.append(V[sel].mean(0) if sel.sum() > 4 else A + t * ab)
             self.centres.append(np.array(cs))
-        self.anterior = np.asarray(anterior, float); self.lat = lateral_sign
+        self.ref1 = np.asarray(ref1, float); self.ref2 = np.asarray(ref2, float)
         self.mask = m
 
+    def frame(self, seg):
+        A, B = self.joints[seg], self.joints[seg + 1]; a = (B - A) / np.linalg.norm(B - A)
+        e1 = self.ref1 - (self.ref1 @ a) * a; e1 /= np.linalg.norm(e1)
+        e2 = self.ref2 - (self.ref2 @ a) * a; e2 -= (e2 @ e1) * e1; e2 /= np.linalg.norm(e2)
+        return a, e1, e2
+
     def coords(self, P, seg):
-        """pour le segment seg : s (0..1), theta (deg, 0 = devant, +90 = côté latéral), rayon (cm)"""
-        A, B = self.joints[seg], self.joints[seg + 1]; ab = B - A; L = np.linalg.norm(ab); a = ab / L
+        """pour le segment seg : s (0..1), theta (deg), rayon (cm)"""
+        A, B = self.joints[seg], self.joints[seg + 1]; ab = B - A; L = np.linalg.norm(ab)
+        a, e1, e2 = self.frame(seg)
         s = ((P - A) @ ab) / L ** 2
         cs = self.centres[seg]; ts = np.linspace(0, 1, len(cs))
         c = np.stack([np.interp(np.clip(s, 0, 1), ts, cs[:, k]) for k in range(3)], 1) + (np.clip(s, -1, 2) - np.clip(s, 0, 1))[:, None] * ab
-        f = self.anterior - (self.anterior @ a) * a; f /= np.linalg.norm(f)
-        l = np.cross(a, f) * self.lat
-        # l doit pointer vers l'extérieur du corps
         d = P - c
-        th = np.degrees(np.arctan2(d @ l, d @ f))
+        th = np.degrees(np.arctan2(d @ e2, d @ e1))
         r = np.linalg.norm(d - (d @ a)[:, None] * a, axis=1)
         return s, th, r
 

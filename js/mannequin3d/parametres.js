@@ -279,15 +279,16 @@ add(
     'bassin_antev',
     'bassin',
     'Antéversion / rétroversion du bassin',
-    -15,
-    25,
+    -12,
+    6,
     '°',
     ['rétroversion', 'antéversion'],
     (v) => [
       { bassin: { axe: 'x', deg: v } },
-      { morph: 'fessiers', w: v > 0 ? v / 25 : v / 15 },
-      { morph: 'lordose', w: v > 0 ? v / 25 : v / 15 },
-    ]
+      { morph: 'fessiers', w: v > 0 ? v / 6 : v / 12 },
+      { morph: 'lordose', w: v > 0 ? v / 6 : v / 12 },
+    ],
+    { qual: [2, 3, 5, 6] }
   )
 );
 add(
@@ -443,11 +444,11 @@ export const TABLEAUX = {
   },
   recurvatum_bilat: {
     label: 'Genu recurvatum bilatéral',
-    valeurs: { ...bil('genou_flex', -10), bassin_antev: 8 },
+    valeurs: { ...bil('genou_flex', -10), bassin_antev: 4 },
   },
   flessum_bilat: {
     label: 'Flessum de genou bilatéral',
-    valeurs: { ...bil('genou_flex', 15), bassin_antev: 8, tronc_lordose: 8 },
+    valeurs: { ...bil('genou_flex', 15), bassin_antev: 4, tronc_lordose: 8 },
   },
   pied_plat_valgus: {
     label: 'Pieds plats valgus bilatéraux',
@@ -488,11 +489,11 @@ export const TABLEAUX = {
   },
   hyperlordose: {
     label: 'Hyperlordose avec antéversion',
-    valeurs: { tronc_lordose: 18, bassin_antev: 12, tronc_antero: 2 },
+    valeurs: { tronc_lordose: 18, bassin_antev: 5, tronc_antero: 2 },
   },
   dos_plat: {
     label: 'Dos plat (rétroversion du bassin)',
-    valeurs: { bassin_antev: -10, tronc_lordose: 0, tronc_cyphose: 5 },
+    valeurs: { bassin_antev: -8, tronc_lordose: 0, tronc_cyphose: 5 },
   },
   hypercyphose: {
     label: 'Hypercyphose dorsale (dos rond)',
@@ -510,7 +511,7 @@ export const TABLEAUX = {
   },
   croise_inf: {
     label: 'Syndrome croisé inférieur (Janda)',
-    valeurs: { bassin_antev: 15, tronc_lordose: 16, tronc_antero: 2 },
+    valeurs: { bassin_antev: 5, tronc_lordose: 16, tronc_antero: 2 },
   },
   attitude_scoliotique: {
     label: 'Attitude scoliotique (fonctionnelle)',
@@ -522,9 +523,29 @@ export const TABLEAUX = {
       tete_incl: -3,
     },
   },
-  anteriorisation: {
-    label: 'Antériorisation globale',
-    valeurs: { tronc_antero: 6, tete_antep: 4, bassin_antev: 6, ...bil('genou_flex', 5) },
+  anteriorisation_chevilles: {
+    label: 'Antériorisation globale depuis les chevilles',
+    valeurs: { glob_chev: 5 },
+  },
+  anteriorisation_genoux: {
+    label: 'Antériorisation globale depuis les genoux',
+    valeurs: { glob_gen: 5 },
+  },
+  anteriorisation_bassin: {
+    label: 'Antériorisation globale depuis le bassin (hanches)',
+    valeurs: { glob_bassin: 5 },
+  },
+  posteriorisation_chevilles: {
+    label: 'Postériorisation globale depuis les chevilles',
+    valeurs: { glob_chev: -4 },
+  },
+  posteriorisation_genoux: {
+    label: 'Postériorisation globale depuis les genoux',
+    valeurs: { glob_gen: -4 },
+  },
+  posteriorisation_bassin: {
+    label: 'Postériorisation globale depuis le bassin (hanches)',
+    valeurs: { glob_bassin: -4 },
   },
 };
 

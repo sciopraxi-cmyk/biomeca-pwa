@@ -276,14 +276,13 @@ export async function creerMoteur(canvas, opts = {}) {
     p0 = tourneX(p0, R.chevilleC, rad(P.glob.a));
     root.position.copy(p0);
     etat.racine.updateMatrixWorld(true);
-    // segments inférieurs épinglés : cuisses (hanches), jambes (genoux) et pieds (chevilles) gardent leur place
-    // au sol ; seuls les corps situés au-dessus d'une articulation « globale » active se déplacent avec elle.
+    // hanches épinglées : la rotation du bassin ne déplace pas les cuisses (seules les hanches sont recalées ; genoux et
+    // pieds suivent par la chaîne du squelette, donc aucun segment de jambe n'est étiré). Avec une bascule globale, les
+    // hanches suivent la rotation du corps autour des genoux ou des chevilles.
     for (const c of ['L', 'R']) {
       let h = tourneX(R.hanche[c], R.genouC, rad(P.glob.k));
       h = tourneX(h, R.chevilleC, rad(P.glob.a));
       epingler('upperleg01.' + c, h);
-      epingler('lowerleg01.' + c, tourneX(R.genou[c], R.chevilleC, rad(P.glob.a)));
-      epingler('foot.' + c, R.cheville[c]);
     }
     etat.racine.updateMatrixWorld(true);
     // pronation / supination : torsion autour de l'axe coude → poignet, répartie sur les deux os de l'avant-bras
