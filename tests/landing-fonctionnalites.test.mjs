@@ -363,7 +363,7 @@ describe('logiciel praticien — lot 5 : rapports, devis et factures, ordonnance
       for (const s of sel.split(',')) expect(s.trim().startsWith('body.theme-clair')).toBe(true);
     }
   });
-  it('couvre les 6 pages et ne touche à aucune couleur d’identité', () => {
+  it("couvre les 6 pages et ne touche à aucune couleur d'identité", () => {
     for (const id of [
       'pg-documents',
       'pg-ordonnances',
@@ -383,7 +383,9 @@ describe('logiciel praticien — lot 5 : rapports, devis et factures, ordonnance
 
 describe('logiciel praticien — fenêtre « Accès au portail patient » (lot 5, suite)', () => {
   const css = lire('css/biomeca.css');
-  const bloc = css.slice(css.indexOf('/* Refonte « premium » — lot 5 (suite)'));
+  const debut = css.indexOf('/* Refonte « premium » — lot 5 (suite)');
+  const fin = css.indexOf('/* Refonte « premium » — lot 6');
+  const bloc = fin > debut ? css.slice(debut, fin) : css.slice(debut);
   const sansCom = bloc.replace(/\/\*[\s\S]*?\*\//g, '');
   const hors = sansCom.replace(/@(media|supports)[^{]*\{/g, '');
   it('chaque règle est bornée à body.theme-clair #portail-patient-modal', () => {
@@ -416,5 +418,38 @@ describe('logiciel praticien — fenêtre « Accès au portail patient » (lot 5
     ]) {
       expect(js).toMatch(new RegExp('id=\\\\?"' + id + '\\\\?"'));
     }
+  });
+});
+
+describe('logiciel praticien — lot 6 : paramètres, notifications, praticiens, exercices, Assistant', () => {
+  const css = lire('css/biomeca.css');
+  const bloc = css.slice(css.indexOf('/* Refonte « premium » — lot 6'));
+  const sansCom = bloc.replace(/\/\*[\s\S]*?\*\//g, '');
+  const hors = sansCom.replace(/@(media|supports)[^{]*\{/g, '');
+  it('chaque règle du lot est bornée à body.theme-clair', () => {
+    const regles = hors
+      .split('}')
+      .map((r) => r.trim())
+      .filter((r) => r.includes('{'));
+    expect(regles.length).toBeGreaterThan(20);
+    for (const r of regles) {
+      const sel = r.slice(0, r.indexOf('{'));
+      for (const s of sel.split(',')) expect(s.trim().startsWith('body.theme-clair')).toBe(true);
+    }
+  });
+  it("couvre les 5 pages et ne touche à aucune couleur d'identité", () => {
+    for (const id of [
+      'pg-params',
+      'pg-notifications',
+      'pg-praticiens',
+      'pg-exercices',
+      'modal-help',
+    ]) {
+      expect(bloc).toContain('#' + id);
+    }
+    expect(bloc).not.toMatch(/--(posturo|sport|pedicurie|podo|osteo|encours)-[a-z-]*\s*:/);
+  });
+  it('aucun contenu imprimé ni iframe ciblé', () => {
+    expect(sansCom).not.toMatch(/iframe|@media print/);
   });
 });
