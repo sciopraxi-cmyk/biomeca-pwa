@@ -10,7 +10,7 @@
 // 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
 // clients sur du code de mois précédents). Toute évolution ultérieure du code
 // applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
-const CACHE_VERSION = 'biomeca-v297';
+const CACHE_VERSION = 'biomeca-v298';
 const CACHE_PREFIX  = 'biomeca-';
 
 // #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur
@@ -234,7 +234,10 @@ function cacheFirst(req) {
 // Network-first : tente le réseau, fallback cache si le réseau échoue.
 // Met à jour le cache au passage en cas de succès réseau.
 function networkFirst(req) {
-  return fetch(req).then(resp => {
+  // cache: 'no-cache' = revalidation auprès du serveur à chaque fois : sans cela, le cache HTTP du navigateur peut
+  // resservir un ancien .js (fichier sans en-tête Cache-Control → péremption « heuristique » de plusieurs minutes à
+  // plusieurs heures) et le praticien ne voit pas la nouvelle version malgré le bon numéro de version.
+  return fetch(req, { cache: 'no-cache' }).then(resp => {
     if (resp && resp.ok) {
       const clone = resp.clone();
       caches.open(CACHE_VERSION)
