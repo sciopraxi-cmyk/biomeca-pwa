@@ -212,7 +212,7 @@ describe('isolation du module (règle CLAUDE.md : import dynamique, hors précac
     expect(lire('index.html')).not.toMatch(/mannequin3d|vendor\/three/);
     const b = lire('js/biomeca.js');
     expect(b).not.toMatch(/^import .*mannequin3d/m);
-    expect(b.match(/import\('\.\/mannequin3d\/index\.js'\)/g)).toHaveLength(2);
+    expect(b.match(/import\('\.\/mannequin3d\/index\.js\?v=' \+ APP_BUILD\)/g)).toHaveLength(2);
   });
   it('le service worker ne précache ni Three.js ni les modèles 3D', () => {
     const sw = lire('service-worker.js');
@@ -379,5 +379,23 @@ describe('répartition du poids G/D et version affichée', () => {
     expect(sw).toContain("CACHE_VERSION = 'biomeca-" + BUILD_UI + "'");
     const app = fs.readFileSync(new URL('../js/biomeca.js', import.meta.url), 'utf8');
     expect(app).toContain("const APP_BUILD = '" + BUILD_UI + "'"); // version du code de la page affichée dans « Mon compte »
+  });
+});
+
+describe('chargement des modules : jamais de mélange entre deux versions', () => {
+  it('chaque import relatif du mannequin porte ?v=<version> ; biomeca.js aussi ; le modèle 3D aussi', async () => {
+    const fs = await import('node:fs');
+    const dir = new URL('../js/mannequin3d/', import.meta.url);
+    const fichiers = fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
+    for (const f of fichiers) {
+      const src = fs.readFileSync(new URL(f, dir), 'utf8');
+      for (const m of src.matchAll(/from '(\.\/[^']+)'/g))
+        expect(m[1], f + ' → ' + m[1]).toBe(m[1].split('?')[0] + '?v=' + BUILD_UI);
+    }
+    const moteur = fs.readFileSync(new URL('moteur.js', dir), 'utf8');
+    expect(moteur).toContain('glb.gz?v=' + BUILD_UI + "'");
+    const app = fs.readFileSync(new URL('../js/biomeca.js', import.meta.url), 'utf8');
+    expect(app).not.toContain("import('./mannequin3d/index.js')");
+    expect(app).toContain("import('./mannequin3d/index.js?v=' + APP_BUILD)");
   });
 });

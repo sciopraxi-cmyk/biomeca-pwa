@@ -1,11 +1,12 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs, assemblage } from './parametres.js';
+import { poseDepuisValeurs, assemblage } from './parametres.js?v=v301';
 
+// ?v= : le modèle 3D est dans /assets/ (cache sans limite de durée) ; l'URL change à chaque version
 const CHEMIN = (sexe) =>
   new URL(
-    '../../assets/mannequin/' + (sexe === 'femme' ? 'femme' : 'homme') + '.glb.gz',
+    '../../assets/mannequin/' + (sexe === 'femme' ? 'femme' : 'homme') + '.glb.gz?v=v301',
     import.meta.url
   ).href;
 const cacheModeles = {};

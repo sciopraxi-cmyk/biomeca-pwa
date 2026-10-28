@@ -5047,7 +5047,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v300';
+const APP_BUILD = 'v301';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -31052,7 +31052,7 @@ async function _m3dPosturoInit() {
   _m3dPosturo = { hote: host, bilan: d, api: null };
   const ref = _m3dPosturo;
   try {
-    const mod = await import('./mannequin3d/index.js');
+    const mod = await import('./mannequin3d/index.js?v=' + APP_BUILD);
     if (_m3dPosturo !== ref) return;
     mod.definirSeuils(POSTURE_THRESHOLDS); // seuils du cabinet (compte admin) → règles de mécanismes
     const sexeDef = p.civilite === 'Mme' ? 'femme' : 'homme';
@@ -31067,7 +31067,13 @@ async function _m3dPosturoInit() {
       }
     });
   } catch (e) {
-    host.textContent = 'Mannequin 3D indisponible : ' + (e && e.message ? e.message : e);
+    host.textContent = 'Mannequin 3D indisponible : ' + (e && e.message ? e.message : e) + ' — ';
+    const rel = document.createElement('button');
+    rel.type = 'button';
+    rel.textContent = 'Actualiser la page';
+    rel.style.cssText = 'border:1px solid #c9d1da;background:#fff;border-radius:14px;padding:3px 12px;cursor:pointer;';
+    rel.onclick = () => location.reload();
+    host.appendChild(rel);
   }
 }
 // Rapport : les 4 vues du mannequin, rendues hors écran à partir des valeurs enregistrées.
@@ -31075,7 +31081,7 @@ async function _m3dVuesRapport(d) {
   const m = d && d.mannequin3d;
   if (!m || !m.valeurs || !Object.keys(m.valeurs).length) return null;
   try {
-    const mod = await import('./mannequin3d/index.js');
+    const mod = await import('./mannequin3d/index.js?v=' + APP_BUILD);
     mod.definirSeuils(POSTURE_THRESHOLDS);
     const imgs = await mod.rendreVues(m.valeurs, { sexe: m.sexe || 'homme', peau: m.peau !== false });
     return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false, meca: mod.htmlRapport(m.valeurs, m.retenues) };
