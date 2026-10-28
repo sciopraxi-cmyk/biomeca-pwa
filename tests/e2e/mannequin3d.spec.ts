@@ -42,6 +42,14 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
       "document.getElementById('m3d-posturo').parentElement === document.getElementById('psec-1').firstElementChild"
     )
   ).toBe(true);
+  // tableaux types cumulables : un 2e tableau s'ajoute au 1er
+  const selT = page.locator('.m3d select.inp').first();
+  await selT.selectOption('genu_valgum_bilat');
+  await selT.selectOption('bascule_bassin_D');
+  const cumul: any = await page.evaluate('_m3dPosturo.api.etat().valeurs');
+  expect(cumul.genou_valgus_D).toBeGreaterThan(0);
+  expect(cumul.bassin_bascule).not.toBe(0);
+  await selT.selectOption('neutre');
   // sexe par défaut d'après la civilité
   await expect(page.locator('.m3d-btn.on', { hasText: 'Femme' })).toBeVisible();
   // curseurs : on ouvre Tronc et Bassin

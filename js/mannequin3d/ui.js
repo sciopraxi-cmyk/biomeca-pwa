@@ -1,5 +1,13 @@
 // Mannequin postural 3D — interface praticien (curseurs, vues, peau / muscles).
-import { CURSEURS, GROUPES, TABLEAUX, PAR_ID, decrire, nettoyerValeurs } from './parametres.js';
+import {
+  CURSEURS,
+  GROUPES,
+  TABLEAUX,
+  appliquerTableau,
+  PAR_ID,
+  decrire,
+  nettoyerValeurs,
+} from './parametres.js';
 import { creerMoteur, VUES } from './moteur.js';
 import { interpreter, EXEMPLES } from './dictee.js';
 import {
@@ -145,12 +153,12 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
   const selTab = el(
     'select',
     { class: 'inp', style: 'font-size:12px;max-width:100%' },
-    el('option', { value: '' }, '— Tableau type —')
+    el('option', { value: '' }, '— Tableau type (cumulable) —')
   );
   for (const k in TABLEAUX) selTab.append(el('option', { value: k }, TABLEAUX[k].label));
   selTab.addEventListener('change', () => {
     if (!selTab.value) return;
-    S.valeurs = Object.assign({}, TABLEAUX[selTab.value].valeurs);
+    S.valeurs = appliquerTableau(S.valeurs, selTab.value); // cumul avec ce qui est déjà réglé
     selTab.value = '';
     majCurseurs();
     maj();

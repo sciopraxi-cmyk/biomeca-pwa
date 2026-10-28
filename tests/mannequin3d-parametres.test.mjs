@@ -336,3 +336,26 @@ describe('dictée : phrases libres, vocabulaire médical', () => {
     expect(await val('bonjour docteur ceci est un test')).toEqual({});
   });
 });
+
+import { appliquerTableau, TABLEAUX as TAB_CUMUL } from '../js/mannequin3d/parametres.js';
+describe('tableaux types cumulables', () => {
+  it('un second tableau s’ajoute au premier au lieu de le remplacer', () => {
+    const a = appliquerTableau({}, 'genu_valgum_bilat');
+    const b = appliquerTableau(a, 'bascule_bassin_D');
+    for (const k in TAB_CUMUL.genu_valgum_bilat.valeurs)
+      expect(b[k]).toBe(TAB_CUMUL.genu_valgum_bilat.valeurs[k]);
+    for (const k in TAB_CUMUL.bascule_bassin_D.valeurs)
+      expect(b[k]).toBe(TAB_CUMUL.bascule_bassin_D.valeurs[k]);
+  });
+  it('conserve aussi les curseurs réglés à la main ; en cas de conflit la valeur du tableau choisi l’emporte', () => {
+    const b = appliquerTableau({ tete_incl: 6, genou_valgus_D: 1 }, 'genu_valgum_bilat');
+    expect(b.tete_incl).toBe(6);
+    expect(b.genou_valgus_D).toBe(TAB_CUMUL.genu_valgum_bilat.valeurs.genou_valgus_D);
+  });
+  it('« Neutre » remet tout à zéro ; l’entrée n’est pas modifiée', () => {
+    const v = { tete_incl: 6 };
+    expect(appliquerTableau(v, 'neutre')).toEqual({});
+    appliquerTableau(v, 'genu_valgum_bilat');
+    expect(v).toEqual({ tete_incl: 6 });
+  });
+});

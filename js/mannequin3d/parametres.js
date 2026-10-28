@@ -636,3 +636,12 @@ export function decrire(valeurs) {
   }
   return lignes;
 }
+
+// Tableaux types cumulables : le tableau choisi s'AJOUTE aux valeurs déjà saisies (curseurs ou autres tableaux).
+// Si un curseur est déjà réglé, la valeur du nouveau tableau le remplace ; « Neutre » remet tout à zéro.
+export function appliquerTableau(valeurs, cle) {
+  const t = TABLEAUX[cle];
+  if (!t) return Object.assign({}, valeurs);
+  if (!Object.keys(t.valeurs).length) return {};
+  return Object.assign({}, valeurs, t.valeurs);
+}
