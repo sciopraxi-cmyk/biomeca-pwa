@@ -481,3 +481,45 @@ describe('mannequin du sport et de la podopédiatrie : modèles enfants et branc
     expect(html).not.toMatch(/m3d-sport|m3d-podo/);
   });
 });
+
+describe('profil des chaînes — curseurs ajoutés (bassin, mandibule)', () => {
+  it('avancement / recul du bassin : translation du bassin seul (cm → m), bornée', () => {
+    const c = PAR_ID.bassin_avance;
+    expect(c.groupe).toBe('bassin');
+    expect([c.min, c.max, c.unite]).toEqual([-6, 6, 'cm']);
+    expect(c.fin).toEqual(['recul', 'avancement']);
+    expect(poseDepuisValeurs({ bassin_avance: 4 }).bassinZ).toBeCloseTo(0.04, 9);
+    expect(poseDepuisValeurs({ bassin_avance: -3 }).bassinZ).toBeCloseTo(-0.03, 9);
+    expect(poseDepuisValeurs({}).bassinZ).toBe(0);
+    // aucun autre os n'est touché
+    const P = poseDepuisValeurs({ bassin_avance: 4 });
+    expect(P.pos).toEqual({});
+    expect(P.morph).toEqual({});
+  });
+  it('mandibule : décalage latéral (D = x négatif) et avancée, en mm → poids de blend shape (1 cm = 1)', () => {
+    expect(PAR_ID.mandi_transl.groupe).toBe('tete');
+    expect(PAR_ID.mandi_antep.groupe).toBe('tete');
+    expect(poseDepuisValeurs({ mandi_transl: 10 }).morph.mandi_x).toBeCloseTo(-1, 9); // D
+    expect(poseDepuisValeurs({ mandi_transl: -5 }).morph.mandi_x).toBeCloseTo(0.5, 9); // G
+    expect(poseDepuisValeurs({ mandi_antep: 15 }).morph.mandi_z).toBeCloseTo(1.5, 9);
+    expect(poseDepuisValeurs({ mandi_antep: -10 }).morph.mandi_z).toBeCloseTo(-1, 9);
+  });
+  it('amplitudes qualitatives croissantes et libellés dans le compte rendu', () => {
+    for (const id of ['bassin_avance', 'mandi_transl', 'mandi_antep']) {
+      const q = PAR_ID[id].qual;
+      expect(q.length).toBe(4);
+      expect(q.every((x, i) => i === 0 || x > q[i - 1])).toBe(true);
+    }
+    expect(decrire({ mandi_transl: -8 })).toEqual(['Décalage latéral de la mandibule : G 8 mm']);
+    expect(decrire({ bassin_avance: 3 })).toEqual([
+      'Avancement / recul du bassin : avancement 3 cm',
+    ]);
+  });
+  it('le repère vert de la tête est au niveau des yeux (axe bi-oculaire)', async () => {
+    const fs = await import('node:fs');
+    const m = fs.readFileSync(new URL('../js/mannequin3d/moteur.js', import.meta.url), 'utf8');
+    expect(m).toMatch(/yeux: \[/);
+    expect(m).not.toMatch(/\n\s+tete: \[\s*pt\('head'/);
+    expect(m).toContain('yeux: 0x16a34a');
+  });
+});

@@ -1,7 +1,7 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs, assemblage } from './parametres.js?v=v304';
+import { poseDepuisValeurs, assemblage } from './parametres.js?v=v305';
 
 // ?v= : le modèle 3D est dans /assets/ (cache sans limite de durée) ; l'URL change à chaque version
 // Modèles : adultes (homme, femme) et enfants par période de la podopédiatrie (II, III, IV), garçon et fille.
@@ -17,10 +17,70 @@ export function nomModele(sexe, profil) {
 }
 const CHEMIN = (nom) =>
   new URL(
-    '../../assets/mannequin/' + (MODELES.includes(nom) ? nom : 'homme') + '.glb.gz?v=v304',
+    '../../assets/mannequin/' + (MODELES.includes(nom) ? nom : 'homme') + '.glb.gz?v=v305',
     import.meta.url
   ).href;
 const cacheModeles = {};
+
+// Mandibule : deux blend shapes (décalage latéral « mandi_x », avancée « mandi_z », 1 cm par unité de poids) créés au
+// chargement : seuls les sommets de la partie basse du visage (sous la ligne des lèvres, devant les oreilles, pondérés
+// 100 % tête) bougent, avec un fondu doux. Ils suivent la tête (déformation avant skinning).
+export function ajouterMorphMandibule(scene, enfant = false) {
+  scene.updateMatrixWorld(true);
+  let tete = null;
+  scene.traverse((o) => {
+    if (o.isBone && (o.userData.name || o.name) === 'head') tete = o;
+  });
+  if (!tete) return false;
+  const k = enfant ? hauteurModele(scene) / 1.75 : 1;
+  const hp = tete.getWorldPosition(new THREE.Vector3());
+  const yLevres = hp.y + (0.037 - 0.071) * k, // ligne des lèvres (yeux = tête + 3,7 cm ; lèvres = yeux − 7,1 cm)
+    zOreille = hp.z - 0.02 * k;
+  const lisse = (t) => {
+    t = Math.max(0, Math.min(1, t));
+    return t * t * (3 - 2 * t);
+  };
+  let fait = false;
+  scene.traverse((m) => {
+    if (!m.isSkinnedMesh || !m.geometry || !m.geometry.attributes.skinIndex) return;
+    const g = m.geometry;
+    if (g.userData.mandibule) return;
+    const pos = g.attributes.position,
+      si = g.attributes.skinIndex,
+      sw = g.attributes.skinWeight,
+      n = pos.count;
+    const jTete = m.skeleton.bones.indexOf(tete);
+    const dx = new Float32Array(n * 3),
+      dz = new Float32Array(n * 3);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      let wt = 0;
+      for (let j = 0; j < 4; j++) if (si.getComponent(i, j) === jTete) wt += sw.getComponent(i, j);
+      if (wt <= 0) continue;
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      const f =
+        lisse((yLevres + 0.012 * k - v.y) / (0.024 * k)) *
+        lisse((v.z - zOreille) / (0.03 * k)) *
+        lisse((wt - 0.5) / 0.5);
+      if (f <= 0) continue;
+      dx[i * 3] = 0.01 * f;
+      dz[i * 3 + 2] = 0.01 * f;
+    }
+    g.morphTargetsRelative = true;
+    const cibles = g.morphAttributes.position || [];
+    const ix = cibles.length;
+    cibles.push(new THREE.BufferAttribute(dx, 3), new THREE.BufferAttribute(dz, 3));
+    g.morphAttributes.position = cibles;
+    g.userData.mandibule = true;
+    m.updateMorphTargets();
+    m.morphTargetDictionary = m.morphTargetDictionary || {};
+    m.morphTargetDictionary.mandi_x = ix;
+    m.morphTargetDictionary.mandi_z = ix + 1;
+    m.morphTargetInfluences = new Array(cibles.length).fill(0);
+    fait = true;
+  });
+  return fait;
+}
 
 async function lireGlb(sexe) {
   if (!cacheModeles[sexe]) {
@@ -41,7 +101,9 @@ async function lireGlb(sexe) {
       const cib = globalThis.createImageBitmap;
       globalThis.createImageBitmap = undefined;
       try {
-        return await new Promise((ok, ko) => new GLTFLoader().parse(buf, '', ok, ko));
+        const gltf = await new Promise((ok, ko) => new GLTFLoader().parse(buf, '', ok, ko));
+        ajouterMorphMandibule(gltf.scene, /_p(II|III|IV)$/.test(sexe));
+        return gltf;
       } finally {
         globalThis.createImageBitmap = cib;
       }
@@ -312,6 +374,8 @@ export async function creerMoteur(canvas, opts = {}) {
     p0 = tourneX(p0, R.genouC, rad(P.glob.k));
     p0 = tourneX(p0, R.chevilleC, rad(P.glob.a));
     p0 = tourneZ(p0, R.chevilleC, rad(P.glob.z));
+    const dzB = P.bassinZ || 0;
+    p0.z += dzB * etat.k;
     root.position.copy(p0);
     etat.racine.updateMatrixWorld(true);
     // hanches épinglées : la rotation du bassin ne déplace pas les cuisses (seules les hanches sont recalées ; genoux et
@@ -321,9 +385,29 @@ export async function creerMoteur(canvas, opts = {}) {
       let h = tourneX(R.hanche[c], R.genouC, rad(P.glob.k));
       h = tourneX(h, R.chevilleC, rad(P.glob.a));
       h = tourneZ(h, R.chevilleC, rad(P.glob.z));
+      h.z += dzB * etat.k;
       epingler('upperleg01.' + c, h);
     }
     etat.racine.updateMatrixWorld(true);
+    // avancement / recul du bassin SEUL : le thorax reste en place, genoux et pieds aussi (la cuisse s'incline autour
+    // de la hanche, la jambe reste d'aplomb)
+    if (dzB) {
+      const dv = new THREE.Vector3(0, 0, dzB * etat.k);
+      epingler('spine05', monde(etat.bones.spine05).sub(dv));
+      etat.racine.updateMatrixWorld(true);
+      for (const c of ['L', 'R']) {
+        const cuisse = etat.bones['upperleg01.' + c],
+          jambe = etat.bones['lowerleg01.' + c];
+        const hanche = monde(cuisse),
+          genou = monde(jambe);
+        const de = genou.clone().sub(hanche),
+          vers = genou.clone().sub(dv).sub(hanche);
+        const qd = new THREE.Quaternion().setFromUnitVectors(de.normalize(), vers.normalize());
+        tournerMonde(cuisse, qd);
+        tournerMonde(jambe, qd.clone().invert());
+      }
+      etat.racine.updateMatrixWorld(true);
+    }
     // pronation / supination : torsion autour de l'axe coude → poignet, répartie sur les deux os de l'avant-bras
     for (const s of ['L', 'R']) {
       const deg = P.twist[s];
@@ -364,11 +448,11 @@ export async function creerMoteur(canvas, opts = {}) {
     }
   }
 
-  // ── repères cliniques (optionnels) : lignes bi-acromiales, bi-iliaques, bi-auriculaires, bi-genoux, fil à plomb
+  // ── repères cliniques (optionnels) : lignes bi-acromiales, bi-iliaques, bi-oculaire, bi-genoux, fil à plomb
   const COUL_REP = {
     epaules: 0x2563eb,
     bassin: 0xdc2626,
-    tete: 0x16a34a,
+    yeux: 0x16a34a,
     genoux: 0xea580c,
     plomb: 0x6b7280,
   };
@@ -407,9 +491,11 @@ export async function creerMoteur(canvas, opts = {}) {
           off('pelvis.L', 'upperleg01.L', new THREE.Vector3(-0.05 * etat.k, 0.1 * etat.k, 0.0))
         ),
       ],
-      tete: [
-        pt('head', off('head', 'head', new THREE.Vector3(-0.075 * etat.k, 0.075 * etat.k, 0.0))),
-        pt('head', off('head', 'head', new THREE.Vector3(0.075 * etat.k, 0.075 * etat.k, 0.0))),
+      // ligne bi-oculaire (axe des yeux) : si elle n'est pas horizontale, le regard n'est pas horizontal
+      // (entrée haute « visuelle » du profil du patient)
+      yeux: [
+        pt('head', off('head', 'head', new THREE.Vector3(-0.032 * etat.k, 0.037 * etat.k, 0.0))),
+        pt('head', off('head', 'head', new THREE.Vector3(0.032 * etat.k, 0.037 * etat.k, 0.0))),
       ],
       genoux: [
         pt('lowerleg01.R', new THREE.Vector3(0, 0, 0)),
@@ -550,7 +636,7 @@ export async function rendreVues(
   await m.chargerSexe(sexe, profil);
   m.peau(peau);
   m.pose(valeurs);
-  // repères cliniques (épaules, bassin, oreilles, genoux, fil à plomb) tracés sur les 4 vues du rapport
+  // repères cliniques (épaules, bassin, yeux, genoux, fil à plomb) tracés sur les 4 vues du rapport
   const angles = avecReperes ? m.montrerReperes(true) : null;
   const out = {};
   for (const k of ['face', 'dos', 'profilD', 'profilG']) {

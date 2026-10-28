@@ -8,16 +8,16 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v304';
-import { creerMoteur, VUES } from './moteur.js?v=v304';
-import { interpreter, EXEMPLES } from './dictee.js?v=v304';
+} from './parametres.js?v=v305';
+import { creerMoteur, VUES } from './moteur.js?v=v305';
+import { interpreter, EXEMPLES } from './dictee.js?v=v305';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v304';
+} from './mecanismes.js?v=v305';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -125,7 +125,7 @@ export function monter(
     {
       class: 'm3d-btn',
       type: 'button',
-      title: 'Lignes de repère : épaules, bassin, oreilles, genoux, fil à plomb',
+      title: 'Lignes de repère : épaules, bassin, yeux, genoux, fil à plomb',
       onclick: () => {
         S.reperes = !S.reperes;
         maj();
@@ -485,8 +485,8 @@ export function monter(
           ang.epaules +
           ' · bassin : ' +
           ang.bassin +
-          ' · oreilles : ' +
-          ang.tete +
+          ' · yeux : ' +
+          ang.yeux +
           ' · genoux : ' +
           ang.genoux;
       moteur.afficher();
