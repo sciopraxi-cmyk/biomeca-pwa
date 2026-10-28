@@ -16,17 +16,39 @@ def body_mesh(v,uv,groups):
     return np.array(pos),np.array(uvs),np.array(tri,np.uint32),np.array(src)
 def build(gender,out,**kw):
     v0,uv,groups=load_obj()
-    mus=kw.get('muscle',.8 if gender else .45)
-    v=macro(v0,gender,.5,mus,kw.get('weight',.5))
-    if gender>=.5:
+    age=kw.get('age',.5); enfant=age<.5
+    mus=kw.get('muscle',.5 if enfant else (.8 if gender else .45))
+    v=macro(v0,gender,age,mus,kw.get('weight',.5))
+    import ecorche as _E
+    _E.ENFANT=None
+    if gender>=.5 and not enfant:
         for t,k in (('torso/torso-muscle-pectoral-incr',1.0),('torso/torso-muscle-dorsi-incr',.7),('torso/torso-vshape-incr',.5)): apply(v,t+'.target',k*gender)
     vnb=v.copy()
-    if gender<.5: v=breast(v,gender,mus,.5,kw.get('cup',.85),.6)
+    if gender<.5 and not enfant: v=breast(v,gender,mus,.5,kw.get('cup',.85),.6)
     yoff=v[:13380,1].min(); v[:,1]-=yoff; vnb[:,1]-=yoff
     posnb=body_mesh(vnb,uv,groups)[0]
     pos,uvs,idx,src=body_mesh(v,uv,groups)
     J,W=skin_weights(len(v))
     bp=bone_positions(v,groups)
+    if enfant:
+        # repères du corps de l'enfant → repères du corps adulte de même sexe (écorché : polygones définis sur l'adulte)
+        def reperes(vv,bpp):
+            f=lambda n:float(bpp[n][0][1])*10
+            bb=np.array(sorted({i[0] for ff in groups['body'] for i in ff}))
+            top=float(vv[bb,1].max())*10
+            hb=top-f('head')
+            band=bb[(vv[bb,1]*10>f('head')+0.35*hb)]
+            hy=f('upperleg01.L'); Hh=top-0.0
+            hs=bb[(np.abs(vv[bb,1]*10-hy)<2.5)&(np.abs(vv[bb,0]*10)<0.14*Hh)]
+            return [0.0,f('foot.L'),f('lowerleg01.L'),f('upperleg01.L'),f('spine03'),f('upperarm01.L'),f('neck01'),f('head'),top],float(np.abs(vv[band,0]).max())*10,float(np.abs(vv[hs,0]).max())*10
+        va=macro(v0,gender,.5,.5,.5); va[:,1]-=va[:13380,1].min()
+        bpa=bone_positions(va,groups)
+        cy,chw,chp=reperes(v,bp); ay,ahw,ahp=reperes(va,bpa)
+        # échelle du bassin : largeur de hanche de l'enfant / de l'adulte, rapportée à l'échelle d'épaule déjà appliquée (sx)
+        sxe=float(bp['upperarm01.L'][0][0])*10/18.8
+        _E.ENFANT=((np.array(cy),np.array(ay),cy[6],chp/ahp*1.0),chw/ahw)
+        print('  bassin',round(chp/ahp,2),'épaule',round(sxe,2),flush=True)
+        print('  repères enfant',[round(x) for x in cy],'→',[round(x) for x in ay],'tête',round(chw/ahw,2),flush=True)
     g=GLB()
     mat=g.material(name='peau',pbrMetallicRoughness={'baseColorFactor':[.80,.58,.46,1],'metallicFactor':0,'roughnessFactor':.55},doubleSided=False)
     # nœuds : 0 = armature
@@ -91,8 +113,17 @@ def build(gender,out,**kw):
         top.append(len(g.nodes)-1)
     g.write(out,top)
     return v,pos,idx,src,bp
+AGES={'garcon':{'II':0.099,'III':0.1536,'IV':0.2462},'fille':{'II':0.1095,'III':0.1714,'IV':0.3102}}
 if __name__=='__main__':
     import os
+    if os.environ.get('ENFANTS'):
+        for per in os.environ['ENFANTS'].split(','):
+            for n,gd in (('garcon',1),('fille',0)):
+                if os.environ.get('SEXES') and n not in os.environ['SEXES'].split(','): continue
+                kw={'age':AGES[n][per]}
+                if os.environ.get('SANS_MUSCLES'): kw['muscles']=False
+                build(gd,f'/root/outils/mannequin/out_{n}_p{per}.glb',**kw); print(n,per,'ok',flush=True)
+        raise SystemExit
     for n,gd in (('homme',1),('femme',0)):
         if os.environ.get('SEXES') and n not in os.environ['SEXES'].split(','): continue
         build(gd,f'/root/outils/mannequin/out_{n}.glb'); print(n,'ok')

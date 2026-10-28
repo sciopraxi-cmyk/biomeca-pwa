@@ -212,7 +212,7 @@ describe('isolation du module (règle CLAUDE.md : import dynamique, hors précac
     expect(lire('index.html')).not.toMatch(/mannequin3d|vendor\/three/);
     const b = lire('js/biomeca.js');
     expect(b).not.toMatch(/^import .*mannequin3d/m);
-    expect(b.match(/import\('\.\/mannequin3d\/index\.js\?v=' \+ APP_BUILD\)/g)).toHaveLength(2);
+    expect(b.match(/import\('\.\/mannequin3d\/index\.js\?v=' \+ APP_BUILD\)/g)).toHaveLength(3);
   });
   it('le service worker ne précache ni Three.js ni les modèles 3D', () => {
     const sw = lire('service-worker.js');
@@ -438,5 +438,46 @@ describe('répartition du poids G/D : latéralisation globale depuis les chevill
     const P = poseDepuisValeurs({ poids_lr: 10, glob_chev: 5 });
     expect(P.glob.a).toBe(5);
     expect(P.glob.z).toBeCloseTo(2.5, 9);
+  });
+});
+
+describe('mannequin du sport et de la podopédiatrie : modèles enfants et branchements', () => {
+  it('8 modèles (adulte + enfant par période, garçon et fille) ; nom choisi selon le sexe et la période', async () => {
+    const { MODELES, nomModele } = await import('../js/mannequin3d/moteur.js?v=' + BUILD_UI);
+    expect(MODELES).toHaveLength(8);
+    expect(nomModele('homme', 'adulte')).toBe('homme');
+    expect(nomModele('femme')).toBe('femme');
+    expect(nomModele('homme', 'II')).toBe('garcon_pII');
+    expect(nomModele('femme', 'III')).toBe('fille_pIII');
+    expect(nomModele('homme', 'IV')).toBe('garcon_pIV');
+    expect(nomModele('homme', 'inconnue')).toBe('homme');
+  });
+  it('chaque modèle est livré compressé, dans /assets/mannequin (chargé à la demande, jamais précaché)', async () => {
+    const fs = await import('node:fs');
+    const { MODELES } = await import('../js/mannequin3d/moteur.js?v=' + BUILD_UI);
+    for (const m of MODELES) {
+      const f = new URL('../assets/mannequin/' + m + '.glb.gz', import.meta.url);
+      expect(fs.existsSync(f), m).toBe(true);
+      const buf = fs.readFileSync(f);
+      expect([buf[0], buf[1]], m + ' gzip').toEqual([0x1f, 0x8b]);
+      expect(buf.length, m).toBeGreaterThan(1_000_000);
+      expect(buf.length, m).toBeLessThan(8_000_000);
+    }
+    const sw = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+    expect(sw.slice(0, sw.indexOf('ASSET_EXTENSIONS'))).not.toMatch(/glb|mannequin\//);
+  });
+  it('branchements : sport (ssec-1) et podopédiatrie (onglet Morphostatique), rapports, mécanismes réservés à l’adulte et à la période IV', async () => {
+    const fs = await import('node:fs');
+    const b = fs.readFileSync(new URL('../js/biomeca.js', import.meta.url), 'utf8');
+    expect(b).toMatch(/if\(shownId === 'ssec-1'\) _m3dSportInit\(\)/);
+    expect(b).toMatch(/if \(target === 3\) \{\s*_m3dPodoInit\(\)/);
+    expect(b).toContain("_m3dVuesRapport(p.bilanData || {}, 'adulte')");
+    expect(b).toContain("d.periode === 'II' || d.periode === 'III' ? d.periode : 'IV'");
+    expect(b).toMatch(
+      /function _m3dMecanismesPermis\(profil\) \{\s*return profil !== 'II' && profil !== 'III';/
+    );
+    // le gabarit HTML des deux bilans n'a pas changé : le bloc est inséré par script
+    const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    expect(html).not.toMatch(/m3d-sport|m3d-podo/);
   });
 });

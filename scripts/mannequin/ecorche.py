@@ -6,6 +6,8 @@ from geom import smooth
 MUSCLE_RED = np.array([0.88, 0.47, 0.47]); TENDON = np.array([0.93, 0.88, 0.78]); BONE = np.array([0.90, 0.86, 0.77])
 FASCIA = np.array([0.88, 0.78, 0.70]); FOND = np.array([0.62, 0.34, 0.34])
 
+ENFANT = None  # (ymap, sxh) pour un corps d'enfant (voir build_skin.build) ; None = adulte
+
 class Sink:
     """Résolution incrémentale des territoires (mémoire bornée) : le plus prioritaire gagne."""
     FLAG = {'muscle': 0.0, 'tendon': 1.0, 'fascia': 0.5, 'bone': 2.0}
@@ -25,18 +27,31 @@ class Terr:
     def __init__(s, name, w, fib, kind='muscle', prio=0, tone=1.0):
         s.name, s.w, s.fib, s.kind, s.prio, s.tone = name, w, fib, kind, prio, tone
 
-def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
+def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None, ymap=None, sxh=None):
     """Pcm, N : points d'évaluation (cm, pose de liaison) et normales ; Pv, Wd : sommets de la peau et poids (repères de membres)."""
     Pv = Pcm if Pv is None else Pv
+    if ymap is None and ENFANT is not None: ymap, sxh = ENFANT
     sy = H / 175.0
     n = len(Pcm); T = Sink(n)
     x = Pcm[:, 0]; y = Pcm[:, 1]; z = Pcm[:, 2]
     ax = np.abs(x)
+    # Corps d'enfant : on ramène les coordonnées dans l'espace « adulte » des polygones (repères anatomiques mis en
+    # correspondance par morceaux : sol, cheville, genou, hanche, taille, épaule, cou, tête) et la largeur de tête a sa propre échelle.
+    if ymap is not None:
+        yadu = np.interp(y, ymap[0], ymap[1])
+        t = np.clip((y - (ymap[2] - 2.0)) / 4.0, 0, 1); t = t * t * (3 - 2 * t)
+        sxl = sx + (sxh - sx) * t
+        if len(ymap) > 3:   # largeur du bassin : de la taille (spine03) vers les hanches, l'échelle suit la largeur du bassin
+            yh, yw = ymap[0][3], ymap[0][4]
+            t2 = np.clip((yw - y) / max(yw - yh, 1e-6), 0, 1); t2 = t2 * t2 * (3 - 2 * t2)
+            sxl = sxl + (ymap[3] - sx) * t2 * (1 - t)
+    else:
+        yadu = y / sy; sxl = sx
     idx = lambda names: [bones.index(b) for b in names if b in bones]
 
     # ---------- projection tronc / tête ----------
     def proj(view):
-        return (ax / sx, y / sy, N[:, 2] if view == 'f' else -N[:, 2])
+        return (ax / sxl, yadu, N[:, 2] if view == 'f' else -N[:, 2])
     def sub_idx(U, V, pts, pad):
         pts = np.asarray(pts, float)
         return np.nonzero((U >= pts[:, 0].min() - pad) & (U <= pts[:, 0].max() + pad) & (V >= pts[:, 1].min() - pad) & (V <= pts[:, 1].max() + pad))[0]
@@ -127,7 +142,7 @@ def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
         if kind == 'hand':
             hb = ['wrist.' + sd] + ['metacarpal%d.%s' % (i, sd) for i in range(1, 5)] + ['finger%d-%d.%s' % (i, j, sd) for i in range(1, 6) for j in range(1, 4)]
             J = [bpos('wrist.' + sd), np.array(bp['finger3-3.' + sd][1]) * 10.0]
-            return Limb(Pv, Wd, bones, hb, J, MED, FRONT, gate=(Pv[:, 0] * side > 42) & (Pv[:, 1] < 108.5))
+            return Limb(Pv, Wd, bones, hb, J, MED, FRONT, gate=(Pv[:, 0] * side > J[0][0] * side - 6.8 * sx) & (Pv[:, 1] < J[0][1] + 0.3 * sx))
     Rm = {'thigh': 7.5, 'shank': 5.2, 'arm': 4.3, 'fore': 3.4, 'hand': 3.3}
     cache = {}
     def lm(name, limb, seg, pts, key, prio=0, kind='muscle', fibsc=1.0, feather=0.55, tone=1.0, gate=None):
@@ -212,7 +227,7 @@ def build_territories(Pcm, N, Wd, bones, bp, H, sx, Pv=None):
     # ---------- MAINS (limb « hand » : θ = 0 face palmaire, +90 radial / pouce, 180 dorsal) ----------
     for side in (1, -1):
         sd = 'L' if side > 0 else 'R'
-        hand = mk_limb(side, 'hand'); gh = ((x * side) > 42.0) & (y < 108.5)
+        hand = mk_limb(side, 'hand'); wr = bpos('wrist.' + sd); gh = ((x * side) > wr[0] * side - 6.8 * sx) & (y < wr[1] + 0.3 * sx)
         H = lambda nm, seg_pts, pr=5, kind='muscle', f=0.4: lm(nm + '.' + sd, hand, 0, seg_pts, 'hand', pr, kind=kind, feather=f, gate=gh)
         H('doigts', [(.44, -180), (1.2, -180), (1.2, 180), (.44, 180)], 1, 'tendon')
         H('thenar', [(.03, 25), (.18, 18), (.34, 38), (.38, 72), (.24, 96), (.06, 84)], 6)

@@ -135,6 +135,7 @@
             'Lignes de repère (épaules, bassin, oreilles, genoux, fil à plomb) avec leurs angles.',
             'Tableaux types cumulables, et dictée libre : le mannequin propose, vous validez.',
             'Les quatre vues et les écarts sont repris dans le rapport.',
+            'Présent dans le bilan postural, le bilan de podologie du sport et la podopédiatrie, avec un mannequin d’enfant adapté à chaque période.',
           ],
         },
         {

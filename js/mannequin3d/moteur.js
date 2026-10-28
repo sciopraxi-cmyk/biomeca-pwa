@@ -1,12 +1,23 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs, assemblage } from './parametres.js?v=v303';
+import { poseDepuisValeurs, assemblage } from './parametres.js?v=v304';
 
 // ?v= : le modèle 3D est dans /assets/ (cache sans limite de durée) ; l'URL change à chaque version
-const CHEMIN = (sexe) =>
+// Modèles : adultes (homme, femme) et enfants par période de la podopédiatrie (II, III, IV), garçon et fille.
+export const MODELES = [
+  'homme',
+  'femme',
+  ...['garcon', 'fille'].flatMap((s) => ['II', 'III', 'IV'].map((p) => s + '_p' + p)),
+];
+export function nomModele(sexe, profil) {
+  if (profil === 'II' || profil === 'III' || profil === 'IV')
+    return (sexe === 'femme' ? 'fille' : 'garcon') + '_p' + profil;
+  return sexe === 'femme' ? 'femme' : 'homme';
+}
+const CHEMIN = (nom) =>
   new URL(
-    '../../assets/mannequin/' + (sexe === 'femme' ? 'femme' : 'homme') + '.glb.gz?v=v303',
+    '../../assets/mannequin/' + (MODELES.includes(nom) ? nom : 'homme') + '.glb.gz?v=v304',
     import.meta.url
   ).href;
 const cacheModeles = {};
@@ -40,6 +51,17 @@ async function lireGlb(sexe) {
     });
   }
   return cacheModeles[sexe];
+}
+
+function hauteurModele(racine) {
+  let h = 1.75;
+  racine.traverse((o) => {
+    if (o.isSkinnedMesh && (o.name === 'peau' || o.name === 'Corps') && o.geometry) {
+      o.geometry.computeBoundingBox();
+      h = o.geometry.boundingBox.max.y - o.geometry.boundingBox.min.y;
+    }
+  });
+  return h;
 }
 
 // Clone indépendant (squelette inclus) pour que plusieurs moteurs (écran + rapport) cohabitent
@@ -124,14 +146,16 @@ export async function creerMoteur(canvas, opts = {}) {
     w: 0,
     h: 0,
     valeurs: {},
+    k: 1, // échelle de cadrage (1 = adulte)
   };
 
   function taille(w, h) {
     etat.w = w;
     etat.h = h;
     renderer.setSize(w, h, false);
+    // 1 m de demi-hauteur pour un adulte, identique pour tous les bilans ; un enfant est cadré à l'échelle de sa taille
     const asp = w / h,
-      demi = 1.0; // 1 m de demi-hauteur, identique pour tous les bilans
+      demi = etat.k;
     cam.left = -demi * asp;
     cam.right = demi * asp;
     cam.top = demi;
@@ -140,7 +164,7 @@ export async function creerMoteur(canvas, opts = {}) {
   }
   function placerCamera() {
     const d = 6,
-      y = 0.9;
+      y = 0.9 * etat.k;
     cam.position.set(Math.sin(etat.az) * d, y, Math.cos(etat.az) * d);
     cam.lookAt(0, y, 0);
     cam.updateMatrixWorld(true);
@@ -150,13 +174,17 @@ export async function creerMoteur(canvas, opts = {}) {
     renderer.render(scene, cam);
   }
 
-  async function chargerSexe(sexe) {
+  async function chargerSexe(sexe0, profil) {
+    const sexe = nomModele(sexe0, profil);
     if (etat.sexe === sexe && etat.racine) return;
     const gltf = await lireGlb(sexe);
     if (etat.racine) scene.remove(etat.racine);
     const racine = cloner(gltf);
     etat.racine = racine;
     etat.sexe = sexe;
+    // échelle de cadrage : adulte = 1 ; enfant = taille / 1,75 m (il remplit le cadre comme un adulte)
+    etat.k = /_p(II|III|IV)$/.test(sexe) ? hauteurModele(racine) / 1.75 : 1;
+    if (etat.w) taille(etat.w, etat.h);
     etat.bones = {};
     etat.repos = {};
     racine.traverse((o) => {
@@ -360,16 +388,28 @@ export async function creerMoteur(canvas, opts = {}) {
     const off = (os, ref, d) => W(ref).clone().add(d).sub(W(os));
     const defs = {
       epaules: [
-        pt('clavicle.R', off('clavicle.R', 'upperarm01.R', new THREE.Vector3(0.0, 0.05, 0.0))),
-        pt('clavicle.L', off('clavicle.L', 'upperarm01.L', new THREE.Vector3(0.0, 0.05, 0.0))),
+        pt(
+          'clavicle.R',
+          off('clavicle.R', 'upperarm01.R', new THREE.Vector3(0.0, 0.05 * etat.k, 0.0))
+        ),
+        pt(
+          'clavicle.L',
+          off('clavicle.L', 'upperarm01.L', new THREE.Vector3(0.0, 0.05 * etat.k, 0.0))
+        ),
       ],
       bassin: [
-        pt('pelvis.R', off('pelvis.R', 'upperleg01.R', new THREE.Vector3(0.05, 0.1, 0.0))),
-        pt('pelvis.L', off('pelvis.L', 'upperleg01.L', new THREE.Vector3(-0.05, 0.1, 0.0))),
+        pt(
+          'pelvis.R',
+          off('pelvis.R', 'upperleg01.R', new THREE.Vector3(0.05 * etat.k, 0.1 * etat.k, 0.0))
+        ),
+        pt(
+          'pelvis.L',
+          off('pelvis.L', 'upperleg01.L', new THREE.Vector3(-0.05 * etat.k, 0.1 * etat.k, 0.0))
+        ),
       ],
       tete: [
-        pt('head', off('head', 'head', new THREE.Vector3(-0.075, 0.075, 0.0))),
-        pt('head', off('head', 'head', new THREE.Vector3(0.075, 0.075, 0.0))),
+        pt('head', off('head', 'head', new THREE.Vector3(-0.075 * etat.k, 0.075 * etat.k, 0.0))),
+        pt('head', off('head', 'head', new THREE.Vector3(0.075 * etat.k, 0.075 * etat.k, 0.0))),
       ],
       genoux: [
         pt('lowerleg01.R', new THREE.Vector3(0, 0, 0)),
@@ -380,7 +420,7 @@ export async function creerMoteur(canvas, opts = {}) {
     for (const k in defs) {
       // trait épais (cylindre de 4 mm de rayon) : lisible aussi sur les vignettes du rapport
       const ligne = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.004, 0.004, 1, 6),
+        new THREE.CylinderGeometry(0.004 * etat.k, 0.004 * etat.k, 1, 6),
         new THREE.MeshBasicMaterial({ color: COUL_REP[k], depthTest: false, transparent: true })
       );
       ligne.renderOrder = 20;
@@ -415,7 +455,7 @@ export async function creerMoteur(canvas, opts = {}) {
       const a = r.a.getWorldPosition(new THREE.Vector3()),
         b = r.b.getWorldPosition(new THREE.Vector3());
       const dir = b.clone().sub(a).normalize(),
-        ext = 0.12;
+        ext = 0.12 * etat.k;
       const p1 = a.clone().addScaledVector(dir, -ext),
         p2 = b.clone().addScaledVector(dir, ext);
       r.ligne.position.copy(p1).add(p2).multiplyScalar(0.5);
@@ -427,7 +467,7 @@ export async function creerMoteur(canvas, opts = {}) {
     const c = etat.pivot ? etat.pivot.chevilleC : new THREE.Vector3();
     reperes.plomb.geometry.setFromPoints([
       new THREE.Vector3(0, 0.0, c.z),
-      new THREE.Vector3(0, 1.95, c.z),
+      new THREE.Vector3(0, 1.95 * etat.k, c.z),
     ]);
     reperes.plomb.computeLineDistances();
     reperes.angles = out;
@@ -494,13 +534,20 @@ export async function creerMoteur(canvas, opts = {}) {
 // Rendu hors écran des 4 vues pour le rapport (mêmes valeurs → mêmes images, échelle identique)
 export async function rendreVues(
   valeurs,
-  { sexe = 'homme', peau = true, largeur = 360, hauteur = 640, reperes: avecReperes = true } = {}
+  {
+    sexe = 'homme',
+    profil = 'adulte',
+    peau = true,
+    largeur = 360,
+    hauteur = 640,
+    reperes: avecReperes = true,
+  } = {}
 ) {
   const c = document.createElement('canvas');
   const m = await creerMoteur(c, { preserve: true });
   m.etat.peau = peau;
   m.taille(largeur, hauteur);
-  await m.chargerSexe(sexe);
+  await m.chargerSexe(sexe, profil);
   m.peau(peau);
   m.pose(valeurs);
   // repères cliniques (épaules, bassin, oreilles, genoux, fil à plomb) tracés sur les 4 vues du rapport

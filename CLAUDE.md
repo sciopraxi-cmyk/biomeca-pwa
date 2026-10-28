@@ -285,8 +285,14 @@ spécification est **locale**, exclue via `.git/info/exclude` : ne jamais la com
   (4 vues avec repères, écarts, hypothèses cochées). Données enregistrées dans `bilanDataPosturo.mannequin3d`
   (`{sexe, peau, valeurs, retenues}`, une centaine d'octets). Les anciennes silhouettes sont conservées masquées et réapparaissent si un dessin existe.
 - **Assets** : `assets/vendor/three/` (Three.js MIT, auto-hébergé), `assets/mannequin/{homme,femme}.glb.gz` (≈ 4,5 Mo chacun,
-  chargés à la demande, jamais précachés). Générés par `scripts/mannequin/` (Blender + MPFB hors dépôt, `/root/outils/mannequin`) ;
+  chargés à la demande, jamais précachés) ; 6 modèles d'enfant du même poids (seul celui qui sert est téléchargé). Générés par `scripts/mannequin/` (Blender + MPFB hors dépôt, `/root/outils/mannequin`) ;
   `scripts/mannequin/gen_meca.py` produit `mecanismes-data.js` depuis le document de règles (à régénérer, ne pas éditer à la main).
+- **Sport et podopédiatrie** (PR en cours) : même module, blocs `#m3d-sport` (ssec-1) et `#m3d-podo` (onglet Morphostatique,
+  `pdpsec-3`), insérés en tête de la carte par `_m3dMonterBloc` (biomeca.js) ; valeurs dans `bilanData.mannequin3d` et
+  `bilanDataPodopediatrie.mannequin3d`. Podopédiatrie : mannequin ENFANT par période (II, III, IV ; `{garcon,fille}_pII…IV.glb.gz`,
+  génération dans `scripts/mannequin/README.md`). Mécanismes lésionnels pour l'adulte, le sport et la période IV seulement
+  (règles de l'adulte ; genu valgum physiologique avant 6 ans). Rapports : `_m3dRapportHTML` (section Mannequin 3D en tête de la
+  Morphostatique ; podo : `_resolvePodoRapportImages` → `visuals.m3d`).
 - **Mécanismes lésionnels** : 51 règles (R01–R51), références vérifiées une à une ; R49–R51 = expertise SCIOPRAXI, sans source.
   Hypothèses jamais un diagnostic ; le praticien coche celles à inclure au rapport. Les seuils d'activation lisent les seuils du
   cabinet (`POSTURE_THRESHOLDS`, Paramètres) quand un équivalent existe (champ `s` des conditions), sinon les défauts du logiciel.
