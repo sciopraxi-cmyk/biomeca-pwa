@@ -43,7 +43,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
     )
   ).toBe(true);
   // version affichée et libellé du menu (une page ancienne servie par un cache ne les aurait pas)
-  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v306');
+  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v307');
   await expect(page.locator('.m3d select.inp').first().locator('option').first()).toHaveText(
     '— Tableau type (cumulable) —'
   );
@@ -229,6 +229,45 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   expect(apres.genou_valgus_D).toBe(11);
   expect(apres.genou_valgus_G).toBe(11);
   expect(apres.tete_incl).toBe(-6);
+  // profil du patient et chaîne musculaire : tableaux types groupés, encadré, case « Inclure au rapport », rapport
+  const selChaine = page.locator('.m3d select.inp').first();
+  expect(await selChaine.locator('optgroup').count()).toBe(2);
+  expect(await selChaine.locator('optgroup option').count()).toBe(12);
+  await selChaine.selectOption('neutre');
+  await selChaine.selectOption('chaine_ouverture_PL');
+  await selChaine.selectOption('chaine_laterale_D');
+  const prof = page.locator('.m3d-profbox');
+  await expect(prof).toContainText('Profil du patient et chaîne musculaire (hypothèse)');
+  await expect(prof).toContainText('Mézières / Meyers');
+  await expect(prof).toContainText('Busquet / GDS');
+  await expect(prof).toContainText('pas un diagnostic');
+  await expect(prof).toContainText('Chaîne d’ouverture (Busquet) = PL, postéro-latérale (GDS)');
+  expect(await prof.locator('input[data-profil]:checked').count()).toBe(0);
+  await prof.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/profil-chaines.png', fullPage: false });
+  // sans case cochée : le rapport ne contient pas le profil
+  const sansCase: any = await page.evaluate('_m3dVuesRapport(currentPatient.bilanDataPosturo)');
+  expect(sansCase.profil).toBe('');
+  await prof.locator('input[data-profil]').check();
+  await page.waitForTimeout(2500);
+  expect(await page.evaluate('currentPatient.bilanDataPosturo.mannequin3d.profilRetenu')).toBe(
+    true
+  );
+  const avecCase: any = await page.evaluate('_m3dVuesRapport(currentPatient.bilanDataPosturo)');
+  expect(avecCase.profil).toContain('Busquet / GDS');
+  expect(avecCase.profil).toContain('cours, diapo 43');
+  const rapProfil = await page.evaluate(async () => {
+    // eslint-disable-next-line no-undef
+    await buildRapportPosturo();
+    const ifr = document.querySelector('#rapport-posturo-body iframe') as HTMLIFrameElement;
+    const h = ifr.contentDocument!.body.innerHTML;
+    return {
+      titre: h.includes('Profil du patient et chaîne musculaire (hypothèse)'),
+      yeux: h.includes('— yeux') && !h.includes('oreilles'),
+    };
+  });
+  expect(rapProfil.titre).toBe(true);
+  expect(rapProfil.yeux).toBe(true);
   // nettoyage
   await page.evaluate(() => (window as any).nav('pg-patients'));
   await page.waitForTimeout(500);

@@ -8,16 +8,17 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v306';
-import { creerMoteur, VUES } from './moteur.js?v=v306';
-import { interpreter, EXEMPLES } from './dictee.js?v=v306';
+} from './parametres.js?v=v307';
+import { creerMoteur, VUES } from './moteur.js?v=v307';
+import { interpreter, EXEMPLES } from './dictee.js?v=v307';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v306';
+} from './mecanismes.js?v=v307';
+import { evaluerProfil, htmlProfil } from './chaines.js?v=v307';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -51,8 +52,8 @@ const CSS = `
 .m3d-prop label{display:flex;gap:6px;align-items:flex-start;padding:2px 0}
 .m3d-prop em{color:#92400e;font-style:normal;font-size:10px}
 .m3d-row.prop{outline:2px dashed #b45309;background:#fff7ed;border-radius:6px}
-.m3d-meca{margin-top:8px;border:1px solid var(--bord,#d8dee5);border-radius:8px;background:#fff;padding:8px 10px}
-.m3d-meca h4{margin:0 0 4px;font-size:13px;color:#7c2d12}
+.m3d-meca,.m3d-profbox{margin-top:8px;border:1px solid var(--bord,#d8dee5);border-radius:8px;background:#fff;padding:8px 10px}
+.m3d-profbox h4,.m3d-meca h4{margin:0 0 4px;font-size:13px;color:#7c2d12}
 .m3d-hyp{border:1px solid #e2e8f0;border-radius:6px;margin:5px 0;padding:4px 8px;background:#fafafa}
 .m3d-hyp>summary{cursor:pointer;font-size:12px}
 .m3d-cr ul{margin:4px 0 0 16px;padding:0;column-count:2;column-gap:32px}
@@ -89,6 +90,8 @@ export function monter(
     retenues: Array.isArray(etat && etat.retenues)
       ? etat.retenues.filter((x) => typeof x === 'string')
       : [],
+    // profil du patient et chaîne musculaire : « Inclure au rapport » coché par le praticien
+    profilRetenu: !!(etat && etat.profilRetenu),
   };
   let moteur = null,
     detruit = false;
@@ -161,7 +164,20 @@ export function monter(
     { class: 'inp', style: 'font-size:12px;max-width:100%' },
     el('option', { value: '' }, '— Tableau type (cumulable) —')
   );
-  for (const k in TABLEAUX) selTab.append(el('option', { value: k }, TABLEAUX[k].label));
+  // tableaux des chaînes musculaires : regroupés par famille (Mézières / Meyers ; Busquet / GDS)
+  const groupesTab = {};
+  for (const k in TABLEAUX) {
+    const g = TABLEAUX[k].groupe;
+    const opt = el('option', { value: k }, TABLEAUX[k].label);
+    if (!g) selTab.append(opt);
+    else {
+      if (!groupesTab[g]) {
+        groupesTab[g] = el('optgroup', { label: g });
+        selTab.append(groupesTab[g]);
+      }
+      groupesTab[g].append(opt);
+    }
+  }
   selTab.addEventListener('change', () => {
     if (!selTab.value) return;
     S.valeurs = appliquerTableau(S.valeurs, selTab.value); // cumul avec ce qui est déjà réglé
@@ -186,6 +202,7 @@ export function monter(
   );
   const cr = el('div', { class: 'm3d-cr' });
   const hyp = el('div', { class: 'm3d-meca' });
+  const prof = el('div', { class: 'm3d-profbox' });
   racine.append(
     el(
       'div',
@@ -324,6 +341,7 @@ export function monter(
       { style: 'flex:1 1 100%;min-width:0' },
       cr,
       hyp,
+      prof,
       el(
         'div',
         {
@@ -501,8 +519,26 @@ export function monter(
       cr.append(ul);
     }
     majMeca();
+    majProfil();
     if (onChange) onChange(etatCourant());
   }
+  // Profil du patient et chaîne musculaire (hypothèse) sur les valeurs VALIDÉES ; toutes périodes (adulte, sport, enfant)
+  function majProfil() {
+    const ouverts = [...prof.querySelectorAll('details[open]')].map(
+      (d) => d.querySelector('summary').textContent
+    );
+    const ang = moteur && moteur.angles ? moteur.angles() : null;
+    const p = evaluerProfil(nettoyerValeurs(S.valeurs), { yeux: ang && ang.yeux });
+    prof.innerHTML = htmlProfil(p, { coche: true, retenu: S.profilRetenu });
+    prof.querySelectorAll('details').forEach((d) => {
+      if (ouverts.includes(d.querySelector('summary').textContent)) d.open = true;
+    });
+  }
+  prof.addEventListener('change', (ev) => {
+    if (!(ev.target && ev.target.dataset && ev.target.dataset.profil)) return;
+    S.profilRetenu = !!ev.target.checked;
+    if (onChange) onChange(etatCourant());
+  });
   // Hypothèses de mécanisme lésionnel sur les valeurs VALIDÉES (pas sur l'aperçu d'une dictée)
   function majMeca() {
     if (!mecanismes) {
@@ -577,6 +613,7 @@ export function monter(
       peau: S.peau,
       valeurs: nettoyerValeurs(S.valeurs),
       retenues: S.retenues.slice(),
+      profilRetenu: S.profilRetenu,
     };
   }
   async function changerSexe(k) {
@@ -647,6 +684,7 @@ export function monter(
       S.sexe = (e && e.sexe) || sexeParDefaut;
       S.peau = e ? e.peau !== false : true;
       S.valeurs = Object.assign({}, e && e.valeurs);
+      S.profilRetenu = !!(e && e.profilRetenu);
       majCurseurs();
       if (moteur) moteur.chargerSexe(S.sexe, profil).then(maj);
       else majBoutons();

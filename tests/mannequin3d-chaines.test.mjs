@@ -1,0 +1,176 @@
+// Profil du patient et chaîne musculaire : fonctions pures (aucun WebGL, aucune donnée patient réelle).
+import { describe, it, expect, afterEach } from 'vitest';
+import { TABLEAUX } from '../js/mannequin3d/parametres.js';
+import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v307';
+import {
+  CHAINES,
+  evaluerProfil,
+  niveauDe,
+  definirSeuilsProfil,
+  seuilsProfil,
+  SEUILS_PROFIL_DEFAUT,
+  htmlProfil,
+  htmlProfilRapport,
+} from '../js/mannequin3d/chaines.js?v=v307';
+
+afterEach(() => {
+  definirSeuilsProfil(null);
+  definirSeuils(null);
+});
+
+describe('niveaux 0–4', () => {
+  it('suivent les amplitudes léger → sévère du curseur et le sens', () => {
+    // genou_valgus : qual [3, 7, 11, 15]
+    expect([0, 2, 3, 7, 11, 15].map((x) => niveauDe('genou_valgus_D', x, 1))).toEqual([
+      0, 0, 1, 2, 3, 4,
+    ]);
+    expect(niveauDe('genou_valgus_D', -8, 1)).toBe(0); // varus : autre sens
+    expect(niveauDe('genou_valgus_D', -8, -1)).toBe(2);
+    expect(niveauDe('inconnu', 5, 1)).toBe(0);
+  });
+  it('le seuil « existe » est celui du cabinet quand il existe', () => {
+    expect(niveauDe('genou_valgus_D', 5, 1)).toBe(1);
+    definirSeuils({ face: { valgumVarum: 6 } });
+    expect(niveauDe('genou_valgus_D', 5, 1)).toBe(0);
+    expect(niveauDe('genou_valgus_D', 6, 1)).toBe(1);
+  });
+});
+
+describe('chaque tableau type de chaîne fait ressortir sa chaîne', () => {
+  const clesChaines = Object.keys(TABLEAUX).filter((k) => k.startsWith('chaine_'));
+  it('12 tableaux, regroupés par famille', () => {
+    expect(clesChaines.length).toBe(12);
+    expect(CHAINES.length).toBe(12);
+    for (const k of clesChaines)
+      expect(TABLEAUX[k].groupe).toMatch(/Mézières \/ Meyers|Busquet \/ GDS/);
+  });
+  const attendu = {
+    chaine_grande_posterieure: ['grande_posterieure', 'postural'],
+    chaine_grande_anterieure: ['grande_anterieure', 'postural'],
+    chaine_laterale_D: ['ligne_laterale_D', 'postural'],
+    chaine_laterale_G: ['ligne_laterale_G', 'postural'],
+    chaine_spiralee_D: ['ligne_spiralee_D', 'postural'],
+    chaine_spiralee_G: ['ligne_spiralee_G', 'postural'],
+    chaine_extension_PM: ['extension_PM', 'chainiste'],
+    chaine_flexion_AM: ['flexion_AM', 'chainiste'],
+    chaine_AP: ['AP', 'chainiste'],
+    chaine_PA: ['PA', 'chainiste'],
+    chaine_fermeture_AL: ['fermeture_AL', 'chainiste'],
+    chaine_ouverture_PL: ['ouverture_PL', 'chainiste'],
+  };
+  for (const [k, [id, profil]] of Object.entries(attendu))
+    it(k + ' → ' + id + ' (' + profil + ')', () => {
+      const p = evaluerProfil(TABLEAUX[k].valeurs);
+      expect(p.exprimees[0].id).toBe(id);
+      expect(p.dominante && p.dominante.id).toBe(id);
+      expect(p.profils).toEqual([profil]);
+      expect(p.grosses).toEqual([]);
+    });
+});
+
+describe('profils', () => {
+  it('mannequin neutre : aucun profil', () => {
+    const p = evaluerProfil({});
+    expect(p.vide).toBe(true);
+    expect(p.profils).toEqual([]);
+  });
+  it('postural : antériorisation globale seule, sans compensation', () => {
+    const p = evaluerProfil({ glob_chev: 5 });
+    expect(p.profils).toEqual(['postural']);
+    expect(p.nbZonesTouchees).toBe(0);
+  });
+  it('le côté de la ligne latérale / spiralée suit les signes (côté inverse = score nul)', () => {
+    const p = evaluerProfil(TABLEAUX.chaine_laterale_D.valeurs);
+    expect(p.chaines.find((c) => c.id === 'ligne_laterale_G').score).toBe(0);
+    const s = evaluerProfil(TABLEAUX.chaine_spiralee_G.valeurs);
+    expect(s.chaines.find((c) => c.id === 'ligne_spiralee_D').score).toBe(0);
+  });
+  it('biomécanique : une grosse compensation d’un seul côté, entrée basse (membre inférieur)', () => {
+    const p = evaluerProfil({ genou_valgus_D: 12, pied_valgus_D: 4, tete_incl: 3 });
+    expect(p.profils).toContain('biomecanique');
+    expect(p.grosses.map((g) => g.id)).toEqual(['genou_valgus_D']);
+    expect(p.entree.type).toBe('basse');
+  });
+  it('un gros écart bilatéral symétrique n’est pas une compensation locale', () => {
+    const p = evaluerProfil({ genou_valgus_D: 12, genou_valgus_G: 12 });
+    expect(p.grosses).toEqual([]);
+    expect(p.profils).not.toContain('biomecanique');
+  });
+  it('entrée haute : tête latéralisée + mandibule ; indices vestibulaire et mandibulaire', () => {
+    const p = evaluerProfil({ tete_incl: 12, mandi_transl: 10 }, { yeux: -5 });
+    expect(p.entree.type).toBe('haute');
+    expect(p.entree.indices.vestibulaire).toBeTruthy();
+    expect(p.entree.indices.mandibulaire).toBeTruthy();
+    expect(p.entree.indices.visuel.angle).toBe(-5);
+    expect(evaluerProfil({ tete_incl: 12 }, { yeux: 0.5 }).entree.indices.visuel).toBeNull();
+  });
+  it('entrée mixte : haut d’un côté, bas de l’autre', () => {
+    const p = evaluerProfil({ tronc_incl: 12, genou_valgus_G: 12 });
+    expect(p.entree.haut[0].cote).toBe('D');
+    expect(p.entree.bas[0].cote).toBe('G');
+    expect(p.entree.type).toBe('mixte');
+  });
+  it('biomécanique + postural', () => {
+    const p = evaluerProfil({ glob_chev: 5, tete_incl: 12 });
+    expect(p.profils).toEqual(['biomecanique', 'postural']);
+    expect(p.libelle).toBe('biomécanique + postural');
+  });
+  it('biomécanique + chaîniste', () => {
+    const p = evaluerProfil({ ...TABLEAUX.chaine_ouverture_PL.valeurs, genou_valgus_D: 13 });
+    expect(p.profils).toEqual(['biomecanique', 'chainiste']);
+    expect(p.grosses.map((g) => g.id)).toEqual(['genou_valgus_D']);
+  });
+  it('plusieurs chaînes : dominante seulement avec l’écart réglable', () => {
+    const v = { ...TABLEAUX.chaine_fermeture_AL.valeurs, ...TABLEAUX.chaine_AP.valeurs };
+    const p = evaluerProfil(v);
+    expect(p.exprimees.length).toBeGreaterThan(1);
+    const ecart = p.exprimees[0].score - p.exprimees[1].score;
+    expect(p.ecartDominante).toBe(ecart);
+    definirSeuilsProfil({ ecartDominante: ecart + 1 });
+    expect(evaluerProfil(v).dominante).toBeNull();
+    definirSeuilsProfil({ ecartDominante: Math.max(1, ecart) });
+    expect(evaluerProfil(v).dominante).toBeTruthy();
+  });
+});
+
+describe('seuils réglables', () => {
+  it('valeurs par défaut validées et surcharge bornée', () => {
+    expect(seuilsProfil()).toEqual(SEUILS_PROFIL_DEFAUT);
+    expect(SEUILS_PROFIL_DEFAUT).toMatchObject({
+      exprimee: 40,
+      ecartDominante: 15,
+      grosse: 3,
+      plusieurs: 3,
+    });
+    definirSeuilsProfil({ exprimee: 95, grosse: 'x', inconnu: 1 });
+    expect(seuilsProfil().exprimee).toBe(95);
+    expect(seuilsProfil().grosse).toBe(3);
+    expect(evaluerProfil(TABLEAUX.chaine_extension_PM.valeurs).exprimees.length).toBe(0);
+  });
+});
+
+describe('affichage', () => {
+  it('encadré : deux appellations, prudence, cours cité, case « Inclure au rapport »', () => {
+    const h = htmlProfil(evaluerProfil(TABLEAUX.chaine_ouverture_PL.valeurs), { coche: true });
+    expect(h).toContain('Mézières / Meyers');
+    expect(h).toContain('Busquet / GDS');
+    expect(h).toContain('pas un diagnostic');
+    expect(h).toContain('cours, diapo 43');
+    expect(h).toContain('data-profil="1"');
+    expect(h).not.toMatch(/checked/);
+    expect(htmlProfil(evaluerProfil({ glob_chev: 5 }), { coche: true, retenu: true })).toMatch(
+      /checked/
+    );
+  });
+  it('rapport : vide si le profil n’est pas retenu ou si le mannequin est neutre', () => {
+    const v = TABLEAUX.chaine_AP.valeurs;
+    expect(htmlProfilRapport(v, false)).toBe('');
+    expect(htmlProfilRapport({}, true)).toBe('');
+    const h = htmlProfilRapport(v, true);
+    expect(h).toContain('AP, antéro-postérieure');
+    expect(h).not.toContain('data-profil');
+  });
+  it('aucune chaîne ne cite un contenu hors du cours : chaque rappel porte un numéro de diapo', () => {
+    for (const c of CHAINES) for (const r of c.cours) expect(r[1]).toMatch(/^\d+$/);
+  });
+});

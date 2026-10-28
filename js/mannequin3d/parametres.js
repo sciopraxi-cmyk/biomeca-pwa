@@ -66,7 +66,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v306';
+export const BUILD = 'v307';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -614,6 +614,106 @@ export const TABLEAUX = {
     valeurs: { glob_bassin: -4 },
   },
 };
+
+// ─── Tableaux types des CHAÎNES MUSCULAIRES (profil du patient) ────────────────────────────────────────
+// Valeurs INDICATIVES déduites de la spécification de Joël (28/10) : chaque tableau pose les signes de sa chaîne à un
+// niveau modéré ; ils sont cumulables comme les autres et ne sont pas des normes. Un test vérifie que chaque tableau
+// fait ressortir sa propre chaîne dans le profil.
+export const GROUPE_POSTURAL = 'Chaînes posturales — Mézières / Meyers';
+export const GROUPE_CHAINISTE = 'Chaînes chaînistes — Busquet / GDS';
+const CHAINES_TABLEAUX = {
+  chaine_grande_posterieure: {
+    label: 'Grande chaîne postérieure (Mézières) = ligne postérieure superficielle (Meyers)',
+    valeurs: { glob_chev: 5, tronc_lordose: 8, tronc_cyphose: 8, tete_flex: -3 },
+  },
+  chaine_grande_anterieure: {
+    label:
+      'Grande chaîne antérieure (Mézières) = ligne antérieure superficielle et profonde (Meyers)',
+    valeurs: { glob_chev: -4, bassin_antev: -5, tete_flex: 5 },
+  },
+  chaine_laterale_D: {
+    label: 'Ligne latérale droite (Meyers) : poids à gauche',
+    valeurs: { poids_lr: -10, tronc_incl: -4, tete_incl: 4 },
+  },
+  chaine_laterale_G: {
+    label: 'Ligne latérale gauche (Meyers) : poids à droite',
+    valeurs: { poids_lr: 10, tronc_incl: 4, tete_incl: -4 },
+  },
+  chaine_spiralee_D: {
+    label: 'Ligne spiralée droite (Meyers)',
+    valeurs: { tronc_rot: 8, bassin_rot: 6, pied_ouverture_D: 15 },
+  },
+  chaine_spiralee_G: {
+    label: 'Ligne spiralée gauche (Meyers)',
+    valeurs: { tronc_rot: -8, bassin_rot: -6, pied_ouverture_G: 15 },
+  },
+  chaine_extension_PM: {
+    label: 'Chaîne d’extension (Busquet) = PM (GDS)',
+    valeurs: { tete_flex: -6, tronc_antero: 3, tronc_lordose: 15, ...bil('genou_flex', -8) },
+  },
+  chaine_flexion_AM: {
+    label: 'Chaîne de flexion (Busquet) = AM (GDS)',
+    valeurs: {
+      tete_flex: 6,
+      tronc_cyphose: 25,
+      tronc_lordose: 8,
+      bassin_avance: -3,
+      glob_bassin: 4,
+      ...bil('genou_flex', 10),
+    },
+  },
+  chaine_AP: {
+    label: 'Chaîne statique en expiration (Busquet) = AP (GDS)',
+    valeurs: {
+      tete_antep: 3,
+      ...bil('epaule_elev', -3),
+      ...bil('epaule_antep', 8),
+      tronc_cyphose: 15,
+      bassin_avance: 3,
+      ...bil('genou_flex', -6),
+    },
+  },
+  chaine_PA: {
+    label: 'Chaîne statique en inspiration (Busquet) = PA (GDS)',
+    valeurs: {
+      tete_antep: -2,
+      ...bil('epaule_elev', 3),
+      ...bil('epaule_antep', -8),
+      bassin_antev: -6,
+      ...bil('genou_flex', -6),
+    },
+  },
+  chaine_fermeture_AL: {
+    label: 'Chaîne de fermeture (Busquet) = AL (GDS)',
+    valeurs: {
+      ...bil('epaule_antep', 10),
+      ...bil('bras_abd', -5),
+      ...bil('bras_rot', -20),
+      ...bil('avbras_pron', 20),
+      tronc_cyphose: 25,
+      ...bil('cuisse_rot', -10),
+      ...bil('pied_valgus', 6),
+      ...bil('pied_ouverture', -5),
+    },
+  },
+  chaine_ouverture_PL: {
+    label: 'Chaîne d’ouverture (Busquet) = PL (GDS)',
+    valeurs: {
+      ...bil('epaule_antep', -10),
+      ...bil('bras_abd', 15),
+      ...bil('bras_rot', 20),
+      ...bil('avbras_pron', -20),
+      tronc_lordose: 15,
+      ...bil('cuisse_rot', 10),
+      ...bil('pied_valgus', -6),
+      ...bil('pied_ouverture', 20),
+    },
+  },
+};
+for (const k of Object.keys(CHAINES_TABLEAUX)) {
+  const postural = /grande|laterale|spiralee/.test(k);
+  TABLEAUX[k] = { ...CHAINES_TABLEAUX[k], groupe: postural ? GROUPE_POSTURAL : GROUPE_CHAINISTE };
+}
 
 // ─── Pose complète à partir des valeurs ────────────────────────────────────────────────────
 // Renvoie { rot, pos, bassin, morph, twist }.
