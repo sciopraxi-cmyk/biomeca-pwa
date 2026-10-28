@@ -10,7 +10,7 @@
 // 2026 (CACHE_VERSION n'avait jamais bougé, cache-first .js/.css bloquait les
 // clients sur du code de mois précédents). Toute évolution ultérieure du code
 // applicatif doit incrémenter cette version (garde-fou CI dans ci.yml).
-const CACHE_VERSION = 'biomeca-v302';
+const CACHE_VERSION = 'biomeca-v303';
 const CACHE_PREFIX  = 'biomeca-';
 
 // #77 — chemin de base réel du SW ('/' en localhost, '/biomeca-pwa/' sur
@@ -56,6 +56,8 @@ const PRECACHE_URLS = [
   './assets/landing/import-doctolib.png',
   './assets/landing/arrivee-rdv.png',
   './assets/landing/bonhomme-postural.png',
+  './assets/landing/visualisation-3d.png',
+  './assets/landing/mecanismes-lesionnels.png',
   './assets/landing/bilan-sport.png',
   './assets/landing/bilan-podopediatrie.png',
   './assets/landing/bilan-pedicurie.png',

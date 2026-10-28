@@ -8,16 +8,16 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v302';
-import { creerMoteur, VUES } from './moteur.js?v=v302';
-import { interpreter, EXEMPLES } from './dictee.js?v=v302';
+} from './parametres.js?v=v303';
+import { creerMoteur, VUES } from './moteur.js?v=v303';
+import { interpreter, EXEMPLES } from './dictee.js?v=v303';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v302';
+} from './mecanismes.js?v=v303';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
