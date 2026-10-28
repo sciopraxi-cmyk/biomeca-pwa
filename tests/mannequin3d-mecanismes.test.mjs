@@ -16,9 +16,9 @@ import { PAR_ID, TABLEAUX } from '../js/mannequin3d/parametres.js';
 const ids = (v) => evaluer(v).map((h) => h.regle.id);
 
 describe('données du document (48 règles, sources relues)', () => {
-  it('48 règles R01–R48 uniques ; 10 phrases de prudence ; sources présentes', () => {
+  it('51 règles R01–R51 uniques ; 10 phrases de prudence ; sources présentes', () => {
     expect(REGLES.map((r) => r.id)).toEqual(
-      Array.from({ length: 48 }, (_, i) => 'R' + String(i + 1).padStart(2, '0'))
+      Array.from({ length: 51 }, (_, i) => 'R' + String(i + 1).padStart(2, '0'))
     );
     expect(PRUDENCE).toHaveLength(10);
     expect(Object.keys(SOURCES).length).toBeGreaterThanOrEqual(28);
@@ -42,6 +42,7 @@ describe('données du document (48 règles, sources relues)', () => {
         ...(c.sym || []).flatMap((t) => lat(t.base)),
         ...(c.any || []).flatMap((t) => lat(t.base)),
         ...(c.glob || []).map((t) => t.id),
+        ...(c.anyGlob || []).map((t) => t.id),
       ];
       for (const id of cites) expect(PAR_ID[id], r.id + '/' + id).toBeTruthy();
     }
@@ -98,8 +99,33 @@ describe('déclenchement des règles', () => {
     expect(ids({ epaule_elev_D: 4, epaule_elev_G: 4 })).not.toContain('R26');
     expect(ids({ epaule_elev_D: 5, epaule_elev_G: 1 })).toContain('R26');
   });
-  it('les antériorisations globales ne déclenchent aucune règle (aucune source documentée)', () => {
-    expect(evaluer({ glob_chev: 8 })).toEqual([]);
+  it('EIAP : effondrement du pied + valgus du genou + antéversion → R49 (chaîne combinée, en tête) ; sous le seuil rien', () => {
+    const v = { pied_valgus_D: 7, genou_valgus_D: 7, bassin_antev: 4 };
+    expect(ids(v)).toContain('R49');
+    expect(evaluer(v)[0].combinee).toBe(true);
+    expect(
+      evaluer(v)
+        .find((h) => h.regle.id === 'R49')
+        .regle.patho.join(' ')
+    ).toContain('EIAP');
+    expect(ids({ pied_valgus_D: 7, genou_valgus_D: 7 })).not.toContain('R49'); // sans antéversion
+    expect(ids({ pied_valgus_D: 7, genou_valgus_D: 7, bassin_antev: 2 })).not.toContain('R49');
+  });
+  it('antériorisation globale (chevilles, genoux ou hanches) → R50 ; aucun déclenchement sous 3°', () => {
+    for (const k of ['glob_chev', 'glob_gen', 'glob_bassin']) {
+      expect(ids({ [k]: 4 })).toContain('R50');
+      expect(ids({ [k]: 2 })).not.toContain('R50');
+      expect(ids({ [k]: -6 })).not.toContain('R50'); // postériorisation : pas d'EIAP par ce mécanisme
+    }
+  });
+  it('R51 : pied + genou valgus + RI de la cuisse + antéversion → fascia thoraco-lombaire / érecteurs du rachis', () => {
+    const v = { pied_valgus_G: 7, genou_valgus_G: 7, cuisse_rot_G: -8, bassin_antev: 4 };
+    const h = evaluer(v).find((x) => x.regle.id === 'R51');
+    expect(h.cotes).toEqual(['G']);
+    expect(h.regle.desc).toContain('érecteurs du rachis');
+    expect(h.regle.asc).toContain('fascia thoraco-lombaire');
+    expect(ids({ ...v, cuisse_rot_G: 8 })).not.toContain('R51'); // rotation externe : non
+    expect(h.regle.sources).toEqual([]); // expertise clinique : aucune référence inventée
   });
   it('tous les tableaux types évaluent sans erreur ; la synthèse compte les pathologies citées', () => {
     for (const k in TABLEAUX) expect(() => evaluer(TABLEAUX[k].valeurs)).not.toThrow();

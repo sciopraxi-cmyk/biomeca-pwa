@@ -33,7 +33,7 @@ export const LIBELLE_NIVEAU = {
   f: 'preuve faible',
   CC: 'consensus clinique (non démontré)',
 };
-const COMBINEES = new Set(['R35', 'R36', 'R37', 'R38', 'R43']);
+const COMBINEES = new Set(['R35', 'R36', 'R37', 'R38', 'R43', 'R49', 'R51']);
 
 function ok(x, op, v) {
   if (x == null || !isFinite(x)) return false;
@@ -126,6 +126,11 @@ export function evaluer(valeurs) {
           for (const S of ['D', 'G'])
             if (ok(val(valeurs, t.base + '_' + S), t.op, seuilTerme(t)))
               decl.push(fmt(t.base + '_' + S, val(valeurs, t.base + '_' + S)));
+    }
+    if (valide && c.anyGlob) {
+      const hit = c.anyGlob.filter((t) => ok(val(valeurs, t.id), t.op, seuilTerme(t)));
+      if (!hit.length) valide = false;
+      else for (const t of hit) decl.push(fmt(t.id, val(valeurs, t.id)));
     }
     if (!valide) continue;
     res.push({ regle: r, cotes, declencheurs: [...new Set(decl)], combinee: COMBINEES.has(r.id) });

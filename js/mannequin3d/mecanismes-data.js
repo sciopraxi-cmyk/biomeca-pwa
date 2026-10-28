@@ -1213,6 +1213,140 @@ export const REGLES = [
     niveaux: ['f', 'CC'],
     sources: ['S21', 'S22'],
   },
+  {
+    id: 'R49',
+    titre:
+      'effondrement du pied (pied_valgus ≥ 5°) + valgus du genou (≥ 5°) + antéversion du bassin (≥ 3°)',
+    auto: true,
+    cond: {
+      lat: [
+        {
+          base: 'pied_valgus',
+          op: '>=',
+          v: 5,
+          s: 'dos.calcaneen',
+        },
+        {
+          base: 'genou_valgus',
+          op: '>=',
+          v: 5,
+          s: 'face.valgumVarum',
+        },
+      ],
+      glob: [
+        {
+          id: 'bassin_antev',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.bassin',
+        },
+      ],
+    },
+    asc: 'Effondrement de la voûte, éversion du calcanéus → RI du tibia → valgus du genou',
+    desc: "Antéversion du bassin, charge reportée sur l'avant-pied",
+    patho: [
+      "Épine irritative d'appui plantaire (EIAP) : inflammation « inconsciente » de la plaque fibro-cartilagineuse proche des os sésamoïdes de la tête du 1er métatarsien",
+    ],
+    musclesH: [],
+    musclesI: [],
+    tests: [
+      'Palpation de la zone sésamoïdienne sous la tête du 1er métatarsien ; analyse des appuis plantaires (à compléter par le praticien)',
+    ],
+    preuve:
+      'CC (expertise clinique du praticien, J. Pozo ; aucune source bibliographique vérifiée)',
+    niveau: 'CC',
+    niveaux: ['CC'],
+    sources: [],
+  },
+  {
+    id: 'R50',
+    titre:
+      "antériorisation globale (depuis les chevilles, les genoux ou les hanches ≥ 3°) ; également : poids porté d'un seul côté (pas de curseur dédié, à constater à l'examen)",
+    auto: true,
+    cond: {
+      anyGlob: [
+        {
+          id: 'glob_chev',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.anteriorisation',
+        },
+        {
+          id: 'glob_gen',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.anteriorisation',
+        },
+        {
+          id: 'glob_bassin',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.anteriorisation',
+        },
+      ],
+    },
+    asc: "Report du poids du corps sur l'avant-pied",
+    desc: "Corps en bloc vers l'avant",
+    patho: ["Épine irritative d'appui plantaire (EIAP) sous la tête du 1er métatarsien"],
+    musclesH: [],
+    musclesI: [],
+    tests: [
+      'Palpation de la zone sésamoïdienne ; analyse des appuis plantaires et de leur répartition droite/gauche (à compléter par le praticien)',
+    ],
+    preuve:
+      'CC (expertise clinique du praticien, J. Pozo ; aucune source bibliographique vérifiée)',
+    niveau: 'CC',
+    niveaux: ['CC'],
+    sources: [],
+  },
+  {
+    id: 'R51',
+    titre:
+      'effondrement du pied (pied_valgus ≥ 5°) + valgus du genou (≥ 5°) + rotation interne de la cuisse (≥ 5°) + antéversion du bassin (≥ 3°)',
+    auto: true,
+    cond: {
+      lat: [
+        {
+          base: 'pied_valgus',
+          op: '>=',
+          v: 5,
+          s: 'dos.calcaneen',
+        },
+        {
+          base: 'genou_valgus',
+          op: '>=',
+          v: 5,
+          s: 'face.valgumVarum',
+        },
+        {
+          base: 'cuisse_rot',
+          op: '<=',
+          v: -5,
+        },
+      ],
+      glob: [
+        {
+          id: 'bassin_antev',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.bassin',
+        },
+      ],
+    },
+    asc: "Pied effondré, RI du tibia et du fémur → relâchement du fascia thoraco-lombaire : moindre transmission d'énergie entre membre inférieur et membre supérieur",
+    desc: 'Excès de contraction compensatoire des érecteurs du rachis (muscles phasiques, peu endurants)',
+    patho: ['Lombalgie', 'douleurs rachidiennes'],
+    musclesH: ['érecteurs du rachis (muscles phasiques, peu endurants)'],
+    musclesI: [],
+    tests: [
+      'Palpation et endurance des érecteurs du rachis ; état du fascia thoraco-lombaire (à compléter par le praticien)',
+    ],
+    preuve:
+      'CC (expertise clinique du praticien, J. Pozo ; aucune source bibliographique vérifiée)',
+    niveau: 'CC',
+    niveaux: ['CC'],
+    sources: [],
+  },
 ];
 export const SOURCES = {
   S1: {
