@@ -1777,7 +1777,11 @@ function _afficherVersionApp() {
   if (!el || typeof caches === 'undefined') return;
   caches.keys().then(function (ks) {
     const v = ks.filter(function (k) { return k.indexOf('biomeca-v') === 0; }).sort().pop();
-    el.textContent = v ? 'Version de l\'application : ' + v.replace('biomeca-', '') : '';
+    const sw = v ? v.replace('biomeca-', '') : '';
+    // « code chargé » = ce que cette page exécute vraiment ; « installée » = version du cache de l'application
+    el.textContent = sw
+      ? 'Version de l\'application : ' + APP_BUILD + (sw !== APP_BUILD ? ' (installée : ' + sw + ' — actualisez la page)' : '')
+      : '';
   }).catch(function () {});
 }
 
@@ -5042,12 +5046,43 @@ initPWA();
 
 
 // ─── Service Worker ───
+// Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
+const APP_BUILD = 'v300';
+function _afficherBandeauMiseAJour() {
+  if (document.getElementById('maj-version-bandeau')) return;
+  const b = document.createElement('div');
+  b.id = 'maj-version-bandeau';
+  b.setAttribute('role', 'status');
+  b.style.cssText =
+    'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100000;background:#1f4e79;color:#fff;' +
+    'padding:10px 16px;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.3);font-size:13px;display:flex;gap:12px;align-items:center;max-width:92vw;';
+  const t = document.createElement('span');
+  t.textContent = 'Une nouvelle version de VERTICY est disponible.';
+  const bt = document.createElement('button');
+  bt.type = 'button';
+  bt.textContent = 'Actualiser';
+  bt.style.cssText = 'background:#fff;color:#1f4e79;border:0;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;';
+  bt.onclick = () => location.reload();
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.textContent = '×';
+  x.setAttribute('aria-label', 'Plus tard');
+  x.style.cssText = 'background:transparent;color:#fff;border:0;font-size:18px;cursor:pointer;';
+  x.onclick = () => b.remove();
+  b.append(t, bt, x);
+  document.body.appendChild(b);
+}
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('service-worker.js', { scope: './' })
       .then(reg => {
         if (reg.waiting) console.info('[SW] new version waiting');
+        // Page ouverte depuis longtemps : le nouveau service worker prend la main mais le code déjà chargé en mémoire
+        // reste l'ancien tant que la page n'est pas rechargée. On le signale (sans recharger de force : saisie en cours).
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.addEventListener('controllerchange', _afficherBandeauMiseAJour);
+        }
         reg.addEventListener('updatefound', () => {
           const sw = reg.installing;
           sw && sw.addEventListener('statechange', () => {

@@ -377,5 +377,7 @@ describe('répartition du poids G/D et version affichée', () => {
     const fs = await import('node:fs');
     const sw = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
     expect(sw).toContain("CACHE_VERSION = 'biomeca-" + BUILD_UI + "'");
+    const app = fs.readFileSync(new URL('../js/biomeca.js', import.meta.url), 'utf8');
+    expect(app).toContain("const APP_BUILD = '" + BUILD_UI + "'"); // version du code de la page affichée dans « Mon compte »
   });
 });

@@ -43,7 +43,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
     )
   ).toBe(true);
   // version affichée et libellé du menu (une page ancienne servie par un cache ne les aurait pas)
-  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v299');
+  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v300');
   await expect(page.locator('.m3d select.inp').first().locator('option').first()).toHaveText(
     '— Tableau type (cumulable) —'
   );
