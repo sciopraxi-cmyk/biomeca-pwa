@@ -3,8 +3,8 @@
 // chaîne ascendante, chaîne descendante, risques de blessure, compensations pouvant aggraver, muscles, tests de
 // confirmation, niveau de preuve et sources. Ce sont des HYPOTHÈSES À CONFIRMER par l'examen clinique, jamais un
 // diagnostic (règlement UE 2017/745) ; les seuils d'activation sont des paramètres à calibrer par le praticien.
-import { REGLES, SOURCES, PRUDENCE } from './mecanismes-data.js?v=v302';
-import { PAR_ID } from './parametres.js?v=v302';
+import { REGLES, SOURCES, PRUDENCE } from './mecanismes-data.js?v=v303';
+import { PAR_ID } from './parametres.js?v=v303';
 
 export { SOURCES, PRUDENCE, REGLES };
 

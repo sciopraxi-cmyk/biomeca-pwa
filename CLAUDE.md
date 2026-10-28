@@ -271,17 +271,46 @@ filets sur des runners neufs, hors de portée du proxy.
   toute couleur d'onglet se change aussi dans le script, pas seulement dans le
   balisage.
 
-## Modules 3D à venir (mannequin postural, plan de semelle)
+## Mannequin postural 3D — acquis (PR #351) et module 3D à venir (plan de semelle)
 
-Deux modules remplaceront des outils de dessin existants : le **mannequin postural 3D**
-(curseurs cliniques au lieu des silhouettes dessinées) et le **plan de semelle 3D** avec
-export STL (au lieu du plan de semelle dessiné). Leurs spécifications sont **locales**,
-exclues via `.git/info/exclude` :
-ne jamais les commiter, les déplacer ni les citer dans un fichier tracké.
+Le **mannequin postural 3D** (curseurs cliniques au lieu des silhouettes dessinées) est livré dans le bilan postural,
+onglet Morphostatique, en 1re position de la section. Le **plan de semelle 3D** avec export STL reste à faire ; sa
+spécification est **locale**, exclue via `.git/info/exclude` : ne jamais la commiter, la déplacer ni la citer dans un fichier tracké.
 
-- **Isolement** : rien dans `index.html` ni dans `js/biomeca.js`. Un dossier par module
-  (`js/semelle3d/`, `js/mannequin3d/`), modules séparés, **import dynamique** à l'ouverture.
-  Le chargement des autres bilans ne doit pas changer.
+**Mannequin — ce qui existe**
+- **Code** : `js/mannequin3d/` (`parametres.js` curseurs + pose + tableaux types ; `moteur.js` Three.js, squelette, repères ;
+  `ui.js` interface ; `dictee.js` dictée libre ; `mecanismes.js` + `mecanismes-data.js` règles de mécanismes lésionnels).
+  Intégration dans `js/biomeca.js` : bloc `#m3d-posturo` (fonction `_m3dPosturoInit`), section « Mannequin 3D » du rapport
+  (4 vues avec repères, écarts, hypothèses cochées). Données enregistrées dans `bilanDataPosturo.mannequin3d`
+  (`{sexe, peau, valeurs, retenues}`, une centaine d'octets). Les anciennes silhouettes sont conservées masquées et réapparaissent si un dessin existe.
+- **Assets** : `assets/vendor/three/` (Three.js MIT, auto-hébergé), `assets/mannequin/{homme,femme}.glb.gz` (≈ 4,5 Mo chacun,
+  chargés à la demande, jamais précachés). Générés par `scripts/mannequin/` (Blender + MPFB hors dépôt, `/root/outils/mannequin`) ;
+  `scripts/mannequin/gen_meca.py` produit `mecanismes-data.js` depuis le document de règles (à régénérer, ne pas éditer à la main).
+- **Mécanismes lésionnels** : 51 règles (R01–R51), références vérifiées une à une ; R49–R51 = expertise SCIOPRAXI, sans source.
+  Hypothèses jamais un diagnostic ; le praticien coche celles à inclure au rapport. Les seuils d'activation lisent les seuils du
+  cabinet (`POSTURE_THRESHOLDS`, Paramètres) quand un équivalent existe (champ `s` des conditions), sinon les défauts du logiciel.
+- **Dictée** : propositions à valider, jamais appliquées d'office ; transcription = celle du navigateur (Whisper local ou IA
+  hébergée HDS : décision en attente, aucune donnée de santé hors hébergeur certifié).
+
+**Pièges appris**
+- **Versions** : un bump = `CACHE_VERSION` (service-worker.js) + `BUILD` (parametres.js) + `APP_BUILD` (biomeca.js) + suffixes
+  `?v=` de TOUS les imports relatifs de `js/mannequin3d/*.js` et du `.glb.gz` + `tests/portail-apercu-praticien.test.mjs` + libellé
+  de `tests/e2e/mannequin3d.spec.ts`. Sans `?v=`, un navigateur mélange d'anciens et de nouveaux modules (« does not provide an export »).
+  Un test impose l'accord des numéros ; « Mon compte » affiche la version du code chargé ; un bandeau propose d'actualiser.
+- **CSP** : GLTFLoader lit les textures par `fetch(blob:)`, bloqué par `connect-src` ; le moteur masque `createImageBitmap` pendant
+  `parse()` pour passer par TextureLoader. Toujours tester dans l'application réelle (E2E Playwright), pas sur un banc sans CSP.
+- **Service worker** : les `.js`/`.css` passent en network-first avec `cache:'no-cache'` (le cache HTTP servait d'anciens modules).
+  Aperçu : `/root/projets/VERTICY/apercu_serveur.py` (Cache-Control no-cache, port 8080, `background=true`).
+- **E2E** : `patients` et `ouvrirBilanPosturo` sont des variables de script, pas des propriétés de `window` (`eval('patients')`).
+  Toute spec qui crée un patient fictif le supprime (✕ de la liste) ; relire la liste après coup.
+- **Prettier** réécrit les tableaux/imports sur plusieurs lignes : un `str.replace` Python sur du code déjà formaté échoue en silence.
+  `assert old in s` avant d'écrire, puis relancer l'E2E.
+- **Convention** : côtés = côtés du PATIENT ; x = gauche du patient, y = haut, z = devant ; bascule + = côté droit plus haut.
+
+Règles communes à tout module 3D :
+
+- **Isolement** : un dossier par module (`js/semelle3d/`, `js/mannequin3d/`), modules séparés, **import dynamique** à l'ouverture
+  (une petite intégration dans `js/biomeca.js`, rien dans `index.html`). Le chargement des autres bilans ne doit pas changer.
 - **Dépendances** (`three`, `OrbitControls`, `STLExporter`, `GLTFLoader`, `three-mesh-bvh`,
   `meshoptimizer`, `manifold-3d`…) : chacune est un ajout soumis à **accord explicite**
   (version exacte, licence, taille). Auto-hébergées sous `assets/vendor/` comme pdf.js
@@ -910,7 +939,7 @@ registrePratId, note}`). Aucune table, aucun réseau, aucun envoi (HDS non migr�
 - **Pages de fonctionnalités** : 5 rubriques validées, photos des bilans `assets/bilans/illus-*.jpg` (ratio 0,834, jamais recadrées), fonctions futures marquées `avenir:true`.
 - **Confort** : case « Se souvenir de moi » (e-mail seul en localStorage, jamais le mot de passe), œil du mot de passe sur les 3 formulaires.
 - **Logo** : version transparente `verticy-logo-simple-transparent.png` sur les 3 cartes de la landing, préchargée par le service worker. Pictogramme (50 px) plus grand que le wordmark (15 px).
-- **Service workers** : `biomeca-v262`.
+- **Service workers** : `biomeca-v262`. Pages « Mannequin 3D du patient » et « Mécanismes lésionnels » livrées (captures `assets/landing/visualisation-3d.png`, `mecanismes-lesionnels.png`, 1280×800, patiente fictive, précachées).
 
 ## Refonte du design intérieur (logiciel praticien) — acquis (PR #342 à #347)
 

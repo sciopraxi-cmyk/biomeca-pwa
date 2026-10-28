@@ -39,8 +39,6 @@ describe('landing — fonctionnalités', () => {
     for (const id of [
       'bilan-osteopathique',
       'dictee-ia',
-      'visualisation-3d',
-      'mecanismes-lesionnels',
       'exercices-automatiques',
       'semelles-3d',
       'mes-rendez-vous',
@@ -52,6 +50,8 @@ describe('landing — fonctionnalités', () => {
   });
   it('les fonctions livrées ne sont pas marquées « à venir »', () => {
     const livre = [
+      'visualisation-3d',
+      'mecanismes-lesionnels',
       'bilan-postural',
       'bilan-sport',
       'bilan-podopediatrie',
@@ -145,6 +145,8 @@ describe('landing — refonte design (vue praticien)', () => {
       'dossier-patient',
       'arrivee-rdv',
       'bonhomme-postural',
+      'visualisation-3d',
+      'mecanismes-lesionnels',
       'bilan-sport',
       'bilan-podopediatrie',
       'bilan-pedicurie',

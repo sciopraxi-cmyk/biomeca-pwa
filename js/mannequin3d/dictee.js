@@ -4,7 +4,7 @@
 // Principe : la phrase est découpée en propositions ; dans chacune on cherche des MOTS-CLÉS (radicaux, sans accents,
 // dans n'importe quel ordre) qui désignent un curseur, puis le côté, le niveau (léger / modéré / marqué / sévère)
 // ou un chiffre (le chiffre l'emporte). Aucun nom de patient n'est lu ni conservé.
-import { PAR_ID } from './parametres.js?v=v302';
+import { PAR_ID } from './parametres.js?v=v303';
 
 export const EXEMPLES = [
   'genu valgum bilatéral marqué',
