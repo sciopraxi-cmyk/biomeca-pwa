@@ -8,16 +8,16 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v303';
-import { creerMoteur, VUES } from './moteur.js?v=v303';
-import { interpreter, EXEMPLES } from './dictee.js?v=v303';
+} from './parametres.js?v=v304';
+import { creerMoteur, VUES } from './moteur.js?v=v304';
+import { interpreter, EXEMPLES } from './dictee.js?v=v304';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v303';
+} from './mecanismes.js?v=v304';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -71,7 +71,12 @@ function el(tag, attrs = {}, ...kids) {
   return e;
 }
 
-export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = {}) {
+export function monter(
+  conteneur,
+  { etat, onChange, sexeParDefaut = 'homme', profil = 'adulte', mecanismes = true } = {}
+) {
+  // profil : 'adulte' ou période de la podopédiatrie ('II', 'III', 'IV') = mannequin enfant aux bonnes proportions
+  const enfant = profil === 'II' || profil === 'III' || profil === 'IV';
   if (!document.getElementById('m3d-css')) {
     const s = el('style', { id: 'm3d-css' });
     s.textContent = CSS;
@@ -96,8 +101,8 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     btnVue = {};
   const barreSexe = el('div', { class: 'm3d-barre' });
   for (const [k, l] of [
-    ['homme', 'Homme'],
-    ['femme', 'Femme'],
+    ['homme', enfant ? 'Garçon' : 'Homme'],
+    ['femme', enfant ? 'Fille' : 'Femme'],
   ]) {
     btnSexe[k] = el(
       'button',
@@ -500,6 +505,12 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
   }
   // Hypothèses de mécanisme lésionnel sur les valeurs VALIDÉES (pas sur l'aperçu d'une dictée)
   function majMeca() {
+    if (!mecanismes) {
+      S.retenues = [];
+      hyp.innerHTML =
+        '<div style="font-size:12px;color:#475569">Mécanismes lésionnels : non proposés pour cette période (écarts fréquents et souvent physiologiques chez le jeune enfant).</div>';
+      return;
+    }
     const res = evaluer(nettoyerValeurs(S.valeurs));
     const ouverts = new Set(
       [...hyp.querySelectorAll('details.m3d-hyp[open]')].map((d) => d.dataset.id)
@@ -573,7 +584,7 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
     majBoutons();
     if (moteur) {
       msg.style.display = 'flex';
-      await moteur.chargerSexe(k);
+      await moteur.chargerSexe(k, profil);
       msg.style.display = 'none';
       maj();
     } else if (onChange) onChange(etatCourant());
@@ -593,7 +604,7 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
       }
       moteur.etat.peau = S.peau;
       ajusterTaille();
-      await moteur.chargerSexe(S.sexe);
+      await moteur.chargerSexe(S.sexe, profil);
       msg.style.display = 'none';
       moteur.vue('face');
       majVues();
@@ -637,7 +648,7 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
       S.peau = e ? e.peau !== false : true;
       S.valeurs = Object.assign({}, e && e.valeurs);
       majCurseurs();
-      if (moteur) moteur.chargerSexe(S.sexe).then(maj);
+      if (moteur) moteur.chargerSexe(S.sexe, profil).then(maj);
       else majBoutons();
     },
     detruire() {

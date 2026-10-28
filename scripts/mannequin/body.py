@@ -41,12 +41,19 @@ def breast(v,gender,muscle,weight,cup=0.5,firm=0.5):
         k=g*mv*wv*cv*fv
         if k>1e-6: apply(v,f'breast/female-young-{mk}-{wk}-{ck}-{fk}.target',k)
     return v
+def age_macro(annees):
+    """âge en années → valeur macro MPFB (1 an = 0 ; 11 ans = 0,1875 ; 25 ans = 0,5)."""
+    if annees<=1: return 0.0
+    if annees<=11: return 0.1875*(annees-1)/10
+    if annees<=25: return 0.1875+(0.5-0.1875)*(annees-11)/14
+    return 0.5
 def macro(v0,gender,age,muscle,weight,race=(0,0,1),height=0.5):
     """gender 0=femme 1=homme ; age 0.5=25 ans ; muscle/weight 0.5=moyen ; race=(african,asian,caucasian)"""
     v=v0.copy()
     g={'female':1-gender,'male':gender}
     if age>=0.5: a={'young':1-(age-.5)*2,'old':(age-.5)*2}
-    else: a={'young':1.0}
+    elif age>=0.1875: t=(age-0.1875)/(0.5-0.1875); a={'child':1-t,'young':t}
+    else: t=age/0.1875; a={'baby':1-t,'child':t}
     m={'minmuscle':max(0,(.5-muscle)*2),'maxmuscle':max(0,(muscle-.5)*2)}; m['averagemuscle']=1-m['minmuscle']-m['maxmuscle']
     w={'minweight':max(0,(.5-weight)*2),'maxweight':max(0,(weight-.5)*2)}; w['averageweight']=1-w['minweight']-w['maxweight']
     for gk,gv in g.items():

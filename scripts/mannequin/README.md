@@ -1,6 +1,7 @@
-# Génération des mannequins 3D (homme / femme)
+# Génération des mannequins 3D (adultes et enfants)
 
-Les fichiers `assets/mannequin/homme.glb.gz` et `femme.glb.gz` sont produits par ces scripts Python
+Les fichiers `assets/mannequin/{homme,femme}.glb.gz` (adultes) et `{garcon,fille}_p{II,III,IV}.glb.gz` (enfants, un par période de la
+podopédiatrie) sont produits par ces scripts Python
 (numpy uniquement). **Aucun code tiers n'est copié** : seules des **données CC0** sont lues.
 
 - Entrées : maillage de base, cibles morphologiques (« targets »), squelette et poids de peau du
@@ -19,3 +20,13 @@ Les fichiers `assets/mannequin/homme.glb.gz` et `femme.glb.gz` sont produits par
   Variables : `SEXES=homme`, `BAKE_RES=1024`, `ECORCHE_DEBUG=1` (couleur distincte par muscle).
   Les chemins absolus de `body.py` / `build_skin.py` sont à adapter.
 - Repère : x = gauche du patient, y = haut, z = devant. Os orientés selon les axes du monde au repos.
+
+## Mannequins d'enfant (podopédiatrie)
+
+- `ENFANTS=II,III,IV python3 build_skin.py` écrit `out_garcon_pII.glb` … `out_fille_pIV.glb` (6 fichiers, ~8 min), puis `gzip -9`.
+- Âge macro MPFB choisi pour obtenir une taille représentative (`AGES` dans `build_skin.py`) : II ≈ 100 cm (≈ 4 ans),
+  III ≈ 122 cm (≈ 7-8 ans), IV ≈ 143 cm garçon / 140 cm fille (≈ 11 ans). Pas de poitrine ni de pectoraux ajoutés.
+- Écorché : les polygones de `ecorche.py` sont définis sur l'adulte. Pour l'enfant, `build_skin.py` calcule des repères (sol,
+  cheville, genou, hanche, taille, épaule, cou, tête) et `ecorche.ENFANT` ramène les coordonnées dans l'espace adulte
+  (correspondance par morceaux en hauteur, échelle de largeur propre à la tête et au bassin).
+- Le moteur cadre l'enfant à l'échelle de sa taille (`etat.k` = taille / 1,75 m) ; les repères cliniques suivent la même échelle.

@@ -5047,7 +5047,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v303';
+const APP_BUILD = 'v304';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -18968,7 +18968,7 @@ async function buildRapportPosturo() {
   const beforeDynIdx = sections.findIndex(s => s.titre && s.titre.startsWith('3.'));
   let visualAnchor = beforeDynIdx >= 0 ? beforeDynIdx : sections.length;
   // #265 — Mannequin 3D : 4 vues rendues à l'échelle identique + compte rendu des valeurs non nulles.
-  const mannequinRapport = await _m3dVuesRapport(d);
+  const mannequinRapport = await _m3dVuesRapport(d, 'adulte');
   if (mannequinRapport) {
     sections.splice(visualAnchor, 0, {titre:'2. Morphostatique — Mannequin 3D', color:'#3498db', type:'mannequin3d', mannequin: mannequinRapport});
     visualAnchor++;
@@ -19312,28 +19312,7 @@ function _doBuildRapport(p, d, prat, logo, sections) {
     bodyHtml += '<div class="section-title"><div class="section-num">'+num+'</div><div class="section-label">'+s.titre+'</div><div class="section-line"></div></div>';
     bodyHtml += '<div class="section-body">';
     if(s.type === 'mannequin3d') {
-      var mq = s.mannequin;
-      if (!mq.imgs) {
-        bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Mannequin 3D non rendu (WebGL indisponible) — les valeurs restent enregistrées.</div>';
-      } else {
-        var lab3d = [['profilD','Profil D'],['dos','Dos'],['face','Face'],['profilG','Profil G']];
-        bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;">';
-        lab3d.forEach(function(k) {
-          bodyHtml += '<div style="text-align:center;"><div style="font-size:9px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">'+k[1]+'</div><img src="'+mq.imgs[k[0]]+'" style="max-width:100%;border-radius:4px;"/></div>';
-        });
-        bodyHtml += '</div>';
-        if (mq.imgs.angles) {
-          var an3d = mq.imgs.angles;
-          bodyHtml += '<div style="font-size:10px;color:#4b5563;margin:0 0 8px;line-height:1.5;">Repères : <b style="color:#2563eb;">— épaules</b> · <b style="color:#dc2626;">— bassin</b> · <b style="color:#16a34a;">— oreilles</b> · <b style="color:#ea580c;">— genoux</b> · <b style="color:#6b7280;">fil à plomb</b>. Inclinaison vue de face (° ; + = côté droit du patient plus haut) : épaules ' + an3d.epaules + ' · bassin ' + an3d.bassin + ' · oreilles ' + an3d.tete + ' · genoux ' + an3d.genoux + '.</div>';
-        }
-      }
-      if (mq.lignes && mq.lignes.length) {
-        bodyHtml += '<ul style="margin:4px 0 8px 18px;padding:0;font-size:11px;color:#374151;">';
-        mq.lignes.forEach(function(t) { bodyHtml += '<li>'+_escHtml(t)+'</li>'; });
-        bodyHtml += '</ul>';
-      }
-      // #265 — hypothèses de mécanisme lésionnel (HTML produit par le module, textes échappés)
-      if (mq.meca) bodyHtml += '<div style="margin-top:10px;font-size:11px;font-weight:700;color:#1f4e79;">Hypothèses de mécanisme lésionnel</div>' + mq.meca;
+      bodyHtml += _m3dRapportHTML(s.mannequin);
     } else if(s.type === 'bonhommes') {
       // Fix #149 — mention rouge sur status 'ko' (annotations Storage introuvables).
       if (s.ko) {
@@ -19486,6 +19465,7 @@ async function buildRapport() {
   // le rapport posturo). Plafond 850 px (cohérent avec A2). Tolérant aux
   // erreurs : helper retourne [] sur échec, la section est alors absente.
   const annotatedViews = await _collectAnnotatedPostureViews(p.bilanData || {}, 850);
+  const m3d = await _m3dVuesRapport(p.bilanData || {}, 'adulte'); // #265 — mannequin 3D du bilan sport
 
   // #88-B Chaînage : composites #98 + fiches annexes 88-B. Pas de window.print()
   // dans buildRapport (aperçu écran uniquement) — l'utilisateur peut voir les
@@ -19494,7 +19474,7 @@ async function buildRapport() {
   // discriminer 'ok'/'nu'/'ko' côté rendu (mention rouge, auto-omission blocs).
   _resolveSportRapportImages(p.bilanData || {}, (composites, statuses) => {
     {
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, annotatedViews, statuses);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, annotatedViews, statuses, m3d);
 
       // #86 Fix E2E logo — récupère la src de l'asset Sciopraxi (mirror posturo
       // _buildRapportBody L4780). Asset statique chargé dans #img-store (index.html
@@ -19921,7 +19901,7 @@ async function _resolveSportRapportImages(bd, callback) {
 // Fix #150 — 6e param `statuses` : map {key → 'ok'|'nu'|'ko'} par silhouette/pieds,
 // produit par _resolveSportRapportImages. Propagé à buildBilanPrintSection pour
 // afficher la mention rouge sur 'ko' et masquer les blocs entièrement 'nu'.
-function _buildSportRapportContentHTML(p, prat, composites = {}, annotatedViews = [], statuses = {}) {
+function _buildSportRapportContentHTML(p, prat, composites = {}, annotatedViews = [], statuses = {}, m3d = null) {
   // 1. Header praticien — alignement strict posturo _doBuildRapport L5371 :
   // chaque champ optionnel via `prat.field || ''`, sans fallback texte chrome.
   // Le caller passe désormais toujours un objet (alignement posturo L4779 `|| {}`
@@ -19974,7 +19954,7 @@ function _buildSportRapportContentHTML(p, prat, composites = {}, annotatedViews 
   // #109-A4 — annotatedViews propagées : injectées DANS la sous-section
   // Bilan Morphostatique de buildBilanPrintSection (cohérent avec posturo).
   const bilanSection = (typeof buildBilanPrintSection === 'function' && p && p.bilanData)
-    ? buildBilanPrintSection(p.bilanData, composites, annotatedViews, statuses) : '';
+    ? buildBilanPrintSection(p.bilanData, composites, annotatedViews, statuses, m3d) : '';
 
   // #109-A4 — Les vues posturales annotées sont désormais injectées DANS la
   // sous-section Bilan Morphostatique (cf. buildBilanPrintSection ci-dessus),
@@ -20011,6 +19991,7 @@ async function printReport() {
   // #109-A3 — Pré-génère les vues posturales annotées avant le chaînage
   // composites/fiches. Plafond 850 px (cohérent avec A2). Tolérant aux erreurs.
   const annotatedViews = await _collectAnnotatedPostureViews(p.bilanData || {}, 850);
+  const m3d = await _m3dVuesRapport(p.bilanData || {}, 'adulte'); // #265 — mannequin 3D du bilan sport
 
   // #88-B Chaînage : composites canvas (#98) PUIS fiches PDF annexes (88-B) AVANT
   // build + injection + window.print(). Imbrication intentionnelle (pas Promise.all)
@@ -20021,7 +20002,7 @@ async function printReport() {
     {
       // #86 Fix E2E — délégation au constructeur partagé _buildSportRapportContentHTML
       // (source unique commune avec buildRapport, parité visuelle garantie).
-      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, annotatedViews, statuses);
+      const { pratHTML, patientHTML, bodyHTML } = _buildSportRapportContentHTML(p, prat, composites, annotatedViews, statuses, m3d);
       document.getElementById('rp-prat-block').innerHTML = pratHTML;
       // #229-B — logo du cabinet au centre du header print.
       const rpLogo = document.getElementById('rp-prat-logo');
@@ -20059,7 +20040,7 @@ async function printReport() {
 // Les autres champs cliniques (chaine_musculaire, ttt.semellesDesc, etc.) restent
 // des triggers d'affichage de la section elle-même (titre + textes), indépendamment
 // de la présence de visuels.
-function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], statuses = {}) {
+function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], statuses = {}, m3d = null) {
   if(!bd||!Object.keys(bd).length) return '';
   const f = (k,def) => (bd[k]!==undefined && bd[k]!=='' && bd[k]!==null) ? bd[k] : (def||'—');
   const yn = (k) => bd[k]==='oui'
@@ -20139,8 +20120,9 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
   // #203-fix placement — photos podoscope EN TÊTE de la section Morphostatique
   // (miroir de l'UI, retour Scio : elles sortaient après la synthèse).
   const hasPodoscope = Array.isArray(bd._podoscopePhotos) && bd._podoscopePhotos.length > 0;
-  if(hasMorpho||bd.chaine_musculaire||hasAnnotatedViews||hasPodoscope) {
+  if(hasMorpho||bd.chaine_musculaire||hasAnnotatedViews||hasPodoscope||m3d) {
     h += sec('Bilan Morphostatique');
+    if (m3d) h += _m3dRapportHTML(m3d); // #265 — mannequin 3D en tête de la section, comme dans l'écran
     h += _buildGalleryReportHTML(bd, '_podoscopePhotos', '_podo_ph_', 'Photos podoscope / morphologie plantaire');
     // Fix #150 défauts 1+2 — Rendu conditionnel + mention rouge.
     // (2) Le bloc des 4 silhouettes n'est rendu que si au moins une tuile a
@@ -23718,6 +23700,7 @@ function showPodopediatrieSection(idx) {
   // bilanDataPodopediatrie (dataURLs déjà réhydratées par prefetch de
   // ouvrirBilanPodopediatrie). setTimeout 50 ms > peinture DOM section.
   if (target === 3) {
+    _m3dPodoInit(); // #265 — mannequin 3D enfant (période II / III / IV)
     if (typeof _podoAchilleInterpret === 'function') _podoAchilleInterpret();
     // #140 Phase 2b2 — Injection idempotente du bloc photos posturales
     // (capture caméra + import + placement points). Marker `_pp_injected`
@@ -24530,9 +24513,11 @@ async function _resolvePodoRapportImages(bd) {
     _composePodoPieds(d),
     (typeof _collectAnnotatedPostureViews === 'function')
       ? _collectAnnotatedPostureViews(d, _MAX_POSTURE_W)
-      : Promise.resolve([])
+      : Promise.resolve([]),
+    // #265 — mannequin 3D enfant (proportions de la période II / III / IV)
+    _m3dVuesRapport(d, d.periode === 'II' || d.periode === 'III' ? d.periode : 'IV')
   ]);
-  return { morpho: results[0], pieds: results[1], annotatedViews: results[2] };
+  return { morpho: results[0], pieds: results[1], annotatedViews: results[2], m3d: results[3] };
 }
 
 // Rendu HTML du bloc « Silhouettes morphostatiques » (grille 2×2, cadre rose podo).
@@ -24699,6 +24684,9 @@ async function buildPodopediatrieRapportHTML() {
   // #203-fix placement — la galerie photos rejoint le groupe examen (cascade
   // d'insertion Morphostatique prioritaire), en tête, miroir de l'UI.
   var examHtml =
+    (visuals.m3d
+      ? '<div class="rp-section rp-imgs"><div class="rp-section-title">🧍 Mannequin 3D</div>' + _m3dRapportHTML(visuals.m3d) + '</div>'
+      : '') +
     _buildGalleryReportHTML(d, '_morphoPhotos', '_pdp_ph_', 'Photos podoscope / morphologie') +
     _renderPodoMorphoBlock(visuals.morpho) +
     _renderPodoPostureBlock(visuals.annotatedViews);
@@ -30999,6 +30987,33 @@ function updateSchemaMoteursTotals() {
   applyTendanceToTerrain(profil);
 }
 
+// #265 — HTML du rapport pour un mannequin 3D (posturo, sport, podopédiatrie) : 4 vues + repères + écarts + hypothèses retenues.
+function _m3dRapportHTML(mq) {
+  var h = '';
+      if (!mq.imgs) {
+        h += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Mannequin 3D non rendu (WebGL indisponible) — les valeurs restent enregistrées.</div>';
+      } else {
+        var lab3d = [['profilD','Profil D'],['dos','Dos'],['face','Face'],['profilG','Profil G']];
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;">';
+        lab3d.forEach(function(k) {
+          h += '<div style="text-align:center;"><div style="font-size:9px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">'+k[1]+'</div><img src="'+mq.imgs[k[0]]+'" style="max-width:100%;border-radius:4px;"/></div>';
+        });
+        h += '</div>';
+        if (mq.imgs.angles) {
+          var an3d = mq.imgs.angles;
+          h += '<div style="font-size:10px;color:#4b5563;margin:0 0 8px;line-height:1.5;">Repères : <b style="color:#2563eb;">— épaules</b> · <b style="color:#dc2626;">— bassin</b> · <b style="color:#16a34a;">— oreilles</b> · <b style="color:#ea580c;">— genoux</b> · <b style="color:#6b7280;">fil à plomb</b>. Inclinaison vue de face (° ; + = côté droit du patient plus haut) : épaules ' + an3d.epaules + ' · bassin ' + an3d.bassin + ' · oreilles ' + an3d.tete + ' · genoux ' + an3d.genoux + '.</div>';
+        }
+      }
+      if (mq.lignes && mq.lignes.length) {
+        h += '<ul style="margin:4px 0 8px 18px;padding:0;font-size:11px;color:#374151;">';
+        mq.lignes.forEach(function(t) { h += '<li>'+_escHtml(t)+'</li>'; });
+        h += '</ul>';
+      }
+      // #265 — hypothèses de mécanisme lésionnel (HTML produit par le module, textes échappés)
+      if (mq.meca) h += '<div style="margin-top:10px;font-size:11px;font-weight:700;color:#1f4e79;">Hypothèses de mécanisme lésionnel</div>' + mq.meca;
+  return h;
+}
+
 // ═══ #265 — Mannequin postural 3D (module isolé js/mannequin3d/, import dynamique) ═══
 // Les valeurs des curseurs sont stockées comme DONNÉES dans bilanDataPosturo.mannequin3d
 // ({v, sexe, peau, valeurs}) : synchronisées comme le reste du bilan, comparables entre bilans.
@@ -31077,17 +31092,146 @@ async function _m3dPosturoInit() {
   }
 }
 // Rapport : les 4 vues du mannequin, rendues hors écran à partir des valeurs enregistrées.
-async function _m3dVuesRapport(d) {
+// profil : 'adulte' ou période de la podopédiatrie ('II', 'III', 'IV') ; les mécanismes lésionnels (règles de l'adulte)
+// ne s'appliquent qu'à l'adulte et à la période IV.
+function _m3dMecanismesPermis(profil) {
+  return profil !== 'II' && profil !== 'III';
+}
+async function _m3dVuesRapport(d, profil) {
+  profil = profil || 'adulte';
   const m = d && d.mannequin3d;
   if (!m || !m.valeurs || !Object.keys(m.valeurs).length) return null;
   try {
     const mod = await import('./mannequin3d/index.js?v=' + APP_BUILD);
     mod.definirSeuils(POSTURE_THRESHOLDS);
-    const imgs = await mod.rendreVues(m.valeurs, { sexe: m.sexe || 'homme', peau: m.peau !== false });
-    return { imgs: imgs, lignes: mod.decrire(m.valeurs), peau: m.peau !== false, meca: mod.htmlRapport(m.valeurs, m.retenues) };
+    const imgs = await mod.rendreVues(m.valeurs, { sexe: m.sexe || 'homme', peau: m.peau !== false, profil: profil });
+    return {
+      imgs: imgs,
+      lignes: mod.decrire(m.valeurs),
+      peau: m.peau !== false,
+      meca: _m3dMecanismesPermis(profil) ? mod.htmlRapport(m.valeurs, m.retenues) : ''
+    };
   } catch (e) {
     return { imgs: null, lignes: [], erreur: true };
   }
+}
+
+// ═══ #265 — Mannequin 3D dans la podologie du sport et la podopédiatrie (mêmes modules que le postural) ═══
+// Les valeurs sont stockées dans le bilan (bilanData.mannequin3d / bilanDataPodopediatrie.mannequin3d). Les anciennes
+// silhouettes dessinées sont conservées masquées et réapparaissent si un dessin existe. Podopédiatrie : mannequin enfant
+// aux proportions de la période (II, III, IV) ; mécanismes lésionnels seulement en période IV.
+const _m3dBlocs = { sport: null, podo: null };
+// Écriture déclenchée uniquement par une modification du mannequin par le praticien (jamais par un affichage ni un rapport).
+document.addEventListener('m3d-sauver', function (ev) {
+  _scheduleBilanAutosave(ev && ev.detail ? ev.detail.flavor : 'posturo');
+});
+async function _m3dMonterBloc(cfg) {
+  const canvas = document.getElementById(cfg.canvasId);
+  const p = currentPatient;
+  if (!canvas || !p) return;
+  const d = cfg.donnees();
+  if (!d) return;
+  const zone = canvas.parentElement && canvas.parentElement.parentElement && canvas.parentElement.parentElement.parentElement; // rangée des 4 silhouettes
+  const barre = zone ? zone.nextElementSibling : null;
+  const carte = zone ? zone.parentElement : null;
+  if (!zone || !carte) return;
+  const profil = cfg.profil();
+  let host = document.getElementById(cfg.hostId);
+  if (!host) {
+    host = document.createElement('div');
+    host.id = cfg.hostId;
+    host.style.margin = '12px 0';
+    const titre = carte.querySelector(cfg.titreSel);
+    if (titre) {
+      titre.textContent = cfg.titreTexte;
+      titre.after(host); // le mannequin ouvre la section, comme dans le bilan postural
+    } else zone.before(host);
+  }
+  const ancien = cfg.anciens.some(function (k) { return d[k] || d[k + 'Path']; });
+  if (ancien) {
+    zone.style.position = 'relative'; zone.style.visibility = ''; zone.style.pointerEvents = '';
+    if (barre) barre.style.display = '';
+  } else {
+    carte.style.position = 'relative';
+    zone.style.cssText += ';position:absolute;top:0;left:0;right:0;visibility:hidden;pointer-events:none;';
+    if (barre) barre.style.display = 'none';
+  }
+  if (ancien && !document.getElementById(cfg.hostId + '-legacy')) {
+    const t = document.createElement('div');
+    t.id = cfg.hostId + '-legacy';
+    t.style.cssText = 'font-size:11px;font-weight:600;color:#6b7280;margin-top:6px;';
+    t.textContent = 'Anciennes silhouettes (dessin conservé tel quel)';
+    zone.before(t);
+  }
+  const etat0 = _m3dBlocs[cfg.cle];
+  if (etat0 && etat0.hote === host && etat0.bilan === d && etat0.profil === profil) return;
+  if (etat0 && etat0.api) { try { etat0.api.detruire(); } catch (e) { /* hôte déjà remplacé */ } }
+  host.textContent = '';
+  const ref = { hote: host, bilan: d, profil: profil, api: null };
+  _m3dBlocs[cfg.cle] = ref;
+  try {
+    const mod = await import('./mannequin3d/index.js?v=' + APP_BUILD);
+    if (_m3dBlocs[cfg.cle] !== ref) return;
+    mod.definirSeuils(POSTURE_THRESHOLDS);
+    ref.api = mod.monter(host, {
+      etat: d.mannequin3d || null,
+      sexeParDefaut: cfg.sexeDef(),
+      profil: profil,
+      mecanismes: _m3dMecanismesPermis(profil),
+      onChange: function (e) {
+        if (globalThis?._modeConsultation) return;
+        const cible = cfg.donnees();
+        if (!cible) return;
+        const avant = JSON.stringify(cible.mannequin3d || null);
+        cible.mannequin3d = e;
+        // la sauvegarde passe par un événement : afficher l'onglet ou générer un rapport n'atteint jamais l'écriture (#277)
+        if (JSON.stringify(e) !== avant && ref.api)
+          document.dispatchEvent(new CustomEvent('m3d-sauver', { detail: { flavor: cfg.flavor } }));
+      }
+    });
+  } catch (e) {
+    host.textContent = 'Mannequin 3D indisponible : ' + (e && e.message ? e.message : e) + ' — ';
+    const rel = document.createElement('button');
+    rel.type = 'button';
+    rel.textContent = 'Actualiser la page';
+    rel.style.cssText = 'border:1px solid #c9d1da;background:#fff;border-radius:14px;padding:3px 12px;cursor:pointer;';
+    rel.onclick = () => location.reload();
+    host.appendChild(rel);
+  }
+}
+function _m3dSexeDef(p) {
+  return p && p.civilite === 'Mme' ? 'femme' : 'homme';
+}
+function _m3dSportInit() {
+  return _m3dMonterBloc({
+    cle: 'sport',
+    canvasId: 'morpho-face',
+    hostId: 'm3d-sport',
+    titreSel: '.sport-block-title',
+    titreTexte: '🧍 Bilan Morphostatique — Mannequin 3D',
+    anciens: ['_morpho_face', '_morpho_face2', '_morpho_profilG', '_morpho_profilD'],
+    flavor: 'sport',
+    donnees: function () { if (typeof bilanData === 'undefined' || !bilanData) return null; return bilanData; },
+    profil: function () { return 'adulte'; },
+    sexeDef: function () { return _m3dSexeDef(currentPatient); }
+  });
+}
+function _m3dPodoInit() {
+  return _m3dMonterBloc({
+    cle: 'podo',
+    canvasId: 'podo-morpho-face',
+    hostId: 'm3d-podo',
+    titreSel: '.podo-block-title',
+    titreTexte: '🦴 Morphostatique — Mannequin 3D',
+    anciens: ['_podo_morpho_face', '_podo_morpho_face2', '_podo_morpho_profilG', '_podo_morpho_profilD'],
+    flavor: 'podopediatrie',
+    donnees: function () { return currentPatient ? (currentPatient.bilanDataPodopediatrie || (currentPatient.bilanDataPodopediatrie = {})) : null; },
+    profil: function () {
+      const per = currentPatient && currentPatient.bilanDataPodopediatrie && currentPatient.bilanDataPodopediatrie.periode;
+      return per === 'II' || per === 'III' || per === 'IV' ? per : 'IV';
+    },
+    sexeDef: function () { return _m3dSexeDef(currentPatient); }
+  });
 }
 
 function showPosturoSection(idx) {
@@ -31212,6 +31356,7 @@ function showSportBilanSection(idx) {
   //    initialisés. _baseSnapshot est posé asynchrone par initMorphoCanvas L6488
   //    → flag idempotent uniforme avec pieds-canvas. Préserve les dessins user au
   //    switch onglet, et garantit la ré-init au switch patient via clearBilanFields.
+  if(shownId === 'ssec-1') _m3dSportInit(); // #265 — mannequin 3D (module chargé à la demande)
   if(shownId === 'ssec-1') setTimeout(() => {
     // #83 — symétrie avec ssec-9 pieds : init + restore overlay des dessins
     // sauvegardés UNIQUEMENT à la (ré)initialisation. Sans restore ici, le
