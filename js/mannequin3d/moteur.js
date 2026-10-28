@@ -1,7 +1,7 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs, assemblage } from './parametres.js?v=v305';
+import { poseDepuisValeurs, assemblage } from './parametres.js?v=v306';
 
 // ?v= : le modèle 3D est dans /assets/ (cache sans limite de durée) ; l'URL change à chaque version
 // Modèles : adultes (homme, femme) et enfants par période de la podopédiatrie (II, III, IV), garçon et fille.
@@ -17,7 +17,7 @@ export function nomModele(sexe, profil) {
 }
 const CHEMIN = (nom) =>
   new URL(
-    '../../assets/mannequin/' + (MODELES.includes(nom) ? nom : 'homme') + '.glb.gz?v=v305',
+    '../../assets/mannequin/' + (MODELES.includes(nom) ? nom : 'homme') + '.glb.gz?v=v306',
     import.meta.url
   ).href;
 const cacheModeles = {};
@@ -72,10 +72,11 @@ export function ajouterMorphMandibule(scene, enfant = false) {
     cibles.push(new THREE.BufferAttribute(dx, 3), new THREE.BufferAttribute(dz, 3));
     g.morphAttributes.position = cibles;
     g.userData.mandibule = true;
-    m.updateMorphTargets();
-    m.morphTargetDictionary = m.morphTargetDictionary || {};
-    m.morphTargetDictionary.mandi_x = ix;
-    m.morphTargetDictionary.mandi_z = ix + 1;
+    // on COMPLÈTE la table existante (cyphose, lordose, genoux…) : updateMorphTargets() la réécrirait
+    const dico = Object.assign({}, m.morphTargetDictionary || {});
+    dico.mandi_x = ix;
+    dico.mandi_z = ix + 1;
+    m.morphTargetDictionary = dico;
     m.morphTargetInfluences = new Array(cibles.length).fill(0);
     fait = true;
   });

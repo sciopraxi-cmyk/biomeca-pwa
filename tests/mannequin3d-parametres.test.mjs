@@ -522,4 +522,16 @@ describe('profil des chaînes — curseurs ajoutés (bassin, mandibule)', () => 
     expect(m).not.toMatch(/\n\s+tete: \[\s*pt\('head'/);
     expect(m).toContain('yeux: 0x16a34a');
   });
+  it('la mandibule COMPLÈTE la table des déformations du modèle (cyphose, lordose, genoux) sans la réécrire', async () => {
+    const fs = await import('node:fs');
+    const m = fs.readFileSync(new URL('../js/mannequin3d/moteur.js', import.meta.url), 'utf8');
+    expect(m).not.toMatch(/\.updateMorphTargets\(\)/);
+    expect(m).toContain('Object.assign({}, m.morphTargetDictionary');
+    // chaque déformation du modèle est encore pilotée par un curseur
+    const morphs = new Set();
+    for (const c of CURSEURS) for (const o of c.ops(c.max || 1)) if (o.morph) morphs.add(o.morph);
+    for (const k of ['cyphose', 'lordose', 'fessiers', 'genou_flex_R', 'genou_valgus_L']) {
+      expect(morphs.has(k)).toBe(true);
+    }
+  });
 });
