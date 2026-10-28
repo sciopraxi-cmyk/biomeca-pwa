@@ -66,7 +66,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v301';
+export const BUILD = 'v302';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -359,13 +359,26 @@ lat('pied_valgus', 'pieds', 'Valgus / varus du pied', -15, 15, '°', ['varus', '
   { os: os('foot', c), axe: 'z', deg: v * cote(c) },
 ]);
 
-// Répartition du poids G/D (appuis) : donnée clinique pour le rapport et les mécanismes (EIAP) ; ne déforme pas le mannequin.
+// Latéralisation globale induite par la répartition du poids : degrés d'inclinaison du corps entier (depuis les chevilles)
+// par point de pourcentage d'écart ; le corps penche du côté le plus chargé (30 points → 7,5°).
+export const LATERALISATION_PAR_POINT = 0.25;
+// Répartition du poids G/D (appuis) : donnée clinique pour le rapport et les mécanismes (EIAP) ; incline tout le corps du côté chargé.
 // valeur = points de pourcentage de plus sur le côté indiqué (+10 → 60 % D / 40 % G).
 add(
-  C('poids_lr', 'pieds', 'Répartition du poids G/D', -30, 30, '%', ['G', 'D'], () => [], {
-    qual: [5, 10, 15, 25],
-    decrit: (x) => 'Répartition du poids : ' + (50 - x) + ' % G / ' + (50 + x) + ' % D',
-  })
+  C(
+    'poids_lr',
+    'pieds',
+    'Répartition du poids G/D',
+    -30,
+    30,
+    '%',
+    ['G', 'D'],
+    (v) => [{ glob: 'z', deg: v * LATERALISATION_PAR_POINT }],
+    {
+      qual: [5, 10, 15, 25],
+      decrit: (x) => 'Répartition du poids : ' + (50 - x) + ' % G / ' + (50 + x) + ' % D',
+    }
+  )
 );
 
 // Antériorisation / postériorisation GLOBALE : tout le corps au-dessus de l'articulation choisie bascule en bloc
@@ -571,7 +584,7 @@ export function poseDepuisValeurs(valeurs) {
     pos = {},
     morph = {},
     twist = { L: 0, R: 0 },
-    glob = { a: 0, k: 0, h: 0 };
+    glob = { a: 0, k: 0, h: 0, z: 0 };
   let bassin = [0, 0, 0, 1];
   const rotAdd = (nom, q) => {
     rot[nom] = qMul(q, rot[nom] || [0, 0, 0, 1]);
@@ -611,15 +624,16 @@ export const REPARTITION_RACHIS = [
   ['spine01', 0.08],
 ];
 export function assemblage(P) {
-  const { a, k, h } = P.glob;
+  const { a, k, h, z } = P.glob;
   const g = qAxe('x', a + k + h);
-  const root = qMul(g, P.bassin);
+  // latéralisation globale (z) : tout le corps penche en bloc de côté depuis les chevilles (rotation monde, en dernier)
+  const root = qMul(qAxe('z', z), qMul(g, P.bassin));
   const counters = {};
   for (const [n, f] of REPARTITION_RACHIS) counters[n] = qInv(qPow(P.bassin, f));
   for (const c of ['L', 'R']) {
     counters['upperleg01.' + c] = qMul(qInv(P.bassin), qAxe('x', -h));
     counters['lowerleg01.' + c] = qAxe('x', -k);
-    counters['foot.' + c] = qAxe('x', -a);
+    counters['foot.' + c] = qMul(qAxe('x', -a), qAxe('z', -z)); // pieds toujours à plat, malgré l'inclinaison
   }
   return { root, counters, global: g };
 }

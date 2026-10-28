@@ -1,12 +1,12 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs, assemblage } from './parametres.js?v=v301';
+import { poseDepuisValeurs, assemblage } from './parametres.js?v=v302';
 
 // ?v= : le modèle 3D est dans /assets/ (cache sans limite de durée) ; l'URL change à chaque version
 const CHEMIN = (sexe) =>
   new URL(
-    '../../assets/mannequin/' + (sexe === 'femme' ? 'femme' : 'homme') + '.glb.gz?v=v301',
+    '../../assets/mannequin/' + (sexe === 'femme' ? 'femme' : 'homme') + '.glb.gz?v=v302',
     import.meta.url
   ).href;
 const cacheModeles = {};
@@ -242,6 +242,14 @@ export async function creerMoteur(canvas, opts = {}) {
       si = Math.sin(rad);
     return new THREE.Vector3(p.x, c.y + dy * co - dz * si, c.z + dy * si + dz * co);
   }
+  // rotation d'angle (rad) autour de l'axe z passant par le point c (plan frontal x-y) : + = haut du corps vers la droite du patient
+  function tourneZ(p, c, rad) {
+    const dx = p.x - c.x,
+      dy = p.y - c.y,
+      co = Math.cos(rad),
+      si = Math.sin(rad);
+    return new THREE.Vector3(c.x + dx * co - dy * si, c.y + dx * si + dy * co, p.z);
+  }
   function epingler(os, cible) {
     const b = etat.bones[os];
     const delta = cible.clone().sub(monde(b));
@@ -275,6 +283,7 @@ export async function creerMoteur(canvas, opts = {}) {
     p0 = tourneX(p0, R.hancheC, rad(P.glob.h));
     p0 = tourneX(p0, R.genouC, rad(P.glob.k));
     p0 = tourneX(p0, R.chevilleC, rad(P.glob.a));
+    p0 = tourneZ(p0, R.chevilleC, rad(P.glob.z));
     root.position.copy(p0);
     etat.racine.updateMatrixWorld(true);
     // hanches épinglées : la rotation du bassin ne déplace pas les cuisses (seules les hanches sont recalées ; genoux et
@@ -283,6 +292,7 @@ export async function creerMoteur(canvas, opts = {}) {
     for (const c of ['L', 'R']) {
       let h = tourneX(R.hanche[c], R.genouC, rad(P.glob.k));
       h = tourneX(h, R.chevilleC, rad(P.glob.a));
+      h = tourneZ(h, R.chevilleC, rad(P.glob.z));
       epingler('upperleg01.' + c, h);
     }
     etat.racine.updateMatrixWorld(true);

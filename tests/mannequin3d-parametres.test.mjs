@@ -362,10 +362,9 @@ describe('tableaux types cumulables', () => {
 
 import { BUILD as BUILD_UI, decrire as decrireVal } from '../js/mannequin3d/parametres.js';
 describe('répartition du poids G/D et version affichée', () => {
-  it('le compte rendu indique la répartition ; le curseur ne déforme pas le mannequin', () => {
+  it('le compte rendu indique la répartition ; le curseur incline le corps entier du côté chargé', () => {
     expect(decrireVal({ poids_lr: 10 })).toEqual(['Répartition du poids : 40 % G / 60 % D']);
     expect(decrireVal({ poids_lr: -15 })).toEqual(['Répartition du poids : 65 % G / 35 % D']);
-    expect(poseDepuisValeurs({ poids_lr: 20 })).toEqual(poseDepuisValeurs({}));
   });
   it('la dictée comprend « poids sur la jambe droite »', async () => {
     const { interpreter } = await import('../js/mannequin3d/dictee.js');
@@ -397,5 +396,47 @@ describe('chargement des modules : jamais de mélange entre deux versions', () =
     const app = fs.readFileSync(new URL('../js/biomeca.js', import.meta.url), 'utf8');
     expect(app).not.toContain("import('./mannequin3d/index.js')");
     expect(app).toContain("import('./mannequin3d/index.js?v=' + APP_BUILD)");
+  });
+});
+
+import { assemblage, qMul, qInv, LATERALISATION_PAR_POINT } from '../js/mannequin3d/parametres.js';
+describe('répartition du poids G/D : latéralisation globale depuis les chevilles', () => {
+  const eq = (a, b) =>
+    a.every((x, i) => Math.abs(x - b[i]) < 1e-9) || a.every((x, i) => Math.abs(x + b[i]) < 1e-9);
+  it('le corps penche du côté le plus chargé : D (+) → rotation z positive (haut vers la droite du patient), G (−) → négative', () => {
+    expect(poseDepuisValeurs({ poids_lr: 20 }).glob.z).toBeCloseTo(
+      20 * LATERALISATION_PAR_POINT,
+      9
+    );
+    expect(poseDepuisValeurs({ poids_lr: -20 }).glob.z).toBeCloseTo(
+      -20 * LATERALISATION_PAR_POINT,
+      9
+    );
+    expect(poseDepuisValeurs({ poids_lr: 0 }).glob.z).toBe(0);
+    expect(poseDepuisValeurs({ poids_lr: 30 }).glob.z).toBeCloseTo(7.5, 9);
+  });
+  it('rotation du bassin intacte, jambes rigides et pieds à plat : rotation monde du pied = identité', () => {
+    for (const v of [
+      { poids_lr: 30 },
+      { poids_lr: -30, glob_chev: 4, bassin_bascule: 5, bassin_antev: 3 },
+    ]) {
+      const P = poseDepuisValeurs(v);
+      const A = assemblage(P);
+      for (const c of ['L', 'R']) {
+        const monde = qMul(
+          A.root,
+          qMul(
+            A.counters['upperleg01.' + c],
+            qMul(A.counters['lowerleg01.' + c], A.counters['foot.' + c])
+          )
+        );
+        expect(eq(monde, [0, 0, 0, 1]), v.poids_lr + ' / ' + c).toBe(true);
+      }
+    }
+  });
+  it('le curseur compte aussi les autres bascules globales (cumul avec l’antériorisation)', () => {
+    const P = poseDepuisValeurs({ poids_lr: 10, glob_chev: 5 });
+    expect(P.glob.a).toBe(5);
+    expect(P.glob.z).toBeCloseTo(2.5, 9);
   });
 });
