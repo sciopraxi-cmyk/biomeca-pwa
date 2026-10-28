@@ -43,7 +43,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
     )
   ).toBe(true);
   // version affichée et libellé du menu (une page ancienne servie par un cache ne les aurait pas)
-  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v304');
+  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v306');
   await expect(page.locator('.m3d select.inp').first().locator('option').first()).toHaveText(
     '— Tableau type (cumulable) —'
   );
@@ -128,7 +128,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   const a1 = await ang();
   expect(Math.abs(a1.bassin - a0.bassin)).toBeGreaterThan(6);
   expect(Math.abs(a1.epaules - a0.epaules)).toBeLessThan(1.5);
-  expect(Math.abs(a1.tete - a0.tete)).toBeLessThan(1.5);
+  expect(Math.abs(a1.yeux - a0.yeux)).toBeLessThan(1.5);
   await page.locator('summary', { hasText: 'Global' }).click();
   await setv('Antériorisation globale depuis les chevilles', '6');
   await page.waitForTimeout(300);

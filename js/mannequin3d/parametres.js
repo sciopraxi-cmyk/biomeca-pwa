@@ -57,7 +57,7 @@ const sd = (c) => (c === 'G' ? 'L' : 'R');
 // ─── Curseurs ─────────────────────────────────────────────────────────────────────────
 // ops(v) → opérations : {os, axe, deg} rotation d'un os ; {os, pos:[dx,dy,dz]} translation (m) ;
 // {bassin:{axe,deg}} rotation du bassin autour des hanches (le haut du corps et les jambes ne suivent pas) ;
-// {morph, w} déformation locale (blend shape, poids = valeur / unité) ; {twist, cote, deg} torsion de l'avant-bras.
+// {bassinz} translation sagittale du bassin seul (m) ; {morph, w} déformation locale (blend shape, poids = valeur / unité) ; {twist, cote, deg} torsion de l'avant-bras.
 // fin = libellés des extrémités (valeur négative → positive). qual = amplitudes léger/modéré/marqué/sévère (dictée).
 function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   return Object.assign(
@@ -66,7 +66,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v304';
+export const BUILD = 'v306';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -129,6 +129,34 @@ add(
   C('tete_transl', 'tete', 'Translation latérale de la tête', -4, 4, 'cm', ['G', 'D'], (v) => [
     { os: 'neck02', pos: [-v / 100, 0, 0] },
   ])
+);
+// Mandibule : déformation locale de la partie basse du visage (blend shape créé au chargement du modèle, 1 cm par
+// unité de poids) ; entrée haute « mandibulaire » du profil du patient. x > 0 = côté gauche du patient.
+add(
+  C(
+    'mandi_transl',
+    'tete',
+    'Décalage latéral de la mandibule',
+    -15,
+    15,
+    'mm',
+    ['G', 'D'],
+    (v) => [{ morph: 'mandi_x', w: -v / 10 }],
+    { qual: [3, 6, 10, 15] }
+  )
+);
+add(
+  C(
+    'mandi_antep',
+    'tete',
+    'Recul / avancée de la mandibule',
+    -15,
+    15,
+    'mm',
+    ['recul', 'avancée'],
+    (v) => [{ morph: 'mandi_z', w: v / 10 }],
+    { qual: [3, 6, 10, 15] }
+  )
 );
 
 // Ceinture scapulaire : les deux clavicules tournent ensemble ; la tête et le tronc ne bougent pas
@@ -291,6 +319,20 @@ add(
       { morph: 'lordose', w: v > 0 ? v / 6 : v / 12 },
     ],
     { qual: [2, 3, 5, 6] }
+  )
+);
+// avancement / recul du bassin (translation sagittale du bassin SEUL : thorax et pieds ne bougent pas ; chaîne AP/AM)
+add(
+  C(
+    'bassin_avance',
+    'bassin',
+    'Avancement / recul du bassin',
+    -6,
+    6,
+    'cm',
+    ['recul', 'avancement'],
+    (v) => [{ bassinz: v / 100 }],
+    { qual: [1, 2, 4, 6] }
   )
 );
 add(
@@ -585,7 +627,8 @@ export function poseDepuisValeurs(valeurs) {
     morph = {},
     twist = { L: 0, R: 0 },
     glob = { a: 0, k: 0, h: 0, z: 0 };
-  let bassin = [0, 0, 0, 1];
+  let bassin = [0, 0, 0, 1],
+    bassinZ = 0;
   const rotAdd = (nom, q) => {
     rot[nom] = qMul(q, rot[nom] || [0, 0, 0, 1]);
   };
@@ -595,6 +638,7 @@ export function poseDepuisValeurs(valeurs) {
     if (!v || !isFinite(v)) continue;
     for (const o of c.ops(v)) {
       if (o.bassin) bassin = qMul(qAxe(o.bassin.axe, o.bassin.deg), bassin);
+      else if (o.bassinz !== undefined) bassinZ += o.bassinz;
       else if (o.glob) glob[o.glob] += o.deg;
       else if (o.morph) morph[o.morph] = (morph[o.morph] || 0) + o.w;
       else if (o.twist) twist[sd(o.cote)] += o.deg;
@@ -606,7 +650,7 @@ export function poseDepuisValeurs(valeurs) {
       } else rotAdd(o.os, qAxe(o.axe, o.deg));
     }
   }
-  return { rot, pos, bassin, morph, twist, glob };
+  return { rot, pos, bassin, morph, twist, glob, bassinZ };
 }
 
 // Assemblage des rotations du squelette (fonction pure, testée ; le moteur ne fait que l'appliquer).

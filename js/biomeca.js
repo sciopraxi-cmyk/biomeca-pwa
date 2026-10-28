@@ -5047,7 +5047,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v304';
+const APP_BUILD = 'v306';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
