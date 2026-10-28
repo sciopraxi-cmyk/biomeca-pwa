@@ -63,6 +63,67 @@ const fmt = (id, v) => {
 };
 const nettoyerTitre = (t) => t.replace(/_/g, ' ');
 
+// ── Titre d'une règle automatique, recalculé avec les seuils RÉELLEMENT appliqués (seuil du cabinet s'il existe).
+const SYM = { '>=': '≥', '>': '>', '<=': '≥', '<': '>', 'abs>=': '≥', 'abs<': '<' };
+function idCurseur(t) {
+  return t.id || t.base + '_D';
+}
+function texteGroupe(termes) {
+  const c = PAR_ID[idCurseur(termes[0])];
+  if (!c) return idCurseur(termes[0]);
+  const lab = c.court || c.label;
+  const parts = termes.map((t) => {
+    const mag = Math.abs(seuilTerme(t));
+    const neg = t.op === '<=' || t.op === '<';
+    const abs = t.op.startsWith('abs');
+    const mot = abs ? 'écart' : (neg ? c.fin[0] : c.fin[1]) || '';
+    return { mot, txt: SYM[t.op] + ' ' + mag };
+  });
+  const mots = [...new Set(parts.map((x) => x.mot).filter(Boolean))];
+  const unite = c.unite ? (c.unite === '°' ? '°' : ' ' + c.unite) : '';
+  return (
+    lab +
+    ' : ' +
+    (mots.length ? mots.join('/') + ' ' : '') +
+    parts.map((x) => x.txt).join(' et ') +
+    unite
+  );
+}
+function groupes(termes) {
+  const m = new Map();
+  for (const t of termes) {
+    const k = idCurseur(t);
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(t);
+  }
+  return [...m.values()].map(texteGroupe);
+}
+export function titreRegle(r) {
+  const c = r.cond;
+  if (!c) return nettoyerTitre(r.titre);
+  const bloc = [];
+  if (c.lat) bloc.push(groupes(c.lat).join(' + '));
+  if (c.sym)
+    bloc.push(
+      c.sym
+        .map((t) => {
+          const k = PAR_ID[t.base + '_D'];
+          return (
+            (k ? k.court : t.base) +
+            ' : asymétrie D/G ≥ ' +
+            seuilTerme(t) +
+            (k && k.unite ? k.unite : '')
+          );
+        })
+        .join(' + ')
+    );
+  if (c.glob) bloc.push(groupes(c.glob).join(' + '));
+  if (c.anyGlob) bloc.push('(' + groupes(c.anyGlob).join(' OU ') + ')');
+  if (c.any) bloc.push('(' + groupes(c.any).join(' OU ') + ')');
+  if (c.bascule === 'ipsi') bloc.push('bascule du bassin ≥ 3° du même côté');
+  return bloc.filter(Boolean).join(' + ');
+}
+
 export function evaluer(valeurs) {
   const res = [];
   for (const r of REGLES) {
@@ -131,6 +192,11 @@ export function evaluer(valeurs) {
       const hit = c.anyGlob.filter((t) => ok(val(valeurs, t.id), t.op, seuilTerme(t)));
       if (!hit.length) valide = false;
       else for (const t of hit) decl.push(fmt(t.id, val(valeurs, t.id)));
+    }
+    if (valide && c.coteDe) {
+      // le côté retenu est celui du patient le plus chargé (valeur > 0 : droit)
+      const v = val(valeurs, c.coteDe);
+      cotes = [v > 0 ? 'D' : 'G'];
     }
     if (!valide) continue;
     res.push({ regle: r, cotes, declencheurs: [...new Set(decl)], combinee: COMBINEES.has(r.id) });
@@ -222,7 +288,7 @@ export function htmlHypothese(h, { ouvert = false, coche = false, retenue = fals
     (srcs || 'aucune (consensus clinique)') +
     '</div></div>';
   const titre =
-    '<b>' + esc(r.id) + '</b> · ' + esc(nettoyerTitre(r.titre)) + esc(libelleCotes(h)) + badges;
+    '<b>' + esc(r.id) + '</b> · ' + esc(titreRegle(h.regle)) + esc(libelleCotes(h)) + badges;
   if (ouvert)
     return (
       '<div style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;margin:6px 0;break-inside:avoid">' +

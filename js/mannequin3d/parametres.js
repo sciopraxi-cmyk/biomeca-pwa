@@ -65,6 +65,8 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
     extra
   );
 }
+// Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
+export const BUILD = 'v299';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -357,6 +359,15 @@ lat('pied_valgus', 'pieds', 'Valgus / varus du pied', -15, 15, '°', ['varus', '
   { os: os('foot', c), axe: 'z', deg: v * cote(c) },
 ]);
 
+// Répartition du poids G/D (appuis) : donnée clinique pour le rapport et les mécanismes (EIAP) ; ne déforme pas le mannequin.
+// valeur = points de pourcentage de plus sur le côté indiqué (+10 → 60 % D / 40 % G).
+add(
+  C('poids_lr', 'pieds', 'Répartition du poids G/D', -30, 30, '%', ['G', 'D'], () => [], {
+    qual: [5, 10, 15, 25],
+    decrit: (x) => 'Répartition du poids : ' + (50 - x) + ' % G / ' + (50 + x) + ' % D',
+  })
+);
+
 // Antériorisation / postériorisation GLOBALE : tout le corps au-dessus de l'articulation choisie bascule en bloc
 // (aucune cassure au niveau du bassin) ; les segments situés en dessous restent fixes, les pieds restent à plat.
 const GLOBAL_FIN = ['postériorisation', 'antériorisation'];
@@ -631,6 +642,10 @@ export function decrire(valeurs) {
   for (const c of CURSEURS) {
     const x = Number(valeurs && valeurs[c.id]);
     if (!x || !isFinite(x)) continue;
+    if (c.decrit) {
+      lignes.push(c.decrit(x));
+      continue;
+    }
     const mot = x < 0 ? c.fin[0] : c.fin[1];
     lignes.push(c.label + ' : ' + (mot ? mot + ' ' : '') + Math.abs(x) + ' ' + c.unite);
   }

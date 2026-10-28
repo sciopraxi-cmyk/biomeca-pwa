@@ -359,3 +359,23 @@ describe('tableaux types cumulables', () => {
     expect(v).toEqual({ tete_incl: 6 });
   });
 });
+
+import { BUILD as BUILD_UI, decrire as decrireVal } from '../js/mannequin3d/parametres.js';
+describe('répartition du poids G/D et version affichée', () => {
+  it('le compte rendu indique la répartition ; le curseur ne déforme pas le mannequin', () => {
+    expect(decrireVal({ poids_lr: 10 })).toEqual(['Répartition du poids : 40 % G / 60 % D']);
+    expect(decrireVal({ poids_lr: -15 })).toEqual(['Répartition du poids : 65 % G / 35 % D']);
+    expect(poseDepuisValeurs({ poids_lr: 20 })).toEqual(poseDepuisValeurs({}));
+  });
+  it('la dictée comprend « poids sur la jambe droite »', async () => {
+    const { interpreter } = await import('../js/mannequin3d/dictee.js');
+    const r = interpreter('poids du corps sur la jambe droite modéré');
+    expect(r.propositions.map((p) => p.id)).toContain('poids_lr');
+    expect(r.propositions.find((p) => p.id === 'poids_lr').valeur).toBeGreaterThan(0);
+  });
+  it('la version affichée (BUILD) suit la version du service worker', async () => {
+    const fs = await import('node:fs');
+    const sw = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+    expect(sw).toContain("CACHE_VERSION = 'biomeca-" + BUILD_UI + "'");
+  });
+});

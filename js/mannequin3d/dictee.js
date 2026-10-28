@@ -14,6 +14,7 @@ export const EXEMPLES = [
   'épaule droite plus haute, ceinture scapulaire inclinée à gauche',
   'jambe droite plus courte de 12 mm',
   'antériorisation globale à partir des chevilles, tête en avant de 5 cm',
+  'poids du corps sur la jambe droite, modéré',
 ];
 
 const norm = (t) =>
@@ -218,6 +219,12 @@ const CONCEPTS = [
     ),
     cote: 'signe',
     special: 'bascule',
+  },
+  {
+    id: 'poids_lr',
+    all: A(/poids|appui|charge/, /jambe|pied|cote|droit|droite|gauche|repartition|asymetri/),
+    cote: 'signe',
+    special: 'pos',
   },
   // ── rachis
   {

@@ -4,6 +4,7 @@ import {
   GROUPES,
   TABLEAUX,
   appliquerTableau,
+  BUILD,
   PAR_ID,
   decrire,
   nettoyerValeurs,
@@ -312,7 +313,22 @@ export function monter(conteneur, { etat, onChange, sexeParDefaut = 'homme' } = 
   );
   racine.append(el('div', { style: 'flex:1 1 440px;min-width:300px' }, dic, panel));
   // compte rendu et mécanismes : sur toute la largeur, sous le mannequin et les curseurs
-  racine.append(el('div', { style: 'flex:1 1 100%;min-width:0' }, cr, hyp));
+  racine.append(
+    el(
+      'div',
+      { style: 'flex:1 1 100%;min-width:0' },
+      cr,
+      hyp,
+      el(
+        'div',
+        {
+          class: 'm3d-build',
+          style: 'font-size:10px;color:#9ca3af;text-align:right;margin-top:4px',
+        },
+        'Mannequin 3D ' + BUILD
+      )
+    )
+  );
   conteneur.append(racine);
 
   function majLigne(id) {

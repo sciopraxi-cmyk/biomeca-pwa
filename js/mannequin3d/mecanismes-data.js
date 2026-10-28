@@ -4,7 +4,7 @@
 export const REGLES = [
   {
     id: 'R01',
-    titre: 'pied_valgus (pronation arrière-pied) ≥ 5° ou pied plat marqué',
+    titre: 'Valgus / varus du pied : valgus ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -36,7 +36,7 @@ export const REGLES = [
   },
   {
     id: 'R02',
-    titre: 'pied_varus (supination arrière-pied) ≥ 5° ou pied creux marqué',
+    titre: 'Valgus / varus du pied : varus ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -106,7 +106,7 @@ export const REGLES = [
   },
   {
     id: 'R05',
-    titre: 'ouverture_pas (rotation pied) > +15° (RE)',
+    titre: 'Ouverture du pas : en dehors > 15°',
     auto: true,
     cond: {
       lat: [
@@ -130,7 +130,7 @@ export const REGLES = [
   },
   {
     id: 'R06',
-    titre: 'ouverture_pas < −5° (pied adduit)',
+    titre: 'Ouverture du pas : en dedans > 5°',
     auto: true,
     cond: {
       lat: [
@@ -154,7 +154,7 @@ export const REGLES = [
   },
   {
     id: 'R07',
-    titre: 'rot_tibia interne ≥ 5°',
+    titre: 'Rotation du tibia : RI ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -178,7 +178,7 @@ export const REGLES = [
   },
   {
     id: 'R08',
-    titre: 'rot_tibia externe ≥ 5°',
+    titre: 'Rotation du tibia : RE ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -202,7 +202,7 @@ export const REGLES = [
   },
   {
     id: 'R09',
-    titre: 'genou_valgus (dynamique) ≥ 5°',
+    titre: 'Valgus / varus du genou : valgus ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -234,7 +234,7 @@ export const REGLES = [
   },
   {
     id: 'R10',
-    titre: 'genou_varus ≥ 5°',
+    titre: 'Valgus / varus du genou : varus ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -264,7 +264,7 @@ export const REGLES = [
   },
   {
     id: 'R11',
-    titre: 'genou_recurvatum ≥ 5°',
+    titre: 'Flessum / recurvatum du genou : recurvatum ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -294,7 +294,7 @@ export const REGLES = [
   },
   {
     id: 'R12',
-    titre: 'genou_flessum ≥ 5°',
+    titre: 'Flessum / recurvatum du genou : flessum ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -319,7 +319,7 @@ export const REGLES = [
   },
   {
     id: 'R13',
-    titre: 'ilmi (longueur) ≥ 10 mm',
+    titre: 'Inégalité de longueur des jambes : écart ≥ 10 et < 20 mm',
     auto: true,
     cond: {
       glob: [
@@ -361,7 +361,7 @@ export const REGLES = [
   },
   {
     id: 'R14',
-    titre: 'ilmi ≥ 20 mm',
+    titre: 'Inégalité de longueur des jambes : écart ≥ 20 mm',
     auto: true,
     cond: {
       glob: [
@@ -386,7 +386,7 @@ export const REGLES = [
   },
   {
     id: 'R15',
-    titre: 'bascule_bassin (côté bas) ≥ 3°',
+    titre: 'Bascule du bassin (côté bas) : écart ≥ 3°',
     auto: true,
     cond: {
       glob: [
@@ -411,7 +411,7 @@ export const REGLES = [
   },
   {
     id: 'R16',
-    titre: 'rotation_bassin ≥ 5°',
+    titre: 'Rotation du bassin : écart ≥ 5°',
     auto: true,
     cond: {
       glob: [
@@ -435,7 +435,7 @@ export const REGLES = [
   },
   {
     id: 'R17',
-    titre: 'antéversion_bassin ≥ 10° (ou hyperlordose lombaire ≥ seuil)',
+    titre: 'Antéversion / rétroversion du bassin : antéversion ≥ 3°',
     auto: true,
     cond: {
       glob: [
@@ -461,7 +461,7 @@ export const REGLES = [
   },
   {
     id: 'R18',
-    titre: 'retroversion_bassin ≥ 5°',
+    titre: 'Antéversion / rétroversion du bassin : rétroversion ≥ 5°',
     auto: true,
     cond: {
       glob: [
@@ -486,7 +486,7 @@ export const REGLES = [
   },
   {
     id: 'R19',
-    titre: 'hyperlordose_lombaire ≥ seuil',
+    titre: 'Hyperlordose lombaire : lordose ≥ 15°',
     auto: true,
     cond: {
       glob: [
@@ -511,7 +511,7 @@ export const REGLES = [
   },
   {
     id: 'R20',
-    titre: 'hypercyphose_dorsale ≥ seuil',
+    titre: 'Hypercyphose dorsale : cyphose ≥ 20°',
     auto: true,
     cond: {
       glob: [
@@ -536,7 +536,7 @@ export const REGLES = [
   },
   {
     id: 'R21',
-    titre: 'antériorisation_thorax',
+    titre: 'Antériorisation du thorax : avant ≥ 2 cm',
     auto: true,
     cond: {
       glob: [
@@ -560,7 +560,7 @@ export const REGLES = [
   },
   {
     id: 'R22',
-    titre: 'tete_antepulsion ≥ seuil (CVA < 50° ou distance tragus-verticale ↑)',
+    titre: 'Antépulsion de la tête : antépulsion ≥ 3 cm',
     auto: true,
     cond: {
       glob: [
@@ -588,7 +588,7 @@ export const REGLES = [
   },
   {
     id: 'R23',
-    titre: 'tete_inclinaison ≥ 3°',
+    titre: 'Inclinaison de la tête : écart ≥ 3°',
     auto: true,
     cond: {
       glob: [
@@ -613,7 +613,7 @@ export const REGLES = [
   },
   {
     id: 'R24',
-    titre: 'tete_rotation ≥ 5°',
+    titre: 'Rotation de la tête : écart ≥ 5°',
     auto: true,
     cond: {
       glob: [
@@ -638,7 +638,7 @@ export const REGLES = [
   },
   {
     id: 'R25',
-    titre: 'tete_flexion (crâne) ≥ seuil',
+    titre: 'Flexion / extension : écart ≥ 8°',
     auto: true,
     cond: {
       glob: [
@@ -662,7 +662,7 @@ export const REGLES = [
   },
   {
     id: 'R26',
-    titre: 'epaule_elevation (asymétrique) ≥ 1 cm',
+    titre: "Élévation de l'épaule : asymétrie D/G ≥ 3°",
     auto: true,
     cond: {
       sym: [
@@ -692,7 +692,7 @@ export const REGLES = [
   },
   {
     id: 'R27',
-    titre: 'epaule_antepulsion ≥ seuil (protraction)',
+    titre: "Antépulsion de l'épaule : antépulsion ≥ 8°",
     auto: true,
     cond: {
       lat: [
@@ -716,7 +716,7 @@ export const REGLES = [
   },
   {
     id: 'R28',
-    titre: 'ceinture_inclinaison ≥ 3°',
+    titre: 'Inclinaison de la ceinture scapulaire : écart ≥ 3°',
     auto: true,
     cond: {
       glob: [
@@ -741,7 +741,7 @@ export const REGLES = [
   },
   {
     id: 'R29',
-    titre: 'ceinture_rotation ≥ 5°',
+    titre: 'Rotation de la ceinture scapulaire : écart ≥ 5°',
     auto: true,
     cond: {
       glob: [
@@ -765,7 +765,7 @@ export const REGLES = [
   },
   {
     id: 'R30',
-    titre: 'bras_abduction ≥ seuil (asymétrie)',
+    titre: 'Abduction du bras : asymétrie D/G ≥ 8°',
     auto: true,
     cond: {
       sym: [
@@ -788,7 +788,7 @@ export const REGLES = [
   },
   {
     id: 'R31',
-    titre: 'bras_rotation interne ≥ seuil',
+    titre: 'Rotation du bras : RI ≥ 10°',
     auto: true,
     cond: {
       lat: [
@@ -812,7 +812,7 @@ export const REGLES = [
   },
   {
     id: 'R32',
-    titre: 'coude flexion asymétrique / pronation_supination avant-bras',
+    titre: 'Flexion du coude : asymétrie D/G ≥ 15°',
     auto: true,
     cond: {
       sym: [
@@ -835,7 +835,7 @@ export const REGLES = [
   },
   {
     id: 'R33',
-    titre: 'inclinaison_tronc ≥ 3°',
+    titre: 'Inclinaison du tronc : écart ≥ 3°',
     auto: true,
     cond: {
       glob: [
@@ -860,7 +860,7 @@ export const REGLES = [
   },
   {
     id: 'R34',
-    titre: 'rotation_tronc ≥ 5°',
+    titre: 'Rotation du tronc : écart ≥ 5°',
     auto: true,
     cond: {
       glob: [
@@ -884,7 +884,8 @@ export const REGLES = [
   },
   {
     id: 'R35',
-    titre: 'croisé_inférieur (antéversion + hyperlordose + abdos/fessiers faibles)',
+    titre:
+      'Antéversion / rétroversion du bassin : antéversion ≥ 3° + Hyperlordose lombaire : lordose ≥ 10°',
     auto: true,
     cond: {
       glob: [
@@ -914,7 +915,8 @@ export const REGLES = [
   },
   {
     id: 'R36',
-    titre: 'croisé_supérieur (tête avancée + hypercyphose + protraction + élévation épaules)',
+    titre:
+      "Antépulsion de la tête : antépulsion ≥ 3 cm + Hypercyphose dorsale : cyphose ≥ 15° + (Antépulsion de l'épaule : antépulsion ≥ 5°)",
     auto: true,
     cond: {
       glob: [
@@ -950,7 +952,8 @@ export const REGLES = [
   },
   {
     id: 'R37',
-    titre: 'pied_valgus + genou_valgus + bassin bascule ipsilatérale',
+    titre:
+      'Valgus / varus du pied : valgus ≥ 5° + Valgus / varus du genou : valgus ≥ 5° + bascule du bassin ≥ 3° du même côté',
     auto: true,
     cond: {
       lat: [
@@ -982,7 +985,7 @@ export const REGLES = [
   },
   {
     id: 'R38',
-    titre: 'pied_varus + genou_varus + abduction cuisse',
+    titre: 'Valgus / varus du pied : varus ≥ 5° + Valgus / varus du genou : varus ≥ 5°',
     auto: true,
     cond: {
       lat: [
@@ -1013,7 +1016,7 @@ export const REGLES = [
   },
   {
     id: 'R39',
-    titre: 'abduction_cuisse ≥ seuil (asymétrique)',
+    titre: 'Abduction de la cuisse : asymétrie D/G ≥ 5°',
     auto: true,
     cond: {
       sym: [
@@ -1036,7 +1039,7 @@ export const REGLES = [
   },
   {
     id: 'R40',
-    titre: 'rotation_cuisse interne ≥ 10°',
+    titre: 'Rotation de la cuisse : RI ≥ 10°',
     auto: true,
     cond: {
       lat: [
@@ -1060,7 +1063,7 @@ export const REGLES = [
   },
   {
     id: 'R41',
-    titre: 'rotation_cuisse externe ≥ 10°',
+    titre: 'Rotation de la cuisse : RE ≥ 10°',
     auto: true,
     cond: {
       lat: [
@@ -1100,7 +1103,8 @@ export const REGLES = [
   },
   {
     id: 'R43',
-    titre: 'pied_valgus + bassin antéversé + tronc lourd',
+    titre:
+      'Valgus / varus du pied : valgus ≥ 5° + Antéversion / rétroversion du bassin : antéversion ≥ 3°',
     auto: true,
     cond: {
       lat: [
@@ -1216,93 +1220,7 @@ export const REGLES = [
   {
     id: 'R49',
     titre:
-      'effondrement du pied (pied_valgus ≥ 5°) + valgus du genou (≥ 5°) + antéversion du bassin (≥ 3°)',
-    auto: true,
-    cond: {
-      lat: [
-        {
-          base: 'pied_valgus',
-          op: '>=',
-          v: 5,
-          s: 'dos.calcaneen',
-        },
-        {
-          base: 'genou_valgus',
-          op: '>=',
-          v: 5,
-          s: 'face.valgumVarum',
-        },
-      ],
-      glob: [
-        {
-          id: 'bassin_antev',
-          op: '>=',
-          v: 3,
-          s: 'neutralite.bassin',
-        },
-      ],
-    },
-    asc: 'Effondrement de la voûte, éversion du calcanéus → RI du tibia → valgus du genou',
-    desc: "Antéversion du bassin, charge reportée sur l'avant-pied",
-    patho: [
-      "Épine irritative d'appui plantaire (EIAP) : inflammation « inconsciente » de la plaque fibro-cartilagineuse proche des os sésamoïdes de la tête du 1er métatarsien",
-    ],
-    musclesH: [],
-    musclesI: [],
-    tests: [
-      'Palpation de la zone sésamoïdienne sous la tête du 1er métatarsien ; analyse des appuis plantaires (à compléter par le praticien)',
-    ],
-    preuve:
-      'CC (expertise clinique du praticien, J. Pozo ; aucune source bibliographique vérifiée)',
-    niveau: 'CC',
-    niveaux: ['CC'],
-    sources: [],
-  },
-  {
-    id: 'R50',
-    titre:
-      "antériorisation globale (depuis les chevilles, les genoux ou les hanches ≥ 3°) ; également : poids porté d'un seul côté (pas de curseur dédié, à constater à l'examen)",
-    auto: true,
-    cond: {
-      anyGlob: [
-        {
-          id: 'glob_chev',
-          op: '>=',
-          v: 3,
-          s: 'neutralite.anteriorisation',
-        },
-        {
-          id: 'glob_gen',
-          op: '>=',
-          v: 3,
-          s: 'neutralite.anteriorisation',
-        },
-        {
-          id: 'glob_bassin',
-          op: '>=',
-          v: 3,
-          s: 'neutralite.anteriorisation',
-        },
-      ],
-    },
-    asc: "Report du poids du corps sur l'avant-pied",
-    desc: "Corps en bloc vers l'avant",
-    patho: ["Épine irritative d'appui plantaire (EIAP) sous la tête du 1er métatarsien"],
-    musclesH: [],
-    musclesI: [],
-    tests: [
-      'Palpation de la zone sésamoïdienne ; analyse des appuis plantaires et de leur répartition droite/gauche (à compléter par le praticien)',
-    ],
-    preuve:
-      'CC (expertise clinique du praticien, J. Pozo ; aucune source bibliographique vérifiée)',
-    niveau: 'CC',
-    niveaux: ['CC'],
-    sources: [],
-  },
-  {
-    id: 'R51',
-    titre:
-      'effondrement du pied (pied_valgus ≥ 5°) + valgus du genou (≥ 5°) + rotation interne de la cuisse (≥ 5°) + antéversion du bassin (≥ 3°)',
+      'Valgus / varus du pied : valgus ≥ 5° + Valgus / varus du genou : valgus ≥ 5° + Rotation de la cuisse : RI ≥ 5° + Antéversion / rétroversion du bassin : antéversion ≥ 3°',
     auto: true,
     cond: {
       lat: [
@@ -1333,16 +1251,103 @@ export const REGLES = [
         },
       ],
     },
-    asc: "Pied effondré, RI du tibia et du fémur → relâchement du fascia thoraco-lombaire : moindre transmission d'énergie entre membre inférieur et membre supérieur",
-    desc: 'Excès de contraction compensatoire des érecteurs du rachis (muscles phasiques, peu endurants)',
-    patho: ['Lombalgie', 'douleurs rachidiennes'],
+    asc: 'Effondrement de la voûte plantaire → valgus du genou → rotation interne du fémur ; antéversion du bassin',
+    desc: "Report de la charge sur l'avant-pied ; relâchement du fascia thoraco-lombaire, donc moindre transmission d'énergie entre le membre inférieur et le membre supérieur ; excès de contraction des érecteurs du rachis (muscles phasiques, peu endurants)",
+    patho: [
+      "Épine irritative d'appui plantaire (EIAP : inflammation « inconsciente » de la plaque fibro-cartilagineuse proche des os sésamoïdes de la tête du 1er métatarsien)",
+      'syndrome de compression de la bandelette ilio-tibiale',
+      'lombalgie',
+      'douleurs rachidiennes',
+    ],
     musclesH: ['érecteurs du rachis (muscles phasiques, peu endurants)'],
     musclesI: [],
     tests: [
-      'Palpation et endurance des érecteurs du rachis ; état du fascia thoraco-lombaire (à compléter par le praticien)',
+      'EIAP : palpation de la zone sésamoïdienne',
+      'analyse des appuis plantaires sur podoscope et/ou plateforme baropodométrique',
+      'tests sur tapis mousse ; érecteurs du rachis : test visuel et palpatoire (contraction musculaire) ; bandelette ilio-tibiale : à compléter par le praticien',
     ],
-    preuve:
-      'CC (expertise clinique du praticien, J. Pozo ; aucune source bibliographique vérifiée)',
+    preuve: 'CC (expertise SCIOPRAXI ; aucune source bibliographique vérifiée)',
+    niveau: 'CC',
+    niveaux: ['CC'],
+    sources: [],
+  },
+  {
+    id: 'R50',
+    titre:
+      '(Antériorisation globale depuis les chevilles : antériorisation ≥ 3° OU Antériorisation globale depuis les genoux : antériorisation ≥ 3° OU Antériorisation globale depuis le bassin (hanches) : antériorisation ≥ 3° OU Antériorisation du thorax : avant ≥ 2 cm)',
+    auto: true,
+    cond: {
+      anyGlob: [
+        {
+          id: 'glob_chev',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.anteriorisation',
+        },
+        {
+          id: 'glob_gen',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.anteriorisation',
+        },
+        {
+          id: 'glob_bassin',
+          op: '>=',
+          v: 3,
+          s: 'neutralite.anteriorisation',
+        },
+        {
+          id: 'tronc_antero',
+          op: '>=',
+          v: 2,
+          s: 'neutralite.anteriorisation',
+        },
+      ],
+    },
+    asc: "Report du poids du corps sur l'avant-pied",
+    desc: "Corps en bloc (globale) ou haut du corps seul (régionale) porté vers l'avant",
+    patho: [
+      "Épine irritative d'appui plantaire (EIAP) sous la tête du 1er métatarsien",
+      'tendinopathies achilléennes',
+      'fasciopathies plantaires',
+    ],
+    musclesH: [],
+    musclesI: [],
+    tests: [
+      'EIAP : palpation de la zone sésamoïdienne',
+      'analyse des appuis plantaires sur podoscope et/ou plateforme baropodométrique',
+      "tests sur tapis mousse ; tendon d'Achille et fascia plantaire : à compléter par le praticien",
+    ],
+    preuve: 'CC (expertise SCIOPRAXI ; aucune source bibliographique vérifiée)',
+    niveau: 'CC',
+    niveaux: ['CC'],
+    sources: [],
+  },
+  {
+    id: 'R51',
+    titre: 'Répartition du poids G/D : écart ≥ 10 %',
+    auto: true,
+    cond: {
+      glob: [
+        {
+          id: 'poids_lr',
+          op: 'abs>=',
+          v: 10,
+        },
+      ],
+      coteDe: 'poids_lr',
+    },
+    asc: "Surcharge d'appui du côté le plus chargé",
+    desc: '—',
+    patho: ["Épine irritative d'appui plantaire (EIAP) du côté le plus chargé"],
+    musclesH: [],
+    musclesI: [],
+    tests: [
+      'Palpation de la zone sésamoïdienne',
+      'analyse des appuis plantaires sur podoscope et/ou plateforme baropodométrique',
+      'tests sur tapis mousse',
+    ],
+    preuve: 'CC (expertise SCIOPRAXI ; aucune source bibliographique vérifiée)',
     niveau: 'CC',
     niveaux: ['CC'],
     sources: [],

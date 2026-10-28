@@ -64,9 +64,9 @@ COND = {
  'R39': {'sym': [{'base': 'cuisse_abd', 'v': 5}]},
  'R40': {'lat': [Lat('cuisse_rot', '<=', -10)]},
  'R41': {'lat': [Lat('cuisse_rot', '>=', 10)]},
- 'R49': {'lat': [Lat('pied_valgus', '>=', 5, 'dos.calcaneen'), Lat('genou_valgus', '>=', 5, 'face.valgumVarum')], 'glob': [Gl('bassin_antev', '>=', 3, 'neutralite.bassin')]},
- 'R50': {'anyGlob': [Gl('glob_chev', '>=', 3, 'neutralite.anteriorisation'), Gl('glob_gen', '>=', 3, 'neutralite.anteriorisation'), Gl('glob_bassin', '>=', 3, 'neutralite.anteriorisation')]},
- 'R51': {'lat': [Lat('pied_valgus', '>=', 5, 'dos.calcaneen'), Lat('genou_valgus', '>=', 5, 'face.valgumVarum'), Lat('cuisse_rot', '<=', -5)], 'glob': [Gl('bassin_antev', '>=', 3, 'neutralite.bassin')]},
+ 'R49': {'lat': [Lat('pied_valgus', '>=', 5, 'dos.calcaneen'), Lat('genou_valgus', '>=', 5, 'face.valgumVarum'), Lat('cuisse_rot', '<=', -5)], 'glob': [Gl('bassin_antev', '>=', 3, 'neutralite.bassin')]},
+ 'R50': {'anyGlob': [Gl('glob_chev', '>=', 3, 'neutralite.anteriorisation'), Gl('glob_gen', '>=', 3, 'neutralite.anteriorisation'), Gl('glob_bassin', '>=', 3, 'neutralite.anteriorisation'), Gl('tronc_antero', '>=', 2, 'neutralite.anteriorisation')]},
+ 'R51': {'glob': [Gl('poids_lr', 'abs>=', 10)], 'coteDe': 'poids_lr'},
  'R43': {'lat': [Lat('pied_valgus', '>=', 5, 'dos.calcaneen')], 'glob': [Gl('bassin_antev', '>=', 3, 'neutralite.bassin')]},
 }
 rules = []

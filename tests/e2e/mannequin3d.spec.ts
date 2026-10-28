@@ -42,6 +42,22 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
       "document.getElementById('m3d-posturo').parentElement === document.getElementById('psec-1').firstElementChild"
     )
   ).toBe(true);
+  // version affichée et libellé du menu (une page ancienne servie par un cache ne les aurait pas)
+  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v299');
+  await expect(page.locator('.m3d select.inp').first().locator('option').first()).toHaveText(
+    '— Tableau type (cumulable) —'
+  );
+  // répartition du poids G/D : curseur dans le groupe Pieds, ligne au compte rendu
+  const champPoids = (lbl: string) =>
+    page.locator('.m3d-row', { hasText: lbl }).locator('input[type=number]').first();
+  await page.locator('summary', { hasText: 'Pieds' }).first().click();
+  await champPoids('Répartition du poids').fill('10');
+  await champPoids('Répartition du poids').dispatchEvent('change');
+  await expect(page.locator('.m3d-cr', { hasText: 'Compte rendu' })).toContainText(
+    '40 % G / 60 % D'
+  );
+  await champPoids('Répartition du poids').fill('0');
+  await champPoids('Répartition du poids').dispatchEvent('change');
   // tableaux types cumulables : un 2e tableau s'ajoute au 1er
   const selT = page.locator('.m3d select.inp').first();
   await selT.selectOption('genu_valgum_bilat');
