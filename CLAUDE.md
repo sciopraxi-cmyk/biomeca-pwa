@@ -278,6 +278,7 @@ onglet Morphostatique, en 1re position de la section. Le **plan de semelle 3D** 
 spécification est **locale**, exclue via `.git/info/exclude` : ne jamais la commiter, la déplacer ni la citer dans un fichier tracké.
 
 **Mannequin — ce qui existe**
+
 - **Code** : `js/mannequin3d/` (`parametres.js` curseurs + pose + tableaux types ; `moteur.js` Three.js, squelette, repères ;
   `ui.js` interface ; `dictee.js` dictée libre ; `mecanismes.js` + `mecanismes-data.js` règles de mécanismes lésionnels).
   Intégration dans `js/biomeca.js` : bloc `#m3d-posturo` (fonction `_m3dPosturoInit`), section « Mannequin 3D » du rapport
@@ -293,6 +294,7 @@ spécification est **locale**, exclue via `.git/info/exclude` : ne jamais la com
   hébergée HDS : décision en attente, aucune donnée de santé hors hébergeur certifié).
 
 **Pièges appris**
+
 - **Versions** : un bump = `CACHE_VERSION` (service-worker.js) + `BUILD` (parametres.js) + `APP_BUILD` (biomeca.js) + suffixes
   `?v=` de TOUS les imports relatifs de `js/mannequin3d/*.js` et du `.glb.gz` + `tests/portail-apercu-praticien.test.mjs` + libellé
   de `tests/e2e/mannequin3d.spec.ts`. Sans `?v=`, un navigateur mélange d'anciens et de nouveaux modules (« does not provide an export »).
