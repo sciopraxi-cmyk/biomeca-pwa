@@ -966,6 +966,41 @@ Refonte CSS seulement, par lots, chaque bloc ajouté en fin de `css/biomeca.css`
 
 **Piège** : ne jamais `pkill -f chrome` (exit 143). Chrome headless : `args:['--no-sandbox','--disable-gpu']`.
 
+## Profil du patient et chaînes musculaires — acquis (PR #354, #355)
+
+Le mannequin 3D déduit de ses valeurs un **profil du patient** et la **chaîne musculaire** correspondante : une HYPOTHÈSE à confirmer
+par le praticien, jamais un diagnostic (même cadre que les mécanismes lésionnels). Le contenu des chaînes vient du cours de
+l'organisme : ne rien ajouter qui n'en vienne pas, chaque rappel affiché porte son numéro de diapo.
+
+- **Code** : `js/mannequin3d/chaines.js` (fonctions pures, testées : `tests/mannequin3d-chaines.test.mjs`). `evaluerProfil(valeurs, {yeux})`
+  renvoie zones notées 0–4, score de chaque chaîne, chaînes exprimées et dominante, compensations locales, profils
+  (`postural` = Mézières / Myers, `chainiste` = Busquet / GDS, `biomecanique`, ou combinaisons) et entrée haute / basse / mixte.
+  HTML : `htmlProfil` (encadré sous les mécanismes) et `htmlProfilRapport` (rapport, seulement si la case « Inclure au rapport »
+  est cochée ; stockée dans `mannequin3d.profilRetenu`). Profil proposé pour l'adulte, le sport et TOUTES les périodes de l'enfant.
+- **Chaînes** : posturales (grande postérieure, grande antérieure, ligne latérale D/G, ligne spiralée D/G ; les deux dernières n'existent que
+  chez Myers) et chaînistes (extension = PM, flexion = AM, AP, PA, fermeture = AL, ouverture = PL ; AL et PL peuvent être unilatérales).
+  Les signes de chaque chaîne sont la liste validée par le praticien ; un test impose que chaque valeur d'un tableau type de chaîne soit un
+  signe de sa chaîne, dans le bon sens.
+- **Seuils réglables** (`definirSeuilsProfil`, pas d'écran de réglage) : chaîne exprimée dès 40 %, dominante avec 15 points d'écart,
+  compensation locale = niveau ≥ 3, ou niveau ≥ 2 d'un seul côté hors signes d'une chaîne exprimée, « plusieurs » zones = 3.
+  Niveaux 0–4 = amplitudes `qual` du curseur ; le seuil du niveau 1 est celui du cabinet quand il existe.
+- **Curseurs ajoutés** : avancement / recul du bassin (`bassin_avance`, bassin seul : thorax et pieds fixes), mandibule (`mandi_transl`,
+  `mandi_antep`, blend shapes créés au chargement par `ajouterMorphMandibule`), « Flexion / extension du coude » (−20 à 140, 0 = coude
+  neutre à 20° de flexion, `COUDE_NEUTRE` mesuré par modèle). Le repère vert de la tête est au niveau des YEUX (`angles.yeux`).
+- **Tableaux types** : 16 tableaux de chaînes + flessum / récurvatum D/G ; menu à 8 catégories dépliables (`CATEGORIES_TABLEAUX`,
+  `TABLEAUX[k].categorie`) ; E2E : `tests/e2e/fixtures/tableau.ts` (`choisirTableau`).
+
+**Pièges appris**
+
+- Ne JAMAIS appeler `updateMorphTargets()` pour ajouter des blend shapes : la table des déformations du modèle (cyphose, lordose,
+  genoux) est réécrite et ces curseurs cessent de fonctionner. Compléter le dictionnaire existant.
+- Les os de l'avant-bras n'ont pas la même orientation d'un modèle à l'autre : toute pose « neutre » d'une articulation se mesure
+  par modèle (angle réel entre os), pas à l'œil sur un seul.
+- Un `<summary>` du menu des tableaux et ceux des groupes de curseurs coexistent : cibler `details.m3d-grp > summary` dans les E2E.
+- **Stockage local** : la ligne `user_data` contient `data` (TOUS les patients). La copie d'abonnement du mode hors connexion
+  (`bm4-acces-cache:<uid>`) ne doit garder que les colonnes d'abonnement, sinon elle double le stockage (alerte « 10 Mo ») et conserve des
+  bilans supprimés jusqu'à la connexion suivante. Les copies `bm4-recuperation:<uid>:<t>` ne sont jamais supprimées par conception.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
