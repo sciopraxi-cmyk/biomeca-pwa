@@ -999,7 +999,33 @@ l'organisme : ne rien ajouter qui n'en vienne pas, chaque rappel affiché porte 
 - Un `<summary>` du menu des tableaux et ceux des groupes de curseurs coexistent : cibler `details.m3d-grp > summary` dans les E2E.
 - **Stockage local** : la ligne `user_data` contient `data` (TOUS les patients). La copie d'abonnement du mode hors connexion
   (`bm4-acces-cache:<uid>`) ne doit garder que les colonnes d'abonnement, sinon elle double le stockage (alerte « 10 Mo ») et conserve des
-  bilans supprimés jusqu'à la connexion suivante. Les copies `bm4-recuperation:<uid>:<t>` ne sont jamais supprimées par conception.
+  bilans supprimés jusqu'à la connexion suivante. Les copies `bm4-recuperation:<uid>:<t>` (saisie locale non appliquée après un conflit de synchronisation) sont limitées aux
+  3 plus récentes (`COPIES_RECUPERATION_MAX`) : le message de reprise annonce le retrait des plus anciennes AVANT de les retirer ; les patients
+  ne sont jamais touchés.
+
+## Reprise des « captures 4 vues » sur le mannequin 3D — acquis (PR #357, #358)
+
+Le bouton « 📸 Reporter les 4 vues » (sous le mannequin des trois bilans) PROPOSE des valeurs de curseurs d'après les angles déjà calculés
+par « Analyse posturale — captures 4 vues » (`bilan._postureAnalysis[vue].angles`, vues face, dos, profilG, profilD). Rien n'est écrit sans
+clic sur « Appliquer la sélection » ; un curseur déjà réglé n'est jamais coché d'office.
+
+- **Code** : `js/mannequin3d/reprise-4vues.js` (`calculerReprise(analyse)`, fonction pure, testée : `tests/mannequin3d-reprise-4vues.test.mjs`) ;
+  panneau d'aperçu dans `ui.js` (option `analyseVues` de `monter`, branchée dans `biomeca.js` pour le postural, le sport et la podopédiatrie).
+- **Règles** : moyenne des vues où une mesure existe ; une mesure sous le seuil du cabinet n'est pas reportée ; valeurs bornées aux curseurs.
+  Cyphose et lordose = dépassement du seuil « hyper » du cabinet. Hyperlordose cervicale = extension de la tête (dépassement du seuil) +
+  antépulsion estimée d'après l'angle cranio-vertébral. Les conversions % → cm (thorax) et angle → cm (antépulsion) utilisent des hypothèses
+  (`LARGEUR_APPUI_CM`, `LONGUEUR_C7_TRAGUS_CM`) et sont marquées « estimé » à l'écran.
+- **Fermeture viscérale** (face) : buste dévié sur la photo → l'angle entre la ligne des épaules et la ligne du bassin va sur
+  `tronc_incl`, du côté de la fermeture, sans reporter épaule ni bassin (pas de double compte) ; buste droit → épaule du côté de la
+  fermeture abaissée (`ceinture_incl`) et bassin du même côté monté (`bassin_bascule`). Le curseur d'inclinaison du buste ne fait pas
+  basculer le bassin du mannequin.
+- **Pièges** : signes inversés entre l'analyse (+ = côté D plus HAUT) et les curseurs `ceinture_incl` / `bassin_bascule` (+ = côté D BAS) ;
+  la rotation de la tête n'est reprise que de la face (signe ambigu au dos) ; mesures sans curseur équivalent (rachis de dos, scapulas,
+  sillon inter-fessier, triangles de la taille, axe jambier, translation du bassin, mandibule, nombril, antériorisation globale, hanche,
+  nez tordu) listées « non reportées » dans l'aperçu.
+- **Ouverture sans écriture** : `etatMannequinVide(e, sexeParDefaut)` (parametres.js) ; les `onChange` du mannequin n'enregistrent pas un
+  état neutre par défaut tant que `mannequin3d` n'existe pas (l'ouverture de la section déclenchait une sauvegarde, donc l'alerte de
+  stockage). E2E : `tests/e2e/mannequin3d-ouverture-sans-ecriture.spec.ts` et `mannequin3d-reprise-4vues.spec.ts`.
 
 ## Fin de tâche : mise à jour de la documentation
 
