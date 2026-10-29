@@ -8,17 +8,17 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v308';
-import { creerMoteur, VUES } from './moteur.js?v=v308';
-import { interpreter, EXEMPLES } from './dictee.js?v=v308';
+} from './parametres.js?v=v309';
+import { creerMoteur, VUES } from './moteur.js?v=v309';
+import { interpreter, EXEMPLES } from './dictee.js?v=v309';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v308';
-import { evaluerProfil, htmlProfil } from './chaines.js?v=v308';
+} from './mecanismes.js?v=v309';
+import { evaluerProfil, htmlProfil } from './chaines.js?v=v309';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}

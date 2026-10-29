@@ -3,8 +3,8 @@
 // (postural, chaîniste/neuromusculaire, biomécanique/viscéral, ou combinaison) et entrée haute / basse / mixte.
 // HYPOTHÈSE à confirmer par le praticien, jamais un diagnostic. Le contenu des chaînes vient UNIQUEMENT du cours
 // de Joël (diapos citées) et de sa spécification du 28/10/2026 ; les seuils sont des paramètres à calibrer.
-import { PAR_ID } from './parametres.js?v=v308';
-import { seuilCabinet } from './mecanismes.js?v=v308';
+import { PAR_ID } from './parametres.js?v=v309';
+import { seuilCabinet } from './mecanismes.js?v=v309';
 
 export const APPELLATION_POSTURAL = 'Mézières / Meyers';
 export const APPELLATION_CHAINISTE = 'Busquet / GDS';
@@ -363,6 +363,7 @@ export const CHAINES = [
     nom: 'AP, antéro-postérieure (GDS) = chaîne statique en expiration (Busquet)',
     signes: [
       S('tete_antep', 1, 'légère antépulsion de tête'),
+      S('tronc_antero', -1, 'thorax en rétro (rétropulsion du thorax)'),
       P('epaule_elev', -1, 'abaissement des épaules'),
       P('epaule_antep', 1, 'antépulsion des épaules'),
       S('tronc_cyphose', 1, 'hypercyphose dorsale'),

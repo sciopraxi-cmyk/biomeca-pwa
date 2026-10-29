@@ -1,7 +1,7 @@
 // Profil du patient et chaîne musculaire : fonctions pures (aucun WebGL, aucune donnée patient réelle).
 import { describe, it, expect, afterEach } from 'vitest';
 import { TABLEAUX } from '../js/mannequin3d/parametres.js';
-import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v308';
+import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v309';
 import {
   CHAINES,
   evaluerProfil,
@@ -11,7 +11,7 @@ import {
   SEUILS_PROFIL_DEFAUT,
   htmlProfil,
   htmlProfilRapport,
-} from '../js/mannequin3d/chaines.js?v=v308';
+} from '../js/mannequin3d/chaines.js?v=v309';
 
 afterEach(() => {
   definirSeuilsProfil(null);
@@ -111,6 +111,55 @@ describe('retours de Joël du 28/10 (tableaux AP / PA, AL et PL unilatérales, l
     definirSeuilsProfil({ unilateralMin: 4 });
     const p = evaluerProfil({ genou_valgus_D: 9 });
     expect(p.grosses).toEqual([]);
+  });
+});
+
+describe('tout ce que pose un tableau de chaîne est un signe de cette chaîne (liste complète)', () => {
+  const ASSOC = {
+    chaine_grande_posterieure: 'grande_posterieure',
+    chaine_grande_anterieure: 'grande_anterieure',
+    chaine_laterale_D: 'ligne_laterale_D',
+    chaine_laterale_G: 'ligne_laterale_G',
+    chaine_spiralee_D: 'ligne_spiralee_D',
+    chaine_spiralee_G: 'ligne_spiralee_G',
+    chaine_extension_PM: 'extension_PM',
+    chaine_flexion_AM: 'flexion_AM',
+    chaine_AP: 'AP',
+    chaine_PA: 'PA',
+    chaine_fermeture_AL: 'fermeture_AL',
+    chaine_fermeture_AL_D: 'fermeture_AL',
+    chaine_fermeture_AL_G: 'fermeture_AL',
+    chaine_ouverture_PL: 'ouverture_PL',
+    chaine_ouverture_PL_D: 'ouverture_PL',
+    chaine_ouverture_PL_G: 'ouverture_PL',
+  };
+  for (const [k, id] of Object.entries(ASSOC))
+    it(k, () => {
+      const ch = CHAINES.find((c) => c.id === id);
+      const signes = [...(ch.principal || []), ...(ch.secondaires || []), ...(ch.signes || [])];
+      for (const [cur, x] of Object.entries(TABLEAUX[k].valeurs)) {
+        const base = cur.replace(/_(D|G)$/, '');
+        const sg = signes.filter(
+          (s) => s.id === cur || (s.paire && s.id === base) || (s.ou && s.ou.includes(cur))
+        );
+        expect(sg.length, k + ' : « ' + cur + ' » absent de la liste des signes').toBeGreaterThan(
+          0
+        );
+        expect(
+          sg.some((s) => Math.sign(s.sens) === Math.sign(x)),
+          k + ' : « ' + cur + ' » n’a pas le bon sens'
+        ).toBe(true);
+      }
+    });
+  it('AP : le thorax en rétro, le bassin avancé et la tête en légère antépulsion figurent dans la liste', () => {
+    const txt = CHAINES.find((c) => c.id === 'AP').signes.map((s) => s.txt);
+    expect(txt).toEqual(
+      expect.arrayContaining([
+        'thorax en rétro (rétropulsion du thorax)',
+        'avancement du bassin',
+        'légère antépulsion de tête',
+      ])
+    );
   });
 });
 
