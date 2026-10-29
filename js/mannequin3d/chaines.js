@@ -3,10 +3,10 @@
 // (postural, chaîniste/neuromusculaire, biomécanique/viscéral, ou combinaison) et entrée haute / basse / mixte.
 // HYPOTHÈSE à confirmer par le praticien, jamais un diagnostic. Le contenu des chaînes vient UNIQUEMENT du cours
 // de Joël (diapos citées) et de sa spécification du 28/10/2026 ; les seuils sont des paramètres à calibrer.
-import { PAR_ID } from './parametres.js?v=v312';
-import { seuilCabinet } from './mecanismes.js?v=v312';
+import { PAR_ID } from './parametres.js?v=v313';
+import { seuilCabinet } from './mecanismes.js?v=v313';
 
-export const APPELLATION_POSTURAL = 'Mézières / Meyers';
+export const APPELLATION_POSTURAL = 'Mézières / Myers';
 export const APPELLATION_CHAINISTE = 'Busquet / GDS';
 
 // ── Seuils réglables (valeurs par défaut validées par Joël le 28/10 ; à calibrer sur cas réels)
@@ -196,7 +196,7 @@ const mkChai = (o) => ({ famille: 'chainiste', appellation: CHAI, ...o });
 export const CHAINES = [
   mkPost({
     id: 'grande_posterieure',
-    nom: 'Grande chaîne postérieure (Mézières) = ligne postérieure superficielle (Meyers)',
+    nom: 'Grande chaîne postérieure (Mézières) = ligne postérieure superficielle (Myers)',
     principal: [
       S(null, 1, 'Antériorisation globale du corps depuis les chevilles ou les genoux', {
         ou: ['glob_chev', 'glob_gen'],
@@ -217,7 +217,7 @@ export const CHAINES = [
         '13',
       ],
       [
-        'Ligne postérieure superficielle (Meyers) : soutien en station verticale, prévient la flexion et favorise la posture droite',
+        'Ligne postérieure superficielle (Myers) : soutien en station verticale, prévient la flexion et favorise la posture droite',
         '27',
       ],
       [
@@ -228,7 +228,7 @@ export const CHAINES = [
   }),
   mkPost({
     id: 'grande_anterieure',
-    nom: 'Grande chaîne antérieure (Mézières) = ligne antérieure superficielle et profonde (Meyers)',
+    nom: 'Grande chaîne antérieure (Mézières) = ligne antérieure superficielle et profonde (Myers)',
     principal: [
       S(null, -1, 'Postériorisation globale du corps depuis les chevilles ou les genoux', {
         ou: ['glob_chev', 'glob_gen'],
@@ -240,7 +240,7 @@ export const CHAINES = [
     ],
     cours: [
       [
-        'Ligne antérieure superficielle (Meyers) : contrebalance et antagoniste de la ligne postérieure superficielle ; responsable de la flexion',
+        'Ligne antérieure superficielle (Myers) : contrebalance et antagoniste de la ligne postérieure superficielle ; responsable de la flexion',
         '28',
       ],
       [
@@ -257,7 +257,7 @@ export const CHAINES = [
       nom:
         'Ligne latérale ' +
         (c === 'D' ? 'droite' : 'gauche') +
-        ' (Meyers ; pas d’équivalent chez Mézières)',
+        ' (Myers ; pas d’équivalent chez Mézières)',
       principal: [
         S('poids_lr', sg, 'Répartition du poids à ' + opp),
         S('tronc_incl', sg, 'inclinaison du tronc à ' + opp),
@@ -284,7 +284,7 @@ export const CHAINES = [
       nom:
         'Ligne spiralée ' +
         (c === 'D' ? 'droite' : 'gauche') +
-        ' (Meyers ; pas d’équivalent chez Mézières)',
+        ' (Myers ; pas d’équivalent chez Mézières)',
       principal: [
         S('tronc_rot', sg, 'Rotation du tronc à ' + c),
         S('bassin_rot', sg, 'rotation du bassin à ' + c),

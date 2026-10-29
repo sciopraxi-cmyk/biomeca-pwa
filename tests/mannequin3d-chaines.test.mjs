@@ -1,7 +1,7 @@
 // Profil du patient et chaîne musculaire : fonctions pures (aucun WebGL, aucune donnée patient réelle).
 import { describe, it, expect, afterEach } from 'vitest';
 import { TABLEAUX, CATEGORIES_TABLEAUX } from '../js/mannequin3d/parametres.js';
-import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v312';
+import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v313';
 import {
   CHAINES,
   evaluerProfil,
@@ -11,7 +11,7 @@ import {
   SEUILS_PROFIL_DEFAUT,
   htmlProfil,
   htmlProfilRapport,
-} from '../js/mannequin3d/chaines.js?v=v312';
+} from '../js/mannequin3d/chaines.js?v=v313';
 
 afterEach(() => {
   definirSeuilsProfil(null);
@@ -42,7 +42,7 @@ describe('chaque tableau type de chaîne fait ressortir sa chaîne', () => {
     expect(clesChaines.length).toBe(16);
     expect(CHAINES.length).toBe(12);
     for (const k of clesChaines)
-      expect(TABLEAUX[k].groupe).toMatch(/Mézières \/ Meyers|Busquet \/ GDS/);
+      expect(TABLEAUX[k].groupe).toMatch(/Mézières \/ Myers|Busquet \/ GDS/);
   });
   const attendu = {
     chaine_grande_posterieure: ['grande_posterieure', 'postural'],
@@ -257,7 +257,7 @@ describe('seuils réglables', () => {
 describe('affichage', () => {
   it('encadré : deux appellations, prudence, cours cité, case « Inclure au rapport »', () => {
     const h = htmlProfil(evaluerProfil(TABLEAUX.chaine_ouverture_PL.valeurs), { coche: true });
-    expect(h).toContain('Mézières / Meyers');
+    expect(h).toContain('Mézières / Myers');
     expect(h).toContain('Busquet / GDS');
     expect(h).toContain('pas un diagnostic');
     expect(h).toContain('cours, diapo 43');

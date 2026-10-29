@@ -79,7 +79,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v312';
+export const BUILD = 'v313';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -646,32 +646,32 @@ export const TABLEAUX = {
 // Valeurs INDICATIVES déduites de la spécification de Joël (28/10) : chaque tableau pose les signes de sa chaîne à un
 // niveau modéré ; ils sont cumulables comme les autres et ne sont pas des normes. Un test vérifie que chaque tableau
 // fait ressortir sa propre chaîne dans le profil.
-export const GROUPE_POSTURAL = 'Chaînes posturales — Mézières / Meyers';
+export const GROUPE_POSTURAL = 'Chaînes posturales — Mézières / Myers';
 export const GROUPE_CHAINISTE = 'Chaînes chaînistes — Busquet / GDS';
 const CHAINES_TABLEAUX = {
   chaine_grande_posterieure: {
-    label: 'Grande chaîne postérieure (Mézières) = ligne postérieure superficielle (Meyers)',
+    label: 'Grande chaîne postérieure (Mézières) = ligne postérieure superficielle (Myers)',
     valeurs: { glob_chev: 5, tronc_lordose: 8, tronc_cyphose: 8, tete_flex: -3 },
   },
   chaine_grande_anterieure: {
     label:
-      'Grande chaîne antérieure (Mézières) = ligne antérieure superficielle et profonde (Meyers)',
+      'Grande chaîne antérieure (Mézières) = ligne antérieure superficielle et profonde (Myers)',
     valeurs: { glob_chev: -4, bassin_antev: -5, tete_flex: 5 },
   },
   chaine_laterale_D: {
-    label: 'Ligne latérale droite (Meyers) : poids à gauche',
+    label: 'Ligne latérale droite (Myers) : poids à gauche',
     valeurs: { poids_lr: -10, tronc_incl: -4, tete_incl: 4 },
   },
   chaine_laterale_G: {
-    label: 'Ligne latérale gauche (Meyers) : poids à droite',
+    label: 'Ligne latérale gauche (Myers) : poids à droite',
     valeurs: { poids_lr: 10, tronc_incl: 4, tete_incl: -4 },
   },
   chaine_spiralee_D: {
-    label: 'Ligne spiralée droite (Meyers)',
+    label: 'Ligne spiralée droite (Myers)',
     valeurs: { tronc_rot: 8, bassin_rot: 6, pied_ouverture_D: 15 },
   },
   chaine_spiralee_G: {
-    label: 'Ligne spiralée gauche (Meyers)',
+    label: 'Ligne spiralée gauche (Myers)',
     valeurs: { tronc_rot: -8, bassin_rot: -6, pied_ouverture_G: 15 },
   },
   chaine_extension_PM: {
@@ -780,7 +780,7 @@ const CHAINES_TABLEAUX = {
     },
   },
 };
-// ordre du menu : Mézières / Meyers puis Busquet / GDS ; pour AL et PL, bilatérale puis côté D puis côté G
+// ordre du menu : Mézières / Myers puis Busquet / GDS ; pour AL et PL, bilatérale puis côté D puis côté G
 const ORDRE_CHAINES = [
   'chaine_grande_posterieure',
   'chaine_grande_anterieure',
