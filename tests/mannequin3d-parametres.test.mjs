@@ -584,3 +584,21 @@ describe('profil des chaînes — curseurs ajoutés (bassin, mandibule)', () => 
     expect(nettoyerValeurs({ coude_flex_D: -50 }).coude_flex_D).toBe(-20);
   });
 });
+
+describe("état « jamais touché » : l'ouverture de la section n'écrit rien", () => {
+  const vide = { v: 1, sexe: 'femme', peau: true, valeurs: {}, retenues: [], profilRetenu: false };
+  it('état neutre par défaut = vide', async () => {
+    const { etatMannequinVide } = await import('../js/mannequin3d/parametres.js');
+    expect(etatMannequinVide(vide, 'femme')).toBe(true);
+    expect(etatMannequinVide(null, 'femme')).toBe(true);
+    expect(etatMannequinVide({ ...vide, valeurs: { tete_incl: 0 } }, 'femme')).toBe(true);
+  });
+  it('tout changement le rend non vide (sexe, peau, valeur, règle retenue, profil)', async () => {
+    const { etatMannequinVide } = await import('../js/mannequin3d/parametres.js');
+    expect(etatMannequinVide({ ...vide, sexe: 'homme' }, 'femme')).toBe(false);
+    expect(etatMannequinVide({ ...vide, peau: false }, 'femme')).toBe(false);
+    expect(etatMannequinVide({ ...vide, valeurs: { tete_incl: 4 } }, 'femme')).toBe(false);
+    expect(etatMannequinVide({ ...vide, retenues: ['R1'] }, 'femme')).toBe(false);
+    expect(etatMannequinVide({ ...vide, profilRetenu: true }, 'femme')).toBe(false);
+  });
+});

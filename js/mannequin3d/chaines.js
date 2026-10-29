@@ -3,8 +3,8 @@
 // (postural, chaîniste/neuromusculaire, biomécanique/viscéral, ou combinaison) et entrée haute / basse / mixte.
 // HYPOTHÈSE à confirmer par le praticien, jamais un diagnostic. Le contenu des chaînes vient UNIQUEMENT du cours
 // de Joël (diapos citées) et de sa spécification du 28/10/2026 ; les seuils sont des paramètres à calibrer.
-import { PAR_ID } from './parametres.js?v=v315';
-import { seuilCabinet } from './mecanismes.js?v=v315';
+import { PAR_ID } from './parametres.js?v=v316';
+import { seuilCabinet } from './mecanismes.js?v=v316';
 
 export const APPELLATION_POSTURAL = 'Mézières / Myers';
 export const APPELLATION_CHAINISTE = 'Busquet / GDS';
