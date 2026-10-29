@@ -9,17 +9,18 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v314';
-import { creerMoteur, VUES } from './moteur.js?v=v314';
-import { interpreter, EXEMPLES } from './dictee.js?v=v314';
+} from './parametres.js?v=v315';
+import { creerMoteur, VUES } from './moteur.js?v=v315';
+import { interpreter, EXEMPLES } from './dictee.js?v=v315';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v314';
-import { evaluerProfil, htmlProfil } from './chaines.js?v=v314';
+} from './mecanismes.js?v=v315';
+import { evaluerProfil, htmlProfil } from './chaines.js?v=v315';
+import { calculerReprise } from './reprise-4vues.js?v=v315';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -28,6 +29,7 @@ const CSS = `
 .m3d-canvas{display:block;width:100%;height:480px;cursor:grab}
 .m3d-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#456;font-size:12px;padding:12px;text-align:center}
 .m3d-vues,.m3d-barre{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.m3d-reprise{border:1px solid #c9d1da;border-radius:8px;background:#f8fafc;padding:8px 10px;margin-top:8px}
 .m3d-btn{border:1px solid var(--bord,#c9d1da);background:#fff;color:#223;border-radius:16px;padding:4px 12px;font-size:12px;cursor:pointer}
 .m3d-tabmenu{position:relative;font-size:12px}
 .m3d-tabmenu>summary{list-style:none;display:inline-block}
@@ -85,7 +87,14 @@ function el(tag, attrs = {}, ...kids) {
 
 export function monter(
   conteneur,
-  { etat, onChange, sexeParDefaut = 'homme', profil = 'adulte', mecanismes = true } = {}
+  {
+    etat,
+    onChange,
+    sexeParDefaut = 'homme',
+    profil = 'adulte',
+    mecanismes = true,
+    analyseVues = null,
+  } = {}
 ) {
   // profil : 'adulte' ou période de la podopédiatrie ('II', 'III', 'IV') = mannequin enfant aux bonnes proportions
   const enfant = profil === 'II' || profil === 'III' || profil === 'IV';
@@ -216,6 +225,117 @@ export function monter(
     },
     '↺ Neutre'
   );
+  // Reprise des résultats de « Analyse posturale — captures 4 vues » : aperçu avant/après, le praticien coche ce qu'il reprend.
+  // Rien n'est écrit sans clic sur « Appliquer » (et l'application passe par maj() comme un réglage manuel).
+  const repriseBox = el('div', { class: 'm3d-reprise', style: 'display:none' });
+  const btnReprise = el(
+    'button',
+    {
+      class: 'm3d-btn',
+      type: 'button',
+      'data-m3d-reprise': '1',
+      title: 'Reporter sur le mannequin les mesures de « Analyse posturale — captures 4 vues »',
+      onclick: () => ouvrirReprise(),
+    },
+    '📸 Reporter les 4 vues'
+  );
+  function ouvrirReprise() {
+    if (repriseBox.style.display !== 'none') {
+      repriseBox.style.display = 'none';
+      return;
+    }
+    const r = calculerReprise(analyseVues ? analyseVues() : null);
+    repriseBox.textContent = '';
+    repriseBox.style.display = 'block';
+    repriseBox.append(el('strong', {}, 'Reprise des 4 vues'));
+    if (!r.vues.length) {
+      repriseBox.append(
+        el(
+          'div',
+          {},
+          "Aucune vue n'est encore analysée : placez les points dans « Analyse posturale — captures 4 vues »."
+        ),
+        el(
+          'button',
+          { class: 'm3d-btn', type: 'button', onclick: () => (repriseBox.style.display = 'none') },
+          'Fermer'
+        )
+      );
+      return;
+    }
+    repriseBox.append(
+      el(
+        'div',
+        { style: 'font-size:11px;color:#475569' },
+        'Vues utilisées : ' +
+          r.vues.join(', ') +
+          '. Moyenne quand une mesure vient de plusieurs vues.'
+      )
+    );
+    const coches = [];
+    if (!r.propositions.length)
+      repriseBox.append(
+        el('div', {}, 'Aucune mesure au-dessus des seuils du cabinet : rien à reporter.')
+      );
+    const ul = el('div', { class: 'm3d-rep-liste' });
+    for (const p of r.propositions) {
+      const actuel = Number(S.valeurs[p.id]) || 0;
+      const cb = el('input', { type: 'checkbox', 'data-rep-id': p.id });
+      cb.checked = actuel === 0; // un curseur déjà réglé n'est jamais remplacé sans que le praticien le coche
+      coches.push([p, cb]);
+      const avant = actuel ? decrire({ [p.id]: actuel })[0] : 'neutre';
+      const apres = decrire({ [p.id]: p.valeur })[0];
+      ul.append(
+        el(
+          'label',
+          { style: 'display:block;margin:4px 0;font-size:12px' },
+          cb,
+          ' ' + apres + (p.estime ? ' (estimé)' : ''),
+          el(
+            'span',
+            { style: 'color:#64748b' },
+            ' — avant : ' + avant + (actuel ? ' (sera remplacé si coché)' : '') + ' — ' + p.source
+          )
+        )
+      );
+    }
+    repriseBox.append(ul);
+    if (r.nonReportees.length)
+      repriseBox.append(
+        el(
+          'div',
+          { style: 'font-size:11px;color:#64748b;margin:6px 0' },
+          'Mesures sans curseur équivalent (non reportées) : ' + r.nonReportees.join(' ; ') + '.'
+        )
+      );
+    const barre = el('div', { class: 'm3d-barre' });
+    if (r.propositions.length)
+      barre.append(
+        el(
+          'button',
+          {
+            class: 'm3d-btn on',
+            type: 'button',
+            'data-m3d-reprise-ok': '1',
+            onclick: () => {
+              for (const [p, cb] of coches) if (cb.checked) S.valeurs[p.id] = p.valeur;
+              repriseBox.style.display = 'none';
+              majCurseurs();
+              maj();
+            },
+          },
+          'Appliquer la sélection'
+        )
+      );
+    barre.append(
+      el(
+        'button',
+        { class: 'm3d-btn', type: 'button', onclick: () => (repriseBox.style.display = 'none') },
+        'Annuler'
+      )
+    );
+    repriseBox.append(barre);
+  }
   const cr = el('div', { class: 'm3d-cr' });
   const hyp = el('div', { class: 'm3d-meca' });
   const prof = el('div', { class: 'm3d-profbox' });
@@ -227,7 +347,8 @@ export function monter(
       boxCanvas,
       barreVues,
       infoRep,
-      el('div', { class: 'm3d-barre' }, selTab, btnRaz)
+      el('div', { class: 'm3d-barre' }, selTab, btnRaz, ...(analyseVues ? [btnReprise] : [])),
+      repriseBox
     )
   );
   const panel = el('div', { class: 'm3d-panel' });

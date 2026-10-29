@@ -1,7 +1,7 @@
 // Profil du patient et chaîne musculaire : fonctions pures (aucun WebGL, aucune donnée patient réelle).
 import { describe, it, expect, afterEach } from 'vitest';
 import { TABLEAUX, CATEGORIES_TABLEAUX } from '../js/mannequin3d/parametres.js';
-import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v314';
+import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v315';
 import {
   CHAINES,
   evaluerProfil,
@@ -11,7 +11,7 @@ import {
   SEUILS_PROFIL_DEFAUT,
   htmlProfil,
   htmlProfilRapport,
-} from '../js/mannequin3d/chaines.js?v=v314';
+} from '../js/mannequin3d/chaines.js?v=v315';
 
 afterEach(() => {
   definirSeuilsProfil(null);

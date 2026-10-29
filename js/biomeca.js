@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v314';
+const APP_BUILD = 'v315';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -31080,6 +31080,7 @@ async function _m3dPosturoInit() {
     ref.api = mod.monter(host, {
       etat: d.mannequin3d || null,
       sexeParDefaut: sexeDef,
+      analyseVues: function () { return d._postureAnalysis || null; },
       onChange: function (e) {
         if (globalThis?._modeConsultation) return;
         const avant = JSON.stringify(d.mannequin3d || null);
@@ -31185,6 +31186,7 @@ async function _m3dMonterBloc(cfg) {
       sexeParDefaut: cfg.sexeDef(),
       profil: profil,
       mecanismes: _m3dMecanismesPermis(profil),
+      analyseVues: function () { const c = cfg.donnees(); return c ? c._postureAnalysis || null : null; },
       onChange: function (e) {
         if (globalThis?._modeConsultation) return;
         const cible = cfg.donnees();
