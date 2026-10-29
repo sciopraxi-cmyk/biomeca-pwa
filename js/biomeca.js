@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v315';
+const APP_BUILD = 'v316';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -6575,6 +6575,32 @@ function _ecrireLocalAvantEnvoi(preparer) {
   }
 }
 
+// Copies de récupération : on en garde les `max` plus récentes. Fonction pure : renvoie les clés à retirer
+// (la date est le suffixe de la clé : ISO ou millisecondes ; une clé au suffixe illisible est la plus ancienne).
+const COPIES_RECUPERATION_MAX = 3;
+function _copiesRecuperationAElaguer(cles, prefixe, max) {
+  const lim = Number.isFinite(max) ? Math.max(1, max) : COPIES_RECUPERATION_MAX;
+  const dateDe = (k) => {
+    const suf = String(k).slice(prefixe.length + 1);
+    const t = /^\d+$/.test(suf) ? Number(suf) : Date.parse(suf);
+    return Number.isFinite(t) ? t : 0;
+  };
+  return (cles || [])
+    .filter((k) => typeof k === 'string' && k.startsWith(prefixe + ':'))
+    .sort((a, b) => dateDe(b) - dateDe(a) || (a < b ? 1 : -1))
+    .slice(lim);
+}
+function _copiesRecuperationExcedentaires() {
+  const prefixe = _scopedKey('bm4-recuperation');
+  if (!prefixe) return [];
+  const cles = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k) cles.push(k);
+  }
+  return _copiesRecuperationAElaguer(cles, prefixe, COPIES_RECUPERATION_MAX);
+}
+
 // Reprise au démarrage (cloud joignable). Retourne true si `patients` a été
 // remplacé par la version locale : l'appelant doit alors la renvoyer au cloud.
 function _recupererSaisieNonSynchronisee(rowUpdatedAt) {
@@ -6595,12 +6621,20 @@ function _recupererSaisieNonSynchronisee(rowUpdatedAt) {
   try {
     localStorage.setItem(_scopedKey('bm4-recuperation') + ':' + (m.t || Date.now()), JSON.stringify(local));
     localStorage.removeItem(kM);
+    let anciennes = [];
+    try { anciennes = _copiesRecuperationExcedentaires(); } catch (_e) { anciennes = []; }
     alert(
       'ℹ️ Une saisie faite sur cet appareil n\'avait pas pu être envoyée au serveur, ' +
       'mais le serveur a changé depuis (ou contient plus de données).\n\n' +
       'Elle n\'a PAS été appliquée pour ne rien écraser. Une copie est conservée sur cet appareil ; ' +
-      'signalez-le si une information manque.'
+      'signalez-le si une information manque.' +
+      (anciennes.length
+        ? '\n\nPour libérer de l\'espace, ' + anciennes.length + ' copie' + (anciennes.length > 1 ? 's' : '') +
+          ' plus ancienne' + (anciennes.length > 1 ? 's' : '') + ' (au-delà des ' + COPIES_RECUPERATION_MAX +
+          ' plus récentes) ' + (anciennes.length > 1 ? 'vont être retirées' : 'va être retirée') + ' de cet appareil.'
+        : '')
     );
+    anciennes.forEach(function (k) { try { localStorage.removeItem(k); } catch (_e) { /* best-effort */ } });
   } catch (_e) { /* copie impossible : marqueur conservé, rien n'est écrasé */ }
   return false;
 }
@@ -31083,6 +31117,8 @@ async function _m3dPosturoInit() {
       analyseVues: function () { return d._postureAnalysis || null; },
       onChange: function (e) {
         if (globalThis?._modeConsultation) return;
+        // l'ouverture de la section n'écrit rien : un état neutre par défaut n'est pas enregistré tant que rien n'a changé
+        if (!d.mannequin3d && mod.etatMannequinVide(e, sexeDef)) return;
         const avant = JSON.stringify(d.mannequin3d || null);
         d.mannequin3d = e;
         if (JSON.stringify(e) !== avant && ref.api) _scheduleBilanAutosave('posturo');
@@ -31191,6 +31227,8 @@ async function _m3dMonterBloc(cfg) {
         if (globalThis?._modeConsultation) return;
         const cible = cfg.donnees();
         if (!cible) return;
+        // l'ouverture de la section n'écrit rien : un état neutre par défaut n'est pas enregistré tant que rien n'a changé
+        if (!cible.mannequin3d && mod.etatMannequinVide(e, cfg.sexeDef())) return;
         const avant = JSON.stringify(cible.mannequin3d || null);
         cible.mannequin3d = e;
         // la sauvegarde passe par un événement : afficher l'onglet ou générer un rapport n'atteint jamais l'écriture (#277)

@@ -15,7 +15,7 @@
 // Données FICTIVES uniquement.
 
 import { describe, it, expect } from 'vitest';
-import { fonction, tableau, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
+import { fonction, tableau, ligneConst, SRC_BIOMECA } from './helpers/extraire-biomeca.mjs';
 
 const IMG = 'data:image/jpeg;base64,QUJD';
 const FONCTIONS = [
@@ -25,6 +25,8 @@ const FONCTIONS = [
   '_confirmerSyncCloud',
   '_ecrireLocalAvantEnvoi',
   '_recupererSaisieNonSynchronisee',
+  '_copiesRecuperationAElaguer',
+  '_copiesRecuperationExcedentaires',
   '_stripDataURLsForPersist',
   '_restoreDataURLsAfterPersist',
   '_countDataUnits',
@@ -38,11 +40,22 @@ const FONCTIONS = [
 
 function monter(o = {}) {
   const mem = new Map(Object.entries(o.stockage || {}));
-  const journal = { setItem: [], removeItem: [], dialogues: [], envois: [], avertissements: [] };
+  const journal = {
+    setItem: [],
+    removeItem: [],
+    dialogues: [],
+    messages: [],
+    envois: [],
+    avertissements: [],
+  };
   const localStorage = {
     getItem: (k) => (mem.has(k) ? mem.get(k) : null),
     setItem: (k, v) => (journal.setItem.push(k), mem.set(k, String(v))),
     removeItem: (k) => (journal.removeItem.push(k), mem.delete(k)),
+    get length() {
+      return mem.size;
+    },
+    key: (i) => [...mem.keys()][i] ?? null,
   };
   let liberer = () => {};
   const attente = new Promise((ok) => (liberer = ok));
@@ -67,12 +80,17 @@ function monter(o = {}) {
     Date,
     Math,
     Number,
+    String,
+    RegExp,
     Array,
     Object,
     Promise,
     setTimeout: (...a) => globalThis.setTimeout(...a),
     clearTimeout: (...a) => globalThis.clearTimeout(...a),
-    alert: (m) => journal.dialogues.push(String(m).split('\n')[0]),
+    alert: (m) => (
+      journal.dialogues.push(String(m).split('\n')[0]),
+      journal.messages.push(String(m))
+    ),
     confirm: () => false,
     // envoi des photos : en attente tant que le test ne le libère pas
     migratePedicuriePhotos: async () => {
@@ -92,6 +110,7 @@ function monter(o = {}) {
       'SPORT_BILAN_PHOTO_KEYS',
       'PEDICURIE_GALLERY_DEFS',
     ].map(tableau),
+    ligneConst('COPIES_RECUPERATION_MAX'),
     'let _nonSyncSeq = 0, _dernierSyncCloudAt = ' +
       JSON.stringify(o.baseCloud ?? null) +
       ', _urgenceFermeture = false;',
@@ -331,5 +350,74 @@ describe('branchement (lecture statique du code de démarrage)', () => {
     expect(SRC_BIOMECA).toContain(
       '_saisieRecuperee = _recupererSaisieNonSynchronisee(myRow.updated_at)'
     );
+  });
+});
+
+describe('copies de récupération : limitées aux plus récentes, avec message clair', () => {
+  const copie = (t) => `bm4-recuperation:u-fictif:${t}`;
+  const bruit = JSON.stringify([patient()]);
+  it('fonction pure : garde les 3 plus récentes (ISO ou millisecondes), ignore les autres clés', () => {
+    const env = monter();
+    const cles = [
+      copie('2026-10-20T11:02:53.508Z'),
+      copie('2026-10-28T22:43:21.868Z'),
+      copie('2026-10-21T14:33:00.318Z'),
+      copie('2026-10-25T15:36:16.228Z'),
+      copie('1700000000000'),
+      'bm4-recuperation:autre-compte:2026-10-01T00:00:00.000Z',
+      'bm4-patients:u-fictif',
+    ];
+    const out = env.f._copiesRecuperationAElaguer(cles, 'bm4-recuperation:u-fictif', 3);
+    expect(out.sort()).toEqual([copie('1700000000000'), copie('2026-10-20T11:02:53.508Z')].sort());
+    expect(env.f._copiesRecuperationAElaguer([], 'x', 3)).toEqual([]);
+  });
+  it("à la création d'une copie : message annonçant le retrait, anciennes retirées, plus récentes et patients intacts", () => {
+    const locaux = [patient({ bilanDataPedicurie: { id: 'b', motif: 'saisie locale' } })];
+    const stockage = {
+      [K]: JSON.stringify(locaux),
+      [M]: JSON.stringify({
+        seq: 1,
+        t: '2026-10-29T10:00:00.000Z',
+        base: '2026-10-19T23:55:50.759Z',
+      }),
+    };
+    for (const t of [
+      '2026-10-20T11:00:00.000Z',
+      '2026-10-21T11:00:00.000Z',
+      '2026-10-22T11:00:00.000Z',
+      '2026-10-23T11:00:00.000Z',
+    ])
+      stockage[copie(t)] = bruit;
+    const env = monter({
+      stockage,
+      globales: { patients: [patient({ bilanDataPedicurie: { id: 'b', motif: 'ancien' } })] },
+    });
+    expect(env.f._recupererSaisieNonSynchronisee('2026-10-20T09:00:00.000+00:00')).toBe(false);
+    const copies = [...env.mem.keys()].filter((k) => k.startsWith('bm4-recuperation:')).sort();
+    expect(copies).toEqual([
+      copie('2026-10-22T11:00:00.000Z'),
+      copie('2026-10-23T11:00:00.000Z'),
+      copie('2026-10-29T10:00:00.000Z'),
+    ]);
+    expect(env.journal.messages[0]).toContain('2 copies plus anciennes');
+    expect(env.journal.messages[0]).toContain('vont être retirées');
+    expect(env.mem.has(K)).toBe(true); // les patients ne sont jamais touchés
+  });
+  it("sous la limite : rien n'est retiré et le message ne parle pas de retrait", () => {
+    const env = monter({
+      stockage: {
+        [K]: JSON.stringify([patient({ bilanDataPedicurie: { id: 'b', motif: 'saisie locale' } })]),
+        [M]: JSON.stringify({
+          seq: 1,
+          t: '2026-10-29T10:00:00.000Z',
+          base: '2026-10-19T23:55:50.759Z',
+        }),
+        [copie('2026-10-20T11:00:00.000Z')]: bruit,
+      },
+      globales: { patients: [patient({ bilanDataPedicurie: { id: 'b', motif: 'ancien' } })] },
+    });
+    env.f._recupererSaisieNonSynchronisee('2026-10-20T09:00:00.000+00:00');
+    expect([...env.mem.keys()].filter((k) => k.startsWith('bm4-recuperation:')).length).toBe(2);
+    expect(env.journal.messages[0]).not.toContain('retirée');
   });
 });

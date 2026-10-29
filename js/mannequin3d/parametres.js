@@ -79,7 +79,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v315';
+export const BUILD = 'v316';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -936,6 +936,19 @@ export function nettoyerValeurs(v) {
     if (x !== 0) out[c.id] = x;
   }
   return out;
+}
+
+// État du mannequin « jamais touché » : sexe par défaut, peau, aucun écart, rien de retenu. L'application ne l'enregistre
+// pas (ouvrir la section morphostatique ne doit rien écrire).
+export function etatMannequinVide(e, sexeParDefaut) {
+  if (!e || typeof e !== 'object') return true;
+  return (
+    e.sexe === sexeParDefaut &&
+    e.peau !== false &&
+    Object.keys(nettoyerValeurs(e.valeurs)).length === 0 &&
+    (!Array.isArray(e.retenues) || e.retenues.length === 0) &&
+    !e.profilRetenu
+  );
 }
 
 // Compte rendu : une ligne par valeur non nulle (libellés côté patient)
