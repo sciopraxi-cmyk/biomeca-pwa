@@ -4524,8 +4524,12 @@ function _memoriserAccesHorsConnexion() {
   try {
     const k = _scopedKey('bm4-acces-cache');
     if (!k || !pwaUser || !pwaUser.user_data) return;
+    // Seules les colonnes d'ABONNEMENT sont copiées : la ligne user_data contient aussi `data` (TOUS les patients,
+    // déjà gardés dans bm4-patients). Sans ce tri, la copie doublait le stockage local (alerte « 10 Mo ») et gardait
+    // des bilans supprimés jusqu'à la connexion suivante.
+    const { data: _donneesPatients, ...abonnement } = pwaUser.user_data;
     localStorage.setItem(k, JSON.stringify({
-      t: Date.now(), user_data: pwaUser.user_data,
+      t: Date.now(), user_data: abonnement,
       user_metadata: pwaUser.user_metadata || {}, app_metadata: pwaUser.app_metadata || {},
     }));
   } catch (_e) { /* idem */ }
@@ -5047,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v313';
+const APP_BUILD = 'v314';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');

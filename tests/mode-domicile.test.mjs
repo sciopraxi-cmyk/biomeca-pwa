@@ -179,6 +179,29 @@ describe('session et abonnement gardés 7 jours', () => {
     expect(m.f._accesDepuisCache()).toBe(false);
     expect(m.pwaUser.user_data).toBe(null);
   });
+  it('le cache d’abonnement ne copie JAMAIS les données patients (colonne data) : pas de doublon du stockage local', () => {
+    const m = monter();
+    m.pwaUser.user_data = {
+      licence_payee: true,
+      formule: 'F1',
+      data: {
+        patients: Array.from({ length: 50 }, (_, i) => ({
+          nom: 'Fictif' + i,
+          bilan: 'x'.repeat(2000),
+        })),
+      },
+    };
+    m.f._memoriserAccesHorsConnexion();
+    const brut = m.mem.get('bm4-acces-cache:u-fictif');
+    expect(brut.length).toBeLessThan(500);
+    expect(brut).not.toContain('Fictif');
+    const c = JSON.parse(brut);
+    expect(c.user_data).toEqual({ licence_payee: true, formule: 'F1' });
+    // le statut d'abonnement reste restitué hors connexion
+    m.pwaUser.user_data = null;
+    expect(m.f._accesDepuisCache()).toBe(true);
+    expect(m.pwaUser.user_data).toEqual({ licence_payee: true, formule: 'F1' });
+  });
   it('cache d’un autre compte jamais appliqué', () => {
     const a = monter({ uid: 'u-a' });
     a.f._memoriserAccesHorsConnexion();

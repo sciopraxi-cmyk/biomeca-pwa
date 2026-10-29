@@ -9,17 +9,17 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v313';
-import { creerMoteur, VUES } from './moteur.js?v=v313';
-import { interpreter, EXEMPLES } from './dictee.js?v=v313';
+} from './parametres.js?v=v314';
+import { creerMoteur, VUES } from './moteur.js?v=v314';
+import { interpreter, EXEMPLES } from './dictee.js?v=v314';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v313';
-import { evaluerProfil, htmlProfil } from './chaines.js?v=v313';
+} from './mecanismes.js?v=v314';
+import { evaluerProfil, htmlProfil } from './chaines.js?v=v314';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
