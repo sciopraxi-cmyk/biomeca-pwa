@@ -8,6 +8,7 @@ import {
   GROUPES,
   POSE_NEUTRE,
   poseDepuisValeurs,
+  COUDE_NEUTRE,
   assemblage,
   REPARTITION_RACHIS,
   nettoyerValeurs,
@@ -533,5 +534,53 @@ describe('profil des chaînes — curseurs ajoutés (bassin, mandibule)', () => 
     for (const k of ['cyphose', 'lordose', 'fessiers', 'genou_flex_R', 'genou_valgus_L']) {
       expect(morphs.has(k)).toBe(true);
     }
+  });
+  it('coudes neutres : 20° de flexion, correction mesurée pour chacun des 8 modèles (choix de Joël, 29/10)', () => {
+    const modeles = [
+      'homme',
+      'femme',
+      'garcon_pII',
+      'garcon_pIII',
+      'garcon_pIV',
+      'fille_pII',
+      'fille_pIII',
+      'fille_pIV',
+    ];
+    expect(Object.keys(COUDE_NEUTRE).sort()).toEqual(modeles.slice().sort());
+    for (const m of modeles) {
+      const D = poseDepuisValeurs({}, m).rot['lowerarm01.R'];
+      const G = poseDepuisValeurs({}, m).rot['lowerarm01.L'];
+      expect(proche(D, qAxe('x', COUDE_NEUTRE[m]))).toBe(true);
+      expect(proche(G, qAxe('x', COUDE_NEUTRE[m]))).toBe(true);
+    }
+    // le curseur « Flexion du coude » part de cette position neutre et ajoute sa flexion
+    expect(
+      proche(
+        poseDepuisValeurs({ coude_flex_D: 40 }, 'homme').rot['lowerarm01.R'],
+        qAxe('x', COUDE_NEUTRE.homme - 40)
+      )
+    ).toBe(true);
+    // sans modèle : valeur par défaut de POSE_NEUTRE
+    expect(proche(poseDepuisValeurs({}).rot['lowerarm01.R'], qAxe('x', 35))).toBe(true);
+  });
+  it('« Flexion / extension du coude » : va de −20 (extension complète) à 140, 0 = coude neutre', () => {
+    const c = PAR_ID.coude_flex_D;
+    expect(c.court).toBe('Flexion / extension du coude');
+    expect([c.min, c.max]).toEqual([-20, 140]);
+    expect(c.fin).toEqual(['extension', 'flexion']);
+    expect(decrire({ coude_flex_D: -10 })).toEqual([
+      'Flexion / extension du coude D : extension 10 °',
+    ]);
+    expect(decrire({ coude_flex_G: 30 })).toEqual([
+      'Flexion / extension du coude G : flexion 30 °',
+    ]);
+    // l'extension réduit la flexion du coude neutre ; nettoyerValeurs conserve les valeurs négatives
+    expect(
+      proche(
+        poseDepuisValeurs({ coude_flex_D: -20 }, 'homme').rot['lowerarm01.R'],
+        qAxe('x', COUDE_NEUTRE.homme + 20)
+      )
+    ).toBe(true);
+    expect(nettoyerValeurs({ coude_flex_D: -50 }).coude_flex_D).toBe(-20);
   });
 });

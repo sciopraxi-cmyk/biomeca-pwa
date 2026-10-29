@@ -3,8 +3,8 @@
 // (postural, chaîniste/neuromusculaire, biomécanique/viscéral, ou combinaison) et entrée haute / basse / mixte.
 // HYPOTHÈSE à confirmer par le praticien, jamais un diagnostic. Le contenu des chaînes vient UNIQUEMENT du cours
 // de Joël (diapos citées) et de sa spécification du 28/10/2026 ; les seuils sont des paramètres à calibrer.
-import { PAR_ID } from './parametres.js?v=v309';
-import { seuilCabinet } from './mecanismes.js?v=v309';
+import { PAR_ID } from './parametres.js?v=v312';
+import { seuilCabinet } from './mecanismes.js?v=v312';
 
 export const APPELLATION_POSTURAL = 'Mézières / Meyers';
 export const APPELLATION_CHAINISTE = 'Busquet / GDS';
@@ -75,6 +75,8 @@ export function niveauDe(id, valeur, sens) {
 const val = (v, id) => Number(v && v[id]) || 0;
 const niveauAbs = (v, id) => {
   const x = val(v, id);
+  // coude : l'extension (valeur négative) ramène vers le bras tendu, ce n'est pas une compensation
+  if (x < 0 && id.startsWith('coude_flex')) return 0;
   return x ? niveauDe(id, x, x > 0 ? 1 : -1) : 0;
 };
 

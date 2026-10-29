@@ -44,12 +44,25 @@ const COU = ['neck01', 'neck02', 'neck03'];
 export const POSE_NEUTRE = [
   { os: 'upperarm01.L', axe: 'z', deg: -30 },
   { os: 'upperarm01.R', axe: 'z', deg: 30 },
-  { os: 'lowerarm01.L', axe: 'x', deg: 50 },
-  { os: 'lowerarm01.R', axe: 'x', deg: 50 },
+  { os: 'lowerarm01.L', axe: 'x', deg: 35 },
+  { os: 'lowerarm01.R', axe: 'x', deg: 35 },
   { os: 'upperleg01.L', axe: 'z', deg: -5 },
   { os: 'upperleg01.R', axe: 'z', deg: 5 },
 ];
 
+// Coudes en position neutre : 20° de flexion (choix de Joël, 29/10). L'orientation des os de l'avant-bras diffère d'un
+// modèle à l'autre : la correction (rotation de lowerarm01 autour de x) est mesurée pour chaque modèle afin que l'angle
+// du coude soit partout de 160° (= 20° de flexion). Valeur par défaut = POSE_NEUTRE.
+export const COUDE_NEUTRE = {
+  homme: 35.7,
+  femme: 26.2,
+  garcon_pII: 35,
+  garcon_pIII: 35,
+  garcon_pIV: 35.1,
+  fille_pII: 38.3,
+  fille_pIII: 39.2,
+  fille_pIV: 33.5,
+};
 const cote = (c) => (c === 'G' ? 1 : -1); // signe de x pour le côté du patient
 const os = (n, c) => n + (c === 'G' ? '.L' : '.R');
 const sd = (c) => (c === 'G' ? 'L' : 'R');
@@ -66,7 +79,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v309';
+export const BUILD = 'v312';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -221,9 +234,18 @@ lat(
 lat('bras_rot', 'bras', 'Rotation du bras', -45, 45, '°', ['RI', 'RE'], (v, c) => [
   { os: os('upperarm01', c), axe: 'y', deg: v * cote(c) },
 ]);
-lat('coude_flex', 'bras', 'Flexion du coude', 0, 140, '°', ['', 'flexion'], (v, c) => [
-  { os: os('lowerarm01', c), axe: 'x', deg: -v },
-]);
+// 0 = coude neutre (20° de flexion) ; valeurs négatives = vers l'extension (−20 = bras tendu, extension complète du
+// modèle) ; valeurs positives = flexion supplémentaire
+lat(
+  'coude_flex',
+  'bras',
+  'Flexion / extension du coude',
+  -20,
+  140,
+  '°',
+  ['extension', 'flexion'],
+  (v, c) => [{ os: os('lowerarm01', c), axe: 'x', deg: -v }]
+);
 // torsion pure de l'avant-bras et de la main autour de l'axe de l'avant-bras (le coude ne plie pas)
 lat(
   'avbras_pron',
@@ -516,6 +538,11 @@ export const TABLEAUX = {
     label: 'Flessum de genou bilatéral',
     valeurs: { ...bil('genou_flex', 15), bassin_antev: 4, tronc_lordose: 8 },
   },
+  // unilatéraux : seul le genou concerné est posé (aucune compensation inventée)
+  flessum_D: { label: 'Flessum de genou unilatéral D', valeurs: { genou_flex_D: 15 } },
+  flessum_G: { label: 'Flessum de genou unilatéral G', valeurs: { genou_flex_G: 15 } },
+  recurvatum_D: { label: 'Genu recurvatum unilatéral D', valeurs: { genou_flex_D: -10 } },
+  recurvatum_G: { label: 'Genu recurvatum unilatéral G', valeurs: { genou_flex_G: -10 } },
   pied_plat_valgus: {
     label: 'Pieds plats valgus bilatéraux',
     valeurs: {
@@ -772,9 +799,62 @@ const ORDRE_CHAINES = [
   'chaine_ouverture_PL_D',
   'chaine_ouverture_PL_G',
 ];
+// ─── Catégories du menu « Tableau type » (dépliables au clic) ─────────────────────────────────────────
+export const CATEGORIES_TABLEAUX = [
+  ['genoux', 'Genoux'],
+  ['pieds', 'Pieds'],
+  ['bassin', 'Bassin'],
+  ['ilmi', 'ILMI (inégalité de longueur des membres inférieurs)'],
+  ['tronc', 'Tronc / buste'],
+  ['anteriorisation', 'Antériorisation / postériorisation'],
+  ['posturales', GROUPE_POSTURAL],
+  ['chainistes', GROUPE_CHAINISTE],
+];
+const CAT_PAR_CLE = {
+  genoux: [
+    'genu_valgum_bilat',
+    'genu_valgum_D',
+    'genu_valgum_G',
+    'genu_varum_bilat',
+    'recurvatum_bilat',
+    'recurvatum_D',
+    'recurvatum_G',
+    'flessum_bilat',
+    'flessum_D',
+    'flessum_G',
+  ],
+  pieds: ['pied_plat_valgus', 'pied_creux_varus', 'rotation_interne_mi', 'pied_en_dehors'],
+  bassin: ['bascule_bassin_D', 'bascule_bassin_G'],
+  ilmi: ['iml_D_courte', 'iml_G_courte'],
+  tronc: [
+    'hyperlordose',
+    'dos_plat',
+    'hypercyphose',
+    'croise_sup',
+    'croise_inf',
+    'attitude_scoliotique',
+  ],
+  anteriorisation: [
+    'anteriorisation_chevilles',
+    'anteriorisation_genoux',
+    'anteriorisation_bassin',
+    'posteriorisation_chevilles',
+    'posteriorisation_genoux',
+    'posteriorisation_bassin',
+  ],
+};
+for (const [cat, cles] of Object.entries(CAT_PAR_CLE))
+  for (const k of cles) {
+    if (!TABLEAUX[k]) throw new Error('tableau inconnu : ' + k);
+    TABLEAUX[k].categorie = cat;
+  }
 for (const k of ORDRE_CHAINES) {
   const postural = /grande|laterale|spiralee/.test(k);
-  TABLEAUX[k] = { ...CHAINES_TABLEAUX[k], groupe: postural ? GROUPE_POSTURAL : GROUPE_CHAINISTE };
+  TABLEAUX[k] = {
+    ...CHAINES_TABLEAUX[k],
+    groupe: postural ? GROUPE_POSTURAL : GROUPE_CHAINISTE,
+    categorie: postural ? 'posturales' : 'chainistes',
+  };
 }
 
 // ─── Pose complète à partir des valeurs ────────────────────────────────────────────────────
@@ -783,7 +863,7 @@ for (const k of ORDRE_CHAINES) {
 //  - bassin : rotation du bassin ; le moteur la fait tourner AUTOUR DES HANCHES, remet la colonne en place
 //    (le haut du corps ne suit pas) et laisse les jambes d'aplomb (rotation inverse sur pelvis.L/R) ;
 //  - morph : {nom → poids} ; twist : {L,R} torsion de l'avant-bras en degrés.
-export function poseDepuisValeurs(valeurs) {
+export function poseDepuisValeurs(valeurs, modele) {
   const rot = {},
     pos = {},
     morph = {},
@@ -794,7 +874,9 @@ export function poseDepuisValeurs(valeurs) {
   const rotAdd = (nom, q) => {
     rot[nom] = qMul(q, rot[nom] || [0, 0, 0, 1]);
   };
-  for (const o of POSE_NEUTRE) rotAdd(o.os, qAxe(o.axe, o.deg));
+  const coude = COUDE_NEUTRE[modele];
+  for (const o of POSE_NEUTRE)
+    rotAdd(o.os, qAxe(o.axe, coude !== undefined && o.os.startsWith('lowerarm01') ? coude : o.deg));
   for (const c of CURSEURS) {
     const v = Number(valeurs && valeurs[c.id]);
     if (!v || !isFinite(v)) continue;

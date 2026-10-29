@@ -4,7 +4,7 @@
 // Principe : la phrase est découpée en propositions ; dans chacune on cherche des MOTS-CLÉS (radicaux, sans accents,
 // dans n'importe quel ordre) qui désignent un curseur, puis le côté, le niveau (léger / modéré / marqué / sévère)
 // ou un chiffre (le chiffre l'emporte). Aucun nom de patient n'est lu ni conservé.
-import { PAR_ID } from './parametres.js?v=v309';
+import { PAR_ID } from './parametres.js?v=v312';
 
 export const EXEMPLES = [
   'genu valgum bilatéral marqué',
@@ -336,6 +336,7 @@ const CONCEPTS = [
   { id: 'avbras_pron', all: A(/pronat/), s: 1, cote: 'lat' },
   { id: 'avbras_pron', all: A(/supinat/), s: -1, cote: 'lat' },
   { id: 'coude_flex', all: A(/coude/, /flexion|fle?chi|plie/), s: 1, cote: 'lat' },
+  { id: 'coude_flex', all: A(/coude/, /extension|tendu|deplie/), s: -1, cote: 'lat' },
   { id: 'bras_rot', all: A(/bras|epaule|humerus/, /rotation interne|\bri\b/), s: -1, cote: 'lat' },
   { id: 'bras_rot', all: A(/bras|epaule|humerus/, /rotation externe|\bre\b/), s: 1, cote: 'lat' },
   {

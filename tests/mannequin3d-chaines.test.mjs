@@ -1,7 +1,7 @@
 // Profil du patient et chaîne musculaire : fonctions pures (aucun WebGL, aucune donnée patient réelle).
 import { describe, it, expect, afterEach } from 'vitest';
-import { TABLEAUX } from '../js/mannequin3d/parametres.js';
-import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v309';
+import { TABLEAUX, CATEGORIES_TABLEAUX } from '../js/mannequin3d/parametres.js';
+import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v312';
 import {
   CHAINES,
   evaluerProfil,
@@ -11,7 +11,7 @@ import {
   SEUILS_PROFIL_DEFAUT,
   htmlProfil,
   htmlProfilRapport,
-} from '../js/mannequin3d/chaines.js?v=v309';
+} from '../js/mannequin3d/chaines.js?v=v312';
 
 afterEach(() => {
   definirSeuilsProfil(null);
@@ -163,6 +163,16 @@ describe('tout ce que pose un tableau de chaîne est un signe de cette chaîne (
   });
 });
 
+describe('coude en extension', () => {
+  it('l’extension du coude (valeur négative) n’est ni une zone touchée ni une compensation locale', () => {
+    const p = evaluerProfil({ coude_flex_G: -20 });
+    expect(p.grosses).toEqual([]);
+    expect(p.zones.find((z) => z.id === 'bras').niveau).toBe(0);
+    expect(p.profils).toEqual([]);
+    expect(evaluerProfil({ coude_flex_G: 100 }).grosses.map((g) => g.id)).toEqual(['coude_flex_G']);
+  });
+});
+
 describe('profils', () => {
   it('mannequin neutre : aucun profil', () => {
     const p = evaluerProfil({});
@@ -267,5 +277,42 @@ describe('affichage', () => {
   });
   it('aucune chaîne ne cite un contenu hors du cours : chaque rappel porte un numéro de diapo', () => {
     for (const c of CHAINES) for (const r of c.cours) expect(r[1]).toMatch(/^\d+$/);
+  });
+});
+
+describe('menu « Tableau type » : catégories et tableaux de genou unilatéraux', () => {
+  it('chaque tableau (sauf « Neutre ») appartient à l’une des 8 catégories demandées, dans l’ordre', () => {
+    expect(CATEGORIES_TABLEAUX.map((c) => c[0])).toEqual([
+      'genoux',
+      'pieds',
+      'bassin',
+      'ilmi',
+      'tronc',
+      'anteriorisation',
+      'posturales',
+      'chainistes',
+    ]);
+    const ids = new Set(CATEGORIES_TABLEAUX.map((c) => c[0]));
+    for (const [k, t] of Object.entries(TABLEAUX)) {
+      if (k === 'neutre') expect(t.categorie).toBeUndefined();
+      else expect(ids.has(t.categorie), k + ' sans catégorie').toBe(true);
+    }
+    expect(Object.keys(TABLEAUX).filter((k) => TABLEAUX[k].categorie === 'genoux').length).toBe(10);
+  });
+  it('flessum et récurvatum D / G : un seul genou, dans le bon sens', () => {
+    expect(TABLEAUX.flessum_D.valeurs).toEqual({ genou_flex_D: 15 });
+    expect(TABLEAUX.flessum_G.valeurs).toEqual({ genou_flex_G: 15 });
+    expect(TABLEAUX.recurvatum_D.valeurs).toEqual({ genou_flex_D: -10 });
+    expect(TABLEAUX.recurvatum_G.valeurs).toEqual({ genou_flex_G: -10 });
+    for (const [k, cote] of [
+      ['flessum_D', 'D'],
+      ['flessum_G', 'G'],
+      ['recurvatum_D', 'D'],
+      ['recurvatum_G', 'G'],
+    ]) {
+      const p = evaluerProfil(TABLEAUX[k].valeurs);
+      expect(p.grosses.map((g) => g.id)).toEqual(['genou_flex_' + cote]);
+      expect(p.entree.type).toBe('basse');
+    }
   });
 });

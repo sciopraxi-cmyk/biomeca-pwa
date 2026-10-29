@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login, requireCredentials } from './fixtures/auth';
+import { choisirTableau } from './fixtures/tableau';
 
 test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', async ({ page }) => {
   test.setTimeout(240_000);
@@ -43,14 +44,14 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
     )
   ).toBe(true);
   // version affichée et libellé du menu (une page ancienne servie par un cache ne les aurait pas)
-  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v309');
-  await expect(page.locator('.m3d select.inp').first().locator('option').first()).toHaveText(
+  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v312');
+  await expect(page.locator('.m3d .m3d-tabmenu > summary').first()).toContainText(
     '— Tableau type (cumulable) —'
   );
   // répartition du poids G/D : curseur dans le groupe Pieds, ligne au compte rendu
   const champPoids = (lbl: string) =>
     page.locator('.m3d-row', { hasText: lbl }).locator('input[type=number]').first();
-  await page.locator('summary', { hasText: 'Pieds' }).first().click();
+  await page.locator('details.m3d-grp > summary', { hasText: 'Pieds' }).first().click();
   await champPoids('Répartition du poids').fill('10');
   await champPoids('Répartition du poids').dispatchEvent('change');
   await expect(page.locator('.m3d-cr', { hasText: 'Compte rendu' })).toContainText(
@@ -59,18 +60,17 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   await champPoids('Répartition du poids').fill('0');
   await champPoids('Répartition du poids').dispatchEvent('change');
   // tableaux types cumulables : un 2e tableau s'ajoute au 1er
-  const selT = page.locator('.m3d select.inp').first();
-  await selT.selectOption('genu_valgum_bilat');
-  await selT.selectOption('bascule_bassin_D');
+  await choisirTableau(page, 'genu_valgum_bilat');
+  await choisirTableau(page, 'bascule_bassin_D');
   const cumul: any = await page.evaluate('_m3dPosturo.api.etat().valeurs');
   expect(cumul.genou_valgus_D).toBeGreaterThan(0);
   expect(cumul.bassin_bascule).not.toBe(0);
-  await selT.selectOption('neutre');
+  await choisirTableau(page, 'neutre');
   // sexe par défaut d'après la civilité
   await expect(page.locator('.m3d-btn.on', { hasText: 'Femme' })).toBeVisible();
   // curseurs : on ouvre Tronc et Bassin
-  await page.locator('summary', { hasText: 'Tronc et rachis' }).click();
-  await page.locator('summary', { hasText: 'Bassin' }).click();
+  await page.locator('details.m3d-grp > summary', { hasText: 'Tronc et rachis' }).click();
+  await page.locator('details.m3d-grp > summary', { hasText: 'Bassin' }).click();
   const champ = (lbl: string) =>
     page.locator('.m3d-row', { hasText: lbl }).locator('input[type=number]').first();
   await champ('Inclinaison du tronc').fill('-8');
@@ -129,7 +129,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   expect(Math.abs(a1.bassin - a0.bassin)).toBeGreaterThan(6);
   expect(Math.abs(a1.epaules - a0.epaules)).toBeLessThan(1.5);
   expect(Math.abs(a1.yeux - a0.yeux)).toBeLessThan(1.5);
-  await page.locator('summary', { hasText: 'Global' }).click();
+  await page.locator('details.m3d-grp > summary', { hasText: 'Global' }).click();
   await setv('Antériorisation globale depuis les chevilles', '6');
   await page.waitForTimeout(300);
   await setv('Antériorisation globale depuis les chevilles', '0');
@@ -207,10 +207,10 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   await expect(page.locator('#po-silh-legacy-titre')).toBeVisible();
   await page.evaluate('delete currentPatient.bilanDataPosturo._bodyCanvas');
   // membres supérieurs : deux colonnes (gauche / droite du patient)
-  const bras = page.locator('details', {
+  const bras = page.locator('details.m3d-grp', {
     has: page.locator('summary', { hasText: 'Membres supérieurs' }),
   });
-  await bras.locator('summary').click();
+  await bras.locator('summary').first().click();
   await expect(bras.locator('.m3d-colhead', { hasText: 'Gauche' })).toBeVisible();
   await expect(bras.locator('.m3d-colhead', { hasText: 'Droite' })).toBeVisible();
   // dictée : le mannequin propose, le praticien valide
@@ -230,12 +230,21 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   expect(apres.genou_valgus_G).toBe(11);
   expect(apres.tete_incl).toBe(-6);
   // profil du patient et chaîne musculaire : tableaux types groupés, encadré, case « Inclure au rapport », rapport
-  const selChaine = page.locator('.m3d select.inp').first();
-  expect(await selChaine.locator('optgroup').count()).toBe(2);
-  expect(await selChaine.locator('optgroup option').count()).toBe(16);
-  await selChaine.selectOption('neutre');
-  await selChaine.selectOption('chaine_ouverture_PL');
-  await selChaine.selectOption('chaine_laterale_D');
+  // menu à catégories dépliables : 8 catégories, 16 tableaux de chaînes, 10 tableaux de genou, replié au départ
+  const menuTab = page.locator('.m3d .m3d-tabmenu').first();
+  expect(await menuTab.locator('details.m3d-cat').count()).toBe(8);
+  expect(await menuTab.locator('details.m3d-cat[data-cat=posturales] [data-tableau]').count()).toBe(
+    6
+  );
+  expect(await menuTab.locator('details.m3d-cat[data-cat=chainistes] [data-tableau]').count()).toBe(
+    10
+  );
+  expect(await menuTab.locator('details.m3d-cat[data-cat=genoux] [data-tableau]').count()).toBe(10);
+  expect(await menuTab.evaluate((e: any) => e.open)).toBe(false);
+  expect(await menuTab.locator('details.m3d-cat[open]').count()).toBe(0);
+  await choisirTableau(page, 'neutre');
+  await choisirTableau(page, 'chaine_ouverture_PL');
+  await choisirTableau(page, 'chaine_laterale_D');
   const prof = page.locator('.m3d-profbox');
   await expect(prof).toContainText('Profil du patient et chaîne musculaire (hypothèse)');
   await expect(prof).toContainText('Mézières / Meyers');
@@ -246,9 +255,9 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   await prof.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/profil-chaines.png', fullPage: false });
   // chaîne AM (flexion) + valgus de genou unilatéral droit : chaîne ET compensation locale au genou droit
-  await selChaine.selectOption('neutre');
-  await selChaine.selectOption('chaine_flexion_AM');
-  await selChaine.selectOption('genu_valgum_D');
+  await choisirTableau(page, 'neutre');
+  await choisirTableau(page, 'chaine_flexion_AM');
+  await choisirTableau(page, 'genu_valgum_D');
   await expect(prof).toContainText('Biomécanique et/ou viscéral (local)');
   await expect(prof).toContainText('Chaîniste / neuromusculaire (régional)');
   await expect(prof).toContainText('Compensations locales');
@@ -257,13 +266,13 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   await prof.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/profil-am-valgum.png', fullPage: false });
   // chaîne d'ouverture unilatérale (tableau type) : côté indiqué
-  await selChaine.selectOption('neutre');
-  await selChaine.selectOption('chaine_ouverture_PL_G');
+  await choisirTableau(page, 'neutre');
+  await choisirTableau(page, 'chaine_ouverture_PL_G');
   await expect(prof).toContainText('côté gauche seulement');
   // retour à la chaîne d'ouverture + ligne latérale D pour la suite (case, rapport)
-  await selChaine.selectOption('neutre');
-  await selChaine.selectOption('chaine_ouverture_PL');
-  await selChaine.selectOption('chaine_laterale_D');
+  await choisirTableau(page, 'neutre');
+  await choisirTableau(page, 'chaine_ouverture_PL');
+  await choisirTableau(page, 'chaine_laterale_D');
   // sans case cochée : le rapport ne contient pas le profil
   const sansCase: any = await page.evaluate('_m3dVuesRapport(currentPatient.bilanDataPosturo)');
   expect(sansCase.profil).toBe('');

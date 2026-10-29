@@ -1,7 +1,7 @@
 // Mannequin postural 3D — moteur WebGL (Three.js auto-hébergé, chargé à la demande).
 import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../assets/vendor/three/GLTFLoader.js';
-import { poseDepuisValeurs, assemblage } from './parametres.js?v=v309';
+import { poseDepuisValeurs, assemblage } from './parametres.js?v=v312';
 
 // ?v= : le modèle 3D est dans /assets/ (cache sans limite de durée) ; l'URL change à chaque version
 // Modèles : adultes (homme, femme) et enfants par période de la podopédiatrie (II, III, IV), garçon et fille.
@@ -17,7 +17,7 @@ export function nomModele(sexe, profil) {
 }
 const CHEMIN = (nom) =>
   new URL(
-    '../../assets/mannequin/' + (MODELES.includes(nom) ? nom : 'homme') + '.glb.gz?v=v309',
+    '../../assets/mannequin/' + (MODELES.includes(nom) ? nom : 'homme') + '.glb.gz?v=v312',
     import.meta.url
   ).href;
 const cacheModeles = {};
@@ -442,7 +442,7 @@ export async function creerMoteur(canvas, opts = {}) {
     etat.valeurs = valeurs || {};
     if (!etat.racine) return;
     if (!etat.pivot) repere();
-    poserBrut(poseDepuisValeurs(etat.valeurs));
+    poserBrut(poseDepuisValeurs(etat.valeurs, etat.sexe));
     if (reperes.groupe) {
       etat.racine.updateMatrixWorld(true);
       majReperes();

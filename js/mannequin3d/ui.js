@@ -3,22 +3,23 @@ import {
   CURSEURS,
   GROUPES,
   TABLEAUX,
+  CATEGORIES_TABLEAUX,
   appliquerTableau,
   BUILD,
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v309';
-import { creerMoteur, VUES } from './moteur.js?v=v309';
-import { interpreter, EXEMPLES } from './dictee.js?v=v309';
+} from './parametres.js?v=v312';
+import { creerMoteur, VUES } from './moteur.js?v=v312';
+import { interpreter, EXEMPLES } from './dictee.js?v=v312';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v309';
-import { evaluerProfil, htmlProfil } from './chaines.js?v=v309';
+} from './mecanismes.js?v=v312';
+import { evaluerProfil, htmlProfil } from './chaines.js?v=v312';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -28,6 +29,16 @@ const CSS = `
 .m3d-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#456;font-size:12px;padding:12px;text-align:center}
 .m3d-vues,.m3d-barre{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .m3d-btn{border:1px solid var(--bord,#c9d1da);background:#fff;color:#223;border-radius:16px;padding:4px 12px;font-size:12px;cursor:pointer}
+.m3d-tabmenu{position:relative;font-size:12px}
+.m3d-tabmenu>summary{list-style:none;display:inline-block}
+.m3d-tabmenu>summary::-webkit-details-marker{display:none}
+.m3d-tabmenu>summary::after{content:' ▾'}
+.m3d-tabpanel{position:absolute;z-index:40;left:0;top:100%;margin-top:4px;width:min(440px,92vw);max-height:360px;overflow:auto;background:#fff;border:1px solid var(--bord,#c9d1da);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:4px}
+.m3d-cat{border-top:1px solid #eef1f4}
+.m3d-cat>summary{cursor:pointer;padding:6px 8px;font-weight:600;color:#2a7a4e}
+.m3d-tabitem{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 8px 5px 18px;font-size:12px;color:#223;cursor:pointer;border-radius:4px}
+.m3d-tabpanel>.m3d-tabitem{padding-left:8px;font-weight:600}
+.m3d-tabitem:hover{background:#eef6f1}
 .m3d-btn.on{background:#2a7a4e;color:#fff;border-color:#2a7a4e}
 .m3d-panel{flex:1 1 440px;min-width:300px;max-height:560px;overflow:auto}
 .m3d-cols{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:0 10px 4px}
@@ -159,32 +170,37 @@ export function monter(
     );
     barreVues.append(btnVue[k]);
   }
-  const selTab = el(
-    'select',
-    { class: 'inp', style: 'font-size:12px;max-width:100%' },
-    el('option', { value: '' }, '— Tableau type (cumulable) —')
-  );
-  // tableaux des chaînes musculaires : regroupés par famille (Mézières / Meyers ; Busquet / GDS)
-  const groupesTab = {};
-  for (const k in TABLEAUX) {
-    const g = TABLEAUX[k].groupe;
-    const opt = el('option', { value: k }, TABLEAUX[k].label);
-    if (!g) selTab.append(opt);
-    else {
-      if (!groupesTab[g]) {
-        groupesTab[g] = el('optgroup', { label: g });
-        selTab.append(groupesTab[g]);
-      }
-      groupesTab[g].append(opt);
-    }
+  // Menu « Tableau type (cumulable) » : catégories dépliables au clic (genoux, pieds, bassin, ILMI, tronc/buste,
+  // antériorisation/postériorisation, chaînes posturales, chaînes chaînistes) ; un clic sur un tableau l'applique
+  // (cumul avec ce qui est déjà réglé) et referme le menu.
+  const selTab = el('details', { class: 'm3d-tabmenu' });
+  selTab.append(el('summary', { class: 'm3d-btn m3d-tabsum' }, '— Tableau type (cumulable) —'));
+  const tabPanel = el('div', { class: 'm3d-tabpanel' });
+  selTab.append(tabPanel);
+  const itemTab = (k) =>
+    el('button', { type: 'button', class: 'm3d-tabitem', 'data-tableau': k }, TABLEAUX[k].label);
+  tabPanel.append(itemTab('neutre'));
+  for (const [cid, clabel] of CATEGORIES_TABLEAUX) {
+    const cles = Object.keys(TABLEAUX).filter((k) => TABLEAUX[k].categorie === cid);
+    if (!cles.length) continue;
+    const cat = el('details', { class: 'm3d-cat', 'data-cat': cid });
+    cat.append(el('summary', {}, clabel + ' (' + cles.length + ')'));
+    cles.forEach((k) => cat.append(itemTab(k)));
+    tabPanel.append(cat);
   }
-  selTab.addEventListener('change', () => {
-    if (!selTab.value) return;
-    S.valeurs = appliquerTableau(S.valeurs, selTab.value); // cumul avec ce qui est déjà réglé
-    selTab.value = '';
+  tabPanel.addEventListener('click', (ev) => {
+    const b = ev.target && ev.target.closest && ev.target.closest('[data-tableau]');
+    if (!b) return;
+    S.valeurs = appliquerTableau(S.valeurs, b.dataset.tableau);
+    selTab.open = false;
     majCurseurs();
     maj();
   });
+  // un clic ailleurs referme le menu
+  const fermerMenu = (ev) => {
+    if (selTab.open && !selTab.contains(ev.target)) selTab.open = false;
+  };
+  document.addEventListener('click', fermerMenu);
   const btnRaz = el(
     'button',
     {
@@ -692,6 +708,7 @@ export function monter(
     detruire() {
       detruit = true;
       window.removeEventListener('resize', ajusterTaille);
+      document.removeEventListener('click', fermerMenu);
       if (moteur) moteur.liberer();
       conteneur.textContent = '';
     },
