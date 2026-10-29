@@ -43,7 +43,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
     )
   ).toBe(true);
   // version affichée et libellé du menu (une page ancienne servie par un cache ne les aurait pas)
-  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v307');
+  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v308');
   await expect(page.locator('.m3d select.inp').first().locator('option').first()).toHaveText(
     '— Tableau type (cumulable) —'
   );
@@ -232,7 +232,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   // profil du patient et chaîne musculaire : tableaux types groupés, encadré, case « Inclure au rapport », rapport
   const selChaine = page.locator('.m3d select.inp').first();
   expect(await selChaine.locator('optgroup').count()).toBe(2);
-  expect(await selChaine.locator('optgroup option').count()).toBe(12);
+  expect(await selChaine.locator('optgroup option').count()).toBe(16);
   await selChaine.selectOption('neutre');
   await selChaine.selectOption('chaine_ouverture_PL');
   await selChaine.selectOption('chaine_laterale_D');
@@ -245,6 +245,25 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   expect(await prof.locator('input[data-profil]:checked').count()).toBe(0);
   await prof.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/profil-chaines.png', fullPage: false });
+  // chaîne AM (flexion) + valgus de genou unilatéral droit : chaîne ET compensation locale au genou droit
+  await selChaine.selectOption('neutre');
+  await selChaine.selectOption('chaine_flexion_AM');
+  await selChaine.selectOption('genu_valgum_D');
+  await expect(prof).toContainText('Biomécanique et/ou viscéral (local)');
+  await expect(prof).toContainText('Chaîniste / neuromusculaire (régional)');
+  await expect(prof).toContainText('Compensations locales');
+  await expect(prof).toContainText('côté droit');
+  await expect(prof).toContainText('Entrée basse');
+  await prof.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/profil-am-valgum.png', fullPage: false });
+  // chaîne d'ouverture unilatérale (tableau type) : côté indiqué
+  await selChaine.selectOption('neutre');
+  await selChaine.selectOption('chaine_ouverture_PL_G');
+  await expect(prof).toContainText('côté gauche seulement');
+  // retour à la chaîne d'ouverture + ligne latérale D pour la suite (case, rapport)
+  await selChaine.selectOption('neutre');
+  await selChaine.selectOption('chaine_ouverture_PL');
+  await selChaine.selectOption('chaine_laterale_D');
   // sans case cochée : le rapport ne contient pas le profil
   const sansCase: any = await page.evaluate('_m3dVuesRapport(currentPatient.bilanDataPosturo)');
   expect(sansCase.profil).toBe('');

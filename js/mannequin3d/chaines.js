@@ -3,8 +3,8 @@
 // (postural, chaîniste/neuromusculaire, biomécanique/viscéral, ou combinaison) et entrée haute / basse / mixte.
 // HYPOTHÈSE à confirmer par le praticien, jamais un diagnostic. Le contenu des chaînes vient UNIQUEMENT du cours
 // de Joël (diapos citées) et de sa spécification du 28/10/2026 ; les seuils sont des paramètres à calibrer.
-import { PAR_ID } from './parametres.js?v=v307';
-import { seuilCabinet } from './mecanismes.js?v=v307';
+import { PAR_ID } from './parametres.js?v=v308';
+import { seuilCabinet } from './mecanismes.js?v=v308';
 
 export const APPELLATION_POSTURAL = 'Mézières / Meyers';
 export const APPELLATION_CHAINISTE = 'Busquet / GDS';
@@ -17,6 +17,7 @@ export const SEUILS_PROFIL_DEFAUT = {
   grosse: 3, // niveau ≥ 3 = grosse compensation
   plusieurs: 3, // nombre de zones touchées pour parler de « plusieurs compensations »
   creditPlein: 2, // niveau à partir duquel un signe compte pour 100 % de son poids dans le score d'une chaîne
+  unilateralMin: 2, // niveau à partir duquel un écart D/G présent d'UN SEUL côté (l'autre côté à 0) est une compensation locale
 };
 let SEUILS = { ...SEUILS_PROFIL_DEFAUT };
 export function definirSeuilsProfil(t) {
@@ -396,6 +397,7 @@ export const CHAINES = [
   }),
   mkChai({
     id: 'fermeture_AL',
+    unilaterale: true,
     nom: 'Chaîne de fermeture (Busquet) = AL, antéro-latérale (GDS)',
     signes: [
       P('epaule_antep', 1, 'antépulsion des épaules'),
@@ -426,6 +428,7 @@ export const CHAINES = [
   }),
   mkChai({
     id: 'ouverture_PL',
+    unilaterale: true,
     nom: 'Chaîne d’ouverture (Busquet) = PL, postéro-latérale (GDS)',
     signes: [
       P('epaule_antep', -1, 'rétropulsion des épaules'),
@@ -462,24 +465,30 @@ export const CHAINE_PAR_ID = Object.fromEntries(CHAINES.map((c) => [c.id, c]));
 
 // ── Crédit d'un signe (0–1) : le niveau divisé par le niveau « plein » (2 par défaut)
 const credit = (niv) => Math.min(1, niv / SEUILS.creditPlein);
-function evalSigne(valeurs, s) {
+function evalSigne(valeurs, s, cote = null) {
   if (s.ou) {
     const niv = Math.max(...s.ou.map((i) => niveauDe(i, val(valeurs, i), s.sens)));
-    return { ...s, niveau: niv, credit: credit(niv) };
+    return { ...s, niveau: niv, credit: credit(niv), ids: s.ou };
   }
   if (s.paire) {
     const nD = niveauDe(s.id + '_D', val(valeurs, s.id + '_D'), s.sens),
       nG = niveauDe(s.id + '_G', val(valeurs, s.id + '_G'), s.sens);
+    const ids = cote ? [s.id + '_' + cote] : [s.id + '_D', s.id + '_G'];
+    if (cote) {
+      const n = cote === 'D' ? nD : nG;
+      return { ...s, niveau: n, niveauD: nD, niveauG: nG, credit: credit(n), ids };
+    }
     return {
       ...s,
       niveau: Math.round(((nD + nG) / 2) * 10) / 10,
       niveauD: nD,
       niveauG: nG,
       credit: (credit(nD) + credit(nG)) / 2,
+      ids,
     };
   }
   const niv = niveauDe(s.id, val(valeurs, s.id), s.sens);
-  return { ...s, niveau: niv, credit: credit(niv) };
+  return { ...s, niveau: niv, credit: credit(niv), ids: [s.id] };
 }
 const moy = (a) => (a.length ? a.reduce((x, y) => x + y.credit, 0) / a.length : 0);
 export function scoreChaine(valeurs, ch) {
@@ -494,8 +503,28 @@ export function scoreChaine(valeurs, ch) {
     );
     return { signes: [...principal, ...secondaires], principalOk: p > 0, score: p > 0 ? score : 0 };
   }
-  const signes = ch.signes.map((s) => evalSigne(valeurs, s));
-  return { signes, principalOk: true, score: Math.round(100 * moy(signes)) };
+  const calc = (cote) => {
+    const signes = ch.signes.map((s) => evalSigne(valeurs, s, cote));
+    return { signes, score: Math.round(100 * moy(signes)) };
+  };
+  const bilat = calc(null);
+  if (!ch.unilaterale) return { signes: bilat.signes, principalOk: true, score: bilat.score };
+  // AL et PL peuvent être unilatérales (spécification de Joël) : on retient la meilleure lecture (deux côtés, D seul,
+  // G seul) ; le côté n'est indiqué que si un côté domine nettement l'autre
+  const D = calc('D'),
+    G = calc('G');
+  const best = [
+    { cote: null, ...bilat },
+    { cote: 'D', ...D },
+    { cote: 'G', ...G },
+  ].sort((a, b) => b.score - a.score)[0];
+  const unilat = best.cote && best.score > bilat.score;
+  return {
+    signes: unilat ? best.signes : bilat.signes,
+    principalOk: true,
+    score: best.score,
+    cote: unilat ? best.cote : null,
+  };
 }
 
 // ── Évaluation complète
@@ -529,21 +558,27 @@ export function zonesEtNiveaux(valeurs) {
 
 // grosses compensations LOCALES (biomécaniques / viscérales) : niveau ≥ seuil « grosse », d'un seul côté
 // (un curseur D/G dont l'autre côté n'est pas aussi important et dans le même sens) ou impair latéral/rotatoire.
-export function grossesLocales(valeurs) {
+export function grossesLocales(valeurs, exclus = new Set()) {
   const out = [];
   for (const c of Object.keys(PAR_ID)) {
     const x = val(valeurs, c);
     if (!x) continue;
     const niv = niveauAbs(valeurs, c);
-    if (niv < SEUILS.grosse) continue;
     const m = c.match(/^(.*)_(D|G)$/);
-    if (m) {
-      if (!ZONE_DE[c]) continue;
-      const autre = m[1] + '_' + (m[2] === 'D' ? 'G' : 'D'),
-        xa = val(valeurs, autre),
-        na = niveauAbs(valeurs, autre);
-      if (na >= SEUILS.grosse && Math.sign(xa) === Math.sign(x)) continue; // bilatéral symétrique : chaîne, pas local
-    } else if (!LOCAUX_IMPAIRS.has(c)) continue;
+    if (niv >= SEUILS.grosse) {
+      if (m) {
+        if (!ZONE_DE[c]) continue;
+        const autre = m[1] + '_' + (m[2] === 'D' ? 'G' : 'D'),
+          xa = val(valeurs, autre),
+          na = niveauAbs(valeurs, autre);
+        if (na >= SEUILS.grosse && Math.sign(xa) === Math.sign(x)) continue; // bilatéral symétrique : chaîne, pas local
+      } else if (!LOCAUX_IMPAIRS.has(c)) continue;
+    } else {
+      // écart moyen mais présent d'UN SEUL côté (l'autre à zéro) : compensation locale, sauf s'il fait partie des
+      // signes d'une chaîne exprimée (ex. chaîne d'ouverture unilatérale)
+      if (!m || !ZONE_DE[c] || niv < SEUILS.unilateralMin || exclus.has(c)) continue;
+      if (niveauAbs(valeurs, m[1] + '_' + (m[2] === 'D' ? 'G' : 'D')) > 0) continue;
+    }
     out.push({
       id: c,
       valeur: x,
@@ -607,21 +642,26 @@ export const PROFILS_LIBELLE = {
 export function evaluerProfil(valeurs, ctx = {}) {
   const v = valeurs || {};
   const zones = zonesEtNiveaux(v);
-  const grosses = grossesLocales(v);
-  const idsGrosses = new Set(grosses.map((g) => g.id));
   const chaines = CHAINES.map((ch) => {
     const r = scoreChaine(v, ch);
     return {
       id: ch.id,
       famille: ch.famille,
       appellation: ch.appellation,
-      nom: ch.nom,
+      nom:
+        ch.nom + (r.cote ? ', côté ' + (r.cote === 'D' ? 'droit' : 'gauche') + ' seulement' : ''),
       cours: ch.cours,
       ...r,
       exprimee: r.principalOk && r.score >= SEUILS.exprimee,
     };
   }).sort((a, b) => b.score - a.score);
   const exprimees = chaines.filter((c) => c.exprimee);
+  // curseurs déjà expliqués par une chaîne exprimée (côté retenu pour une chaîne unilatérale)
+  const exclus = new Set();
+  for (const c of exprimees)
+    for (const sg of c.signes) if (sg.credit > 0) for (const i of sg.ids || []) exclus.add(i);
+  const grosses = grossesLocales(v, exclus);
+  const idsGrosses = new Set(grosses.map((g) => g.id));
   const P_ = exprimees.filter((c) => c.famille === 'posturale'),
     C_ = exprimees.filter((c) => c.famille === 'chainiste');
   // zones touchées hors grosses compensations locales (qui relèvent du profil biomécanique)
@@ -776,7 +816,7 @@ export function htmlProfil(p, { ouvert = false, coche = false, retenu = false } 
       '<div style="font-size:12px;color:#475569;margin:6px 0">Aucune chaîne musculaire n’atteint le seuil d’expression.</div>';
   if (p.grosses.length) {
     h +=
-      '<div style="font-size:12px;margin:8px 0 2px"><b>Grosses compensations locales (biomécanique / viscérale) :</b></div><ul style="margin:2px 0 2px 16px;padding:0;font-size:11.5px">';
+      '<div style="font-size:12px;margin:8px 0 2px"><b>Compensations locales, importantes ou d’un seul côté (biomécanique / viscérale) :</b></div><ul style="margin:2px 0 2px 16px;padding:0;font-size:11.5px">';
     h += p.grosses
       .map(
         (g) =>

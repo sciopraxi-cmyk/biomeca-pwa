@@ -44,8 +44,8 @@ const COU = ['neck01', 'neck02', 'neck03'];
 export const POSE_NEUTRE = [
   { os: 'upperarm01.L', axe: 'z', deg: -30 },
   { os: 'upperarm01.R', axe: 'z', deg: 30 },
-  { os: 'lowerarm01.L', axe: 'x', deg: 6 },
-  { os: 'lowerarm01.R', axe: 'x', deg: 6 },
+  { os: 'lowerarm01.L', axe: 'x', deg: 50 },
+  { os: 'lowerarm01.R', axe: 'x', deg: 50 },
   { os: 'upperleg01.L', axe: 'z', deg: -5 },
   { os: 'upperleg01.R', axe: 'z', deg: 5 },
 ];
@@ -66,7 +66,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v307';
+export const BUILD = 'v308';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -665,11 +665,12 @@ const CHAINES_TABLEAUX = {
   chaine_AP: {
     label: 'Chaîne statique en expiration (Busquet) = AP (GDS)',
     valeurs: {
-      tete_antep: 3,
+      tete_antep: 2,
       ...bil('epaule_elev', -3),
       ...bil('epaule_antep', 8),
       tronc_cyphose: 15,
-      bassin_avance: 3,
+      tronc_antero: -3,
+      bassin_avance: 5,
       ...bil('genou_flex', -6),
     },
   },
@@ -677,14 +678,14 @@ const CHAINES_TABLEAUX = {
     label: 'Chaîne statique en inspiration (Busquet) = PA (GDS)',
     valeurs: {
       tete_antep: -2,
-      ...bil('epaule_elev', 3),
+      ...bil('epaule_elev', 8),
       ...bil('epaule_antep', -8),
       bassin_antev: -6,
       ...bil('genou_flex', -6),
     },
   },
   chaine_fermeture_AL: {
-    label: 'Chaîne de fermeture (Busquet) = AL (GDS)',
+    label: 'Chaîne de fermeture (Busquet) = AL (GDS), des deux côtés',
     valeurs: {
       ...bil('epaule_antep', 10),
       ...bil('bras_abd', -5),
@@ -696,8 +697,50 @@ const CHAINES_TABLEAUX = {
       ...bil('pied_ouverture', -5),
     },
   },
+  ...Object.fromEntries(
+    ['D', 'G'].flatMap((c) => [
+      [
+        'chaine_fermeture_AL_' + c,
+        {
+          label:
+            'Chaîne de fermeture (Busquet) = AL (GDS), côté ' +
+            (c === 'D' ? 'droit' : 'gauche') +
+            ' seulement',
+          valeurs: {
+            ['epaule_antep_' + c]: 10,
+            ['bras_abd_' + c]: -5,
+            ['bras_rot_' + c]: -20,
+            ['avbras_pron_' + c]: 20,
+            tronc_cyphose: 25,
+            ['cuisse_rot_' + c]: -10,
+            ['pied_valgus_' + c]: 6,
+            ['pied_ouverture_' + c]: -5,
+          },
+        },
+      ],
+      [
+        'chaine_ouverture_PL_' + c,
+        {
+          label:
+            'Chaîne d’ouverture (Busquet) = PL (GDS), côté ' +
+            (c === 'D' ? 'droit' : 'gauche') +
+            ' seulement',
+          valeurs: {
+            ['epaule_antep_' + c]: -10,
+            ['bras_abd_' + c]: 15,
+            ['bras_rot_' + c]: 20,
+            ['avbras_pron_' + c]: -20,
+            tronc_lordose: 15,
+            ['cuisse_rot_' + c]: 10,
+            ['pied_valgus_' + c]: -6,
+            ['pied_ouverture_' + c]: 20,
+          },
+        },
+      ],
+    ])
+  ),
   chaine_ouverture_PL: {
-    label: 'Chaîne d’ouverture (Busquet) = PL (GDS)',
+    label: 'Chaîne d’ouverture (Busquet) = PL (GDS), des deux côtés',
     valeurs: {
       ...bil('epaule_antep', -10),
       ...bil('bras_abd', 15),
@@ -710,7 +753,26 @@ const CHAINES_TABLEAUX = {
     },
   },
 };
-for (const k of Object.keys(CHAINES_TABLEAUX)) {
+// ordre du menu : Mézières / Meyers puis Busquet / GDS ; pour AL et PL, bilatérale puis côté D puis côté G
+const ORDRE_CHAINES = [
+  'chaine_grande_posterieure',
+  'chaine_grande_anterieure',
+  'chaine_laterale_D',
+  'chaine_laterale_G',
+  'chaine_spiralee_D',
+  'chaine_spiralee_G',
+  'chaine_extension_PM',
+  'chaine_flexion_AM',
+  'chaine_AP',
+  'chaine_PA',
+  'chaine_fermeture_AL',
+  'chaine_fermeture_AL_D',
+  'chaine_fermeture_AL_G',
+  'chaine_ouverture_PL',
+  'chaine_ouverture_PL_D',
+  'chaine_ouverture_PL_G',
+];
+for (const k of ORDRE_CHAINES) {
   const postural = /grande|laterale|spiralee/.test(k);
   TABLEAUX[k] = { ...CHAINES_TABLEAUX[k], groupe: postural ? GROUPE_POSTURAL : GROUPE_CHAINISTE };
 }

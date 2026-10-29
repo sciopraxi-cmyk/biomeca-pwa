@@ -1,7 +1,7 @@
 // Profil du patient et chaîne musculaire : fonctions pures (aucun WebGL, aucune donnée patient réelle).
 import { describe, it, expect, afterEach } from 'vitest';
 import { TABLEAUX } from '../js/mannequin3d/parametres.js';
-import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v307';
+import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v308';
 import {
   CHAINES,
   evaluerProfil,
@@ -11,7 +11,7 @@ import {
   SEUILS_PROFIL_DEFAUT,
   htmlProfil,
   htmlProfilRapport,
-} from '../js/mannequin3d/chaines.js?v=v307';
+} from '../js/mannequin3d/chaines.js?v=v308';
 
 afterEach(() => {
   definirSeuilsProfil(null);
@@ -38,8 +38,8 @@ describe('niveaux 0–4', () => {
 
 describe('chaque tableau type de chaîne fait ressortir sa chaîne', () => {
   const clesChaines = Object.keys(TABLEAUX).filter((k) => k.startsWith('chaine_'));
-  it('12 tableaux, regroupés par famille', () => {
-    expect(clesChaines.length).toBe(12);
+  it('16 tableaux (AL et PL aussi d’un seul côté), regroupés par famille', () => {
+    expect(clesChaines.length).toBe(16);
     expect(CHAINES.length).toBe(12);
     for (const k of clesChaines)
       expect(TABLEAUX[k].groupe).toMatch(/Mézières \/ Meyers|Busquet \/ GDS/);
@@ -57,15 +57,61 @@ describe('chaque tableau type de chaîne fait ressortir sa chaîne', () => {
     chaine_PA: ['PA', 'chainiste'],
     chaine_fermeture_AL: ['fermeture_AL', 'chainiste'],
     chaine_ouverture_PL: ['ouverture_PL', 'chainiste'],
+    chaine_fermeture_AL_D: ['fermeture_AL', 'chainiste', 'D'],
+    chaine_fermeture_AL_G: ['fermeture_AL', 'chainiste', 'G'],
+    chaine_ouverture_PL_D: ['ouverture_PL', 'chainiste', 'D'],
+    chaine_ouverture_PL_G: ['ouverture_PL', 'chainiste', 'G'],
   };
-  for (const [k, [id, profil]] of Object.entries(attendu))
-    it(k + ' → ' + id + ' (' + profil + ')', () => {
+  for (const [k, [id, profil, cote]] of Object.entries(attendu))
+    it(k + ' → ' + id + ' (' + profil + (cote ? ', côté ' + cote : '') + ')', () => {
       const p = evaluerProfil(TABLEAUX[k].valeurs);
       expect(p.exprimees[0].id).toBe(id);
+      expect(p.exprimees[0].cote || undefined).toBe(cote);
       expect(p.dominante && p.dominante.id).toBe(id);
       expect(p.profils).toEqual([profil]);
       expect(p.grosses).toEqual([]);
     });
+});
+
+describe('retours de Joël du 28/10 (tableaux AP / PA, AL et PL unilatérales, local + chaîne)', () => {
+  it('AP : bassin avancé plus prononcé, thorax en rétro, tête moins en antépulsion', () => {
+    const v = TABLEAUX.chaine_AP.valeurs;
+    expect(v.bassin_avance).toBeGreaterThanOrEqual(5);
+    expect(v.tronc_antero).toBeLessThan(0);
+    expect(v.tete_antep).toBeLessThanOrEqual(2);
+  });
+  it('PA : élévation des épaules beaucoup plus marquée', () => {
+    expect(TABLEAUX.chaine_PA.valeurs.epaule_elev_D).toBeGreaterThanOrEqual(8);
+  });
+  it('AL / PL unilatérales : le tableau ne pose que les signes d’un côté', () => {
+    const v = TABLEAUX.chaine_fermeture_AL_D.valeurs;
+    expect(Object.keys(v).filter((k) => k.endsWith('_G'))).toEqual([]);
+    expect(Object.keys(v).filter((k) => k.endsWith('_D')).length).toBeGreaterThan(5);
+    const w = TABLEAUX.chaine_ouverture_PL_G.valeurs;
+    expect(Object.keys(w).filter((k) => k.endsWith('_D'))).toEqual([]);
+  });
+  it('chaîne AM + genu valgum unilatéral droit : chaîniste ET biomécanique (genou droit, entrée basse)', () => {
+    const v = { ...TABLEAUX.chaine_flexion_AM.valeurs, ...TABLEAUX.genu_valgum_D.valeurs };
+    const p = evaluerProfil(v);
+    expect(p.exprimees[0].id).toBe('flexion_AM');
+    expect(p.profils).toEqual(['biomecanique', 'chainiste']);
+    expect(p.grosses.map((g) => g.id)).toContain('genou_valgus_D');
+    expect(p.grosses.find((g) => g.id === 'genou_valgus_D').cote).toBe('D');
+    expect(p.entree.type).toBe('basse');
+    // le même valgus des DEUX côtés n'est pas une compensation locale
+    const b = evaluerProfil({
+      ...TABLEAUX.chaine_flexion_AM.valeurs,
+      genou_valgus_D: 9,
+      genou_valgus_G: 9,
+    });
+    expect(b.profils).toEqual(['chainiste']);
+  });
+  it('un écart moyen d’un seul côté appartenant à la chaîne exprimée n’est pas « local »', () => {
+    expect(evaluerProfil(TABLEAUX.chaine_fermeture_AL_D.valeurs).grosses).toEqual([]);
+    definirSeuilsProfil({ unilateralMin: 4 });
+    const p = evaluerProfil({ genou_valgus_D: 9 });
+    expect(p.grosses).toEqual([]);
+  });
 });
 
 describe('profils', () => {
