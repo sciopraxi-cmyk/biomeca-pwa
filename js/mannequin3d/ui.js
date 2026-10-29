@@ -3,21 +3,23 @@ import {
   CURSEURS,
   GROUPES,
   TABLEAUX,
+  CATEGORIES_TABLEAUX,
   appliquerTableau,
   BUILD,
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v306';
-import { creerMoteur, VUES } from './moteur.js?v=v306';
-import { interpreter, EXEMPLES } from './dictee.js?v=v306';
+} from './parametres.js?v=v314';
+import { creerMoteur, VUES } from './moteur.js?v=v314';
+import { interpreter, EXEMPLES } from './dictee.js?v=v314';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v306';
+} from './mecanismes.js?v=v314';
+import { evaluerProfil, htmlProfil } from './chaines.js?v=v314';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
@@ -27,6 +29,16 @@ const CSS = `
 .m3d-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#456;font-size:12px;padding:12px;text-align:center}
 .m3d-vues,.m3d-barre{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .m3d-btn{border:1px solid var(--bord,#c9d1da);background:#fff;color:#223;border-radius:16px;padding:4px 12px;font-size:12px;cursor:pointer}
+.m3d-tabmenu{position:relative;font-size:12px}
+.m3d-tabmenu>summary{list-style:none;display:inline-block}
+.m3d-tabmenu>summary::-webkit-details-marker{display:none}
+.m3d-tabmenu>summary::after{content:' ▾'}
+.m3d-tabpanel{position:absolute;z-index:40;left:0;top:100%;margin-top:4px;width:min(440px,92vw);max-height:360px;overflow:auto;background:#fff;border:1px solid var(--bord,#c9d1da);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:4px}
+.m3d-cat{border-top:1px solid #eef1f4}
+.m3d-cat>summary{cursor:pointer;padding:6px 8px;font-weight:600;color:#2a7a4e}
+.m3d-tabitem{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 8px 5px 18px;font-size:12px;color:#223;cursor:pointer;border-radius:4px}
+.m3d-tabpanel>.m3d-tabitem{padding-left:8px;font-weight:600}
+.m3d-tabitem:hover{background:#eef6f1}
 .m3d-btn.on{background:#2a7a4e;color:#fff;border-color:#2a7a4e}
 .m3d-panel{flex:1 1 440px;min-width:300px;max-height:560px;overflow:auto}
 .m3d-cols{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:0 10px 4px}
@@ -51,8 +63,8 @@ const CSS = `
 .m3d-prop label{display:flex;gap:6px;align-items:flex-start;padding:2px 0}
 .m3d-prop em{color:#92400e;font-style:normal;font-size:10px}
 .m3d-row.prop{outline:2px dashed #b45309;background:#fff7ed;border-radius:6px}
-.m3d-meca{margin-top:8px;border:1px solid var(--bord,#d8dee5);border-radius:8px;background:#fff;padding:8px 10px}
-.m3d-meca h4{margin:0 0 4px;font-size:13px;color:#7c2d12}
+.m3d-meca,.m3d-profbox{margin-top:8px;border:1px solid var(--bord,#d8dee5);border-radius:8px;background:#fff;padding:8px 10px}
+.m3d-profbox h4,.m3d-meca h4{margin:0 0 4px;font-size:13px;color:#7c2d12}
 .m3d-hyp{border:1px solid #e2e8f0;border-radius:6px;margin:5px 0;padding:4px 8px;background:#fafafa}
 .m3d-hyp>summary{cursor:pointer;font-size:12px}
 .m3d-cr ul{margin:4px 0 0 16px;padding:0;column-count:2;column-gap:32px}
@@ -89,6 +101,8 @@ export function monter(
     retenues: Array.isArray(etat && etat.retenues)
       ? etat.retenues.filter((x) => typeof x === 'string')
       : [],
+    // profil du patient et chaîne musculaire : « Inclure au rapport » coché par le praticien
+    profilRetenu: !!(etat && etat.profilRetenu),
   };
   let moteur = null,
     detruit = false;
@@ -156,19 +170,37 @@ export function monter(
     );
     barreVues.append(btnVue[k]);
   }
-  const selTab = el(
-    'select',
-    { class: 'inp', style: 'font-size:12px;max-width:100%' },
-    el('option', { value: '' }, '— Tableau type (cumulable) —')
-  );
-  for (const k in TABLEAUX) selTab.append(el('option', { value: k }, TABLEAUX[k].label));
-  selTab.addEventListener('change', () => {
-    if (!selTab.value) return;
-    S.valeurs = appliquerTableau(S.valeurs, selTab.value); // cumul avec ce qui est déjà réglé
-    selTab.value = '';
+  // Menu « Tableau type (cumulable) » : catégories dépliables au clic (genoux, pieds, bassin, ILMI, tronc/buste,
+  // antériorisation/postériorisation, chaînes posturales, chaînes chaînistes) ; un clic sur un tableau l'applique
+  // (cumul avec ce qui est déjà réglé) et referme le menu.
+  const selTab = el('details', { class: 'm3d-tabmenu' });
+  selTab.append(el('summary', { class: 'm3d-btn m3d-tabsum' }, '— Tableau type (cumulable) —'));
+  const tabPanel = el('div', { class: 'm3d-tabpanel' });
+  selTab.append(tabPanel);
+  const itemTab = (k) =>
+    el('button', { type: 'button', class: 'm3d-tabitem', 'data-tableau': k }, TABLEAUX[k].label);
+  tabPanel.append(itemTab('neutre'));
+  for (const [cid, clabel] of CATEGORIES_TABLEAUX) {
+    const cles = Object.keys(TABLEAUX).filter((k) => TABLEAUX[k].categorie === cid);
+    if (!cles.length) continue;
+    const cat = el('details', { class: 'm3d-cat', 'data-cat': cid });
+    cat.append(el('summary', {}, clabel + ' (' + cles.length + ')'));
+    cles.forEach((k) => cat.append(itemTab(k)));
+    tabPanel.append(cat);
+  }
+  tabPanel.addEventListener('click', (ev) => {
+    const b = ev.target && ev.target.closest && ev.target.closest('[data-tableau]');
+    if (!b) return;
+    S.valeurs = appliquerTableau(S.valeurs, b.dataset.tableau);
+    selTab.open = false;
     majCurseurs();
     maj();
   });
+  // un clic ailleurs referme le menu
+  const fermerMenu = (ev) => {
+    if (selTab.open && !selTab.contains(ev.target)) selTab.open = false;
+  };
+  document.addEventListener('click', fermerMenu);
   const btnRaz = el(
     'button',
     {
@@ -186,6 +218,7 @@ export function monter(
   );
   const cr = el('div', { class: 'm3d-cr' });
   const hyp = el('div', { class: 'm3d-meca' });
+  const prof = el('div', { class: 'm3d-profbox' });
   racine.append(
     el(
       'div',
@@ -324,6 +357,7 @@ export function monter(
       { style: 'flex:1 1 100%;min-width:0' },
       cr,
       hyp,
+      prof,
       el(
         'div',
         {
@@ -501,8 +535,26 @@ export function monter(
       cr.append(ul);
     }
     majMeca();
+    majProfil();
     if (onChange) onChange(etatCourant());
   }
+  // Profil du patient et chaîne musculaire (hypothèse) sur les valeurs VALIDÉES ; toutes périodes (adulte, sport, enfant)
+  function majProfil() {
+    const ouverts = [...prof.querySelectorAll('details[open]')].map(
+      (d) => d.querySelector('summary').textContent
+    );
+    const ang = moteur && moteur.angles ? moteur.angles() : null;
+    const p = evaluerProfil(nettoyerValeurs(S.valeurs), { yeux: ang && ang.yeux });
+    prof.innerHTML = htmlProfil(p, { coche: true, retenu: S.profilRetenu });
+    prof.querySelectorAll('details').forEach((d) => {
+      if (ouverts.includes(d.querySelector('summary').textContent)) d.open = true;
+    });
+  }
+  prof.addEventListener('change', (ev) => {
+    if (!(ev.target && ev.target.dataset && ev.target.dataset.profil)) return;
+    S.profilRetenu = !!ev.target.checked;
+    if (onChange) onChange(etatCourant());
+  });
   // Hypothèses de mécanisme lésionnel sur les valeurs VALIDÉES (pas sur l'aperçu d'une dictée)
   function majMeca() {
     if (!mecanismes) {
@@ -577,6 +629,7 @@ export function monter(
       peau: S.peau,
       valeurs: nettoyerValeurs(S.valeurs),
       retenues: S.retenues.slice(),
+      profilRetenu: S.profilRetenu,
     };
   }
   async function changerSexe(k) {
@@ -647,6 +700,7 @@ export function monter(
       S.sexe = (e && e.sexe) || sexeParDefaut;
       S.peau = e ? e.peau !== false : true;
       S.valeurs = Object.assign({}, e && e.valeurs);
+      S.profilRetenu = !!(e && e.profilRetenu);
       majCurseurs();
       if (moteur) moteur.chargerSexe(S.sexe, profil).then(maj);
       else majBoutons();
@@ -654,6 +708,7 @@ export function monter(
     detruire() {
       detruit = true;
       window.removeEventListener('resize', ajusterTaille);
+      document.removeEventListener('click', fermerMenu);
       if (moteur) moteur.liberer();
       conteneur.textContent = '';
     },

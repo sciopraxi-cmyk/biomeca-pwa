@@ -44,12 +44,25 @@ const COU = ['neck01', 'neck02', 'neck03'];
 export const POSE_NEUTRE = [
   { os: 'upperarm01.L', axe: 'z', deg: -30 },
   { os: 'upperarm01.R', axe: 'z', deg: 30 },
-  { os: 'lowerarm01.L', axe: 'x', deg: 6 },
-  { os: 'lowerarm01.R', axe: 'x', deg: 6 },
+  { os: 'lowerarm01.L', axe: 'x', deg: 35 },
+  { os: 'lowerarm01.R', axe: 'x', deg: 35 },
   { os: 'upperleg01.L', axe: 'z', deg: -5 },
   { os: 'upperleg01.R', axe: 'z', deg: 5 },
 ];
 
+// Coudes en position neutre : 20° de flexion (choix de Joël, 29/10). L'orientation des os de l'avant-bras diffère d'un
+// modèle à l'autre : la correction (rotation de lowerarm01 autour de x) est mesurée pour chaque modèle afin que l'angle
+// du coude soit partout de 160° (= 20° de flexion). Valeur par défaut = POSE_NEUTRE.
+export const COUDE_NEUTRE = {
+  homme: 35.7,
+  femme: 26.2,
+  garcon_pII: 35,
+  garcon_pIII: 35,
+  garcon_pIV: 35.1,
+  fille_pII: 38.3,
+  fille_pIII: 39.2,
+  fille_pIV: 33.5,
+};
 const cote = (c) => (c === 'G' ? 1 : -1); // signe de x pour le côté du patient
 const os = (n, c) => n + (c === 'G' ? '.L' : '.R');
 const sd = (c) => (c === 'G' ? 'L' : 'R');
@@ -66,7 +79,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v306';
+export const BUILD = 'v314';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],
@@ -221,9 +234,18 @@ lat(
 lat('bras_rot', 'bras', 'Rotation du bras', -45, 45, '°', ['RI', 'RE'], (v, c) => [
   { os: os('upperarm01', c), axe: 'y', deg: v * cote(c) },
 ]);
-lat('coude_flex', 'bras', 'Flexion du coude', 0, 140, '°', ['', 'flexion'], (v, c) => [
-  { os: os('lowerarm01', c), axe: 'x', deg: -v },
-]);
+// 0 = coude neutre (20° de flexion) ; valeurs négatives = vers l'extension (−20 = bras tendu, extension complète du
+// modèle) ; valeurs positives = flexion supplémentaire
+lat(
+  'coude_flex',
+  'bras',
+  'Flexion / extension du coude',
+  -20,
+  140,
+  '°',
+  ['extension', 'flexion'],
+  (v, c) => [{ os: os('lowerarm01', c), axe: 'x', deg: -v }]
+);
 // torsion pure de l'avant-bras et de la main autour de l'axe de l'avant-bras (le coude ne plie pas)
 lat(
   'avbras_pron',
@@ -516,6 +538,11 @@ export const TABLEAUX = {
     label: 'Flessum de genou bilatéral',
     valeurs: { ...bil('genou_flex', 15), bassin_antev: 4, tronc_lordose: 8 },
   },
+  // unilatéraux : seul le genou concerné est posé (aucune compensation inventée)
+  flessum_D: { label: 'Flessum de genou unilatéral D', valeurs: { genou_flex_D: 15 } },
+  flessum_G: { label: 'Flessum de genou unilatéral G', valeurs: { genou_flex_G: 15 } },
+  recurvatum_D: { label: 'Genu recurvatum unilatéral D', valeurs: { genou_flex_D: -10 } },
+  recurvatum_G: { label: 'Genu recurvatum unilatéral G', valeurs: { genou_flex_G: -10 } },
   pied_plat_valgus: {
     label: 'Pieds plats valgus bilatéraux',
     valeurs: {
@@ -615,13 +642,228 @@ export const TABLEAUX = {
   },
 };
 
+// ─── Tableaux types des CHAÎNES MUSCULAIRES (profil du patient) ────────────────────────────────────────
+// Valeurs INDICATIVES déduites de la spécification de Joël (28/10) : chaque tableau pose les signes de sa chaîne à un
+// niveau modéré ; ils sont cumulables comme les autres et ne sont pas des normes. Un test vérifie que chaque tableau
+// fait ressortir sa propre chaîne dans le profil.
+export const GROUPE_POSTURAL = 'Chaînes posturales — Mézières / Myers';
+export const GROUPE_CHAINISTE = 'Chaînes chaînistes — Busquet / GDS';
+const CHAINES_TABLEAUX = {
+  chaine_grande_posterieure: {
+    label: 'Grande chaîne postérieure (Mézières) = ligne postérieure superficielle (Myers)',
+    valeurs: { glob_chev: 5, tronc_lordose: 8, tronc_cyphose: 8, tete_flex: -3 },
+  },
+  chaine_grande_anterieure: {
+    label:
+      'Grande chaîne antérieure (Mézières) = ligne antérieure superficielle et profonde (Myers)',
+    valeurs: { glob_chev: -4, bassin_antev: -5, tete_flex: 5 },
+  },
+  chaine_laterale_D: {
+    label: 'Ligne latérale droite (Myers) : poids à gauche',
+    valeurs: { poids_lr: -10, tronc_incl: -4, tete_incl: 4 },
+  },
+  chaine_laterale_G: {
+    label: 'Ligne latérale gauche (Myers) : poids à droite',
+    valeurs: { poids_lr: 10, tronc_incl: 4, tete_incl: -4 },
+  },
+  chaine_spiralee_D: {
+    label: 'Ligne spiralée droite (Myers)',
+    valeurs: { tronc_rot: 8, bassin_rot: 6, pied_ouverture_D: 15 },
+  },
+  chaine_spiralee_G: {
+    label: 'Ligne spiralée gauche (Myers)',
+    valeurs: { tronc_rot: -8, bassin_rot: -6, pied_ouverture_G: 15 },
+  },
+  chaine_extension_PM: {
+    label: 'Chaîne d’extension (Busquet) = PM (GDS)',
+    valeurs: { tete_flex: -6, tronc_antero: 3, tronc_lordose: 15, ...bil('genou_flex', -8) },
+  },
+  chaine_flexion_AM: {
+    label: 'Chaîne de flexion (Busquet) = AM (GDS)',
+    valeurs: {
+      tete_flex: 6,
+      tronc_cyphose: 25,
+      tronc_lordose: 8,
+      bassin_avance: -3,
+      glob_bassin: 4,
+      ...bil('genou_flex', 10),
+    },
+  },
+  chaine_AP: {
+    label: 'Chaîne statique en expiration (Busquet) = AP (GDS)',
+    valeurs: {
+      tete_antep: 2,
+      ...bil('epaule_elev', -3),
+      ...bil('epaule_antep', 8),
+      tronc_cyphose: 15,
+      tronc_antero: -3,
+      bassin_avance: 5,
+      ...bil('genou_flex', -6),
+    },
+  },
+  chaine_PA: {
+    label: 'Chaîne statique en inspiration (Busquet) = PA (GDS)',
+    valeurs: {
+      tete_antep: -2,
+      ...bil('epaule_elev', 8),
+      ...bil('epaule_antep', -8),
+      bassin_antev: -6,
+      ...bil('genou_flex', -6),
+    },
+  },
+  chaine_fermeture_AL: {
+    label: 'Chaîne de fermeture (Busquet) = AL (GDS), des deux côtés',
+    valeurs: {
+      ...bil('epaule_antep', 10),
+      ...bil('bras_abd', -5),
+      ...bil('bras_rot', -20),
+      ...bil('avbras_pron', 20),
+      tronc_cyphose: 25,
+      ...bil('cuisse_rot', -10),
+      ...bil('pied_valgus', 6),
+      ...bil('pied_ouverture', -5),
+    },
+  },
+  ...Object.fromEntries(
+    ['D', 'G'].flatMap((c) => [
+      [
+        'chaine_fermeture_AL_' + c,
+        {
+          label:
+            'Chaîne de fermeture (Busquet) = AL (GDS), côté ' +
+            (c === 'D' ? 'droit' : 'gauche') +
+            ' seulement',
+          valeurs: {
+            ['epaule_antep_' + c]: 10,
+            ['bras_abd_' + c]: -5,
+            ['bras_rot_' + c]: -20,
+            ['avbras_pron_' + c]: 20,
+            tronc_cyphose: 25,
+            ['cuisse_rot_' + c]: -10,
+            ['pied_valgus_' + c]: 6,
+            ['pied_ouverture_' + c]: -5,
+          },
+        },
+      ],
+      [
+        'chaine_ouverture_PL_' + c,
+        {
+          label:
+            'Chaîne d’ouverture (Busquet) = PL (GDS), côté ' +
+            (c === 'D' ? 'droit' : 'gauche') +
+            ' seulement',
+          valeurs: {
+            ['epaule_antep_' + c]: -10,
+            ['bras_abd_' + c]: 15,
+            ['bras_rot_' + c]: 20,
+            ['avbras_pron_' + c]: -20,
+            tronc_lordose: 15,
+            ['cuisse_rot_' + c]: 10,
+            ['pied_valgus_' + c]: -6,
+            ['pied_ouverture_' + c]: 20,
+          },
+        },
+      ],
+    ])
+  ),
+  chaine_ouverture_PL: {
+    label: 'Chaîne d’ouverture (Busquet) = PL (GDS), des deux côtés',
+    valeurs: {
+      ...bil('epaule_antep', -10),
+      ...bil('bras_abd', 15),
+      ...bil('bras_rot', 20),
+      ...bil('avbras_pron', -20),
+      tronc_lordose: 15,
+      ...bil('cuisse_rot', 10),
+      ...bil('pied_valgus', -6),
+      ...bil('pied_ouverture', 20),
+    },
+  },
+};
+// ordre du menu : Mézières / Myers puis Busquet / GDS ; pour AL et PL, bilatérale puis côté D puis côté G
+const ORDRE_CHAINES = [
+  'chaine_grande_posterieure',
+  'chaine_grande_anterieure',
+  'chaine_laterale_D',
+  'chaine_laterale_G',
+  'chaine_spiralee_D',
+  'chaine_spiralee_G',
+  'chaine_extension_PM',
+  'chaine_flexion_AM',
+  'chaine_AP',
+  'chaine_PA',
+  'chaine_fermeture_AL',
+  'chaine_fermeture_AL_D',
+  'chaine_fermeture_AL_G',
+  'chaine_ouverture_PL',
+  'chaine_ouverture_PL_D',
+  'chaine_ouverture_PL_G',
+];
+// ─── Catégories du menu « Tableau type » (dépliables au clic) ─────────────────────────────────────────
+export const CATEGORIES_TABLEAUX = [
+  ['genoux', 'Genoux'],
+  ['pieds', 'Pieds'],
+  ['bassin', 'Bassin'],
+  ['ilmi', 'ILMI (inégalité de longueur des membres inférieurs)'],
+  ['tronc', 'Tronc / buste'],
+  ['anteriorisation', 'Antériorisation / postériorisation'],
+  ['posturales', GROUPE_POSTURAL],
+  ['chainistes', GROUPE_CHAINISTE],
+];
+const CAT_PAR_CLE = {
+  genoux: [
+    'genu_valgum_bilat',
+    'genu_valgum_D',
+    'genu_valgum_G',
+    'genu_varum_bilat',
+    'recurvatum_bilat',
+    'recurvatum_D',
+    'recurvatum_G',
+    'flessum_bilat',
+    'flessum_D',
+    'flessum_G',
+  ],
+  pieds: ['pied_plat_valgus', 'pied_creux_varus', 'rotation_interne_mi', 'pied_en_dehors'],
+  bassin: ['bascule_bassin_D', 'bascule_bassin_G'],
+  ilmi: ['iml_D_courte', 'iml_G_courte'],
+  tronc: [
+    'hyperlordose',
+    'dos_plat',
+    'hypercyphose',
+    'croise_sup',
+    'croise_inf',
+    'attitude_scoliotique',
+  ],
+  anteriorisation: [
+    'anteriorisation_chevilles',
+    'anteriorisation_genoux',
+    'anteriorisation_bassin',
+    'posteriorisation_chevilles',
+    'posteriorisation_genoux',
+    'posteriorisation_bassin',
+  ],
+};
+for (const [cat, cles] of Object.entries(CAT_PAR_CLE))
+  for (const k of cles) {
+    if (!TABLEAUX[k]) throw new Error('tableau inconnu : ' + k);
+    TABLEAUX[k].categorie = cat;
+  }
+for (const k of ORDRE_CHAINES) {
+  const postural = /grande|laterale|spiralee/.test(k);
+  TABLEAUX[k] = {
+    ...CHAINES_TABLEAUX[k],
+    groupe: postural ? GROUPE_POSTURAL : GROUPE_CHAINISTE,
+    categorie: postural ? 'posturales' : 'chainistes',
+  };
+}
+
 // ─── Pose complète à partir des valeurs ────────────────────────────────────────────────────
 // Renvoie { rot, pos, bassin, morph, twist }.
 //  - rot  : {os → quaternion} ; pos : {os → [dx,dy,dz]} ;
 //  - bassin : rotation du bassin ; le moteur la fait tourner AUTOUR DES HANCHES, remet la colonne en place
 //    (le haut du corps ne suit pas) et laisse les jambes d'aplomb (rotation inverse sur pelvis.L/R) ;
 //  - morph : {nom → poids} ; twist : {L,R} torsion de l'avant-bras en degrés.
-export function poseDepuisValeurs(valeurs) {
+export function poseDepuisValeurs(valeurs, modele) {
   const rot = {},
     pos = {},
     morph = {},
@@ -632,7 +874,9 @@ export function poseDepuisValeurs(valeurs) {
   const rotAdd = (nom, q) => {
     rot[nom] = qMul(q, rot[nom] || [0, 0, 0, 1]);
   };
-  for (const o of POSE_NEUTRE) rotAdd(o.os, qAxe(o.axe, o.deg));
+  const coude = COUDE_NEUTRE[modele];
+  for (const o of POSE_NEUTRE)
+    rotAdd(o.os, qAxe(o.axe, coude !== undefined && o.os.startsWith('lowerarm01') ? coude : o.deg));
   for (const c of CURSEURS) {
     const v = Number(valeurs && valeurs[c.id]);
     if (!v || !isFinite(v)) continue;

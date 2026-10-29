@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login, requireCredentials } from './fixtures/auth';
+import { choisirTableau } from './fixtures/tableau';
 
 // Mannequin 3D dans le bilan de podologie du sport et dans la podopédiatrie (période II, III ou IV).
 test('mannequin 3D : bilan sport et podopédiatrie (parcours réel, patient fictif)', async ({
@@ -59,8 +60,8 @@ test('mannequin 3D : bilan sport et podopédiatrie (parcours réel, patient fict
     return getComputedStyle(c.parentElement!.parentElement!.parentElement!).visibility;
   });
   expect(dessinVisible).toBe('hidden');
-  await page.locator('#m3d-sport select.inp').first().selectOption('genu_valgum_bilat');
-  await page.locator('#m3d-sport select.inp').first().selectOption('bascule_bassin_D');
+  await choisirTableau(page, 'genu_valgum_bilat', '#m3d-sport');
+  await choisirTableau(page, 'bascule_bassin_D', '#m3d-sport');
   await page.waitForTimeout(2500);
   const sport: any = await page.evaluate('currentPatient.bilanData ? bilanData.mannequin3d : null');
   expect(sport.valeurs.genou_valgus_D).toBeGreaterThan(0);
@@ -104,8 +105,7 @@ test('mannequin 3D : bilan sport et podopédiatrie (parcours réel, patient fict
     await attendre();
     await expect(page.locator('#m3d-podo .m3d-btn.on', { hasText: 'Garçon' })).toBeVisible();
     await expect(page.locator('#m3d-podo .m3d-btn', { hasText: 'Fille' })).toBeVisible();
-    const sel = page.locator('#m3d-podo select.inp').first();
-    await sel.selectOption('genu_valgum_bilat');
+    await choisirTableau(page, 'genu_valgum_bilat', '#m3d-podo');
     await page.waitForTimeout(2500);
     const podo: any = await page.evaluate('currentPatient.bilanDataPodopediatrie.mannequin3d');
     expect(podo.valeurs.genou_valgus_D).toBeGreaterThan(0);
