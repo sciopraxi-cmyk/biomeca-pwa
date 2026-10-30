@@ -15,6 +15,10 @@ function monter() {
       SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'),
       SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES')) + 1
     ),
+    SRC_BIOMECA.slice(
+      SRC_BIOMECA.indexOf('const _EXO_PATHO_SLUGS'),
+      SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const _EXO_PATHO_SLUGS')) + 1
+    ),
     fonction('_exoSubsSecours'),
     fonction('_exoBibCats'),
     fonction('_exoBibSubs'),
@@ -151,7 +155,9 @@ describe('podopédiatrie : catégories retirées', () => {
     'systeme-vestibulaire',
     'reeduc-pied',
     'systeme-mandibulaire',
+    'reeduc-chaines', // rouvertes pour la podopédiatrie (demande du 30/10/2026 : propositions chaînes posturales et chaînistes)
     'reflexes-archaiques',
+    'reeduc-posturale',
     'respi-posture',
   ];
   const base = codes.map((c, i) => ({
@@ -245,7 +251,7 @@ describe('catégories découpées (24/10/2026) : dessins et podopédiatrie', () 
     'chaine-statique-expiration',
     'chaine-statique-inspiration',
   ];
-  it('chaque nouvelle catégorie a son dessin et reste exclue de la podopédiatrie', () => {
+  it('chaque nouvelle catégorie a son dessin ; terrain exclu de la podopédiatrie, chaînes rouvertes (30/10/2026)', () => {
     const f = monter();
     NOUVELLES.forEach((c) => {
       expect(f._exoAvecPicto(c, 'Test')).toMatch(/^(🏃|⛓️) Test$/u);
@@ -261,7 +267,58 @@ describe('catégories découpées (24/10/2026) : dessins et podopédiatrie', () 
     }));
     base.push({ ...BASE[0] });
     f.charger(base, [], []);
-    expect(f._exoBibCats('podo').map((c) => c.value)).toEqual([BASE[0].categorie_code]);
+    // terrain moteur : toujours exclu ; chaînes (Busquet / GDS) : rouvertes pour les propositions automatiques
+    expect(f._exoBibCats('podo').map((c) => c.value)).toEqual([
+      ...NOUVELLES.filter((c) => c.startsWith('chaine-')),
+      BASE[0].categorie_code,
+    ]);
     expect(f._exoBibCats('sport').map((c) => c.value)).toEqual(expect.arrayContaining(NOUVELLES));
+  });
+});
+
+describe('nerfs crâniens (30/10/2026) : podopédiatrie', () => {
+  it('nerfs crâniens et tronc cérébral exclus de la podopédiatrie, SAUF NC8 qui porte les exercices vestibulaires', () => {
+    const exclues = SRC_BIOMECA.slice(
+      SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'),
+      SRC_BIOMECA.indexOf(']', SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'))
+    );
+    for (const c of [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12])
+      expect(exclues).toMatch(new RegExp("'nc" + c + '-'));
+    expect(exclues).toMatch(/'tronc-cerebral'/);
+    expect(exclues).not.toMatch(/'nc8-vestibulo-cochleaire'/);
+  });
+});
+
+describe('pathologies genou / hanche / pied (30/10/2026) : plus des exercices des circuits', () => {
+  it('absentes des listes des circuits (sport, posturo, podo), liste de secours comprise ; remplacées par des cases', () => {
+    const ligne = (nom) =>
+      SRC_BIOMECA.slice(
+        SRC_BIOMECA.indexOf('const ' + nom),
+        SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const ' + nom)) + 1
+      );
+    const corps = [
+      objet('FICHES_SYSTEMES'),
+      'let _exoBib = null;',
+      'function _escHtml(s){return String(s);}',
+      ligne('_EXO_PODO_EXCLUES'),
+      ligne('_EXO_PATHO_SLUGS'),
+      fonction('_exoSubsSecours'),
+      fonction('_exoBibCats'),
+      'return { _exoBibCats, FICHES_SYSTEMES };',
+    ].join('\n');
+    // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
+    const g = new Function(corps)();
+    // les trois catégories existent bien dans la bibliothèque de secours…
+    expect(Object.keys(g.FICHES_SYSTEMES)).toEqual(
+      expect.arrayContaining(['pathologies-genou', 'pathologies-hanche', 'pathologies-pied'])
+    );
+    // …mais aucun bilan ne les propose dans les listes des circuits
+    for (const bilan of ['sport', 'posturo', 'podo'])
+      expect(g._exoBibCats(bilan).filter((c) => /^pathologies-/.test(c.value))).toEqual([]);
+    expect(g._exoBibCats('sport').length).toBeGreaterThan(5);
+    expect(
+      (SRC_BIOMECA.match(/\['(bit|fp|pubalgie|piriforme|fessier|achille|fibulaires)', /g) || [])
+        .length
+    ).toBe(7);
   });
 });

@@ -254,7 +254,7 @@ describe('câblage (garde de source)', () => {
   it('le service worker patient met le module en cache et la version a changé', () => {
     const sw = lire('patient/sw.js');
     expect(sw).toMatch(/questionnaire-modele\.mjs/);
-    expect(sw).toMatch(/verticy-patient-v21/);
+    expect(sw).toMatch(/verticy-patient-v22/);
   });
   it('la carte « Mon questionnaire » est un bouton, plus un « Bientôt disponible »', () => {
     const h = lire('patient/index.html');

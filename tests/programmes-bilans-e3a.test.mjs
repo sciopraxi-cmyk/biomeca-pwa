@@ -16,6 +16,10 @@ function monter() {
     fonction('_progFr'),
     fonction('_progDefaut'),
     fonction('_progDefautPied'),
+    SRC_BIOMECA.slice(
+      SRC_BIOMECA.indexOf('const _PROG_PATHO = ['),
+      SRC_BIOMECA.indexOf('\n];', SRC_BIOMECA.indexOf('const _PROG_PATHO = [')) + 3
+    ),
     fonction('_progPeriodes'),
     fonction('_progSeances'),
     fonction('_progTexteSeances'),
