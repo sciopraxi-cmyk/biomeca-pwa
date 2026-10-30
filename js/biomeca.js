@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v323';
+const APP_BUILD = 'v324';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -26184,7 +26184,9 @@ function _exoBibConstruire(base, persoCats, perso) {
 // « (posture) » reste proposée, la respiration « (sport) » est retirée. Les catégories ajoutées ensuite à la base
 // et les catégories personnelles du praticien restent proposées.
 // Terrain moteur et chaînes musculaires ont été découpés en 2 et 6 catégories (24/10/2026) : toutes restent exclues.
-const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-articulaire', 'nc1-olfactif', 'nc2-optique', 'nc3-oculomoteur', 'nc4-trochleaire', 'nc5-trijumeau', 'nc6-abducens', 'nc7-facial', 'nc8-vestibulo-cochleaire', 'nc9-glosso-pharyngien', 'nc10-vague', 'nc11-accessoire', 'nc12-hypoglosse', 'tronc-cerebral', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
+// NC8 (vestibulo-cochléaire) n'est PAS exclue de la podopédiatrie : elle porte désormais les exercices vestibulaires que ce bilan
+// proposait dans « Système vestibulaire » (déplacés le 30/10/2026). Les autres nerfs crâniens et le tronc cérébral restent exclus.
+const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-articulaire', 'nc1-olfactif', 'nc2-optique', 'nc3-oculomoteur', 'nc4-trochleaire', 'nc5-trijumeau', 'nc6-abducens', 'nc7-facial', 'nc9-glosso-pharyngien', 'nc10-vague', 'nc11-accessoire', 'nc12-hypoglosse', 'tronc-cerebral', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
 // Liste de secours (hors ligne) : exercices de la catégorie ; ceux du pied viennent de EXERCICES_PIED_ENFANT.
 function _exoSubsSecours(slug, cfg) {
   const l = cfg.subs.map(o => ({ value: o, label: o }));
@@ -26406,6 +26408,8 @@ function _exoAutoContexte(bilan) {
     analyseVues: d._postureAnalysis || null,
     neuro: d.neuro4 || {},
     canauxVestibulaire: { ant: coche('po-canal-ant'), post: coche('po-canal-post'), lat: coche('po-canal-lat') },
+    // renseignement de la section vestibulaire dédiée (typage canalaire, Romberg) : sert à décider de proposer « utricules »
+    vestibulaireRenseigne: !!(document.querySelector('input[name="po-pevs"]:checked') || coche('po-romberg-ant') || coche('po-romberg-lat')),
     visuel: (function () {
       // bloc « Investigation entrée visuelle » : entrée visuelle primaire/secondaire, défaut de convergence, hétérophorie
       const l = [];

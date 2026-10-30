@@ -271,3 +271,16 @@ describe('catégories découpées (24/10/2026) : dessins et podopédiatrie', () 
     expect(f._exoBibCats('sport').map((c) => c.value)).toEqual(expect.arrayContaining(NOUVELLES));
   });
 });
+
+describe('nerfs crâniens (30/10/2026) : podopédiatrie', () => {
+  it('nerfs crâniens et tronc cérébral exclus de la podopédiatrie, SAUF NC8 qui porte les exercices vestibulaires', () => {
+    const exclues = SRC_BIOMECA.slice(
+      SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'),
+      SRC_BIOMECA.indexOf(']', SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'))
+    );
+    for (const c of [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12])
+      expect(exclues).toMatch(new RegExp("'nc" + c + '-'));
+    expect(exclues).toMatch(/'tronc-cerebral'/);
+    expect(exclues).not.toMatch(/'nc8-vestibulo-cochleaire'/);
+  });
+});

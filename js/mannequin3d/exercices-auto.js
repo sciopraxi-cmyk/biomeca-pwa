@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v323';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v323';
-import { calculerReprise } from './reprise-4vues.js?v=v323';
+import { PAR_ID } from './parametres.js?v=v324';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v324';
+import { calculerReprise } from './reprise-4vues.js?v=v324';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -153,17 +153,22 @@ export function proposerExercices(c) {
   const podo = !!(c && c.bilan === 'podo');
   if (podo) {
     /* pas de données vestibulaires dans ce bilan */
-  } else if (!canaux.ant && !canaux.post && !canaux.lat)
-    ajoute({
-      cle: 'vest-utricules',
-      groupe: 'vestibule',
-      cats: [
-        { code: 'nc8-vestibulo-cochleaire', exo: 'utricule' },
-        { code: 'systeme-vestibulaire', exo: 'utricule' },
-      ],
-      raison: 'vestibulaire : aucun canal semi-circulaire coché → utricules',
-    });
-  else
+  } else if (!canaux.ant && !canaux.post && !canaux.lat) {
+    // « utricules » seulement si le bilan contient au moins une donnée vestibulaire (case du tableau vestibulaire, même
+    // « normal », ou renseignement de la section dédiée) : une section vide ne propose rien (décision du 30/10)
+    const donneeVest =
+      Object.keys(n).some((k) => /^vest-/.test(k) && n[k]) || !!(c && c.vestibulaireRenseigne);
+    if (donneeVest)
+      ajoute({
+        cle: 'vest-utricules',
+        groupe: 'vestibule',
+        cats: [
+          { code: 'nc8-vestibulo-cochleaire', exo: 'utricule' },
+          { code: 'systeme-vestibulaire', exo: 'utricule' },
+        ],
+        raison: 'vestibulaire : aucun canal semi-circulaire coché → utricules',
+      });
+  } else
     for (const [k, , lib, re] of CSC)
       if (canaux[k])
         ajoute({
@@ -261,57 +266,52 @@ export function proposerExercices(c) {
     });
 
   // Totaux de la colonne « nerfs crâniens » du tableau neuro-fonctionnel (mêmes cases que les totaux affichés, dont la
-  // recapillarisation) : le côté qui a le plus de cases cochées donne le tronc cérébral (« TC droit » / « TC gauche »)
+  // recapillarisation) : le côté qui a le plus de cases cochées donne le tronc cérébral (« TC droit » / « TC gauche »).
   const NC_IDS = ['nc-recap', ...NERFS.map((x) => 'nc-nc' + x.k)];
   const totG = NC_IDS.filter((id) => !!n[id + '-g']).length;
   const totD = NC_IDS.filter((id) => !!n[id + '-d']).length;
-  const cotePrincipal = totD > totG ? 'D' : totG > totD ? 'G' : null;
-  // Nerfs crâniens : une case gauche ou droite cochée → catégorie du nerf (le praticien choisit l'exercice parmi ceux du nerf).
-  // Les nerfs du côté principal passent d'abord, puis l'ordre des numéros. Les nerfs qui vont normalement en emplacement 3
-  // peuvent DÉBORDER dans l'emplacement 1 quand il reste des lignes libres (les 8 premiers emplacements doivent être remplis).
-  if (!podo)
-    for (const nc of NERFS)
-      if (coche(n, 'nc-nc' + nc.k, ['g', 'd'])) {
-        const cote =
-          n['nc-nc' + nc.k + '-d'] && n['nc-nc' + nc.k + '-g']
-            ? 'les deux côtés'
-            : n['nc-nc' + nc.k + '-d']
-              ? 'droit'
-              : 'gauche';
-        const surPrincipal =
-          !cotePrincipal ||
-          (cotePrincipal === 'D' ? !!n['nc-nc' + nc.k + '-d'] : !!n['nc-nc' + nc.k + '-g']);
-        ajoute({
-          cle: 'nc-' + nc.k,
-          groupe: nc.groupe || 'slot3',
-          slot3: nc.slot3,
-          debordable: nc.slot3,
-          ordre: (surPrincipal ? 0 : 100) + nc.k,
-          cats: [{ code: nc.code, exo: null }],
-          sousVide: true,
-          raison: nc.nom + ' (' + cote + ') : case cochée dans le tableau des nerfs crâniens',
-        });
-      }
-  // Tronc cérébral : proposé dès qu'un nerf crânien est coché (ou pattern / hypothèse tronc cérébral). Le CÔTÉ vient du total
-  // de la colonne des nerfs crâniens (plus important à droite → « TC droit »), à défaut du côté du pattern ; sinon le
-  // praticien choisit. Emplacement 1.
   const patG = !!n['apd-tronc-g'];
   const patD = !!n['apd-tronc-d'];
   const hypoTC = !!n['po-hypo-tronc'] || !!n['hypo-tronc'] || !!(c && c.hypoTronc);
-  if (!podo && (totG + totD > 0 || patG || patD || hypoTC)) {
-    let coteTC = cotePrincipal;
-    let origine =
-      'total des nerfs crâniens plus important à ' +
-      (cotePrincipal === 'D' ? 'droite' : 'gauche') +
+  // côté du tronc cérébral : total des nerfs crâniens, à défaut côté du pattern ; sinon (égalité) le praticien choisit
+  let coteTC = totD > totG ? 'D' : totG > totD ? 'G' : null;
+  let origineTC = coteTC
+    ? 'total des nerfs crâniens plus important à ' +
+      (coteTC === 'D' ? 'droite' : 'gauche') +
       ' (' +
       Math.max(totD, totG) +
       ' contre ' +
       Math.min(totD, totG) +
-      ')';
-    if (!coteTC && patD !== patG) {
-      coteTC = patD ? 'D' : 'G';
-      origine = 'pattern tronc cérébral coché à ' + (patD ? 'droite' : 'gauche');
+      ')'
+    : '';
+  if (!coteTC && patD !== patG) {
+    coteTC = patD ? 'D' : 'G';
+    origineTC = 'pattern tronc cérébral coché à ' + (patD ? 'droite' : 'gauche');
+  }
+  const cs = coteTC ? coteTC.toLowerCase() : null;
+  // Nerfs crâniens : une case cochée → catégorie du nerf (le praticien choisit l'exercice parmi ceux du nerf).
+  // Si le tronc cérébral est « droit », SEULS les nerfs cochés à DROITE sont proposés (idem à gauche) ; à égalité, tous.
+  // Les nerfs qui vont normalement en emplacement 3 peuvent DÉBORDER dans l'emplacement 1 quand il reste des lignes libres
+  // (les 8 premiers emplacements doivent être remplis).
+  if (!podo)
+    for (const nc of NERFS) {
+      const id = 'nc-nc' + nc.k;
+      if (!coche(n, id, cs ? [cs] : ['g', 'd'])) continue;
+      const cote =
+        n[id + '-d'] && n[id + '-g'] ? 'les deux côtés' : n[id + '-d'] ? 'droit' : 'gauche';
+      ajoute({
+        cle: 'nc-' + nc.k,
+        groupe: nc.groupe || 'slot3',
+        slot3: nc.slot3,
+        debordable: nc.slot3,
+        ordre: nc.k,
+        cats: [{ code: nc.code, exo: null }],
+        sousVide: true,
+        raison: nc.nom + ' (' + cote + ') : case cochée dans le tableau des nerfs crâniens',
+      });
     }
+  // Tronc cérébral : proposé dès qu'un nerf crânien est coché (ou pattern / hypothèse tronc cérébral). Emplacement 1.
+  if (!podo && (totG + totD > 0 || patG || patD || hypoTC))
     ajoute({
       cle: 'tronc-cerebral',
       groupe: 'tronc',
@@ -323,10 +323,9 @@ export function proposerExercices(c) {
       ],
       sousVide: !coteTC,
       raison: coteTC
-        ? 'tronc cérébral ' + (coteTC === 'D' ? 'droit' : 'gauche') + ' : ' + origine
+        ? 'tronc cérébral ' + (coteTC === 'D' ? 'droit' : 'gauche') + ' : ' + origineTC
         : 'tronc cérébral : nerfs crâniens ou pattern cochés des deux côtés (à égalité) — choisissez le côté',
     });
-  }
   // Exercice visuel (« au niveau des yeux ») : règles propres à chaque bilan, motif = ce qui est coché ; emplacement 3
   if (c && Array.isArray(c.visuel) && c.visuel.length)
     ajoute({

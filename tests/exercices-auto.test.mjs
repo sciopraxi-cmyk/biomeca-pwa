@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v323';
+} from '../js/mannequin3d/exercices-auto.js?v=v324';
 
 const CAT = [
   {
@@ -79,10 +79,15 @@ const cles = (r) => r.propositions.map((p) => p.cle);
 const vide = () => Array.from({ length: 8 }, () => [null, null, null]);
 
 describe('vestibulaire', () => {
-  it('aucun canal coché → utricules', () => {
-    const r = proposerExercices({ bilan: 'posturo', neuro: {} });
+  it('aucun canal coché MAIS une donnée vestibulaire dans le bilan → utricules ; section vide → rien', () => {
+    expect(cles(proposerExercices({ bilan: 'posturo', neuro: {} }))).toEqual([]);
+    const r = proposerExercices({ bilan: 'posturo', neuro: { 'vest-ant-n': true } }); // test fait, normal
     expect(cles(r)).toEqual(['vest-utricules']);
     expect(resoudre(r.propositions[0], CAT).defaut).toBe('utr');
+    expect(cles(proposerExercices({ neuro: {}, vestibulaireRenseigne: true }))).toEqual([
+      'vest-utricules',
+    ]);
+    expect(cles(proposerExercices({ neuro: {}, vestibulaireRenseigne: false }))).toEqual([]);
   });
   it('canal coché → exercice du canal (pas les utricules) ; plusieurs canaux = plusieurs exercices', () => {
     const r = proposerExercices({ neuro: { 'vest-ant-g': true, 'vest-lat-d': true } });
@@ -250,7 +255,6 @@ describe('placement dans les circuits', () => {
   it('proposition dont la catégorie manque : non résolue (jamais inventée)', () => {
     const p = proposerExercices({ valeurs: { pied_valgus_D: 10 }, neuro: {} }).propositions[0];
     expect(resoudre(p, [])).toBeNull();
-    expect(res({}).length).toBeGreaterThan(0);
   });
 
   it('destination choisie par le praticien : emplacement 3 de la ligne voulue, sans écraser', () => {
@@ -331,7 +335,9 @@ describe('placement dans les circuits', () => {
   it('podopédiatrie : jamais de proposition vestibulaire ni proprioceptive (pas de données dans ce bilan)', () => {
     expect(cles(proposerExercices({ bilan: 'podo', neuro: {} }))).toEqual([]);
     expect(cles(proposerExercices({ bilan: 'podo', neuro: { 'prop-lent-g': true } }))).toEqual([]);
-    expect(cles(proposerExercices({ bilan: 'posturo', neuro: {} }))).toEqual(['vest-utricules']);
+    expect(cles(proposerExercices({ bilan: 'posturo', neuro: { 'vest-lat-n': true } }))).toEqual([
+      'vest-utricules',
+    ]);
   });
 
   it('ordre des réflexes : RPP, Moro, RTP, puis Babinski, plantaire, RTAC, Perez, Galant, Landau, palmaire, Babkin, reptation', () => {
@@ -484,8 +490,15 @@ describe('placement dans les circuits', () => {
       neuro: { 'nc-nc3-g': true, 'nc-nc4-n': true, 'nc-nc11-d': true, 'nc-nc8-d': true },
     });
     const nc = r.propositions.filter((p) => p.cle.startsWith('nc-'));
-    expect(nc.map((p) => p.cle).sort()).toEqual(['nc-11', 'nc-3', 'nc-8']);
-    expect(nc.find((p) => p.cle === 'nc-3')).toMatchObject({
+    // 2 cases à droite (NC8, NC11) contre 1 à gauche (NC3) → TC droit : seuls les nerfs cochés à droite sont proposés
+    expect(nc.map((p) => p.cle).sort()).toEqual(['nc-11', 'nc-8']);
+    // à égalité : tous les nerfs cochés
+    const egal = proposerExercices({ neuro: { 'nc-nc3-g': true, 'nc-nc4-d': true } });
+    expect(egal.propositions.filter((p) => p.cle.startsWith('nc-')).map((p) => p.cle)).toEqual([
+      'nc-3',
+      'nc-4',
+    ]);
+    expect(egal.propositions.find((p) => p.cle === 'nc-3')).toMatchObject({
       groupe: 'slot3',
       slot3: true,
       sousVide: true,
@@ -584,14 +597,15 @@ describe('placement dans les circuits', () => {
     ]);
     expect(plan.libres.filter((x) => x.slot === 0)).toHaveLength(0); // les 8 premiers emplacements sont remplis
   });
-  it('débordement : les nerfs du côté principal passent avant ceux de l’autre côté ; visuel et mandibule ne débordent jamais', () => {
+  it('débordement : seuls les nerfs du côté du tronc cérébral sont proposés ; visuel et mandibule ne débordent jamais', () => {
     const r = proposerExercices({
       neuro: { 'nc-nc5-g': true, 'nc-nc2-d': true, 'nc-nc3-d': true, 'nc-nc7-d': true },
       visuel: ['défaut de convergence'],
       atm: ['ATM'],
     });
     const ordre = r.propositions.filter((p) => p.cle.startsWith('nc-')).map((p) => p.cle);
-    expect(ordre).toEqual(['nc-2', 'nc-3', 'nc-7', 'nc-5']);
+    // TC droit (3 à droite contre 1 à gauche) : le nerf 5 coché seulement à gauche n'est PAS proposé
+    expect(ordre).toEqual(['nc-2', 'nc-3', 'nc-7']);
     const rr = r.propositions
       .map((p) => {
         const k = /^nc-(\d+)$/.exec(p.cle);
@@ -669,5 +683,27 @@ describe('placement dans les circuits', () => {
         })
       )
     ).toContain('visuel');
+  });
+
+  it('TC gauche : seuls les nerfs cochés à gauche ; un nerf coché des deux côtés compte à gauche comme à droite', () => {
+    const nc = (neuro) =>
+      proposerExercices({ neuro })
+        .propositions.filter((p) => p.cle.startsWith('nc-'))
+        .map((p) => p.cle);
+    expect(nc({ 'nc-nc1-g': true, 'nc-nc2-g': true, 'nc-nc3-d': true })).toEqual(['nc-1', 'nc-2']);
+    expect(nc({ 'nc-nc1-g': true, 'nc-nc1-d': true, 'nc-nc2-d': true, 'nc-nc3-d': true })).toEqual([
+      'nc-1',
+      'nc-2',
+      'nc-3',
+    ]);
+    // côté tiré du pattern (totaux à égalité) : même restriction
+    expect(nc({ 'nc-nc1-g': true, 'nc-nc2-d': true, 'apd-tronc-d': true })).toEqual(['nc-2']);
+  });
+  it('vestibule = canaux ET NC8, même groupe de priorité (emplacement 1)', () => {
+    const r = proposerExercices({ neuro: { 'vest-ant-g': true, 'nc-nc8-d': true } });
+    const g = r.propositions
+      .filter((p) => p.cle === 'vest-ant' || p.cle === 'nc-8')
+      .map((p) => p.groupe);
+    expect(g).toEqual(['vestibule', 'vestibule']);
   });
 });
