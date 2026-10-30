@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v317';
+const APP_BUILD = 'v318';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -26315,6 +26315,202 @@ function _progDefautPied(dateBilanISO) {
   while ((d + 3) % 7 !== 0) d++; // jour 0 (01/01/1970) = jeudi
   return { debut: _progISO(d), fin: _progISO(d + 27) };
 }
+// ── Chantier B lot 2 — « ✨ Proposer les exercices » dans les circuits Express (sport, posturo)
+// La logique (règles du praticien) est dans js/mannequin3d/exercices-auto.js (pure, testée). Ici : lecture du bilan,
+// aperçu avec cases à cocher, écriture dans les listes SEULEMENT après « Appliquer » ; jamais d'écrasement.
+function _exoAutoLignes(bilan) {
+  const pref = bilan === 'sport' ? 'sp' : 'po';
+  const lignes = [];
+  ['c1', 'c2'].forEach(function (c) {
+    for (let i = 1; i <= 4; i++) {
+      const libre = document.getElementById(pref + '-' + c + '-ex' + i + '-libre');
+      const rang = libre && (bilan === 'sport' ? libre.closest('.exo-stack') : libre.closest('div[style*="border"]'));
+      lignes.push({ sels: rang ? Array.from(rang.querySelectorAll('select.exo-sys')) : [] });
+    }
+  });
+  return lignes;
+}
+function _exoAutoEtat(lignes) {
+  return lignes.map(function (l) {
+    return [0, 1, 2].map(function (k) {
+      const s = l.sels[k];
+      if (!s || !s.value) return null;
+      const pair = s.closest('.exo-pair');
+      const sub = pair && pair.querySelector('select.exo-sub');
+      return { sys: s.value, sub: sub ? sub.value : '' };
+    });
+  });
+}
+function _exoAutoContexte(bilan) {
+  if (bilan === 'sport') {
+    const bd = (typeof bilanData !== 'undefined' && bilanData) || {};
+    const neuro = {};
+    Object.keys(bd).forEach(function (k) { if (bd[k] === true && /^(vest|prop|ref)_/.test(k)) neuro[k.replace(/_/g, '-')] = true; });
+    const terrain = bd.terrain_aerien ? 'aerien' : (bd.terrain_terrien ? 'terrien' : null);
+    return { bilan: 'sport', valeurs: (bd.mannequin3d && bd.mannequin3d.valeurs) || null, analyseVues: bd._postureAnalysis || null, neuro: neuro, terrain: terrain };
+  }
+  const d = (currentPatient && currentPatient.bilanDataPosturo) || {};
+  const pref = document.querySelector('input[name="po-pref-mot"]:checked');
+  const coche = function (id) { const e = document.getElementById(id); return !!(e && e.checked); };
+  return {
+    bilan: 'posturo',
+    valeurs: (d.mannequin3d && d.mannequin3d.valeurs) || null,
+    analyseVues: d._postureAnalysis || null,
+    neuro: d.neuro4 || {},
+    canauxVestibulaire: { ant: coche('po-canal-ant'), post: coche('po-canal-post'), lat: coche('po-canal-lat') },
+    terrain: pref ? (pref.value === 'tonique-aerien' ? 'aerien' : (pref.value === 'phasique-terrien' ? 'terrien' : null)) : null
+  };
+}
+function _exoAutoEcrire(lignes, e) {
+  const sel = lignes[e.ligne] && lignes[e.ligne].sels[e.slot];
+  if (!sel) return false;
+  _exoBibAssurerOption(sel, e.sys, e.sysLib);
+  sel.value = e.sys;
+  sel.dispatchEvent(new Event('change', { bubbles: true })); // crée la liste d'exercices (et, en sport, recopie l'Échauffement)
+  if (e.sub) {
+    const pair = sel.closest('.exo-pair');
+    const sub = pair && pair.querySelector('select.exo-sub');
+    if (sub) { _exoBibAssurerOption(sub, e.sub, e.subLib); sub.value = e.sub; sub.dispatchEvent(new Event('change', { bubbles: true })); }
+    else _exoBibForcerSub(sel, e.sub, e.subLib);
+  }
+  return true;
+}
+async function _exoAutoOuvrir(bilan) {
+  if (typeof _exoBib === 'undefined' || !_exoBib) { try { await exoBibRafraichir(); } catch (_e) { /* liste de secours */ } }
+  let M;
+  try { M = await import('./mannequin3d/index.js?v=' + APP_BUILD); } catch (_e) { alert('Module indisponible hors connexion.'); return; }
+  const lignes = _exoAutoLignes(bilan);
+  if (lignes.length !== 8 || lignes.some(function (l) { return l.sels.length < 3; })) { alert('Circuits Express introuvables dans ce bilan.'); return; }
+  const catalogue = _exoBibCats(bilan);
+  const r = M.proposerExercices(_exoAutoContexte(bilan));
+  const etat = _exoAutoEtat(lignes);
+  const resolues = [], absentes = [];
+  r.propositions.forEach(function (p) { const x = M.resoudre(p, catalogue); if (x) resolues.push(x); else absentes.push(p); });
+  const coches = {}, choix = {}, dest = {};
+  resolues.forEach(function (p) { coches[p.cle] = true; });
+  let pied = !!r.programmePied;
+  let respi = true;
+  const pc = (typeof _progChamp === 'function') ? _progChamp(bilan === 'sport' ? 'sp' : 'po', 'pied-on') : null;
+  const piedDejaCoche = !!(pc && pc.checked);
+
+  const ov = document.createElement('div');
+  ov.id = 'exo-auto-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;color:#222;border-radius:12px;max-width:820px;width:100%;padding:16px 18px;font-size:13px;box-shadow:0 10px 40px rgba(0,0,0,.3);';
+  ov.appendChild(box);
+  const el = function (tag, css, txt) { const e = document.createElement(tag); if (css) e.style.cssText = css; if (txt != null) e.textContent = txt; return e; };
+  const fermer = function () { ov.remove(); };
+
+  function rendre() {
+    box.textContent = '';
+    box.appendChild(el('div', 'font-weight:700;font-size:16px;margin-bottom:4px;', '✨ Exercices proposés d’après le bilan'));
+    box.appendChild(el('div', 'color:#555;margin-bottom:10px;', 'Rien n’est écrit tant que vous n’avez pas cliqué « Appliquer ». Les exercices déjà choisis ne sont jamais modifiés.'));
+    const actives = resolues.filter(function (p) { return coches[p.cle]; });
+    const plan = M.planifier(actives, etat, catalogue, bilan, choix, dest);
+    const ou = {};
+    plan.ecritures.forEach(function (e) { if (e.cle !== 'respiration') ou[e.cle] = e; });
+    r.notes.forEach(function (n) { box.appendChild(el('div', 'color:#b7740a;margin-bottom:6px;', 'ℹ️ ' + n)); });
+    if (!resolues.length && !r.programmePied) box.appendChild(el('div', 'margin:8px 0;', 'Aucune règle ne propose d’exercice pour ce bilan.'));
+    resolues.forEach(function (p) {
+      const row = el('div', 'border:1px solid #ddd;border-radius:8px;padding:8px 10px;margin-bottom:6px;');
+      const l1 = el('label', 'display:flex;gap:8px;align-items:flex-start;cursor:pointer;');
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!coches[p.cle];
+      cb.onchange = function () { coches[p.cle] = cb.checked; rendre(); };
+      l1.appendChild(cb);
+      const t = el('div', '');
+      t.appendChild(el('div', 'font-weight:600;', p.sysLib));
+      t.appendChild(el('div', 'color:#555;font-size:12px;', p.raison));
+      l1.appendChild(t);
+      row.appendChild(l1);
+      if (coches[p.cle]) {
+        const ligne = el('div', 'display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 0 24px;align-items:center;');
+        if (p.candidats.length) {
+          const s = document.createElement('select'); s.className = 'inp'; s.style.cssText = 'font-size:12px;max-width:100%;background:#fff;color:#222;border:1px solid #bbb;padding:4px 6px;width:auto;';
+          if (!p.defaut) { const o = document.createElement('option'); o.value = ''; o.textContent = '— je choisirai l’exercice moi-même —'; s.appendChild(o); }
+          p.candidats.forEach(function (c) { const o = document.createElement('option'); o.value = c.value; o.textContent = c.label; s.appendChild(o); });
+          s.value = Object.prototype.hasOwnProperty.call(choix, p.cle) ? choix[p.cle] : p.defaut;
+          s.onchange = function () { choix[p.cle] = s.value; rendre(); };
+          ligne.appendChild(s);
+        }
+        const d = document.createElement('select'); d.className = 'inp'; d.style.cssText = 'font-size:12px;background:#fff;color:#222;border:1px solid #bbb;padding:4px 6px;width:auto;';
+        const auto = ou[p.cle] && !dest[p.cle];
+        const o0 = document.createElement('option'); o0.value = '';
+        o0.textContent = auto ? ('Placer : ' + M.LIBELLE_LIGNE(ou[p.cle].ligne) + ', emplacement 1 (auto)') : (dest[p.cle] ? 'Placer : (auto)' : 'Ne pas placer (lignes pleines)');
+        d.appendChild(o0);
+        const libres0 = [];
+        for (let i = 0; i < 8; i++) for (let k = 0; k < 3; k++) if (!etat[i][k]) libres0.push([i, k]);
+        libres0.forEach(function (x) { const o = document.createElement('option'); o.value = x[0] + ':' + x[1]; o.textContent = M.LIBELLE_LIGNE(x[0]) + ', emplacement ' + (x[1] + 1); d.appendChild(o); });
+        d.value = dest[p.cle] ? (dest[p.cle].ligne + ':' + dest[p.cle].slot) : '';
+        d.onchange = function () { if (!d.value) delete dest[p.cle]; else { const q = d.value.split(':'); dest[p.cle] = { ligne: +q[0], slot: +q[1] }; } rendre(); };
+        ligne.appendChild(d);
+        row.appendChild(ligne);
+        const np = plan.nonPlacees.find(function (x) { return x.cle === p.cle; });
+        if (np) row.appendChild(el('div', 'margin:4px 0 0 24px;color:#b7740a;font-size:12px;', 'Non placé : les 8 lignes sont prises. Choisissez un emplacement libre ci-dessus ou laissez de côté.'));
+        if (plan.dejaPresentes.some(function (x) { return x.cle === p.cle; })) row.appendChild(el('div', 'margin:4px 0 0 24px;color:#2a7a4e;font-size:12px;', 'Déjà présent dans les circuits : rien à ajouter.'));
+      }
+      box.appendChild(row);
+    });
+    absentes.forEach(function (p) { box.appendChild(el('div', 'color:#999;font-size:12px;margin-bottom:4px;', '⚠️ ' + p.raison + ' : catégorie absente de la liste d’exercices de ce bilan, non proposée.')); });
+    if (r.programmePied) {
+      const l = el('label', 'display:flex;gap:8px;align-items:center;cursor:pointer;margin:8px 0;');
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = pied && !!pc; cb.disabled = piedDejaCoche || !pc;
+      cb.onchange = function () { pied = cb.checked; };
+      l.appendChild(cb);
+      l.appendChild(el('span', '', 'Cocher le programme de renforcement des muscles profonds du pied (' + r.programmePied.raison + ')' + (piedDejaCoche ? ' — déjà coché' : '')));
+      box.appendChild(l);
+    }
+    const nResp = plan.ecritures.filter(function (e) { return e.cle === 'respiration'; }).length;
+    const lr = el('label', 'display:flex;gap:8px;align-items:center;cursor:pointer;margin:8px 0;');
+    const cr = document.createElement('input'); cr.type = 'checkbox'; cr.checked = respi;
+    cr.onchange = function () { respi = cr.checked; };
+    lr.appendChild(cr);
+    lr.appendChild(el('span', '', 'Emplacement 2 : exercice de respiration, en alternant « Faim d’air » et « Respiration pour le stress » (' + nResp + ' ligne(s) libre(s))'));
+    box.appendChild(lr);
+    const bar = el('div', 'display:flex;gap:8px;justify-content:flex-end;margin-top:12px;');
+    const bn = el('button', 'padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer;', 'Annuler'); bn.onclick = fermer;
+    const nb = plan.ecritures.filter(function (e) { return e.cle !== 'respiration' || respi; }).length + (pied && !piedDejaCoche ? 1 : 0);
+    const bo = el('button', 'padding:8px 14px;border-radius:8px;border:none;background:#2a7a4e;color:#fff;font-weight:700;cursor:pointer;', 'Appliquer (' + nb + ')');
+    bo.disabled = nb === 0;
+    bo.onclick = function () {
+      const plan2 = M.planifier(resolues.filter(function (p) { return coches[p.cle]; }), _exoAutoEtat(lignes), catalogue, bilan, choix, dest);
+      let n = 0;
+      plan2.ecritures.forEach(function (e) {
+        if (e.cle === 'respiration' && !respi) return;
+        if (e.sub && !e.subLib) { const p = resolues.find(function (x) { return x.cle === e.cle; }); const c = p && p.candidats.find(function (x) { return x.value === e.sub; }); if (c) e.subLib = c.label; }
+        if (_exoAutoEcrire(lignes, e)) n++;
+      });
+      if (pied && pc && !pc.checked) { pc.checked = true; pc.dispatchEvent(new Event('change', { bubbles: true })); n++; }
+      fermer();
+      if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave(bilan);
+      alert(n + ' ajout(s) dans les circuits. Vérifiez-les, puis enregistrez le bilan comme d’habitude.');
+    };
+    bar.appendChild(bn); bar.appendChild(bo);
+    box.appendChild(bar);
+  }
+  ov.onclick = function (e) { if (e.target === ov) fermer(); };
+  rendre();
+  document.body.appendChild(ov);
+}
+// Bouton posé à l'ouverture de la section des circuits (idempotent ; aucun changement de la structure des pages)
+function _exoAutoBouton(bilan) {
+  const libre = document.getElementById((bilan === 'sport' ? 'sp' : 'po') + '-c1-ex1-libre');
+  if (!libre) return;
+  const sec = document.getElementById(bilan === 'sport' ? 'ssec-9' : 'psec-8');
+  if (!sec || sec.querySelector('.exo-auto-btn')) return;
+  // juste au-dessus des deux circuits Express (les listes se trouvent plus bas que le plan de semelles)
+  const grille = libre.closest('div[style*="grid-template-columns"]') || libre.closest('.card');
+  if (!grille || !grille.parentNode) return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn exo-auto-btn';
+  b.style.cssText = 'margin:0 0 10px 0;background:#2a7a4e;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;';
+  b.textContent = '✨ Proposer les exercices des circuits';
+  b.title = 'Propose des exercices d’après le profil, le neuro-fonctionnel, les réflexes et le pied : aperçu avant de valider';
+  b.onclick = function () { _exoAutoOuvrir(bilan); };
+  grille.parentNode.insertBefore(b, grille);
+}
+
 const _PROG_LIBELLES = { chauffe: 'Échauffement', express1: 'Express 1', pied: 'programme du pied du jour', express2: 'Express 2' };
 // Programme du pied : jours 1 à 28 dans l'ordre, puis retour en sens inverse (jour 29 = exercices du jour 27,
 // jour 30 = jour 26, …) ; il s'arrête à 55 jours au plus (le jour 55 = exercices du jour 1). Renvoie le numéro (1-28) des exercices du n-ième jour.
@@ -31291,6 +31487,7 @@ function showPosturoSection(idx) {
     t.classList.toggle('act', i === idx);
   });
   if(typeof _injectMicButtons==='function') setTimeout(_injectMicButtons, 200);
+  if(idx === 8) setTimeout(() => { _exoAutoBouton('posturo'); }, 200);
   if(idx === 1) {
     // Attendre que psec-1 soit visible avant d'initialiser le canvas
     const psec1 = document.getElementById('psec-1');
@@ -31454,6 +31651,7 @@ function showSportBilanSection(idx) {
   // 5. Section Traitements (ssec-9) — drawPiedsTemplate UNIQUEMENT la 1ère fois.
   //    _baseSnapshot est posé synchroniquement par drawPiedsTemplate L6744
   //    → flag idempotent. Préserve le dessin pieds au switch onglet.
+  if(shownId === 'ssec-9') setTimeout(() => { _exoAutoBouton('sport'); }, 200);
   if(shownId === 'ssec-9') setTimeout(() => {
     const pc = document.getElementById('pieds-canvas');
     if(pc && !pc._baseSnapshot && typeof drawPiedsTemplate === 'function') {

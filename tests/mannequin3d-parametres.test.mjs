@@ -213,7 +213,8 @@ describe('isolation du module (règle CLAUDE.md : import dynamique, hors précac
     expect(lire('index.html')).not.toMatch(/mannequin3d|vendor\/three/);
     const b = lire('js/biomeca.js');
     expect(b).not.toMatch(/^import .*mannequin3d/m);
-    expect(b.match(/import\('\.\/mannequin3d\/index\.js\?v=' \+ APP_BUILD\)/g)).toHaveLength(3);
+    // 4 points d'entrée : posturo, sport/podopédiatrie (mannequin), et « Proposer les exercices » (chantier B)
+    expect(b.match(/import\('\.\/mannequin3d\/index\.js\?v=' \+ APP_BUILD\)/g)).toHaveLength(4);
   });
   it('le service worker ne précache ni Three.js ni les modèles 3D', () => {
     const sw = lire('service-worker.js');

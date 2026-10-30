@@ -3,8 +3,8 @@
 // du mannequin qui ont un équivalent. Rien n'est écrit ici : l'interface montre l'aperçu avant/après et le praticien coche.
 // Règles décidées par le praticien : moyenne quand une mesure vient de plusieurs vues ; une mesure sous le seuil du cabinet
 // n'est pas reportée ; les conversions % → cm sont estimées (marquées « estimé »).
-import { PAR_ID } from './parametres.js?v=v317';
-import { seuilCabinet } from './mecanismes.js?v=v317';
+import { PAR_ID } from './parametres.js?v=v318';
+import { seuilCabinet } from './mecanismes.js?v=v318';
 
 // Seuils par défaut (identiques à POSTURE_THRESHOLDS_DEFAULTS de biomeca.js) ; la valeur du cabinet les remplace.
 const DEFAUTS = {
