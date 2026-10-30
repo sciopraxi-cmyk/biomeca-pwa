@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v318';
+} from '../js/mannequin3d/exercices-auto.js?v=v319';
 
 const CAT = [
   {
@@ -272,5 +272,17 @@ describe('placement dans les circuits', () => {
     expect(plan.ecritures.find((e) => e.cle === 'ref-moro')).toMatchObject({ ligne: 5, slot: 2 });
     expect(plan.nonPlacees.map((p) => p.cle)).toContain('proprio');
     expect(plan.ecritures.filter((e) => e.slot === 0).map((e) => e.cle)).not.toContain('ref-moro');
+  });
+
+  it('Myers : antériorisé = ligne postérieure = étirement postérieur ; postériorisé = antérieur ; latéralisé = latéral', () => {
+    const lab = (v) => {
+      const r = proposerExercices({ valeurs: v, neuro: {} });
+      const p = r.propositions.find((x) => x.cle.startsWith('myers-'));
+      return p ? resoudre(p, CAT).defaut : null;
+    };
+    expect(lab({ glob_chev: 10, glob_gen: 6, tronc_lordose: 6 })).toBe('ep');
+    expect(lab({ glob_chev: -10, glob_gen: -6 })).toBe('ea');
+    expect(lab({ poids_lr: 12, tronc_incl: 8, tete_incl: -4 })).toBe('el');
+    expect(lab({})).toBeNull();
   });
 });

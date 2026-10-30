@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v318';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v318';
-import { calculerReprise } from './reprise-4vues.js?v=v318';
+import { PAR_ID } from './parametres.js?v=v319';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v319';
+import { calculerReprise } from './reprise-4vues.js?v=v319';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -145,15 +145,26 @@ export function proposerExercices(c) {
       ajoute({
         cle: 'myers-' + ch.id,
         groupe: 'chaine',
-        cats: [{ code: 'reeduc-posturale', exo: 'ant[ée]rieur' }],
-        raison: 'patient antériorisé = ligne postérieure de Myers' + dom,
+        cats: [{ code: 'reeduc-posturale', exo: 'post[ée]rieur' }],
+        raison: 'patient antériorisé = ligne postérieure de Myers → étirement postérieur' + dom,
       });
     else if (ch.id === 'grande_anterieure')
       ajoute({
         cle: 'myers-' + ch.id,
         groupe: 'chaine',
-        cats: [{ code: 'reeduc-posturale', exo: 'post[ée]rieur' }],
-        raison: 'patient postériorisé = ligne antérieure de Myers' + dom,
+        cats: [{ code: 'reeduc-posturale', exo: 'ant[ée]rieur' }],
+        raison: 'patient postériorisé = ligne antérieure de Myers → étirement antérieur' + dom,
+      });
+    else if (/^ligne_laterale_/.test(ch.id))
+      ajoute({
+        cle: 'myers-laterale',
+        groupe: 'chaine',
+        cats: [{ code: 'reeduc-posturale', exo: 'lat[ée]ral' }],
+        raison:
+          'patient latéralisé (charge du corps à ' +
+          (ch.id.endsWith('_D') ? 'droite' : 'gauche') +
+          ') = ligne latérale de Myers → étirement latéral' +
+          dom,
       });
     else if (CHAINE_CATEGORIE[ch.id]) {
       const m = CHAINE_CATEGORIE[ch.id];
