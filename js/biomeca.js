@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v316';
+const APP_BUILD = 'v317';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -18881,7 +18881,7 @@ function _extractPosturoSections(d) {
   if(d.chaineStatDeg) chaines.push('Statique dégradée');
   if(chaines.length) terr.push(['Chaînes musculaires', chaines.join(', ')]);
   if(d.tensionPrincipal) terr.push(['Tension principale', d.tensionPrincipal]);
-  if(d.biomecArticulaire) terr.push(['Biomécanique/Articulaire', d.biomecArticulaire]);
+  if(d.biomecArticulaire) terr.push(['Biomécanique / organique / articulaire', d.biomecArticulaire]);
   if(terr.length) sections.push({titre:'8. Terrain du patient', items:terr, color:'#2a7a4e'});
 
   // 9. Traitements — trait[] accumulé en 2 temps (avant puis après le bloc
@@ -20645,7 +20645,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
     if(terrain.length)  h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Terrain</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + terrain.join(', ') + '</td></tr>';
     if(postural.length) h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Postural</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + postural.join(', ') + '</td></tr>';
     if(npc.length)      h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">NPC</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + npc.join(', ') + '</td></tr>';
-    if(bioMec)          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Bioméca / Articulaire / viscéral</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + _escHtml(bioMec) + '</td></tr>';
+    if(bioMec)          h += '<tr><td style="padding:2px 5px;border:1px solid #e0e0e0;font-weight:600;background:#fafafa;width:50%;font-size:9px;">Biomécanique / organique / articulaire</td><td style="padding:2px 5px;border:1px solid #e0e0e0;font-size:9px;">' + _escHtml(bioMec) + '</td></tr>';
     h += '</table>';
   }
 
@@ -26040,12 +26040,13 @@ const FICHES_SYSTEMES = {
       "4. Les 12 travaux de la respiration",
       "5. Méthodes EPO",
       "6. Coordination de la respiration",
-      "7. Rééducation de la cohérence cardiaque"
+      "7. Rééducation de la cohérence cardiaque",
+      "8. Faim d'air"
     ]
   },
   'reeduc-posturale': {
     label: '🧍 Rééducation posturale',
-    bilans: ['posturo'],
+    bilans: ['sport', 'posturo'],
     subs: ["10. Exercices chaînes posturales"]
   },
   'reeduc-articulaire': {
@@ -26084,7 +26085,8 @@ const FICHES_SYSTEMES = {
     subs: [
       "1. Exercices autour du diaphragme",
       "2. Tempos respiratoires",
-      "3. Respiration pour le stress"
+      "3. Respiration pour le stress",
+      "4. Faim d'air"
     ]
   }
 };
@@ -28502,10 +28504,10 @@ function getBilanPosturoHTML() {
       </div>
     </div>
 
-    <!-- 3. Biomécanique -->
+    <!-- 3. Biomécanique / organique / articulaire -->
     <div style="background:linear-gradient(135deg,#f0faf4,#e8f8ee);border-left:4px solid #2a7a4e;border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">3 – <span style="color:#2a7a4e;">B</span>iomécanique / <span style="color:var(--encours-encre);">A</span>rticulaire</div>
-      <textarea class="inp" id="po-biomec-articulaire" rows="4" placeholder="Observations biomécanique et articulaire..." style="background:#fff;color:#222;"></textarea>
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">3 – <span style="color:#2a7a4e;">B</span>iomécanique / Organique / <span style="color:var(--encours-encre);">A</span>rticulaire</div>
+      <textarea class="inp" id="po-biomec-articulaire" rows="4" placeholder="Observations biomécanique, organique et articulaire..." style="background:#fff;color:#222;"></textarea>
     </div>
 
   </div>
@@ -29296,7 +29298,7 @@ async function genererSynthese() {
   if(chainesActives.length) terrainItems.push('Posture en excès: '+chainesActives.join(', '));
   // 3. Biomécanique / articulaire (texte libre)
   const biomec = document.getElementById('po-biomec-articulaire')?.value?.trim();
-  if(biomec) terrainItems.push('Biomécanique: '+biomec);
+  if(biomec) terrainItems.push('Biomécanique/organique/articulaire: '+biomec);
   if(terrainItems.length) sections.push({titre:'🌿 Terrain', items:[terrainItems.join(' · ')]});
 
   // Plan semelles (psec-8) #92 — matériaux/recouvrement (cb multi), description,
@@ -30209,7 +30211,7 @@ function _collectSportSyntheseSections(d, readers) {
   if(d.chaine_stat_opt) chn2.push('statique opt. (PA)');
   if(d.chaine_stat_deg) chn2.push('statique dég. (AP)');
   if(chn2.length) sp.push('NPC: ' + chn2.join(', '));
-  if(d.biomec_articulaire) sp.push('Bioméca/Articulaire/viscéral: ' + d.biomec_articulaire);
+  if(d.biomec_articulaire) sp.push('Biomécanique/organique/articulaire: ' + d.biomec_articulaire);
   if(sp.length) sections.push({ titre: '🌿 Schémas du patient', items: [sp.join(' · ')] });
 
   return sections;

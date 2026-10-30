@@ -44,7 +44,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
     )
   ).toBe(true);
   // version affichée et libellé du menu (une page ancienne servie par un cache ne les aurait pas)
-  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v316');
+  await expect(page.locator('.m3d-build')).toContainText('Mannequin 3D v317');
   await expect(page.locator('.m3d .m3d-tabmenu > summary').first()).toContainText(
     '— Tableau type (cumulable) —'
   );
@@ -258,7 +258,7 @@ test('mannequin 3D dans le bilan postural (parcours réel, patiente fictive)', a
   await choisirTableau(page, 'neutre');
   await choisirTableau(page, 'chaine_flexion_AM');
   await choisirTableau(page, 'genu_valgum_D');
-  await expect(prof).toContainText('Biomécanique et/ou viscéral (local)');
+  await expect(prof).toContainText('Biomécanique / organique / articulaire (local)');
   await expect(prof).toContainText('Chaîniste / neuromusculaire (régional)');
   await expect(prof).toContainText('Compensations locales');
   await expect(prof).toContainText('côté droit');
