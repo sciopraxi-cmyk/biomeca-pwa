@@ -1027,6 +1027,49 @@ clic sur « Appliquer la sélection » ; un curseur déjà réglé n'est jamais 
   état neutre par défaut tant que `mannequin3d` n'existe pas (l'ouverture de la section déclenchait une sauvegarde, donc l'alerte de
   stockage). E2E : `tests/e2e/mannequin3d-ouverture-sans-ecriture.spec.ts` et `mannequin3d-reprise-4vues.spec.ts`.
 
+## Exercices automatiques des circuits Express — acquis (PR #360, #361)
+
+Le bouton « ✨ Proposer les exercices des circuits » (posturo `psec-8`, sport `ssec-9`, podopédiatrie `#pd-circuits-tables`) PROPOSE
+des exercices pour les 8 lignes des circuits Express d'après le bilan. Rien n'est écrit avant « Appliquer » ; on complète sans écraser,
+sans doublon, et une proposition déjà présente ne consomme pas de ligne.
+
+- **Code** : logique pure `js/mannequin3d/exercices-auto.js` (`proposerExercices`, `resoudre`, `planifier`, `detecterPathologies`), lecture du
+  bilan et aperçu dans `biomeca.js` (`_exoAutoContexte`, `_exoAutoOuvrir`). Tests : `tests/exercices-auto.test.mjs`,
+  `tests/pathologies-fiches.test.mjs`, E2E `tests/e2e/exercices-auto.spec.ts`.
+- **Emplacements** : 1 = exercices principaux (priorité d'affichage : chaîne, terrain aérien/terrien, réflexes, vestibule, tronc cérébral ;
+  priorité de SÉLECTION s'il y a plus de propositions que de lignes : chaîne, terrain, vestibule, tronc cérébral, nerfs, puis réflexes,
+  proprioception, pied ; le surplus passe en emplacement 3) ; 2 = respiration, en alternant « Faim d'air » et « Respiration pour le stress »
+  (jamais deux respirations dans une ligne) ; 3 = visuel, mandibule (ATM) et nerfs crâniens qui ne tiennent pas en 1. Les 8 premiers
+  emplacements sont toujours remplis : les nerfs crâniens débordent en 1 tant qu'il reste des lignes libres (visuel et mandibule jamais).
+- **Chaînes** : Myers (profil du mannequin) — antériorisé = ligne postérieure = étirement postérieur ; postériorisé = antérieure = étirement
+  antérieur ; latéralisé = ligne latérale = étirement latéral ; chaînistes (flexion, extension, fermeture, ouverture, statiques) ; le profil
+  biomécanique/organique/articulaire donne « Rééducation articulaire ». Les mécanismes lésionnels ne servent pas ici : anamnèse et tout ce qui
+  est coché ou écrit dans les sections du bilan.
+- **Nerfs crâniens** : 13 catégories (NC1 à NC12 + tronc cérébral), créées par migration SQL et liste de secours `FICHES_SYSTEMES`
+  (`nouveau: true`, exclues de l'import initial), réservées au sport et au posturo. NC8 porte tout le vestibulaire (les exercices
+  vestibulaires y ont été déplacés, mêmes codes). Tronc cérébral : côté = total de la colonne nerfs crâniens (recapillarisation incluse), à
+  égalité le praticien choisit ; seuls les nerfs cochés du côté retenu sont proposés. « Utricules » seulement si le bilan contient une donnée
+  vestibulaire.
+- **Podopédiatrie** : réflexes `podo_reflexe_*`, valgus/varus, chaînes posturale et chaîniste ; ni vestibulaire, ni proprioception, ni terrain.
+  Réflexe sans fiche = listé « aucune fiche », jamais inventé.
+- **Pathologies (lot 4)** : les catégories `pathologies-*` ne sont plus dans les listes Express ; 7 cases « Programmes de réathlétisation »
+  (`{pref}-prog-pat-{cle}`, `programmes.patho`) dans « Programme du patient » des 3 bilans, cochées par détection de termes dans l'anamnèse
+  et les textes (variantes, accents, négation « pas de… » ignorée ; raison = phrase trouvée, jamais décochée). Côté patient : fiche PDF seule,
+  sans chrono (page « Mes fiches », `#zone-mes-fiches`, `fichesAffichables`). `programme_patient_deposer` accepte une liste `fiches`
+  (12 codes max, doublons et codes inconnus ignorés) : migration `supabase/migrations/portail-programme-fiches.sql`, banc
+  `supabase/tests/portail-programme-fiches.test.sql`.
+- **Pièges** : (1) ajouter une constante utilisée par `_exoBibCats`, `_progLire` ou `_progPortailConstruire` casse les bancs qui les
+  extraient : l'ajouter aussi au prélude de `tests/helpers/fenetres-claires.mjs` ; un golden de structure qui tombe de plusieurs centaines de
+  lignes = prélude incomplet, pas une vraie différence ; (2) ajouter des catégories à `FICHES_SYSTEMES` change le golden de structure du
+  bilan posturo (options des listes) ; (3) `mannequin3d-parametres.test.mjs` compte les `import('./mannequin3d/index.js?v=' + APP_BUILD)`
+  de `biomeca.js` ; (4) SQL de catégories : rejouer deux fois sur base jetable, y compris avec un exercice perso rattaché ; une migration
+  qui remplace une fonction existante se teste avec l'ancien banc avant et après ; (5) E2E : le patient fictif doit être supprimé et la
+  suppression attendue (~4 s) avant de fermer le navigateur ; (6) un SQL de plus de ~4000 caractères est tronqué par Telegram : blocs
+  complets de ~1500 caractères maximum.
+- **Avis de synchronisation** : l'ancienne fenêtre « saisie non envoyée » est remplacée par `_avisDiscret` (bas gauche, 12 s, fermable) et
+  ne dit rien si la saisie locale est identique au serveur ou déjà gardée dans une copie `bm4-recuperation`. Aucun dialogue bloquant ne doit
+  se déclencher à chaque ouverture.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
