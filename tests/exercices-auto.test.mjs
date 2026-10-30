@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v319';
+} from '../js/mannequin3d/exercices-auto.js?v=v320';
 
 const CAT = [
   {
@@ -284,5 +284,52 @@ describe('placement dans les circuits', () => {
     expect(lab({ glob_chev: -10, glob_gen: -6 })).toBe('ea');
     expect(lab({ poids_lr: 12, tronc_incl: 8, tete_incl: -4 })).toBe('el');
     expect(lab({})).toBeNull();
+  });
+
+  it('podopédiatrie : pieds cochés par le praticien, réflexes propres au bilan, réflexes sans fiche listés', () => {
+    const r = proposerExercices({
+      bilan: 'podo',
+      neuro: {
+        'ref-succion-o': true,
+        'ref-rtsc-o': true,
+        'ref-parachute-o': true,
+        'ref-rtac-o': true,
+      },
+      pieds: [{ cote: 'G', sens: 'varus', source: 'morphostatique' }],
+    });
+    expect(r.programmePied.raison).toMatch(/varus gauche \(morphostatique\)/);
+    expect(r.notes.join(' ')).toMatch(/parachute.*aucune fiche/);
+    const cat = [
+      {
+        value: 'reflexes-archaiques',
+        label: 'R',
+        subs: [
+          { value: 'a', label: '4. Réflexe de succion' },
+          { value: 'b', label: '7. Réflexe Tonique Symétrique du Cou RTSC' },
+          { value: 'c', label: '6. Réflexe Tonique Asymétrique du Cou RTAC' },
+        ],
+      },
+    ];
+    const get = (cle) =>
+      resoudre(
+        r.propositions.find((p) => p.cle === cle),
+        cat
+      ).defaut;
+    expect(get('ref-succion')).toBe('a');
+    expect(get('ref-rtsc')).toBe('b'); // « Asymétrique » ne doit pas être pris pour « Symétrique »
+    expect(get('ref-rtac')).toBe('c');
+  });
+  it('diagnostic valgus sans côté : pas de côté inventé dans le motif', () => {
+    const r = proposerExercices({
+      neuro: {},
+      pieds: [{ cote: 'D', sens: 'valgus', source: 'diagnostic', sansCote: true }],
+    });
+    expect(r.programmePied.raison).toBe('pied : valgus (diagnostic)');
+  });
+
+  it('podopédiatrie : jamais de proposition vestibulaire ni proprioceptive (pas de données dans ce bilan)', () => {
+    expect(cles(proposerExercices({ bilan: 'podo', neuro: {} }))).toEqual([]);
+    expect(cles(proposerExercices({ bilan: 'podo', neuro: { 'prop-lent-g': true } }))).toEqual([]);
+    expect(cles(proposerExercices({ bilan: 'posturo', neuro: {} }))).toEqual(['vest-utricules']);
   });
 });

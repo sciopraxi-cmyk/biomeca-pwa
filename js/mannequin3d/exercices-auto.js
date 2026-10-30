@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v319';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v319';
-import { calculerReprise } from './reprise-4vues.js?v=v319';
+import { PAR_ID } from './parametres.js?v=v320';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v320';
+import { calculerReprise } from './reprise-4vues.js?v=v320';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -19,6 +19,16 @@ export const REFLEXES = {
   'ref-plantaire': { nom: 'Plantaire', fiche: 'plantaire' },
   'ref-palmaire': { nom: 'Palmaire', fiche: 'palmaire' },
   'ref-babkin': { nom: 'Babkin', fiche: 'babkin' },
+  // réflexes propres à la podopédiatrie qui ont une fiche dans la bibliothèque
+  'ref-succion': { nom: 'Succion', fiche: 'succion' },
+  'ref-rtsc': { nom: 'RTSC', fiche: '(?<![aA])sym[ée]trique du cou' },
+  'ref-tonique-labyrinthique': { nom: 'Tonique labyrinthique', fiche: 'labyrinthique' },
+};
+// réflexes cochés sans fiche dans la bibliothèque : listés « sans fiche », jamais inventés
+export const REFLEXES_SANS_FICHE = {
+  'ref-allongement-croise': 'allongement croisé',
+  'ref-optocinetique': 'optocinétique',
+  'ref-parachute': 'parachute',
 };
 const COLS_REFLEXE = ['o', 'g', 'd']; // « n » = normal : pas un réflexe à rééduquer
 
@@ -98,7 +108,11 @@ export function proposerExercices(c) {
       /canal semi circulaire lat[ée]ral|canal lat[ée]ral/,
     ],
   ];
-  if (!canaux.ant && !canaux.post && !canaux.lat)
+  // la podopédiatrie n'a ni section vestibulaire ni neuro-fonctionnel : aucune proposition vestibulaire ni proprioceptive
+  const podo = !!(c && c.bilan === 'podo');
+  if (podo) {
+    /* pas de données vestibulaires dans ce bilan */
+  } else if (!canaux.ant && !canaux.post && !canaux.lat)
     ajoute({
       cle: 'vest-utricules',
       groupe: 'neuro',
@@ -117,7 +131,7 @@ export function proposerExercices(c) {
 
   // 2) Proprioception : une case ou plus de la section → « Stimulation du système proprioceptif »
   const propCoche = Object.keys(n).some((k) => /^prop-/.test(k) && n[k] && !/-n$/.test(k));
-  if (propCoche)
+  if (propCoche && !podo)
     ajoute({
       cle: 'proprio',
       groupe: 'neuro',
@@ -134,6 +148,12 @@ export function proposerExercices(c) {
         cats: [{ code: 'reflexes-archaiques', exo: r.fiche }],
         raison: 'réflexe archaïque ' + r.nom + ' coché',
       });
+
+  const sansFiche = [];
+  for (const [id, nom] of Object.entries(REFLEXES_SANS_FICHE))
+    if (coche(n, id, COLS_REFLEXE))
+      sansFiche.push('réflexe ' + nom + ' coché : aucune fiche d’exercice dans la bibliothèque');
+  if (sansFiche.length) notes.push(...sansFiche);
 
   // 4) Chaînes (profil du mannequin) : Myers (posturales) puis Busquet / GDS (chaînistes)
   const v = (c && c.valeurs) || null;
@@ -161,9 +181,9 @@ export function proposerExercices(c) {
         groupe: 'chaine',
         cats: [{ code: 'reeduc-posturale', exo: 'lat[ée]ral' }],
         raison:
-          'patient latéralisé (charge du corps à ' +
+          'patient latéralisé (charge du corps) = ligne latérale ' +
           (ch.id.endsWith('_D') ? 'droite' : 'gauche') +
-          ') = ligne latérale de Myers → étirement latéral' +
+          ' de Myers → étirement latéral' +
           dom,
       });
     else if (CHAINE_CATEGORIE[ch.id]) {
@@ -195,9 +215,13 @@ export function proposerExercices(c) {
 
   // 6) Valgus / varus du pied : un exercice de « Rééducation du pied » préselectionné + programme du pied coché
   const pv = piedValgusVarus(v, c && c.analyseVues);
+  for (const x of (c && c.pieds) || [])
+    if (!pv.some((y) => y.cote === x.cote && y.sens === x.sens)) pv.push(x);
   let programmePied = null;
   if (pv.length) {
-    const txt = pv.map((p) => p.sens + ' ' + COTE[p.cote] + ' (' + p.source + ')').join(', ');
+    const txt = pv
+      .map((p) => p.sens + (p.sansCote ? '' : ' ' + COTE[p.cote]) + ' (' + p.source + ')')
+      .join(', ');
     ajoute({
       cle: 'pied',
       groupe: 'pied',

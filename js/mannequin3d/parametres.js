@@ -79,7 +79,7 @@ function C(id, groupe, label, min, max, unite, fin, ops, extra = {}) {
   );
 }
 // Version de la construction affichée dans l'interface (doit suivre CACHE_VERSION du service worker : test dédié)
-export const BUILD = 'v319';
+export const BUILD = 'v320';
 export const GROUPES = [
   ['tete', 'Tête et cou'],
   ['epaules', 'Épaules et ceinture scapulaire'],

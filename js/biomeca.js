@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v319';
+const APP_BUILD = 'v320';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -26165,7 +26165,7 @@ function _exoBibConstruire(base, persoCats, perso) {
 // « (posture) » reste proposée, la respiration « (sport) » est retirée. Les catégories ajoutées ensuite à la base
 // et les catégories personnelles du praticien restent proposées.
 // Terrain moteur et chaînes musculaires ont été découpés en 2 et 6 catégories (24/10/2026) : toutes restent exclues.
-const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-chaines', 'chaine-flexion', 'chaine-extension', 'chaine-fermeture', 'chaine-ouverture', 'chaine-statique-expiration', 'chaine-statique-inspiration', 'reeduc-posturale', 'reeduc-articulaire', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
+const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-articulaire', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
 // Liste de secours (hors ligne) : exercices de la catégorie ; ceux du pied viennent de EXERCICES_PIED_ENFANT.
 function _exoSubsSecours(slug, cfg) {
   const l = cfg.subs.map(o => ({ value: o, label: o }));
@@ -26319,12 +26319,12 @@ function _progDefautPied(dateBilanISO) {
 // La logique (règles du praticien) est dans js/mannequin3d/exercices-auto.js (pure, testée). Ici : lecture du bilan,
 // aperçu avec cases à cocher, écriture dans les listes SEULEMENT après « Appliquer » ; jamais d'écrasement.
 function _exoAutoLignes(bilan) {
-  const pref = bilan === 'sport' ? 'sp' : 'po';
+  const pref = bilan === 'sport' ? 'sp' : (bilan === 'podo' ? 'pd' : 'po');
   const lignes = [];
   ['c1', 'c2'].forEach(function (c) {
     for (let i = 1; i <= 4; i++) {
       const libre = document.getElementById(pref + '-' + c + '-ex' + i + '-libre');
-      const rang = libre && (bilan === 'sport' ? libre.closest('.exo-stack') : libre.closest('div[style*="border"]'));
+      const rang = libre && (bilan === 'posturo' ? libre.closest('div[style*="border"]') : libre.closest('.exo-stack'));
       lignes.push({ sels: rang ? Array.from(rang.querySelectorAll('select.exo-sys')) : [] });
     }
   });
@@ -26342,6 +26342,27 @@ function _exoAutoEtat(lignes) {
   });
 }
 function _exoAutoContexte(bilan) {
+  if (bilan === 'podo') {
+    const d = (currentPatient && currentPatient.bilanDataPodopediatrie) || {};
+    const cc = function (k) { const e = document.querySelector('[data-field="' + k + '"]'); return !!(e && e.checked); };
+    const neuro = {};
+    // case du bilan podopédiatrie → réflexe du module (colonne « observé »)
+    [['moro', 'ref-moro'], ['rtac', 'ref-rtac'], ['perez', 'ref-perez'], ['galant', 'ref-galant'], ['landau', 'ref-landau'],
+     ['babinski', 'ref-babinski'], ['palmaire', 'ref-palmaire'], ['bauer', 'ref-reptation'], ['babkin', 'ref-babkin'],
+     ['succion', 'ref-succion'], ['rtsc', 'ref-rtsc'], ['tonique_labyrinthique', 'ref-tonique-labyrinthique'],
+     ['allongement_croise', 'ref-allongement-croise'], ['optocinetique', 'ref-optocinetique'], ['parachute', 'ref-parachute']
+    ].forEach(function (x) { if (cc('podo_reflexe_' + x[0])) neuro[x[1] + '-o'] = true; });
+    const pieds = [];
+    [['d', 'D'], ['g', 'G']].forEach(function (c) {
+      ['valgus', 'varus'].forEach(function (sens) {
+        if (cc('podo_morpho_' + c[0] + '_' + sens)) pieds.push({ cote: c[1], sens: sens, source: 'morphostatique' });
+      });
+    });
+    ['valgus', 'varus'].forEach(function (sens) {
+      if (cc('podo_diag_' + sens) && !pieds.some(function (x) { return x.sens === sens; })) pieds.push({ cote: 'D', sens: sens, source: 'diagnostic', sansCote: true });
+    });
+    return { bilan: 'podo', valeurs: (d.mannequin3d && d.mannequin3d.valeurs) || null, analyseVues: d._postureAnalysis || null, neuro: neuro, pieds: pieds, terrain: null };
+  }
   if (bilan === 'sport') {
     const bd = (typeof bilanData !== 'undefined' && bilanData) || {};
     const neuro = {};
@@ -26390,7 +26411,7 @@ async function _exoAutoOuvrir(bilan) {
   resolues.forEach(function (p) { coches[p.cle] = true; });
   let pied = !!r.programmePied;
   let respi = true;
-  const pc = (typeof _progChamp === 'function') ? _progChamp(bilan === 'sport' ? 'sp' : 'po', 'pied-on') : null;
+  const pc = (typeof _progChamp === 'function') ? _progChamp(bilan === 'sport' ? 'sp' : (bilan === 'podo' ? 'pd' : 'po'), 'pied-on') : null;
   const piedDejaCoche = !!(pc && pc.checked);
 
   const ov = document.createElement('div');
@@ -26451,7 +26472,7 @@ async function _exoAutoOuvrir(bilan) {
       }
       box.appendChild(row);
     });
-    absentes.forEach(function (p) { box.appendChild(el('div', 'color:#999;font-size:12px;margin-bottom:4px;', '⚠️ ' + p.raison + ' : catégorie absente de la liste d’exercices de ce bilan, non proposée.')); });
+    absentes.forEach(function (p) { box.appendChild(el('div', 'color:#999;font-size:12px;margin-bottom:4px;', '⚠️ ' + p.raison + ' : aucune fiche correspondante dans la liste d’exercices de ce bilan, non proposée.')); });
     if (r.programmePied) {
       const l = el('label', 'display:flex;gap:8px;align-items:center;cursor:pointer;margin:8px 0;');
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = pied && !!pc; cb.disabled = piedDejaCoche || !pc;
@@ -26482,7 +26503,7 @@ async function _exoAutoOuvrir(bilan) {
       });
       if (pied && pc && !pc.checked) { pc.checked = true; pc.dispatchEvent(new Event('change', { bubbles: true })); n++; }
       fermer();
-      if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave(bilan);
+      if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave(bilan === 'podo' ? 'podopediatrie' : bilan);
       alert(n + ' ajout(s) dans les circuits. Vérifiez-les, puis enregistrez le bilan comme d’habitude.');
     };
     bar.appendChild(bn); bar.appendChild(bo);
@@ -26494,13 +26515,21 @@ async function _exoAutoOuvrir(bilan) {
 }
 // Bouton posé à l'ouverture de la section des circuits (idempotent ; aucun changement de la structure des pages)
 function _exoAutoBouton(bilan) {
-  const libre = document.getElementById((bilan === 'sport' ? 'sp' : 'po') + '-c1-ex1-libre');
+  const pref = bilan === 'sport' ? 'sp' : (bilan === 'podo' ? 'pd' : 'po');
+  const libre = document.getElementById(pref + '-c1-ex1-libre');
   if (!libre) return;
-  const sec = document.getElementById(bilan === 'sport' ? 'ssec-9' : 'psec-8');
-  if (!sec || sec.querySelector('.exo-auto-btn')) return;
-  // juste au-dessus des deux circuits Express (les listes se trouvent plus bas que le plan de semelles)
-  const grille = libre.closest('div[style*="grid-template-columns"]') || libre.closest('.card');
-  if (!grille || !grille.parentNode) return;
+  let parent, avant;
+  if (bilan === 'podo') {
+    parent = document.getElementById('pd-circuits-tables');
+    avant = parent && parent.firstChild;
+  } else {
+    const sec = document.getElementById(bilan === 'sport' ? 'ssec-9' : 'psec-8');
+    if (!sec || sec.querySelector('.exo-auto-btn')) return;
+    // juste au-dessus des deux circuits Express (les listes se trouvent plus bas que le plan de semelles)
+    avant = libre.closest('div[style*="grid-template-columns"]') || libre.closest('.card');
+    parent = avant && avant.parentNode;
+  }
+  if (!parent || parent.querySelector('.exo-auto-btn')) return;
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'btn exo-auto-btn';
@@ -26508,7 +26537,7 @@ function _exoAutoBouton(bilan) {
   b.textContent = '✨ Proposer les exercices des circuits';
   b.title = 'Propose des exercices d’après le profil, le neuro-fonctionnel, les réflexes et le pied : aperçu avant de valider';
   b.onclick = function () { _exoAutoOuvrir(bilan); };
-  grille.parentNode.insertBefore(b, grille);
+  parent.insertBefore(b, avant || null);
 }
 
 const _PROG_LIBELLES = { chauffe: 'Échauffement', express1: 'Express 1', pied: 'programme du pied du jour', express2: 'Express 2' };
@@ -26885,6 +26914,8 @@ function _progMaj(pref) {
     ['pd-circ-c1', 'pd-circ-c2'].forEach((id) => { const e = document.getElementById(id); if (e) e.style.display = p.express.actif ? '' : 'none'; });
     const c = document.getElementById('pd-circ-ch');
     if (c) c.style.display = p.chauffe.actif ? '' : 'none';
+    const bt = document.querySelector('#pd-circuits-tables .exo-auto-btn');
+    if (bt) bt.style.display = p.express.actif ? '' : 'none';
   }
   const err = [];
   [['pied', 'programme du pied'], ['express', 'circuits Express'], ['chauffe', 'circuit Échauffement']].forEach(([k, n]) => {
@@ -26949,6 +26980,7 @@ function _progMonter(pref) {
   w.innerHTML = _progHTML(pref) + (pref === 'pd' ? _joursBlocHTML('pd') + _podoCircuitsHTML() : '');
   w.setAttribute('data-monte', '1');
   if (pref === 'pd') _circChauffeBrancher('pd', document.getElementById('pd-circuits-tables'));
+  if (pref === 'pd') _exoAutoBouton('podo');
   if (pref === 'po') {
     // Posturo : le tableau Échauffement est ajouté en fin de la carte des circuits Express (apparaît quand la case est cochée).
     const carte = (document.getElementById('po-c1-ex1-libre') || {}).closest ? document.getElementById('po-c1-ex1-libre').closest('.card') : null;

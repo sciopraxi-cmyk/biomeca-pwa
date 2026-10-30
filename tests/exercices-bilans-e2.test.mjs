@@ -151,7 +151,9 @@ describe('podopédiatrie : catégories retirées', () => {
     'systeme-vestibulaire',
     'reeduc-pied',
     'systeme-mandibulaire',
+    'reeduc-chaines', // rouvertes pour la podopédiatrie (demande du 30/10/2026 : propositions chaînes posturales et chaînistes)
     'reflexes-archaiques',
+    'reeduc-posturale',
     'respi-posture',
   ];
   const base = codes.map((c, i) => ({
@@ -245,7 +247,7 @@ describe('catégories découpées (24/10/2026) : dessins et podopédiatrie', () 
     'chaine-statique-expiration',
     'chaine-statique-inspiration',
   ];
-  it('chaque nouvelle catégorie a son dessin et reste exclue de la podopédiatrie', () => {
+  it('chaque nouvelle catégorie a son dessin ; terrain exclu de la podopédiatrie, chaînes rouvertes (30/10/2026)', () => {
     const f = monter();
     NOUVELLES.forEach((c) => {
       expect(f._exoAvecPicto(c, 'Test')).toMatch(/^(🏃|⛓️) Test$/u);
@@ -261,7 +263,11 @@ describe('catégories découpées (24/10/2026) : dessins et podopédiatrie', () 
     }));
     base.push({ ...BASE[0] });
     f.charger(base, [], []);
-    expect(f._exoBibCats('podo').map((c) => c.value)).toEqual([BASE[0].categorie_code]);
+    // terrain moteur : toujours exclu ; chaînes (Busquet / GDS) : rouvertes pour les propositions automatiques
+    expect(f._exoBibCats('podo').map((c) => c.value)).toEqual([
+      ...NOUVELLES.filter((c) => c.startsWith('chaine-')),
+      BASE[0].categorie_code,
+    ]);
     expect(f._exoBibCats('sport').map((c) => c.value)).toEqual(expect.arrayContaining(NOUVELLES));
   });
 });
