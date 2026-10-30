@@ -73,9 +73,12 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     // vestibule, proprioception, pied
     expect(po[0][0]).toMatch(/Rééducation articulaire/);
     expect(po[1][0]).toMatch(/Moro/i);
-    expect(po[2][0]).toMatch(/vestibulaire > .*canal antérieur/i);
-    expect(po[3][0]).toMatch(/proprioceptif/i);
-    expect(po[4][0]).toMatch(/Rééducation du pied/);
+    expect(po[2][0]).toMatch(/(vestibulaire|NC8 — Vestibulo-cochléaire) > .*canal antérieur/i);
+    expect(po[3][0]).toMatch(/Tronc cérébral > .*TC gauche/); // nerf crânien NC2 coché à gauche → TC gauche
+    expect(po[4][0]).toMatch(/proprioceptif/i);
+    expect(po[5][0]).toMatch(/Rééducation du pied/);
+    // les 8 premiers emplacements se remplissent : le nerf NC2 (normalement emplacement 3) déborde en emplacement 1
+    expect(po[6][0]).toMatch(/NC2/);
     // ATM coché (section 7) : exercice de la mâchoire en EMPLACEMENT 3, jamais en 1
     expect(po.flat().filter((x) => /mandibul/i.test(x))).toHaveLength(1);
     expect(po.map((l) => l[2]).join('|')).toMatch(/mâchoire/i);
