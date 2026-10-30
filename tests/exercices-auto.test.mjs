@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v324';
+} from '../js/mannequin3d/exercices-auto.js?v=v325';
 
 const CAT = [
   {
@@ -699,11 +699,27 @@ describe('placement dans les circuits', () => {
     // côté tiré du pattern (totaux à égalité) : même restriction
     expect(nc({ 'nc-nc1-g': true, 'nc-nc2-d': true, 'apd-tronc-d': true })).toEqual(['nc-2']);
   });
-  it('vestibule = canaux ET NC8, même groupe de priorité (emplacement 1)', () => {
-    const r = proposerExercices({ neuro: { 'vest-ant-g': true, 'nc-nc8-d': true } });
-    const g = r.propositions
-      .filter((p) => p.cle === 'vest-ant' || p.cle === 'nc-8')
-      .map((p) => p.groupe);
-    expect(g).toEqual(['vestibule', 'vestibule']);
+  it('vestibule = canaux ET NC8 (même groupe, emplacement 1) ; mais jamais NC8 EN DOUBLE : le canal désigné prime', () => {
+    // NC8 seul : proposition générale du nerf 8, exercice au choix du praticien
+    const seul = proposerExercices({ neuro: { 'nc-nc8-d': true } });
+    expect(seul.propositions.filter((p) => p.cle === 'nc-8').map((p) => p.groupe)).toEqual([
+      'vestibule',
+    ]);
+    // NC8 + canal latéral coché : un seul exercice (le canal), la proposition générale disparaît
+    const r = proposerExercices({
+      neuro: { 'vest-lat-g': true, 'nc-nc8-g': true, 'nc-nc2-g': true },
+    });
+    const cl = r.propositions.map((p) => p.cle);
+    expect(cl).toContain('vest-lat');
+    expect(cl).not.toContain('nc-8');
+    expect(cl).toContain('nc-2'); // les autres nerfs ne sont pas touchés
+    expect(r.propositions.find((p) => p.cle === 'vest-lat').raison).toMatch(
+      /NC8 coché : cet exercice prime/
+    );
+    // idem avec « utricules » (donnée vestibulaire sans canal coché)
+    const u = proposerExercices({ neuro: { 'vest-ant-n': true, 'nc-nc8-d': true } });
+    expect(u.propositions.map((p) => p.cle)).toEqual(['vest-utricules', 'tronc-cerebral']); // pas de nc-8
+    // NC8 sans canal désigné ne supprime rien d'autre ; le tronc cérébral compte toujours le nerf 8 dans son total
+    expect(r.propositions.find((p) => p.cle === 'tronc-cerebral').raison).toMatch(/2 contre 0/);
   });
 });

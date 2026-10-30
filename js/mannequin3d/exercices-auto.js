@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v324';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v324';
-import { calculerReprise } from './reprise-4vues.js?v=v324';
+import { PAR_ID } from './parametres.js?v=v325';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v325';
+import { calculerReprise } from './reprise-4vues.js?v=v325';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -376,6 +376,17 @@ export function proposerExercices(c) {
       raison: 'profil biomécanique / organique / articulaire : choisissez l’exercice',
     });
 
+  // NC8 (nerf vestibulo-cochléaire) et canaux semi-circulaires = la même catégorie d'exercices : quand le bilan désigne un canal
+  // (ou un exercice vestibulaire précis), c'est CET exercice qui prime (décision du 30/10) ; la proposition générique « NC8 » disparaît
+  const vestPrecis = prop.filter((p) => /^vest-/.test(p.cle));
+  if (vestPrecis.length) {
+    const i8 = prop.findIndex((p) => p.cle === 'nc-8');
+    if (i8 >= 0) {
+      prop.splice(i8, 1);
+      for (const v of vestPrecis)
+        v.raison += ' (NC8 coché : cet exercice prime sur la proposition générale du nerf 8)';
+    }
+  }
   const rang = (p) => (RANG_GROUPE[p.groupe] == null ? 99 : RANG_GROUPE[p.groupe]);
   const triees = prop
     .map((p, i) => [p, i])

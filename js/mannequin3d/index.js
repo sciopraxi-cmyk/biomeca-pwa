@@ -1,18 +1,18 @@
 // Mannequin postural 3D — point d'entrée (import dynamique : rien n'est chargé avant l'ouverture de la section).
-export { monter } from './ui.js?v=v324';
-export { rendreVues } from './moteur.js?v=v324';
+export { monter } from './ui.js?v=v325';
+export { rendreVues } from './moteur.js?v=v325';
 export {
   decrire,
   nettoyerValeurs,
   etatMannequinVide,
   CURSEURS,
   TABLEAUX,
-} from './parametres.js?v=v324';
-export { evaluer, htmlRapport, synthese, definirSeuils } from './mecanismes.js?v=v324';
+} from './parametres.js?v=v325';
+export { evaluer, htmlRapport, synthese, definirSeuils } from './mecanismes.js?v=v325';
 export {
   evaluerProfil,
   htmlProfil,
   htmlProfilRapport,
   definirSeuilsProfil,
-} from './chaines.js?v=v324';
-export { proposerExercices, resoudre, planifier, LIBELLE_LIGNE } from './exercices-auto.js?v=v324';
+} from './chaines.js?v=v325';
+export { proposerExercices, resoudre, planifier, LIBELLE_LIGNE } from './exercices-auto.js?v=v325';
