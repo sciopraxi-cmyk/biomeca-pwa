@@ -44,6 +44,7 @@ function monter(o = {}) {
     setItem: [],
     removeItem: [],
     dialogues: [],
+    avis: [],
     messages: [],
     envois: [],
     avertissements: [],
@@ -92,6 +93,7 @@ function monter(o = {}) {
       journal.messages.push(String(m))
     ),
     confirm: () => false,
+    _avisDiscret: (m) => (journal.avis.push(String(m)), true),
     // envoi des photos : en attente tant que le test ne le libère pas
     migratePedicuriePhotos: async () => {
       journal.envois.push('migration démarrée');
@@ -298,7 +300,54 @@ describe('reprise au démarrage', () => {
       'saisie locale'
     );
     expect(env.mem.has(M)).toBe(false);
-    expect(env.journal.dialogues.length).toBe(1);
+    // jamais de fenêtre à valider : un avis discret, une seule fois
+    expect(env.journal.dialogues).toEqual([]);
+    expect(env.journal.avis.length).toBe(1);
+    expect(env.journal.avis[0]).toContain("n'a pas été appliquée");
+  });
+
+  it('saisie locale identique au serveur (images ignorées) : aucun message, aucune copie, marqueur retiré', () => {
+    const sameCloud = [
+      patient({ bilanDataPedicurie: { id: 'b', motif: 'pareil', photo: 'chemin/serveur.jpg' } }),
+    ];
+    const sameLocal = [
+      patient({ bilanDataPedicurie: { motif: 'pareil', id: 'b', photo: 'idb:abc123' } }),
+    ];
+    const env = monter({
+      stockage: {
+        [K]: JSON.stringify(sameLocal),
+        [M]: JSON.stringify(base('2026-10-19T23:55:50.759Z')),
+      },
+      globales: { patients: sameCloud },
+    });
+    // le serveur a changé depuis (base différente) mais le contenu est le même
+    expect(env.f._recupererSaisieNonSynchronisee('2026-10-20T09:00:00.000+00:00')).toBe(false);
+    expect(env.journal.dialogues).toEqual([]);
+    expect(env.journal.avis).toEqual([]);
+    expect([...env.mem.keys()].some((k) => k.startsWith('bm4-recuperation:'))).toBe(false);
+    expect(env.mem.has(M)).toBe(false);
+    expect(env.mem.has(K)).toBe(true);
+  });
+
+  it('une copie identique est déjà gardée : pas de seconde copie, pas de message (plus de boucle à chaque rechargement)', () => {
+    const loc = [patient({ bilanDataPedicurie: { id: 'b', motif: 'saisie locale' } })];
+    const env = monter({
+      stockage: {
+        [K]: JSON.stringify(loc),
+        [M]: JSON.stringify(base('2026-10-19T23:55:50.759Z')),
+        'bm4-recuperation:u-fictif:2026-10-20T10:00:00.000Z': JSON.stringify(loc),
+      },
+      globales: { patients: cloud },
+    });
+    for (let i = 0; i < 3; i++) {
+      // chaque rechargement repose le marqueur puis relit
+      env.mem.set(M, JSON.stringify(base('2026-10-19T23:55:50.759Z')));
+      env.f._recupererSaisieNonSynchronisee('2026-10-20T09:00:00.000+00:00');
+    }
+    expect([...env.mem.keys()].filter((k) => k.startsWith('bm4-recuperation:')).length).toBe(1);
+    expect(env.journal.avis).toEqual([]);
+    expect(env.journal.dialogues).toEqual([]);
+    expect(env.mem.has(M)).toBe(false);
   });
 
   it('version locale plus pauvre que le cloud : jamais appliquée (copie à part)', () => {
@@ -399,8 +448,8 @@ describe('copies de récupération : limitées aux plus récentes, avec message 
       copie('2026-10-23T11:00:00.000Z'),
       copie('2026-10-29T10:00:00.000Z'),
     ]);
-    expect(env.journal.messages[0]).toContain('2 copies plus anciennes');
-    expect(env.journal.messages[0]).toContain('vont être retirées');
+    expect(env.journal.dialogues).toEqual([]); // retrait silencieux : plus de fenêtre à valider
+    expect(env.journal.avis.length).toBe(1);
     expect(env.mem.has(K)).toBe(true); // les patients ne sont jamais touchés
   });
   it("sous la limite : rien n'est retiré et le message ne parle pas de retrait", () => {
@@ -418,6 +467,7 @@ describe('copies de récupération : limitées aux plus récentes, avec message 
     });
     env.f._recupererSaisieNonSynchronisee('2026-10-20T09:00:00.000+00:00');
     expect([...env.mem.keys()].filter((k) => k.startsWith('bm4-recuperation:')).length).toBe(2);
-    expect(env.journal.messages[0]).not.toContain('retirée');
+    expect(env.journal.dialogues).toEqual([]);
+    expect(env.journal.avis[0]).not.toContain('retirée');
   });
 });

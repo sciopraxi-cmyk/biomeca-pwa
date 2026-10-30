@@ -268,6 +268,10 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     await page.waitForTimeout(500);
     page.once('dialog', (d) => d.accept());
     const card = page.locator('#pt-list-el > div', { has: page.locator(`text=E2E ${nom}`) });
-    if (await card.count()) await card.first().locator('button', { hasText: '✕' }).click();
+    if (await card.count()) {
+      await card.first().locator('button', { hasText: '✕' }).click();
+      await expect(card).toHaveCount(0, { timeout: 10_000 });
+      await page.waitForTimeout(4000); // laisse la suppression partir au serveur avant la fermeture du navigateur
+    }
   }
 });

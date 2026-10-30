@@ -854,7 +854,7 @@ async function loadSupabaseData() {
     // → currentBilanSportSousType / currentBilanPosturoSousType (indépendants).
     const flagsMigrated = migrateBilanFlags(patients);
     if(migrated || flagsMigrated || _saisieRecuperee) { console.log('Migration bilans OK'); savePatients(); }
-    if (_saisieRecuperee) alert('✓ Une saisie non envoyée lors de la dernière fermeture a été retrouvée et renvoyée au serveur.');
+    if (_saisieRecuperee && typeof _avisDiscret === 'function') _avisDiscret('✓ Une saisie non envoyée lors de la dernière fermeture a été retrouvée et renvoyée au serveur.');
   } catch(e) {
     // Fallback localStorage si Supabase indisponible.
     // #65 — clé localStorage unifiée sur bm4-patients/bm4-praticiens : le
@@ -4222,6 +4222,34 @@ function _etatApresCloud(ok, seqEnvoi) {
   _etatSauvegarde('saved');
 }
 
+// Petit avis en bas à gauche : disparaît seul au bout de 12 s, se ferme d'un clic, ne bloque jamais la page.
+function _avisDiscret(message) {
+  try {
+    if (typeof document === 'undefined' || !document.body) { console.info('[avis] ' + message); return false; }
+    let zone = document.getElementById('avis-discret');
+    if (!zone) {
+      zone = document.createElement('div');
+      zone.id = 'avis-discret';
+      zone.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9998;display:flex;flex-direction:column;gap:6px;max-width:min(420px,calc(100vw - 24px));';
+      document.body.appendChild(zone);
+    }
+    const n = document.createElement('div');
+    n.setAttribute('role', 'status');
+    n.style.cssText = 'background:#fff;color:#222;border:1px solid #a9dfbf;border-left:4px solid #2a7a4e;border-radius:8px;padding:8px 28px 8px 10px;font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.18);position:relative;';
+    n.textContent = message;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '×';
+    x.setAttribute('aria-label', 'Fermer');
+    x.style.cssText = 'position:absolute;top:2px;right:6px;border:none;background:none;font-size:16px;cursor:pointer;color:#666;';
+    x.onclick = function () { n.remove(); };
+    n.appendChild(x);
+    zone.appendChild(n);
+    setTimeout(function () { n.remove(); }, 12000);
+    return true;
+  } catch (_e) { return false; }
+}
+
 function _showSyncErrorBanner(message) {
   const b = document.getElementById('sync-error-banner');
   const t = document.getElementById('sync-error-banner-text');
@@ -5051,7 +5079,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v327';
+const APP_BUILD = 'v328';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -6618,22 +6646,35 @@ function _recupererSaisieNonSynchronisee(rowUpdatedAt) {
     patients = local;
     return true;
   }
+  // Avis discret (jamais de fenêtre à valider à chaque ouverture) : une saisie locale qui ne diffère pas du serveur, ou déjà
+  // gardée à l'identique dans une copie de récupération, ne dit rien du tout. Les images sont ignorées dans la comparaison
+  // (« idb:… » ou donnée image en local, chemin côté serveur).
+  const stable = (v) => JSON.stringify(v, function (_k, x) {
+    if (typeof x === 'string' && (x.indexOf('data:image') === 0 || x.indexOf('idb:') === 0 || /\.(jpe?g|png|webp)$/i.test(x))) return '[image]';
+    if (x && typeof x === 'object' && !Array.isArray(x)) { const o = {}; Object.keys(x).sort().forEach(function (kk) { o[kk] = x[kk]; }); return o; }
+    return x;
+  });
+  const dire = (texte) => { try { if (typeof _avisDiscret === 'function') _avisDiscret(texte); else console.info('[synchro] ' + texte); } catch (_e) { /* jamais bloquant */ } };
   try {
-    localStorage.setItem(_scopedKey('bm4-recuperation') + ':' + (m.t || Date.now()), JSON.stringify(local));
+    let identique = false;
+    try { identique = stable(local) === stable(patients); } catch (_e) { identique = false; }
+    if (identique) { localStorage.removeItem(kM); return false; }
+    const prefixeCopies = _scopedKey('bm4-recuperation');
+    const jsonLocal = JSON.stringify(local);
+    let dejaGardee = false;
+    try {
+      for (let i = 0; i < localStorage.length && !dejaGardee; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf(prefixeCopies + ':') === 0 && stable(JSON.parse(localStorage.getItem(k) || 'null')) === stable(local)) dejaGardee = true;
+      }
+    } catch (_e) { dejaGardee = false; }
+    if (dejaGardee) { localStorage.removeItem(kM); return false; }
+    localStorage.setItem(prefixeCopies + ':' + (m.t || Date.now()), jsonLocal);
     localStorage.removeItem(kM);
     let anciennes = [];
     try { anciennes = _copiesRecuperationExcedentaires(); } catch (_e) { anciennes = []; }
-    alert(
-      'ℹ️ Une saisie faite sur cet appareil n\'avait pas pu être envoyée au serveur, ' +
-      'mais le serveur a changé depuis (ou contient plus de données).\n\n' +
-      'Elle n\'a PAS été appliquée pour ne rien écraser. Une copie est conservée sur cet appareil ; ' +
-      'signalez-le si une information manque.' +
-      (anciennes.length
-        ? '\n\nPour libérer de l\'espace, ' + anciennes.length + ' copie' + (anciennes.length > 1 ? 's' : '') +
-          ' plus ancienne' + (anciennes.length > 1 ? 's' : '') + ' (au-delà des ' + COPIES_RECUPERATION_MAX +
-          ' plus récentes) ' + (anciennes.length > 1 ? 'vont être retirées' : 'va être retirée') + ' de cet appareil.'
-        : '')
-    );
+    dire('ℹ️ Une saisie faite sur cet appareil n\'avait pas pu être envoyée et n\'a pas été appliquée (le serveur est plus récent). ' +
+      'Une copie est conservée ; signalez-le si une information manque.');
     anciennes.forEach(function (k) { try { localStorage.removeItem(k); } catch (_e) { /* best-effort */ } });
   } catch (_e) { /* copie impossible : marqueur conservé, rien n'est écrasé */ }
   return false;

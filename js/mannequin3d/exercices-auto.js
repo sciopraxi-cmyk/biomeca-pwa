@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v327';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v327';
-import { calculerReprise } from './reprise-4vues.js?v=v327';
+import { PAR_ID } from './parametres.js?v=v328';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v328';
+import { calculerReprise } from './reprise-4vues.js?v=v328';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
