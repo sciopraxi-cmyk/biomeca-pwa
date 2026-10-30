@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v325';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v325';
-import { calculerReprise } from './reprise-4vues.js?v=v325';
+import { PAR_ID } from './parametres.js?v=v326';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v326';
+import { calculerReprise } from './reprise-4vues.js?v=v326';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -41,6 +41,19 @@ export const RANG_GROUPE = {
   pied: 7,
   // emplacement 3 : visuel, mandibule (ATM) et nerfs crâniens 1-7, 9, 10, 12
   slot3: 9,
+};
+// Quand il y a plus de propositions « emplacement 1 » que de lignes libres, on garde d'abord les plus PRIORITAIRES (ordre de
+// sélection ci-dessous) ; les lignes sont ensuite remplies dans l'ordre d'affichage (RANG_GROUPE). Le tronc cérébral et le
+// vestibulaire passent avant les réflexes : le dernier réflexe (4e…) est alors proposé en EMPLACEMENT 3 (décision du 30/10).
+export const RANG_SELECTION = {
+  chaine: 0,
+  terrain: 1,
+  vestibule: 2,
+  tronc: 3,
+  nerfs: 4,
+  reflexe: 5,
+  proprio: 6,
+  pied: 7,
 };
 // Nerfs crâniens (NC1…NC12) : catégories d'exercices créées le 30/10/2026. Emplacement 3 sauf NC8, NC11 (et tronc cérébral)
 // qui vont en emplacement 1. Déclencheur : une case « gauche » ou « droite » cochée dans le tableau des nerfs crâniens.
@@ -492,9 +505,25 @@ export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {
     return true;
   };
   const restantes = resolues.filter((p) => !traitees.has(p.cle));
+  const naturelles = restantes.filter((x) => !x.slot3);
+  const libresSlot1 = occ.filter((l) => !l[0]).length;
+  // sélection : les plus prioritaires gardent l'emplacement 1 ; les autres passent en emplacement 3 (jamais perdues)
+  const parPriorite = naturelles
+    .map((p, i) => [p, i])
+    .sort(
+      (a, b) =>
+        (RANG_SELECTION[a[0].groupe] ?? 99) - (RANG_SELECTION[b[0].groupe] ?? 99) || a[1] - b[1]
+    )
+    .map((x) => x[0]);
+  const gardees = new Set(
+    parPriorite.slice(0, Math.max(0, libresSlot1 + dejaPresentesSlot1(naturelles, subDe, present)))
+  );
   const aPlacer3 = [];
-  for (const p of restantes.filter((x) => !x.slot3))
-    if (!place(p, 0)) nonPlacees.push({ ...p, sub: subDe(p) });
+  for (const p of naturelles) {
+    if (gardees.has(p)) {
+      if (!place(p, 0)) aPlacer3.push(p);
+    } else aPlacer3.push(p);
+  }
   for (const p of restantes.filter((x) => x.slot3)) {
     const libre1 = occ.some((l) => !l[0]);
     if (p.debordable && libre1) {
@@ -527,5 +556,12 @@ export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {
   return { ecritures, dejaPresentes, nonPlacees, libres };
 }
 
+// nombre de propositions « emplacement 1 » déjà présentes dans les circuits (elles ne prennent pas de ligne)
+function dejaPresentesSlot1(naturelles, subDe, present) {
+  return naturelles.filter((p) => {
+    const sub = subDe(p);
+    return sub ? present(p.sys, sub) : false;
+  }).length;
+}
 export const LIBELLE_LIGNE = (i) =>
   i < 4 ? 'Express 1 — ex. ' + (i + 1) : 'Express 2 — ex. ' + (i - 3);

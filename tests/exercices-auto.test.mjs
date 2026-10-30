@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v325';
+} from '../js/mannequin3d/exercices-auto.js?v=v326';
 
 const CAT = [
   {
@@ -209,7 +209,7 @@ describe('placement dans les circuits', () => {
     expect(e.map((x) => x.ligne)).not.toContain(1);
     expect(plan.ecritures.filter((x) => x.slot === 1).map((x) => x.ligne)).not.toContain(0);
   });
-  it('plus de 8 principaux : les suivants sont listés « non placées », rien de perdu', () => {
+  it('plus de 8 principaux : les suivants passent en EMPLACEMENT 3 (rien de perdu) ; non placées seulement si tout est plein', () => {
     const neuro = {};
     [
       'rpp',
@@ -245,7 +245,79 @@ describe('placement dans les circuits', () => {
     expect(rr.filter(Boolean)).toHaveLength(10); // + utricules : catégorie absente ici, non résolue
     const plan = planifier(rr.filter(Boolean), vide(), cat, 'posturo');
     expect(plan.ecritures.filter((e) => e.slot === 0)).toHaveLength(8);
-    expect(plan.nonPlacees).toHaveLength(2);
+    expect(plan.nonPlacees).toHaveLength(0);
+    expect(plan.ecritures.filter((e) => e.slot === 2).map((e) => e.ligne)).toEqual([0, 1]);
+    // emplacement 3 lui aussi plein : les propositions en trop restent listées, jamais perdues
+    const pleins = vide();
+    for (let i = 0; i < 8; i++) pleins[i][2] = { sys: 'autre', sub: 'z' + i };
+    const plan2 = planifier(rr.filter(Boolean), pleins, cat, 'posturo');
+    expect(plan2.nonPlacees).toHaveLength(2);
+  });
+  it('EXEMPLE 2 DU PRATICIEN : 4 réflexes + TC + vestibulaire NC8 + chaîne musculaire + chaîne articulaire + terrain = 9 → le TC est prioritaire, le 4e réflexe va en emplacement 3', () => {
+    const catalogue = [
+      { value: 'terrain-aerien', label: 'T', subs: [{ value: 't', label: 'A' }] },
+      {
+        value: 'reflexes-archaiques',
+        label: 'R',
+        subs: [
+          { value: 'a', label: 'Réflexe de peur paralysante' },
+          { value: 'b', label: 'Réflexe de MORO' },
+          { value: 'c', label: 'Réflexe tendineux de protection' },
+          { value: 'd', label: 'Réflexe de Babinski' },
+        ],
+      },
+      {
+        value: 'nc8-vestibulo-cochleaire',
+        label: 'N8',
+        subs: [{ value: 'l', label: 'Rééducation pour un canal semi circulaire latéral' }],
+      },
+      {
+        value: 'tronc-cerebral',
+        label: 'TC',
+        subs: [
+          { value: 'tcd', label: 'Fente iso max TC droit' },
+          { value: 'tcg', label: 'Fente iso max TC gauche' },
+        ],
+      },
+      {
+        value: 'reeduc-posturale',
+        label: 'P',
+        subs: [{ value: 'el', label: 'Étirement patient latéralisé - latéral global' }],
+      },
+      { value: 'reeduc-articulaire', label: 'Art', subs: [{ value: 'x', label: 'X' }] },
+    ];
+    const r = proposerExercices({
+      valeurs: { poids_lr: 12, tronc_incl: 8, tete_incl: -4, pied_valgus_D: 10 }, // chaîne musculaire + profil articulaire
+      terrain: 'aerien',
+      neuro: {
+        'ref-rpp-o': true,
+        'ref-moro-o': true,
+        'ref-rtp-o': true,
+        'ref-babinski-g': true,
+        'vest-lat-d': true,
+        'nc-nc8-d': true,
+        'nc-nc1-d': true,
+      },
+    });
+    const rr = r.propositions
+      .filter((p) => p.cle !== 'pied' && p.cle !== 'nc-1')
+      .map((p) => resoudre(p, catalogue))
+      .filter(Boolean);
+    expect(rr).toHaveLength(9);
+    const plan = planifier(rr, vide(), catalogue, 'posturo');
+    const s1 = plan.ecritures
+      .filter((e) => e.slot === 0)
+      .sort((a, b) => a.ligne - b.ligne)
+      .map((e) => e.cle);
+    expect(s1).toHaveLength(8);
+    expect(s1).toContain('tronc-cerebral');
+    expect(s1).toContain('vest-lat');
+    expect(s1).not.toContain('ref-babinski');
+    // l'ordre des lignes reste l'ordre d'affichage : chaîne, terrain, réflexes, vestibule, tronc cérébral
+    expect(s1.slice(-2)).toEqual(['vest-lat', 'tronc-cerebral']);
+    const s3 = plan.ecritures.filter((e) => e.slot === 2);
+    expect(s3.map((e) => [e.ligne, e.cle])).toEqual([[0, 'ref-babinski']]);
+    expect(plan.nonPlacees).toHaveLength(0);
   });
   it('respiration : Faim d’air sur les lignes paires, stress sur les impaires ; catégorie absente = rien', () => {
     expect(respirationPourLigne(0, CAT, 'posturo').sub).toBe('r4');
