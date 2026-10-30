@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v320';
+const APP_BUILD = 'v321';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -26368,7 +26368,11 @@ function _exoAutoContexte(bilan) {
     const neuro = {};
     Object.keys(bd).forEach(function (k) { if (bd[k] === true && /^(vest|prop|ref)_/.test(k)) neuro[k.replace(/_/g, '-')] = true; });
     const terrain = bd.terrain_aerien ? 'aerien' : (bd.terrain_terrien ? 'terrien' : null);
-    return { bilan: 'sport', valeurs: (bd.mannequin3d && bd.mannequin3d.valeurs) || null, analyseVues: bd._postureAnalysis || null, neuro: neuro, terrain: terrain };
+    const atmS = [];
+    if (bd.tonicite_aggr_atm) atmS.push('serrage aggravé : ATM');
+    if (bd.atm_reductible) atmS.push('ATM articulaire réductible');
+    if (bd.atm_irreductible) atmS.push('ATM articulaire irréductible');
+    return { bilan: 'sport', valeurs: (bd.mannequin3d && bd.mannequin3d.valeurs) || null, analyseVues: bd._postureAnalysis || null, neuro: neuro, terrain: terrain, atm: atmS };
   }
   const d = (currentPatient && currentPatient.bilanDataPosturo) || {};
   const pref = document.querySelector('input[name="po-pref-mot"]:checked');
@@ -26379,6 +26383,13 @@ function _exoAutoContexte(bilan) {
     analyseVues: d._postureAnalysis || null,
     neuro: d.neuro4 || {},
     canauxVestibulaire: { ant: coche('po-canal-ant'), post: coche('po-canal-post'), lat: coche('po-canal-lat') },
+    atm: (function () {
+      const l = [];
+      if (coche('po-aggr-atm')) l.push('serrage aggravé : ATM');
+      const o = document.querySelector('input[name="po-atm-origine"]:checked');
+      if (o) l.push('origine de l’ATM : ' + o.value);
+      return l;
+    })(),
     terrain: pref ? (pref.value === 'tonique-aerien' ? 'aerien' : (pref.value === 'phasique-terrien' ? 'terrien' : null)) : null
   };
 }
@@ -26428,7 +26439,7 @@ async function _exoAutoOuvrir(bilan) {
     box.appendChild(el('div', 'font-weight:700;font-size:16px;margin-bottom:4px;', '✨ Exercices proposés d’après le bilan'));
     box.appendChild(el('div', 'color:#555;margin-bottom:10px;', 'Rien n’est écrit tant que vous n’avez pas cliqué « Appliquer ». Les exercices déjà choisis ne sont jamais modifiés.'));
     const actives = resolues.filter(function (p) { return coches[p.cle]; });
-    const plan = M.planifier(actives, etat, catalogue, bilan, choix, dest);
+    const plan = M.planifier(actives, etat, catalogue, bilan, choix, dest, { respi: respi });
     const ou = {};
     plan.ecritures.forEach(function (e) { if (e.cle !== 'respiration') ou[e.cle] = e; });
     r.notes.forEach(function (n) { box.appendChild(el('div', 'color:#b7740a;margin-bottom:6px;', 'ℹ️ ' + n)); });
@@ -26457,11 +26468,13 @@ async function _exoAutoOuvrir(bilan) {
         const d = document.createElement('select'); d.className = 'inp'; d.style.cssText = 'font-size:12px;background:#fff;color:#222;border:1px solid #bbb;padding:4px 6px;width:auto;';
         const auto = ou[p.cle] && !dest[p.cle];
         const o0 = document.createElement('option'); o0.value = '';
-        o0.textContent = auto ? ('Placer : ' + M.LIBELLE_LIGNE(ou[p.cle].ligne) + ', emplacement 1 (auto)') : (dest[p.cle] ? 'Placer : (auto)' : 'Ne pas placer (lignes pleines)');
+        o0.textContent = auto ? ('Placer : ' + M.LIBELLE_LIGNE(ou[p.cle].ligne) + ', emplacement ' + (ou[p.cle].slot + 1) + ' (auto)') : (dest[p.cle] ? 'Placer : (auto)' : 'Ne pas placer (lignes pleines)');
         d.appendChild(o0);
-        const libres0 = [];
-        for (let i = 0; i < 8; i++) for (let k = 0; k < 3; k++) if (!etat[i][k]) libres0.push([i, k]);
-        libres0.forEach(function (x) { const o = document.createElement('option'); o.value = x[0] + ':' + x[1]; o.textContent = M.LIBELLE_LIGNE(x[0]) + ', emplacement ' + (x[1] + 1); d.appendChild(o); });
+        // emplacements encore libres APRÈS toutes les autres propositions ; le sien reste choisissable
+        const offerts = plan.libres.slice();
+        if (dest[p.cle] && ou[p.cle]) offerts.push({ ligne: ou[p.cle].ligne, slot: ou[p.cle].slot });
+        offerts.sort(function (a, b) { return a.ligne - b.ligne || a.slot - b.slot; });
+        offerts.forEach(function (x) { const o = document.createElement('option'); o.value = x.ligne + ':' + x.slot; o.textContent = M.LIBELLE_LIGNE(x.ligne) + ', emplacement ' + (x.slot + 1); d.appendChild(o); });
         d.value = dest[p.cle] ? (dest[p.cle].ligne + ':' + dest[p.cle].slot) : '';
         d.onchange = function () { if (!d.value) delete dest[p.cle]; else { const q = d.value.split(':'); dest[p.cle] = { ligne: +q[0], slot: +q[1] }; } rendre(); };
         ligne.appendChild(d);
@@ -26494,7 +26507,7 @@ async function _exoAutoOuvrir(bilan) {
     const bo = el('button', 'padding:8px 14px;border-radius:8px;border:none;background:#2a7a4e;color:#fff;font-weight:700;cursor:pointer;', 'Appliquer (' + nb + ')');
     bo.disabled = nb === 0;
     bo.onclick = function () {
-      const plan2 = M.planifier(resolues.filter(function (p) { return coches[p.cle]; }), _exoAutoEtat(lignes), catalogue, bilan, choix, dest);
+      const plan2 = M.planifier(resolues.filter(function (p) { return coches[p.cle]; }), _exoAutoEtat(lignes), catalogue, bilan, choix, dest, { respi: respi });
       let n = 0;
       plan2.ecritures.forEach(function (e) {
         if (e.cle === 'respiration' && !respi) return;

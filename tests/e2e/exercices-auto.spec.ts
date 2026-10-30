@@ -47,6 +47,9 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
       d.neuro4 = { 'ref-moro-o': true, 'prop-lent-g': true, 'vest-ant-g': true };
       d.mannequin3d = { v: 1, sexe: 'F', peau: 'clair', valeurs: { pied_valgus_D: 10 } };
     });
+    await page.evaluate(() => showPosturoSection(6));
+    await page.waitForTimeout(500);
+    await page.evaluate(() => ((document.getElementById('po-aggr-atm') as any).checked = true));
     await page.evaluate(() => showPosturoSection(8));
     await page.waitForTimeout(800);
     await page.click('#psec-8 .exo-auto-btn');
@@ -57,13 +60,21 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     await page.locator('#exo-auto-modal button', { hasText: 'Appliquer' }).click();
     await page.waitForTimeout(800);
     const po = await etat('po', false);
-    expect(po[0][0]).toMatch(/vestibulaire > .*canal antérieur/i);
-    expect(po[1][0]).toMatch(/proprioceptif/i);
-    expect(po[2][0]).toMatch(/Moro/i);
+    // priorité : réflexes, vestibule, proprioception, pied (chaîne et terrain passeraient avant)
+    expect(po[0][0]).toMatch(/Moro/i);
+    expect(po[1][0]).toMatch(/vestibulaire > .*canal antérieur/i);
+    expect(po[2][0]).toMatch(/proprioceptif/i);
     expect(po[3][0]).toMatch(/Rééducation du pied/);
+    // ATM coché (section 7) : exercice de la mâchoire en EMPLACEMENT 3, jamais en 1
+    expect(po.flat().filter((x) => /mandibul/i.test(x))).toHaveLength(1);
+    expect(po.map((l) => l[2]).join('|')).toMatch(/mâchoire/i);
+    expect(po.map((l) => l[0]).join('|')).not.toMatch(/mandibul/i);
+    po.forEach((l) => {
+      const pris = l.filter((x) => x !== '- > -');
+      expect(new Set(pris).size).toBe(pris.length);
+    });
     po.forEach((l, i) => {
       expect(l[1]).toMatch(i % 2 === 0 ? /Faim d'air/ : /stress/);
-      expect(l[2]).toBe('- > -');
     });
     expect(
       await page.evaluate(() => (document.getElementById('po-prog-pied-on') as any).checked)
@@ -103,8 +114,8 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     await page.locator('#exo-auto-modal button', { hasText: 'Appliquer' }).click();
     await page.waitForTimeout(800);
     const sp = await etat('sp', true);
-    expect(sp[0][0]).toMatch(/canal postérieur/i);
-    expect(sp[1][0]).toMatch(/Moro/i);
+    expect(sp[0][0]).toMatch(/Moro/i);
+    expect(sp[1][0]).toMatch(/canal postérieur/i);
     sp.forEach((l, i) => expect(l[1]).toMatch(i % 2 === 0 ? /Faim d'air/ : /stress/));
 
     // podopédiatrie : réflexes cochés, valgus du pied, chaînes du mannequin (charge à droite), respiration

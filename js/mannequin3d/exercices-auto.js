@@ -1,28 +1,44 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v320';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v320';
-import { calculerReprise } from './reprise-4vues.js?v=v320';
+import { PAR_ID } from './parametres.js?v=v321';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v321';
+import { calculerReprise } from './reprise-4vues.js?v=v321';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
+  // ORDRE DE PRIORITÉ dicté par le praticien : d'abord RPP, MORO, RTP ; puis Babinski, plantaire, RTAC, Perez, Galant,
+  // Landau, palmaire, Babkin, reptation (la fin de la liste = réflexes propres à la podopédiatrie)
   'ref-rpp': { nom: 'RPP', fiche: 'peur paralysante' },
-  'ref-rtp': { nom: 'RTP', fiche: 'tendineux de protection' },
   'ref-moro': { nom: 'Moro', fiche: 'moro' },
-  'ref-perez': { nom: 'Perez', fiche: 'perez' },
-  'ref-landau': { nom: 'Landau', fiche: 'landau' },
-  'ref-reptation': { nom: 'Reptation', fiche: 'reptation' },
-  'ref-rtac': { nom: 'RTAC', fiche: 'asym[ée]trique du cou' },
-  'ref-galant': { nom: 'Galant', fiche: 'galant' },
+  'ref-rtp': { nom: 'RTP', fiche: 'tendineux de protection' },
   'ref-babinski': { nom: 'Babinski', fiche: 'babinski' },
   'ref-plantaire': { nom: 'Plantaire', fiche: 'plantaire' },
+  'ref-rtac': { nom: 'RTAC', fiche: 'asym[ée]trique du cou' },
+  'ref-perez': { nom: 'Perez', fiche: 'perez' },
+  'ref-galant': { nom: 'Galant', fiche: 'galant' },
+  'ref-landau': { nom: 'Landau', fiche: 'landau' },
   'ref-palmaire': { nom: 'Palmaire', fiche: 'palmaire' },
   'ref-babkin': { nom: 'Babkin', fiche: 'babkin' },
-  // réflexes propres à la podopédiatrie qui ont une fiche dans la bibliothèque
+  'ref-reptation': { nom: 'Reptation', fiche: 'reptation' },
   'ref-succion': { nom: 'Succion', fiche: 'succion' },
   'ref-rtsc': { nom: 'RTSC', fiche: '(?<![aA])sym[ée]trique du cou' },
   'ref-tonique-labyrinthique': { nom: 'Tonique labyrinthique', fiche: 'labyrinthique' },
+};
+// Rang de priorité dans l'EMPLACEMENT 1 des 8 lignes (décision du 30/10) : chaîne musculaire, terrain aérien/terrien,
+// réflexes archaïques, vestibule, nerfs crâniens (à venir), tronc cérébral (à venir) ; ensuite les autres règles.
+// Visuel et mandibule (ATM) vont dans l'EMPLACEMENT 3.
+export const RANG_GROUPE = {
+  chaine: 0,
+  terrain: 1,
+  reflexe: 2,
+  vestibule: 3,
+  nerfs: 4,
+  tronc: 5,
+  proprio: 6,
+  pied: 7,
+  articulaire: 8,
+  slot3: 9,
 };
 // réflexes cochés sans fiche dans la bibliothèque : listés « sans fiche », jamais inventés
 export const REFLEXES_SANS_FICHE = {
@@ -115,7 +131,7 @@ export function proposerExercices(c) {
   } else if (!canaux.ant && !canaux.post && !canaux.lat)
     ajoute({
       cle: 'vest-utricules',
-      groupe: 'neuro',
+      groupe: 'vestibule',
       cats: [{ code: 'systeme-vestibulaire', exo: 'utricule' }],
       raison: 'vestibulaire : aucun canal semi-circulaire coché → utricules',
     });
@@ -124,7 +140,7 @@ export function proposerExercices(c) {
       if (canaux[k])
         ajoute({
           cle: 'vest-' + k,
-          groupe: 'neuro',
+          groupe: 'vestibule',
           cats: [{ code: 'systeme-vestibulaire', exo: re.source }],
           raison: 'vestibulaire : ' + lib + ' coché',
         });
@@ -134,7 +150,7 @@ export function proposerExercices(c) {
   if (propCoche && !podo)
     ajoute({
       cle: 'proprio',
-      groupe: 'neuro',
+      groupe: 'proprio',
       cats: [{ code: 'systeme-somesthesique', exo: 'proprioceptif' }],
       raison: 'proprioception : case(s) cochée(s) dans le bilan neuro-fonctionnel',
     });
@@ -144,7 +160,7 @@ export function proposerExercices(c) {
     if (coche(n, id, COLS_REFLEXE))
       ajoute({
         cle: id,
-        groupe: 'neuro',
+        groupe: 'reflexe',
         cats: [{ code: 'reflexes-archaiques', exo: r.fiche }],
         raison: 'réflexe archaïque ' + r.nom + ' coché',
       });
@@ -213,6 +229,16 @@ export function proposerExercices(c) {
       raison: 'terrain ' + (c.terrain === 'aerien' ? 'aérien' : 'terrien'),
     });
 
+  // Mandibule / ATM cochée dans le bilan (buccal) : exercice de la mâchoire, EMPLACEMENT 3
+  if (c && Array.isArray(c.atm) && c.atm.length)
+    ajoute({
+      cle: 'mandibule',
+      groupe: 'slot3',
+      slot3: true,
+      cats: [{ code: 'systeme-mandibulaire', exo: null }],
+      raison: 'mandibule / ATM : ' + c.atm.join(', '),
+    });
+
   // 6) Valgus / varus du pied : un exercice de « Rééducation du pied » préselectionné + programme du pied coché
   const pv = piedValgusVarus(v, c && c.analyseVues);
   for (const x of (c && c.pieds) || [])
@@ -242,7 +268,12 @@ export function proposerExercices(c) {
       raison: 'profil biomécanique / organique / articulaire : choisissez l’exercice',
     });
 
-  return { propositions: prop, programmePied, notes };
+  const rang = (p) => (RANG_GROUPE[p.groupe] == null ? 99 : RANG_GROUPE[p.groupe]);
+  const triees = prop
+    .map((p, i) => [p, i])
+    .sort((x, y) => rang(x[0]) - rang(y[0]) || x[1] - y[1])
+    .map((x) => x[0]);
+  return { propositions: triees, programmePied, notes };
 }
 
 // ── Résolution d'une proposition dans la liste réelle de catégories du bilan (libellés, pas de codes devinés)
@@ -290,7 +321,7 @@ export function respirationPourLigne(ligne, catalogue, bilan) {
  * Règles : emplacement 1 = exercice principal du bilan (lignes libres dans l'ordre) ; emplacement 2 = respiration ;
  * l'emplacement 3 n'est jamais rempli d'office. Rien d'existant n'est écrasé ; un exercice déjà présent n'est pas dupliqué.
  */
-export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {}) {
+export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {}, options = {}) {
   const ecritures = [];
   const dejaPresentes = [];
   const nonPlacees = [];
@@ -300,7 +331,7 @@ export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {
   const subDe = (p) =>
     Object.prototype.hasOwnProperty.call(choix, p.cle) ? choix[p.cle] : p.defaut;
   const traitees = new Set();
-  // 1) destinations choisies par le praticien (n'importe quel emplacement libre)
+  // 1) destinations choisies par le praticien : chaque emplacement ne sert qu'UNE fois (premier choix retenu)
   for (const p of resolues) {
     const d = dest[p.cle];
     if (!d) continue;
@@ -317,8 +348,9 @@ export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {
     ecritures.push({ ligne: d.ligne, slot: d.slot, sys: p.sys, sysLib: p.sysLib, sub, cle: p.cle });
     occ[d.ligne][d.slot] = { sys: p.sys, sub };
   }
-  // 2) les autres : emplacement 1 des lignes libres, dans l'ordre de priorité
+  // 2) les autres : emplacement 1 des lignes libres (dans l'ordre de priorité) ; visuel / mandibule : emplacement 3
   let l1 = 0;
+  let l3 = 0;
   for (const p of resolues) {
     if (traitees.has(p.cle)) continue;
     const sub = subDe(p);
@@ -326,31 +358,37 @@ export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {
       dejaPresentes.push(p);
       continue;
     }
-    while (l1 < 8 && occ[l1][0]) l1++;
-    if (l1 >= 8) {
+    const slot = p.slot3 ? 2 : 0;
+    let l = slot === 2 ? l3 : l1;
+    while (l < 8 && occ[l][slot]) l++;
+    if (l >= 8) {
       nonPlacees.push({ ...p, sub });
       continue;
     }
-    ecritures.push({ ligne: l1, slot: 0, sys: p.sys, sysLib: p.sysLib, sub, cle: p.cle });
-    occ[l1][0] = { sys: p.sys, sub };
-    l1++;
+    ecritures.push({ ligne: l, slot, sys: p.sys, sysLib: p.sysLib, sub, cle: p.cle });
+    occ[l][slot] = { sys: p.sys, sub };
+    if (slot === 2) l3 = l + 1;
+    else l1 = l + 1;
   }
   // 3) respiration en emplacement 2 de chaque ligne où il est libre
-  for (let i = 0; i < 8; i++) {
-    if (occ[i][1]) continue;
-    const r = respirationPourLigne(i, catalogue, bilan);
-    if (!r) continue;
-    ecritures.push({
-      ligne: i,
-      slot: 1,
-      sys: r.sys,
-      sysLib: r.sysLib,
-      sub: r.sub,
-      subLib: r.subLib,
-      cle: 'respiration',
-    });
-    occ[i][1] = { sys: r.sys, sub: r.sub };
-  }
+  if (options.respi !== false)
+    for (let i = 0; i < 8; i++) {
+      if (occ[i][1]) continue;
+      const r = respirationPourLigne(i, catalogue, bilan);
+      if (!r) continue;
+      // jamais deux exercices de respiration dans la même ligne (même catégorie déjà présente dans un emplacement)
+      if (occ[i].some((x) => x && x.sys === r.sys)) continue;
+      ecritures.push({
+        ligne: i,
+        slot: 1,
+        sys: r.sys,
+        sysLib: r.sysLib,
+        sub: r.sub,
+        subLib: r.subLib,
+        cle: 'respiration',
+      });
+      occ[i][1] = { sys: r.sys, sub: r.sub };
+    }
   const libres = [];
   for (let i = 0; i < 8; i++)
     for (let s = 0; s < 3; s++) if (!occ[i][s]) libres.push({ ligne: i, slot: s });

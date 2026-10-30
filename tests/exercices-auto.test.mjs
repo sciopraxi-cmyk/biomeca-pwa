@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v320';
+} from '../js/mannequin3d/exercices-auto.js?v=v321';
 
 const CAT = [
   {
@@ -119,7 +119,7 @@ describe('proprioception et réflexes', () => {
       neuro: { 'ref-moro-o': true, 'ref-rtac-g': true, 'ref-palmaire-d': true, 'ref-rpp-n': true },
     });
     const fiches = r.propositions
-      .filter((p) => p.groupe === 'neuro' && /^ref-/.test(p.cle))
+      .filter((p) => p.groupe === 'reflexe')
       .map((p) => resoudre(p, CAT).defaut);
     expect(fiches).toEqual(['r2', 'r6', 'r12']);
     expect(cles(r)).not.toContain('ref-rpp');
@@ -177,10 +177,11 @@ describe('placement dans les circuits', () => {
     }).propositions.map((p) => resoudre(p, CAT));
     const plan = planifier(rr, vide(), CAT, 'posturo');
     const p1 = plan.ecritures.filter((e) => e.slot === 0);
+    // priorité : réflexes, puis vestibule, puis proprioception
     expect(p1.map((e) => [e.ligne, e.sub])).toEqual([
-      [0, 'ant'],
-      [1, 'p'],
-      [2, 'r2'],
+      [0, 'r2'],
+      [1, 'ant'],
+      [2, 'p'],
     ]);
     const p2 = plan.ecritures.filter((e) => e.slot === 1);
     expect(p2).toHaveLength(8);
@@ -331,5 +332,130 @@ describe('placement dans les circuits', () => {
     expect(cles(proposerExercices({ bilan: 'podo', neuro: {} }))).toEqual([]);
     expect(cles(proposerExercices({ bilan: 'podo', neuro: { 'prop-lent-g': true } }))).toEqual([]);
     expect(cles(proposerExercices({ bilan: 'posturo', neuro: {} }))).toEqual(['vest-utricules']);
+  });
+
+  it('ordre des réflexes : RPP, Moro, RTP, puis Babinski, plantaire, RTAC, Perez, Galant, Landau, palmaire, Babkin, reptation', () => {
+    const neuro = {};
+    [
+      'reptation',
+      'babkin',
+      'palmaire',
+      'landau',
+      'galant',
+      'perez',
+      'rtac',
+      'plantaire',
+      'babinski',
+      'rtp',
+      'moro',
+      'rpp',
+    ].forEach((k) => (neuro['ref-' + k + '-o'] = true));
+    const r = proposerExercices({ neuro: { ...neuro, 'vest-ant-g': true } });
+    expect(r.propositions.filter((p) => p.groupe === 'reflexe').map((p) => p.cle)).toEqual(
+      [
+        'rpp',
+        'moro',
+        'rtp',
+        'babinski',
+        'plantaire',
+        'rtac',
+        'perez',
+        'galant',
+        'landau',
+        'palmaire',
+        'babkin',
+        'reptation',
+      ].map((k) => 'ref-' + k)
+    );
+  });
+  it('priorité des groupes : chaîne, terrain, réflexes, vestibule, puis proprio, pied, articulaire ; mandibule (emplacement 3) en dernier', () => {
+    const r = proposerExercices({
+      valeurs: { poids_lr: 12, tronc_incl: 8, tete_incl: -4, pied_valgus_D: 10 },
+      neuro: { 'ref-moro-o': true, 'vest-ant-g': true, 'prop-lent-g': true },
+      terrain: 'aerien',
+      atm: ['serrage aggravé : ATM'],
+    });
+    expect(r.propositions.map((p) => p.groupe)).toEqual([
+      'chaine',
+      'terrain',
+      'reflexe',
+      'vestibule',
+      'proprio',
+      'pied',
+      'articulaire',
+      'slot3',
+    ]);
+  });
+  it('mandibule / ATM : exercice de la mâchoire placé en EMPLACEMENT 3, jamais en 1 ; rien si ATM non coché', () => {
+    expect(cles(proposerExercices({ neuro: {}, atm: [] }))).not.toContain('mandibule');
+    const rr = proposerExercices({ neuro: {}, atm: ['ATM'] })
+      .propositions.map((p) =>
+        resoudre(p, [
+          ...CAT,
+          {
+            value: 'systeme-mandibulaire',
+            label: 'Mandibule',
+            subs: [{ value: 'm', label: '1. Rééducation de la mâchoire' }],
+          },
+        ])
+      )
+      .filter(Boolean);
+    const m = rr.find((p) => p.cle === 'mandibule');
+    expect(m.defaut).toBe('m');
+    const plan = planifier(rr, vide(), CAT, 'posturo');
+    expect(plan.ecritures.find((e) => e.cle === 'mandibule')).toMatchObject({ ligne: 0, slot: 2 });
+    expect(plan.ecritures.filter((e) => e.slot === 0).map((e) => e.cle)).not.toContain('mandibule');
+  });
+  it('jamais deux exercices identiques dans une même ligne, même avec beaucoup de propositions', () => {
+    const rr = proposerExercices({
+      valeurs: { poids_lr: 12, tronc_incl: 8, tete_incl: -4, pied_valgus_D: 10 },
+      neuro: { 'ref-moro-o': true, 'ref-rpp-o': true, 'vest-ant-g': true, 'prop-lent-g': true },
+      terrain: 'aerien',
+      atm: ['ATM'],
+    })
+      .propositions.map((p) => resoudre(p, CAT))
+      .filter(Boolean);
+    const plan = planifier(rr, vide(), CAT, 'posturo');
+    const lignes = vide();
+    plan.ecritures.forEach((e) => (lignes[e.ligne][e.slot] = e.sys + '|' + e.sub));
+    lignes.forEach((l) => {
+      const pris = l.filter(Boolean);
+      expect(new Set(pris).size).toBe(pris.length);
+    });
+    // case « respiration » décochée : emplacement 2 laissé libre et proposé aux autres
+    const sans = planifier(rr, vide(), CAT, 'posturo', {}, {}, { respi: false });
+    expect(sans.ecritures.some((e) => e.slot === 1)).toBe(false);
+    expect(sans.libres.filter((x) => x.slot === 1)).toHaveLength(8);
+  });
+  it('emplacements déjà choisis : retirés de la liste des libres pour les autres propositions', () => {
+    const rr = proposerExercices({
+      neuro: { 'ref-moro-o': true, 'ref-rpp-o': true, 'prop-lent-g': true },
+    })
+      .propositions.map((p) => resoudre(p, CAT))
+      .filter(Boolean);
+    const plan = planifier(rr, vide(), CAT, 'posturo', {}, { 'ref-moro': { ligne: 0, slot: 2 } });
+    expect(plan.libres.some((x) => x.ligne === 0 && x.slot === 2)).toBe(false);
+    // deux propositions qui visent le même emplacement : la seconde n'écrase pas, elle reste « non placée »
+    const plan2 = planifier(
+      rr,
+      vide(),
+      CAT,
+      'posturo',
+      {},
+      { 'ref-moro': { ligne: 0, slot: 2 }, proprio: { ligne: 0, slot: 2 } }
+    );
+    expect(plan2.nonPlacees.map((p) => p.cle)).toContain('proprio');
+    expect(plan2.ecritures.filter((e) => e.ligne === 0 && e.slot === 2)).toHaveLength(1);
+  });
+
+  it('une ligne qui contient déjà un exercice de respiration (n’importe quel emplacement) ne reçoit pas une seconde respiration', () => {
+    const etat = vide();
+    etat[0][0] = { sys: 'respi-posture', sub: 'r3' };
+    etat[1][2] = { sys: 'respi-posture', sub: 'r4' };
+    const plan = planifier([], etat, CAT, 'posturo');
+    const l = plan.ecritures.filter((e) => e.slot === 1).map((e) => e.ligne);
+    expect(l).not.toContain(0);
+    expect(l).not.toContain(1);
+    expect(l).toHaveLength(6);
   });
 });
