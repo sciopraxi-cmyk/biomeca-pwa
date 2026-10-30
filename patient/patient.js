@@ -27,6 +27,7 @@ import {
   etatChrono,
   exosTermines,
   exerciceAffichable,
+  fichesAffichables,
   exerciceSuivantMs,
   formaterIdentifiant,
   formaterTemps,
@@ -858,6 +859,8 @@ async function majCarteExercices() {
     phrase = situationJour(c, auj.index, validations, aujourdhuiISO()).aJour
       ? 'Bravo, vous êtes à jour 🎉'
       : 'Votre programme du jour';
+  } else if (fichesAffichables(c).length) {
+    phrase = 'Vos fiches de réathlétisation';
   }
   $('phrase-exercices').textContent = phrase;
 }
@@ -872,16 +875,17 @@ function elt(tag, classe, texte) {
 // Fiche PDF : sur la même page, dans un cadre sous l'exercice (fiche livrée avec l'application ou fiche privée lue
 // avec la session ; jamais un chemin libre : tout est contrôlé dans patient-logique.mjs).
 // `cibleCadre` : zone pleine largeur sous les sous-exercices où s'ouvre la fiche (les colonnes sont trop étroites).
-function boutonFiche(ex, cibleCadre) {
+function boutonFiche(ex, cibleCadre, etiquette) {
+  const ouvrir = etiquette || '📄 Fiche PDF (avec QR)';
   const zone = elt('div', 'zone-fiche');
-  const b = elt('button', 'btn-fiche', '📄 Fiche PDF (avec QR)');
+  const b = elt('button', 'btn-fiche', ouvrir);
   b.type = 'button';
   let cadre = null;
   b.addEventListener('click', async () => {
     if (cadre) {
       cadre.remove();
       cadre = null;
-      b.textContent = '📄 Fiche PDF (avec QR)';
+      b.textContent = ouvrir;
       return;
     }
     cadre = document.createElement('iframe');
@@ -1544,13 +1548,32 @@ async function ouvrirExercices() {
   }
   if (p !== undefined) programme = p;
   const c = programme && programme.contenu;
+  afficherMesFiches(c);
   if (!c || !Array.isArray(c.jours) || !c.jours.length) {
-    $('vide-exercices').hidden = false;
+    // fiches seules (réathlétisation) : pas de message « programme pas prêt » si au moins une fiche est publiée
+    $('vide-exercices').hidden = fichesAffichables(c).length > 0;
     return;
   }
   jourCourant = jourProgramme(c, aujourdhuiISO()).index;
   $('zone-exercices').hidden = false;
   afficherJour();
+}
+
+// « Mes fiches » : programmes de réathlétisation publiés en fiche seule (PDF), sans chrono ni validation
+function afficherMesFiches(c) {
+  const zone = $('zone-mes-fiches');
+  const liste = $('liste-mes-fiches');
+  liste.replaceChildren();
+  const fiches = fichesAffichables(c);
+  zone.hidden = fiches.length === 0;
+  for (const { ex } of fiches) {
+    const bloc = elt('div', 'sous-exercice fiche-seule');
+    bloc.appendChild(elt('h3', '', ex.nom));
+    const cadre = elt('div', 'cadre-fiche-zone');
+    bloc.appendChild(boutonFiche(ex, cadre, '📄 Ouvrir la fiche'));
+    bloc.appendChild(cadre);
+    liste.appendChild(bloc);
+  }
 }
 
 // ─── Messagerie patient ↔ praticien ───

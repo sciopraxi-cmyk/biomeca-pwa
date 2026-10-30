@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v326';
+const APP_BUILD = 'v327';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -26187,6 +26187,8 @@ function _exoBibConstruire(base, persoCats, perso) {
 // NC8 (vestibulo-cochléaire) n'est PAS exclue de la podopédiatrie : elle porte désormais les exercices vestibulaires que ce bilan
 // proposait dans « Système vestibulaire » (déplacés le 30/10/2026). Les autres nerfs crâniens et le tronc cérébral restent exclus.
 const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-articulaire', 'nc1-olfactif', 'nc2-optique', 'nc3-oculomoteur', 'nc4-trochleaire', 'nc5-trijumeau', 'nc6-abducens', 'nc7-facial', 'nc9-glosso-pharyngien', 'nc10-vague', 'nc11-accessoire', 'nc12-hypoglosse', 'tronc-cerebral', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
+// Pathologies genou / hanche / pied : plus des exercices des circuits, mais des cases « programme de réathlétisation » (chantier B lot 4)
+const _EXO_PATHO_SLUGS = ['pathologies-genou', 'pathologies-hanche', 'pathologies-pied'];
 // Liste de secours (hors ligne) : exercices de la catégorie ; ceux du pied viennent de EXERCICES_PIED_ENFANT.
 function _exoSubsSecours(slug, cfg) {
   const l = cfg.subs.map(o => ({ value: o, label: o }));
@@ -26197,11 +26199,11 @@ function _exoBibCats(bilan) {
   const podo = bilan === 'podo';
   if (!_exoBib) {
     return Object.entries(FICHES_SYSTEMES)
-      .filter(([slug, cfg]) => (podo ? !_EXO_PODO_EXCLUES.includes(slug) : cfg.bilans.includes(bilan)))
+      .filter(([slug, cfg]) => (podo ? !_EXO_PODO_EXCLUES.includes(slug) : !_EXO_PATHO_SLUGS.includes(slug) && cfg.bilans.includes(bilan)))
       .map(([slug, cfg]) => ({ value: slug, label: cfg.label, subs: _exoSubsSecours(slug, cfg) }));
   }
   if (podo) return _exoBib.filter(c => !_EXO_PODO_EXCLUES.includes(c.value));
-  return _exoBib.filter(c => !c.bilans || c.bilans.includes(bilan));
+  return _exoBib.filter(c => !_EXO_PATHO_SLUGS.includes(c.value) && (!c.bilans || c.bilans.includes(bilan)));
 }
 function _exoBibSubs(sysValue) {
   const c = (_exoBib || []).find(x => x.value === sysValue);
@@ -26444,6 +26446,20 @@ function _exoAutoEcrire(lignes, e) {
   }
   return true;
 }
+// Tous les textes du bilan ouvert (anamnèse, motif, diagnostic, conclusion, textes libres) : champs affichés + données enregistrées.
+function _exoAutoTextes(bilan) {
+  const out = [];
+  const page = document.getElementById(bilan === 'sport' ? 'pg-bilan' : (bilan === 'podo' ? 'pg-podopediatrie' : 'pg-bilan-posturo'));
+  if (page) page.querySelectorAll('textarea, input[type="text"], input:not([type])').forEach(function (e) { if (e.value && e.value.length < 20000) out.push(e.value); });
+  const d = bilan === 'sport' ? (typeof bilanData !== 'undefined' ? bilanData : null) : (currentPatient && (bilan === 'podo' ? currentPatient.bilanDataPodopediatrie : currentPatient.bilanDataPosturo));
+  (function parcourir(v, prof) {
+    if (prof > 6 || v == null) return;
+    if (typeof v === 'string') { if (v.length < 20000 && !/^data:/.test(v)) out.push(v); return; }
+    if (Array.isArray(v)) { v.forEach(function (x) { parcourir(x, prof + 1); }); return; }
+    if (typeof v === 'object') Object.keys(v).forEach(function (k) { if (k !== 'programmes' && k !== 'mannequin3d' && k !== '_postureAnalysis') parcourir(v[k], prof + 1); });
+  })(d, 0);
+  return out;
+}
 async function _exoAutoOuvrir(bilan) {
   if (typeof _exoBib === 'undefined' || !_exoBib) { try { await exoBibRafraichir(); } catch (_e) { /* liste de secours */ } }
   let M;
@@ -26459,6 +26475,12 @@ async function _exoAutoOuvrir(bilan) {
   resolues.forEach(function (p) { coches[p.cle] = true; });
   let pied = !!r.programmePied;
   let respi = true;
+  const prefP = bilan === 'sport' ? 'sp' : (bilan === 'podo' ? 'pd' : 'po');
+  // programmes de réathlétisation : cases du « Programme du patient » d'après les termes trouvés dans le bilan
+  const patho = (M.detecterPathologies ? M.detecterPathologies(_exoAutoTextes(bilan)) : []).map(function (x) {
+    const c = document.getElementById(prefP + '-prog-pat-' + x.cle);
+    return { cle: x.cle, label: x.label, raison: x.raison, champ: c, deja: !!(c && c.checked), coche: !!c };
+  }).filter(function (x) { return x.champ; });
   const pc = (typeof _progChamp === 'function') ? _progChamp(bilan === 'sport' ? 'sp' : (bilan === 'podo' ? 'pd' : 'po'), 'pied-on') : null;
   const piedDejaCoche = !!(pc && pc.checked);
 
@@ -26480,7 +26502,7 @@ async function _exoAutoOuvrir(bilan) {
     const ou = {};
     plan.ecritures.forEach(function (e) { if (e.cle !== 'respiration') ou[e.cle] = e; });
     r.notes.forEach(function (n) { box.appendChild(el('div', 'color:#b7740a;margin-bottom:6px;', 'ℹ️ ' + n)); });
-    if (!resolues.length && !r.programmePied) box.appendChild(el('div', 'margin:8px 0;', 'Aucune règle ne propose d’exercice pour ce bilan.'));
+    if (!resolues.length && !r.programmePied && !patho.length) box.appendChild(el('div', 'margin:8px 0;', 'Aucune règle ne propose d’exercice pour ce bilan.'));
     resolues.forEach(function (p) {
       const row = el('div', 'border:1px solid #ddd;border-radius:8px;padding:8px 10px;margin-bottom:6px;');
       const l1 = el('label', 'display:flex;gap:8px;align-items:flex-start;cursor:pointer;');
@@ -26531,6 +26553,17 @@ async function _exoAutoOuvrir(bilan) {
       l.appendChild(el('span', '', 'Cocher le programme de renforcement des muscles profonds du pied (' + r.programmePied.raison + ')' + (piedDejaCoche ? ' — déjà coché' : '')));
       box.appendChild(l);
     }
+    patho.forEach(function (x) {
+      const l = el('label', 'display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin:8px 0;');
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = x.coche || x.deja; cb.disabled = x.deja;
+      cb.onchange = function () { x.coche = cb.checked; rendre(); };
+      l.appendChild(cb);
+      const t = el('div', '');
+      t.appendChild(el('div', 'font-weight:600;', '📄 Cocher le programme de réathlétisation : ' + x.label + (x.deja ? ' — déjà coché' : '')));
+      t.appendChild(el('div', 'color:#555;font-size:12px;', 'terme trouvé dans le bilan : ' + x.raison + ' (fiche PDF sur le compte du patient, sans chronomètre)'));
+      l.appendChild(t);
+      box.appendChild(l);
+    });
     const nResp = plan.ecritures.filter(function (e) { return e.cle === 'respiration'; }).length;
     const lr = el('label', 'display:flex;gap:8px;align-items:center;cursor:pointer;margin:8px 0;');
     const cr = document.createElement('input'); cr.type = 'checkbox'; cr.checked = respi;
@@ -26540,7 +26573,7 @@ async function _exoAutoOuvrir(bilan) {
     box.appendChild(lr);
     const bar = el('div', 'display:flex;gap:8px;justify-content:flex-end;margin-top:12px;');
     const bn = el('button', 'padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer;', 'Annuler'); bn.onclick = fermer;
-    const nb = plan.ecritures.filter(function (e) { return e.cle !== 'respiration' || respi; }).length + (pied && !piedDejaCoche ? 1 : 0);
+    const nb = plan.ecritures.filter(function (e) { return e.cle !== 'respiration' || respi; }).length + (pied && !piedDejaCoche ? 1 : 0) + patho.filter(function (x) { return x.coche && !x.deja; }).length;
     const bo = el('button', 'padding:8px 14px;border-radius:8px;border:none;background:#2a7a4e;color:#fff;font-weight:700;cursor:pointer;', 'Appliquer (' + nb + ')');
     bo.disabled = nb === 0;
     bo.onclick = function () {
@@ -26552,6 +26585,7 @@ async function _exoAutoOuvrir(bilan) {
         if (_exoAutoEcrire(lignes, e)) n++;
       });
       if (pied && pc && !pc.checked) { pc.checked = true; pc.dispatchEvent(new Event('change', { bubbles: true })); n++; }
+      patho.forEach(function (x) { if (x.coche && !x.deja && !x.champ.checked) { x.champ.checked = true; x.champ.dispatchEvent(new Event('change', { bubbles: true })); n++; } });
       fermer();
       if (typeof _scheduleBilanAutosave === 'function') _scheduleBilanAutosave(bilan === 'podo' ? 'podopediatrie' : bilan);
       alert(n + ' ajout(s) dans les circuits. Vérifiez-les, puis enregistrez le bilan comme d’habitude.');
@@ -26718,6 +26752,17 @@ function _PIED_JOURS_EXOS() {
   return vus;
 }
 // Périodes valides : le programme du pied est plafonné à 55 jours même si la fin choisie est plus tardive.
+// Programmes de réathlétisation (fiches seules sur le portail patient : PDF, sans chronomètre ni séance).
+// Les cases se cochent dans « Programme du patient » ; la détection automatique vient du module exercices-auto (PATHOLOGIES).
+const _PROG_PATHO = [
+  ['bit', 'Syndrome de la bandelette ilio-tibiale', "pathologies-genou|1. Programme de réathlétisation d'un syndrome de la bandelette ilio tibiale"],
+  ['fp', 'Syndrome fémoro-patellaire', "pathologies-genou|2. Programme de réathlétisation d'un syndrome fémoro-patellaire"],
+  ['pubalgie', 'Pubalgie', "pathologies-hanche|1. Programme de réathlétisation d'une pubalgie"],
+  ['piriforme', 'Syndrome du piriforme', "pathologies-hanche|2. Programme de réathlétisation d'un syndrome du piriforme"],
+  ['fessier', 'Tendinopathie du moyen fessier', "pathologies-hanche|3. Programme de réathlétisation d'une tendinopathie du moyen fessier"],
+  ['achille', "Tendinopathie d'Achille", "pathologies-pied|1. Programme de réathlétisation d'une tendinopathie d'Achille"],
+  ['fibulaires', 'Tendinopathie des fibulaires', "pathologies-pied|2. Programme de réathlétisation d'une tendinopathie des fibulaires"],
+];
 function _progPeriodes(p) {
   const out = {};
   [['pied', p && p.pied], ['express', p && p.express], ['chauffe', p && p.chauffe]].forEach(([k, v]) => {
@@ -26828,7 +26873,8 @@ function _progPortailConstruire(flavor, d) {
   const joursC = flavor === 'sport' ? (d.ttt || {}).jours : d.joursCircuits;
   const per = _progPeriodes(prog);
   const cles = Object.keys(per);
-  if (!cles.length) return null;
+  const fiches = _PROG_PATHO.filter((x) => prog && prog.patho && prog.patho[x[0]]).map((x) => x[2]);
+  if (!cles.length) return fiches.length ? { debut: null, fin: null, jours: [], noms: {}, fiches } : null;
   const jEx = (joursC && Array.isArray(joursC.express) && joursC.express) || [];
   const jCh = (joursC && Array.isArray(joursC.chauffe) && joursC.chauffe) || [];
   const circ = _progCircuitsDe(flavor, d);
@@ -26857,8 +26903,10 @@ function _progPortailConstruire(flavor, d) {
     if (actif('express', j) && (!jEx.length || jEx.includes(w))) ajoute('express2', ex2);
     if (seances.length) jours.push(Object.assign({ date: _progISO(j) }, rang ? { rang } : {}, { seances }));
   }
-  if (!jours.length) return null;
-  return { debut: jours[0].date, fin: jours[jours.length - 1].date, jours, noms };
+  if (!jours.length) return fiches.length ? { debut: null, fin: null, jours: [], noms: {}, fiches } : null;
+  const sortie = { debut: jours[0].date, fin: jours[jours.length - 1].date, jours, noms };
+  if (fiches.length) sortie.fiches = fiches;
+  return sortie;
 }
 // Modules cochés dans un bilan mais sans exercice choisi (donc absents du programme publié). Renvoie la liste des titres.
 function _progPortailManques(flavor, d) {
@@ -26897,6 +26945,8 @@ function _progLignesRapport(p, jours) {
   }
   if (p && p.express && p.express.actif) l.push('Circuits Express 1 et 2 : ' + (per(p.express) || 'dates à définir'));
   if (p && p.chauffe && p.chauffe.actif) l.push('Circuit Échauffement : ' + (per(p.chauffe) || 'dates à définir'));
+  const pat = _PROG_PATHO.filter((x) => p && p.patho && p.patho[x[0]]).map((x) => x[1]);
+  if (pat.length) l.push('Programme' + (pat.length > 1 ? 's' : '') + ' de réathlétisation (fiche PDF sur le portail patient) : ' + pat.join(', '));
   return l.concat(_progTexteSeances(p, jours));
 }
 // Sport : le rythme 30/30 ou 45/15 se choisit à côté du titre et s'applique aux 8 exercices de l'Échauffement.
@@ -26926,7 +26976,11 @@ function _progLire(pref) {
   const pied = lire('pied');
   const mod = _progModifsNettoyer(_progModifs[pref]);
   if (Object.keys(mod).length) pied.modifs = mod;
-  return { pied, circuits: circOn, express: ex, chauffe: ch };
+  const patho = {};
+  _PROG_PATHO.forEach((x) => { const c = _progChamp(pref, 'pat-' + x[0]); if (c && c.checked) patho[x[0]] = true; });
+  const res = { pied, circuits: circOn, express: ex, chauffe: ch };
+  if (Object.keys(patho).length) res.patho = patho;
+  return res;
 }
 function _progEcrire(pref, p) {
   const q = p || {};
@@ -26941,6 +26995,7 @@ function _progEcrire(pref, p) {
   _progModifs[pref] = _progModifsNettoyer(q.pied && q.pied.modifs);
   poser('express', q.express);
   poser('chauffe', q.chauffe);
+  _PROG_PATHO.forEach((x) => { const c = _progChamp(pref, 'pat-' + x[0]); if (c) c.checked = !!(q.patho && q.patho[x[0]]); });
   const circ = _progChamp(pref, 'circ-on');
   if (circ) circ.checked = !!q.circuits || !!(q.express && q.express.actif) || !!(q.chauffe && q.chauffe.actif);
   _progMaj(pref);
@@ -27011,6 +27066,8 @@ function _progHTML(pref) {
     '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#222;font-weight:600;margin-top:8px;"><input type="checkbox" id="' + pref + '-prog-circ-on" onchange="_progChange(\'' + pref + '\',\'circ\')"/> Circuits d\'exercices</label>' +
     '<div id="' + pref + '-prog-circ-detail" style="display:none;margin-left:22px;">' +
     ligne('express', 'Circuits Express 1 et 2') + ligne('chauffe', 'Circuit Échauffement') + '</div>' +
+    '<div style="font-size:12px;color:#222;font-weight:600;margin-top:10px;">📄 Programmes de réathlétisation <span style="font-weight:400;color:#666;">(fiche PDF seule sur le compte du patient, sans chronomètre)</span></div>' +
+    _PROG_PATHO.map((x) => '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#222;margin:3px 0 0 8px;"><input type="checkbox" id="' + pref + '-prog-pat-' + x[0] + '" onchange="_progMaj(\'' + pref + '\')"> ' + _escHtml(x[1]) + '</label>').join('') +
     '<div id="' + pref + '-prog-resume" style="font-size:11px;color:#2a7a4e;margin-top:8px;line-height:1.6;"></div></div>';
 }
 function _joursBlocHTML(pref) {
@@ -38492,7 +38549,7 @@ function _portailFlavorProgramme(p) {
   let meilleur = null, max = 0;
   ['sport', 'podopediatrie', 'posturo'].forEach(function (f) {
     const r = _progPortailConstruire(f, p[_PORTAIL_DONNEES_BILAN[f]]);
-    const n = r ? r.jours.reduce(function (t, j) { return t + j.seances.length; }, 0) : 0;
+    const n = r ? r.jours.reduce(function (t, j) { return t + j.seances.length; }, 0) + (r.fiches ? r.fiches.length : 0) : 0;
     if (n > max) { max = n; meilleur = f; }
   });
   return meilleur;

@@ -56,10 +56,35 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     await page.evaluate(() => {
       currentPatient.bilanDataPosturo.neuro4['nc-nc2-g'] = true;
     });
+    // anamnèse / motif : « tendinopathie d'achille » → case du programme de réathlétisation proposée (jamais cochée avant « Appliquer »)
+    await page.evaluate(() => {
+      const m: any = document.getElementById('po-motif');
+      m.value = "Douleur au talon depuis 2 mois, tendinopathie d'achille gauche. Pas de pubalgie.";
+      m.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     await page.evaluate(() => showPosturoSection(8));
     await page.waitForTimeout(800);
+    // les catégories « pathologies » ne sont plus dans les listes des circuits Express
+    expect(
+      await page.evaluate(
+        () =>
+          Array.from(document.querySelectorAll('#psec-8 select.exo-sys option')).filter((o: any) =>
+            /^pathologies-/.test(o.value)
+          ).length
+      )
+    ).toBe(0);
+    expect(
+      await page.evaluate(() => (document.getElementById('po-prog-pat-achille') as any).checked)
+    ).toBe(false);
     await page.click('#psec-8 .exo-auto-btn');
     await page.waitForSelector('#exo-auto-modal');
+    const texteModal = await page.locator('#exo-auto-modal').innerText();
+    expect(texteModal).toMatch(/programme de réathlétisation : Tendinopathie d'Achille/);
+    expect(texteModal).toContain("tendinopathie d'achille gauche");
+    expect(texteModal).not.toMatch(/réathlétisation : Pubalgie/);
+    expect(
+      await page.evaluate(() => (document.getElementById('po-prog-pat-achille') as any).checked)
+    ).toBe(false);
     // nerf crânien coché : la catégorie est proposée (SQL collé) ou signalée « aucune fiche » (jamais inventée)
     expect(await page.locator('#exo-auto-modal').innerText()).toMatch(/NC2/);
     // rien n'est écrit avant « Appliquer »
@@ -96,6 +121,27 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     expect(
       await page.evaluate(() => (document.getElementById('po-prog-pied-on') as any).checked)
     ).toBe(true);
+    // la case Achille est cochée, les autres non ; elle est enregistrée dans le programme du bilan
+    expect(
+      await page.evaluate(() =>
+        ['bit', 'fp', 'pubalgie', 'piriforme', 'fessier', 'achille', 'fibulaires']
+          .map((k) => (document.getElementById('po-prog-pat-' + k) as any).checked)
+          .join()
+      )
+    ).toBe('false,false,false,false,false,true,false');
+    expect(
+      await page.evaluate(() => {
+        const p: any = _progLire('po');
+        const m: any = _progPortailConstruire('posturo', { programmes: p });
+        return JSON.stringify({
+          patho: p.patho,
+          fiches: m && m.fiches,
+          jours: m && m.jours.length,
+        });
+      })
+    ).toContain(
+      '"fiches":["pathologies-pied|1. Programme de réathlétisation d\'une tendinopathie d\'Achille"]'
+    );
     // second passage : rien n'est dupliqué
     await page.click('#psec-8 .exo-auto-btn');
     await page.waitForSelector('#exo-auto-modal');

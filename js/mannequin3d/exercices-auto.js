@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v326';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v326';
-import { calculerReprise } from './reprise-4vues.js?v=v326';
+import { PAR_ID } from './parametres.js?v=v327';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v327';
+import { calculerReprise } from './reprise-4vues.js?v=v327';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -565,3 +565,88 @@ function dejaPresentesSlot1(naturelles, subDe, present) {
 }
 export const LIBELLE_LIGNE = (i) =>
   i < 4 ? 'Express 1 — ex. ' + (i + 1) : 'Express 2 — ex. ' + (i - 3);
+
+// ── Programmes de réathlétisation (chantier B, lot 4) : cases « Programme du patient », cochées d'après les TEXTES du bilan ──
+// `cle` = suffixe de la case `{pref}-prog-pat-{cle}` ; `code` = code de la fiche dans la bibliothèque (catégorie|libellé).
+export const PATHOLOGIES = [
+  {
+    cle: 'bit',
+    label: 'Syndrome de la bandelette ilio-tibiale',
+    code: "pathologies-genou|1. Programme de réathlétisation d'un syndrome de la bandelette ilio tibiale",
+    re: /bandelette\s+ilio[\s-]*tibiale|essuie[\s-]*glace/,
+  },
+  {
+    cle: 'fp',
+    label: 'Syndrome fémoro-patellaire',
+    code: "pathologies-genou|2. Programme de réathlétisation d'un syndrome fémoro-patellaire",
+    re: /femoro[\s-]*patellaire/,
+  },
+  {
+    cle: 'pubalgie',
+    label: 'Pubalgie',
+    code: "pathologies-hanche|1. Programme de réathlétisation d'une pubalgie",
+    re: /pubalgie/,
+  },
+  {
+    cle: 'piriforme',
+    label: 'Syndrome du piriforme',
+    code: "pathologies-hanche|2. Programme de réathlétisation d'un syndrome du piriforme",
+    re: /piriforme|piriformis|syndrome\s+(du\s+)?(muscle\s+)?pyramidal/,
+  },
+  {
+    cle: 'fessier',
+    label: 'Tendinopathie du moyen fessier',
+    code: "pathologies-hanche|3. Programme de réathlétisation d'une tendinopathie du moyen fessier",
+    re: /(tendinopath\w*|tendinite|tendinose)[^.;\n]{0,30}(moyen\s+fessier|moyen\s+glute\w*|glute\w*\s+moyen|gluteal\w*)|(moyen\s+fessier|moyen\s+glute\w*)[^.;\n]{0,15}(tendinopath\w*|tendinite|tendinose)/,
+  },
+  {
+    cle: 'achille',
+    label: "Tendinopathie d'Achille",
+    code: "pathologies-pied|1. Programme de réathlétisation d'une tendinopathie d'Achille",
+    re: /(tendinopath\w*|tendinite|tendinose|peritenonite)[^.;\n]{0,30}achill\w*|achill\w*[^.;\n]{0,12}(tendinopath\w*|tendinite|tendinose)/,
+  },
+  {
+    cle: 'fibulaires',
+    label: 'Tendinopathie des fibulaires',
+    code: "pathologies-pied|2. Programme de réathlétisation d'une tendinopathie des fibulaires",
+    re: /(tendinopath\w*|tendinite|tendinose)[^.;\n]{0,30}(fibulaire\w*|peronier\w*|peroneus|peroneaux)|(fibulaires?|peroniers?)[^.;\n]{0,15}(tendinopath\w*|tendinite|tendinose)/,
+  },
+];
+const _sansAccent = (t) =>
+  String(t)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2019\u2018`]/g, "'")
+    .toLowerCase();
+const _NEGATION =
+  /\b(pas\s+d[e']|pas\s+de|aucun\w*|sans|absence|absent\w*|ni|non|exclu\w*|eliminer?|ecart\w*)\b/;
+/**
+ * Cherche les termes de pathologie dans tous les textes du bilan (anamnèse, motif, diagnostic, conclusion, texte libre).
+ * Variantes courantes acceptées (accents, majuscules, tendinite/tendinopathie, achilléenne, péroniers…). Une phrase qui nie
+ * la pathologie (« pas de tendinopathie d'Achille ») ne coche rien. Renvoie [{ cle, label, code, raison }], une par programme,
+ * avec la PHRASE trouvée comme raison (le praticien décoche s'il n'est pas d'accord).
+ */
+export function detecterPathologies(textes) {
+  const trouvees = new Map();
+  for (const brut of Array.isArray(textes) ? textes : []) {
+    if (typeof brut !== 'string' || !brut.trim() || brut.length > 20000) continue;
+    for (const phrase of brut.split(/(?<=[.!?])\s+|\n+|;/)) {
+      const n = _sansAccent(phrase);
+      if (!n.trim()) continue;
+      for (const pa of PATHOLOGIES) {
+        if (trouvees.has(pa.cle)) continue;
+        const m = pa.re.exec(n);
+        if (!m) continue;
+        if (_NEGATION.test(n.slice(Math.max(0, m.index - 40), m.index))) continue;
+        const raison = phrase.trim().replace(/\s+/g, ' ');
+        trouvees.set(pa.cle, {
+          cle: pa.cle,
+          label: pa.label,
+          code: pa.code,
+          raison: '« ' + (raison.length > 160 ? raison.slice(0, 157) + '…' : raison) + ' »',
+        });
+      }
+    }
+  }
+  return PATHOLOGIES.filter((pa) => trouvees.has(pa.cle)).map((pa) => trouvees.get(pa.cle));
+}

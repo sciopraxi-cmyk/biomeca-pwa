@@ -882,3 +882,30 @@ describe('patient-compte — gestion par le praticien', () => {
     expect((await avec({ action: 'effacer', patient_id: PID })).statut).toBe(400);
   });
 });
+
+// Chantier B lot 4 : « Mes fiches » (fiches de réathlétisation sans chronomètre)
+import { fichesAffichables } from '../patient/patient-logique.mjs';
+describe('fichesAffichables', () => {
+  const cat = {
+    'a|1': { nom: 'Fiche A', liens: [], pdf: 'assets/fiches/pathologies-pied/1. Programme.pdf' },
+    'b|2': { nom: 'Fiche B', liens: [], pdf: 'base/12345678-1234-1234-1234-123456789abc.pdf' },
+  };
+  it("rend les fiches du catalogue, dans l'ordre, sans doublon, avec leur PDF", () => {
+    const r = fichesAffichables({ fiches: ['b|2', 'a|1', 'b|2'], catalogue: cat });
+    expect(r.map((x) => x.code)).toEqual(['b|2', 'a|1']);
+    expect(r[0].ex.pdfPrive).toBe('base/12345678-1234-1234-1234-123456789abc.pdf');
+    expect(r[1].ex.pdfPublic).toContain('assets/fiches/pathologies-pied/');
+  });
+  it("ignore ce qui n'est pas dans le catalogue, les types invalides, et plafonne à 12", () => {
+    expect(
+      fichesAffichables({ fiches: ['inconnu', 3, null, 'a|1'], catalogue: cat }).map((x) => x.code)
+    ).toEqual(['a|1']);
+    expect(fichesAffichables({ fiches: 'a|1', catalogue: cat })).toEqual([]);
+    expect(fichesAffichables(null)).toEqual([]);
+    expect(fichesAffichables({ catalogue: cat })).toEqual([]);
+    const gros = {};
+    const codes = Array.from({ length: 20 }, (_, i) => 'c|' + i);
+    codes.forEach((c) => (gros[c] = { nom: c, liens: [], pdf: 'base/x.pdf' }));
+    expect(fichesAffichables({ fiches: codes, catalogue: gros })).toHaveLength(12);
+  });
+});

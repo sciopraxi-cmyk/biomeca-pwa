@@ -681,6 +681,7 @@ export const PAGE_BILAN_POSTURO = {
       ligneConst('POSTURE_CAPTURE_ASPECT'),
       tableau('POSTURE_VIEWS'),
       'var _exoBib = null;',
+      ligneConst('_EXO_PATHO_SLUGS'),
       fonction('_escHtml'),
       fonction('_exoBibCats'),
       fonction('_genSysOptionsHTML'),

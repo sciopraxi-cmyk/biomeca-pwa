@@ -194,6 +194,23 @@ export function exerciceAffichable(catalogue, code) {
 }
 
 /**
+ * « Mes fiches » : fiches de réathlétisation publiées SANS séance ni chrono (liste `fiches` de la copie du programme).
+ * Seules les fiches présentes dans le catalogue de la copie sont rendues (jamais un code libre) ; sans doublon.
+ */
+export function fichesAffichables(contenu) {
+  const l = contenu && Array.isArray(contenu.fiches) ? contenu.fiches : [];
+  const vus = new Set();
+  const out = [];
+  for (const code of l.slice(0, 12)) {
+    if (typeof code !== 'string' || vus.has(code)) continue;
+    vus.add(code);
+    const ex = exerciceAffichable(contenu.catalogue, code);
+    if (ex) out.push({ code, ex });
+  }
+  return out;
+}
+
+/**
  * Séances du programme absentes du jour affiché (ex. Express un samedi non coché) avec leur prochaine date.
  * Renvoie [{ id, titre, date }] (date = null s'il n'y en a plus), dans l'ordre des séances du programme.
  */

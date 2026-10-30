@@ -11,7 +11,10 @@ function monter() {
   const jours = SRC_BIOMECA.slice(dj, SRC_BIOMECA.indexOf('\n];', dj) + 3);
   const de = SRC_BIOMECA.indexOf('const EXERCICES_PIED_ENFANT = [');
   const exos = SRC_BIOMECA.slice(de, SRC_BIOMECA.indexOf('\n];', de) + 3);
+  const dp = SRC_BIOMECA.indexOf('const _PROG_PATHO = [');
+  const patho = SRC_BIOMECA.slice(dp, SRC_BIOMECA.indexOf('\n];', dp) + 3);
   const corps = [
+    patho,
     jours,
     exos,
     bloc('const _PROG_TITRES_PORTAIL'),
@@ -307,5 +310,40 @@ describe('séances absentes du jour affiché', async () => {
     expect(L.seancesAbsentes(contenu, 2)).toEqual([]);
     expect(L.seancesAbsentes(contenu, 3).map((a) => a.date)).toEqual([null, null, null]);
     expect(L.seancesAbsentes(contenu, 9)).toEqual([]);
+  });
+});
+
+describe('fiches de réathlétisation (fiches seules, chantier B lot 4)', () => {
+  const fiches = (...k) => k.reduce((o, x) => ({ ...o, [x]: true }), {});
+  it('sans programme actif mais avec une fiche : copie à 0 jour et la liste « fiches »', () => {
+    const r = f._progPortailConstruire('sport', {
+      ttt: { programmes: { patho: fiches('achille') } },
+    });
+    expect(r.jours).toEqual([]);
+    expect(r.fiches).toEqual([
+      "pathologies-pied|1. Programme de réathlétisation d'une tendinopathie d'Achille",
+    ]);
+  });
+  it("fiches dans l'ordre de la liste (genou, hanche, pied), avec les séances du programme du pied", () => {
+    const r = f._progPortailConstruire(
+      'sport',
+      sport(prog({ patho: fiches('fibulaires', 'bit', 'pubalgie') }))
+    );
+    expect(r.fiches.map((c) => c.split('|')[0])).toEqual([
+      'pathologies-genou',
+      'pathologies-hanche',
+      'pathologies-pied',
+    ]);
+    expect(r.jours.length).toBeGreaterThan(0);
+  });
+  it('sans case cochée : aucune clé « fiches » (copie identique à avant), et rien à publier sans programme', () => {
+    expect(f._progPortailConstruire('sport', sport(prog())).fiches).toBeUndefined();
+    expect(f._progPortailConstruire('sport', { ttt: { programmes: {} } })).toBeNull();
+    expect(f._progPortailConstruire('sport', { ttt: { programmes: { patho: {} } } })).toBeNull();
+  });
+  it('clé inconnue dans patho : ignorée', () => {
+    expect(
+      f._progPortailConstruire('sport', { ttt: { programmes: { patho: { nimporte: true } } } })
+    ).toBeNull();
   });
 });

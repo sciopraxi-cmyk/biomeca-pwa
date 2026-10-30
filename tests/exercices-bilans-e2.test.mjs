@@ -15,6 +15,10 @@ function monter() {
       SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES'),
       SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const _EXO_PODO_EXCLUES')) + 1
     ),
+    SRC_BIOMECA.slice(
+      SRC_BIOMECA.indexOf('const _EXO_PATHO_SLUGS'),
+      SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const _EXO_PATHO_SLUGS')) + 1
+    ),
     fonction('_exoSubsSecours'),
     fonction('_exoBibCats'),
     fonction('_exoBibSubs'),
@@ -282,5 +286,39 @@ describe('nerfs crâniens (30/10/2026) : podopédiatrie', () => {
       expect(exclues).toMatch(new RegExp("'nc" + c + '-'));
     expect(exclues).toMatch(/'tronc-cerebral'/);
     expect(exclues).not.toMatch(/'nc8-vestibulo-cochleaire'/);
+  });
+});
+
+describe('pathologies genou / hanche / pied (30/10/2026) : plus des exercices des circuits', () => {
+  it('absentes des listes des circuits (sport, posturo, podo), liste de secours comprise ; remplacées par des cases', () => {
+    const ligne = (nom) =>
+      SRC_BIOMECA.slice(
+        SRC_BIOMECA.indexOf('const ' + nom),
+        SRC_BIOMECA.indexOf('\n', SRC_BIOMECA.indexOf('const ' + nom)) + 1
+      );
+    const corps = [
+      objet('FICHES_SYSTEMES'),
+      'let _exoBib = null;',
+      'function _escHtml(s){return String(s);}',
+      ligne('_EXO_PODO_EXCLUES'),
+      ligne('_EXO_PATHO_SLUGS'),
+      fonction('_exoSubsSecours'),
+      fonction('_exoBibCats'),
+      'return { _exoBibCats, FICHES_SYSTEMES };',
+    ].join('\n');
+    // eslint-disable-next-line no-new-func -- extraction contrôlée de code du dépôt
+    const g = new Function(corps)();
+    // les trois catégories existent bien dans la bibliothèque de secours…
+    expect(Object.keys(g.FICHES_SYSTEMES)).toEqual(
+      expect.arrayContaining(['pathologies-genou', 'pathologies-hanche', 'pathologies-pied'])
+    );
+    // …mais aucun bilan ne les propose dans les listes des circuits
+    for (const bilan of ['sport', 'posturo', 'podo'])
+      expect(g._exoBibCats(bilan).filter((c) => /^pathologies-/.test(c.value))).toEqual([]);
+    expect(g._exoBibCats('sport').length).toBeGreaterThan(5);
+    expect(
+      (SRC_BIOMECA.match(/\['(bit|fp|pubalgie|piriforme|fessier|achille|fibulaires)', /g) || [])
+        .length
+    ).toBe(7);
   });
 });
