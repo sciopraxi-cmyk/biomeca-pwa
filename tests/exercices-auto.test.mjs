@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v328';
+} from '../js/mannequin3d/exercices-auto.js?v=v329';
 
 const CAT = [
   {

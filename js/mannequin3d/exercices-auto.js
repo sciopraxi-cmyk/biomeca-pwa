@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v328';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v328';
-import { calculerReprise } from './reprise-4vues.js?v=v328';
+import { PAR_ID } from './parametres.js?v=v329';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v329';
+import { calculerReprise } from './reprise-4vues.js?v=v329';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -649,4 +649,63 @@ export function detecterPathologies(textes) {
     }
   }
   return PATHOLOGIES.filter((pa) => trouvees.has(pa.cle)).map((pa) => trouvees.get(pa.cle));
+}
+
+// ── Cochage automatique de « terrain / synthèse » (règle de Joël, 30/10 : posturo ET sport) ─────────────────────────────
+// Chaîne du mannequin → case « Posture en excès » du bilan (suffixe d'id : po-chaine-<x> / sp-chaine-<x>).
+// Fermeture = AL et ouverture = PL (Busquet / GDS) ; PA = statique optimisée, AP = statique dégradée.
+export const CHAINE_CASE = {
+  extension_PM: 'ext',
+  flexion_AM: 'flex',
+  fermeture_AL: 'ferm',
+  ouverture_PL: 'ouv',
+  PA: 'stat-opt',
+  AP: 'stat-deg',
+};
+/**
+ * Plan de cochage : ne retourne QUE ce qui est à cocher et qui ne l'est pas déjà (on complète, on n'écrase rien,
+ * on ne décoche jamais). Fonction pure.
+ * @param {object} c
+ *  - valeurs: curseurs du mannequin (ou null)
+ *  - terrain: 'aerien' | 'terrien' | null (préférences motrices en posturo)
+ *  - deja: { terrain: bool (une des 3 cases déjà cochée), posture: {ant, post, later, laterDir}, chaines: {ext, flex, ferm, ouv, 'stat-opt', 'stat-deg'} }
+ *  - refuses: clés déjà cochées automatiquement une fois (le praticien les a décochées : on n'y revient pas)
+ * @returns {{terrain: string|null, posture: {ant?:boolean, post?:boolean, later?:boolean, laterDir?:string}, chaines: string[], cles: string[]}}
+ */
+export function planTerrainSynthese(c) {
+  const deja = (c && c.deja) || {};
+  const dp = deja.posture || {};
+  const dc = deja.chaines || {};
+  const refuses = new Set((c && c.refuses) || []);
+  const out = { terrain: null, posture: {}, chaines: [], cles: [] };
+  const prendre = (cle) => {
+    if (refuses.has(cle)) return false;
+    out.cles.push(cle);
+    return true;
+  };
+  if (
+    c &&
+    (c.terrain === 'aerien' || c.terrain === 'terrien') &&
+    !deja.terrain &&
+    prendre('terrain-' + c.terrain)
+  )
+    out.terrain = c.terrain;
+  const profil = c && c.valeurs ? evaluerProfil(c.valeurs) : null;
+  const ex = profil ? profil.exprimees.map((x) => x.id) : [];
+  if (ex.includes('grande_posterieure') && !dp.ant && prendre('posture-ant'))
+    out.posture.ant = true;
+  if (ex.includes('grande_anterieure') && !dp.post && prendre('posture-post'))
+    out.posture.post = true;
+  const lat = ex.filter((i) => /^ligne_laterale_[DG]$/.test(i)).map((i) => i.slice(-1));
+  if (lat.length && !dp.later && prendre('posture-later')) {
+    out.posture.later = true;
+    // règle de Joël : ligne latérale DROITE = latéralisation globale à GAUCHE (et inversement) ; les deux lignes = pas de côté
+    if (lat.length === 1 && !dp.laterDir)
+      out.posture.laterDir = lat[0] === 'D' ? 'gauche' : 'droite';
+  }
+  for (const id of ex) {
+    const k = CHAINE_CASE[id];
+    if (k && !dc[k] && prendre('chaine-' + k)) out.chaines.push(k);
+  }
+  return out;
 }

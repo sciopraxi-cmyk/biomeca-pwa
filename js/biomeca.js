@@ -5079,7 +5079,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v328';
+const APP_BUILD = 'v329';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -18912,14 +18912,19 @@ function _extractPosturoSections(d) {
   if(d.postureAnt) postures.push('Antériorisation');
   if(d.posturePost) postures.push('Postériorisation');
   if(d.postureLater) postures.push('Latéralisation '+(d.postureLaterDir||''));
+  const terrains = [];
+  if(d.terrainAerien) terrains.push('Aérien');
+  if(d.terrainTerrien) terrains.push('Terrien');
+  if(d.terrainMixte) terrains.push('Mixte');
+  if(terrains.length) terr.push(['Terrain', terrains.join(', ')]);
   if(postures.length) terr.push(['Posture globale', postures.join(', ')]);
   const chaines = [];
   if(d.chaineExt) chaines.push('Chaîne extension (PM)');
   if(d.chaineFlexion) chaines.push('Chaîne flexion (AM)');
-  if(d.chaineFerm) chaines.push('Fermeture');
-  if(d.chaineOuv) chaines.push('Ouverture');
-  if(d.chaineStatOpt) chaines.push('Statique optimum');
-  if(d.chaineStatDeg) chaines.push('Statique dégradée');
+  if(d.chaineFerm) chaines.push('Chaîne de fermeture (AL)');
+  if(d.chaineOuv) chaines.push('Chaîne d’ouverture (PL)');
+  if(d.chaineStatOpt) chaines.push('Chaîne statique optimisée (PA)');
+  if(d.chaineStatDeg) chaines.push('Chaîne statique dégradée (AP)');
   if(chaines.length) terr.push(['Chaînes musculaires', chaines.join(', ')]);
   if(d.tensionPrincipal) terr.push(['Tension principale', d.tensionPrincipal]);
   if(d.biomecArticulaire) terr.push(['Biomécanique / organique / articulaire', d.biomecArticulaire]);
@@ -20675,8 +20680,8 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
   const npc = [];
   if(bd.chaine_ext)      npc.push('extension (PM)');
   if(bd.chaine_flex)     npc.push('flexion (AM)');
-  if(bd.chaine_ferm)     npc.push('fermeture (PL)');
-  if(bd.chaine_ouv)      npc.push('ouverture (AL)');
+  if(bd.chaine_ferm)     npc.push('fermeture (AL)');
+  if(bd.chaine_ouv)      npc.push('ouverture (PL)');
   if(bd.chaine_stat_opt) npc.push('statique opt. (PA)');
   if(bd.chaine_stat_deg) npc.push('statique dég. (AP)');
   const bioMec = bd.biomec_articulaire || '';
@@ -26470,7 +26475,7 @@ function _exoAutoContexte(bilan) {
       if (o) l.push('origine de l’ATM : ' + o.value);
       return l;
     })(),
-    terrain: pref ? (pref.value === 'tonique-aerien' ? 'aerien' : (pref.value === 'phasique-terrien' ? 'terrien' : null)) : null
+    terrain: pref ? (pref.value === 'tonique-aerien' ? 'aerien' : (pref.value === 'phasique-terrien' ? 'terrien' : null)) : (coche('po-terrain-aerien') ? 'aerien' : (coche('po-terrain-terrien') ? 'terrien' : null))
   };
 }
 function _exoAutoEcrire(lignes, e) {
@@ -26497,7 +26502,7 @@ function _exoAutoTextes(bilan) {
     if (prof > 6 || v == null) return;
     if (typeof v === 'string') { if (v.length < 20000 && !/^data:/.test(v)) out.push(v); return; }
     if (Array.isArray(v)) { v.forEach(function (x) { parcourir(x, prof + 1); }); return; }
-    if (typeof v === 'object') Object.keys(v).forEach(function (k) { if (k !== 'programmes' && k !== 'mannequin3d' && k !== '_postureAnalysis') parcourir(v[k], prof + 1); });
+    if (typeof v === 'object') Object.keys(v).forEach(function (k) { if (k !== 'programmes' && k !== 'mannequin3d' && k !== '_tsAuto' && k !== '_postureAnalysis') parcourir(v[k], prof + 1); });
   })(d, 0);
   return out;
 }
@@ -27522,10 +27527,10 @@ function getBilanPosturoHTML() {
         <div style="font-weight:700;color:#6c3483;font-size:13px;margin-bottom:8px;">🧠 Préférences motrices</div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:5px 14px;color:#222;">
-            <input type="radio" name="po-pref-mot" value="tonique-aerien"/> 🌬️ Tonique-Aérien
+            <input type="radio" name="po-pref-mot" value="tonique-aerien" onchange="_terrainSyntheseAuto('posturo')"/> 🌬️ Tonique-Aérien
           </label>
           <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #8e44ad;border-radius:20px;padding:5px 14px;color:#222;">
-            <input type="radio" name="po-pref-mot" value="phasique-terrien"/> 🌍 Phasique-Terrien
+            <input type="radio" name="po-pref-mot" value="phasique-terrien" onchange="_terrainSyntheseAuto('posturo')"/> 🌍 Phasique-Terrien
           </label>
         </div>
       </div>
@@ -28836,6 +28841,14 @@ function getBilanPosturoHTML() {
     <div style="background:linear-gradient(135deg,#eaf4ff,#dceeff);border-left:4px solid #3498db;border-radius:8px;padding:12px;margin-bottom:12px;">
       <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#222;">1 – <span style="color:var(--blue);">P</span>ostural</div>
 
+      <div style="font-weight:600;color:var(--txt);margin-bottom:8px;font-size:12px;">Terrain :</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+        ${[['aerien','🌬️ Aérien'],['terrien','🌍 Terrien'],['mixte','⚖️ Mixte']].map(([k,l]) => `
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:var(--card);border:2px solid var(--posturo-trait);border-radius:20px;padding:5px 14px;color:var(--txt);width:fit-content;">
+          <input type="checkbox" id="po-terrain-${k}" onchange="togglePosturoTerrain('${k}')"/> ${l}
+        </label>`).join('')}
+      </div>
+
       <div style="font-weight:600;color:#222;margin-bottom:8px;font-size:12px;">Posture :</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         <label style="cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #3498db;border-radius:20px;padding:5px 14px;color:#222;width:fit-content;">
@@ -28869,8 +28882,8 @@ function getBilanPosturoHTML() {
         ${[
           ['Chaine extension (PM)','po-chaine-ext'],
           ['Chaine de flexion (AM)','po-chaine-flex'],
-          ['Chaine de fermeture (PL)','po-chaine-ferm'],
-          ["Chaine d'ouverture (AL)",'po-chaine-ouv'],
+          ['Chaine de fermeture (AL)','po-chaine-ferm'],
+          ["Chaine d'ouverture (PL)",'po-chaine-ouv'],
           ['Chaine statique optimisée (PA)','po-chaine-stat-opt'],
           ['Chaine statique dégradée (AP)','po-chaine-stat-deg']
         ].map(([label,id]) => `
@@ -29166,6 +29179,72 @@ function toggleRomberg(type, checked) {
   opts.style.display = checked ? 'flex' : 'none';
   if(!checked) document.querySelectorAll('input[name="po-romberg-'+type+'-dir"]').forEach(function(r){ r.checked=false; });
 }
+function togglePosturoTerrain(which) {
+  // même mutex que le sport : une seule case Aérien / Terrien / Mixte
+  const cb = document.getElementById('po-terrain-' + which);
+  if(!cb || !cb.checked) return;
+  ['aerien','terrien','mixte'].forEach(k => { const t = document.getElementById('po-terrain-' + k); if(t && k !== which) t.checked = false; });
+}
+
+// Chantier B (30/10) — cochage automatique de « terrain / synthèse » (posturo ET sport), règle de Joël :
+// chaînes de Myers (postural) et chaînistes exprimées par le mannequin, terrain aérien/terrien (préférences motrices en
+// posturo). On COMPLÈTE sans écraser : jamais de décochage, rien si la case est déjà cochée, et une case que le praticien
+// a décochée n'est pas recochée (clés retenues dans _tsAuto). Ligne latérale D = latéralisation globale à GAUCHE.
+async function _terrainSyntheseAuto(bilan) {
+  try {
+    if (globalThis?._modeConsultation) return;
+    const sport = bilan === 'sport';
+    const pf = sport ? 'sp' : 'po';
+    const d = sport ? ((typeof bilanData !== 'undefined' && bilanData) || null) : (currentPatient && currentPatient.bilanDataPosturo);
+    if (!d || !document.getElementById(pf + '-posture-ant')) return;
+    const M = await import('./mannequin3d/index.js?v=' + APP_BUILD);
+    const ck = id => !!document.getElementById(id)?.checked;
+    const chaines = {};
+    Object.values(M.CHAINE_CASE).forEach(k => { chaines[k] = ck(pf + '-chaine-' + k); });
+    const pref = sport ? null : document.querySelector('input[name="po-pref-mot"]:checked');
+    const terrainPref = pref ? (pref.value === 'tonique-aerien' ? 'aerien' : (pref.value === 'phasique-terrien' ? 'terrien' : null)) : null;
+    if(!Array.isArray(d._tsAuto)) d._tsAuto = [];
+    const plan = M.planTerrainSynthese({
+      valeurs: (d.mannequin3d && d.mannequin3d.valeurs) || null,
+      terrain: terrainPref,
+      deja: {
+        terrain: sport ? true : (ck('po-terrain-aerien') || ck('po-terrain-terrien') || ck('po-terrain-mixte')),
+        posture: { ant: ck(pf + '-posture-ant'), post: ck(pf + '-posture-post'), later: ck(pf + '-posture-later'),
+                   laterDir: !!document.querySelector('input[name="' + pf + '-posture-later-dir"]:checked') },
+        chaines: chaines
+      },
+      refuses: d._tsAuto
+    });
+    const faits = [];
+    const poser = (id, champ) => {
+      const e = document.getElementById(id);
+      if(!e) return false;
+      e.checked = true;
+      if(sport && champ) setBilanField(champ, true);
+      return true;
+    };
+    if(plan.terrain && poser('po-terrain-' + plan.terrain)) { togglePosturoTerrain(plan.terrain); faits.push('terrain ' + (plan.terrain === 'aerien' ? 'aérien' : 'terrien')); }
+    if(plan.posture.ant && poser(pf + '-posture-ant', 'posture_ant')) faits.push('antériorisation globale');
+    if(plan.posture.post && poser(pf + '-posture-post', 'posture_post')) faits.push('postériorisation globale');
+    if(plan.posture.later && poser(pf + '-posture-later', 'posture_later')) {
+      if(sport) toggleSportPostureLater(true); else togglePostureLater(true);
+      let t = 'latéralisation globale';
+      if(plan.posture.laterDir) {
+        const r = document.querySelector('input[name="' + pf + '-posture-later-dir"][value="' + plan.posture.laterDir + '"]');
+        if(r) { r.checked = true; t += ' ' + plan.posture.laterDir; }
+      }
+      faits.push(t);
+    }
+    const LIB = { ext: 'extension (PM)', flex: 'flexion (AM)', ferm: 'fermeture (AL)', ouv: 'ouverture (PL)', 'stat-opt': 'statique optimisée (PA)', 'stat-deg': 'statique dégradée (AP)' };
+    plan.chaines.forEach(k => { if(poser(pf + '-chaine-' + k, 'chaine_' + k.replace('-', '_'))) faits.push('chaîne ' + LIB[k]); });
+    if(!faits.length) return;
+    plan.cles.forEach(c => { if(d._tsAuto.indexOf(c) < 0) d._tsAuto.push(c); });
+    _avisDiscret('Terrain / synthèse coché d’après le mannequin et les préférences : ' + faits.join(', ') + '.');
+    // la sauvegarde passe par l'événement (jamais d'écriture directe depuis l'affichage, #277)
+    document.dispatchEvent(new CustomEvent('m3d-sauver', { detail: { flavor: sport ? 'sport' : 'posturo' } }));
+  } catch (e) { console.warn('[terrain-synthese]', e && e.message ? e.message : e); }
+}
+
 function togglePostureLater(checked) {
   const opts = document.getElementById('po-posture-later-opts');
   if(!opts) return;
@@ -29656,14 +29735,16 @@ async function genererSynthese() {
     const dir = document.querySelector('input[name="po-posture-later-dir"]:checked')?.value;
     postureGlobale.push('latéralisation' + (dir ? ' '+dir : ''));
   }
+  const terrainsCoches = [['po-terrain-aerien','aérien'],['po-terrain-terrien','terrien'],['po-terrain-mixte','mixte']].filter(function(t){ return document.getElementById(t[0])?.checked; }).map(function(t){ return t[1]; });
+  if(terrainsCoches.length) terrainItems.push('Terrain: '+terrainsCoches.join(', '));
   if(postureGlobale.length) terrainItems.push('Posture globale: '+postureGlobale.join(', '));
   // 2. Posture en excès — chaînes (map explicite [id, label] pour robustesse,
   //    couvre les 6 chaînes : ext PM, flex AM, ferm PL, ouv AL, stat-opt PA, stat-deg AP)
   const chaines = [
     ['po-chaine-ext','Chaine extension (PM)'],
     ['po-chaine-flex','Chaine de flexion (AM)'],
-    ['po-chaine-ferm','Chaine de fermeture (PL)'],
-    ['po-chaine-ouv',"Chaine d'ouverture (AL)"],
+    ['po-chaine-ferm','Chaine de fermeture (AL)'],
+    ['po-chaine-ouv',"Chaine d'ouverture (PL)"],
     ['po-chaine-stat-opt','Chaine statique optimisée (PA)'],
     ['po-chaine-stat-deg','Chaine statique dégradée (AP)']
   ];
@@ -30582,8 +30663,8 @@ function _collectSportSyntheseSections(d, readers) {
   const chn2 = [];
   if(d.chaine_ext) chn2.push('extension (PM)');
   if(d.chaine_flex) chn2.push('flexion (AM)');
-  if(d.chaine_ferm) chn2.push('fermeture (PL)');
-  if(d.chaine_ouv) chn2.push("ouverture (AL)");
+  if(d.chaine_ferm) chn2.push('fermeture (AL)');
+  if(d.chaine_ouv) chn2.push("ouverture (PL)");
   if(d.chaine_stat_opt) chn2.push('statique opt. (PA)');
   if(d.chaine_stat_deg) chn2.push('statique dég. (AP)');
   if(chn2.length) sp.push('NPC: ' + chn2.join(', '));
@@ -31499,7 +31580,7 @@ async function _m3dPosturoInit() {
         if (!d.mannequin3d && mod.etatMannequinVide(e, sexeDef)) return;
         const avant = JSON.stringify(d.mannequin3d || null);
         d.mannequin3d = e;
-        if (JSON.stringify(e) !== avant && ref.api) _scheduleBilanAutosave('posturo');
+        if (JSON.stringify(e) !== avant && ref.api) { _terrainSyntheseAuto('posturo'); _scheduleBilanAutosave('posturo'); }
       }
     });
   } catch (e) {
@@ -31609,6 +31690,7 @@ async function _m3dMonterBloc(cfg) {
         if (!cible.mannequin3d && mod.etatMannequinVide(e, cfg.sexeDef())) return;
         const avant = JSON.stringify(cible.mannequin3d || null);
         cible.mannequin3d = e;
+        if (JSON.stringify(e) !== avant && ref.api && cfg.flavor === 'sport') _terrainSyntheseAuto('sport');
         // la sauvegarde passe par un événement : afficher l'onglet ou générer un rapport n'atteint jamais l'écriture (#277)
         if (JSON.stringify(e) !== avant && ref.api)
           document.dispatchEvent(new CustomEvent('m3d-sauver', { detail: { flavor: cfg.flavor } }));
@@ -32201,6 +32283,7 @@ function _balayerBilanPosturo(d) {
   // Section 8
   d.postureAnt=getChk('po-posture-ant'); d.posturePost=getChk('po-posture-post');
   d.postureLater=getChk('po-posture-later'); d.postureLaterDir=getRad('po-posture-later-dir');
+  d.terrainAerien=getChk('po-terrain-aerien'); d.terrainTerrien=getChk('po-terrain-terrien'); d.terrainMixte=getChk('po-terrain-mixte');
   d.chaineExt=getChk('po-chaine-ext'); d.chaineFlexion=getChk('po-chaine-flex'); d.chaineFerm=getChk('po-chaine-ferm');
   d.chaineOuv=getChk('po-chaine-ouv'); d.chaineStatOpt=getChk('po-chaine-stat-opt'); d.chaineStatDeg=getChk('po-chaine-stat-deg');
   d.biomecArticulaire=getPoVal('po-biomec-articulaire');
@@ -32556,7 +32639,8 @@ function loadPosturoBilan() {
   setChk('po-posture-ant',d.postureAnt); setChk('po-posture-post',d.posturePost);
   setChk('po-posture-later',d.postureLater); if(d.postureLater) togglePostureLater(true);
   setPosturoRadio('po-posture-later-dir',d.postureLaterDir);
-  setChk('po-chaine-ext',d.chaineExt); setChk('po-chaine-ferm',d.chaineFerm);
+  setChk('po-terrain-aerien',d.terrainAerien); setChk('po-terrain-terrien',d.terrainTerrien); setChk('po-terrain-mixte',d.terrainMixte);
+  setChk('po-chaine-ext',d.chaineExt); setChk('po-chaine-flex',d.chaineFlexion); setChk('po-chaine-ferm',d.chaineFerm);
   setChk('po-chaine-ouv',d.chaineOuv); setChk('po-chaine-stat-opt',d.chaineStatOpt); setChk('po-chaine-stat-deg',d.chaineStatDeg);
   setPoVal('po-biomec-articulaire',d.biomecArticulaire);
   setPoVal('po-semelles-desc',d.semellesDesc); setPoVal('po-prochain-rdv',d.prochaineRdv); _ecrireJoursCircuits('po',d.joursCircuits); _progEcrire('po',d.programmes); (function(){ const r=document.getElementById('po-ch-ratio'); if(r) r.value=d.circ_ch_ratio||'30/30'; setTimeout(function(){ _circChauffeSync('po'); },250); })();
