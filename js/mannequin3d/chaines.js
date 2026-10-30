@@ -1,10 +1,10 @@
 // Mannequin postural 3D — profil du patient et chaîne musculaire (fonctions pures, sans WebGL).
 // À partir des valeurs des curseurs : zones du corps notées de 0 à 4, score de chaque chaîne musculaire, profil
-// (postural, chaîniste/neuromusculaire, biomécanique/viscéral, ou combinaison) et entrée haute / basse / mixte.
+// (postural, chaîniste/neuromusculaire, biomécanique/organique/articulaire, ou combinaison) et entrée haute / basse / mixte.
 // HYPOTHÈSE à confirmer par le praticien, jamais un diagnostic. Le contenu des chaînes vient UNIQUEMENT du cours
 // de Joël (diapos citées) et de sa spécification du 28/10/2026 ; les seuils sont des paramètres à calibrer.
-import { PAR_ID } from './parametres.js?v=v316';
-import { seuilCabinet } from './mecanismes.js?v=v316';
+import { PAR_ID } from './parametres.js?v=v317';
+import { seuilCabinet } from './mecanismes.js?v=v317';
 
 export const APPELLATION_POSTURAL = 'Mézières / Myers';
 export const APPELLATION_CHAINISTE = 'Busquet / GDS';
@@ -173,7 +173,7 @@ const LATERAL_SIGNE = new Set([
   'bassin_inegalite',
   'poids_lr',
 ]);
-// curseurs impairs qui peuvent porter une GROSSE compensation locale (biomécanique / viscérale)
+// curseurs impairs qui peuvent porter une GROSSE compensation locale (biomécanique / organique / articulaire)
 const LOCAUX_IMPAIRS = new Set(
   [...LATERAL_SIGNE].filter((i) => i !== 'poids_lr').concat(['mandi_antep'])
 );
@@ -559,7 +559,7 @@ export function zonesEtNiveaux(valeurs) {
   });
 }
 
-// grosses compensations LOCALES (biomécaniques / viscérales) : niveau ≥ seuil « grosse », d'un seul côté
+// grosses compensations LOCALES (biomécaniques / organiques / articulaires) : niveau ≥ seuil « grosse », d'un seul côté
 // (un curseur D/G dont l'autre côté n'est pas aussi important et dans le même sens) ou impair latéral/rotatoire.
 export function grossesLocales(valeurs, exclus = new Set()) {
   const out = [];
@@ -636,7 +636,7 @@ export function entreeLocale(grosses, valeurs, ctx = {}) {
 }
 
 export const PROFILS_LIBELLE = {
-  biomecanique: 'Biomécanique et/ou viscéral (local)',
+  biomecanique: 'Biomécanique / organique / articulaire (local)',
   postural: 'Postural (global) — chaînes ' + APPELLATION_POSTURAL,
   chainiste: 'Chaîniste / neuromusculaire (régional) — chaînes ' + APPELLATION_CHAINISTE,
 };
@@ -771,7 +771,7 @@ export function htmlProfil(p, { ouvert = false, coche = false, retenu = false } 
     APPELLATION_POSTURAL +
     '</b> · Chaîniste / neuromusculaire (régional) : chaînes <b>' +
     APPELLATION_CHAINISTE +
-    '</b> · Biomécanique / viscéral : problème local.</div>';
+    '</b> · Biomécanique / organique / articulaire : problème local.</div>';
   if (p.vide || (!p.profils.length && !p.exprimees.length)) {
     return (
       '<div class="m3d-prof"><h4 style="margin:0 0 4px;font-size:13px;color:#1e3a8a">🧬 Profil du patient et chaîne musculaire (hypothèse)</h4>' +
@@ -819,7 +819,7 @@ export function htmlProfil(p, { ouvert = false, coche = false, retenu = false } 
       '<div style="font-size:12px;color:#475569;margin:6px 0">Aucune chaîne musculaire n’atteint le seuil d’expression.</div>';
   if (p.grosses.length) {
     h +=
-      '<div style="font-size:12px;margin:8px 0 2px"><b>Compensations locales, importantes ou d’un seul côté (biomécanique / viscérale) :</b></div><ul style="margin:2px 0 2px 16px;padding:0;font-size:11.5px">';
+      '<div style="font-size:12px;margin:8px 0 2px"><b>Compensations locales, importantes ou d’un seul côté (biomécanique / organique / articulaire) :</b></div><ul style="margin:2px 0 2px 16px;padding:0;font-size:11.5px">';
     h += p.grosses
       .map(
         (g) =>
