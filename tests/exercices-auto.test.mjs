@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v322';
+} from '../js/mannequin3d/exercices-auto.js?v=v323';
 
 const CAT = [
   {
@@ -493,7 +493,7 @@ describe('placement dans les circuits', () => {
     expect(nc.find((p) => p.cle === 'nc-8')).toMatchObject({ groupe: 'vestibule', slot3: false });
     expect(nc.find((p) => p.cle === 'nc-11')).toMatchObject({ groupe: 'nerfs', slot3: false });
   });
-  it('NC1-7, 9, 10, 12 → emplacement 3 ; NC8 et NC11 → emplacement 1 ; le praticien choisit l’exercice', () => {
+  it('NC1-7, 9, 10, 12 → emplacement 3 ; NC8 et NC11 → emplacement 1 (emplacement 1 déjà plein : pas de débordement)', () => {
     const neuro = {};
     [1, 2, 3, 5, 6, 7, 9, 11].forEach((k) => (neuro['nc-nc' + k + '-g'] = true));
     const rr = proposerExercices({ neuro })
@@ -502,28 +502,140 @@ describe('placement dans les circuits', () => {
         const k = +p.cle.slice(3);
         return resoudre({ ...p, cats: [{ code: 'nc' + k + '-x', exo: null }] }, CAT_NC);
       });
-    const plan = planifier(rr, vide(), CAT_NC, 'posturo');
+    const etat = vide();
+    for (let i = 1; i < 8; i++) etat[i][0] = { sys: 'autre', sub: 'x' + i }; // 7 lignes déjà prises en emplacement 1
+    const plan = planifier(rr, etat, CAT_NC, 'posturo');
     const place = (k) => plan.ecritures.find((e) => e.cle === 'nc-' + k);
     expect(place(11).slot).toBe(0);
     [1, 2, 3, 5, 6, 7, 9].forEach((k) => expect(place(k).slot).toBe(2));
     expect(place(3).sub).toBe(''); // exercice laissé au praticien
-    expect(plan.ecritures.filter((e) => e.slot === 0).map((e) => e.cle)).toEqual(['nc-11']);
   });
-  it('tronc cérébral (pattern ou hypothèse) → emplacement 1, exercice laissé au praticien ; pas en podopédiatrie', () => {
-    expect(cles(proposerExercices({ neuro: { 'apd-tronc-g': true } }))).toContain('tronc-cerebral');
-    expect(cles(proposerExercices({ neuro: { 'po-hypo-tronc': true } }))).toContain(
-      'tronc-cerebral'
-    );
-    expect(cles(proposerExercices({ neuro: { 'apd-tronc-n': true } }))).not.toContain(
-      'tronc-cerebral'
-    );
+  it('EXEMPLE DU PRATICIEN : chaîne, terrain, 3 réflexes, TC droit, 2 nerfs à droite en emplacement 1 ; les 2 autres nerfs en emplacement 3 des lignes 1 et 2', () => {
+    const catalogue = [
+      {
+        value: 'terrain-terrien',
+        label: 'Terrain terrien',
+        subs: [{ value: 'tt', label: 'Terrien 1' }],
+      },
+      {
+        value: 'reflexes-archaiques',
+        label: 'Réflexes archaïques',
+        subs: [
+          { value: 'rpp', label: '1. Réflexe de peur paralysante' },
+          { value: 'moro', label: '2. Réflexe de MORO' },
+          { value: 'rtp', label: '3. Réflexe tendineux de protection' },
+        ],
+      },
+      {
+        value: 'tronc-cerebral',
+        label: 'Tronc cérébral',
+        subs: [
+          { value: 'd', label: '1. Fente iso max TC droit' },
+          { value: 'g', label: '2. Fente iso max TC gauche' },
+        ],
+      },
+      ...[1, 2, 3, 4].map((k) => ({
+        value: 'nc' + k + '-x',
+        label: 'NC' + k,
+        subs: [{ value: 'a', label: 'A' }],
+      })),
+      ...CAT_NC, // les définitions ci-dessus passent avant (la première occurrence d'une catégorie est gardée)
+    ].filter((c, i, a) => a.findIndex((x) => x.value === c.value) === i);
+    const r = proposerExercices({
+      valeurs: { poids_lr: 12, tronc_incl: 8, tete_incl: -4 }, // une chaîne (ligne latérale)
+      terrain: 'terrien',
+      neuro: {
+        'ref-rpp-o': true,
+        'ref-moro-o': true,
+        'ref-rtp-o': true,
+        'nc-nc1-d': true,
+        'nc-nc2-d': true,
+        'nc-nc3-d': true,
+        'nc-nc4-d': true,
+      },
+    });
+    const rr = r.propositions
+      .map((p) => {
+        const k = /^nc-(\d+)$/.exec(p.cle);
+        return resoudre(
+          k ? { ...p, cats: [{ code: 'nc' + k[1] + '-x', exo: null }] } : p,
+          catalogue
+        );
+      })
+      // l'exemple du praticien ne parle pas du vestibulaire : on écarte la proposition « utricules » (aucun canal coché)
+      .filter((p) => p && p.cle !== 'vest-utricules');
+    const plan = planifier(rr, vide(), catalogue, 'posturo');
+    const slot1 = plan.ecritures.filter((e) => e.slot === 0).sort((a, b) => a.ligne - b.ligne);
+    expect(slot1.map((e) => e.cle)).toEqual([
+      'myers-laterale',
+      'terrain-terrien',
+      'ref-rpp',
+      'ref-moro',
+      'ref-rtp',
+      'tronc-cerebral',
+      'nc-1',
+      'nc-2',
+    ]);
+    expect(slot1.find((e) => e.cle === 'tronc-cerebral').sub).toBe('d'); // total plus important à droite → TC droit
+    const slot3 = plan.ecritures.filter((e) => e.slot === 2).sort((a, b) => a.ligne - b.ligne);
+    expect(slot3.map((e) => [e.ligne, e.cle])).toEqual([
+      [0, 'nc-3'],
+      [1, 'nc-4'],
+    ]);
+    expect(plan.libres.filter((x) => x.slot === 0)).toHaveLength(0); // les 8 premiers emplacements sont remplis
+  });
+  it('débordement : les nerfs du côté principal passent avant ceux de l’autre côté ; visuel et mandibule ne débordent jamais', () => {
+    const r = proposerExercices({
+      neuro: { 'nc-nc5-g': true, 'nc-nc2-d': true, 'nc-nc3-d': true, 'nc-nc7-d': true },
+      visuel: ['défaut de convergence'],
+      atm: ['ATM'],
+    });
+    const ordre = r.propositions.filter((p) => p.cle.startsWith('nc-')).map((p) => p.cle);
+    expect(ordre).toEqual(['nc-2', 'nc-3', 'nc-7', 'nc-5']);
+    const rr = r.propositions
+      .map((p) => {
+        const k = /^nc-(\d+)$/.exec(p.cle);
+        return resoudre(k ? { ...p, cats: [{ code: 'nc' + k[1] + '-x', exo: null }] } : p, [
+          ...CAT_NC,
+          { value: 'nc7-x', label: 'NC7', subs: [{ value: 'a', label: 'A' }] },
+          { value: 'systeme-mandibulaire', label: 'M', subs: [{ value: 'm', label: 'Mâchoire' }] },
+        ]);
+      })
+      .filter(Boolean);
+    const plan = planifier(rr, vide(), CAT_NC, 'posturo');
+    expect(plan.ecritures.find((e) => e.cle === 'visuel').slot).toBe(2);
+    expect(plan.ecritures.find((e) => e.cle === 'mandibule').slot).toBe(2);
+  });
+  it('tronc cérébral : le côté vient du total des nerfs crâniens (D > G → TC droit), puis du pattern ; égalité → le praticien choisit', () => {
+    const tc = (neuro, extra = {}) =>
+      proposerExercices({ neuro, ...extra }).propositions.find((x) => x.cle === 'tronc-cerebral');
+    const d = tc({ 'nc-nc1-d': true, 'nc-nc2-d': true, 'nc-nc3-g': true });
+    expect(d.raison).toMatch(/tronc cérébral droit.*2 contre 1/);
+    expect(
+      resoudre(d, [
+        {
+          value: 'tronc-cerebral',
+          label: 'T',
+          subs: [
+            { value: 'd', label: 'Fente iso max TC droit' },
+            { value: 'g', label: 'Fente iso max TC gauche' },
+          ],
+        },
+      ]).defaut
+    ).toBe('d');
+    const g = tc({ 'nc-nc4-g': true, 'nc-recap-g': true, 'nc-nc1-d': true });
+    expect(g.raison).toMatch(/tronc cérébral gauche/); // la recapillarisation compte dans le total
+    expect(tc({ 'nc-nc1-d': true, 'nc-nc2-g': true }).sousVide).toBe(true); // égalité
+    expect(tc({ 'apd-tronc-d': true }).raison).toMatch(/pattern tronc cérébral coché à droite/);
+    expect(tc({ 'po-hypo-tronc': true }).sousVide).toBe(true);
+    expect(tc({ 'nc-nc1-n': true })).toBeUndefined();
+    expect(tc({ 'apd-tronc-n': true })).toBeUndefined();
+    expect(tc({}, { hypoTronc: true })).toBeDefined();
     expect(
       cles(proposerExercices({ bilan: 'podo', neuro: { 'apd-tronc-g': true, 'nc-nc2-g': true } }))
     ).toEqual([]);
-    const p = proposerExercices({ neuro: { 'apd-tronc-d': true } }).propositions.find(
-      (x) => x.cle === 'tronc-cerebral'
-    );
-    expect(p).toMatchObject({ groupe: 'tronc', sousVide: true });
+    const p = tc({ 'apd-tronc-d': true });
+    expect(p.groupe).toBe('tronc');
     expect(p.slot3).toBeUndefined();
   });
   it('NC8 coché : les canaux vestibulaires visent NC8 (puis l’ancienne catégorie si l’exercice n’y est plus)', () => {

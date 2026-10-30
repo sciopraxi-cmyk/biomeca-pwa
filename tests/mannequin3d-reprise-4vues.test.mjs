@@ -1,8 +1,8 @@
 // Reprise des résultats de « captures 4 vues » sur le mannequin 3D : fonctions pures (aucun WebGL, aucune donnée patient réelle).
 import { describe, it, expect, afterEach } from 'vitest';
-import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v322';
-import { calculerReprise } from '../js/mannequin3d/reprise-4vues.js?v=v322';
-import { PAR_ID } from '../js/mannequin3d/parametres.js?v=v322';
+import { definirSeuils } from '../js/mannequin3d/mecanismes.js?v=v323';
+import { calculerReprise } from '../js/mannequin3d/reprise-4vues.js?v=v323';
+import { PAR_ID } from '../js/mannequin3d/parametres.js?v=v323';
 
 afterEach(() => definirSeuils(null));
 

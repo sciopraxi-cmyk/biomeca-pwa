@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v322';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v322';
-import { calculerReprise } from './reprise-4vues.js?v=v322';
+import { PAR_ID } from './parametres.js?v=v323';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v323';
+import { calculerReprise } from './reprise-4vues.js?v=v323';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -260,33 +260,73 @@ export function proposerExercices(c) {
       raison: 'terrain ' + (c.terrain === 'aerien' ? 'aérien' : 'terrien'),
     });
 
-  // Nerfs crâniens : une case gauche ou droite cochée → catégorie du nerf (le praticien choisit l'exercice parmi les 3)
+  // Totaux de la colonne « nerfs crâniens » du tableau neuro-fonctionnel (mêmes cases que les totaux affichés, dont la
+  // recapillarisation) : le côté qui a le plus de cases cochées donne le tronc cérébral (« TC droit » / « TC gauche »)
+  const NC_IDS = ['nc-recap', ...NERFS.map((x) => 'nc-nc' + x.k)];
+  const totG = NC_IDS.filter((id) => !!n[id + '-g']).length;
+  const totD = NC_IDS.filter((id) => !!n[id + '-d']).length;
+  const cotePrincipal = totD > totG ? 'D' : totG > totD ? 'G' : null;
+  // Nerfs crâniens : une case gauche ou droite cochée → catégorie du nerf (le praticien choisit l'exercice parmi ceux du nerf).
+  // Les nerfs du côté principal passent d'abord, puis l'ordre des numéros. Les nerfs qui vont normalement en emplacement 3
+  // peuvent DÉBORDER dans l'emplacement 1 quand il reste des lignes libres (les 8 premiers emplacements doivent être remplis).
   if (!podo)
     for (const nc of NERFS)
-      if (coche(n, 'nc-nc' + nc.k, ['g', 'd']))
+      if (coche(n, 'nc-nc' + nc.k, ['g', 'd'])) {
+        const cote =
+          n['nc-nc' + nc.k + '-d'] && n['nc-nc' + nc.k + '-g']
+            ? 'les deux côtés'
+            : n['nc-nc' + nc.k + '-d']
+              ? 'droit'
+              : 'gauche';
+        const surPrincipal =
+          !cotePrincipal ||
+          (cotePrincipal === 'D' ? !!n['nc-nc' + nc.k + '-d'] : !!n['nc-nc' + nc.k + '-g']);
         ajoute({
           cle: 'nc-' + nc.k,
           groupe: nc.groupe || 'slot3',
           slot3: nc.slot3,
+          debordable: nc.slot3,
+          ordre: (surPrincipal ? 0 : 100) + nc.k,
           cats: [{ code: nc.code, exo: null }],
           sousVide: true,
-          raison: nc.nom + ' : case cochée dans le tableau des nerfs crâniens',
+          raison: nc.nom + ' (' + cote + ') : case cochée dans le tableau des nerfs crâniens',
         });
-  // Tronc cérébral : pattern tronc cérébral (RIMS/REMI) coché ou hypothèse « tronc cérébral » → emplacement 1
-  if (
-    !podo &&
-    (coche(n, 'apd-tronc', ['g', 'd']) ||
-      !!n['po-hypo-tronc'] ||
-      !!n['hypo-tronc'] ||
-      !!(c && c.hypoTronc))
-  )
+      }
+  // Tronc cérébral : proposé dès qu'un nerf crânien est coché (ou pattern / hypothèse tronc cérébral). Le CÔTÉ vient du total
+  // de la colonne des nerfs crâniens (plus important à droite → « TC droit »), à défaut du côté du pattern ; sinon le
+  // praticien choisit. Emplacement 1.
+  const patG = !!n['apd-tronc-g'];
+  const patD = !!n['apd-tronc-d'];
+  const hypoTC = !!n['po-hypo-tronc'] || !!n['hypo-tronc'] || !!(c && c.hypoTronc);
+  if (!podo && (totG + totD > 0 || patG || patD || hypoTC)) {
+    let coteTC = cotePrincipal;
+    let origine =
+      'total des nerfs crâniens plus important à ' +
+      (cotePrincipal === 'D' ? 'droite' : 'gauche') +
+      ' (' +
+      Math.max(totD, totG) +
+      ' contre ' +
+      Math.min(totD, totG) +
+      ')';
+    if (!coteTC && patD !== patG) {
+      coteTC = patD ? 'D' : 'G';
+      origine = 'pattern tronc cérébral coché à ' + (patD ? 'droite' : 'gauche');
+    }
     ajoute({
       cle: 'tronc-cerebral',
       groupe: 'tronc',
-      cats: [{ code: 'tronc-cerebral', exo: null }],
-      sousVide: true,
-      raison: 'tronc cérébral : pattern ou hypothèse cochés dans le bilan neuro-fonctionnel',
+      cats: [
+        {
+          code: 'tronc-cerebral',
+          exo: coteTC ? 'TC ' + (coteTC === 'D' ? 'droit' : 'gauche') : null,
+        },
+      ],
+      sousVide: !coteTC,
+      raison: coteTC
+        ? 'tronc cérébral ' + (coteTC === 'D' ? 'droit' : 'gauche') + ' : ' + origine
+        : 'tronc cérébral : nerfs crâniens ou pattern cochés des deux côtés (à égalité) — choisissez le côté',
     });
+  }
   // Exercice visuel (« au niveau des yeux ») : règles propres à chaque bilan, motif = ce qui est coché ; emplacement 3
   if (c && Array.isArray(c.visuel) && c.visuel.length)
     ajoute({
@@ -340,7 +380,7 @@ export function proposerExercices(c) {
   const rang = (p) => (RANG_GROUPE[p.groupe] == null ? 99 : RANG_GROUPE[p.groupe]);
   const triees = prop
     .map((p, i) => [p, i])
-    .sort((x, y) => rang(x[0]) - rang(y[0]) || x[1] - y[1])
+    .sort((x, y) => rang(x[0]) - rang(y[0]) || (x[0].ordre || 0) - (y[0].ordre || 0) || x[1] - y[1])
     .map((x) => x[0]);
   return { propositions: triees, programmePied, notes };
 }
@@ -417,28 +457,41 @@ export function planifier(resolues, etat, catalogue, bilan, choix = {}, dest = {
     ecritures.push({ ligne: d.ligne, slot: d.slot, sys: p.sys, sysLib: p.sysLib, sub, cle: p.cle });
     occ[d.ligne][d.slot] = { sys: p.sys, sub };
   }
-  // 2) les autres : emplacement 1 des lignes libres (dans l'ordre de priorité) ; visuel / mandibule : emplacement 3
-  let l1 = 0;
-  let l3 = 0;
-  for (const p of resolues) {
-    if (traitees.has(p.cle)) continue;
+  // 2) les autres. Emplacement 1 des lignes libres, dans l'ordre de priorité, jusqu'à remplir les 8 premiers emplacements :
+  //    d'abord les propositions « emplacement 1 » ; ensuite, s'il reste des lignes libres, les nerfs crâniens qui vont
+  //    normalement en emplacement 3 (« débordement ») ; le reste, et le visuel / la mandibule, vont en emplacement 3.
+  const place = (p, slot) => {
     const sub = subDe(p);
     if (sub ? present(p.sys, sub) : false) {
       dejaPresentes.push(p);
-      continue;
+      return true;
     }
-    const slot = p.slot3 ? 2 : 0;
-    let l = slot === 2 ? l3 : l1;
+    let l = 0;
     while (l < 8 && occ[l][slot]) l++;
-    if (l >= 8) {
-      nonPlacees.push({ ...p, sub });
-      continue;
-    }
-    ecritures.push({ ligne: l, slot, sys: p.sys, sysLib: p.sysLib, sub, cle: p.cle });
+    if (l >= 8) return false;
+    ecritures.push({
+      ligne: l,
+      slot,
+      sys: p.sys,
+      sysLib: p.sysLib,
+      sub,
+      cle: p.cle,
+      deborde: slot === 0 && !!p.slot3,
+    });
     occ[l][slot] = { sys: p.sys, sub };
-    if (slot === 2) l3 = l + 1;
-    else l1 = l + 1;
+    return true;
+  };
+  const restantes = resolues.filter((p) => !traitees.has(p.cle));
+  const aPlacer3 = [];
+  for (const p of restantes.filter((x) => !x.slot3))
+    if (!place(p, 0)) nonPlacees.push({ ...p, sub: subDe(p) });
+  for (const p of restantes.filter((x) => x.slot3)) {
+    const libre1 = occ.some((l) => !l[0]);
+    if (p.debordable && libre1) {
+      if (!place(p, 0)) aPlacer3.push(p);
+    } else aPlacer3.push(p);
   }
+  for (const p of aPlacer3) if (!place(p, 2)) nonPlacees.push({ ...p, sub: subDe(p) });
   // 3) respiration en emplacement 2 de chaque ligne où il est libre
   if (options.respi !== false)
     for (let i = 0; i < 8; i++) {
