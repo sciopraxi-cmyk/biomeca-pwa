@@ -1,9 +1,9 @@
 // Chantier B — exercices proposés automatiquement dans les circuits Express (fonctions pures, sans DOM).
 // Règles dictées par le praticien le 30/10/2026 (voir documents/Chantier_B_regles_de_Joel_2026-10-30.md) :
 // rien n'est inventé hors de ces règles ; la sélection est PROPOSÉE (aperçu), jamais appliquée d'office.
-import { PAR_ID } from './parametres.js?v=v321';
-import { evaluerProfil, niveauDe } from './chaines.js?v=v321';
-import { calculerReprise } from './reprise-4vues.js?v=v321';
+import { PAR_ID } from './parametres.js?v=v322';
+import { evaluerProfil, niveauDe } from './chaines.js?v=v322';
+import { calculerReprise } from './reprise-4vues.js?v=v322';
 
 // ── Réflexes archaïques du bilan neuro-fonctionnel (id sans préfixe) → mot qui identifie la fiche du même nom
 export const REFLEXES = {
@@ -29,17 +29,42 @@ export const REFLEXES = {
 // réflexes archaïques, vestibule, nerfs crâniens (à venir), tronc cérébral (à venir) ; ensuite les autres règles.
 // Visuel et mandibule (ATM) vont dans l'EMPLACEMENT 3.
 export const RANG_GROUPE = {
+  // « chaîne » (30/10) = chaîniste (flexion, extension, ouverture, fermeture, AP, PA) OU posturale (rééducation
+  // posturale) OU biomécanique/organique/articulaire (rééducation articulaire)
   chaine: 0,
   terrain: 1,
   reflexe: 2,
-  vestibule: 3,
-  nerfs: 4,
-  tronc: 5,
+  vestibule: 3, // dont NC8 vestibulo-cochléaire
+  nerfs: 4, // NC11 accessoire
+  tronc: 5, // tronc cérébral (13)
   proprio: 6,
   pied: 7,
-  articulaire: 8,
+  // emplacement 3 : visuel, mandibule (ATM) et nerfs crâniens 1-7, 9, 10, 12
   slot3: 9,
 };
+// Nerfs crâniens (NC1…NC12) : catégories d'exercices créées le 30/10/2026. Emplacement 3 sauf NC8, NC11 (et tronc cérébral)
+// qui vont en emplacement 1. Déclencheur : une case « gauche » ou « droite » cochée dans le tableau des nerfs crâniens.
+export const NERFS = [
+  { k: 1, code: 'nc1-olfactif', nom: 'NC1 olfactif', slot3: true },
+  { k: 2, code: 'nc2-optique', nom: 'NC2 optique', slot3: true },
+  { k: 3, code: 'nc3-oculomoteur', nom: 'NC3 oculomoteur', slot3: true },
+  { k: 4, code: 'nc4-trochleaire', nom: 'NC4 trochléaire', slot3: true },
+  { k: 5, code: 'nc5-trijumeau', nom: 'NC5 trijumeau', slot3: true },
+  { k: 6, code: 'nc6-abducens', nom: 'NC6 abducens', slot3: true },
+  { k: 7, code: 'nc7-facial', nom: 'NC7 facial', slot3: true },
+  {
+    k: 8,
+    code: 'nc8-vestibulo-cochleaire',
+    nom: 'NC8 vestibulo-cochléaire',
+    slot3: false,
+    groupe: 'vestibule',
+  },
+  { k: 9, code: 'nc9-glosso-pharyngien', nom: 'NC9 glosso-pharyngien', slot3: true },
+  { k: 10, code: 'nc10-vague', nom: 'NC10 vague', slot3: true },
+  { k: 11, code: 'nc11-accessoire', nom: 'NC11 accessoire', slot3: false, groupe: 'nerfs' },
+  { k: 12, code: 'nc12-hypoglosse', nom: 'NC12 hypoglosse', slot3: true },
+];
+
 // réflexes cochés sans fiche dans la bibliothèque : listés « sans fiche », jamais inventés
 export const REFLEXES_SANS_FICHE = {
   'ref-allongement-croise': 'allongement croisé',
@@ -132,7 +157,10 @@ export function proposerExercices(c) {
     ajoute({
       cle: 'vest-utricules',
       groupe: 'vestibule',
-      cats: [{ code: 'systeme-vestibulaire', exo: 'utricule' }],
+      cats: [
+        { code: 'nc8-vestibulo-cochleaire', exo: 'utricule' },
+        { code: 'systeme-vestibulaire', exo: 'utricule' },
+      ],
       raison: 'vestibulaire : aucun canal semi-circulaire coché → utricules',
     });
   else
@@ -141,7 +169,10 @@ export function proposerExercices(c) {
         ajoute({
           cle: 'vest-' + k,
           groupe: 'vestibule',
-          cats: [{ code: 'systeme-vestibulaire', exo: re.source }],
+          cats: [
+            { code: 'nc8-vestibulo-cochleaire', exo: re.source },
+            { code: 'systeme-vestibulaire', exo: re.source },
+          ],
           raison: 'vestibulaire : ' + lib + ' coché',
         });
 
@@ -229,6 +260,44 @@ export function proposerExercices(c) {
       raison: 'terrain ' + (c.terrain === 'aerien' ? 'aérien' : 'terrien'),
     });
 
+  // Nerfs crâniens : une case gauche ou droite cochée → catégorie du nerf (le praticien choisit l'exercice parmi les 3)
+  if (!podo)
+    for (const nc of NERFS)
+      if (coche(n, 'nc-nc' + nc.k, ['g', 'd']))
+        ajoute({
+          cle: 'nc-' + nc.k,
+          groupe: nc.groupe || 'slot3',
+          slot3: nc.slot3,
+          cats: [{ code: nc.code, exo: null }],
+          sousVide: true,
+          raison: nc.nom + ' : case cochée dans le tableau des nerfs crâniens',
+        });
+  // Tronc cérébral : pattern tronc cérébral (RIMS/REMI) coché ou hypothèse « tronc cérébral » → emplacement 1
+  if (
+    !podo &&
+    (coche(n, 'apd-tronc', ['g', 'd']) ||
+      !!n['po-hypo-tronc'] ||
+      !!n['hypo-tronc'] ||
+      !!(c && c.hypoTronc))
+  )
+    ajoute({
+      cle: 'tronc-cerebral',
+      groupe: 'tronc',
+      cats: [{ code: 'tronc-cerebral', exo: null }],
+      sousVide: true,
+      raison: 'tronc cérébral : pattern ou hypothèse cochés dans le bilan neuro-fonctionnel',
+    });
+  // Exercice visuel (« au niveau des yeux ») : règles propres à chaque bilan, motif = ce qui est coché ; emplacement 3
+  if (c && Array.isArray(c.visuel) && c.visuel.length)
+    ajoute({
+      cle: 'visuel',
+      groupe: 'slot3',
+      slot3: true,
+      cats: [{ code: 'systeme-visuel', exo: null }],
+      sousVide: true,
+      raison: 'visuel : ' + c.visuel.join(', '),
+    });
+
   // Mandibule / ATM cochée dans le bilan (buccal) : exercice de la mâchoire, EMPLACEMENT 3
   if (c && Array.isArray(c.atm) && c.atm.length)
     ajoute({
@@ -262,7 +331,7 @@ export function proposerExercices(c) {
   if (profil && profil.profils.includes('biomecanique'))
     ajoute({
       cle: 'articulaire',
-      groupe: 'articulaire',
+      groupe: 'chaine',
       cats: [{ code: 'reeduc-articulaire', exo: null }],
       sousVide: true,
       raison: 'profil biomécanique / organique / articulaire : choisissez l’exercice',

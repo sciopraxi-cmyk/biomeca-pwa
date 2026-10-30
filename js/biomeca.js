@@ -5051,7 +5051,7 @@ initPWA();
 
 // ─── Service Worker ───
 // Version du code chargé dans CETTE page (doit suivre CACHE_VERSION de service-worker.js : test dédié).
-const APP_BUILD = 'v321';
+const APP_BUILD = 'v322';
 function _afficherBandeauMiseAJour() {
   if (document.getElementById('maj-version-bandeau')) return;
   const b = document.createElement('div');
@@ -26088,7 +26088,23 @@ const FICHES_SYSTEMES = {
       "3. Respiration pour le stress",
       "4. Faim d'air"
     ]
-  }
+  },
+  // Nerfs crâniens et tronc cérébral (30/10/2026) : créés dans la base par SQL ; ici la liste de secours hors ligne.
+  // `nouveau` = pas de fiche PDF : exclus de l'import initial depuis les fiches (_exoBaseDepuisFiches).
+  'nc1-olfactif': { label: '👃 NC1 — Olfactif', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Snif fort', '2. Loto des odeurs', '3. Odeur en cuisine'] },
+  'nc2-optique': { label: '👁️ NC2 — Optique', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Le lapin latéral', '2. Lumière latérale', '3. Objet latéral (reconnaissance forme/couleur)'] },
+  'nc3-oculomoteur': { label: '👁️ NC3 — Oculomoteur', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Loin/près', '2. Convergence glabelle', '3. Brock string du III / planche oculaire horizontale'] },
+  'nc4-trochleaire': { label: '👁️ NC4 — Trochléaire', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Le petit train', '2. Convergence bout du nez', '3. Brock string du IV / planche oculaire verticale'] },
+  'nc5-trijumeau': { label: '🦷 NC5 — Trijumeau', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Mordre un objet', '2. Mouvement de la mâchoire avec et sans résistance', '3. Graphesthésie ou Arc Z Vibe ou pinceau (V1, V2, V3)'] },
+  'nc6-abducens': { label: '👁️ NC6 — Abducens', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Poursuite ou fixation vers l\'extérieur', '2. Divergence vers l\'extérieur', '3. Paupières fermées, pousser l\'œil vers l\'extérieur'] },
+  'nc7-facial': { label: '🙂 NC7 — Facial', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Faire la grimace d\'un côté', '2. Souriant, lever le sourcil d\'un côté ou fermer fort un œil', '3. Vibration (Arc Z Vibe) sur les 2/3 antérieurs de la langue'] },
+  // hors ligne : seule la stimulation sonore (les 5 exercices vestibulaires restent dans « Système vestibulaire »)
+  'nc8-vestibulo-cochleaire': { label: '👂 NC8 — Vestibulo-cochléaire', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Stimulation sonore unilatérale'] },
+  'nc9-glosso-pharyngien': { label: '🗣️ NC9 — Glosso-pharyngien', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Avaler la salive langue pincée', '2. Gargarismes (eau froide/chaude)', '3. Vibration Arc Z Vibe sur le 1/3 postérieur de la langue'] },
+  'nc10-vague': { label: '🫁 NC10 — Vague', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Respiration diaphragmatique', '2. Fredonner / humm voix grave', '3. Vibration Arc Z Vibe sur le tragus de l\'oreille'] },
+  'nc11-accessoire': { label: '💪 NC11 — Accessoire', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Shrug (contraction iso max des trapèzes supérieurs)', '2. Contraction iso max du SCOM', '3. Déglutitions successives'] },
+  'nc12-hypoglosse': { label: '👅 NC12 — Hypoglosse', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Cercle forcé avec la langue contre l\'arrière des lèvres', '2. Tirer la langue dans l\'axe avec ou sans résistance', '3. Pousser la langue contre la joue'] },
+  'tronc-cerebral': { label: '🧠 Tronc cérébral', bilans: ['sport', 'posturo'], nouveau: true, subs: ['1. Fente iso max TC droit', '2. Fente iso max TC gauche'] }
 };
 
 // #88 Génère le bloc <option> filtré par bilan ('sport' ou 'posturo') pour les
@@ -26125,6 +26141,9 @@ const _EXO_PICTOS = {
   'chaine-ouverture': '⛓️', 'chaine-statique-expiration': '⛓️', 'chaine-statique-inspiration': '⛓️',
   'respi-sport': '🌬️', 'reeduc-posturale': '🧍', 'reeduc-articulaire': '🦴', 'pathologies-genou': '🦵',
   'pathologies-hanche': '🦴', 'pathologies-pied': '🦶', 'respi-posture': '🌬️',
+  'nc1-olfactif': '👃', 'nc2-optique': '👁️', 'nc3-oculomoteur': '👁️', 'nc4-trochleaire': '👁️', 'nc5-trijumeau': '🦷', 'nc6-abducens': '👁️',
+  'nc7-facial': '🙂', 'nc8-vestibulo-cochleaire': '👂', 'nc9-glosso-pharyngien': '🗣️', 'nc10-vague': '🫁', 'nc11-accessoire': '💪',
+  'nc12-hypoglosse': '👅', 'tronc-cerebral': '🧠',
 };
 // Catégorie personnelle (code « pcat:… » ou vide) : ⭐ ; catégorie de la base inconnue de la liste : 🏋️.
 function _exoAvecPicto(code, libelle) {
@@ -26165,7 +26184,7 @@ function _exoBibConstruire(base, persoCats, perso) {
 // « (posture) » reste proposée, la respiration « (sport) » est retirée. Les catégories ajoutées ensuite à la base
 // et les catégories personnelles du praticien restent proposées.
 // Terrain moteur et chaînes musculaires ont été découpés en 2 et 6 catégories (24/10/2026) : toutes restent exclues.
-const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-articulaire', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
+const _EXO_PODO_EXCLUES = ['systeme-somesthesique', 'reeduc-terrain', 'terrain-terrien', 'terrain-aerien', 'reeduc-articulaire', 'nc1-olfactif', 'nc2-optique', 'nc3-oculomoteur', 'nc4-trochleaire', 'nc5-trijumeau', 'nc6-abducens', 'nc7-facial', 'nc8-vestibulo-cochleaire', 'nc9-glosso-pharyngien', 'nc10-vague', 'nc11-accessoire', 'nc12-hypoglosse', 'tronc-cerebral', 'pathologies-genou', 'pathologies-hanche', 'pathologies-pied', 'respi-sport'];
 // Liste de secours (hors ligne) : exercices de la catégorie ; ceux du pied viennent de EXERCICES_PIED_ENFANT.
 function _exoSubsSecours(slug, cfg) {
   const l = cfg.subs.map(o => ({ value: o, label: o }));
@@ -26361,18 +26380,22 @@ function _exoAutoContexte(bilan) {
     ['valgus', 'varus'].forEach(function (sens) {
       if (cc('podo_diag_' + sens) && !pieds.some(function (x) { return x.sens === sens; })) pieds.push({ cote: 'D', sens: sens, source: 'diagnostic', sansCote: true });
     });
-    return { bilan: 'podo', valeurs: (d.mannequin3d && d.mannequin3d.valeurs) || null, analyseVues: d._postureAnalysis || null, neuro: neuro, pieds: pieds, terrain: null };
+    // charges / stabilité → test de rotation nucale, ligne « yeux fermés » : amélioration ou aggravation → exercice visuel
+    const yeux = document.querySelector('input[name="podo_nucale_yeux"]:checked');
+    const visuel = yeux && (yeux.value === 'amelioration' || yeux.value === 'aggravation') ? ['rotation nucale, yeux fermés : ' + (yeux.value === 'amelioration' ? 'amélioration' : 'aggravation')] : [];
+    return { bilan: 'podo', valeurs: (d.mannequin3d && d.mannequin3d.valeurs) || null, analyseVues: d._postureAnalysis || null, neuro: neuro, pieds: pieds, terrain: null, visuel: visuel };
   }
   if (bilan === 'sport') {
     const bd = (typeof bilanData !== 'undefined' && bilanData) || {};
     const neuro = {};
-    Object.keys(bd).forEach(function (k) { if (bd[k] === true && /^(vest|prop|ref)_/.test(k)) neuro[k.replace(/_/g, '-')] = true; });
+    Object.keys(bd).forEach(function (k) { if (bd[k] === true && /^(vest|prop|ref|nc|apd)_/.test(k)) neuro[k.replace(/_/g, '-')] = true; });
     const terrain = bd.terrain_aerien ? 'aerien' : (bd.terrain_terrien ? 'terrien' : null);
     const atmS = [];
     if (bd.tonicite_aggr_atm) atmS.push('serrage aggravé : ATM');
     if (bd.atm_reductible) atmS.push('ATM articulaire réductible');
     if (bd.atm_irreductible) atmS.push('ATM articulaire irréductible');
-    return { bilan: 'sport', valeurs: (bd.mannequin3d && bd.mannequin3d.valeurs) || null, analyseVues: bd._postureAnalysis || null, neuro: neuro, terrain: terrain, atm: atmS };
+    // le bilan sport n'a pas de section pour les yeux : aucune règle visuelle
+    return { bilan: 'sport', valeurs: (bd.mannequin3d && bd.mannequin3d.valeurs) || null, analyseVues: bd._postureAnalysis || null, neuro: neuro, terrain: terrain, atm: atmS, hypoTronc: !!bd.hypo_tronc };
   }
   const d = (currentPatient && currentPatient.bilanDataPosturo) || {};
   const pref = document.querySelector('input[name="po-pref-mot"]:checked');
@@ -26383,6 +26406,16 @@ function _exoAutoContexte(bilan) {
     analyseVues: d._postureAnalysis || null,
     neuro: d.neuro4 || {},
     canauxVestibulaire: { ant: coche('po-canal-ant'), post: coche('po-canal-post'), lat: coche('po-canal-lat') },
+    visuel: (function () {
+      // bloc « Investigation entrée visuelle » : entrée visuelle primaire/secondaire, défaut de convergence, hétérophorie
+      const l = [];
+      const e = document.querySelector('input[name="po-vis-entree"]:checked');
+      if (e) l.push('entrée visuelle ' + e.value);
+      if (coche('po-conv-oculaire')) l.push('défaut de convergence');
+      const het = ['po-hetero-h-uni', 'po-hetero-h-bi', 'po-hetero-v'].some(function (id) { const x = document.getElementById(id); return !!(x && x.value && x.value.trim()); });
+      if (het) l.push('hétérophorie');
+      return l;
+    })(),
     atm: (function () {
       const l = [];
       if (coche('po-aggr-atm')) l.push('serrage aggravé : ATM');
@@ -33224,7 +33257,7 @@ const EXERCICES_PIED_ENFANT = [
 function _exoBaseDepuisFiches() {
   const cats = [];
   const exos = [];
-  Object.keys(FICHES_SYSTEMES).forEach((slug, i) => {
+  Object.keys(FICHES_SYSTEMES).filter((slug) => !FICHES_SYSTEMES[slug].nouveau).forEach((slug, i) => {
     const c = FICHES_SYSTEMES[slug];
     cats.push({ code: slug, libelle: String(c.label || slug).replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').trim(), bilans: c.bilans || [], ordre: i });
     (c.subs || []).forEach((sub, j) => {

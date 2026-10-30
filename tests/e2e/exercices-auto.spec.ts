@@ -50,10 +50,18 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     await page.evaluate(() => showPosturoSection(6));
     await page.waitForTimeout(500);
     await page.evaluate(() => ((document.getElementById('po-aggr-atm') as any).checked = true));
+    await page.evaluate(
+      () => ((document.getElementById('po-conv-oculaire') as any).checked = true)
+    );
+    await page.evaluate(() => {
+      currentPatient.bilanDataPosturo.neuro4['nc-nc2-g'] = true;
+    });
     await page.evaluate(() => showPosturoSection(8));
     await page.waitForTimeout(800);
     await page.click('#psec-8 .exo-auto-btn');
     await page.waitForSelector('#exo-auto-modal');
+    // nerf crânien coché : la catégorie est proposée (SQL collé) ou signalée « aucune fiche » (jamais inventée)
+    expect(await page.locator('#exo-auto-modal').innerText()).toMatch(/NC2/);
     // rien n'est écrit avant « Appliquer »
     expect((await etat('po', false)).flat().every((x) => x === '- > -')).toBe(true);
     page.once('dialog', (d) => d.accept());
@@ -61,10 +69,13 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     await page.waitForTimeout(800);
     const po = await etat('po', false);
     // priorité : réflexes, vestibule, proprioception, pied (chaîne et terrain passeraient avant)
-    expect(po[0][0]).toMatch(/Moro/i);
-    expect(po[1][0]).toMatch(/vestibulaire > .*canal antérieur/i);
-    expect(po[2][0]).toMatch(/proprioceptif/i);
-    expect(po[3][0]).toMatch(/Rééducation du pied/);
+    // « chaîne » d'abord (le profil biomécanique/organique/articulaire donne la catégorie articulaire), puis réflexes,
+    // vestibule, proprioception, pied
+    expect(po[0][0]).toMatch(/Rééducation articulaire/);
+    expect(po[1][0]).toMatch(/Moro/i);
+    expect(po[2][0]).toMatch(/vestibulaire > .*canal antérieur/i);
+    expect(po[3][0]).toMatch(/proprioceptif/i);
+    expect(po[4][0]).toMatch(/Rééducation du pied/);
     // ATM coché (section 7) : exercice de la mâchoire en EMPLACEMENT 3, jamais en 1
     expect(po.flat().filter((x) => /mandibul/i.test(x))).toHaveLength(1);
     expect(po.map((l) => l[2]).join('|')).toMatch(/mâchoire/i);
@@ -73,6 +84,9 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
       const pris = l.filter((x) => x !== '- > -');
       expect(new Set(pris).size).toBe(pris.length);
     });
+    // exercice visuel (défaut de convergence coché) : emplacement 3, jamais en 1
+    expect(po.map((l) => l[2]).join('|')).toMatch(/visuel/i);
+    expect(po.map((l) => l[0]).join('|')).not.toMatch(/visuel/i);
     po.forEach((l, i) => {
       expect(l[1]).toMatch(i % 2 === 0 ? /Faim d'air/ : /stress/);
     });
@@ -149,6 +163,11 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     await page.evaluate(() =>
       (document.querySelector('[data-field="podo_morpho_d_valgus"]') as any).click()
     );
+    await page.evaluate(() => showPodopediatrieSection(5));
+    await page.waitForTimeout(500);
+    await page.evaluate(() =>
+      (document.querySelector('input[name="podo_nucale_yeux"][value="aggravation"]') as any).click()
+    );
     await page.evaluate(() => showPodopediatrieSection(8));
     await page.waitForTimeout(800);
     await page.evaluate(() => {
@@ -185,6 +204,7 @@ test('exercices proposés dans les circuits Express (parcours réel, patient fic
     console.log('PODO', JSON.stringify(pd));
     const tous = pd.flat().join(' | ');
     expect(tous).toMatch(/Moro/i);
+    expect(tous).toMatch(/visuel/i); // rotation nucale, yeux fermés : aggravation
     expect(tous).toMatch(/Rééducation du pied/);
     expect(tous).toMatch(/posturale/i);
     expect(

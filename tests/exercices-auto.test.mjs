@@ -6,7 +6,7 @@ import {
   planifier,
   respirationPourLigne,
   piedValgusVarus,
-} from '../js/mannequin3d/exercices-auto.js?v=v321';
+} from '../js/mannequin3d/exercices-auto.js?v=v322';
 
 const CAT = [
   {
@@ -368,21 +368,22 @@ describe('placement dans les circuits', () => {
       ].map((k) => 'ref-' + k)
     );
   });
-  it('priorité des groupes : chaîne, terrain, réflexes, vestibule, puis proprio, pied, articulaire ; mandibule (emplacement 3) en dernier', () => {
+  it('priorité des groupes : chaîne (posturale + articulaire), terrain, réflexes, vestibule, puis proprio, pied ; mandibule (emplacement 3) en dernier', () => {
     const r = proposerExercices({
       valeurs: { poids_lr: 12, tronc_incl: 8, tete_incl: -4, pied_valgus_D: 10 },
       neuro: { 'ref-moro-o': true, 'vest-ant-g': true, 'prop-lent-g': true },
       terrain: 'aerien',
       atm: ['serrage aggravé : ATM'],
     });
+    // « chaîne » = chaîniste, posturale OU biomécanique/organique/articulaire (rééducation articulaire)
     expect(r.propositions.map((p) => p.groupe)).toEqual([
+      'chaine',
       'chaine',
       'terrain',
       'reflexe',
       'vestibule',
       'proprio',
       'pied',
-      'articulaire',
       'slot3',
     ]);
   });
@@ -457,5 +458,104 @@ describe('placement dans les circuits', () => {
     expect(l).not.toContain(0);
     expect(l).not.toContain(1);
     expect(l).toHaveLength(6);
+  });
+
+  const CAT_NC = [
+    ...CAT,
+    {
+      value: 'systeme-visuel',
+      label: 'Système visuel',
+      subs: [
+        { value: 'f', label: '1. Fixation' },
+        { value: 'p', label: '2. Poursuite' },
+      ],
+    },
+    ...[1, 2, 3, 5, 6, 7, 9, 10, 11, 12].map((k) => ({
+      value: 'nc' + k + '-x',
+      label: 'NC' + k,
+      subs: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ],
+    })),
+  ];
+  it('nerfs crâniens : une case G ou D cochée → la catégorie du nerf ; « normal » ne déclenche rien', () => {
+    const r = proposerExercices({
+      neuro: { 'nc-nc3-g': true, 'nc-nc4-n': true, 'nc-nc11-d': true, 'nc-nc8-d': true },
+    });
+    const nc = r.propositions.filter((p) => p.cle.startsWith('nc-'));
+    expect(nc.map((p) => p.cle).sort()).toEqual(['nc-11', 'nc-3', 'nc-8']);
+    expect(nc.find((p) => p.cle === 'nc-3')).toMatchObject({
+      groupe: 'slot3',
+      slot3: true,
+      sousVide: true,
+    });
+    expect(nc.find((p) => p.cle === 'nc-8')).toMatchObject({ groupe: 'vestibule', slot3: false });
+    expect(nc.find((p) => p.cle === 'nc-11')).toMatchObject({ groupe: 'nerfs', slot3: false });
+  });
+  it('NC1-7, 9, 10, 12 → emplacement 3 ; NC8 et NC11 → emplacement 1 ; le praticien choisit l’exercice', () => {
+    const neuro = {};
+    [1, 2, 3, 5, 6, 7, 9, 11].forEach((k) => (neuro['nc-nc' + k + '-g'] = true));
+    const rr = proposerExercices({ neuro })
+      .propositions.filter((p) => p.cle.startsWith('nc-'))
+      .map((p) => {
+        const k = +p.cle.slice(3);
+        return resoudre({ ...p, cats: [{ code: 'nc' + k + '-x', exo: null }] }, CAT_NC);
+      });
+    const plan = planifier(rr, vide(), CAT_NC, 'posturo');
+    const place = (k) => plan.ecritures.find((e) => e.cle === 'nc-' + k);
+    expect(place(11).slot).toBe(0);
+    [1, 2, 3, 5, 6, 7, 9].forEach((k) => expect(place(k).slot).toBe(2));
+    expect(place(3).sub).toBe(''); // exercice laissé au praticien
+    expect(plan.ecritures.filter((e) => e.slot === 0).map((e) => e.cle)).toEqual(['nc-11']);
+  });
+  it('tronc cérébral (pattern ou hypothèse) → emplacement 1, exercice laissé au praticien ; pas en podopédiatrie', () => {
+    expect(cles(proposerExercices({ neuro: { 'apd-tronc-g': true } }))).toContain('tronc-cerebral');
+    expect(cles(proposerExercices({ neuro: { 'po-hypo-tronc': true } }))).toContain(
+      'tronc-cerebral'
+    );
+    expect(cles(proposerExercices({ neuro: { 'apd-tronc-n': true } }))).not.toContain(
+      'tronc-cerebral'
+    );
+    expect(
+      cles(proposerExercices({ bilan: 'podo', neuro: { 'apd-tronc-g': true, 'nc-nc2-g': true } }))
+    ).toEqual([]);
+    const p = proposerExercices({ neuro: { 'apd-tronc-d': true } }).propositions.find(
+      (x) => x.cle === 'tronc-cerebral'
+    );
+    expect(p).toMatchObject({ groupe: 'tronc', sousVide: true });
+    expect(p.slot3).toBeUndefined();
+  });
+  it('NC8 coché : les canaux vestibulaires visent NC8 (puis l’ancienne catégorie si l’exercice n’y est plus)', () => {
+    const nc8 = {
+      value: 'nc8-vestibulo-cochleaire',
+      label: 'NC8',
+      subs: [{ value: 'c', label: '3. Rééducation pour un canal antérieur' }],
+    };
+    const r = proposerExercices({ neuro: { 'vest-ant-g': true } });
+    const p = r.propositions.find((x) => x.cle === 'vest-ant');
+    expect(resoudre(p, [nc8, ...CAT]).sys).toBe('nc8-vestibulo-cochleaire');
+    expect(resoudre(p, CAT).sys).toBe('systeme-vestibulaire');
+  });
+  it('exercice visuel : posturo et podo selon leurs cases, emplacement 3, rien si rien de coché (sport : jamais)', () => {
+    expect(cles(proposerExercices({ neuro: {}, visuel: [] }))).not.toContain('visuel');
+    const r = proposerExercices({
+      neuro: {},
+      visuel: ['entrée visuelle primaire', 'défaut de convergence'],
+    });
+    const p = r.propositions.find((x) => x.cle === 'visuel');
+    expect(p).toMatchObject({ groupe: 'slot3', slot3: true, sousVide: true });
+    expect(p.raison).toMatch(/entrée visuelle primaire, défaut de convergence/);
+    const plan = planifier([resoudre(p, CAT_NC)], vide(), CAT_NC, 'posturo');
+    expect(plan.ecritures.find((e) => e.cle === 'visuel')).toMatchObject({ ligne: 0, slot: 2 });
+    expect(
+      cles(
+        proposerExercices({
+          bilan: 'podo',
+          neuro: {},
+          visuel: ['rotation nucale, yeux fermés : aggravation'],
+        })
+      )
+    ).toContain('visuel');
   });
 });
