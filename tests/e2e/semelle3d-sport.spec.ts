@@ -101,13 +101,84 @@ test('semelle 3D sport : 3D pour un bilan neuf, dessin gardé sinon', async ({ p
     return [im.naturalWidth, im.naturalHeight, im.src.slice(0, 5)];
   });
   expect(png[0]).toBeGreaterThan(100);
-  expect(png[2]).toBe('blob:');
+  expect(png[2]).toBe('data:');
   await expect(page.locator('#sp-3d-ouvrir')).toContainText('Modifier');
   await page.screenshot({ path: '/tmp/capv1b/03_resume.png' });
 
-  // 3. l'enregistrement en mémoire n'a rien écrit dans le bilan (V1c)
-  const ecrit = await page.evaluate(() => JSON.stringify(eval('bilanData')).includes('_semelle3d'));
-  expect(ecrit).toBe(false);
+  // 3. V1c : JSON + résumé dans le bilan, PNG envoyé dans Storage, aucune image data: dans ce qui est persisté
+  await expect
+    .poll(async () => page.evaluate(() => !!eval('currentPatient').bilanData._semelle3dPath), {
+      timeout: 60_000,
+    })
+    .toBe(true);
+  const bilan = await page.evaluate(() => {
+    const bd = eval('currentPatient').bilanData;
+    const sauve = Object.keys(localStorage)
+      .filter((k) => /patients/i.test(k))
+      .map((k) => localStorage.getItem(k) || '')
+      .join('');
+    const i = sauve.indexOf('_semelle3dPlan');
+    return {
+      plan: JSON.stringify(bd._semelle3dPlan).length,
+      mode: bd._semelle3dPlan.mode,
+      scan: JSON.stringify(bd._semelle3dPlan).includes('buffer'),
+      path: bd._semelle3dPath,
+      ramData: String(bd._semelle3d || '').slice(0, 14),
+      persisteTrouve: i >= 0,
+      persisteImageData: /_semelle3d"\s*:\s*"data:/.test(sauve),
+    };
+  });
+  expect(bilan.plan).toBeLessThan(6000);
+  expect(bilan.scan).toBe(false);
+  expect(bilan.path).toMatch(/semelle3d_\d+\.png$/);
+  expect(bilan.persisteTrouve).toBe(true);
+  expect(bilan.persisteImageData).toBe(false);
+
+  // 3b. rechargement complet : le plan, le résumé et l'image reviennent depuis Storage
+  // la session est conservée au rechargement (pas de nouvelle connexion)
+  await page.reload();
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          try {
+            return eval('patients').length;
+          } catch {
+            return 0;
+          }
+        }),
+      { timeout: 60_000 }
+    )
+    .toBeGreaterThan(0);
+  await page.evaluate(async (n) => {
+    const i = eval('patients').findIndex((p: any) => p.nom === n);
+    eval('selectPatient')(eval('patients')[i]);
+  }, nom);
+  await page.evaluate(() => eval('nav')('pg-bilan'));
+  await page.evaluate(() => eval('showSportBilanSection')(8));
+  await expect(page.locator('#sp-3d-bloc')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#sp-3d-resume')).toContainText('Base thermoformée', {
+    timeout: 30_000,
+  });
+  await expect(page.locator('#sp-3d-resume')).toContainText('Coin pronateur postérieur');
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async () => {
+          const im = document.getElementById('sp-3d-apercu') as HTMLImageElement;
+          if (!im.src) return 0;
+          try {
+            await im.decode();
+          } catch {
+            return 0;
+          }
+          return im.naturalWidth;
+        }),
+      { timeout: 30_000 }
+    )
+    .toBeGreaterThan(100);
+  await expect(page.locator('#sp-3d-ouvrir')).toContainText('Modifier');
+  await page.screenshot({ path: '/tmp/capv1b/05_apres_rechargement.png' });
 
   // 4. ancien bilan AVEC dessin (valeur) : dessin gardé, pas de bloc 3D
   await page.evaluate((png) => {

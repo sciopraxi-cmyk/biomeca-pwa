@@ -9049,7 +9049,10 @@ const SPORT_BILAN_PHOTO_KEYS = [
   // #85 captures Analyse posturale
   '_postureFace', '_postureDos', '_postureProfilG', '_postureProfilD',
   // #99 overlay dessins legacy (PNG transparent — calques superposés à la photo)
-  '_morpho_face', '_morpho_face2', '_morpho_profilG', '_morpho_profilD', '_pieds'
+  '_morpho_face', '_morpho_face2', '_morpho_profilG', '_morpho_profilD', '_pieds',
+  // V1c — image PNG du plan de semelles 3D (jamais en data: dans le blob : seul `_semelle3dPath` est persisté).
+  // Le JSON de paramètres (`_semelle3dPlan`) et le résumé texte (`_semelle3dResume`) restent inline (< 2 Ko).
+  '_semelle3d'
 ];
 
 // Miroir prefetchPosturoPhotos L3143 — restaure dataUrl RAM depuis path Storage
@@ -9821,9 +9824,17 @@ function _drawMorphoCanvasesFromSource(source, posesReadyFlag) {
 
 // V1b — Plan de semelles 3D du bilan SPORT (remplace le dessin des pieds pour un bilan neuf ou sans dessin).
 // Règle : js/semelle3d/regle.js (un bilan qui a `_pieds`/`_piedsPath` garde son dessin). Le plan vit en mémoire
-// seulement dans cette étape : l'enregistrement du JSON + PNG (Storage) est l'étape V1c. Le scan n'est jamais conservé.
-let _s3dSport = null;     // { etat, resume, urlImage } du plan en cours
+// V1c : JSON (`_semelle3dPlan`) + résumé inline dans le bilan, PNG dans Storage (`_semelle3d` / `_semelle3dPath`). Le scan n'est jamais conservé.
+let _s3dSport = null;     // { etat, resume, image } relus depuis bilanData (jamais de scan)
 let _s3dRegleSport = '3d';
+function _s3dLireBilanSport() {
+  const bd = currentPatient && currentPatient.bilanData;
+  if (bd && bd._semelle3dPlan && typeof bd._semelle3dPlan === 'object') {
+    _s3dSport = { etat: bd._semelle3dPlan, resume: bd._semelle3dResume || null, image: typeof bd._semelle3d === 'string' ? bd._semelle3d : null };
+  } else {
+    _s3dSport = null;
+  }
+}
 async function _s3dMajBlocSport() {
   const dessin = document.getElementById('sp-dessin-bloc');
   const bloc3d = document.getElementById('sp-3d-bloc');
@@ -9836,10 +9847,10 @@ async function _s3dMajBlocSport() {
   _s3dRegleSport = mode;
   dessin.style.display = mode === 'dessin' ? '' : 'none';
   bloc3d.style.display = mode === '3d' ? '' : 'none';
+  _s3dLireBilanSport();
   _s3dAfficherSport();
 }
 function _s3dRazSport() {
-  if (_s3dSport && _s3dSport.urlImage) { try { URL.revokeObjectURL(_s3dSport.urlImage); } catch (_e) { /* rien */ } }
   _s3dSport = null;
   _s3dAfficherSport();
 }
@@ -9847,10 +9858,10 @@ function _s3dEscHtml(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp
 function _s3dAfficherSport() {
   const r = document.getElementById('sp-3d-resume'), im = document.getElementById('sp-3d-apercu'), b = document.getElementById('sp-3d-ouvrir');
   if (!r || !im || !b) return;
-  if (_s3dSport && _s3dSport.resume) {
-    const lignes = Array.isArray(_s3dSport.resume.lignes) ? _s3dSport.resume.lignes : [];
+  if (_s3dSport && _s3dSport.etat) {
+    const lignes = _s3dSport.resume && Array.isArray(_s3dSport.resume.lignes) ? _s3dSport.resume.lignes : [];
     r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
-    if (_s3dSport.urlImage) { im.src = _s3dSport.urlImage; im.style.display = 'block'; } else { im.style.display = 'none'; }
+    if (_s3dSport.image) { im.src = _s3dSport.image; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
     b.textContent = '🦶 Modifier le plan 3D';
   } else {
     r.textContent = 'Aucun plan enregistré.';
@@ -9858,18 +9869,29 @@ function _s3dAfficherSport() {
     b.textContent = '🦶 Plan de semelles 3D';
   }
 }
+function _s3dBlobEnDataUrl(blob) {
+  return new Promise((ok, ko) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => ko(new Error('lecture de l\'image impossible')); fr.readAsDataURL(blob); });
+}
+// Enregistre le plan dans le bilan sport : JSON + résumé inline, PNG envoyé dans Storage par le circuit habituel
+// (saveBilanSilent → migrateSportBilanDataPhotos). Le scan n'est jamais conservé (absent de l'état reçu).
+async function _s3dEnregistrerSport({ etat, resume, png }) {
+  if (!currentPatient) throw new Error('aucun patient ouvert');
+  if (!png) throw new Error('image du plan absente');
+  const dataUrl = await _s3dBlobEnDataUrl(png);
+  if (typeof dataUrl !== 'string' || dataUrl.indexOf('data:image/png') !== 0) throw new Error('image du plan invalide');
+  bilanData._semelle3dPlan = etat;
+  bilanData._semelle3dResume = resume;
+  bilanData._semelle3d = dataUrl;
+  delete bilanData._semelle3dPath; // nouvelle image : l'ancien fichier Storage n'est plus la bonne version
+  await saveBilanSilent();
+  _s3dLireBilanSport();
+  _s3dAfficherSport();
+}
 async function ouvrirSemelle3DSport() {
   let M;
   try { M = await import('./semelle3d/index.js?v=' + APP_BUILD); } catch (_e) { _s3dMessageSport('Module 3D indisponible hors connexion.'); return; }
-  M.ouvrirSemelle3D({
-    etat: _s3dSport ? _s3dSport.etat : null,
-    version: APP_BUILD,
-    onEnregistrer: async ({ etat, resume, png }) => {
-      if (_s3dSport && _s3dSport.urlImage) { try { URL.revokeObjectURL(_s3dSport.urlImage); } catch (_e) { /* rien */ } }
-      _s3dSport = { etat, resume, urlImage: png ? URL.createObjectURL(png) : null };
-      _s3dAfficherSport();
-    }
-  });
+  _s3dLireBilanSport();
+  M.ouvrirSemelle3D({ etat: _s3dSport ? _s3dSport.etat : null, version: APP_BUILD, onEnregistrer: _s3dEnregistrerSport });
 }
 function _s3dMessageSport(t) {
   const r = document.getElementById('sp-3d-resume');
@@ -25770,6 +25792,7 @@ function loadBilan() {
       SPORT_BILAN_PHOTO_KEYS.forEach(k => {
         if (currentPatient.bilanData[k]) bilanData[k] = currentPatient.bilanData[k];
       });
+      if (currentPatient.bilanData._semelle3dPlan) { bilanData._semelle3dPlan = currentPatient.bilanData._semelle3dPlan; bilanData._semelle3dResume = currentPatient.bilanData._semelle3dResume; }
       // #203-fix — même report pour les clés podoscope dynamiques + le tableau
       // d'ids : le save (global) doit les connaître, sinon il les écrase.
       if (Array.isArray(currentPatient.bilanData._podoscopePhotos)) {
