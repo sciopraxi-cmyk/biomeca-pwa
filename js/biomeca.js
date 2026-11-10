@@ -5954,6 +5954,7 @@ function nav(id) {
         // 3. Initialiser canvas pieds APRÈS loadBilan (bilanData disponible)
         const pc = document.getElementById('pieds-canvas');
         if(pc) { drawPiedsTemplate(currentPatient?.bilanData?._pieds); }
+        _s3dMajBlocSport();
         // #226-A — pré-remplissage fiche → anamnèse (après loadBilan).
         _fichePrefillApply('sport');
       }, 200);
@@ -7179,6 +7180,7 @@ function selectPatient(p) {
 }
 
 function clearBilanFields() {
+  if (typeof _s3dRazSport === 'function') _s3dRazSport();
   document.querySelectorAll('.bilan-field').forEach(el => {
     if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = '';
   });
@@ -9817,6 +9819,63 @@ function _drawMorphoCanvasesFromSource(source, posesReadyFlag) {
   });
 }
 
+// V1b — Plan de semelles 3D du bilan SPORT (remplace le dessin des pieds pour un bilan neuf ou sans dessin).
+// Règle : js/semelle3d/regle.js (un bilan qui a `_pieds`/`_piedsPath` garde son dessin). Le plan vit en mémoire
+// seulement dans cette étape : l'enregistrement du JSON + PNG (Storage) est l'étape V1c. Le scan n'est jamais conservé.
+let _s3dSport = null;     // { etat, resume, urlImage } du plan en cours
+let _s3dRegleSport = '3d';
+async function _s3dMajBlocSport() {
+  const dessin = document.getElementById('sp-dessin-bloc');
+  const bloc3d = document.getElementById('sp-3d-bloc');
+  if (!dessin || !bloc3d) return;
+  let mode = '3d';
+  try { const R = await import('./semelle3d/regle.js?v=' + APP_BUILD); mode = R.modeSemelleBilan(currentPatient && currentPatient.bilanData, '_pieds'); } catch (_e) { mode = 'dessin'; }
+  // Un dessin en cours de saisie (non encore enregistré) compte comme un dessin : on ne le masque jamais.
+  const pc = document.getElementById('pieds-canvas');
+  if (pc && pc._userDirty) mode = 'dessin';
+  _s3dRegleSport = mode;
+  dessin.style.display = mode === 'dessin' ? '' : 'none';
+  bloc3d.style.display = mode === '3d' ? '' : 'none';
+  _s3dAfficherSport();
+}
+function _s3dRazSport() {
+  if (_s3dSport && _s3dSport.urlImage) { try { URL.revokeObjectURL(_s3dSport.urlImage); } catch (_e) { /* rien */ } }
+  _s3dSport = null;
+  _s3dAfficherSport();
+}
+function _s3dEscHtml(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function _s3dAfficherSport() {
+  const r = document.getElementById('sp-3d-resume'), im = document.getElementById('sp-3d-apercu'), b = document.getElementById('sp-3d-ouvrir');
+  if (!r || !im || !b) return;
+  if (_s3dSport && _s3dSport.resume) {
+    const lignes = Array.isArray(_s3dSport.resume.lignes) ? _s3dSport.resume.lignes : [];
+    r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
+    if (_s3dSport.urlImage) { im.src = _s3dSport.urlImage; im.style.display = 'block'; } else { im.style.display = 'none'; }
+    b.textContent = '🦶 Modifier le plan 3D';
+  } else {
+    r.textContent = 'Aucun plan enregistré.';
+    im.removeAttribute('src'); im.style.display = 'none';
+    b.textContent = '🦶 Plan de semelles 3D';
+  }
+}
+async function ouvrirSemelle3DSport() {
+  let M;
+  try { M = await import('./semelle3d/index.js?v=' + APP_BUILD); } catch (_e) { _s3dMessageSport('Module 3D indisponible hors connexion.'); return; }
+  M.ouvrirSemelle3D({
+    etat: _s3dSport ? _s3dSport.etat : null,
+    version: APP_BUILD,
+    onEnregistrer: async ({ etat, resume, png }) => {
+      if (_s3dSport && _s3dSport.urlImage) { try { URL.revokeObjectURL(_s3dSport.urlImage); } catch (_e) { /* rien */ } }
+      _s3dSport = { etat, resume, urlImage: png ? URL.createObjectURL(png) : null };
+      _s3dAfficherSport();
+    }
+  });
+}
+function _s3dMessageSport(t) {
+  const r = document.getElementById('sp-3d-resume');
+  if (r) r.textContent = t;
+}
+
 // #99 Restauration différée des canvas morpho/pieds depuis bilanData global
 // (post-prefetch Storage). Appelée dans le .then() de prefetchSportBilanDataPhotos
 // pour traiter le cas où les 5 clés _morpho_*/_pieds ont été remplacées par des
@@ -9838,6 +9897,7 @@ function _restoreSportMorphoPiedsFromBilanData() {
   // dans img.onload de chaque canvas qui a une dataURL, ou immédiatement pour
   // les canvas sans dataURL (rien à restaurer).
   _drawMorphoCanvasesFromSource(src, true);
+  _s3dMajBlocSport();
   if (src._pieds && typeof drawPiedsTemplate === 'function') {
     // Callback onReady passé à drawPiedsTemplate → pose `_restoreReady=true`
     // dans saved.onload après le drawImage déterministe.

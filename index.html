@@ -5755,6 +5755,7 @@
       <div class="sport-block-title c-vert">🦶 Plan de Semelles</div>
       <div class="field-lbl" style="margin-top:6px;">📝 Description</div>
       <textarea class="inp" id="sp-semelles-desc" rows="3" placeholder="Description du plan de semelles..." style="background:#fff;color:#222;"></textarea>
+      <div id="sp-dessin-bloc">
       <div class="field-lbl" style="margin-top:10px;">✏️ Dessin sur les pieds</div>
       <div style="position:relative;margin:8px 0;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:8px;text-align:center;">
         <div id="sp-pieds-wrap" style="position:relative;display:inline-block;width:80%;max-width:400px;margin:0 auto;line-height:0;">
@@ -5783,6 +5784,15 @@
           <option value="8">Épais</option>
         </select>
         <button class="btn btn-red" onclick="undoPieds()">↩ Annuler</button>
+      </div>
+      </div>
+      <div id="sp-3d-bloc" style="display:none;margin-top:10px;">
+        <div class="field-lbl">🦶 Plan de semelles 3D</div>
+        <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-top:6px;color:#222;">
+          <div id="sp-3d-resume" style="font-size:12px;line-height:1.5;margin-bottom:10px;">Aucun plan enregistré.</div>
+          <img id="sp-3d-apercu" alt="Aperçu du plan de semelles 3D" style="display:none;max-width:100%;max-height:220px;margin-bottom:10px;border-radius:6px;border:1px solid var(--bord);"/>
+          <button class="btn" id="sp-3d-ouvrir" type="button" onclick="ouvrirSemelle3DSport()">🦶 Plan de semelles 3D</button>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
         <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:10px;">
