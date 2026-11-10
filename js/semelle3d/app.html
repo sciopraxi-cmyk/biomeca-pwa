@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semelle 3D — Verticy</title>
+<script type="importmap">{ "imports": { "three": "../../assets/vendor/three/three.module.min.js" } }</script>
+<style>
+  :root { color-scheme: light; --ink:#0b1b3a; --txt2:#3b4a68; --mut:#6b7a99; --line:#e3e9f5; --soft:#f6f9fe; --bleu:#2563eb; --bleu-d:#1d4ed8; --teal:#14b8a6; --or:#f59e0b; --rouge:#dc2626;
+    --ombre: 0 1px 2px rgba(11,27,58,.04), 0 12px 32px -14px rgba(37,99,235,.18); font-family: 'DM Sans', system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; } /* sinon une règle « display:flex » écrase l'attribut hidden */
+  html, body { height: 100%; }
+  body { margin: 0; display: grid; grid-template-rows: 62px minmax(0, 1fr); height: 100vh; background: #f5f8fe; color: var(--ink); font-size: 13px; line-height: 1.4; -webkit-font-smoothing: antialiased; overflow: hidden; }
+  small { color: var(--mut); }
+  button { font-family: inherit; font-weight: 700; font-size: 13px; border-radius: 12px; border: 1.5px solid #cfd9ee; background: #fff; color: var(--ink); padding: 8px 13px; cursor: pointer; transition: transform .12s, box-shadow .15s; }
+  button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 18px -10px rgba(11,27,58,.4); }
+  button:disabled { background: #eef1f7; border-color: var(--line); color: #9aa6bf; box-shadow: none; cursor: default; }
+  button.plein, #btn-base, #btn-analyser, #btn-demo, #btn-el-ajouter { background: var(--bleu); border-color: var(--bleu); color: #fff; box-shadow: 0 10px 24px -12px rgba(37,99,235,.8); }
+  button.plein:disabled, #btn-base:disabled, #btn-analyser:disabled, #btn-demo:disabled, #btn-el-ajouter:disabled { background: #eef1f7; border-color: var(--line); color: #9aa6bf; box-shadow: none; }
+  input[type=text], select { font-family: inherit; font-size: 12.5px; border: 0; border-radius: 9px; box-shadow: 0 0 0 1px #cfd9ee; padding: 6px 8px; background: #fff; color: var(--ink); }
+  input[type=text]:focus, select:focus { outline: none; box-shadow: 0 0 0 2px var(--bleu); }
+  input[type=text] { width: 64px; text-align: right; font-family: 'DM Mono', ui-monospace, monospace; }
+  input[type=range] { accent-color: var(--bleu); flex: 1; min-width: 0; }
+  select { max-width: 100%; }
+  /* ---- barre du haut ---- */
+  header.haut { display: flex; align-items: center; gap: 12px; padding: 0 20px; background: #fff; border-bottom: 1px solid var(--line); }
+  header.haut img { height: 46px; margin: -4px 0; }
+  .sep { width: 1px; height: 26px; background: var(--line); }
+  .titre { font-weight: 800; font-size: 15px; letter-spacing: -.2px; white-space: nowrap; }
+  .titre small { display: block; font-weight: 500; font-size: 11px; letter-spacing: 0; }
+  .pill { padding: 5px 11px; border-radius: 20px; background: #eef4ff; color: var(--bleu); border: 1px solid #bbd0f7; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .pill.g { background: #e8faf6; color: #0f766e; border-color: #a7ebdf; }
+  .pill.a { background: #fff7e6; color: #b45309; border-color: #f3d9a4; }
+  #parcours { display: flex; gap: 3px; margin: 0 auto; background: var(--soft); padding: 4px; border-radius: 14px; border: 1px solid var(--line); }
+  #parcours button { border: 0; background: transparent; box-shadow: none; padding: 7px 13px; border-radius: 10px; font-size: 12.5px; color: var(--mut); display: flex; gap: 7px; align-items: center; }
+  #parcours button i { font-style: normal; width: 19px; height: 19px; border-radius: 50%; background: #dbe5f7; color: var(--txt2); font-size: 11px; display: grid; place-items: center; }
+  #parcours button.ok i { background: var(--teal); color: #fff; }
+  #parcours button.warn i { background: var(--or); color: #fff; }
+  #parcours button.on { background: var(--ink); color: #fff; }
+  #parcours button.on i { background: #fff; color: var(--ink); }
+  #parcours button:disabled { background: transparent; color: #9aa6bf; }
+  header.haut .btn-ic { padding: 8px 11px; }
+  /* ---- V1 : habillage quand la page est ouverte dans Verticy (iframe plein écran) ---- */
+  body.hote header.haut { gap: 8px; padding: 0 12px; }
+  body.hote header.haut button { white-space: nowrap; padding: 8px 10px; }
+  body.hote header.haut .titre small { display: none; }
+  body.hote header.haut > img, body.hote header.haut > .sep { display: none; } /* Verticy porte déjà la marque */
+  body.hote #parcours button[data-etape="5"], body.hote #pill-long { display: none; } /* étape « Prescription » non codée ; la longueur est déjà dans la carte 1 */
+  body.hote #parcours { margin: 0 auto; } body.hote #parcours button { padding: 7px 8px; gap: 5px; }
+  body.hote header.haut .pill { padding: 4px 8px; }
+  #hote-msg { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 50; max-width: min(640px, 70vw); background: #fff; border-radius: 12px; padding: 9px 16px; box-shadow: 0 0 0 1px var(--line), 0 12px 32px -10px rgba(11,27,58,.35); font-size: 13px; font-weight: 700; line-height: 1.3; text-align: center; }
+  #hote-msg:empty { display: none; }
+  /* ---- trois colonnes ---- */
+  main.app { display: grid; grid-template-columns: 330px minmax(0, 1fr) 280px; gap: 14px; padding: 14px; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; padding: 2px 4px 14px 2px; }
+  .col::-webkit-scrollbar { width: 8px; } .col::-webkit-scrollbar-thumb { background: #cfd9ee; border-radius: 4px; }
+  details.card { background: #fff; border-radius: 16px; box-shadow: 0 0 0 1px var(--line), var(--ombre); flex: none; }
+  details.card > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 11px 14px; font-weight: 800; font-size: 14px; letter-spacing: -.2px; cursor: pointer; }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::after { content: '▸'; margin-left: auto; color: var(--mut); font-size: 12px; }
+  details.card[open] > summary::after { content: '▾'; }
+  details.card > .c { padding: 0 14px 14px; }
+  .chip { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-size: 13px; font-weight: 800; background: color-mix(in srgb, var(--c, #2563eb) 12%, #fff); color: var(--c, #2563eb); flex: none; }
+  .badge { font-size: 11px; font-weight: 700; background: #e8faf6; color: #0f766e; padding: 2px 9px; border-radius: 12px; }
+  .badge.a { background: #fff7e6; color: #b45309; }
+  .lbl { font-size: 11px; font-weight: 700; color: var(--mut); text-transform: uppercase; letter-spacing: .9px; margin: 11px 0 5px; }
+  .rng { display: flex; align-items: center; gap: 10px; margin: 7px 0; color: var(--txt2); font-weight: 600; }
+  .rng .n { width: 82px; flex: none; }
+  .rng b { min-width: 52px; text-align: right; font-family: 'DM Mono', ui-monospace, monospace; font-size: 12px; color: var(--ink); }
+  .rng.champ { justify-content: space-between; } .rng.champ .n { width: auto; flex: 1; } .rng.champ small { flex: none; }
+  .seg { display: flex; background: var(--soft); border-radius: 11px; padding: 3px; box-shadow: inset 0 0 0 1px var(--line); }
+  .seg label { flex: 1; position: relative; }
+  .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .seg span { display: block; text-align: center; padding: 7px 2px; border-radius: 9px; font-size: 11.5px; font-weight: 600; color: var(--txt2); }
+  .seg label:has(input:checked) span { background: #fff; color: var(--bleu); font-weight: 800; box-shadow: 0 0 0 1px #bbd0f7, 0 4px 10px -4px rgba(37,99,235,.35); }
+  .seg label:has(input:focus-visible) span { box-shadow: 0 0 0 2px var(--bleu); }
+  .sugg, .sugg-bleue { display: block; line-height: 1.45; border-radius: 12px; background: #eff6ff; box-shadow: inset 0 0 0 1.5px #93c5fd; color: #1e40af; font-style: normal; padding: 8px 10px; margin: 8px 0; font-size: 12.5px; }
+  .sugg-bleue button { background: var(--bleu); color: #fff; border: 0; border-radius: 9px; padding: 5px 11px; font-size: 12px; margin-top: 4px; }
+  #henke-info .ok { color: #047857; font-weight: 600; } #henke-info .aval { color: #b45309; font-weight: 600; } #henke-info .alerte { color: #b45309; } #henke-info .lim { color: #6b7a99; } #henke-info hr { border: 0; border-top: 1px solid #e2e8f0; margin: 6px 0; }
+  #henke-bandeau { border-radius: 10px; background: #fff7ed; box-shadow: inset 0 0 0 1.5px #fdba74; color: #9a3412; padding: 6px 9px; margin: 6px 0; font-size: 12.5px; }
+  #liste-elements .rouge { color: #b91c1c; font-weight: 600; }
+  #henke-palper.on { background: #0b1b3a; color: #fff; }
+  .sugg-bleue small { display: block; margin-top: 4px; color: #1e40af; }
+  .confirm { background: #fef2f2; border-radius: 12px; box-shadow: inset 0 0 0 1.5px #fca5a5; padding: 8px 10px; margin: 8px 0; font-size: 12.5px; }
+  .el { border-radius: 14px; background: var(--soft); box-shadow: inset 0 0 0 1px var(--line); padding: 9px 11px; margin: 8px 0; }
+  .el:hover { box-shadow: inset 0 0 0 1.5px #bbd0f7; }
+  .el p { margin: 6px 0; } .el input[type=text] { width: 54px; padding: 4px 6px; } .el select { font-size: 12px; }
+  .el-avert { color: #b45309; font-size: 12px; }
+  .pastille { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+  #el-msg, .err { color: var(--rouge); font-weight: 600; font-size: 12.5px; }
+  .avance { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .avance > summary { cursor: pointer; font-weight: 700; color: var(--txt2); font-size: 12.5px; }
+  .vide { color: var(--mut); font-size: 12.5px; padding: 4px 0; }
+  /* ---- scène 3D ---- */
+  #vue { position: relative; border-radius: 22px; overflow: hidden; min-height: 0; box-shadow: 0 0 0 1px var(--line), 0 24px 60px -30px rgba(37,99,235,.35); background: radial-gradient(ellipse 70% 60% at 50% 42%, #fff 0%, #eef4ff 55%, #e1ebfb 100%); }
+  #vue > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+  .glass { position: absolute; z-index: 3; background: rgba(255,255,255,.84); backdrop-filter: blur(8px); border-radius: 14px; box-shadow: 0 0 0 1px var(--line), 0 10px 28px -12px rgba(11,27,58,.25); }
+  .outils { left: 14px; top: 14px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .outils button { width: 40px; height: 40px; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 17px; color: var(--txt2); border-radius: 11px; }
+  .outils button.on { background: var(--ink); color: #fff; }
+  .outils button:disabled { background: transparent; color: #b6c0d6; }
+  .vues { left: 50%; top: 14px; transform: translateX(-50%); padding: 5px; display: flex; gap: 3px; }
+  .vues button { border: 0; background: transparent; box-shadow: none; padding: 7px 10px; border-radius: 10px; color: var(--txt2); font-size: 12.5px; }
+  .vues button.on { background: var(--bleu); color: #fff; box-shadow: 0 8px 18px -8px rgba(37,99,235,.8); }
+  .ligne { display: flex; justify-content: space-between; align-items: flex-end; width: 100%; }
+  #lib-cote { position: static; padding: 9px 14px; font-weight: 700; font-size: 13px; }
+  #lib-cote em { font-style: normal; background: var(--teal); color: #fff; border-radius: 8px; padding: 2px 9px; margin: 0 3px; }
+  #lib-cote.a { color: #b45309; }
+  #legende-zones { left: 50%; transform: translateX(-50%); top: 62px; padding: 9px 12px; font-size: 12px; color: var(--txt2); }
+  .aide-souris { position: absolute; z-index: 2; right: 16px; top: 64px; font-size: 11px; color: var(--mut); text-align: right; max-width: 190px; }
+  .bas { position: absolute; z-index: 3; left: 14px; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .opts { position: static; padding: 5px; display: flex; gap: 3px; }
+  .opts button { border: 0; background: transparent; box-shadow: none; padding: 7px 12px; border-radius: 9px; color: var(--txt2); font-size: 12px; }
+  .opts button.on { background: #eef4ff; color: var(--bleu); }
+  #mesure-etiquette { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 7px 14px; font-size: 13px; color: var(--txt2); pointer-events: none; white-space: nowrap; }
+  #mesure-etiquette.resultat { color: #b4122f; font-weight: 700; font-size: 15px; }
+  #pinceau-panel { position: absolute; left: 76px; top: 66px; padding: 8px 12px; font-size: 12px; color: var(--txt2); z-index: 5; max-width: 330px; }
+  #pinceau-panel label { margin-right: 8px; white-space: nowrap; }
+  #vue.mode-pinceau canvas { cursor: crosshair; }
+  #miroir-confirm { position: absolute; left: 50%; top: 100px; transform: translateX(-50%); padding: 10px 14px; font-size: 13px; color: var(--txt); max-width: 70%; text-align: center; z-index: 5; }
+  #miroir-confirm button { margin-left: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--bleu); background: #fff; color: var(--bleu); cursor: pointer; }
+  #miroir-confirm #miroir-oui { background: var(--bleu); color: #fff; }
+  #vue.mode-mesure canvas { cursor: crosshair; }
+  .opts button:disabled { opacity: .45; cursor: default; }
+  .opts label { display: flex; align-items: center; gap: 4px; padding: 0 8px; font-size: 12px; color: var(--txt2); white-space: nowrap; }
+  #coupe-panel { position: static; width: 100%; padding: 10px 14px; font-size: 12.5px; }
+  #coupe-panel[hidden] { display: none; }
+  #coupe-panel canvas { display: block; width: 100%; height: 170px; }
+  #coupe-panel.replie canvas, #coupe-panel.replie #coupe-mesures, #coupe-panel.replie .coupe-reglages { display: none; }
+  #coupe-toggle { float: right; padding: 3px 10px; font-size: 12px; border-radius: 9px; }
+  #coupe-mesures { font-size: 12.5px; color: var(--txt2); } #coupe-mesures div { margin: 2px 0; }
+  .coupe-titre { font-weight: 800; font-size: 13px; margin-right: 8px; }
+  /* ---- colonne de droite ---- */
+  .ctl { display: flex; gap: 9px; align-items: flex-start; margin: 7px 0; font-size: 12.5px; color: var(--txt2); }
+  .ctl i { font-style: normal; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; background: var(--teal); flex: none; }
+  .ctl.w i { background: var(--or); } .ctl.e i { background: var(--rouge); }
+  #stats div { margin: 5px 0; font-size: 12.5px; color: var(--txt2); }
+  #journal { font-size: 12px; color: var(--txt2); padding-left: 18px; margin: 4px 0 0; }
+  #etat-ligne { font-size: 11.5px; color: var(--mut); padding: 0 4px; } #etat { font-weight: 700; color: var(--txt2); }
+  .lexique dt { font-weight: 700; margin-top: 8px; } .lexique dd { margin: 0 0 0 8px; color: var(--txt2); }
+  details.simple { background: #fff; border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 8px 12px; font-size: 12.5px; }
+  .ok { color: #0f766e; font-weight: 600; }
+  /* ---- 2 pieds ---- */
+  #onglets-pieds { position: static; padding: 5px; display: flex; gap: 3px; }
+  #onglets-pieds button { border: 0; background: transparent; box-shadow: none; padding: 7px 12px; border-radius: 10px; color: var(--txt2); font-size: 12.5px; }
+  #onglets-pieds button.on { background: var(--ink); color: #fff; }
+  .portee { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eef4ff; color: var(--bleu); border: 1px solid #bbd0f7; }
+  .portee.p-D { background: #eef4ff; } .portee.p-G { background: #e8faf6; color: #0f766e; border-color: #a7ebdf; }
+  .el button[data-act=detacher] { padding: 2px 9px; font-size: 11.5px; border-radius: 9px; }
+  .el.autre { opacity: .55; } .el.autre:hover { opacity: 1; }
+  #bloc-deroge.propre { box-shadow: inset 0 0 0 2px #14b8a6; }
+  #bloc-deroge small { display: block; margin-top: 4px; }
+  #hud-edition { left: 14px; bottom: 74px; padding: 7px 12px; font-size: 12.5px; max-width: 46%; line-height: 1.45; pointer-events: none; }
+  #hud-edition b { color: var(--ink); }
+  #legende-3d { margin-top: 8px; padding: 8px; border: 1px solid #e3e7ee; border-radius: 10px; background: #fafbfd; font-size: 12px; }
+  #legende-3d .leg-reglages { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  #legende-3d input[type=range] { width: 90px; vertical-align: middle; }
+  #leg-liste { margin-top: 6px; }
+  #leg-liste .leg-ligne { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 6px; cursor: pointer; }
+  #leg-liste .leg-ligne:hover { background: #eef1f7; }
+  #leg-liste .leg-ligne.sel { outline: 2px solid #7c3aed; outline-offset: -1px; }
+  #leg-liste .leg-ligne.cache .leg-nom, #leg-liste .leg-ligne.inactif .leg-nom { opacity: .45; text-decoration: line-through; }
+  #leg-liste .leg-ligne.autre { opacity: .55; }
+  #leg-liste .teinte { width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); flex: none; }
+  #leg-liste .leg-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #leg-liste .leg-shore { white-space: nowrap; color: #44506a; }
+  #leg-liste .oeil { padding: 0 6px; min-width: 24px; }
+  #leg-barre { height: 12px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); margin-top: 8px; }
+  #legende-3d .leg-echelle { display: flex; justify-content: space-between; color: #44506a; }
+  .carte-teinte { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); margin-right: 4px; }
+  #liste-elements .el.sel { outline: 2px solid #7c3aed; outline-offset: 1px; }
+  #liste-elements .el .pas { padding: 0 7px; min-width: 24px; }
+  #vue.mode-point canvas { cursor: crosshair; }
+</style>
+</head>
+<body>
+<header class="haut">
+  <img src="../../assets/semelle3d/verticy-logo.png" alt="Verticy"><span class="sep"></span>
+  <div class="titre">Semelle 3D<small>Plan de la semelle</small></div>
+  <span class="pill">Patient fictif</span><span class="pill a" id="pill-cote">Pied : à confirmer</span><span class="pill" id="pill-long">longueur —</span>
+  <nav id="parcours" aria-label="Étapes">
+    <button data-etape="1" class="on"><i>1</i>Scan</button><button data-etape="2"><i>2</i>Base</button><button data-etape="3"><i>3</i>Éléments</button><button data-etape="4"><i>4</i>Contrôles</button><button data-etape="5" disabled title="Lot 6 : prescription imprimable"><i>5</i>Prescription</button>
+  </nav>
+  <button class="btn-ic" id="btn-annuler" disabled title="Annuler (Ctrl+Z)">↶</button><button class="btn-ic" id="btn-retablir" disabled title="Rétablir (Ctrl+Maj+Z)">↷</button>
+  <button id="btn-image-rapport" disabled title="Image pour le rapport : vue de dessus + vue 3/4 médiale">Image du rapport</button>
+  <button id="btn-export-base" class="plein" disabled>Exporter le STL →</button>
+  <button id="btn-enregistrer" class="plein" style="background:#0f766e;border-color:#0f766e" hidden title="Enregistrer le plan et son image dans le bilan">Enregistrer</button><button id="btn-fermer" hidden>Fermer</button>
+</header>
+<div id="hote-msg" hidden role="status"></div>
+<dialog id="dlg-image" style="border:1px solid #d5e0f3;border-radius:14px;padding:16px;max-width:96vw;max-height:94vh;overflow:auto"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><b>Image du rapport</b><span id="image-msg" style="flex:1;color:#4b5d7e;font-size:13px"></span><button id="image-telecharger" class="plein" type="button">Télécharger (PNG)</button><button id="image-fermer" type="button">Fermer</button></div><img id="image-apercu" alt="Image du rapport" style="max-width:100%;height:auto;display:block"></dialog>
+<main class="app">
+<section class="col" id="col-gauche">
+  <details class="card" id="p-scan" open><summary><span class="chip" id="chip-scan" style="--c:#2563eb">1</span>Scan et longueur<span class="badge a" id="badge-scan" hidden></span></summary><div class="c">
+    <div class="seg" id="seg-nb" role="radiogroup" aria-label="Nombre de pieds scannés"><label><input type="radio" name="nbpieds" value="1" checked><span>Un pied</span></label><label><input type="radio" name="nbpieds" value="2"><span>Les deux pieds</span></label></div>
+    <div class="lbl">Scan</div>
+    <input type="file" id="fichier" accept=".stl,.obj,.ply,.3mf" style="max-width:100%"><br>
+    <small>STL (binaire ou ASCII), OBJ, PLY, 3MF — format reconnu par le contenu. Scans <b>synthétiques</b> uniquement.</small>
+    <div class="rng champ"><span class="n">Scan de démonstration</span></div>
+    <div style="display:flex;gap:6px"><select id="demo" style="flex:1;min-width:0"></select><button id="btn-demo" style="flex:none">Charger</button></div>
+    <div id="info-fichier"></div>
+    <div style="margin:6px 0"><button id="btn-reprendre" hidden>Reprendre le plan enregistré</button></div>
+    <div id="bloc-modeb">
+    <details id="p-modeb"><summary class="lbl" style="cursor:pointer">Sans scan : pied générique (mode B)</summary>
+      <small>Pour visualiser une semelle sans empreinte 3D : pied <b>moyen fictif</b> à la longueur saisie. Aperçu <b>indicatif</b>, jamais une mesure du patient.</small>
+      <div style="margin:6px 0"><label><input type="radio" name="mb-cote" value="D" checked> Pied droit (D)</label> &nbsp; <label><input type="radio" name="mb-cote" value="G"> Pied gauche (G)</label></div>
+      <div class="rng champ"><span class="n">Longueur du pied <input type="text" id="mb-long" inputmode="decimal" placeholder="ex. 265" style="width:84px"> mm</span></div>
+      <div class="rng champ"><span class="n">Largeur <select id="mb-larg"><option value="0.9">étroit</option><option value="1" selected>moyen</option><option value="1.1">large</option></select> &nbsp; Voûte <select id="mb-voute"><option value="8">basse</option><option value="15" selected>moyenne</option><option value="24">haute</option></select></span></div>
+      <button id="btn-modeb">Créer le pied générique</button>
+    </details>
+    </div>
+    <div id="bloc-1p">
+    <div class="lbl">Longueur exacte du pied</div>
+    <div class="rng champ"><span class="n"><input type="text" id="longueur" inputmode="decimal" placeholder="ex. 265" style="width:84px"> mm</span><button id="btn-analyser" disabled>Analyser le scan</button></div>
+    <small>Elle fixe l'échelle du scan (podomètre). Aucune unité n'est supposée.</small>
+    <div id="confirm-ecart" class="confirm" hidden></div>
+    <div class="lbl">À confirmer par vous</div>
+    <p class="sugg" id="prop-cote">Latéralité proposée : —</p>
+    <label><input type="radio" name="cote" value="D" disabled> Pied droit (D)</label> &nbsp; <label><input type="radio" name="cote" value="G" disabled> Pied gauche (G)</label><br>
+    <button id="btn-cote" disabled style="margin-top:6px">Confirmer la latéralité</button>
+    <p class="sugg" id="prop-long">Sens talon / avant-pied proposé : —</p>
+    <button id="btn-inv-y" disabled>Inverser talon ↔ avant-pied</button>
+    <p class="sugg" id="prop-vert">Face plantaire proposée : —</p>
+    <button id="btn-inv-z" disabled>Inverser dessus ↔ dessous</button>
+    </div>
+    <div id="bloc-2p" hidden>
+      <div id="sep-info" class="sugg" style="margin-top:8px">Chargez un scan des 2 pieds : ils sont séparés automatiquement.</div>
+      <button id="btn-coupe-main" hidden>Corriger la coupe à la main</button>
+      <div id="coupe-manuelle" class="confirm" hidden>
+        <b>Coupe à placer à la main.</b> <span id="coupe-msg"></span>
+        <div class="seg" role="radiogroup" aria-label="Axe de la coupe" style="margin:6px 0"><label><input type="radio" name="axe-coupe" value="0" checked><span>Axe X</span></label><label><input type="radio" name="axe-coupe" value="1"><span>Axe Y</span></label><label><input type="radio" name="axe-coupe" value="2"><span>Axe Z</span></label></div>
+        <div class="rng"><input type="range" id="coupe-curseur" min="0" max="1" step="0.01" value="0.5"><b id="coupe-valeur" style="min-width:90px"></b></div>
+        <small>Le plan rouge dans la vue sépare le scan en deux pieds : placez-le entre eux.</small><br>
+        <button id="btn-coupe-appliquer" class="plein" style="margin-top:4px">Appliquer cette coupe</button>
+      </div>
+      <div class="lbl">Longueur exacte de chaque pied</div>
+      <div class="rng champ"><span class="n"><b>Pied A</b> <input type="text" id="long-A" inputmode="decimal" placeholder="ex. 265" style="width:70px"> mm</span><span class="n"><b>Pied B</b> <input type="text" id="long-B" inputmode="decimal" placeholder="ex. 258" style="width:70px"> mm</span></div>
+      <button id="btn-analyser-2p" disabled style="background:var(--bleu);border-color:var(--bleu);color:#fff">Analyser les 2 pieds</button>
+      <div id="confirm-ecart-2p" class="confirm" hidden></div>
+      <div class="lbl">À confirmer par vous</div>
+      <p class="sugg" id="prop-paire">Latéralité proposée : —</p>
+      <button id="btn-inverser-paire" disabled>⇄ Inverser (A ↔ B)</button>
+      <p style="margin:8px 0 4px"><label><input type="checkbox" id="conf-paire" disabled> <b>Je confirme :</b> <span id="txt-paire">…</span></label></p>
+      <button id="btn-valider-paire" disabled>Valider les 2 pieds</button>
+      <details class="avance"><summary>Sens du scan (avancé)</summary>
+        <small>À n'utiliser que si la vue montre un pied à l'envers.</small><br>
+        <button id="inv-A-y" disabled>A : talon ↔ avant-pied</button> <button id="inv-A-z" disabled>A : dessus ↔ dessous</button><br>
+        <button id="inv-B-y" disabled style="margin-top:4px">B : talon ↔ avant-pied</button> <button id="inv-B-z" disabled>B : dessus ↔ dessous</button>
+      </details>
+    </div>
+  </div></details>
+
+  <details class="card" id="p-base" open><summary><span class="chip" style="--c:#2563eb">2</span>Base</summary><div class="c">
+    <div id="base-msg" class="sugg" style="margin-top:0">Analysez d'abord un scan (carte 1).</div>
+    <div id="bloc-deroge" class="sugg-bleue" hidden><label id="chk-deroge-ligne"><input type="checkbox" id="chk-deroge"> Base <b>propre au pied <span id="deroge-cote"></span></b> (dérogation)</label><small id="deroge-txt"></small></div>
+    <div class="seg" role="radiogroup" aria-label="Type de base">
+      <label title="Plateau d'épaisseur constante"><input type="radio" name="type-base" value="plate"><span>Plate</span></label>
+      <label title="Suit l'empreinte, dessous creux"><input type="radio" name="type-base" value="thermoformee" checked><span>Thermoformée</span></label>
+      <label title="Dessus moulé, dessous plein, biseau médial"><input type="radio" name="type-base" value="pleine_dessous"><span>Intermédiaire</span></label>
+    </div>
+    <div class="lbl">Matériau</div>
+    <select id="base-materiau" style="width:100%"><option value="">— aucun choisi —</option></select>
+    <small id="base-mat-info"></small>
+    <small id="base-ep-auto"></small>
+    <div class="rng champ"><span class="n">Épaisseur</span><span><input type="text" id="epaisseur" value="1,5" inputmode="decimal"> mm</span></div>
+    <div class="lbl">Gravure sous la semelle</div>
+    <label class="chk"><input type="checkbox" id="grav-actif" checked> Graver le nom, le pied (D/G) et la date</label>
+    <div id="bloc-grav">
+      <div class="rng champ"><span class="n">Nom complet</span><span><input type="text" id="grav-nom" value="Patient fictif" maxlength="60" autocomplete="off" spellcheck="false"></span></div>
+      <div class="rng champ"><span class="n">Âge du patient</span><span><input type="text" id="pat-age" value="" inputmode="numeric" size="3" placeholder="—" autocomplete="off"> ans <small>(vide = adulte ; enfant = moins de 12 ans : change les skives suggérées. À terme repris du logiciel bilan)</small></span></div>
+      <div class="rng champ"><span class="n">Date</span><span><input type="text" id="grav-date" value="" placeholder="JJ/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off"></span></div>
+      <div class="rng champ"><span class="n">Profondeur</span><span><input type="text" id="grav-prof" value="0,4" inputmode="decimal"> mm</span></div>
+      <small id="grav-info"></small>
+    </div>
+    <div class="lbl">Étendue</div>
+    <div class="seg" role="radiogroup" aria-label="Étendue de la base">
+      <label><input type="radio" name="etendue" value="entiere" checked><span>Entière</span></label>
+      <label><input type="radio" name="etendue" value="demi"><span>Demi-semelle</span></label>
+    </div>
+    <div id="bloc-demi" hidden>
+      <div class="rng"><span class="n">Limite</span><input type="range" id="limite" min="40" max="90" step="1" value="60"><b id="limite-val">60 %</b></div>
+      <small>de la longueur du pied (défaut 60 %, de 40 à 90).</small>
+      <div class="lbl">Devant la limite</div>
+      <div class="seg" role="radiogroup" aria-label="Devant la limite">
+        <label><input type="radio" name="devant" value="materiau2" checked><span>2<sup>e</sup> matériau</span></label>
+        <label><input type="radio" name="devant" value="rien"><span>Rien</span></label>
+      </div>
+      <div id="bloc-devant">
+        <p id="legende-zones-carte" class="vide"><span class="pastille" style="background:#3f7fd0"></span> base · <span class="pastille" style="background:#f5a01f"></span> 2<sup>e</sup> matériau devant</p>
+        <select id="devant-materiau" style="width:100%"><option value="">— aucun choisi —</option></select>
+        <small id="devant-ep-auto"></small>
+        <div class="rng champ"><span class="n">Épaisseur devant</span><span><input type="text" id="ep-devant" inputmode="decimal" placeholder="= base"> mm</span></div>
+        <div class="rng champ"><span class="n">Raccord</span><span><input type="text" id="raccord-devant" value="20" inputmode="decimal"> mm</span></div>
+      </div>
+      <div id="bloc-arrondi" class="rng champ"><span class="n">Arrondi des 2 pointes avant</span><span><input type="text" id="arrondi" value="8" inputmode="decimal"> mm</span></div>
+    </div>
+    <details class="avance"><summary>Réglages avancés</summary>
+      <div class="rng"><span class="n">Moulage</span><input type="range" id="taux" min="0" max="100" step="5" value="50"><b id="taux-val">50 %</b></div>
+      <div class="rng champ"><span class="n">Lissage</span><span><input type="text" id="lissage" value="3" inputmode="decimal"> mm</span></div>
+      <div class="rng champ" id="ligne-biseau" hidden><span class="n">Biseau médial</span><span><input type="text" id="biseau" value="45" inputmode="decimal"> °</span></div>
+      <label><input type="checkbox" id="contour-lisse" checked> Contour lissé</label>
+      <label title="Le contour suit l'empreinte sur les bords médial, latéral et le pourtour talonnier ; le devant est arrondi comme une semelle classique (sans la forme des orteils)"><input type="checkbox" id="forme-semelle" checked> Devant arrondi (semelle classique)</label>
+      <label title="Cochée : le relief du devant de l'empreinte (têtes métatarsiennes, espaces entre les têtes) est moulé dans la semelle. Décochée : plateau (comme une semelle classique). La voûte est toujours gardée."><input type="checkbox" id="moulage-tetes"> Mouler les têtes métatarsiennes</label>
+    </details>
+    <button id="btn-base" disabled style="width:100%;margin-top:12px">Construire la base</button>
+  </div></details>
+
+  <details class="card" id="bloc-elements" open hidden><summary><span class="chip" style="--c:#7c3aed">3</span>Éléments</summary><div class="c">
+    <small>Un élément s'ajoute sur la base. Hauteur, densité (Shore) et matériau se règlent pour chacun ; le matériau vient du tableau PODAXIA.</small>
+    <div style="display:flex;gap:6px;margin-top:8px"><select id="el-type" style="flex:1;min-width:0"><optgroup label="Sous le pied"><option value="coin_pronateur_posterieur">Coin pronateur postérieur (en degrés)</option><option value="soutien_de_voute">Soutien de voûte libre (cloche, non collé au bord)</option></optgroup><optgroup label="Collés au bord (même règle que la voûte)"><option value="voute_bord" selected>Voûte au bord médial</option><option value="flange_mediale">Flange médiale</option><option value="arche_externe">Arche externe (bord latéral)</option><option value="aileron">Aileron (bord latéral)</option><option value="cuvette_talonniere">Cuvette talonnière (2 bords + talon)</option></optgroup><optgroup label="Axe de Henke (axe à valider d'abord)"><option value="torsion">Torsion autour de l'axe de Henke</option><option value="skive">Skive de Kirby (talon)</option></optgroup></select><button id="btn-el-ajouter" style="flex:none">Ajouter</button></div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:6px" title="Pose une rangée de points à 0 mm le long de l'axe du pied : on les tire ensuite vers le haut ou le bas dans la 3D (vue médiale conseillée)"><button id="btn-rangee" style="flex:1">● Rangée de points le long du pied</button><input id="rangee-n" type="text" inputmode="numeric" size="2" value="9" style="width:34px;text-align:center" aria-label="Nombre de points"></div>
+    <div id="ligne-portee" hidden><div class="lbl" style="margin:8px 0 4px">S'applique à</div><select id="el-portee" style="width:100%"><option value="commun" selected>Aux 2 pieds (commun, miroir automatique)</option><option value="D">Pied D seulement</option><option value="G">Pied G seulement</option></select></div>
+    <div id="sugg-voute" class="sugg-bleue" hidden></div>
+    <div id="el-msg"></div>
+    <div id="legende-3d" hidden>
+      <div class="leg-reglages">
+        <label><input type="checkbox" id="transp-on" checked> Transparence</label>
+        <label>Opacité <input type="range" id="transp-op" min="0" max="100" value="40"> <span id="transp-op-val">40 %</span></label>
+        <label title="Montre sur la tranche de la semelle (vue médiale, latérale…) chaque matériau empilé, de sa couleur"><input type="checkbox" id="strates-on" checked> Couches sur la tranche</label>
+        <label><input type="checkbox" id="isthme-on" checked> Ligne de l'isthme</label>
+        <button id="isthme-reset" title="Remet la ligne pointillée telle que proposée par le scan">Réinitialiser la ligne</button>
+      </div>
+      <small>Chaque élément a sa couleur ; elle couvre exactement sa zone. Cliquez une ligne pour sélectionner l'élément, ◉ pour masquer sa couleur (affichage seulement). Ligne blanche pointillée = limite entre la partie du pied qui touche le sol en charge et celle qui ne le touche pas (estimée depuis le scan) : tirez ses points blancs (vue de dessus) pour la corriger.</small>
+      <div id="isthme-info" class="sugg-bleue" style="margin-top:6px" hidden></div>
+      <div id="leg-liste"></div>
+      <div class="lbl" style="margin-top:8px">Dureté (Shore)</div>
+      <div id="leg-barre"></div>
+      <div class="leg-echelle"><span>5 · souple</span><span>35</span><span>70 · ferme</span></div>
+      <small>La pastille de chaque ligne suit le Shore choisi ; gris = pas de Shore choisi.</small>
+    </div>
+    <div id="el-vide" class="vide">Aucun élément pour l'instant. Les autres éléments PODAXIA (23 sur 30) arrivent avec la bibliothèque du lot 4.</div>
+    <div id="liste-elements"></div>
+  </div></details>
+
+  <details class="card" id="p-henke"><summary><span class="chip" style="--c:#7c3aed">H</span>Axe de Henke</summary><div class="c">
+    <small>Axe de l'articulation sous-talienne. <b>Proposition à valider par le praticien</b> : valeurs de départ tirées de la littérature (inclinaison 42°, déviation calculée entre le talon et le milieu des têtes M1-M2).</small>
+    <label class="chk"><input type="checkbox" id="henke-on"> Afficher l'axe de Henke</label>
+    <div id="henke-reglages" hidden>
+      <div id="henke-bandeau" hidden>⚠ Axe à valider avant toute torsion ou export avec torsion.</div>
+      <div id="henke-info" style="font-size:12.5px;margin:6px 0"></div>
+      <div id="henke-correction" style="font-size:12.5px;margin:6px 0"></div>
+      <div class="rng champ"><span class="n">Inclinaison (sol)</span><span><input type="text" id="henke-incl" value="42" inputmode="decimal"> °</span></div>
+      <div class="rng champ"><span class="n">Déviation (plan transversal)</span><span><input type="text" id="henke-dev" value="16" inputmode="decimal"> °</span></div>
+      <label class="chk"><input type="checkbox" id="henke-bras"> Carte des bras de levier <small>(bleu : supinateur, rouge : pronateur)</small></label>
+      <small>Glissez le point vert d'eau (talon) et les points noirs M1, M2, M3 dans la vue de dessus ; l'axe suit tant que sa source est « defaut ». Si le point du talon est masqué par le panneau Coupe, repliez ce panneau (▾ Replier).</small>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button id="henke-palper">Palper (2 points)</button><button id="henke-defaut">Repères par défaut</button><button id="henke-valider" style="background:var(--bleu);color:#fff">Valider l'axe</button></div>
+      <small id="henke-aide-multi" hidden>Deux pieds affichés : choisissez l'onglet D ou G pour régler ou valider un axe.</small>
+    </div>
+  </div></details>
+
+  <details class="card" id="p-mannequin"><summary><span class="chip" style="--c:#f59e0b">M</span>Pied mannequin</summary><div class="c">
+    <small>Pied et court segment de jambe <b>fictifs</b> (anatomie moyenne : talon, malléoles, cou-de-pied, orteils) posés sur l'empreinte, qui tournent autour de l'axe de Henke pour <b>voir</b> l'effet d'une supination ou d'une pronation. Affichage seulement : ne change ni la semelle ni l'export.</small>
+    <label class="chk"><input type="checkbox" id="mq-on"> Afficher le pied mannequin</label>
+    <div id="mq-reglages" hidden>
+      <div style="margin:4px 0;font-size:12.5px">
+        <label class="chk"><input type="radio" name="mq-mode" value="corrige" checked> Pied posé sur la semelle corrigée <small>(l'axe se corrige)</small></label>
+        <label class="chk"><input type="radio" name="mq-mode" value="libre"> Rotation libre autour de l'axe <small>(démonstration)</small></label>
+      </div>
+      <div class="rng"><span class="n" id="mq-phi-nom">Rotation phi <small>(+ supination, − pronation)</small></span><input type="range" id="mq-phi" min="-15" max="15" step="0.5" value="0"><b id="mq-phi-val">0°</b></div>
+      <div class="rng"><span class="n">Opacité du pied</span><input type="range" id="mq-opa" min="20" max="100" step="5" value="100"><b id="mq-opa-val">100 %</b></div>
+      <div id="mq-boutons" style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0" hidden><button id="mq-torsion" disabled>Reprendre phi de la torsion</button><button id="mq-zero">Remettre à 0</button></div>
+      <div id="mq-info" style="font-size:12.5px;margin:6px 0"></div>
+      <small id="mq-msg"></small>
+      <small>Axe : <b style="color:#7c3aed">violet = axe de départ</b>, <b style="color:#16a34a">vert = axe corrigé par la torsion</b> (modèle indicatif à valider). Flèches : bleu = frontal (inversion / éversion), vert = transversal (adduction / abduction), orange = sagittal (flexion plantaire / dorsale).</small>
+    </div>
+  </div></details>
+
+  <details class="simple" id="p-lot0"><summary>Lot 0 (dôme de démonstration)</summary>
+    <p><button id="btn-construire">Construire le dôme</button>
+    <button id="btn-exporter" disabled>Exporter en STL</button></p>
+  </details>
+</section>
+
+<section id="vue">
+  <div id="bandeau-generique" class="glass" hidden style="position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:5;padding:6px 14px;max-width:70%;text-align:center;border-radius:12px;font-size:12.5px;font-weight:600;color:#92400e;background:#fffbeb;box-shadow:inset 0 0 0 1.5px #f59e0b;pointer-events:none">Pied générique (proportions moyennes fictives) : aperçu indicatif, pas une mesure du patient</div>
+  <div class="glass outils" role="toolbar" aria-label="Outils">
+    <button id="outil-select" class="on" title="Sélection : clic = choisir un élément, glisser = le déplacer, poignées = l'étirer ou le tourner (tourner la vue : fond)">⌖</button><button id="outil-point" title="Point curseur : cliquer sur la semelle pour poser un point (tirer le point vers le haut ou le bas = monter ou descendre la semelle)">●</button><button id="outil-coupe" title="Afficher / replier la coupe en travers">✂</button><button id="outil-mesure" title="Mesure : cliquez 2 points sur la semelle = distance en mm et écarts x / y / z (Échap : effacer ; affichage seulement)">📏</button><button id="outil-miroir" title="Miroir : copie les éléments propres au pied affiché sur l'autre pied, en symétrie (après confirmation ; 2 pieds seulement ; Annuler le défait)">⇋</button><button id="outil-pinceau" title="Pinceau : glisser sur la semelle pour lisser (ou remplir) le relief sous le disque. Un geste = une retouche (Annuler la défait)">✎</button>
+  </div>
+  <div class="glass vues" role="group" aria-label="Vues">
+    <button data-vue="trois-quarts" class="on">3/4</button><button data-vue="dessus" title="Face où repose le pied">Plantaire</button><button data-vue="mediale">Médiale</button><button data-vue="laterale">Latérale</button><button data-vue="posterieure">Postérieure</button><button data-vue="dessous">Dessous</button>
+  </div>
+  <div class="glass" id="legende-zones" hidden><span class="pastille" style="background:#3f7fd0"></span> base &nbsp; <span class="pastille" style="background:#f5a01f"></span> 2<sup>e</sup> matériau devant</div>
+  <div class="glass" id="hud-edition" hidden></div>
+  <div class="glass" id="mesure-etiquette" hidden></div>
+  <div class="glass" id="pinceau-panel" hidden><b>Pinceau</b> <label>Rayon <input type="range" id="pinceau-rayon" min="5" max="30" step="1" value="10" style="width:110px;vertical-align:middle"> <span id="pinceau-rayon-val">10 mm</span></label> <label><input type="radio" name="pinceau-mode" value="lisser" checked> Lisser</label> <label><input type="radio" name="pinceau-mode" value="remplir"> Remplir <small>(ajoute seulement)</small></label><br><small>Glissez sur la semelle : un geste = une retouche, posée dans la liste des éléments (Annuler la défait ; Échap : quitter).</small></div>
+  <div class="glass" id="miroir-confirm" hidden><span id="miroir-texte"></span> <button id="miroir-oui" type="button">Oui, remplacer</button> <button id="miroir-non" type="button">Non</button></div>
+  <div class="aide-souris">souris : tourner · molette : zoom · clic droit : déplacer</div>
+  <div class="bas">
+    <div class="ligne"><div class="glass opts"><button id="btn-recentrer">⌂ Recentrer</button><button id="btn-relief">Relief ×3</button><button id="btn-eclater" title="Vue éclatée : chaque élément est soulevé au-dessus de la base (affichage seulement)" disabled>Éclater</button><label id="eclat-reglage" class="reglage-eclat" hidden>espace <input type="range" id="eclat-esp" min="0" max="30" step="1" value="12" style="width:90px;vertical-align:middle"> <span id="eclat-val">12 mm</span></label><label class="case-fantome" title="Affiche le scan du pied en gris transparent par-dessus la semelle (affichage seulement)"><input type="checkbox" id="fantome-on" disabled> Pied fantôme</label></div><div class="glass" id="onglets-pieds" role="tablist" aria-label="Pied affiché" hidden><button data-onglet="D" class="on">Pied D</button><button data-onglet="G">Pied G</button><button data-onglet="3D">Les 2 (3D)</button></div><div class="glass a" id="lib-cote">Côté : à confirmer</div></div>
+    <div class="glass" id="coupe-panel" hidden>
+      <button id="coupe-toggle" type="button">▾ Replier</button><span class="coupe-titre">Coupe</span>
+      <span class="coupe-reglages">
+        <label><input type="radio" name="coupe-mode" value="T" checked> en travers</label>
+        <label><input type="radio" name="coupe-mode" value="L"> talon → orteils</label>
+        <input type="range" id="coupe-pos" min="0" max="100" step="1" value="40" style="width:240px;vertical-align:middle"> <span id="coupe-val"></span>
+        <small>— tirets rouges : empreinte du pied ; hauteur ×<span id="coupe-fact">1</span></small>
+      </span>
+      <canvas id="coupe" width="1200" height="170"></canvas>
+      <div id="coupe-mesures"></div>
+    </div>
+  </div>
+  <select id="vue-preset" hidden><option value="dessus">de dessus</option><option value="trois-quarts" selected>3/4</option><option value="dessous">de dessous</option><option value="trois-quarts-dessous">3/4 de dessous</option><option value="mediale">médiale</option><option value="laterale">latérale</option><option value="posterieure">postérieure</option></select>
+  <select id="relief" hidden><option value="1">réel (×1)</option><option value="3">exagéré (×3)</option></select>
+</section>
+
+<section class="col" id="col-droite">
+  <div id="etat-ligne">État : <span id="etat">prêt</span></div>
+  <details class="card" id="p-controles" open><summary><span class="chip" style="--c:#14b8a6">✔</span>Contrôles</summary><div class="c" id="controles"><p class="vide">Construisez la base pour voir les contrôles.</p></div></details>
+  <details class="card" id="p-mesures" open><summary><span class="chip" style="--c:#2563eb">📐</span>Mesures</summary><div class="c"><div id="stats"></div></div></details>
+  <details class="card" id="p-journal"><summary><span class="chip" style="--c:#6b7a99">☰</span>Journal</summary><div class="c"><small>Journal d'audit de la session.</small><ol id="journal"></ol></div></details>
+  <details class="card" id="p-aide"><summary><span class="chip" style="--c:#7c3aed">?</span>Aide · lexique</summary><div class="c"><div class="lexique">
+    <dl>
+      <dt>Empreinte (H_plantaire)</dt><dd>La forme du dessous du pied mesurée par le scan : une « carte de hauteur », au demi-millimètre près.</dd>
+      <dt>Base</dt><dd>La plaque de la semelle, avant d'y ajouter des éléments (coin, voûte…).</dd>
+      <dt>Taux de moulage</dt><dd>De 0 % (le dessus de la base ignore la forme du pied : il est plan) à 100 % (le dessus épouse toute la forme du pied). 50 % = la moitié du relief.</dd>
+      <dt>Épaisseur</dt><dd>Épaisseur de matériau de la base, en mm. Minimum accepté : 0,9 mm (résines Flex/Flux).</dd>
+      <dt>Lissage</dt><dd>Arrondit le relief du dessus pour effacer les petits creux, bosses et le bruit du scan. Plus le nombre est grand, plus la surface est douce et moins elle suit les détails : 2 mm = très fidèle, 6 mm = très doux.</dd>
+      <dt>Contour lissé</dt><dd>Le scan donne un bord en dents de scie (marches de 0,5 mm et petites vagues de 1 à 2 mm). « Lissé » le remplace par une courbe continue (les irrégularités plus petites que 3 mm disparaissent) et rapproche le bord de sa vraie position. Un angle très vif est légèrement arrondi (jusqu'à 1 mm).</dd>
+      <dt>Écart au contour théorique</dt><dd>Distance entre le bord fabriqué et le bord exact d'une forme dont on connaît le dessin (mesuré sur des formes de test).</dd>
+      <dt>Biseau médial</dt><dd>Sur le bord interne (côté de la voûte), le dessous de la base intermédiaire remonte en pente vers le bord, pour épouser l'intérieur de la chaussure. L'angle est celui de cette pente avec l'horizontale.</dd>
+      <dt>Demi-semelle</dt><dd>La base va du talon jusqu'à une limite (en % de la longueur du pied, 60 % par défaut). Devant la limite : soit un 2<sup>e</sup> matériau (même épaisseur que la base par défaut, réglable ; un raccord lisse évite toute marche), soit rien. Sans rien devant, les deux angles du bout sont arrondis (rayon réglable).</dd>
+      <dt>Élément de bord</dt><dd>Un élément qui se colle au bord de la semelle (voûte, flange, arche externe, aileron, cuvette). Son sommet est AU bord, sans décroissance ; le dessus descend doucement vers le milieu ; le dessous remonte vers le bord en biseau, comme la base intermédiaire. L'angle du biseau (45° par défaut) se règle pour chaque élément ; un élément à deux bords a un biseau sur chacun.</dd>
+      <dt>Milieu de la voûte (suggestion bleue)</dt><dd>Proposé à la rangée la plus étroite de l'empreinte entre 15 % et 55 % de la longueur (l'isthme). Rien n'est placé sans votre clic ; si l'empreinte n'a pas d'isthme net, la suggestion est marquée « à confirmer ».</dd>
+      <dt>Élément</dt><dd>Une pièce ajoutée sur la base (coin, soutien de voûte…). Sa forme suit les formules du fournisseur PODAXIA ; au bord, sa hauteur revient doucement à zéro (le « raccord »), donc pas d'arête vive.</dd>
+      <dt>Coin pronateur postérieur</dt><dd>Rampe sous le talon : haute côté latéral, nulle côté médial. On règle l'angle en degrés ; la hauteur au bord vaut largeur × tan(angle) (4° sur 56 mm = 3,9 mm). Elle diminue vers l'avant à partir de 55 % de sa longueur.</dd>
+      <dt>Raccord</dt><dd>Largeur sur laquelle l'élément redescend à zéro. Moins de 5 mm : avertissement de confort.</dd>
+      <dt>Shore (densité)</dt><dd>Dureté du matériau (plus le nombre est grand, plus il est ferme). Chaque matériau a aussi une <b>résistance en kg/m³</b> (2e nombre de votre tableau) : deux matériaux de même Shore n'ont pas le même ressenti ni la même fonction ; elle est rappelée sur la fiche et reprise telle quelle du tableau (non modifiable). Le choix d'un matériau propose le Shore du tableau, que vous pouvez changer ; il n'agit pas sur la forme, seulement sur la fiche et la couleur.</dd>
+      <dt>Outil de coupe</dt><dd>Mesure l'angle réel de la surface d'un élément sur la coupe en travers (droite ajustée sur la zone plane, hors raccord) et l'épaisseur minimale du profil.</dd>
+      <dt>Latéralité</dt><dd>Pied droit ou gauche : elle décide quel bord est « médial ».</dd>
+      <dt>Maillage fermé</dt><dd>La surface 3D n'a aucun trou : condition pour fabriquer.</dd>
+    </dl>
+  </div></div></details>
+</section>
+</main>
+<script type="module" src="./vue/viewer.js"></script>
+</body>
+</html>
