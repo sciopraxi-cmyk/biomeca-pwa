@@ -18728,6 +18728,15 @@ async function _resolvePosturoRapportImages(bd) {
     var ids = Array.isArray(d._plantairePhotos) ? d._plantairePhotos : [];
     return Promise.all(ids.map(function (id) { return resolveRamOrPath('_plant_ph_' + id); }));
   }
+  // V1d2 — images du plan de semelles 3D (`_semelle3d` = pied droit, `_semelle3dG` = pied gauche si 2 pieds).
+  // Un plan enregistré dont l'image est introuvable (ni RAM ni Storage) est 'ko' (mention rouge), jamais silencieusement absent.
+  async function resolve3d(cle) {
+    var r = await resolveRamOrPath(cle);
+    if (r.status === 'nu') return { status: 'ko', dataUrl: null };
+    return r;
+  }
+  var a3d = d._semelle3dPlan && typeof d._semelle3dPlan === 'object';
+  var deux3d = !!(a3d && d._semelle3dPlan.pieds === 2);
   var results = await Promise.all([
     resolveBodyCanvas(),
     resolveRamOrPath('_empreinte'),
@@ -18735,7 +18744,9 @@ async function _resolvePosturoRapportImages(bd) {
     (typeof _collectAnnotatedPostureViews === 'function')
       ? _collectAnnotatedPostureViews(d, _MAX_POSTURE_W)
       : Promise.resolve([]),
-    resolvePlantGallery()
+    resolvePlantGallery(),
+    a3d ? resolve3d('_semelle3d') : Promise.resolve({ status: 'nu', dataUrl: null }),
+    deux3d ? resolve3d('_semelle3dG') : Promise.resolve({ status: 'nu', dataUrl: null })
   ]);
   // #148-posturo — calque silhouettes résolu avec SUCCÈS mais VIDE (dessiné
   // puis tout gommé : _serializeDrawCanvas persiste un PNG transparent vide,
@@ -18751,7 +18762,9 @@ async function _resolvePosturoRapportImages(bd) {
     empreinte:      results[1],
     feetComposite:  results[2],
     annotatedViews: results[3],
-    plantGallery:   results[4]
+    plantGallery:   results[4],
+    semelle3d:      results[5],
+    semelle3dG:     results[6]
   };
 }
 
@@ -19330,6 +19343,12 @@ async function buildRapportPosturo() {
       img: visuals.feetComposite.dataUrl,
       ko: visuals.feetComposite.status === 'ko'});
   }
+  // V1d2 — plan de semelles 3D (image(s) + base + éléments + recouvrement), après le dessin s'il y en a un.
+  if (d._semelle3dPlan) {
+    sections.push({titre: visuals.feetComposite.status !== 'nu' ? '9. Plan de semelles 3D' : '9. Plan de semelles', type:'semelle3d',
+      img: visuals.semelle3d.dataUrl, st: visuals.semelle3d.status,
+      imgG: visuals.semelle3dG.dataUrl, stG: visuals.semelle3dG.status});
+  }
 
   _buildRapportBody(p, d, prat, logo, sections);
 }
@@ -19652,6 +19671,9 @@ function _doBuildRapport(p, d, prat, logo, sections) {
         bodyHtml += '<div style="font-size:10px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:6px 10px;margin:6px 0 8px;">⚠️ Image non chargée — vérifiez votre connexion avant d\'imprimer.</div>';
       }
       if(s.img) bodyHtml += '<div style="text-align:center;padding:10px 0;"><img src="'+s.img+'" style="max-width:70%;border-radius:4px;display:block;margin:0 auto;"/></div>';
+    } else if(s.type === 'semelle3d') {
+      // V1d2 — même constructeur que le rapport sport : 2 pieds = pied GAUCHE à gauche, pied DROIT à droite.
+      bodyHtml += _s3dRapportHtml(d, s.img, s.st, s.imgG, s.stG);
     } else if(s.type === 'empreinte') {
       // Fix #149 — mention rouge 'ko' (empreinte plantaire Storage KO).
       if (s.ko) {
