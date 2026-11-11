@@ -180,6 +180,41 @@ test('semelle 3D sport : 3D pour un bilan neuf, dessin gardé sinon', async ({ p
   await expect(page.locator('#sp-3d-ouvrir')).toContainText('Modifier');
   await page.screenshot({ path: '/tmp/capv1b/05_apres_rechargement.png' });
 
+  // 3c. V1d : rapport du bilan (après rechargement : l'image vient de Storage) = image + base + éléments + recouvrement
+  await page.evaluate(() => eval('nav')('pg-rapport'));
+  await page.evaluate(() => eval('buildRapport')());
+  await expect(page.locator('#rpt-body')).toContainText('Plan de semelles 3D', { timeout: 60_000 });
+  await expect(page.locator('#rpt-body')).toContainText('Base thermoformée');
+  await expect(page.locator('#rpt-body')).toContainText('Coin pronateur postérieur');
+  await expect(page.locator('#rpt-body')).toContainText('Recouvrement : aucun');
+  const imgRapport = await page.evaluate(async () => {
+    const im = document.querySelector(
+      '#rpt-body img[alt="Plan de semelles 3D"]'
+    ) as HTMLImageElement | null;
+    if (!im) return 0;
+    await im.decode();
+    return im.naturalWidth;
+  });
+  expect(imgRapport).toBeGreaterThan(100);
+  await page.locator('#rpt-body img[alt="Plan de semelles 3D"]').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/capv1b/06_rapport.png' });
+  await page.locator('#rpt-body li', { hasText: 'Recouvrement' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/capv1b/07_rapport_liste.png' });
+
+  // 3d. Storage injoignable : mention rouge, la liste reste affichée
+  await page.route('**/storage/v1/object/**', (r) => r.abort());
+  await page.evaluate(() => {
+    const bd = eval('currentPatient').bilanData;
+    delete bd._semelle3d;
+    delete eval('bilanData')._semelle3d;
+  });
+  await page.evaluate(() => eval('buildRapport')());
+  await expect(page.locator('#rpt-body')).toContainText('Image du plan 3D non chargée', {
+    timeout: 60_000,
+  });
+  await expect(page.locator('#rpt-body')).toContainText('Base thermoformée');
+  await page.unroute('**/storage/v1/object/**');
+
   // 4. ancien bilan AVEC dessin (valeur) : dessin gardé, pas de bloc 3D
   await page.evaluate((png) => {
     // le dessin existe dans le bilan en cours (copie de travail) : l'enregistrement à la sortie le conserve

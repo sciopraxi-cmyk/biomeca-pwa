@@ -9822,6 +9822,20 @@ function _drawMorphoCanvasesFromSource(source, posesReadyFlag) {
   });
 }
 
+// V1d — bloc « plan 3D » du rapport (sport ; réutilisable postural/podo en V1d2/V1d3). Fonction pure : aucun accès au DOM.
+function _s3dRapportHtml(bd, imgSrc, statut) {
+  const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const resume = bd && bd._semelle3dResume;
+  const lignes = resume && Array.isArray(resume.lignes) ? resume.lignes : [];
+  let h = '<div style="margin-bottom:6px;">';
+  h += '<div style="font-size:9px;font-weight:700;margin-bottom:3px;">Plan de semelles 3D</div>';
+  if (statut === 'ko') h += '<div style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin-bottom:6px;">⚠️ Image du plan 3D non chargée (Storage injoignable) : la liste ci-dessous reste valable.</div>';
+  if (imgSrc && /^data:image\/png;base64,/.test(imgSrc)) h += '<img src="' + imgSrc + '" alt="Plan de semelles 3D" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
+  if (lignes.length) h += '<ul style="font-size:9px;margin:0 0 6px 14px;padding:0;">' + lignes.map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>';
+  h += '</div>';
+  return h;
+}
+
 // V1b — Plan de semelles 3D du bilan SPORT (remplace le dessin des pieds pour un bilan neuf ou sans dessin).
 // Règle : js/semelle3d/regle.js (un bilan qui a `_pieds`/`_piedsPath` garde son dessin). Le plan vit en mémoire
 // V1c : JSON (`_semelle3dPlan`) + résumé inline dans le bilan, PNG dans Storage (`_semelle3d` / `_semelle3dPath`). Le scan n'est jamais conservé.
@@ -19902,6 +19916,23 @@ function buildPhotoMini(data,side,t) {
 // Mutation IN PLACE de bd évitée — on utilise un objet local drawingUrls pour
 // ne pas re-peupler `currentPatient.bilanData` (laissé décidé par saveBilanSilent).
 async function _resolveSportRapportImages(bd, callback) {
+  // V1d — image du plan de semelles 3D : résolue à part (RAM ou Storage), ajoutée aux composites/statuts au retour.
+  // Statuts comme les dessins : 'ok' | 'nu' (pas de plan) | 'ko' (chemin Storage présent mais image introuvable).
+  let _img3d = null, _st3d = 'nu';
+  if (bd._semelle3dPlan) {
+    if (typeof bd._semelle3d === 'string' && bd._semelle3d.indexOf('data:') === 0) { _img3d = bd._semelle3d; _st3d = 'ok'; }
+    else if (bd._semelle3dPath && typeof prefetchPhotoToDataUrl === 'function') {
+      const r3 = await prefetchPhotoToDataUrl(bd._semelle3dPath);
+      if (r3.ok) { _img3d = r3.dataUrl; _st3d = 'ok'; }
+      else { _st3d = 'ko'; console.warn('[rapport-sport] prefetch fail _semelle3dPath →', r3.error); }
+    } else { _st3d = 'ko'; }
+  }
+  const _cbSans3d = callback;
+  callback = (comp, st) => {
+    if (_img3d) comp._semelle3d = _img3d;
+    st._semelle3d = _st3d;
+    _cbSans3d(comp, st);
+  };
   const TODO = [
     { key: '_morpho_face',    baseId: 'imgjs-morpho-face'    },
     { key: '_morpho_face2',   baseId: 'imgjs-morpho-face2'   },
@@ -20842,8 +20873,11 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
   const hasRecouvr   = ttt.recouvrement && ttt.recouvrement.length;
   // #119 — Porte path-aware : idem hasMorpho. Sans tester _piedsPath, un bilan
   // dont le dessin pieds a été migré paraît « sans pieds » → section masquée.
-  if(bd._pieds || bd._piedsPath || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
+  const hasPlan3d = !!bd._semelle3dPlan;
+  if(bd._pieds || bd._piedsPath || hasPlan3d || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
     h += sec('Plan de Semelles');
+    // V1d — plan 3D : image (dessus + 3/4 médial) puis base, éléments choisis et recouvrement.
+    if (hasPlan3d) h += _s3dRapportHtml(bd, composites._semelle3d, statuses._semelle3d);
     // Fix #150 défauts 1+2 — Rendu conditionnel + mention rouge pour le
     // schéma plantaire. Le gabarit n'est rendu que si _pieds a un statut
     // 'ok' ou 'ko'. Sinon on omet (plus de gabarit vierge alourdissant le
