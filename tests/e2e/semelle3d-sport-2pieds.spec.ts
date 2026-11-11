@@ -20,6 +20,10 @@ test('semelle 3D sport : 2 pieds enregistrés, relus après rechargement, rouver
   });
   const nom = `S3dDeux${Date.now()}`;
   await login(page);
+  // la liste des patients est chargée de façon asynchrone après la connexion : créer avant écraserait le nouveau patient
+  await expect
+    .poll(async () => page.evaluate(() => eval('patients').length), { timeout: 60_000 })
+    .toBeGreaterThan(0);
   await page.click('button:has-text("Nouveau patient")');
   await page.fill('#np-nom', nom);
   await page.fill('#np-prenom', 'E2E');

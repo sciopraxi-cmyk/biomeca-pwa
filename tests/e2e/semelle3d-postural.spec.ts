@@ -6,6 +6,10 @@ const PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 async function nouveauPatient(page: any, nom: string) {
+  // la liste des patients est chargée de façon asynchrone après la connexion : créer avant écraserait le nouveau patient
+  await expect
+    .poll(async () => page.evaluate(() => eval('patients').length), { timeout: 60_000 })
+    .toBeGreaterThan(0);
   await page.click('button:has-text("Nouveau patient")');
   await page.fill('#np-nom', nom);
   await page.fill('#np-prenom', 'E2E');
@@ -107,11 +111,11 @@ test('semelle 3D postural : 3D pour un bilan neuf, dessin gardé sinon, RAZ au c
   expect(png[0]).toBeGreaterThan(100);
   await expect(page.locator('#po-3d-ouvrir')).toContainText('Modifier');
   await page.screenshot({ path: '/tmp/capv1b2/02_resume.png' });
-  // rien n'est écrit dans le bilan à cette étape
+  // V1c2 : le plan est enregistré dans le bilan (JSON + résumé) ; le détail est vérifié dans semelle3d-postural-enreg.spec.ts
   const cles = await page.evaluate(() =>
     Object.keys(eval('currentPatient').bilanDataPosturo).filter((k) => /semelle3d/i.test(k))
   );
-  expect(cles).toEqual([]);
+  expect(cles).toContain('_semelle3dPlan');
 
   // 3. un autre patient : le plan du précédent ne fuit pas
   await page.evaluate(() => eval('nav')('pg-patients'));
