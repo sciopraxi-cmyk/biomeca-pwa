@@ -188,8 +188,11 @@ export async function traiterMessageA(msg, etat) {
     return { type: 'fantome', positions: aff.positions, indices: aff.indices };
   }
   if (msg.type === 'mannequin') { // lot 4 bis, étape 5 : pied mannequin anatomique (un seul volume fermé), même repère que la semelle ; affichage seulement
+    // Mode B (pied générique, sans scan) : l'empreinte est VIRTUELLE (étroite, sans orteils) ; y coller le pied le rétrécit et écrase les orteils.
+    // Sans scan, le pied sculpté garde ses proportions validées, mises à l'échelle de la longueur (decision de Joël, pied sculpté).
     if (!etat.plantaire) throw new Error('mannequin : aucune empreinte analysée');
-    const cote = msg.cote === 'G' ? 'G' : 'D', m = creerMannequin({ grille: etat.plantaire.grille, contour: msg.forme_semelle ? formeSemelle(etat.plantaire.grille).grille : null, longueur_mm: msg.longueur_mm, cote }).pied;
+    const cote = msg.cote === 'G' ? 'G' : 'D', m = creerMannequin({ grille: etat.generique ? null : etat.plantaire.grille, contour: etat.generique ? null : msg.forme_semelle ? formeSemelle(etat.plantaire.grille).grille : null, longueur_mm: msg.longueur_mm, cote }).pied;
+    if (m.ongles && m.ongles.positions && !m.ongles.decal) m.ongles.decal = new Float32Array(m.ongles.positions.length / 3); // pied sculpté pur : pas de relevé sous les ongles (l'affichage lit toujours ongles.decal)
     return { type: 'mannequin', positions: m.positions, indices: m.indices, normales: m.normales, couleurs: m.couleurs, decal: m.decal, ongles: m.ongles, centre: m.centre, z_cheville_mm: m.z_cheville_mm, longueur_mm: m.longueur_mm };
   }
   if (msg.type === 'appui_mannequin') { // lot 4 bis, étape 5 : le pied suit la correction de la semelle (inclinaison + relèvement) et ne la traverse jamais ; affichage seulement

@@ -37,3 +37,14 @@ test('retour au mode scan : importer / recaler remettent « générique » à fa
   await traiterMessageA({ type: 'importer', buffer: d.buffer, nom: d.nom }, etat); etat.generique = true; /* état forcé : l'analyse d'un scan doit remettre « générique » à faux d'elle-même (défense en profondeur, même si l'import le fait déjà) */ const r = await traiterMessageA({ type: 'recaler', longueur_mm: d.longueur_suggeree_mm }, etat); assert.ok(r.rapport.generique === undefined); assert.ok(etat.generique === false);
   await traiterMessageA({ type: 'base', cote: 'D', params: { type: 'plate', cote: 'D' }, elements: [] }, etat); assert.equal((await traiterMessageA({ type: 'exporter', cote: 'D' }, etat)).indicatif, false);
 });
+test('mannequin du mode B : pied sculpté à ses proportions validées (largeur ≈ 108 mm pour 265 mm), pas rétréci par l\'empreinte virtuelle ; avec un scan (non générique) le pied reste adapté à l\'empreinte', async () => {
+  const etat = {}; await gen(etat, { longueur_mm: 265 });
+  const largeur = (m) => { let a = Infinity, b = -Infinity; for (let v = 0; v < m.positions.length; v += 3) { const x = m.positions[v]; if (x < a) a = x; if (x > b) b = x; } return b - a; };
+  const m = await traiterMessageA({ type: 'mannequin', cote: 'D', longueur_mm: 265, forme_semelle: true }, etat);
+  const w = largeur(m); assert.ok(w > 103 && w < 114, 'pied générique : largeur ' + w.toFixed(1) + ' mm attendue ≈ 108');
+  assert.equal(m.ongles.nb, 5);
+  assert.ok(m.ongles.decal && m.ongles.decal.length === m.ongles.positions.length / 3, 'ongles.decal : lu par l\'affichage'); assert.ok(m.decal && m.decal.length === m.positions.length / 3);
+  etat.generique = false; // même empreinte, mais traitée comme celle d'un scan : le pied s'y adapte (plus étroit)
+  const s = await traiterMessageA({ type: 'mannequin', cote: 'D', longueur_mm: 265, forme_semelle: false }, etat);
+  assert.ok(largeur(s) < 100, 'avec une empreinte, le pied est adapté (largeur ' + largeur(s).toFixed(1) + ' mm)');
+});
