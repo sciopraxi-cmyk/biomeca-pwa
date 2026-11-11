@@ -7181,6 +7181,7 @@ function selectPatient(p) {
 
 function clearBilanFields() {
   if (typeof _s3dRazSport === 'function') _s3dRazSport();
+  if (typeof _s3dRazPosturo === 'function') _s3dRazPosturo();
   document.querySelectorAll('.bilan-field').forEach(el => {
     if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = '';
   });
@@ -9945,6 +9946,65 @@ async function ouvrirSemelle3DSport() {
 function _s3dMessageSport(t) {
   const r = document.getElementById('sp-3d-resume');
   if (r) r.textContent = t;
+}
+
+// V1b2 — Plan de semelles 3D du bilan POSTURAL (remplace le dessin des pieds pour un bilan neuf ou sans dessin).
+// Règle : js/semelle3d/regle.js avec la clé '_feetComposite' (un bilan qui a déjà l'image composite du dessin garde son dessin).
+// Dans cette étape le plan vit en mémoire seulement : l'enregistrement (JSON + PNG Storage) est l'étape V1c2.
+let _s3dPosturo = null;     // { etat, resume, url, urlG } du plan en cours (URL d'objet : libérées à la RAZ)
+let _s3dRegleLecturePosturo = '3d';
+function _s3dLibererPosturo() {
+  if (_s3dPosturo) { [_s3dPosturo.url, _s3dPosturo.urlG].forEach(u => { if (u) { try { URL.revokeObjectURL(u); } catch (_e) { /* rien */ } } }); }
+}
+async function _s3dMajBlocPosturo() {
+  const dessin = document.getElementById('po-dessin-bloc');
+  const bloc3d = document.getElementById('po-3d-bloc');
+  if (!dessin || !bloc3d) return;
+  let mode = '3d';
+  try { const R = await import('./semelle3d/regle.js?v=' + APP_BUILD); mode = R.modeSemelleBilan(currentPatient && currentPatient.bilanDataPosturo, '_feetComposite'); } catch (_e) { mode = 'dessin'; }
+  // Un dessin en cours de saisie (non encore enregistré) compte comme un dessin : on ne le masque jamais.
+  const fc = document.getElementById('posturo-feet-canvas');
+  if (fc && fc._userDirty) mode = 'dessin';
+  _s3dRegleLecturePosturo = mode;
+  dessin.style.display = mode === 'dessin' ? '' : 'none';
+  bloc3d.style.display = mode === '3d' ? '' : 'none';
+  _s3dAfficherPosturo();
+}
+function _s3dRazPosturo() {
+  _s3dLibererPosturo();
+  _s3dPosturo = null;
+  _s3dAfficherPosturo();
+}
+function _s3dAfficherPosturo() {
+  const r = document.getElementById('po-3d-resume'), im = document.getElementById('po-3d-apercu'), imG = document.getElementById('po-3d-apercu-g'), b = document.getElementById('po-3d-ouvrir');
+  if (!r || !im || !imG || !b) return;
+  if (_s3dPosturo && _s3dPosturo.etat) {
+    const res = _s3dPosturo.resume, deux = !!(res && res.deux && res.pieds);
+    const lignes = res && Array.isArray(res.lignes) ? res.lignes : [];
+    if (deux) r.innerHTML = [['D', 'Pied droit'], ['G', 'Pied gauche']].map(([c, t]) => '<b>' + t + '</b><br>' + ((res.pieds[c] && res.pieds[c].lignes) || []).map(l => '• ' + _s3dEscHtml(l)).join('<br>')).join('<br><br>');
+    else r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
+    if (_s3dPosturo.url) { im.src = _s3dPosturo.url; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
+    if (deux && _s3dPosturo.urlG) { imG.src = _s3dPosturo.urlG; imG.style.display = 'block'; imG.style.flex = '1 1 0'; im.style.flex = '1 1 0'; } else { imG.removeAttribute('src'); imG.style.display = 'none'; im.style.flex = ''; }
+    b.textContent = '🦶 Modifier le plan 3D';
+  } else {
+    r.textContent = 'Aucun plan enregistré.';
+    im.removeAttribute('src'); im.style.display = 'none';
+    imG.removeAttribute('src'); imG.style.display = 'none';
+    b.textContent = '🦶 Plan de semelles 3D';
+  }
+}
+async function ouvrirSemelle3DPosturo() {
+  let M;
+  try { M = await import('./semelle3d/index.js?v=' + APP_BUILD); } catch (_e) { const r = document.getElementById('po-3d-resume'); if (r) r.textContent = 'Module 3D indisponible hors connexion.'; return; }
+  M.ouvrirSemelle3D({
+    etat: _s3dPosturo ? _s3dPosturo.etat : null,
+    version: APP_BUILD,
+    onEnregistrer: async ({ etat, resume, png, pngG }) => {
+      _s3dLibererPosturo();
+      _s3dPosturo = { etat, resume, url: png ? URL.createObjectURL(png) : null, urlG: pngG ? URL.createObjectURL(pngG) : null };
+      _s3dAfficherPosturo();
+    }
+  });
 }
 
 // #99 Restauration différée des canvas morpho/pieds depuis bilanData global
@@ -29071,6 +29131,7 @@ function getBilanPosturoHTML() {
       </div>
       <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin:8px 0 4px;">📝 Description</div>
       <textarea class="inp" id="po-semelles-desc" rows="3" placeholder="Description du plan de semelles..." style="background:#fff;color:#222;"></textarea>
+      <div id="po-dessin-bloc">
       <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin:10px 0 4px;">✏️ Dessin sur les pieds</div>
       <div style="position:relative;margin:8px 0;background:#fff;border-radius:8px;border:1px solid var(--bord);padding:8px;text-align:center;">
         <img id="posturo-feet-img" src="assets/plan-semelles-schema-plantaire.png" style="width:80%;max-width:400px;display:block;margin:0 auto;"/>
@@ -29098,6 +29159,18 @@ function getBilanPosturoHTML() {
           <option value="8">🖌️ Épais</option>
         </select>
         <button class="btn btn-red" onclick="undoPosturoFeet()">↩ Annuler</button>
+      </div>
+      </div>
+      <div id="po-3d-bloc" style="display:none;margin-top:10px;">
+        <div style="font-size:10px;color:#2a7a4e;font-weight:600;margin:10px 0 4px;">🦶 Plan de semelles 3D</div>
+        <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-top:6px;color:#222;">
+          <div id="po-3d-resume" style="font-size:12px;line-height:1.5;margin-bottom:10px;">Aucun plan enregistré.</div>
+          <div id="po-3d-images" style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;margin-bottom:10px;">
+            <img id="po-3d-apercu-g" alt="Aperçu du plan de semelles 3D, pied gauche" style="display:none;min-width:0;max-width:100%;max-height:220px;border-radius:6px;border:1px solid var(--bord);"/>
+            <img id="po-3d-apercu" alt="Aperçu du plan de semelles 3D" style="display:none;min-width:0;max-width:100%;max-height:220px;border-radius:6px;border:1px solid var(--bord);"/>
+          </div>
+          <button class="btn" id="po-3d-ouvrir" type="button" onclick="ouvrirSemelle3DPosturo()">🦶 Plan de semelles 3D</button>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
         <div style="background:linear-gradient(135deg,#fff9f0,#fff3e0);border-left:4px solid #f0a500;border-radius:8px;padding:10px;">
@@ -31900,6 +31973,7 @@ function showPosturoSection(idx) {
     }, 400);
   }
   if(idx === 8) {
+    if (typeof _s3dMajBlocPosturo === 'function') _s3dMajBlocPosturo(); // V1b2
     // Fix #78 — même garde, initPosturoFeetCanvas est tout aussi destructive
     // (voir commentaire ci-dessus pour idx===1).
     const feetCanvas = document.getElementById('posturo-feet-canvas');
@@ -32514,6 +32588,7 @@ async function savePosturoBilan(silent = false) {
 }
 
 function loadPosturoBilan() {
+  if (typeof _s3dMajBlocPosturo === 'function') _s3dMajBlocPosturo(); // V1b2 : dessin gardé ou plan 3D
   const d = currentPatient?.bilanDataPosturo;
   if(!d) return;
   setPoVal('po-medecin',d.medecin); setPoVal('po-date-consult',d.dateConsult);
