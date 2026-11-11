@@ -9825,15 +9825,32 @@ function _drawMorphoCanvasesFromSource(source, posesReadyFlag) {
 }
 
 // V1d — bloc « plan 3D » du rapport (sport ; réutilisable postural/podo en V1d2/V1d3). Fonction pure : aucun accès au DOM.
-function _s3dRapportHtml(bd, imgSrc, statut) {
+function _s3dRapportHtml(bd, imgSrc, statut, imgSrcG, statutG) {
   const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const resume = bd && bd._semelle3dResume;
   const lignes = resume && Array.isArray(resume.lignes) ? resume.lignes : [];
+  const deux = !!(resume && resume.deux && resume.pieds && bd._semelle3dPlan && bd._semelle3dPlan.pieds === 2);
+  const mention = (qui) => '<div style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin-bottom:6px;">⚠️ Image du plan 3D' + qui + ' non chargée (Storage injoignable) : la liste ci-dessous reste valable.</div>';
+  const image = (src, alt) => (src && /^data:image\/png;base64,/.test(src)) ? '<img src="' + src + '" alt="' + alt + '" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>' : '';
+  const liste = (ls) => (ls && ls.length) ? '<ul style="font-size:9px;margin:0 0 6px 14px;padding:0;">' + ls.map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>' : '';
   let h = '<div style="margin-bottom:6px;">';
   h += '<div style="font-size:9px;font-weight:700;margin-bottom:3px;">Plan de semelles 3D</div>';
-  if (statut === 'ko') h += '<div style="font-size:9px;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 8px;margin-bottom:6px;">⚠️ Image du plan 3D non chargée (Storage injoignable) : la liste ci-dessous reste valable.</div>';
-  if (imgSrc && /^data:image\/png;base64,/.test(imgSrc)) h += '<img src="' + imgSrc + '" alt="Plan de semelles 3D" style="max-width:380px;width:100%;border:1px solid #ddd;border-radius:5px;display:block;margin-bottom:6px;"/>';
-  if (lignes.length) h += '<ul style="font-size:9px;margin:0 0 6px 14px;padding:0;">' + lignes.map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>';
+  if (deux) { // 2 pieds côte à côte : le pied GAUCHE à gauche, le pied DROIT à droite (titre, image, liste dans chaque colonne)
+    h += '<div style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;">';
+    [['G', 'Pied gauche', imgSrcG, statutG], ['D', 'Pied droit', imgSrc, statut]].forEach(([c, titre, src, st]) => {
+      h += '<div style="flex:1 1 0;min-width:0;">';
+      h += '<div style="font-size:9px;font-weight:700;margin:4px 0 3px;">' + titre + '</div>';
+      if (st === 'ko') h += mention(' (' + titre.toLowerCase() + ')');
+      h += image(src, 'Plan de semelles 3D, ' + titre.toLowerCase());
+      h += liste(resume.pieds[c] && resume.pieds[c].lignes);
+      h += '</div>';
+    });
+    h += '</div></div>';
+    return h;
+  }
+  if (statut === 'ko') h += mention('');
+  h += image(imgSrc, 'Plan de semelles 3D');
+  h += liste(lignes);
   h += '</div>';
   return h;
 }
@@ -9882,7 +9899,7 @@ function _s3dAfficherSport() {
     } else r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
     if (_s3dSport.image) { im.src = _s3dSport.image; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
     const imG = document.getElementById('sp-3d-apercu-g');
-    if (imG) { if (deux && _s3dSport.imageG) { imG.src = _s3dSport.imageG; imG.style.display = 'block'; } else { imG.removeAttribute('src'); imG.style.display = 'none'; } }
+    if (imG) { if (deux && _s3dSport.imageG) { imG.src = _s3dSport.imageG; imG.style.display = 'block'; imG.style.flex = '1 1 0'; im.style.flex = '1 1 0'; } else { imG.removeAttribute('src'); imG.style.display = 'none'; im.style.flex = ''; } }
     b.textContent = '🦶 Modifier le plan 3D';
   } else {
     r.textContent = 'Aucun plan enregistré.';
@@ -19936,19 +19953,28 @@ function buildPhotoMini(data,side,t) {
 async function _resolveSportRapportImages(bd, callback) {
   // V1d — image du plan de semelles 3D : résolue à part (RAM ou Storage), ajoutée aux composites/statuts au retour.
   // Statuts comme les dessins : 'ok' | 'nu' (pas de plan) | 'ko' (chemin Storage présent mais image introuvable).
-  let _img3d = null, _st3d = 'nu';
+  // 2 pieds : `_semelle3d` = pied droit, `_semelle3dG` = pied gauche (même résolution, chacun son statut).
+  const _res3d = async (cle) => {
+    if (typeof bd[cle] === 'string' && bd[cle].indexOf('data:') === 0) return { img: bd[cle], st: 'ok' };
+    const chemin = bd[cle + 'Path'];
+    if (chemin && typeof prefetchPhotoToDataUrl === 'function') {
+      const r3 = await prefetchPhotoToDataUrl(chemin);
+      if (r3.ok) return { img: r3.dataUrl, st: 'ok' };
+      console.warn('[rapport-sport] prefetch fail', cle + 'Path', '→', r3.error);
+    }
+    return { img: null, st: 'ko' };
+  };
+  let _img3d = null, _st3d = 'nu', _img3dG = null, _st3dG = 'nu';
   if (bd._semelle3dPlan) {
-    if (typeof bd._semelle3d === 'string' && bd._semelle3d.indexOf('data:') === 0) { _img3d = bd._semelle3d; _st3d = 'ok'; }
-    else if (bd._semelle3dPath && typeof prefetchPhotoToDataUrl === 'function') {
-      const r3 = await prefetchPhotoToDataUrl(bd._semelle3dPath);
-      if (r3.ok) { _img3d = r3.dataUrl; _st3d = 'ok'; }
-      else { _st3d = 'ko'; console.warn('[rapport-sport] prefetch fail _semelle3dPath →', r3.error); }
-    } else { _st3d = 'ko'; }
+    const rD = await _res3d('_semelle3d'); _img3d = rD.img; _st3d = rD.st;
+    if (bd._semelle3dPlan.pieds === 2) { const rG = await _res3d('_semelle3dG'); _img3dG = rG.img; _st3dG = rG.st; }
   }
   const _cbSans3d = callback;
   callback = (comp, st) => {
     if (_img3d) comp._semelle3d = _img3d;
+    if (_img3dG) comp._semelle3dG = _img3dG;
     st._semelle3d = _st3d;
+    st._semelle3dG = _st3dG;
     _cbSans3d(comp, st);
   };
   const TODO = [
@@ -20895,7 +20921,7 @@ function buildBilanPrintSection(bd, composites = {}, annotatedViews = [], status
   if(bd._pieds || bd._piedsPath || hasPlan3d || ttt.semellesDesc || hasMateriaux || hasRecouvr) {
     h += sec('Plan de Semelles');
     // V1d — plan 3D : image (dessus + 3/4 médial) puis base, éléments choisis et recouvrement.
-    if (hasPlan3d) h += _s3dRapportHtml(bd, composites._semelle3d, statuses._semelle3d);
+    if (hasPlan3d) h += _s3dRapportHtml(bd, composites._semelle3d, statuses._semelle3d, composites._semelle3dG, statuses._semelle3dG);
     // Fix #150 défauts 1+2 — Rendu conditionnel + mention rouge pour le
     // schéma plantaire. Le gabarit n'est rendu que si _pieds a un statut
     // 'ok' ou 'ko'. Sinon on omet (plus de gabarit vierge alourdissant le

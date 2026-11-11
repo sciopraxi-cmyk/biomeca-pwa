@@ -126,7 +126,23 @@ test('semelle 3D sport : 2 pieds enregistrés, relus après rechargement, rouver
     return !!bd._semelle3d && bd._semelle3d === bd._semelle3dG;
   });
   expect(memeImage).toBe(false);
-  await page.screenshot({ path: '/tmp/capv1d2p/02_bilan.png' });
+  // côte à côte : image du pied GAUCHE à gauche, image du pied DROIT à droite, sur la même ligne, sans chevauchement
+  const geoBilan = await page.evaluate(() => {
+    const r = (i: string) => document.getElementById(i)!.getBoundingClientRect();
+    const g = r('sp-3d-apercu-g'),
+      d = r('sp-3d-apercu');
+    return {
+      gDroite: g.right,
+      dGauche: d.left,
+      ecartHaut: Math.abs(g.top - d.top),
+      w: [g.width, d.width],
+    };
+  });
+  expect(geoBilan.gDroite).toBeLessThanOrEqual(geoBilan.dGauche);
+  expect(geoBilan.ecartHaut).toBeLessThan(2);
+  expect(Math.min(...geoBilan.w)).toBeGreaterThan(100);
+  await page.locator('#sp-3d-bloc').scrollIntoViewIfNeeded();
+  await page.locator('#sp-3d-bloc').screenshot({ path: '/tmp/capv1d2p/02_bilan.png' });
 
   // 3. Storage : 2 fichiers distincts, aucune image data: persistée
   await expect
@@ -219,6 +235,109 @@ test('semelle 3D sport : 2 pieds enregistrés, relus après rechargement, rouver
   await page.screenshot({ path: '/tmp/capv1d2p/04_rouvert.png' });
   await f2.click('#btn-fermer');
 
+  // 4b. V1d-2p-3 : rapport du bilan = une partie par pied (titre, image, liste), le pied droit d'abord
+  await page.evaluate(() => eval('nav')('pg-rapport'));
+  await page.evaluate(() => eval('buildRapport')());
+  await expect(page.locator('#rpt-body')).toContainText('Plan de semelles 3D', { timeout: 60_000 });
+  await expect(page.locator('#rpt-body img[alt="Plan de semelles 3D, pied droit"]')).toHaveCount(1);
+  await expect(page.locator('#rpt-body img[alt="Plan de semelles 3D, pied gauche"]')).toHaveCount(
+    1
+  );
+  const rap = await page.evaluate(async () => {
+    const q = async (alt: string) => {
+      const im = document.querySelector(`#rpt-body img[alt="${alt}"]`) as HTMLImageElement;
+      await im.decode();
+      const r = im.getBoundingClientRect();
+      const corps = document.getElementById('rpt-body')!.getBoundingClientRect();
+      return {
+        w: im.naturalWidth,
+        deborde: r.right > corps.right + 1,
+        src: im.src.length,
+        g: r.left,
+        dr: r.right,
+        h: r.top,
+      };
+    };
+    const html = document.getElementById('rpt-body')!.innerText;
+    return {
+      d: await q('Plan de semelles 3D, pied droit'),
+      g: await q('Plan de semelles 3D, pied gauche'),
+      iD: html.indexOf('Pied droit'),
+      iG: html.indexOf('Pied gauche'),
+      iCoin: html.indexOf('Coin pronateur postérieur'),
+      nCoin: (html.match(/Coin pronateur postérieur/g) || []).length,
+      nRecouv: (html.match(/Recouvrement : aucun/g) || []).length,
+    };
+  });
+  expect(rap.g.dr).toBeLessThanOrEqual(rap.d.g); // rapport : image gauche à gauche, image droite à droite
+  expect(Math.abs(rap.g.h - rap.d.h)).toBeLessThan(2);
+  expect(rap.d.w).toBeGreaterThan(100);
+  expect(rap.g.w).toBeGreaterThan(100);
+  expect(rap.d.deborde || rap.g.deborde).toBe(false);
+  expect(rap.d.src).not.toBe(rap.g.src); // images différentes
+  expect(rap.iD).toBeGreaterThan(-1);
+  expect(rap.iG).toBeLessThan(rap.iD); // colonne du pied gauche à gauche, pied droit à droite
+  expect(rap.nCoin).toBe(1); // le coin n'est que sur le pied droit
+  expect(rap.iCoin).toBeGreaterThan(rap.iD);
+  expect(rap.nRecouv).toBe(2); // une ligne « Recouvrement » par pied
+  await page
+    .locator('#rpt-body img[alt="Plan de semelles 3D, pied droit"]')
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/capv1d2p/05_rapport_D.png' });
+  await page
+    .locator('#rpt-body img[alt="Plan de semelles 3D, pied gauche"]')
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/capv1d2p/06_rapport_G.png' });
+
+  // 4d. impression : même constructeur ; window.print est remplacé, le PDF est produit par le navigateur en mode impression
+  await page.evaluate(() => {
+    (window as any).__imprime = 0;
+    window.print = () => {
+      (window as any).__imprime++;
+    };
+  });
+  await page.evaluate(() => eval('printReport')());
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__imprime), { timeout: 60_000 })
+    .toBe(1);
+  await page.waitForTimeout(500);
+  await page.pdf({ path: '/tmp/capv1d2p/rapport.pdf', format: 'A4', printBackground: true });
+  await page.evaluate(() => eval('nav')('pg-bilan'));
+  await page.evaluate(() => eval('showSportBilanSection')(8));
+
+  // 4c. Storage injoignable pour le seul pied gauche : mention rouge sur ce pied, image droite et 2 listes présentes
+  await page.route('**/storage/v1/object/**', (r) => r.abort());
+  await page.evaluate(() => {
+    for (const bd of [eval('currentPatient').bilanData, eval('bilanData')]) delete bd._semelle3dG;
+  });
+  await page.evaluate(() => eval('nav')('pg-rapport')); // l'impression (4d) a quitté l'affichage normal du rapport
+  await page.evaluate(() => eval('buildRapport')());
+  await expect(page.locator('#rpt-body')).toContainText(
+    'Image du plan 3D (pied gauche) non chargée',
+    {
+      timeout: 60_000,
+    }
+  );
+  await expect(page.locator('#rpt-body')).not.toContainText(
+    'Image du plan 3D (pied droit) non chargée'
+  );
+  await expect(page.locator('#rpt-body img[alt="Plan de semelles 3D, pied droit"]')).toHaveCount(1);
+  await expect(page.locator('#rpt-body img[alt="Plan de semelles 3D, pied gauche"]')).toHaveCount(
+    0
+  );
+  await expect(page.locator('#rpt-body')).toContainText('Coin pronateur postérieur');
+  expect(await page.locator('#rpt-body li', { hasText: 'Recouvrement' }).count()).toBe(2);
+  await page.locator('#rpt-body', { hasText: 'non chargée' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/capv1d2p/07_rapport_G_ko.png' });
+  await page.unroute('**/storage/v1/object/**');
+  // le pied gauche revient depuis Storage au rapport suivant (rien n'a été effacé du bilan : seul le chemin compte)
+  await page.evaluate(() => eval('buildRapport')());
+  await expect(page.locator('#rpt-body img[alt="Plan de semelles 3D, pied gauche"]')).toHaveCount(
+    1,
+    {
+      timeout: 60_000,
+    }
+  );
   // 6. retour à un seul pied : l'image et la clé du pied gauche disparaissent (pas de reste périmé)
   await page.evaluate(async () => {
     const enregistrer = eval('_s3dEnregistrerSport'); // résolu avant tout await (CSP : pas d'eval après)

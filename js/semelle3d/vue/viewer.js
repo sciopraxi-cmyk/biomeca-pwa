@@ -40,7 +40,7 @@ worker.onmessage = (e) => {
   attente.delete(e.data.id);
   if (r) (e.data.ok ? r.resolve(e.data) : r.reject(Object.assign(new Error(e.data.erreur), { code: e.data.code })));
 };
-worker.onerror = (e) => { $('etat').textContent = 'erreur du worker : ' + e.message; };
+worker.onerror = (e) => { $('etat').textContent = 'erreur du worker : ' + (e.message || 'chargement ou exécution impossible') + (e.filename ? ' (' + String(e.filename).split('/').slice(-2).join('/') + (e.lineno ? ':' + e.lineno : '') + ')' : ''); for (const [id, r] of attente) { attente.delete(id); r.reject(Object.assign(new Error('le calcul 3D s\'est arrêté (chargement du module) : fermez puis rouvrez le plan'), { code: 'WORKER' })); } }; // détail ajouté : un message vide ne permettait pas de situer la panne
 const demander = (msg, transferts = []) => new Promise((resolve, reject) => {
   const id = suivant++;
   if (msg.type === 'coupe' && deux.pied()) msg = { ...msg, pied: deux.pied() }; // 2 pieds : la coupe se fait sur le pied de l'onglet
