@@ -31,7 +31,7 @@ export function ouvrirSemelle3D({ etat = null, version = '', onEnregistrer, onFe
     if (m.type === 'pret') repondre({ type: 'init', etat });
     else if (m.type === 'fermer') fermer();
     else if (m.type === 'enregistrer') {
-      try { await onEnregistrer({ etat: m.etat, resume: m.resume, png: m.png, largeur: m.largeur, hauteur: m.hauteur, cote: m.cote, generique: m.generique }); repondre({ type: 'enregistre', ok: true }); }
+      try { await onEnregistrer({ etat: m.etat, resume: m.resume, png: m.png, pngG: m.pngG || null, largeur: m.largeur, hauteur: m.hauteur, cote: m.cote, generique: m.generique }); repondre({ type: 'enregistre', ok: true }); }
       catch (err) { repondre({ type: 'enregistre', ok: false, erreur: err && err.message ? String(err.message) : 'erreur' }); }
     }
   }

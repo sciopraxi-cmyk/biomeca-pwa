@@ -974,6 +974,7 @@ deux = initDeuxPieds({
   fixerPas: () => { try { edition.selectionner(null); edition.enregistrer(); } catch (err) { void err; } }, // lot 4d : un miroir = un pas dans Annuler
   ecrireZip, nomFichierZip, afficher, poserEtiquettes, majParcours, majCote, statsBase, majControles, dessinerCartes, dessinerCoupe, viderVue, apresAnalyse, nomFichierSTL,
   baseParams, ecrireBaseParams, majFormulaireBase, estBord, axeHenke: () => henke.exporter(),
+  importerAxes: (o) => { for (const c of ['D', 'G']) if (o && o[c]) henke.importer(c, o[c]); }, // V1 : réouverture des 2 pieds
   limiteDevant, couleurShore, majSuggestion,
   masquerCoupe: (b) => { if (ligneCoupe) ligneCoupe.visible = !b; demanderRendu(); },
   get: () => ({ scanPret, elements, rapport, baseRapport, positionsAff, materiaux: materiauxTable }),
@@ -1040,7 +1041,7 @@ if (location.search.includes('test4b')) window.__edition4b = edition; // aide de
 
 // ======================= B3 : image du rapport (dessus + 3/4 médial) =======================
 const imageRapport = initImageRapport({ THREE, scene, renderer, $, demanderRendu, redimensionner, getMaille: () => maille, racineTransp: () => transp.racine(), aidesTransp: () => transp.aides(), getGrille: () => grille,
-  get: () => ({ baseAffichee, coteConfirme, generique: !!(rapport && rapport.generique), deuxPieds: deux.actif(), eclate: transp.eclate() }) });
+  get: () => ({ baseAffichee, coteConfirme, generique: !!(rapport && rapport.generique), deuxPieds: deux.actif() && !deux.pied(), eclate: transp.eclate() }) });
 let derniereImage = null;
 $('btn-image-rapport').onclick = () => {
   try {
@@ -1076,8 +1077,8 @@ if (HOTE) {
   document.querySelectorAll('.pill').forEach((e) => { if (e.textContent.trim() === 'Patient fictif') e.hidden = true; });
 
   function exporterEtat() {
+    if (deux.actif()) return deux.etatPieds(); // 2 pieds (v2) : mode, fiches D et G, plan complet
     if (!baseAffichee || !baseRapport || !coteConfirme) throw new Error('affichez d\'abord la semelle (créez la base)');
-    if (deux.actif()) throw new Error('le mode « deux pieds » n\'est pas encore enregistrable : un pied à la fois');
     const generique = !!(rapport && rapport.generique);
     if (generique && !ficheB) throw new Error('réglages du pied générique introuvables : recréez le pied');
     const axe = henke.exporter();
@@ -1100,9 +1101,16 @@ if (HOTE) {
     elements = clone(etat.elements || []); dessinerCartes();
     if (elements.length) await appliquerLesElements();
   }
+  const passerEn2Pieds = () => { const rb = document.querySelector('input[name=nbpieds][value="2"]'); rb.checked = true; rb.dispatchEvent(new Event('change', { bubbles: true })); };
   async function init(etat) {
     try {
       if (!etat) { dire('Nouveau plan : créez le pied (sans scan ou avec un scan), puis la base.'); return; }
+      if (etat.v === 2 && etat.pieds === 2) { // plan enregistré pour les 2 pieds
+        passerEn2Pieds();
+        if (etat.mode === 'B') { dire('Réouverture du plan des 2 pieds…'); await deux.restaurerGeneriques(etat); dire('Plan des 2 pieds rouvert.'); }
+        else { aReprendreA = etat; dire('Plan enregistré en mode scan (2 pieds) : réimportez le même scan, séparez et validez les 2 pieds, puis « Reprendre le plan enregistré ».'); $('btn-reprendre').hidden = false; }
+        journalEnregistre = journal.length; return;
+      }
       if (etat.v !== VERSION_ETAT) throw new Error('version de plan inconnue (' + etat.v + ')');
       if (etat.mode === 'B') { dire('Réouverture du plan enregistré…'); await restaurerB(etat); dire('Plan enregistré rouvert.'); }
       else { aReprendreA = etat; dire('Plan enregistré en mode scan : réimportez le même scan (le scan n\'est pas conservé), puis « Reprendre le plan enregistré ».'); $('btn-reprendre').hidden = false; }
@@ -1112,6 +1120,11 @@ if (HOTE) {
   $('btn-reprendre').onclick = async () => { // mode A : le plan enregistré est réappliqué sur le scan réimporté
     if (!aReprendreA) return;
     try {
+      if (aReprendreA.v === 2) { // plan des 2 pieds : le scan doit être séparé et les 2 pieds validés
+        if (!deux.actif() || deux.generique()) throw new Error('importez le scan des 2 pieds, indiquez la longueur de chaque pied et validez les 2 pieds (carte 1)');
+        await deux.appliquerPlan(aReprendreA.plan);
+        aReprendreA = null; $('btn-reprendre').hidden = true; journalEnregistre = journal.length; dire('Plan enregistré réappliqué sur le scan des 2 pieds.'); return;
+      }
       if (!rapport || rapport.generique) throw new Error('importez et analysez d\'abord le scan (carte 1)');
       if (!coteConfirme) throw new Error('confirmez le côté du pied (carte 1)');
       if (coteConfirme !== aReprendreA.cote) throw new Error('le scan est un pied ' + (coteConfirme === 'D' ? 'droit' : 'gauche') + ' ; le plan enregistré est pour le pied ' + (aReprendreA.cote === 'D' ? 'droit' : 'gauche'));
@@ -1124,13 +1137,24 @@ if (HOTE) {
   };
 
   let enCours = false;
-  $('btn-enregistrer').onclick = () => {
+  const enBlob = (img) => new Promise((ok) => img.canvas.toBlob(ok, 'image/png'));
+  $('btn-enregistrer').onclick = async () => {
     if (enCours) return;
     try {
+      if (deux.actif()) { // 2 pieds : une image et un résumé PAR pied (chaque pied est affiché seul, D puis G, pour la photo)
+        enCours = true; $('btn-enregistrer').disabled = true; dire('Enregistrement des 2 pieds…');
+        const etat = exporterEtat();
+        const par = await deux.parPied(async (c, R) => { const img = imageRapport.creer(), png = await enBlob(img); if (!png) throw new Error('image du pied ' + c + ' non créée'); return { resume: resumerPlan(R), png, img }; });
+        const resume = { deux: true, pieds: { D: par.D.resume, G: par.G.resume }, lignes: ['Pied droit', ...par.D.resume.lignes, 'Pied gauche', ...par.G.resume.lignes] };
+        versMere({ type: 'enregistrer', etat, resume, png: par.D.png, pngG: par.G.png, largeur: par.D.img.largeur, hauteur: par.D.img.hauteur, cote: 'DG', generique: par.D.img.generique });
+        return;
+      }
       const etat = exporterEtat(), resume = resumerPlan(baseRapport), img = imageRapport.creer();
       enCours = true; $('btn-enregistrer').disabled = true; dire('Enregistrement…');
-      img.canvas.toBlob((png) => { if (!png) { enCours = false; $('btn-enregistrer').disabled = false; dire('image non créée', true); return; } versMere({ type: 'enregistrer', etat, resume, png, largeur: img.largeur, hauteur: img.hauteur, cote: etat.cote, generique: img.generique }); }, 'image/png');
-    } catch (err) { dire(err.message, true); }
+      const png = await enBlob(img);
+      if (!png) { enCours = false; $('btn-enregistrer').disabled = false; dire('image non créée', true); return; }
+      versMere({ type: 'enregistrer', etat, resume, png, largeur: img.largeur, hauteur: img.hauteur, cote: etat.cote, generique: img.generique });
+    } catch (err) { enCours = false; $('btn-enregistrer').disabled = false; dire(err.message, true); }
   };
   let fermetureDemandee = false;
   $('btn-fermer').onclick = () => {

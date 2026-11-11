@@ -9052,7 +9052,9 @@ const SPORT_BILAN_PHOTO_KEYS = [
   '_morpho_face', '_morpho_face2', '_morpho_profilG', '_morpho_profilD', '_pieds',
   // V1c — image PNG du plan de semelles 3D (jamais en data: dans le blob : seul `_semelle3dPath` est persisté).
   // Le JSON de paramètres (`_semelle3dPlan`) et le résumé texte (`_semelle3dResume`) restent inline (< 2 Ko).
-  '_semelle3d'
+  '_semelle3d',
+  // V1d-2p — plan des 2 pieds : `_semelle3d` = image du pied DROIT, `_semelle3dG` = image du pied GAUCHE (même circuit Storage, clé `_semelle3dGPath`).
+  '_semelle3dG'
 ];
 
 // Miroir prefetchPosturoPhotos L3143 — restaure dataUrl RAM depuis path Storage
@@ -9844,7 +9846,7 @@ let _s3dRegleSport = '3d';
 function _s3dLireBilanSport() {
   const bd = currentPatient && currentPatient.bilanData;
   if (bd && bd._semelle3dPlan && typeof bd._semelle3dPlan === 'object') {
-    _s3dSport = { etat: bd._semelle3dPlan, resume: bd._semelle3dResume || null, image: typeof bd._semelle3d === 'string' ? bd._semelle3d : null };
+    _s3dSport = { etat: bd._semelle3dPlan, resume: bd._semelle3dResume || null, image: typeof bd._semelle3d === 'string' ? bd._semelle3d : null, imageG: typeof bd._semelle3dG === 'string' ? bd._semelle3dG : null };
   } else {
     _s3dSport = null;
   }
@@ -9873,13 +9875,19 @@ function _s3dAfficherSport() {
   const r = document.getElementById('sp-3d-resume'), im = document.getElementById('sp-3d-apercu'), b = document.getElementById('sp-3d-ouvrir');
   if (!r || !im || !b) return;
   if (_s3dSport && _s3dSport.etat) {
-    const lignes = _s3dSport.resume && Array.isArray(_s3dSport.resume.lignes) ? _s3dSport.resume.lignes : [];
-    r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
+    const res = _s3dSport.resume, deux = !!(res && res.deux && res.pieds);
+    const lignes = res && Array.isArray(res.lignes) ? res.lignes : [];
+    if (deux) { // 2 pieds : une partie par pied, avec son titre
+      r.innerHTML = [['D', 'Pied droit'], ['G', 'Pied gauche']].map(([c, t]) => '<b>' + t + '</b><br>' + ((res.pieds[c] && res.pieds[c].lignes) || []).map(l => '• ' + _s3dEscHtml(l)).join('<br>')).join('<br><br>');
+    } else r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
     if (_s3dSport.image) { im.src = _s3dSport.image; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
+    const imG = document.getElementById('sp-3d-apercu-g');
+    if (imG) { if (deux && _s3dSport.imageG) { imG.src = _s3dSport.imageG; imG.style.display = 'block'; } else { imG.removeAttribute('src'); imG.style.display = 'none'; } }
     b.textContent = '🦶 Modifier le plan 3D';
   } else {
     r.textContent = 'Aucun plan enregistré.';
     im.removeAttribute('src'); im.style.display = 'none';
+    const imG0 = document.getElementById('sp-3d-apercu-g'); if (imG0) { imG0.removeAttribute('src'); imG0.style.display = 'none'; }
     b.textContent = '🦶 Plan de semelles 3D';
   }
 }
@@ -9888,15 +9896,25 @@ function _s3dBlobEnDataUrl(blob) {
 }
 // Enregistre le plan dans le bilan sport : JSON + résumé inline, PNG envoyé dans Storage par le circuit habituel
 // (saveBilanSilent → migrateSportBilanDataPhotos). Le scan n'est jamais conservé (absent de l'état reçu).
-async function _s3dEnregistrerSport({ etat, resume, png }) {
+async function _s3dEnregistrerSport({ etat, resume, png, pngG }) {
   if (!currentPatient) throw new Error('aucun patient ouvert');
   if (!png) throw new Error('image du plan absente');
   const dataUrl = await _s3dBlobEnDataUrl(png);
   if (typeof dataUrl !== 'string' || dataUrl.indexOf('data:image/png') !== 0) throw new Error('image du plan invalide');
+  // 2 pieds : `png` = pied droit, `pngG` = pied gauche (obligatoire) ; 1 pied : la clé du pied gauche est effacée (retour d'un plan 2 pieds à 1 pied).
+  const deux = !!(etat && etat.v === 2 && etat.pieds === 2);
+  let dataUrlG = null;
+  if (deux) {
+    if (!pngG) throw new Error('image du pied gauche absente');
+    dataUrlG = await _s3dBlobEnDataUrl(pngG);
+    if (typeof dataUrlG !== 'string' || dataUrlG.indexOf('data:image/png') !== 0) throw new Error('image du pied gauche invalide');
+  }
   bilanData._semelle3dPlan = etat;
   bilanData._semelle3dResume = resume;
   bilanData._semelle3d = dataUrl;
   delete bilanData._semelle3dPath; // nouvelle image : l'ancien fichier Storage n'est plus la bonne version
+  if (dataUrlG) bilanData._semelle3dG = dataUrlG; else delete bilanData._semelle3dG;
+  delete bilanData._semelle3dGPath;
   await saveBilanSilent();
   _s3dLireBilanSport();
   _s3dAfficherSport();

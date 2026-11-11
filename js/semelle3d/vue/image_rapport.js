@@ -74,7 +74,7 @@ export function initImageRapport(P) {
   function creer() {
     const S = get();
     if (!S.baseAffichee || !getMaille()) throw new Error('affichez d\'abord la semelle (étape Base)');
-    if (S.deuxPieds) throw new Error('l\'image du rapport est prévue pour un seul pied (mode « deux pieds » : à venir)');
+    if (S.deuxPieds) throw new Error('affichez un seul pied (onglet Pied D ou Pied G) pour créer son image ; l\'enregistrement dans le bilan photographie les 2 pieds, un par un');
     if (S.eclate) throw new Error('quittez la vue éclatée avant de créer l\'image');
     if (S.coteConfirme !== 'D' && S.coteConfirme !== 'G') throw new Error('confirmez le côté du pied');
     const reliefAvant = $('relief').value;

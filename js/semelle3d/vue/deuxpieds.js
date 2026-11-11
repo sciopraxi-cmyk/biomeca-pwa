@@ -239,6 +239,54 @@ export function initDeuxPieds(P) {
     } catch (err) { S.generique = false; erreur(err.message); }
   }
 
+  // ---------- V1 : enregistrement et réouverture des 2 pieds (paramètres seulement ; le scan n'est jamais conservé) ----------
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  async function montrerOnglet(o) { // comme allerOnglet, mais attend l'affichage (nécessaire avant de photographier le pied)
+    if (S.onglet === o) { if (S.resultats) await montrer(); return; }
+    if (S.commun) P.ecrireBaseParams(o === '3D' ? S.commun : { ...S.commun, ...S.derog[o] });
+    S.onglet = o; majOnglets(); majBlocDeroge(); P.dessinerCartes();
+    if (S.resultats) await montrer();
+  }
+  // Appelle fn(cote, rapportDuPied) pour D puis G, chaque pied étant affiché SEUL (onglet D puis G) ; remet l'onglet d'origine ensuite.
+  async function parPied(fn) {
+    if (!actif() || !S.resultats) throw new Error('affichez d\'abord les 2 semelles (créez la base)');
+    const avant = S.onglet, sortie = {};
+    try { for (const c of ['D', 'G']) { await montrerOnglet(c); sortie[c] = await fn(c, S.resultats[c].rapport); } }
+    finally { await montrerOnglet(avant); }
+    return sortie;
+  }
+  function etatPieds() { // état enregistrable : mode (A scan / B générique), longueurs et réglages du pied générique, plan complet (base commune + dérogations + éléments + axes de Henke)
+    if (!actif() || !S.resultats) throw new Error('affichez d\'abord les 2 semelles (créez la base)');
+    const plan = clone(construirePlan());
+    const fiche = {};
+    for (const c of ['D', 'G']) {
+      const a = S.analyse.rapports[source(c)].acquisition;
+      fiche[c] = S.generique ? { longueur_mm: a.longueur_pied_mm, largeur_rel: a.largeur_rel, voute_mm: a.voute_mm } : { longueur_mm: a.longueur_pied_mm };
+    }
+    return { v: 2, mode: S.generique ? 'B' : 'A', pieds: 2, fiche, plan };
+  }
+  async function appliquerPlan(plan) { // réapplique un plan enregistré sur les 2 pieds déjà créés (génériques ou scan confirmé)
+    const e = clone(plan || {}), base = (e.base && e.base.commun) || {}, der = (e.base && e.base.derogations) || { D: {}, G: {} };
+    S.commun = base; S.derog = { D: der.D || {}, G: der.G || {} };
+    S.deroge = { D: Object.keys(S.derog.D).length > 0, G: Object.keys(S.derog.G).length > 0 };
+    S.onglet = 'D'; P.ecrireBaseParams({ ...S.commun, ...S.derog.D });
+    P.mettre({ elements: e.elements || [] });
+    if (e.axe_henke && P.importerAxes) P.importerAxes(e.axe_henke);
+    majOnglets(); majBlocDeroge(); P.dessinerCartes();
+    S.dernierOnglet = null; await calculer();
+    if (!S.resultats) throw new Error('les semelles enregistrées n\'ont pas pu être reconstruites');
+  }
+  async function restaurerGeneriques(etat) { // réouverture d'un plan enregistré en mode B : tout se reconstruit depuis les paramètres
+    const f = etat.fiche || {};
+    for (const c of ['D', 'G']) {
+      if (!f[c]) throw new Error('réglages du pied ' + c + ' absents du plan enregistré');
+      $('g2-long-' + c).value = String(f[c].longueur_mm).replace('.', ','); $('g2-larg-' + c).value = String(f[c].largeur_rel); $('g2-voute-' + c).value = String(f[c].voute_mm);
+    }
+    await creerGeneriques();
+    if (!actif() || !S.generique) throw new Error('les 2 pieds génériques n\'ont pas pu être recréés');
+    await appliquerPlan(etat.plan);
+  }
+
   // ---------- plan hybride ----------
   const proxUid = () => { let m = 0; for (const e of P.get().elements) { const k = /^e(\d+)/.exec(e.uid || ''); if (k) m = Math.max(m, Number(k[1])); } return 'e' + (m + 1); };
   function assainer() { // tout élément a une portée et un identifiant unique (ceux posés par la suggestion de voûte n'en ont pas)
@@ -470,6 +518,7 @@ export function initDeuxPieds(P) {
 
   return {
     actif, calculer, exporter, detacher, miroir: appliquerMiroir, cacherMiroir,
+    parPied, etatPieds, appliquerPlan, restaurerGeneriques, generique: () => S.generique,
     // lot 4b : instantané du plan (sans rien modifier) et retour à un instantané ; vue affichée pour les repères 3D
     vue: () => (actif() && S.resultats ? { onglet: S.onglet, R: S.resultats, dx: S.dx3d, longueur: { D: S.analyse.rapports[source('D')].acquisition.longueur_pied_mm, G: S.analyse.rapports[source('G')].acquisition.longueur_pied_mm }, boite: { D: S.analyse.rapports[source('D')].boite, G: S.analyse.rapports[source('G')].boite } } : null),
     instantane: () => {
