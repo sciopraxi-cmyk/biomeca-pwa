@@ -15,7 +15,7 @@ export function initDeuxPieds(P) {
     mode2: false, sugg: null, optsMono: null,
     sep: null, brut: null, plan3d: null,
     inv: { A: { y: false, z: false }, B: { y: false, z: false } }, confirmeEcart: { A: false, B: false },
-    analyse: null, affectation: null, propose: null, confirme: false,
+    analyse: null, affectation: null, propose: null, confirme: false, generique: false,
     onglet: 'D', commun: null, derog: { D: {}, G: {} }, deroge: { D: false, G: false },
     resultats: null, plan: null, seq: 0, dernierOnglet: null, dx3d: { D: 0, G: 0 },
   };
@@ -70,7 +70,7 @@ export function initDeuxPieds(P) {
 
   // ---------- état : remise à zéro ----------
   function resetEtat() {
-    S.sep = null; S.brut = null; S.analyse = null; S.affectation = null; S.propose = null; S.confirme = false;
+    S.sep = null; S.brut = null; S.analyse = null; S.affectation = null; S.propose = null; S.confirme = false; S.generique = false;
     S.inv = { A: { y: false, z: false }, B: { y: false, z: false } }; S.confirmeEcart = { A: false, B: false };
     S.commun = null; S.derog = { D: {}, G: {} }; S.deroge = { D: false, G: false }; S.resultats = null; S.plan = null; S.onglet = 'D'; S.dernierOnglet = null; S.seq++;
     retirerPlanCoupe();
@@ -89,7 +89,7 @@ export function initDeuxPieds(P) {
     $('etat').textContent = 'séparation des 2 pieds (worker)…'; $('sep-info').innerHTML = ''; $('confirm-ecart-2p').hidden = true;
     try {
       const r = await demander({ type: 'separer', coupe });
-      S.sep = r; S.analyse = null; S.confirme = false; S.affectation = null;
+      S.sep = r; S.analyse = null; S.confirme = false; S.affectation = null; S.generique = false;
       $('coupe-manuelle').hidden = true; retirerPlanCoupe(); $('btn-coupe-main').hidden = false;
       const A = r.affichage.A, B = r.affichage.B;
       const f = fusionner([{ positions: A.positions, indices: A.indices, couleur: COUL.A }, { positions: B.positions, indices: B.indices, couleur: COUL.B }]);
@@ -170,15 +170,18 @@ export function initDeuxPieds(P) {
 
   function afficherAnalyse() {
     const r = S.analyse, A = r.affichage.A, B = r.affichage.B, bA = boite(A.positions), bB = boite(B.positions);
-    const dxA = -10 - bA.mx[0], dxB = 10 - bB.mn[0]; // A à gauche, B à droite (l'affectation D/G n'est pas encore décidée)
+    const gen = !!S.generique; // 2 pieds génériques : A = D, B = G, placés comme dans la vue des 2 semelles (D à droite de l'écran)
+    const dxA = gen ? 10 - bA.mn[0] : -10 - bA.mx[0], dxB = gen ? -10 - bB.mx[0] : 10 - bB.mn[0]; // scan : A à gauche, B à droite (l'affectation D/G n'est pas encore décidée)
     const f = fusionner([{ positions: A.positions, indices: A.indices, dx: dxA, hauteur: true }, { positions: B.positions, indices: B.indices, dx: dxB, hauteur: true }]);
     P.mettre({ positionsAff: f.pos, indicesAff: f.idx, couleursAff: f.col });
     P.afficher(f.pos, f.idx, { vue: P.$('vue-preset').value, couleurs: f.col });
-    P.poserEtiquettes([['PIED A', dxA + (bA.mn[0] + bA.mx[0]) / 2, bA.mx[1] + 14, 2], ['PIED B', dxB + (bB.mn[0] + bB.mx[0]) / 2, bB.mx[1] + 14, 2]]);
+    P.poserEtiquettes([[gen ? 'PIED D' : 'PIED A', dxA + (bA.mn[0] + bA.mx[0]) / 2, bA.mx[1] + 14, 2], [gen ? 'PIED G' : 'PIED B', dxB + (bB.mn[0] + bB.mx[0]) / 2, bB.mx[1] + 14, 2]]);
+    $('bandeau-generique').hidden = !gen;
     $('stats').innerHTML = ['A', 'B'].map((id) => { const R = r.rapports[id], a = R.acquisition, g = R.grille;
+      if (gen) return '<div><b>Pied ' + (id === 'A' ? 'D' : 'G') + ' GÉNÉRIQUE</b> (mode B, sans scan) : longueur ' + fr(a.longueur_pied_mm) + ' mm · largeur ×' + fr(a.largeur_rel, 2) + ' · voûte ' + fr(a.voute_mm, 0) + ' mm · hauteur de ' + fr(g.hauteur_min_mm, 2) + ' à ' + fr(g.hauteur_max_mm, 2) + ' mm</div>' + R.avertissements.map((t) => '<div>⚠ ' + echapper(t) + '</div>').join('');
       return '<div><b>Pied ' + id + '</b> : longueur ' + fr(a.longueur_pied_mm) + ' mm · échelle ×' + fr(a.facteur_echelle, 4) + ' (écart ' + fr(a.ecart_echelle_pct, 2) + ' %) · grille ' + g.nx + ' × ' + g.ny + ' à ' + fr(g.pas_mm) + ' mm · hauteur de ' + fr(g.hauteur_min_mm, 2) + ' à ' + fr(g.hauteur_max_mm, 2) + ' mm</div>' + R.avertissements.map((t) => '<div>⚠ ' + echapper(t) + '</div>').join(''); }).join('');
-    for (const id of ['btn-inverser-paire', 'inv-A-y', 'inv-A-z', 'inv-B-y', 'inv-B-z']) $(id).disabled = false;
-    $('conf-paire').disabled = false; $('conf-paire').checked = false; $('btn-valider-paire').disabled = true;
+    for (const id of ['btn-inverser-paire', 'inv-A-y', 'inv-A-z', 'inv-B-y', 'inv-B-z']) $(id).disabled = gen; // 2 pieds génériques : D et G sont choisis dans la fiche, rien à inverser
+    $('conf-paire').disabled = gen; $('conf-paire').checked = gen; $('btn-valider-paire').disabled = !gen;
     majTextesPaire(); P.majParcours(); majPastilles();
   }
 
@@ -187,6 +190,12 @@ export function initDeuxPieds(P) {
     const r = S.analyse; if (!r) return;
     const p = r.paire, a = S.affectation, nom = { D: 'DROIT', G: 'GAUCHE' };
     const prop = p.affectation;
+    if (S.generique) { // pas de latéralité à deviner : le praticien a saisi le pied D et le pied G
+      $('prop-paire').innerHTML = 'Latéralité : <b>pied D</b> et <b>pied G</b> (choisis dans la fiche « 2 pieds génériques »).';
+      $('txt-paire').textContent = 'le pied D mesure ' + Math.round(r.rapports.A.acquisition.longueur_pied_mm) + ' mm et le pied G ' + Math.round(r.rapports.B.acquisition.longueur_pied_mm) + ' mm';
+      $('btn-valider-paire').disabled = true; $('btn-valider-paire').textContent = S.confirme ? 'Pieds D et G prêts ✓' : 'Valider les 2 pieds';
+      return;
+    }
     $('prop-paire').innerHTML = 'Latéralité proposée : <b>A = ' + prop.A + '</b>, <b>B = ' + prop.B + '</b>' + (p.ambigu ? ' — <b>peu fiable</b> (' + (p.concordants === false ? 'signaux contradictoires' : 'signaux faibles') + ')' : '') + ' — à confirmer. <small>Un pied droit et un pied gauche : jamais deux du même côté.</small>';
     $('txt-paire').textContent = 'A est le pied ' + nom[a.A] + ' et B est le pied ' + nom[a.B];
     $('btn-valider-paire').disabled = !$('conf-paire').checked;
@@ -194,10 +203,10 @@ export function initDeuxPieds(P) {
   }
   async function confirmer() {
     try {
-      await demander({ type: 'confirmer_pieds', affectation: S.affectation });
+      if (!S.generique) await demander({ type: 'confirmer_pieds', affectation: S.affectation }); // 2 pieds génériques : D / G déjà posés par le worker
       S.confirme = true; S.onglet = S.onglet === 'G' ? 'G' : 'D';
       const sD = source('D'), sG = source('G');
-      noter('confirmation', 'latéralité confirmée par le praticien : pied ' + sD + ' = D, pied ' + sG + ' = G (proposée : A=' + S.propose.A + ', B=' + S.propose.B + ')');
+      noter('confirmation', S.generique ? '2 pieds génériques : pied D et pied G choisis par le praticien' : 'latéralité confirmée par le praticien : pied ' + sD + ' = D, pied ' + sG + ' = G (proposée : A=' + S.propose.A + ', B=' + S.propose.B + ')');
       P.mettre({ rapport: S.analyse.rapports[source(S.onglet)], coteConfirme: S.onglet });
       P.majCote(); majPastilles();
       $('onglets-pieds').hidden = false; majOnglets();
@@ -207,6 +216,27 @@ export function initDeuxPieds(P) {
       majTextesPaire();
       return true;
     } catch (err) { erreur(err.message); return false; }
+  }
+
+  // ---------- mode B pour les 2 pieds : pieds génériques D et G, sans scan ----------
+  async function creerGeneriques() {
+    const L = { D: lire('g2-long-D'), G: lire('g2-long-G') };
+    if (![L.D, L.G].every((v) => Number.isFinite(v) && v > 0)) { $('etat').textContent = 'saisissez la longueur du pied D et du pied G (en mm)'; erreur('Saisissez la longueur de chaque pied (en mm).'); return; }
+    const pieds = {};
+    for (const c of ['D', 'G']) pieds[c] = { longueur_mm: L[c], largeur_rel: Number($('g2-larg-' + c).value), voute_mm: Number($('g2-voute-' + c).value) };
+    P.viderVue(); $('sep-info').innerHTML = ''; // repart d'une vue vide (le scan éventuel est abandonné)
+    $('etat').textContent = 'création des 2 pieds génériques (worker)…';
+    try {
+      const r = await demander({ type: 'pieds_generiques', pieds });
+      S.generique = true; S.analyse = { rapports: r.rapports, affichage: r.affichage, paire: { affectation: { ...r.affectation }, ambigu: false, concordants: true } };
+      S.propose = { ...r.affectation }; S.affectation = { ...r.affectation }; S.confirme = false;
+      P.apresAnalyse(); $('btn-base').disabled = true;
+      P.mettre({ rapport: r.rapports.A, coteConfirme: null, baseAffichee: false });
+      afficherAnalyse();
+      noter('creation', 'H_plantaire GÉNÉRIQUES (mode B, sans scan) · D ' + fr(L.D) + ' mm (largeur ×' + fr(pieds.D.largeur_rel, 2) + ', voûte ' + fr(pieds.D.voute_mm, 0) + ' mm) · G ' + fr(L.G) + ' mm (largeur ×' + fr(pieds.G.largeur_rel, 2) + ', voûte ' + fr(pieds.G.voute_mm, 0) + ' mm)');
+      await confirmer();
+      $('etat').textContent = '2 pieds génériques créés : choisissez le type de base';
+    } catch (err) { S.generique = false; erreur(err.message); }
   }
 
   // ---------- plan hybride ----------
@@ -359,12 +389,12 @@ export function initDeuxPieds(P) {
       for (const c of ['D', 'G']) {
         const r = await demander({ type: 'exporter', pied: c });
         const type = S.resultats[c].rapport.type;
-        const nom = P.nomFichierSTL({ plate: 'Base-fictive-plate', thermoformee: 'Base-fictive-thermoformee', pleine_dessous: 'Base-fictive-intermediaire' }[type], c, maintenant);
+        const nom = P.nomFichierSTL((S.generique ? 'INDICATIF-Pied-generique-' : '') + { plate: 'Base-fictive-plate', thermoformee: 'Base-fictive-thermoformee', pleine_dessous: 'Base-fictive-intermediaire' }[type], c, maintenant);
         fichiers.push({ nom, donnees: new Uint8Array(r.stl) });
         noter('export', nom + ' · ' + r.octets + ' octets · fichier relu : fermé');
         noms.push(nom + ' (' + r.nbTriangles + ' triangles)');
       }
-      const zip = P.ecrireZip(fichiers, new Date()), nomZip = P.nomFichierZip('Semelles-fictives', maintenant);
+      const zip = P.ecrireZip(fichiers, new Date()), nomZip = P.nomFichierZip((S.generique ? 'INDICATIF-' : '') + 'Semelles-fictives', maintenant);
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([zip], { type: 'application/zip' })); a.download = nomZip; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 60000);
       noter('export', nomZip + ' · ' + zip.byteLength + ' octets · 2 STL');
@@ -388,6 +418,7 @@ export function initDeuxPieds(P) {
 
   // ---------- liaisons ----------
   $('btn-analyser-2p').onclick = () => analyser();
+  $('btn-modeb2').onclick = () => creerGeneriques();
   for (const id of ['long-A', 'long-B']) $(id).addEventListener('input', () => { S.confirmeEcart = { A: false, B: false }; });
   $('btn-coupe-main').onclick = () => ouvrirCoupeManuelle('Placez le plan de coupe entre les deux pieds.');
   for (const rb of document.querySelectorAll('input[name=axe-coupe]')) rb.addEventListener('change', () => { if (S.brut) majCurseurCoupe(Number(rb.value), true); });
@@ -398,7 +429,7 @@ export function initDeuxPieds(P) {
     separer({ n, d: Number($('coupe-curseur').value) });
   };
   $('btn-inverser-paire').onclick = async () => {
-    if (!S.analyse) return;
+    if (!S.analyse || S.generique) return;
     S.affectation = { A: autreCote(S.affectation.A), B: autreCote(S.affectation.B) };
     noter('modification', 'Inverser : A = ' + S.affectation.A + ', B = ' + S.affectation.B);
     majTextesPaire();

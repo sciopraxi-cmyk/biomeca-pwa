@@ -61,6 +61,28 @@ export function traiterMessage(msg, etat) {
   throw new TypeError('type de message inconnu : ' + msg.type);
 }
 
+// Mode B : empreinte VIRTUELLE d'un pied générique (utilisée par « pied_generique » et « pieds_generiques »). Paramètres invalides : exception, aucun état touché.
+function empreinteGenerique(msg) {
+  const t0 = maintenant();
+  const g = grilleDuPiedGenerique({ longueur_mm: msg.longueur_mm, cote: msg.cote, largeur_rel: msg.largeur_rel ?? 1, voute_mm: msg.voute_mm ?? 15 });
+  let hmin = Infinity, hmax = -Infinity, n = 0, xa = Infinity, xb = -Infinity, yb = 0, zb = 0;
+  for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) { const v = g.z[j * g.nx + i]; if (!Number.isFinite(v)) continue; n++; if (v < hmin) hmin = v; if (v > hmax) hmax = v; const x = g.ox + i * g.pas, y = g.oy + j * g.pas; if (x < xa) xa = x; if (x > xb) xb = x; if (y > yb) yb = y; }
+  zb = hmax;
+  const rapport = {
+    generique: true,
+    acquisition: { mode: 'B_generique', longueur_pied_mm: msg.longueur_mm, facteur_echelle: 1, ecart_echelle_pct: 0, ecart_confirme: false, unite_probable: null, cote: msg.cote, largeur_rel: msg.largeur_rel ?? 1, voute_mm: msg.voute_mm ?? 15 },
+    boite: { x_min: xa, x_max: xb, y_min: 0, y_max: yb, z_min: 0, z_max: zb },
+    grille: { nx: g.nx, ny: g.ny, pas_mm: g.pas, cellules_valides: n, cellules_masquees_pente_raide: 0, hauteur_min_mm: hmin, hauteur_max_mm: hmax },
+    propositions: { cote: { valeur: msg.cote, ambigu: false, concordants: true }, sens_longitudinal: { confiance: 1, ambigu: false }, sens_vertical: { confiance: 1, ambigu: false } },
+    confirmations_requises: [], diagnostics: {},
+    avertissements: ['Pied générique (proportions moyennes fictives) : aperçu INDICATIF, ce n\'est pas une mesure du patient'],
+    limites: ['Aucun scan : la forme du pied, la voûte et les têtes métatarsiennes viennent d\'un modèle moyen. L\'export est nommé « indicatif ».'],
+    duree_ms: Math.round(maintenant() - t0),
+  };
+  const aff = maillageAffichage(g);
+  return { g, rapport, aff };
+}
+
 // Version asynchrone (3MF : décompression par l'API du navigateur) : messages du mode A, puis repli sur traiterMessage.
 export async function traiterMessageA(msg, etat) {
   if (!msg || typeof msg.type !== 'string') throw new TypeError('message invalide');
@@ -126,26 +148,22 @@ export async function traiterMessageA(msg, etat) {
     return { type: 'demo', buffer: d.buffer, nom: d.nom, longueur_suggeree_mm: d.longueur_suggeree_mm, cote_reel: d.cote_reel, libelle: d.libelle };
   }
   if (msg.type === 'pied_generique') { // mode B (sans scan) : empreinte VIRTUELLE d'un pied générique (proportions moyennes fictives), même format que l'empreinte d'un scan
-    const t0 = maintenant();
-    const g = grilleDuPiedGenerique({ longueur_mm: msg.longueur_mm, cote: msg.cote, largeur_rel: msg.largeur_rel ?? 1, voute_mm: msg.voute_mm ?? 15 });
-    let hmin = Infinity, hmax = -Infinity, n = 0, xa = Infinity, xb = -Infinity, yb = 0, zb = 0;
-    for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) { const v = g.z[j * g.nx + i]; if (!Number.isFinite(v)) continue; n++; if (v < hmin) hmin = v; if (v > hmax) hmax = v; const x = g.ox + i * g.pas, y = g.oy + j * g.pas; if (x < xa) xa = x; if (x > xb) xb = x; if (y > yb) yb = y; }
-    zb = hmax;
-    const rapport = {
-      generique: true,
-      acquisition: { mode: 'B_generique', longueur_pied_mm: msg.longueur_mm, facteur_echelle: 1, ecart_echelle_pct: 0, ecart_confirme: false, unite_probable: null, cote: msg.cote, largeur_rel: msg.largeur_rel ?? 1, voute_mm: msg.voute_mm ?? 15 },
-      boite: { x_min: xa, x_max: xb, y_min: 0, y_max: yb, z_min: 0, z_max: zb },
-      grille: { nx: g.nx, ny: g.ny, pas_mm: g.pas, cellules_valides: n, cellules_masquees_pente_raide: 0, hauteur_min_mm: hmin, hauteur_max_mm: hmax },
-      propositions: { cote: { valeur: msg.cote, ambigu: false, concordants: true }, sens_longitudinal: { confiance: 1, ambigu: false }, sens_vertical: { confiance: 1, ambigu: false } },
-      confirmations_requises: [], diagnostics: {},
-      avertissements: ['Pied générique (proportions moyennes fictives) : aperçu INDICATIF, ce n\'est pas une mesure du patient'],
-      limites: ['Aucun scan : la forme du pied, la voûte et les têtes métatarsiennes viennent d\'un modèle moyen. L\'export est nommé « indicatif ».'],
-      duree_ms: Math.round(maintenant() - t0),
-    };
-    const aff = maillageAffichage(g);
+    const { g, rapport, aff } = empreinteGenerique(msg);
     etat.scan = null; etat.pieds_scan = null; etat.analyses = null; etat.pieds = null;
     etat.plantaire = { grille: g, rapport }; etat.finale = null; etat.base = null; etat.generique = true; // une nouvelle empreinte invalide la base et les éléments
     return { type: 'recale', rapport, positions: aff.positions, indices: aff.indices };
+  }
+  if (msg.type === 'pieds_generiques') { // mode B pour les 2 pieds : un pied générique D et un G (longueur, largeur, voûte propres à chaque pied), sans scan ; D et G sont imposés (aucune latéralité à deviner)
+    const p = msg.pieds || {};
+    const E = {};
+    for (const cote of ['D', 'G']) {
+      if (!p[cote]) throw new Error('2 pieds génériques : réglages du pied ' + cote + ' manquants');
+      E[cote] = empreinteGenerique({ longueur_mm: p[cote].longueur_mm, cote, largeur_rel: p[cote].largeur_rel, voute_mm: p[cote].voute_mm });
+    }
+    etat.scan = null; etat.pieds_scan = null; etat.analyses = null; etat.plantaire = null; etat.finale = null; etat.base = null; etat.generique = true;
+    etat.pieds = {}; for (const cote of ['D', 'G']) etat.pieds[cote] = { plantaire: { grille: E[cote].g, rapport: E[cote].rapport }, source: cote, generique: true };
+    etat.affectation = { A: 'D', B: 'G' };
+    return { type: 'pieds_generiques', rapports: { A: E.D.rapport, B: E.G.rapport }, affichage: { A: { positions: E.D.aff.positions, indices: E.D.aff.indices }, B: { positions: E.G.aff.positions, indices: E.G.aff.indices } }, affectation: etat.affectation };
   }
   if (msg.type === 'importer') {
     etat.generique = false;

@@ -224,6 +224,14 @@
     <button id="btn-inv-z" disabled>Inverser dessus ↔ dessous</button>
     </div>
     <div id="bloc-2p" hidden>
+      <details id="p-modeb2"><summary class="lbl" style="cursor:pointer">Sans scan : 2 pieds génériques (mode B)</summary>
+        <small>Pour visualiser les 2 semelles sans empreinte 3D : deux pieds <b>moyens fictifs</b>, chacun à sa longueur. Aperçu <b>indicatif</b>, jamais une mesure du patient. Le pied droit et le pied gauche se règlent séparément.</small>
+        <div class="rng champ"><span class="n"><b>Pied droit (D)</b> longueur <input type="text" id="g2-long-D" inputmode="decimal" placeholder="ex. 265" style="width:70px"> mm</span></div>
+        <div class="rng champ"><span class="n">Largeur <select id="g2-larg-D"><option value="0.9">étroit</option><option value="1" selected>moyen</option><option value="1.1">large</option></select> &nbsp; Voûte <select id="g2-voute-D"><option value="8">basse</option><option value="15" selected>moyenne</option><option value="24">haute</option></select></span></div>
+        <div class="rng champ"><span class="n"><b>Pied gauche (G)</b> longueur <input type="text" id="g2-long-G" inputmode="decimal" placeholder="ex. 258" style="width:70px"> mm</span></div>
+        <div class="rng champ"><span class="n">Largeur <select id="g2-larg-G"><option value="0.9">étroit</option><option value="1" selected>moyen</option><option value="1.1">large</option></select> &nbsp; Voûte <select id="g2-voute-G"><option value="8">basse</option><option value="15" selected>moyenne</option><option value="24">haute</option></select></span></div>
+        <button id="btn-modeb2">Créer les 2 pieds génériques</button>
+      </details>
       <div id="sep-info" class="sugg" style="margin-top:8px">Chargez un scan des 2 pieds : ils sont séparés automatiquement.</div>
       <button id="btn-coupe-main" hidden>Corriger la coupe à la main</button>
       <div id="coupe-manuelle" class="confirm" hidden>
