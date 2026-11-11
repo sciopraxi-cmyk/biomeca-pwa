@@ -7182,6 +7182,7 @@ function selectPatient(p) {
 function clearBilanFields() {
   if (typeof _s3dRazSport === 'function') _s3dRazSport();
   if (typeof _s3dRazPosturo === 'function') _s3dRazPosturo();
+  if (typeof _s3dRazPodo === 'function') _s3dRazPodo();
   document.querySelectorAll('.bilan-field').forEach(el => {
     if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = '';
   });
@@ -10034,6 +10035,65 @@ async function ouvrirSemelle3DPosturo() {
   try { M = await import('./semelle3d/index.js?v=' + APP_BUILD); } catch (_e) { const r = document.getElementById('po-3d-resume'); if (r) r.textContent = 'Module 3D indisponible hors connexion.'; return; }
   _s3dLireBilanPosturo();
   M.ouvrirSemelle3D({ etat: _s3dPosturo ? _s3dPosturo.etat : null, version: APP_BUILD, onEnregistrer: _s3dEnregistrerPosturo });
+}
+
+// V1b3 — Plan de semelles 3D du bilan PODOPÉDIATRIE (onglet Traitement, périodes II à IV : remplace le schéma plantaire dessinable
+// pour un bilan neuf ou sans dessin). Règle : js/semelle3d/regle.js avec la clé '_podo_pieds' (un bilan qui a déjà son schéma dessiné,
+// valeur ou chemin Storage, le garde). Dans cette étape le plan vit en mémoire seulement : l'enregistrement est l'étape V1c3.
+let _s3dPodo = null;     // { etat, resume, url, urlG } du plan en cours (URL d'objet : libérées à la RAZ)
+let _s3dRegleLecturePodo = '3d';
+function _s3dLibererPodo() {
+  if (_s3dPodo) { [_s3dPodo.url, _s3dPodo.urlG].forEach(u => { if (u) { try { URL.revokeObjectURL(u); } catch (_e) { /* rien */ } } }); }
+}
+async function _s3dMajBlocPodo() {
+  const dessin = document.getElementById('podo-dessin-bloc');
+  const bloc3d = document.getElementById('podo-3d-bloc');
+  if (!dessin || !bloc3d) return;
+  let mode = '3d';
+  try { const R = await import('./semelle3d/regle.js?v=' + APP_BUILD); mode = R.modeSemelleBilan(currentPatient && currentPatient.bilanDataPodopediatrie, '_podo_pieds'); } catch (_e) { mode = 'dessin'; }
+  // Un dessin en cours de saisie (non encore enregistré) compte comme un dessin : on ne le masque jamais.
+  const pc = document.getElementById('podo-pieds-canvas');
+  if (pc && pc._userDirty) mode = 'dessin';
+  _s3dRegleLecturePodo = mode;
+  dessin.style.display = mode === 'dessin' ? '' : 'none';
+  bloc3d.style.display = mode === '3d' ? '' : 'none';
+  _s3dAfficherPodo();
+}
+function _s3dRazPodo() {
+  _s3dLibererPodo();
+  _s3dPodo = null;
+  _s3dAfficherPodo();
+}
+function _s3dAfficherPodo() {
+  const r = document.getElementById('podo-3d-resume'), im = document.getElementById('podo-3d-apercu'), imG = document.getElementById('podo-3d-apercu-g'), b = document.getElementById('podo-3d-ouvrir');
+  if (!r || !im || !imG || !b) return;
+  if (_s3dPodo && _s3dPodo.etat) {
+    const res = _s3dPodo.resume, deux = !!(res && res.deux && res.pieds);
+    const lignes = res && Array.isArray(res.lignes) ? res.lignes : [];
+    if (deux) r.innerHTML = [['D', 'Pied droit'], ['G', 'Pied gauche']].map(([c, t]) => '<b>' + t + '</b><br>' + ((res.pieds[c] && res.pieds[c].lignes) || []).map(l => '• ' + _s3dEscHtml(l)).join('<br>')).join('<br><br>');
+    else r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
+    if (_s3dPodo.url) { im.src = _s3dPodo.url; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
+    if (deux && _s3dPodo.urlG) { imG.src = _s3dPodo.urlG; imG.style.display = 'block'; imG.style.flex = '1 1 0'; im.style.flex = '1 1 0'; } else { imG.removeAttribute('src'); imG.style.display = 'none'; im.style.flex = ''; }
+    b.textContent = '🦶 Modifier le plan 3D';
+  } else {
+    r.textContent = 'Aucun plan enregistré.';
+    im.removeAttribute('src'); im.style.display = 'none';
+    imG.removeAttribute('src'); imG.style.display = 'none';
+    b.textContent = '🦶 Plan de semelles 3D';
+  }
+}
+async function ouvrirSemelle3DPodo() {
+  let M;
+  try { M = await import('./semelle3d/index.js?v=' + APP_BUILD); } catch (_e) { const r = document.getElementById('podo-3d-resume'); if (r) r.textContent = 'Module 3D indisponible hors connexion.'; return; }
+  M.ouvrirSemelle3D({
+    etat: _s3dPodo ? _s3dPodo.etat : null,
+    version: APP_BUILD,
+    onEnregistrer: async ({ etat, resume, png, pngG }) => {
+      _s3dLibererPodo();
+      _s3dPodo = { etat, resume, url: png ? URL.createObjectURL(png) : null, urlG: pngG ? URL.createObjectURL(pngG) : null };
+      _s3dAfficherPodo();
+    }
+  });
 }
 
 // #99 Restauration différée des canvas morpho/pieds depuis bilanData global
@@ -22782,6 +22842,7 @@ async function savePodopediatrieBilan(silent) {
 
 // Restauration AUTORITATIVE (miroir loadPedicurieBilan).
 function loadPodopediatrieBilan() {
+  if (typeof _s3dMajBlocPodo === 'function') _s3dMajBlocPodo(); // V1b3 : schéma gardé ou plan 3D
   const d = currentPatient?.bilanDataPodopediatrie;
   if (!d) { _progMonter('pd'); _progEcrire('pd', null); _ecrireJoursCircuits('pd', null); _podoCircuitsEcrire(null); return; }
   document.querySelectorAll('#pg-podopediatrie .podopediatrie-field').forEach(el => {
@@ -24078,6 +24139,7 @@ function showPodopediatrieSection(idx) {
   // dans initPodoPiedsCanvas rend l'appel safe même sur ré-activation
   // successive de l'onglet ou pendant édition en cours.
   if (target === 8) {
+    if (typeof _s3dMajBlocPodo === 'function') _s3dMajBlocPodo(); // V1b3
     setTimeout(() => {
       if (typeof initPodoPiedsCanvas === 'function') {
         initPodoPiedsCanvas(currentPatient?.bilanDataPodopediatrie?._podo_pieds);

@@ -3080,6 +3080,7 @@
                  et posturo (posturo-feet-canvas). Toolbar dupliquée avec ids
                  podo-pieds-tool-* + mapping dans setDrawTool → _markPodoPiedsTool
                  pour highlighting cohérent. -->
+            <div id="podo-dessin-bloc">
             <div class="podo-field-lbl">Schéma plantaire</div>
             <div style="display:flex;justify-content:center;margin:10px 0;">
               <div id="podo-pieds-wrap" style="position:relative;display:inline-block;width:80%;max-width:400px;margin:0 auto;line-height:0;">
@@ -3108,6 +3109,18 @@
               </select>
               <button class="btn" onclick="undoPodoPieds()" style="background:#9f1239;color:#fff;">↩ Annuler</button>
               <button class="btn" onclick="clearPodoPieds()" style="background:transparent;color:#9f1239;border:1px solid #9f1239;">🗑 Tout effacer</button>
+            </div>
+            </div>
+            <div id="podo-3d-bloc" style="display:none;margin-top:10px;">
+              <div class="podo-field-lbl">🦶 Plan de semelles 3D</div>
+              <div style="background:#fff;border-radius:8px;border:1px solid var(--bord);padding:12px;margin-top:6px;color:#222;">
+                <div id="podo-3d-resume" style="font-size:12px;line-height:1.5;margin-bottom:10px;">Aucun plan enregistré.</div>
+                <div id="podo-3d-images" style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;margin-bottom:10px;">
+                  <img id="podo-3d-apercu-g" alt="Aperçu du plan de semelles 3D, pied gauche" style="display:none;min-width:0;max-width:100%;max-height:220px;border-radius:6px;border:1px solid var(--bord);"/>
+                  <img id="podo-3d-apercu" alt="Aperçu du plan de semelles 3D" style="display:none;min-width:0;max-width:100%;max-height:220px;border-radius:6px;border:1px solid var(--bord);"/>
+                </div>
+                <button class="btn" id="podo-3d-ouvrir" type="button" onclick="ouvrirSemelle3DPodo()">🦶 Plan de semelles 3D</button>
+              </div>
             </div>
 
             <!-- Encadrement Matériaux + Recouvrement dans 2 cartes distinctes
