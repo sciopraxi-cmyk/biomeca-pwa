@@ -118,11 +118,11 @@ test('semelle 3D podopédiatrie : 3D pour un bilan neuf, dessin gardé sinon, RA
   expect(png[0]).toBeGreaterThan(100);
   await expect(page.locator('#podo-3d-ouvrir')).toContainText('Modifier');
   await page.screenshot({ path: '/tmp/capv1b3/02_resume.png' });
-  // V1b3 : rien n'est écrit dans le bilan à cette étape (l'enregistrement est l'étape V1c3)
+  // V1c3 : le plan est enregistré dans le bilan (JSON + résumé) ; le détail est vérifié dans semelle3d-podo-enreg.spec.ts
   const cles = await page.evaluate(() =>
     Object.keys(eval('currentPatient').bilanDataPodopediatrie).filter((k) => /semelle3d/i.test(k))
   );
-  expect(cles).toEqual([]);
+  expect(cles).toContain('_semelle3dPlan');
 
   // 3. un autre patient : le plan du précédent ne fuit pas
   await page.evaluate(() => eval('nav')('pg-patients'));

@@ -8788,7 +8788,10 @@ const PODOPEDIATRIE_PHOTO_KEYS = [
   // Supabase Storage à migratePodopediatriePhotos, stash restauré après
   // savePatients() par restorePodopediatriePhotosStash (les 3 helpers itèrent
   // sur PODOPEDIATRIE_PHOTO_KEYS, pas de liste en dur — vérifié).
-  '_podo_pieds'
+  '_podo_pieds',
+  // V1c3 — images du plan de semelles 3D : `_semelle3d` = pied DROIT (ou le seul pied), `_semelle3dG` = pied GAUCHE.
+  // Même circuit Storage que les autres photos du bilan (migration, prefetch, strip) ; l'oublier = PNG en data: dans le blob.
+  '_semelle3d', '_semelle3dG'
 ];
 
 async function prefetchPodopediatriePhotos(d) {
@@ -10037,13 +10040,19 @@ async function ouvrirSemelle3DPosturo() {
   M.ouvrirSemelle3D({ etat: _s3dPosturo ? _s3dPosturo.etat : null, version: APP_BUILD, onEnregistrer: _s3dEnregistrerPosturo });
 }
 
-// V1b3 — Plan de semelles 3D du bilan PODOPÉDIATRIE (onglet Traitement, périodes II à IV : remplace le schéma plantaire dessinable
+// V1b3/V1c3 — Plan de semelles 3D du bilan PODOPÉDIATRIE (onglet Traitement, périodes II à IV : remplace le schéma plantaire dessinable
 // pour un bilan neuf ou sans dessin). Règle : js/semelle3d/regle.js avec la clé '_podo_pieds' (un bilan qui a déjà son schéma dessiné,
-// valeur ou chemin Storage, le garde). Dans cette étape le plan vit en mémoire seulement : l'enregistrement est l'étape V1c3.
-let _s3dPodo = null;     // { etat, resume, url, urlG } du plan en cours (URL d'objet : libérées à la RAZ)
+// valeur ou chemin Storage, le garde). V1c3 : JSON (`_semelle3dPlan`) + résumé (`_semelle3dResume`) inline dans bilanDataPodopediatrie,
+// PNG dans Storage (`_semelle3d` pied droit / `_semelle3dG` pied gauche, clés de PODOPEDIATRIE_PHOTO_KEYS). Le scan n'est jamais conservé.
+let _s3dPodo = null;     // { etat, resume, image, imageG } relus depuis bilanDataPodopediatrie (jamais de scan)
 let _s3dRegleLecturePodo = '3d';
-function _s3dLibererPodo() {
-  if (_s3dPodo) { [_s3dPodo.url, _s3dPodo.urlG].forEach(u => { if (u) { try { URL.revokeObjectURL(u); } catch (_e) { /* rien */ } } }); }
+function _s3dLireBilanPodo() {
+  const d = currentPatient && currentPatient.bilanDataPodopediatrie;
+  if (d && d._semelle3dPlan && typeof d._semelle3dPlan === 'object') {
+    _s3dPodo = { etat: d._semelle3dPlan, resume: d._semelle3dResume || null, image: typeof d._semelle3d === 'string' ? d._semelle3d : null, imageG: typeof d._semelle3dG === 'string' ? d._semelle3dG : null };
+  } else {
+    _s3dPodo = null;
+  }
 }
 async function _s3dMajBlocPodo() {
   const dessin = document.getElementById('podo-dessin-bloc');
@@ -10057,10 +10066,10 @@ async function _s3dMajBlocPodo() {
   _s3dRegleLecturePodo = mode;
   dessin.style.display = mode === 'dessin' ? '' : 'none';
   bloc3d.style.display = mode === '3d' ? '' : 'none';
+  _s3dLireBilanPodo();
   _s3dAfficherPodo();
 }
 function _s3dRazPodo() {
-  _s3dLibererPodo();
   _s3dPodo = null;
   _s3dAfficherPodo();
 }
@@ -10072,8 +10081,8 @@ function _s3dAfficherPodo() {
     const lignes = res && Array.isArray(res.lignes) ? res.lignes : [];
     if (deux) r.innerHTML = [['D', 'Pied droit'], ['G', 'Pied gauche']].map(([c, t]) => '<b>' + t + '</b><br>' + ((res.pieds[c] && res.pieds[c].lignes) || []).map(l => '• ' + _s3dEscHtml(l)).join('<br>')).join('<br><br>');
     else r.innerHTML = lignes.length ? lignes.map(l => '• ' + _s3dEscHtml(l)).join('<br>') : 'Plan enregistré.';
-    if (_s3dPodo.url) { im.src = _s3dPodo.url; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
-    if (deux && _s3dPodo.urlG) { imG.src = _s3dPodo.urlG; imG.style.display = 'block'; imG.style.flex = '1 1 0'; im.style.flex = '1 1 0'; } else { imG.removeAttribute('src'); imG.style.display = 'none'; im.style.flex = ''; }
+    if (_s3dPodo.image) { im.src = _s3dPodo.image; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
+    if (deux && _s3dPodo.imageG) { imG.src = _s3dPodo.imageG; imG.style.display = 'block'; imG.style.flex = '1 1 0'; im.style.flex = '1 1 0'; } else { imG.removeAttribute('src'); imG.style.display = 'none'; im.style.flex = ''; }
     b.textContent = '🦶 Modifier le plan 3D';
   } else {
     r.textContent = 'Aucun plan enregistré.';
@@ -10082,18 +10091,38 @@ function _s3dAfficherPodo() {
     b.textContent = '🦶 Plan de semelles 3D';
   }
 }
+// Enregistre le plan dans le bilan podopédiatrie : JSON + résumé inline, PNG envoyés dans Storage par le circuit habituel
+// (savePodopediatrieBilan → migratePodopediatriePhotos). 2 pieds : `png` = pied droit, `pngG` = pied gauche (obligatoire) ;
+// 1 pied : la clé du pied gauche est effacée (retour d'un plan 2 pieds à 1 pied).
+async function _s3dEnregistrerPodo({ etat, resume, png, pngG }) {
+  if (!currentPatient) throw new Error('aucun patient ouvert');
+  if (!png) throw new Error('image du plan absente');
+  const dataUrl = await _s3dBlobEnDataUrl(png);
+  if (typeof dataUrl !== 'string' || dataUrl.indexOf('data:image/png') !== 0) throw new Error('image du plan invalide');
+  const deux = !!(etat && etat.v === 2 && etat.pieds === 2);
+  let dataUrlG = null;
+  if (deux) {
+    if (!pngG) throw new Error('image du pied gauche absente');
+    dataUrlG = await _s3dBlobEnDataUrl(pngG);
+    if (typeof dataUrlG !== 'string' || dataUrlG.indexOf('data:image/png') !== 0) throw new Error('image du pied gauche invalide');
+  }
+  if (!currentPatient.bilanDataPodopediatrie) currentPatient.bilanDataPodopediatrie = {};
+  const d = currentPatient.bilanDataPodopediatrie;
+  d._semelle3dPlan = etat;
+  d._semelle3dResume = resume;
+  d._semelle3d = dataUrl;
+  delete d._semelle3dPath; // nouvelle image : l'ancien fichier Storage n'est plus la bonne version
+  if (dataUrlG) d._semelle3dG = dataUrlG; else delete d._semelle3dG;
+  delete d._semelle3dGPath;
+  await savePodopediatrieBilan(true);
+  _s3dLireBilanPodo();
+  _s3dAfficherPodo();
+}
 async function ouvrirSemelle3DPodo() {
   let M;
   try { M = await import('./semelle3d/index.js?v=' + APP_BUILD); } catch (_e) { const r = document.getElementById('podo-3d-resume'); if (r) r.textContent = 'Module 3D indisponible hors connexion.'; return; }
-  M.ouvrirSemelle3D({
-    etat: _s3dPodo ? _s3dPodo.etat : null,
-    version: APP_BUILD,
-    onEnregistrer: async ({ etat, resume, png, pngG }) => {
-      _s3dLibererPodo();
-      _s3dPodo = { etat, resume, url: png ? URL.createObjectURL(png) : null, urlG: pngG ? URL.createObjectURL(pngG) : null };
-      _s3dAfficherPodo();
-    }
-  });
+  _s3dLireBilanPodo();
+  M.ouvrirSemelle3D({ etat: _s3dPodo ? _s3dPodo.etat : null, version: APP_BUILD, onEnregistrer: _s3dEnregistrerPodo });
 }
 
 // #99 Restauration différée des canvas morpho/pieds depuis bilanData global
