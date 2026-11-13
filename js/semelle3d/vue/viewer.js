@@ -206,6 +206,8 @@ let positionsAff = null, indicesAff = null, rapport = null, scanPret = false;
 let opts = { inverserY: false, inverserZ: false };
 let coteConfirme = null, sprites = [];
 const fr = (v, n = 1) => Number(v).toFixed(n).replace('.', ',');
+const bordsMm = () => { const v = Number(String($('bords-mm').value).trim().replace(',', '.')); return Number.isFinite(v) ? Math.min(30, Math.max(0, v)) : 5; };
+const majBlocBords = () => { $('bloc-bords').hidden = typeEmpreinte() !== 'creusee'; };
 const typeEmpreinte = () => { const r = document.querySelector('input[name=typeemp]:checked'); return r ? r.value : 'decharge'; };
 
 for (const [cle, lib] of Object.entries({
@@ -283,7 +285,7 @@ function afficherRapport(r) {
     'Grille : ' + g.nx + ' × ' + g.ny + ' à ' + fr(g.pas_mm) + ' mm · ' + g.cellules_valides.toLocaleString('fr-FR') + ' cellules couvertes',
     'Hauteur : de ' + fr(g.hauteur_min_mm, 2) + ' à ' + fr(g.hauteur_max_mm, 2) + ' mm', 'Calcul : ' + r.duree_ms + ' ms (dans le worker)',
   ].concat(r.avertissements.map((t) => '⚠ ' + t)).map((t) => '<div>' + t + '</div>').join('') : [
-    'Type d\'empreinte : ' + (a.type_empreinte === 'creusee' ? 'boîte creusée' + (r.conversion ? ' (bord ' + fr(r.conversion.plateau_pct, 0) + ' % du scan, creux de ' + fr(r.conversion.profondeur_mm, 0) + ' mm, converti en empreinte unique)' : '') : 'pied en décharge'),
+    'Type d\'empreinte : ' + (a.type_empreinte === 'creusee' ? 'boîte creusée' + (r.conversion ? ' (bord ' + fr(r.conversion.plateau_pct, 0) + ' % du scan, creux de ' + fr(r.conversion.profondeur_mm, 0) + ' mm, converti en empreinte unique' + (r.conversion.bords ? ' ; bords gardés jusqu\'à ' + fr(r.conversion.bords.bords_mm, 0) + ' mm au-dessus du pied' : ' ; fond du creux seul') + ')' : '') : 'pied en décharge'),
     'Longueur saisie : ' + fr(a.longueur_pied_mm) + ' mm',
     'Facteur d\'échelle : ×' + fr(a.facteur_echelle, 4) + ' (écart ' + fr(a.ecart_echelle_pct, 2) + ' %)' + (a.unite_probable ? ' · unité probable du fichier : ' + a.unite_probable : ''),
     'Grille : ' + g.nx + ' × ' + g.ny + ' à ' + fr(g.pas_mm) + ' mm · ' + g.cellules_valides.toLocaleString('fr-FR') + ' cellules couvertes',
@@ -330,6 +332,7 @@ async function importer(buffer, nom) {
     $('info-fichier').innerHTML = '<div class="ok">' + nom + '</div><div>Format reconnu : ' + i.format + ' · ' + (i.octets / 1e6).toFixed(2).replace('.', ',') + ' Mo · ' + i.nbTriangles.toLocaleString('fr-FR') + ' triangles · lu en ' + i.ms_lecture + ' ms</div>' + i.avertissements.map((t) => '<div>⚠ ' + t + '</div>').join('');
     noter('import', nom + ' · ' + i.format + ' · ' + i.nbTriangles + ' triangles');
     for (const rb of document.querySelectorAll('input[name=typeemp]')) rb.checked = rb.value === (i.type_probable === 'creusee' ? 'creusee' : 'decharge'); // pré-sélection seulement : le praticien choisit
+    majBlocBords();
     scanPret = true; $('btn-analyser').disabled = false;
     $('etat').textContent = 'scan lu : saisissez la longueur du pied';
     deux.surImport();
@@ -342,11 +345,11 @@ async function analyser(confirmeEcart = false) {
   $('confirm-ecart').hidden = true;
   $('etat').textContent = 'analyse en cours (worker)…';
   try {
-    const r = await demander({ type: 'recaler', longueur_mm: L, confirmeEcart, type_empreinte: typeEmpreinte(), ...opts });
+    const r = await demander({ type: 'recaler', longueur_mm: L, confirmeEcart, type_empreinte: typeEmpreinte(), bords_mm: bordsMm(), ...opts });
     if (r.type === 'confirmation_requise') {
       const e = r.echelle;
       $('confirm-ecart').hidden = false;
-      $('confirm-ecart').innerHTML = '<b>Le scan doit être multiplié par ' + fr(e.facteur_echelle, 3) + '</b> pour mesurer ' + fr(L) + ' mm (écart de ' + fr(e.ecart_echelle_pct, 0) + ' % avec la taille du fichier)' + (e.unite_probable ? ' : le fichier semble être en <b>' + e.unite_probable + '</b>' : '') + '. Confirmez-vous que ' + fr(L) + ' mm est bien la longueur de ce pied ? <br><button id="btn-conf-ecart">Oui, je confirme</button>';
+      $('confirm-ecart').innerHTML = '<b>Changement d\'unité à confirmer.</b> ' + (e.unite_probable ? 'Ce fichier est probablement en <b>' + ({ m: 'mètres', cm: 'centimètres', pouce: 'pouces', mm: 'millimètres' }[e.unite_probable] || e.unite_probable) + '</b>. ' : '') + 'Pour que le pied mesure ' + fr(L) + ' mm, il faut l\'agrandir ×' + fr(e.facteur_echelle, 3) + '. Votre pied mesure-t-il bien ' + fr(L) + ' mm ? <br><button id="btn-conf-ecart">Oui, je confirme</button>';
       $('btn-conf-ecart').onclick = () => { noter('confirmation', 'écart d\'échelle ' + fr(e.ecart_echelle_pct, 1) + ' % confirmé (facteur ' + fr(e.facteur_echelle, 3) + ')'); analyser(true); };
       $('etat').textContent = 'confirmation de l\'échelle requise';
       return;
@@ -384,7 +387,8 @@ $('btn-modeb').onclick = async () => { // mode B : pied générique, sans scan
   } catch (err) { $('etat').textContent = 'erreur : ' + err.message; }
 };
 $('btn-analyser').onclick = () => analyser(false);
-for (const rb of document.querySelectorAll('input[name=typeemp]')) rb.addEventListener('change', () => { if (!scanPret) return; coteConfirme = null; majCote(); noter('modification', 'type d\'empreinte : ' + (rb.value === 'creusee' ? 'boîte creusée' : 'pied en décharge') + ' (choisi par le praticien)'); if (rapport) analyser(true); }); // le côté confirmé n'a plus de valeur : il est à reconfirmer
+$('bords-mm').addEventListener('change', () => { if (!scanPret || !rapport || typeEmpreinte() !== 'creusee') return; coteConfirme = null; majCote(); noter('modification', 'bords gardés : ' + fr(bordsMm(), 0) + ' mm'); analyser(true); });
+for (const rb of document.querySelectorAll('input[name=typeemp]')) rb.addEventListener('change', () => { majBlocBords(); if (!scanPret) return; coteConfirme = null; majCote(); noter('modification', 'type d\'empreinte : ' + (rb.value === 'creusee' ? 'boîte creusée' : 'pied en décharge') + ' (choisi par le praticien)'); if (rapport) analyser(true); }); // le côté confirmé n'a plus de valeur : il est à reconfirmer
 $('btn-cote').onclick = () => {
   const c = document.querySelector('input[name=cote]:checked');
   if (!c) { $('etat').textContent = 'choisissez D ou G avant de confirmer'; return; }
@@ -1089,7 +1093,7 @@ if (HOTE) {
     const axe = henke.exporter();
     return {
       v: VERSION_ETAT, mode: generique ? 'B' : 'A', cote: coteConfirme,
-      fiche: generique ? clone(ficheB) : { longueur_mm: nombreFr('longueur'), inverser_y: !!opts.inverserY, inverser_z: !!opts.inverserZ, ...(typeEmpreinte() === 'creusee' ? { type_empreinte: 'creusee' } : {}) },
+      fiche: generique ? clone(ficheB) : { longueur_mm: nombreFr('longueur'), inverser_y: !!opts.inverserY, inverser_z: !!opts.inverserZ, ...(typeEmpreinte() === 'creusee' ? { type_empreinte: 'creusee', bords_mm: bordsMm() } : {}) },
       base: clone(baseParams()), elements: clone(elements), axe: axe && axe[coteConfirme] ? clone(axe[coteConfirme]) : null,
     };
   }
@@ -1133,6 +1137,11 @@ if (HOTE) {
       if (!rapport || rapport.generique) throw new Error('importez et analysez d\'abord le scan (carte 1)');
       if (!coteConfirme) throw new Error('confirmez le côté du pied (carte 1)');
       if (coteConfirme !== aReprendreA.cote) throw new Error('le scan est un pied ' + (coteConfirme === 'D' ? 'droit' : 'gauche') + ' ; le plan enregistré est pour le pied ' + (aReprendreA.cote === 'D' ? 'droit' : 'gauche'));
+      { // le plan a été fait sur UNE empreinte (type + bords) : la même doit être choisie, sinon le relief (donc la base) diffère
+        const f = aReprendreA.fiche || {}, typeP = f.type_empreinte || 'decharge', bordsP = typeP === 'creusee' ? (f.bords_mm === undefined ? 5 : f.bords_mm) : null;
+        if (typeP !== typeEmpreinte()) throw new Error('le plan enregistré a été fait avec « ' + (typeP === 'creusee' ? 'Boîte creusée' : 'Pied en décharge') + ' » : choisissez le même type d\'empreinte (carte 1)');
+        if (bordsP !== null && Math.abs(bordsP - bordsMm()) > 1e-9) throw new Error('le plan enregistré a été fait avec des bords gardés de ' + fr(bordsP, 0) + ' mm : réglez la même valeur (carte 1)');
+      }
       if (aReprendreA.axe) henke.importer(aReprendreA.cote, aReprendreA.axe);
       ecrireBaseParams(aReprendreA.base); await construireLaBase();
       if (!baseAffichee) throw new Error('la base n\'a pas pu être reconstruite');

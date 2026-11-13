@@ -6,7 +6,9 @@
 import { estValide } from './grille.js';
 import { EPSILON_HAUTEUR_MM } from '../constantes.js';
 
-export function maillerCarte(g, { epsilon = EPSILON_HAUTEUR_MM } = {}) {
+// coque_mm > 0 : au lieu d'un fond plat à z = 0, le dessous suit le relief à `coque_mm` sous la face supérieure (coque mince, comme l'affichage d'une empreinte
+// dans un logiciel de semelles) ; la face inférieure est alors la face plantaire visible depuis dessous. Affichage seulement : jamais utilisé pour la base ni les exports.
+export function maillerCarte(g, { epsilon = EPSILON_HAUTEUR_MM, coque_mm = 0 } = {}) {
   const { nx, ny, pas, ox, oy, z } = g;
   const cellule = (i, j) => {
     if (i < 0 || j < 0 || i > nx - 2 || j > ny - 2) return false;
@@ -29,7 +31,7 @@ export function maillerCarte(g, { epsilon = EPSILON_HAUTEUR_MM } = {}) {
         throw new RangeError('maillage : hauteur <= ' + epsilon + ' mm en (' + i + ', ' + j + ')');
       }
       num[k] = posTemp.length / 6;
-      posTemp.push(ox + i * pas, oy + j * pas, h, ox + i * pas, oy + j * pas, 0);
+      posTemp.push(ox + i * pas, oy + j * pas, h, ox + i * pas, oy + j * pas, coque_mm > 0 ? h - coque_mm : 0);
     }
   };
   for (let j = 0; j < ny - 1; j++) {

@@ -6,7 +6,7 @@ import { compterValides, minMax } from './grille.js';
 import { maillerCarte } from './maillage.js';
 import { verifierMaillage } from './verification.js';
 import { ecrireSTLBinaire, lireSTLBinaire, indexerSommets } from './stl.js';
-import { importerScan, analyserScan, maillageAffichage, fabriquerDemo, fabriquerDemoDeuxPieds, fabriquerDemoBoite, SCENARIOS_DEMO_2P, SCENARIOS_DEMO_BOITE } from './modeA.js';
+import { importerScan, analyserScan, maillageAffichage, fabriquerDemo, fabriquerDemoDeuxPieds, fabriquerDemoBoite, SCENARIOS_DEMO_2P, SCENARIOS_DEMO_BOITE, COQUE_EMPREINTE_MM } from './modeA.js';
 import { construireBase, extraireCoupe } from './base.js';
 import { maillerBase } from './maillage_base.js';
 import { EPAISSEUR_BASE_MIN_MM, EPAISSEUR_TOTALE_AVERTISSEMENT_MM } from '../constantes.js';
@@ -79,7 +79,7 @@ function empreinteGenerique(msg) {
     limites: ['Aucun scan : la forme du pied, la voûte et les têtes métatarsiennes viennent d\'un modèle moyen. L\'export est nommé « indicatif ».'],
     duree_ms: Math.round(maintenant() - t0),
   };
-  const aff = maillageAffichage(g);
+  const aff = maillageAffichage(g, 1, { coque: true });
   return { g, rapport, aff };
 }
 
@@ -107,7 +107,7 @@ export async function traiterMessageA(msg, etat) {
     if (Object.keys(confirmations).length) return { type: 'confirmation_requise', pieds: confirmations };
     etat.analyses = analyses; etat.pieds = null;
     const rapports = {};
-    for (const id of ['A', 'B']) { rapports[id] = analyses[id].rapport; const aff = maillageAffichage(analyses[id].grille); affichage[id] = { positions: aff.positions, indices: aff.indices }; }
+    for (const id of ['A', 'B']) { rapports[id] = analyses[id].rapport; const aff = maillageAffichage(analyses[id].grille, 1, { coque: true }); affichage[id] = { positions: aff.positions, indices: aff.indices }; }
     return { type: 'recale_pieds', rapports, paire: proposerPaire(rapports.A.propositions.cote, rapports.B.propositions.cote), affichage };
   }
   if (msg.type === 'confirmer_pieds') {
@@ -181,15 +181,25 @@ export async function traiterMessageA(msg, etat) {
     const r = analyserScan(etat.scan.mesh, msg);
     if (r.confirmation_requise) return { type: 'confirmation_requise', echelle: r.echelle };
     etat.generique = false;
-    const aff = maillageAffichage(r.grille);
+    const aff = maillageAffichage(r.grille, 1, { avecMurs: true, coque: true });
     etat.plantaire = { grille: r.grille, rapport: r.rapport };
     etat.base = null; etat.finale = null; // une nouvelle empreinte invalide la base et les éléments
     return { type: 'recale', rapport: r.rapport, positions: aff.positions, indices: aff.indices };
   }
   if (msg.type === 'fantome') { // lot 4d : surface du scan (pied fantôme), même repère que la semelle ; affichage seulement
     if (!etat.plantaire) throw new Error('pied fantôme : aucune empreinte analysée');
-    const aff = maillageAffichage(etat.plantaire.grille, 0.05);
-    return { type: 'fantome', positions: aff.positions, indices: aff.indices };
+    // Le pied est POSÉ sur la semelle moulée (et non confondu avec elle) : même calcul d'appui que le pied mannequin (relèvement + inclinaison minimaux pour que
+    // la plante ne traverse jamais le dessus de la semelle, au contact aux points les plus hauts de la semelle). Sans semelle construite : pied à son niveau d'origine.
+    const g = etat.plantaire.grille, socle = 0.05;
+    const aff = maillageAffichage(g, socle, { coque: true });
+    let appui = null;
+    if (etat.finale) {
+      try { const f = etat.finale; appui = appuiMannequin({ nx: f.nx, ny: f.ny, pas: f.pas, ox: f.ox, oy: f.oy, haut: f.haut, hautBase: f.haut_base, z: g.z, socle }); } catch (err) { void err; }
+    }
+    // la coque se pose AU-DESSUS de la plante (la plante est sa face inférieure) : décalage d'une épaisseur de coque
+    const P = aff.positions, dz = COQUE_EMPREINTE_MM;
+    for (let v = 0; v < P.length; v += 3) P[v + 2] += dz + (appui ? appui.a_mm + appui.b * (P[v] - appui.px) + appui.c * (P[v + 1] - appui.py) : 0);
+    return { type: 'fantome', positions: aff.positions, indices: aff.indices, appui: appui ? { a_mm: appui.a_mm, inclinaison_deg: appui.inclinaison_deg, penetration_mm: appui.penetration_mm, borne_atteinte: appui.borne_atteinte } : null };
   }
   if (msg.type === 'mannequin') { // lot 4 bis, étape 5 : pied mannequin anatomique (un seul volume fermé), même repère que la semelle ; affichage seulement
     // Mode B (pied générique, sans scan) : l'empreinte est VIRTUELLE (étroite, sans orteils) ; y coller le pied le rétrécit et écrase les orteils.

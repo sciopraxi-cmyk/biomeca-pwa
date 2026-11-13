@@ -13,6 +13,7 @@ export { teinteSuivante, couleurTeinte, PALETTE_ELEMENTS };
 export function initTransparence(P) {
   const { $, THREE, scene, camera, controls, renderer, demanderRendu, couleurShore, echapper } = P;
   let eclat = false, espace = 12;      // lot 4d : vue éclatée (affichage seulement)
+  let versionSemelle = 0;           // incrémentée à chaque nouvel affichage de la semelle : le fantôme posé dessus doit être recalculé
   const fantomes = new Map();          // lot 4d : clé de pied -> { positions, indices } | 'attente' | 'echec'
   const couleurDe = (e, k, teinte) => (e ? P.couleurElement(e, k) : couleurTeinte(teinte, k)); // un calcul en retard peut contenir un élément déjà retiré : on retombe sur sa teinte
   const dom = renderer.domElement;
@@ -127,18 +128,20 @@ export function initTransparence(P) {
   // Pied fantôme : surface du scan (calculée par le worker, même repère que la semelle), gris transparent, légèrement au-dessus
   function dessinerFantome(g, grp) {
     const k = cle(g), f = fantomes.get(k);
-    if (f === undefined) {
-      fantomes.set(k, 'attente');
+    // Le fantôme est posé sur la semelle : il est recalculé (worker) chaque fois que la semelle change ; l'ancien reste affiché en attendant (pas de clignotement).
+    if (f === undefined || (typeof f === 'object' && f.perime && !f.enCours)) {
+      if (f === undefined) fantomes.set(k, 'attente'); else f.enCours = true;
+      const v0 = versionSemelle;
       P.demander(g.pied ? { type: 'fantome', pied: g.pied } : { type: 'fantome' })
-        .then((r) => { fantomes.set(k, { positions: r.positions, indices: r.indices }); dessiner(); })
+        .then((r) => { fantomes.set(k, { positions: r.positions, indices: r.indices, appui: r.appui, perime: v0 !== versionSemelle }); dessiner(); }) // la semelle a changé pendant le calcul : un nouveau calcul suit
         .catch((err) => { fantomes.set(k, 'echec'); $('el-msg').textContent = 'pied fantôme : scan indisponible (' + err.message + ')'; });
-      return;
+      if (f === undefined) return;
     }
     if (typeof f === 'string') return;
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(f.positions, 3)); geo.setIndex(new THREE.BufferAttribute(f.indices, 1));
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: FANTOME.couleur, transparent: true, opacity: FANTOME.opacite, depthWrite: false, side: THREE.DoubleSide }));
-    m.position.z = FANTOME.souleve_mm; m.renderOrder = 40; m.userData = { role: 'fantome', pied: g.pied, opacite: FANTOME.opacite };
+    m.position.z = 0; m.renderOrder = 40; m.userData = { role: 'fantome', pied: g.pied, opacite: FANTOME.opacite };
     grp.add(m);
   }
   function dessiner() {
@@ -280,7 +283,7 @@ export function initTransparence(P) {
 
   return {
     // groupes = [{ pied: null|'D'|'G', dx, liste, isthme }] ; vide = rien à montrer
-    afficher(g) { groupes = (g || []).filter((x) => x && x.liste); legende(); dessiner(); },
+    afficher(g) { groupes = (g || []).filter((x) => x && x.liste); versionSemelle++; for (const f of fantomes.values()) if (typeof f === 'object') f.perime = true; legende(); dessiner(); },
     effacer() { groupes = []; vider(); legende(); demanderRendu(); },
     relief() { for (const o of racine.children) o.scale.z = relief(); echelle(); demanderRendu(); },
     reset() { corrections.clear(); masques = new Set(); groupes = []; fantomes.clear(); vider(); legende(); },

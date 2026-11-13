@@ -4,6 +4,8 @@ import { lireMaillage } from './lecteurs.js';
 import { recaler } from './recalage.js';
 import { analyserBoite, convertirCreusee } from './empreinte_creusee.js';
 import { boiteEmpreinteFictive } from './boite_fictive.js';
+import { regulariserMasque } from './contour.js';
+import { CONTOUR_EMPREINTE_SIGMA_MM } from '../constantes.js';
 import { rasteriser } from './rasterisation.js';
 import { signalVoute, proposerLateralite } from './lateralite.js';
 import { compterValides, minMax } from './grille.js';
@@ -27,7 +29,8 @@ export async function importerScan(buffer, nom = '') {
 
 // Retour : { confirmation_requise: true, echelle } SANS rasterisation si l'écart d'échelle dépasse 15 % et n'est pas confirmé.
 export const TYPES_EMPREINTE = Object.freeze(['decharge', 'creusee']);
-export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverserY = false, inverserZ = false, type_empreinte = 'decharge' }) {
+export const BORDS_DEFAUT_MM = 5; // largeur de la bande de bords gardée autour du pied ET hauteur au-dessus du point le plus haut du pied (boîte creusée)
+export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverserY = false, inverserZ = false, type_empreinte = 'decharge', bords_mm = BORDS_DEFAUT_MM }) {
   const t0 = maintenant();
   if (!TYPES_EMPREINTE.includes(type_empreinte)) throw new TypeError('type d\'empreinte inconnu : ' + type_empreinte + ' (decharge ou creusee)');
   const creusee = type_empreinte === 'creusee';
@@ -37,12 +40,38 @@ export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverse
   if (!creusee) { try { boiteProbable = analyserBoite(mesh).creusee; } catch (err) { void err; } }
   const r = recaler(conv ? conv.mesh : mesh, longueur_mm, { inverserY, inverserZ, versPied: conv ? conv.versPied : undefined });
   if (r.echelle.confirmation_requise && !confirmeEcart) return { confirmation_requise: true, echelle: r.echelle };
-  const g = rasteriser(r, {});
+  let g, bordsInfo = null;
+  if (conv && bords_mm > 0 && conv.mursIdx.length) {
+    // Bords qui remontent (comme GESPODO) : même repère que le pied (le recalage transforme TOUS les sommets), triangles gardés jusqu'à
+    // « point le plus haut du pied + bords_mm » ; même grille pour le pied et les bords (le pied seul fixe le contour de la semelle).
+    const hLim = r.boite.z_max + bords_mm, P = r.positions, I = conv.mursIdx, garde = [];
+    for (let t = 0; t < I.length; t += 3) {
+      const z0 = P[3 * I[t] + 2], z1 = P[3 * I[t + 1] + 2], z2 = P[3 * I[t + 2] + 2];
+      if (Math.min(z0, z1, z2) > -2) garde.push(I[t], I[t + 1], I[t + 2]);
+    }
+    const union = new Uint32Array(r.indices.length + garde.length); union.set(r.indices); union.set(garde, r.indices.length);
+    let b = { x_min: Infinity, x_max: -Infinity, y_min: Infinity, y_max: -Infinity };
+    for (let k = 0; k < union.length; k++) { const x = P[3 * union[k]], y = P[3 * union[k] + 1]; if (x < b.x_min) b.x_min = x; if (x > b.x_max) b.x_max = x; if (y < b.y_min) b.y_min = y; if (y > b.y_max) b.y_max = y; }
+    g = rasteriser(r, { boite: b });
+    const gu = rasteriser({ positions: P, indices: union }, { boite: b });
+    const murs = new Float32Array(g.z.length).fill(NaN);
+    // Largeur : seule la bande qui moule le pied est gardée (distance horizontale au contour du pied <= bords_mm), pas toute la mousse autour.
+    const dPied = distanceAuPied(g);
+    let nMurs = 0, zMax = 0;
+    for (let k = 0; k < murs.length; k++) if (!Number.isFinite(g.z[k]) && Number.isFinite(gu.z[k]) && gu.z[k] <= hLim && dPied[k] <= bords_mm) { murs[k] = gu.z[k]; nMurs++; if (gu.z[k] > zMax) zMax = gu.z[k]; }
+    g.murs = murs;
+    lisserContourEmpreinte(g);
+    for (let k = 0, n = 0; k < g.murs.length; k++) if (Number.isFinite(g.murs[k])) n++, nMurs = n;
+    bordsInfo = { bords_mm, hauteur_limite_mm: hLim, cellules: nMurs, hauteur_max_mm: zMax };
+  } else { g = rasteriser(r, {}); if (conv) lisserContourEmpreinte(g); }
   const mm = minMax(g);
   if (!mm) throw new RangeError('rasterisation : aucune cellule couverte (scan vide ou hors cadre)');
   const lateralite = proposerLateralite(r.signal_contour, signalVoute(g, longueur_mm));
   const avert = [...r.avertissements];
   if (creusee) {
+    // Le signal « voûte » (hauteur médial / latéral) dépend du relief du fond, que la mousse altère : sur le premier vrai scan (pied gauche) il disait D
+    // (faible), le contour disait G (net). Pour une boîte, le contour du creux prime ; la proposition reste « à confirmer ».
+    if (r.signal_contour && r.signal_contour.valeur) { lateralite.valeur = r.signal_contour.valeur; lateralite.signal_retenu = 'contour'; }
     lateralite.ambigu = true; // jamais décisif pour une boîte : le praticien confirme avec le pied réel
     lateralite.avertissement = 'Boîte creusée : une empreinte creusée se lit facilement en miroir (le creux du pied droit ressemble à un pied gauche) ; confirmez le côté avec le pied réel.';
     avert.unshift(lateralite.avertissement);
@@ -54,7 +83,7 @@ export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverse
     grille: { nx: g.nx, ny: g.ny, pas_mm: g.pas, cellules_valides: compterValides(g), cellules_masquees_pente_raide: g.cellules_pente_raide, hauteur_min_mm: mm.min, hauteur_max_mm: mm.max },
     propositions: { ...r.propositions, cote: lateralite },
     confirmations_requises: ['cote', 'sens_longitudinal', 'sens_vertical'],
-    conversion: conv ? { type: 'creusee', plateau_pct: Math.round(1000 * conv.mesures.plateau_pct) / 10, cavite_pct: Math.round(1000 * conv.mesures.cavite_pct) / 10, profondeur_mm: Math.round(10 * conv.profondeur_brute * r.echelle.facteur_echelle) / 10, triangles_gardes: conv.mesures.triangles_gardes, triangles_total: conv.mesures.triangles_total } : null,
+    conversion: conv ? { type: 'creusee', bords: bordsInfo, plateau_pct: Math.round(1000 * conv.mesures.plateau_pct) / 10, cavite_pct: Math.round(1000 * conv.mesures.cavite_pct) / 10, profondeur_mm: Math.round(10 * conv.profondeur_brute * r.echelle.facteur_echelle) / 10, triangles_gardes: conv.mesures.triangles_gardes, triangles_total: conv.mesures.triangles_total } : null,
     diagnostics: r.diagnostics,
     avertissements: avert,
     limites: ['La longueur saisie est une référence, pas une garantie : l\'ombre du scan (orteils, bords) peut dépasser le pied réel.',
@@ -64,11 +93,37 @@ export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverse
   return { confirmation_requise: false, grille: g, rapport };
 }
 
+// Distance (mm) de chaque cellule à la plus proche cellule du pied (grille.z finie) : transformée en distance « chanfrein 3-4 » (erreur < 8 %).
+export function distanceAuPied(g) {
+  const { nx, ny, pas } = g, n = nx * ny, INF = 1e9, d = new Float32Array(n);
+  for (let k = 0; k < n; k++) d[k] = Number.isFinite(g.z[k]) ? 0 : INF;
+  const relax = (k, kk, w) => { if (d[kk] + w < d[k]) d[k] = d[kk] + w; };
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; if (i > 0) relax(k, k - 1, 3); if (j > 0) { relax(k, k - nx, 3); if (i > 0) relax(k, k - nx - 1, 4); if (i < nx - 1) relax(k, k - nx + 1, 4); } }
+  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) { const k = j * nx + i; if (i < nx - 1) relax(k, k + 1, 3); if (j < ny - 1) { relax(k, k + nx, 3); if (i < nx - 1) relax(k, k + nx + 1, 4); if (i > 0) relax(k, k + nx - 1, 4); } }
+  for (let k = 0; k < n; k++) d[k] = d[k] >= INF ? Infinity : (d[k] / 3) * pas;
+  return d;
+}
+
+// Lissage du contour d'une empreinte issue d'une boîte creusée (modifie g sur place) : 1) le contour du PIED est régularisé (dents et déchirures plus
+// petites que sigma effacées, trous minuscules comblés) ; 2) le contour de l'ensemble pied + bords est régularisé de la même façon, les bords gardent
+// la hauteur de leurs voisins. Le pied n'est jamais agrandi par les bords : la hauteur du pied et le contour de la semelle viennent du pied seul.
+export function lisserContourEmpreinte(g) {
+  const sigma = CONTOUR_EMPREINTE_SIGMA_MM;
+  const pied = regulariserMasque(g, sigma).grille;
+  g.z = pied.z;
+  if (!g.murs) return;
+  const k0 = g.z.length, union = new Float32Array(k0);
+  for (let k = 0; k < k0; k++) union[k] = Number.isFinite(g.z[k]) ? g.z[k] : (Number.isFinite(g.murs[k]) ? g.murs[k] : NaN);
+  const u = regulariserMasque({ ...g, z: union }, sigma).grille;
+  for (let k = 0; k < k0; k++) g.murs[k] = !Number.isFinite(g.z[k]) && Number.isFinite(u.z[k]) ? u.z[k] : NaN;
+}
+
 // Maillage d'AFFICHAGE de H_plantaire : socle de 1 mm ajouté, valeurs négatives ramenées à 0 (affichage seulement).
-export function maillageAffichage(g, socle_mm = 1) {
+export const COQUE_EMPREINTE_MM = 1.5; // épaisseur de la coque d'affichage de l'empreinte
+export function maillageAffichage(g, socle_mm = 1, { avecMurs = false, coque = false } = {}) {
   const c = { ...g, z: new Float32Array(g.z.length) };
-  for (let k = 0; k < g.z.length; k++) c.z[k] = Number.isFinite(g.z[k]) ? Math.max(g.z[k], 0) + socle_mm : NaN;
-  return maillerCarte(c);
+  for (let k = 0; k < g.z.length; k++) c.z[k] = Number.isFinite(g.z[k]) ? Math.max(g.z[k], 0) + socle_mm : (avecMurs && g.murs && Number.isFinite(g.murs[k]) ? Math.max(g.murs[k], 0) + socle_mm : NaN);
+  return maillerCarte(c, coque ? { coque_mm: COQUE_EMPREINTE_MM } : {});
 }
 
 // Scénarios de démonstration : scans SYNTHÉTIQUES exportés dans divers formats, repères et unités.

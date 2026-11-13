@@ -27,6 +27,8 @@ export const UNITES_CONNUES = Object.freeze([
   { nom: 'mm', facteur: 1 }, { nom: 'cm', facteur: 10 }, { nom: 'pouce', facteur: 25.4 }, { nom: 'm', facteur: 1000 },
 ]);
 export const TOLERANCE_UNITE = 0.05;
+// Boîte creusée : le contour de l'empreinte (pied + bords gardés) est lissé comme celui de la base (dents de la mousse effacées). Valeur technique, à juger sur vrai scan.
+export const CONTOUR_EMPREINTE_SIGMA_MM = 3;
 // Recalage : paramètres techniques (pas des valeurs cliniques), signalés dans le rapport.
 export const RECALAGE = Object.freeze({
   ransac_tolerance_mm: 0.5, // distance au plan d'appui comptée « sur le plan »

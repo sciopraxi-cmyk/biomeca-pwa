@@ -129,7 +129,12 @@ export function construireBase(plantaire, params = {}, cat = null) {
     const lim = demi && !avecDevant ? jl : plantaire0.ny - 1;
     for (let j = 0; j <= lim; j++) for (let i = 0; i < plantaire0.nx; i++) { const v = plantaire0.z[j * plantaire0.nx + i]; if (estValide(v) && v < mn) mn = v; }
   }
-  const G = lisserGauss(g, p.lissage_mm);
+  // Bords qui remontent d'une empreinte creusée (grille.murs, hors du pied) : ils ne changent JAMAIS le contour de la semelle (le pied seul le fixe)
+  // mais entrent dans le lissage du moulage, pour que le bord de la base épouse la paroi.
+  const murs = plantaire0.murs && plantaire0.murs.length === g.z.length ? plantaire0.murs : null;
+  let gMoulage = g;
+  if (murs) { const z = new Float32Array(g.z.length); for (let k = 0; k < z.length; k++) z[k] = estValide(g.z[k]) ? g.z[k] : (Number.isFinite(murs[k]) ? murs[k] : NaN); gMoulage = { ...g, z }; }
+  const G = lisserGauss(gMoulage, p.lissage_mm);
   const taux = p.type === 'plate' ? 0 : p.taux;
   const haut = new Float32Array(n), bas = new Float32Array(n);
   // Épaisseur par rangée : celle de la base, puis (2e matériau devant) transition lisse vers l'épaisseur de devant, centrée sur la limite.
