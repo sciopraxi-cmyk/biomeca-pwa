@@ -20,10 +20,11 @@ describe('semelle 3D — noyau de calcul (node:test)', () => {
     });
     const resume = sortie
       .split('\n')
-      .filter((l) => /^ℹ (tests|pass|fail)|^✖/.test(l))
+      .filter((l) => /^ℹ (tests|pass|fail)|^✖|^# tests? \d+/.test(l))
       .join('\n');
     expect(code, resume).toBe(0);
-    expect(sortie).toMatch(/ℹ tests (\d+)/);
-    expect(Number(/ℹ tests (\d+)/.exec(sortie)[1])).toBeGreaterThan(450);
+    const m = /ℹ tests (\d+)/.exec(sortie) || /# tests (\d+)/.exec(sortie);
+    expect(m, resume).not.toBeNull();
+    expect(Number(m[1])).toBeGreaterThan(450);
   }, 1500000);
 });
