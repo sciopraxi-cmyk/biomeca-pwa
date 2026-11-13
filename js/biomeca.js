@@ -24945,6 +24945,22 @@ async function _resolvePodoRapportImages(bd) {
     { key: '_podo_morpho_profilG', baseId: 'imgjs-morpho-profilG', canvasId: 'podo-morpho-profilG', label: 'Profil droit' },
     { key: '_podo_morpho_profilD', baseId: 'imgjs-morpho-profilD', canvasId: 'podo-morpho-profilD', label: 'Profil gauche' }
   ];
+  // V1d3 — images du plan de semelles 3D (`_semelle3d` = pied droit, `_semelle3dG` = pied gauche si 2 pieds).
+  // Un plan enregistré dont l'image est introuvable (ni RAM ni Storage) est 'ko' (mention rouge), jamais silencieusement absent.
+  async function resolve3d(cle) {
+    var dataUrl = (typeof d[cle] === 'string' && d[cle].indexOf('data:') === 0) ? d[cle] : null;
+    var chemin = d[cle + 'Path'];
+    if (!dataUrl && chemin && typeof prefetchPhotoToDataUrl === 'function') {
+      try {
+        var r3 = await prefetchPhotoToDataUrl(chemin);
+        if (r3 && r3.ok && r3.dataUrl) dataUrl = r3.dataUrl;
+      } catch (e) { /* → 'ko' ci-dessous */ }
+    }
+    return dataUrl ? { status: 'ok', dataUrl: dataUrl } : { status: 'ko', dataUrl: null };
+  }
+  var a3d = d._semelle3dPlan && typeof d._semelle3dPlan === 'object';
+  var deux3d = !!(a3d && d._semelle3dPlan.pieds === 2);
+  var rien3d = { status: 'nu', dataUrl: null };
   var results = await Promise.all([
     Promise.all(MORPHO_TILES.map(function (t) {
       return _composePodoMorphoTile(d, t.key, t.baseId, t.canvasId).then(function (r) {
@@ -24956,9 +24972,11 @@ async function _resolvePodoRapportImages(bd) {
       ? _collectAnnotatedPostureViews(d, _MAX_POSTURE_W)
       : Promise.resolve([]),
     // #265 — mannequin 3D enfant (proportions de la période II / III / IV)
-    _m3dVuesRapport(d, d.periode === 'II' || d.periode === 'III' ? d.periode : 'IV')
+    _m3dVuesRapport(d, d.periode === 'II' || d.periode === 'III' ? d.periode : 'IV'),
+    a3d ? resolve3d('_semelle3d') : Promise.resolve(rien3d),
+    deux3d ? resolve3d('_semelle3dG') : Promise.resolve(rien3d)
   ]);
-  return { morpho: results[0], pieds: results[1], annotatedViews: results[2], m3d: results[3] };
+  return { morpho: results[0], pieds: results[1], annotatedViews: results[2], m3d: results[3], semelle3d: results[4], semelle3dG: results[5] };
 }
 
 // Rendu HTML du bloc « Silhouettes morphostatiques » (grille 2×2, cadre rose podo).
@@ -25132,6 +25150,13 @@ async function buildPodopediatrieRapportHTML() {
     _renderPodoMorphoBlock(visuals.morpho) +
     _renderPodoPostureBlock(visuals.annotatedViews);
   var treatmentHtml = _renderPodoPiedsBlock(visuals.pieds);
+  // V1d3 — plan de semelles 3D (image(s) + base + éléments + recouvrement), même constructeur que le sport et le postural :
+  // 2 pieds = pied GAUCHE à gauche, pied DROIT à droite. Placé avec le groupe traitement, après le schéma s'il y en a un.
+  if (d._semelle3dPlan) {
+    treatmentHtml += '<div class="rp-section rp-imgs"><div class="rp-section-title">' + (treatmentHtml ? '🦶 Plan de semelles 3D' : '👣 Plan de semelles') + '</div>'
+      + _s3dRapportHtml(d, visuals.semelle3d.dataUrl, visuals.semelle3d.status, visuals.semelle3dG.dataUrl, visuals.semelle3dG.status)
+      + '</div>';
+  }
   var examInserted = false;
   var treatmentInserted = false;
   var hasMorphoSection = clinical.some(function (s) { return s.isMorpho; });
