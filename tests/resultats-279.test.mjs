@@ -23,7 +23,9 @@ const REF = JSON.parse(readFileSync(join(RACINE, 'tests/golden/resultats-279.jso
 const json = (o) => JSON.parse(JSON.stringify(o));
 const CAS = cas(charger().TESTS);
 
-describe('#279 étape 2 — _construireResultatTest', () => {
+// Délai relevé à 30 s : chaque cas recharge tout biomeca.js dans le harnais (`charger()`), ce qui dépasse les 5 s par défaut sur les machines chargées de la CI
+// (échecs intermittents constatés sur main et sur plusieurs branches, sans rapport avec le code testé).
+describe('#279 étape 2 — _construireResultatTest', { timeout: 30000 }, () => {
   it('E1. Même résultat qu’avant l’extraction, pour les 9 tests, le repli KFPPA et l’amorti en descente', () => {
     expect(Object.keys(REF)).toHaveLength(11);
     expect(CAS.map((c) => c.nom).sort()).toEqual(Object.keys(REF).sort());
