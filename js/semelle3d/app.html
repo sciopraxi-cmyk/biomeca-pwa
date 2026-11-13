@@ -191,6 +191,7 @@
 <dialog id="dlg-image" style="border:1px solid #d5e0f3;border-radius:14px;padding:16px;max-width:96vw;max-height:94vh;overflow:auto"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><b>Image du rapport</b><span id="image-msg" style="flex:1;color:#4b5d7e;font-size:13px"></span><button id="image-telecharger" class="plein" type="button">Télécharger (PNG)</button><button id="image-fermer" type="button">Fermer</button></div><img id="image-apercu" alt="Image du rapport" style="max-width:100%;height:auto;display:block"></dialog>
 <main class="app">
 <section class="col" id="col-gauche">
+  <div style="margin:0 0 8px"><button id="btn-reprendre" hidden style="width:100%">Reprendre le plan enregistré</button></div>
   <details class="card" id="p-scan" open><summary><span class="chip" id="chip-scan" style="--c:#2563eb">1</span>Scan et longueur<span class="badge a" id="badge-scan" hidden></span></summary><div class="c">
     <div class="seg" id="seg-nb" role="radiogroup" aria-label="Nombre de pieds scannés"><label><input type="radio" name="nbpieds" value="1" checked><span>Un pied</span></label><label><input type="radio" name="nbpieds" value="2"><span>Les deux pieds</span></label></div>
     <div class="lbl">Scan</div>
@@ -199,7 +200,6 @@
     <div class="rng champ"><span class="n">Scan de démonstration</span></div>
     <div style="display:flex;gap:6px"><select id="demo" style="flex:1;min-width:0"></select><button id="btn-demo" style="flex:none">Charger</button></div>
     <div id="info-fichier"></div>
-    <div style="margin:6px 0"><button id="btn-reprendre" hidden>Reprendre le plan enregistré</button></div>
     <div id="bloc-modeb">
     <details id="p-modeb"><summary class="lbl" style="cursor:pointer">Sans scan : pied générique (mode B)</summary>
       <small>Pour visualiser une semelle sans empreinte 3D : pied <b>moyen fictif</b> à la longueur saisie. Aperçu <b>indicatif</b>, jamais une mesure du patient.</small>
