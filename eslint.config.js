@@ -75,6 +75,18 @@ export default [
     },
   },
 
+  // js/semelle3d/ : module du plan de semelle 3D (navigateur + Web Worker, chargé à la demande).
+  // Code porté du prototype validé : no-unused-vars en avertissement (dette connue), le reste reste strict.
+  {
+    files: ['js/semelle3d/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.browser, ...globals.worker },
+    },
+    rules: { 'no-unused-vars': 'warn' },
+  },
+
   // js/*.mjs : ES modules clean (calc.mjs pour les calculs cliniques,
   // access.mjs pour le gating). Peuvent tourner en navigateur (chargement
   // futur via import) ou Node (tests Vitest) → on autorise les globals

@@ -5,6 +5,10 @@ js/landing.js
 service-worker.js
 css/biomeca.css
 
+# Module semelle 3D porté du prototype (code dense, motifs des sabotages figés) : à reformater plus tard
+js/semelle3d/
+tests/semelle3d/
+
 # Generated / vendored
 manifest.json
 package-lock.json
