@@ -2,6 +2,8 @@
 // Fonctions pures (appelées par le worker, testables sans navigateur).
 import { lireMaillage } from './lecteurs.js';
 import { recaler } from './recalage.js';
+import { analyserBoite, convertirCreusee } from './empreinte_creusee.js';
+import { boiteEmpreinteFictive } from './boite_fictive.js';
 import { rasteriser } from './rasterisation.js';
 import { signalVoute, proposerLateralite } from './lateralite.js';
 import { compterValides, minMax } from './grille.js';
@@ -15,26 +17,46 @@ const maintenant = () => (typeof performance !== 'undefined' ? performance.now()
 export async function importerScan(buffer, nom = '') {
   const t0 = maintenant();
   const m = await lireMaillage(buffer);
-  return { mesh: m, info: { nom, format: m.format, octets: buffer.byteLength, nbSommets: m.nbSommets, nbTriangles: m.nbTriangles, avertissements: m.avertissements, ms_lecture: Math.round(maintenant() - t0) } };
+  const ms_lecture = Math.round(maintenant() - t0);
+  // Type d'empreinte probable (bord plan + cavité = boîte creusée) : sert seulement à pré-sélectionner le choix du praticien.
+  let type_probable = 'decharge';
+  try { if (analyserBoite(m).creusee) type_probable = 'creusee'; } catch (err) { void err; }
+  const avertissements = type_probable === 'creusee' ? [...m.avertissements, 'Ce scan ressemble à une boîte d\'empreinte creusée (bord plan entourant une cavité) : vérifiez le choix « Type d\'empreinte ».'] : m.avertissements;
+  return { mesh: m, info: { nom, format: m.format, octets: buffer.byteLength, nbSommets: m.nbSommets, nbTriangles: m.nbTriangles, avertissements, type_probable, ms_lecture } };
 }
 
 // Retour : { confirmation_requise: true, echelle } SANS rasterisation si l'écart d'échelle dépasse 15 % et n'est pas confirmé.
-export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverserY = false, inverserZ = false }) {
+export const TYPES_EMPREINTE = Object.freeze(['decharge', 'creusee']);
+export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverserY = false, inverserZ = false, type_empreinte = 'decharge' }) {
   const t0 = maintenant();
-  const r = recaler(mesh, longueur_mm, { inverserY, inverserZ });
+  if (!TYPES_EMPREINTE.includes(type_empreinte)) throw new TypeError('type d\'empreinte inconnu : ' + type_empreinte + ' (decharge ou creusee)');
+  const creusee = type_empreinte === 'creusee';
+  // Boîte creusée : on ne garde que la cavité et on indique le sens du pied ; ensuite c'est le même recalage qu'un pied en décharge.
+  const conv = creusee ? convertirCreusee(mesh) : null;
+  let boiteProbable = false;
+  if (!creusee) { try { boiteProbable = analyserBoite(mesh).creusee; } catch (err) { void err; } }
+  const r = recaler(conv ? conv.mesh : mesh, longueur_mm, { inverserY, inverserZ, versPied: conv ? conv.versPied : undefined });
   if (r.echelle.confirmation_requise && !confirmeEcart) return { confirmation_requise: true, echelle: r.echelle };
   const g = rasteriser(r, {});
   const mm = minMax(g);
   if (!mm) throw new RangeError('rasterisation : aucune cellule couverte (scan vide ou hors cadre)');
   const lateralite = proposerLateralite(r.signal_contour, signalVoute(g, longueur_mm));
+  const avert = [...r.avertissements];
+  if (creusee) {
+    lateralite.ambigu = true; // jamais décisif pour une boîte : le praticien confirme avec le pied réel
+    lateralite.avertissement = 'Boîte creusée : une empreinte creusée se lit facilement en miroir (le creux du pied droit ressemble à un pied gauche) ; confirmez le côté avec le pied réel.';
+    avert.unshift(lateralite.avertissement);
+  }
+  if (boiteProbable) avert.unshift('Ce scan ressemble à une boîte d\'empreinte creusée mais le type « Pied en décharge » est choisi : le relief serait retourné. Choisissez « Boîte creusée » si c\'est bien une boîte.');
   const rapport = {
-    acquisition: { mode: 'A_scan', longueur_pied_mm: longueur_mm, facteur_echelle: r.echelle.facteur_echelle, ecart_echelle_pct: r.echelle.ecart_echelle_pct, ecart_confirme: !!(r.echelle.confirmation_requise && confirmeEcart), unite_probable: r.echelle.unite_probable },
+    acquisition: { mode: 'A_scan', type_empreinte, longueur_pied_mm: longueur_mm, facteur_echelle: r.echelle.facteur_echelle, ecart_echelle_pct: r.echelle.ecart_echelle_pct, ecart_confirme: !!(r.echelle.confirmation_requise && confirmeEcart), unite_probable: r.echelle.unite_probable },
     boite: r.boite,
     grille: { nx: g.nx, ny: g.ny, pas_mm: g.pas, cellules_valides: compterValides(g), cellules_masquees_pente_raide: g.cellules_pente_raide, hauteur_min_mm: mm.min, hauteur_max_mm: mm.max },
     propositions: { ...r.propositions, cote: lateralite },
     confirmations_requises: ['cote', 'sens_longitudinal', 'sens_vertical'],
+    conversion: conv ? { type: 'creusee', plateau_pct: Math.round(1000 * conv.mesures.plateau_pct) / 10, cavite_pct: Math.round(1000 * conv.mesures.cavite_pct) / 10, profondeur_mm: Math.round(10 * conv.profondeur_brute * r.echelle.facteur_echelle) / 10, triangles_gardes: conv.mesures.triangles_gardes, triangles_total: conv.mesures.triangles_total } : null,
     diagnostics: r.diagnostics,
-    avertissements: r.avertissements,
+    avertissements: avert,
     limites: ['La longueur saisie est une référence, pas une garantie : l\'ombre du scan (orteils, bords) peut dépasser le pied réel.',
       'Le facteur est calculé sur la boîte englobante le long de l\'axe de l\'ACP (écart d\'axe possible de quelques degrés).'],
     duree_ms: Math.round(maintenant() - t0),
@@ -66,6 +88,19 @@ export const SCENARIOS_DEMO_2P = Object.freeze({
   deux_pieds_separes: { libelle: 'Les 2 pieds — séparés (D 265 mm, G 258 mm)', ecart_mm: 130 },
   deux_pieds_colles: { libelle: 'Les 2 pieds — collés, un seul bloc (D 265 mm, G 258 mm)', ecart_mm: 95 },
 });
+// Boîtes d'empreinte creusées FICTIVES (banc de contrôle seulement) : bord plan + cavité à la forme d'un pied fictif, STL en mm, posées de travers.
+export const SCENARIOS_DEMO_BOITE = Object.freeze({
+  boite_creusee_droit: { libelle: 'Boîte creusée — pied droit (fictif) — STL, mm', cote: 'D', longueur_mm: 265 },
+  boite_creusee_gauche: { libelle: 'Boîte creusée — pied gauche (fictif) — STL, mm', cote: 'G', longueur_mm: 258 },
+});
+export function fabriquerDemoBoite(scenario) {
+  const s = SCENARIOS_DEMO_BOITE[scenario];
+  if (!s) throw new TypeError('scénario inconnu : ' + scenario);
+  const b = boiteEmpreinteFictive({ cote: s.cote, longueur_mm: s.longueur_mm });
+  const m = transformerMaillage(b, { R: produit(rotZ(deg(200)), rotX(deg(60))), t: [10, 20, 30] });
+  return { buffer: ecrireSTLBinaireScan(m), nom: 'demo_synthetique_' + scenario + '.stl', longueur_suggeree_mm: s.longueur_mm, cote_reel: s.cote, libelle: s.libelle, type_empreinte: 'creusee' };
+}
+
 export function fabriquerDemoDeuxPieds(scenario) {
   const s = SCENARIOS_DEMO_2P[scenario];
   if (!s) throw new TypeError('scénario inconnu : ' + scenario);

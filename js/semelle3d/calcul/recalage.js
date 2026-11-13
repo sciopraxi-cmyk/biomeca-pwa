@@ -167,6 +167,8 @@ export function recaler(mesh, longueur_mm, options = {}) {
   let sens = haut.score >= bas.score ? 1 : -1;
   const confVertical = (Math.max(haut.score, bas.score) + 1) / (Math.min(haut.score, bas.score) + 1);
   const propVertical = { valeur: sens === 1 ? '+e3' : '-e3', confiance: confVertical, a_confirmer: true, ambigu: confVertical < P.seuil_confiance_vertical };
+  // Boîte creusée : le sens du pied (vers le bord de la boîte) est connu, il n'est plus deviné par le plan le plus plat.
+  if (options.versPied) { sens = dot(e3, unit(options.versPied)) >= 0 ? 1 : -1; propVertical.valeur = sens === 1 ? '+e3' : '-e3'; propVertical.imposee = true; propVertical.ambigu = false; }
   if (options.inverserZ) sens = -sens;
   const plan = sens === 1 ? haut : bas;
   if (plan.repli) avertissements.push('plan d\'appui : repli sur le plan de la boîte (RANSAC sans candidat valable)');

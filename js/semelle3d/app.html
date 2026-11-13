@@ -210,6 +210,9 @@
     </details>
     </div>
     <div id="bloc-1p">
+    <div class="lbl">Type d'empreinte</div>
+    <div class="seg" id="seg-type" role="radiogroup" aria-label="Type d'empreinte"><label><input type="radio" name="typeemp" value="decharge" checked><span>Pied en décharge (bombé)</span></label><label><input type="radio" name="typeemp" value="creusee"><span>Boîte creusée</span></label></div>
+    <small id="type-aide">Pied en décharge : le scan montre la face plantaire du pied. Boîte creusée : le scan montre une boîte d'empreinte (bord plan + creux du pied) ; elle est convertie en la même empreinte.</small>
     <div class="lbl">Longueur exacte du pied</div>
     <div class="rng champ"><span class="n"><input type="text" id="longueur" inputmode="decimal" placeholder="ex. 265" style="width:84px"> mm</span><button id="btn-analyser" disabled>Analyser le scan</button></div>
     <small>Elle fixe l'échelle du scan (podomètre). Aucune unité n'est supposée.</small>

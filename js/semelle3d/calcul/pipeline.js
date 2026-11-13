@@ -6,7 +6,7 @@ import { compterValides, minMax } from './grille.js';
 import { maillerCarte } from './maillage.js';
 import { verifierMaillage } from './verification.js';
 import { ecrireSTLBinaire, lireSTLBinaire, indexerSommets } from './stl.js';
-import { importerScan, analyserScan, maillageAffichage, fabriquerDemo, fabriquerDemoDeuxPieds, SCENARIOS_DEMO_2P } from './modeA.js';
+import { importerScan, analyserScan, maillageAffichage, fabriquerDemo, fabriquerDemoDeuxPieds, fabriquerDemoBoite, SCENARIOS_DEMO_2P, SCENARIOS_DEMO_BOITE } from './modeA.js';
 import { construireBase, extraireCoupe } from './base.js';
 import { maillerBase } from './maillage_base.js';
 import { EPAISSEUR_BASE_MIN_MM, EPAISSEUR_TOTALE_AVERTISSEMENT_MM } from '../constantes.js';
@@ -142,6 +142,10 @@ export async function traiterMessageA(msg, etat) {
   if (msg.type === 'demo' && SCENARIOS_DEMO_2P[msg.scenario]) {
     const d = fabriquerDemoDeuxPieds(msg.scenario);
     return { type: 'demo', buffer: d.buffer, nom: d.nom, longueurs_suggerees_mm: d.longueurs_suggerees_mm, libelle: d.libelle };
+  }
+  if (msg.type === 'demo' && SCENARIOS_DEMO_BOITE[msg.scenario]) {
+    const d = fabriquerDemoBoite(msg.scenario);
+    return { type: 'demo', buffer: d.buffer, nom: d.nom, longueur_suggeree_mm: d.longueur_suggeree_mm, cote_reel: d.cote_reel, libelle: d.libelle };
   }
   if (msg.type === 'demo') {
     const d = fabriquerDemo(msg.scenario);
