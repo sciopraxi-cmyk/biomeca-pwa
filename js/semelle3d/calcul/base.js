@@ -55,6 +55,10 @@ export function validerParametresBase(p = {}) {
     if (q.biseau_deg < BISEAU_MEDIAL.angle_min_deg || q.biseau_deg > BISEAU_MEDIAL.angle_max_deg) {
       throw new RangeError('base : angle du biseau hors de ' + BISEAU_MEDIAL.angle_min_deg + ' à ' + BISEAU_MEDIAL.angle_max_deg + '°');
     }
+    nombre(q.biseau_lateral_deg, 'angle du biseau latéral');
+    if (q.biseau_lateral_deg !== 0 && (q.biseau_lateral_deg < BISEAU_MEDIAL.angle_min_deg || q.biseau_lateral_deg > BISEAU_MEDIAL.angle_max_deg)) {
+      throw new RangeError('base : angle du biseau latéral hors de ' + BISEAU_MEDIAL.angle_min_deg + ' à ' + BISEAU_MEDIAL.angle_max_deg + '° (0 = aucun biseau latéral)');
+    }
   }
   return q;
 }
@@ -69,6 +73,13 @@ export function biseauMedial(haut, epaisseur_mm, distanceMedial, angle_deg) {
     bas[k] = estValide(haut[k]) ? Math.max(0, haut[k] - e - distanceMedial[k] * t) : NaN;
   }
   return bas;
+}
+
+// Distance au contour LISSÉE : la distance calculée depuis des cellules en marches de 0,5 mm est quantifiée ; le dessous de la biseau en gardait
+// des dents (retour de Joël : « les bords sont dentelés »). Un flou léger (sigma en mm) rend la pente continue ; 0 sur les sources n'est plus exact (<= sigma / 2 d'écart).
+export function lisserDistance(g, d, sigma_mm) {
+  const f = Float64Array.from(d, (v) => (Number.isFinite(v) ? v : 1e4));
+  return Float32Array.from(flouGauss(f, g.nx, g.ny, g.pas, sigma_mm, 'zero'));
 }
 
 // Fin d'une demi-semelle : rangées au-delà de jl retirées, puis OUVERTURE morphologique (érosion puis dilatation par un disque de rayon R)
@@ -133,7 +144,18 @@ export function construireBase(plantaire, params = {}, cat = null) {
   // mais entrent dans le lissage du moulage, pour que le bord de la base épouse la paroi.
   const murs = plantaire0.murs && plantaire0.murs.length === g.z.length ? plantaire0.murs : null;
   let gMoulage = g;
-  if (murs) { const z = new Float32Array(g.z.length); for (let k = 0; k < z.length; k++) z[k] = estValide(g.z[k]) ? g.z[k] : (Number.isFinite(murs[k]) ? murs[k] : NaN); gMoulage = { ...g, z }; }
+  if (murs) {
+    // Les cellules du pied retirées par la régularisation du contour (dents effacées) n'ont ni hauteur ni mur : elles laissaient des TROUS dans le
+    // champ du lissage, d'où des sauts de ~2 mm sur le bord (retour de Joël : « les bords sont dentelés »). On y remet la hauteur d'origine du pied.
+    const z = new Float32Array(g.z.length), z0 = plantaire0.z, rMax = demi && !avecDevant ? jl : Infinity;
+    for (let k = 0; k < z.length; k++) {
+      if (estValide(g.z[k])) z[k] = g.z[k];
+      else if (Number.isFinite(murs[k])) z[k] = murs[k];
+      else if (reg && z0.length === z.length && Number.isFinite(z0[k]) && Math.floor(k / g.nx) <= rMax) z[k] = z0[k];
+      else z[k] = NaN;
+    }
+    gMoulage = { ...g, z };
+  }
   const G = lisserGauss(gMoulage, p.lissage_mm);
   const taux = p.type === 'plate' ? 0 : p.taux;
   const haut = new Float32Array(n), bas = new Float32Array(n);
@@ -159,6 +181,27 @@ export function construireBase(plantaire, params = {}, cat = null) {
   if (p.contour_lisse) contour = lisserContour({ ...g, z: haut }, { champ: reg.champ, deplacementMaxPas: CONTOUR_LISSAGE.deplacement_max_regularise_pas });
   else if (p.type === 'pleine_dessous') contour = lisserContour({ ...g, z: haut });
   if (p.contour_lisse && contour) { base.dx = contour.dx; base.dy = contour.dy; }
+  // Hauteur AU POINT DÉPLACÉ : un nœud du contour glisse de dx, dy vers le vrai bord, mais gardait la hauteur de sa cellule : le long d'un bord oblique,
+  // la hauteur montait par marches de ~0,3 mm (×3 avec le relief : « les bords sont dentelés »). On la corrige au 1er ordre avec la pente locale du moulage.
+  if (p.contour_lisse && contour) {
+    const nx = g.nx, ny = g.ny, h0 = Float32Array.from(haut);
+    const pente = (k, i, j, di, dj) => { // dérivée de h0 selon (di, dj), centrée si les deux voisins existent, sinon unilatérale, 0 si aucun
+      const kp = (j + dj) * nx + (i + di), km = (j - dj) * nx + (i - di);
+      const vp = i + di >= 0 && i + di < nx && j + dj >= 0 && j + dj < ny && estValide(h0[kp]), vm = i - di >= 0 && i - di < nx && j - dj >= 0 && j - dj < ny && estValide(h0[km]);
+      if (vp && vm) return (h0[kp] - h0[km]) / (2 * g.pas);
+      if (vp) return (h0[kp] - h0[k]) / g.pas;
+      if (vm) return (h0[k] - h0[km]) / g.pas;
+      return 0;
+    };
+    for (let k = 0; k < n; k++) {
+      if (!contour.bord[k] || !estValide(haut[k]) || (contour.dx[k] === 0 && contour.dy[k] === 0)) continue;
+      const i = k % nx, j = Math.floor(k / nx);
+      const dh = pente(k, i, j, 1, 0) * contour.dx[k] + pente(k, i, j, 0, 1) * contour.dy[k];
+      const borne = Math.max(-1, Math.min(1, dh)); // la correction reste petite (déplacement <= 1,2 pas)
+      haut[k] += borne;
+      if (p.type === 'thermoformee' || p.type === 'pleine_dessous') bas[k] = Math.max(0, haut[k] - ep[k]);
+    }
+  }
   // Nœuds du contour de l'empreinte COMPLÈTE (avant la coupe en demi-semelle) : servent aux éléments de bord (voûte…).
   if (!contour) contour = lisserContour({ ...g, z: haut });
   base.contourBord = { bord: contour.bord, normX: contour.normX, normY: contour.normY };
@@ -169,13 +212,37 @@ export function construireBase(plantaire, params = {}, cat = null) {
     const cosOuv = Math.cos((BISEAU_MEDIAL.ouverture_deg * Math.PI) / 180);
     const sources = new Uint8Array(n);
     let ns = 0;
-    for (let k = 0; k < n; k++) if (contour.bord[k] && contour.normX[k] * med >= cosOuv) { sources[k] = 1; ns++; }
+    // Talon : chaque biseau contourne l'arrière du talon jusqu'à son milieu (retour de Joël : « on doit voir un talon qui a le biseau »).
+    // Axe du talon = x moyen des cellules des rangées du talon ; sont ajoutés les nœuds du contour qui regardent vers l'arrière, du côté du biseau.
+    const jTalon = jmin + Math.round(BISEAU_MEDIAL.talon_pct / 100 * (jmax - jmin));
+    let sxT = 0, nT = 0;
+    for (let j = jmin; j <= jmin + Math.round(0.15 * (jmax - jmin)); j++) for (let i = 0; i < g.nx; i++) if (estValide(haut[j * g.nx + i])) { sxT += g.ox + i * g.pas; nT++; }
+    const axeTalon = nT ? sxT / nT : 0;
+    const surTalon = (k, signe) => { // signe = +1 : côté médial ; -1 : côté latéral
+      const j = Math.floor(k / g.nx), i = k % g.nx;
+      return j <= jTalon && contour.normY[k] < 0 && (g.ox + i * g.pas - axeTalon) * med * signe >= 0;
+    };
+    let talonMed = 0, talonLat = 0;
+    for (let k = 0; k < n; k++) if (contour.bord[k] && (contour.normX[k] * med >= cosOuv || surTalon(k, 1))) { sources[k] = 1; ns++; if (surTalon(k, 1)) talonMed++; }
     if (ns === 0) throw new Error('base intermédiaire : aucun contour médial trouvé');
-    const d = distanceAuxSources(g.nx, g.ny, g.pas, sources);
+    const d = lisserDistance(g, distanceAuxSources(g.nx, g.ny, g.pas, sources), BISEAU_MEDIAL.lissage_mm);
     base.bas = biseauMedial(haut, ep, d, p.biseau_deg);
     let largeur = 0;
     for (let k = 0; k < n; k++) if (estValide(haut[k]) && base.bas[k] > 0 && d[k] > largeur) largeur = d[k];
-    biseau = { angle_deg: p.biseau_deg, cote: p.cote, noeuds_contour_medial: ns, largeur_max_mm: largeur };
+    biseau = { angle_deg: p.biseau_deg, cote: p.cote, noeuds_contour_medial: ns, largeur_max_mm: largeur, lateral: null, talon: { noeuds_medial: talonMed, noeuds_lateral: 0, axe_x_mm: axeTalon } };
+    // Biseau LATÉRAL : même règle, avec le contour dont la normale pointe vers l'extérieur du pied du côté latéral (opposé au médial) ; talon et avant-pied inchangés.
+    // Le dessous est le plus haut des deux dessous (le biseau le plus proche du point domine).
+    if (p.biseau_lateral_deg > 0) {
+      const srcL = new Uint8Array(n);
+      let nl = 0;
+      for (let k = 0; k < n; k++) if (contour.bord[k] && (contour.normX[k] * med <= -cosOuv || surTalon(k, -1))) { srcL[k] = 1; nl++; if (surTalon(k, -1)) talonLat++; }
+      if (nl === 0) throw new Error('base intermédiaire : aucun contour latéral trouvé');
+      const dl = lisserDistance(g, distanceAuxSources(g.nx, g.ny, g.pas, srcL), BISEAU_MEDIAL.lissage_mm);
+      const basL = biseauMedial(haut, ep, dl, p.biseau_lateral_deg);
+      let largL = 0;
+      for (let k = 0; k < n; k++) if (estValide(haut[k])) { if (basL[k] > base.bas[k]) base.bas[k] = basL[k]; if (basL[k] > 0 && dl[k] > largL) largL = dl[k]; }
+      biseau.talon.noeuds_lateral = talonLat; biseau.lateral = { angle_deg: p.biseau_lateral_deg, noeuds_contour_lateral: nl, largeur_max_mm: largL };
+    }
   }
   let ep0 = Infinity, ep1 = -Infinity, h1 = -Infinity;
   for (let k = 0; k < n; k++) {

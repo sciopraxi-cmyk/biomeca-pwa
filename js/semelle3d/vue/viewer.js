@@ -424,7 +424,7 @@ function apresAnalyse() {
 function majFormulaireBase() {
   $('taux-val').textContent = $('taux').value + ' %';
   $('taux').disabled = typeBase() === 'plate';
-  $('ligne-biseau').hidden = typeBase() !== 'pleine_dessous';
+  $('ligne-biseau').hidden = typeBase() !== 'pleine_dessous'; $('ligne-biseau-lat').hidden = typeBase() !== 'pleine_dessous';
   const demi = etendue() === 'demi', rien = devant() === 'rien';
   $('bloc-demi').hidden = !demi; $('limite-val').textContent = $('limite').value + ' %';
   $('bloc-devant').hidden = rien; $('bloc-arrondi').hidden = !rien; // l'arrondi n'agit que sans matériau devant
@@ -434,7 +434,7 @@ const devant = () => document.querySelector('input[name=devant]:checked').value;
 function baseParams() {
   const t = typeBase();
   const p = { type: t, taux: Number($('taux').value) / 100, epaisseur_mm: nombreFr('epaisseur'), lissage_mm: nombreFr('lissage'), contour_lisse: $('contour-lisse').checked, forme_semelle: $('forme-semelle').checked, moulage_tetes: $('moulage-tetes').checked };
-  if (t === 'pleine_dessous') { p.cote = coteConfirme; p.biseau_deg = nombreFr('biseau'); }
+  if (t === 'pleine_dessous') { p.cote = coteConfirme; p.biseau_deg = nombreFr('biseau'); p.biseau_lateral_deg = nombreFr('biseau-lat'); }
   p.materiau_id = $('base-materiau').value || null;
   p.etendue = etendue();
   if (p.etendue === 'demi') {
@@ -452,7 +452,7 @@ function ecrireBaseParams(p) { // inverse de baseParams : remet le formulaire da
   const nb = (id, v) => { if (v !== undefined && v !== null && Number.isFinite(v)) $(id).value = texteNombre(v, 3); };
   if (p.type) coche('type-base', p.type);
   if (p.taux !== undefined) $('taux').value = String(Math.round(p.taux * 100));
-  nb('epaisseur', p.epaisseur_mm); nb('lissage', p.lissage_mm); nb('biseau', p.biseau_deg);
+  nb('epaisseur', p.epaisseur_mm); nb('lissage', p.lissage_mm); nb('biseau', p.biseau_deg); if (p.biseau_lateral_deg !== undefined) nb('biseau-lat', p.biseau_lateral_deg); else if (p.type === 'pleine_dessous' && p.biseau_deg !== undefined) $('biseau-lat').value = '0'; // plan enregistré AVANT le biseau latéral : relu sans biseau latéral (le résultat d'origine ne change pas)
   if (p.contour_lisse !== undefined) $('contour-lisse').checked = !!p.contour_lisse;
   if (p.forme_semelle !== undefined) $('forme-semelle').checked = !!p.forme_semelle;
   if (p.moulage_tetes !== undefined) $('moulage-tetes').checked = !!p.moulage_tetes;
@@ -476,6 +476,7 @@ function statsBase(R) {
   L.push(R.moulage_tetes ? 'Têtes métatarsiennes : relief de l\'empreinte moulé' : 'Têtes métatarsiennes : relief aplati (plateau de ' + fr(Math.max(0, R.tetes_aplaties.plateau_mm), 1) + ' mm), voûte gardée');
   if (R.forme_semelle && R.forme_semelle.applique) L.push('Devant arrondi (semelle classique) : le contour suit l\'empreinte au talon et sur les bords médial et latéral ; le devant ne reproduit plus les orteils');
   if (R.biseau) L.push('Biseau médial : ' + fr(R.biseau.angle_deg, 0) + '° côté ' + (R.biseau.cote === 'D' ? 'droit (bord -X)' : 'gauche (bord +X)') + ', largeur max. ' + fr(R.biseau.largeur_max_mm, 1) + ' mm');
+  if (R.biseau && R.biseau.lateral) L.push('Biseau latéral : ' + fr(R.biseau.lateral.angle_deg, 0) + '° côté ' + (R.biseau.cote === 'D' ? 'droit (bord +X)' : 'gauche (bord -X)') + ', largeur max. ' + fr(R.biseau.lateral.largeur_max_mm, 1) + ' mm');
   $('legende-zones').hidden = limiteDevant(R) === null;
   if (R.etendue && R.etendue.mode === 'demi') {
     L.push('Demi-semelle : du talon à <b>' + fr(R.etendue.limite_pct, 0) + ' %</b> (' + fr(R.etendue.limite_mm, 0) + ' mm sur ' + fr(R.etendue.longueur_empreinte_mm, 0) + ' mm) · devant : ' + (R.etendue.devant === 'rien' ? '<b>rien</b> (angles du bout arrondis)' : '<b>2<sup>e</sup> matériau</b> de ' + fr(R.etendue.epaisseur_devant_mm, 2) + ' mm, raccord ' + fr(R.etendue.raccord_devant_mm, 0) + ' mm'));
@@ -634,7 +635,7 @@ function epaisseurDepuisMateriau(idMat, idEp, idMsg, nom) {
 $('base-materiau').addEventListener('change', () => epaisseurDepuisMateriau('base-materiau', 'epaisseur', 'base-ep-auto', 'de la base'));
 $('devant-materiau').addEventListener('change', () => epaisseurDepuisMateriau('devant-materiau', 'ep-devant', 'devant-ep-auto', 'de devant'));
 for (const id of ['taux']) $(id).addEventListener('input', programmer);
-for (const id of ['epaisseur', 'lissage', 'biseau', 'contour-lisse', 'forme-semelle', 'moulage-tetes', 'base-materiau', 'devant-materiau', 'ep-devant', 'raccord-devant', 'arrondi']) $(id).addEventListener('change', programmer);
+for (const id of ['epaisseur', 'lissage', 'biseau', 'biseau-lat', 'contour-lisse', 'forme-semelle', 'moulage-tetes', 'base-materiau', 'devant-materiau', 'ep-devant', 'raccord-devant', 'arrondi']) $(id).addEventListener('change', programmer);
 $('limite').addEventListener('input', programmer);
 for (const id of ['grav-actif', 'grav-nom', 'grav-date', 'grav-prof']) $(id).addEventListener(id === 'grav-actif' ? 'change' : 'input', () => { $('bloc-grav').style.opacity = $('grav-actif').checked ? '' : '.45'; if (deux.actif() || baseAffichee) programmerElements(); });
 for (const rb of document.querySelectorAll('input[name=etendue], input[name=devant]')) rb.addEventListener('change', programmer);
