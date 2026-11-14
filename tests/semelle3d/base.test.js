@@ -127,7 +127,7 @@ test('biseau MÉDIAL : pied droit -> bande biseautée du côté -X, pied gauche 
   for (const [cote, signe] of [['D', -1], ['G', 1]]) {
     const g = scanPose(cote);
     const th = construireBase(g, { type: 'thermoformee', taux: 1, contour_lisse: false });
-    const b = construireBase(g, { type: 'pleine_dessous', taux: 1, cote, contour_lisse: false });
+    const b = construireBase(g, { type: 'pleine_dessous', taux: 1, cote, contour_lisse: false, biseau_lateral_deg: 0 }); // biseau médial seul (le latéral a ses propres tests : biseau_lateral.test.js)
     let sx = 0, n = 0;
     for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
       const k = j * g.nx + i;

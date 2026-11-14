@@ -51,7 +51,7 @@ export const RECALAGE = Object.freeze({
 // --- Lot 2 : base (moulage, épaisseur, lissage, contour) ---
 export const TYPES_BASE = Object.freeze(['plate', 'thermoformee', 'pleine_dessous']);
 // Réglages par défaut = DÉCISIONS DE JOËL du 31/10/2026 (type thermoformée, taux 50 %, épaisseur 1,5 mm, lissage 3 mm depuis le 31/10 soir, biseau 45°).
-export const BASE_DEFAUTS = Object.freeze({ type: 'thermoformee', taux: 0.5, epaisseur_mm: 1.5, lissage_mm: 3, biseau_deg: 45, contour_lisse: true,
+export const BASE_DEFAUTS = Object.freeze({ type: 'thermoformee', taux: 0.5, epaisseur_mm: 1.5, lissage_mm: 3, biseau_deg: 45, biseau_lateral_deg: 45, // biseau latéral (demande de Joël 14/11) : même règle que le médial ; 0 = aucun contour_lisse: true,
   // Lot 3 bis : matériau de la base (tableau PODAXIA), étendue entière ou demi-semelle, 2e matériau devant.
   forme_semelle: false, moulage_tetes: true, materiau_id: null, etendue: 'entiere', limite_pct: 60, devant: 'materiau2', materiau_devant_id: null, epaisseur_devant_mm: null, raccord_devant_mm: 20, arrondi_mm: 8 });
 // Décision de Joël (31/10) : les résines Flex et Flux font de 0,9 à 1,8 mm -> une base est acceptée à partir de 0,9 mm

@@ -55,6 +55,10 @@ export function validerParametresBase(p = {}) {
     if (q.biseau_deg < BISEAU_MEDIAL.angle_min_deg || q.biseau_deg > BISEAU_MEDIAL.angle_max_deg) {
       throw new RangeError('base : angle du biseau hors de ' + BISEAU_MEDIAL.angle_min_deg + ' à ' + BISEAU_MEDIAL.angle_max_deg + '°');
     }
+    nombre(q.biseau_lateral_deg, 'angle du biseau latéral');
+    if (q.biseau_lateral_deg !== 0 && (q.biseau_lateral_deg < BISEAU_MEDIAL.angle_min_deg || q.biseau_lateral_deg > BISEAU_MEDIAL.angle_max_deg)) {
+      throw new RangeError('base : angle du biseau latéral hors de ' + BISEAU_MEDIAL.angle_min_deg + ' à ' + BISEAU_MEDIAL.angle_max_deg + '° (0 = aucun biseau latéral)');
+    }
   }
   return q;
 }
@@ -175,7 +179,20 @@ export function construireBase(plantaire, params = {}, cat = null) {
     base.bas = biseauMedial(haut, ep, d, p.biseau_deg);
     let largeur = 0;
     for (let k = 0; k < n; k++) if (estValide(haut[k]) && base.bas[k] > 0 && d[k] > largeur) largeur = d[k];
-    biseau = { angle_deg: p.biseau_deg, cote: p.cote, noeuds_contour_medial: ns, largeur_max_mm: largeur };
+    biseau = { angle_deg: p.biseau_deg, cote: p.cote, noeuds_contour_medial: ns, largeur_max_mm: largeur, lateral: null };
+    // Biseau LATÉRAL : même règle, avec le contour dont la normale pointe vers l'extérieur du pied du côté latéral (opposé au médial) ; talon et avant-pied inchangés.
+    // Le dessous est le plus haut des deux dessous (le biseau le plus proche du point domine).
+    if (p.biseau_lateral_deg > 0) {
+      const srcL = new Uint8Array(n);
+      let nl = 0;
+      for (let k = 0; k < n; k++) if (contour.bord[k] && contour.normX[k] * med <= -cosOuv) { srcL[k] = 1; nl++; }
+      if (nl === 0) throw new Error('base intermédiaire : aucun contour latéral trouvé');
+      const dl = distanceAuxSources(g.nx, g.ny, g.pas, srcL);
+      const basL = biseauMedial(haut, ep, dl, p.biseau_lateral_deg);
+      let largL = 0;
+      for (let k = 0; k < n; k++) if (estValide(haut[k])) { if (basL[k] > base.bas[k]) base.bas[k] = basL[k]; if (basL[k] > 0 && dl[k] > largL) largL = dl[k]; }
+      biseau.lateral = { angle_deg: p.biseau_lateral_deg, noeuds_contour_lateral: nl, largeur_max_mm: largL };
+    }
   }
   let ep0 = Infinity, ep1 = -Infinity, h1 = -Infinity;
   for (let k = 0; k < n; k++) {
