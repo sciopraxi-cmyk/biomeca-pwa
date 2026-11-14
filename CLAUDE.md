@@ -1070,6 +1070,39 @@ sans doublon, et une proposition déjà présente ne consomme pas de ligne.
   ne dit rien si la saisie locale est identique au serveur ou déjà gardée dans une copie `bm4-recuperation`. Aucun dialogue bloquant ne doit
   se déclencher à chaque ouverture.
 
+## Semelle 3D — acquis (PR #363 à #366)
+
+La **Semelle 3D** (`js/semelle3d/`, page `app.html` en iframe plein écran, import dynamique) est intégrée aux bilans sport, postural
+et podopédiatrie (PR #363). Le scan n'est **jamais conservé** : le bilan enregistre les paramètres du plan, une image et un résumé
+(éléments, base, recouvrement). Mode A = scan STL/OBJ/PLY/3MF + longueur du pied saisie en premier ; la latéralité est à confirmer.
+
+- **Empreinte unique (PR #364)** : un scan de boîte creusée (mousse) devient la même empreinte qu'un pied en décharge
+  (`calcul/empreinte_creusee.js`, `analyserScan(..., { type_empreinte: 'decharge'|'creusee', bords_mm })`). Les bords qui remontent
+  sont gardés (`grille.murs`) : ils entrent dans le lissage du moulage mais ne changent jamais le contour de la semelle. Le plan
+  enregistré porte `type_empreinte` et `bords_mm` ; « Reprendre » refuse si l'un des deux diffère. Jamais de boîte dans le logiciel
+  (boîtes fictives du banc seulement) ; la confirmation d'échelle reste obligatoire.
+- **Biseaux de la base « Intermédiaire » (PR #366)** : champ `biseau_lateral_deg` (45° par défaut, 0 = aucun, 15 à 75 sinon) à côté du
+  biseau médial ; un plan enregistré avant ce champ est relu avec 0. Chaque biseau contourne l'arrière du talon jusqu'à son milieu
+  (`BISEAU_MEDIAL.talon_pct`), les deux se rejoignent ; le rapport expose `biseau.lateral` et `biseau.talon`. Dessous = le plus haut
+  des deux biseaux ; dessus et contour ne changent pas.
+- **Bords dentelés = trois causes mesurées** (`calcul/base.js`) : (1) en contour lissé, les cellules du pied retirées par la régularisation
+  ne sont ni pied ni mur : trous dans le champ du lissage, la hauteur du bord saute de ~2 mm (×3 avec « Relief ×3 ») ; on y remet la
+  hauteur d'origine ; (2) la distance au contour, calculée depuis des cellules de 0,5 mm, est quantifiée : flou léger
+  (`BISEAU_MEDIAL.lissage_mm`) ; (3) un nœud du contour glisse vers le vrai bord mais gardait la hauteur de sa cellule : correction au
+  premier ordre par la pente locale. Diagnostic : relever la 1re cellule valide du bord par colonne, contour lissé puis non lissé.
+- **Pièges** : (1) un test de talon sur un pied de démo ne prouve rien (sa paroi arrière est déjà basse) : utiliser une ellipse plate
+  avec une cellule au niveau de référence loin devant ; (2) chaque critère d'une détection ou d'un lissage a un test où SEUL lui décide,
+  sinon son sabotage passe inaperçu ; (3) un commentaire `//` placé au milieu d'une ligne `Object.freeze({ ... })` avale les clés
+  suivantes ; (4) un bump de version oublie des fichiers : grepper `vNNN` (imports `?v=`, E2E, `APP_BUILD`), pas seulement
+  `biomeca-vNNN` ; (5) la CI tourne en Node 22 : `node --test` avec le glob `tests/semelle3d/**/*.test.js`, sortie TAP différente
+  de Node 24+ (géré par `tests/semelle3d-noyau.test.mjs`) ; (6) `tests/resultats-279.test.mjs` recharge tout `biomeca.js` à chaque
+  cas : délai de 30 s (PR #365), sinon échecs intermittents de 5 s qui bloquaient la fusion ; (7) le job `push` saute la garde
+  `CACHE_VERSION`, seul le job du run `pull_request` porte « ✓ CACHE_VERSION bump detected » ; (8) `/tmp` est petit sur le serveur
+  de développement : rediriger `TMPDIR`.
+- **Export** : le STL ne porte qu'un seul volume, sans matière ni dureté ; les matériaux de chaque zone sont dans le rapport. Les exports
+  multi-imprimantes (STL par matière, 3MF multi-volumes, remplissage par zone) sont décidés mais **pas codés** ; aucune valeur de
+  remplissage ne doit être inventée (à calibrer par essais).
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
