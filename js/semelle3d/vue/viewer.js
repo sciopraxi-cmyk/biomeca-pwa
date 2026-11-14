@@ -206,11 +206,15 @@ let positionsAff = null, indicesAff = null, rapport = null, scanPret = false;
 let opts = { inverserY: false, inverserZ: false };
 let coteConfirme = null, sprites = [];
 const fr = (v, n = 1) => Number(v).toFixed(n).replace('.', ',');
+const bordsMm = () => { const v = Number(String($('bords-mm').value).trim().replace(',', '.')); return Number.isFinite(v) ? Math.min(30, Math.max(0, v)) : 5; };
+const majBlocBords = () => { $('bloc-bords').hidden = typeEmpreinte() !== 'creusee'; };
+const typeEmpreinte = () => { const r = document.querySelector('input[name=typeemp]:checked'); return r ? r.value : 'decharge'; };
 
 for (const [cle, lib] of Object.entries({
   reel_droit_stl: 'Pied droit réaliste (fictif) — STL, mm', reel_gauche_obj: 'Pied gauche réaliste (fictif) — OBJ, mm', reel_creux_stl: 'Pied droit creux (fictif, voûte haute) — STL',
   droit_stl_mm: 'Pied droit simple — STL binaire, mm, tourné de 30°', gauche_obj_mm: 'Pied gauche — OBJ, mm, autre repère',
   droit_ply_m: 'Pied droit — PLY binaire en MÈTRES', gauche_3mf_pouces: 'Pied gauche — 3MF en POUCES',
+  boite_creusee_droit: 'Boîte creusée — pied droit (fictif) — STL, mm', boite_creusee_gauche: 'Boîte creusée — pied gauche (fictif) — STL, mm',
 })) { const o = document.createElement('option'); o.value = cle; o.textContent = lib; $('demo').append(o); }
 
 function etiquette(texte, x, y, z) {
@@ -281,6 +285,7 @@ function afficherRapport(r) {
     'Grille : ' + g.nx + ' × ' + g.ny + ' à ' + fr(g.pas_mm) + ' mm · ' + g.cellules_valides.toLocaleString('fr-FR') + ' cellules couvertes',
     'Hauteur : de ' + fr(g.hauteur_min_mm, 2) + ' à ' + fr(g.hauteur_max_mm, 2) + ' mm', 'Calcul : ' + r.duree_ms + ' ms (dans le worker)',
   ].concat(r.avertissements.map((t) => '⚠ ' + t)).map((t) => '<div>' + t + '</div>').join('') : [
+    'Type d\'empreinte : ' + (a.type_empreinte === 'creusee' ? 'boîte creusée' + (r.conversion ? ' (bord ' + fr(r.conversion.plateau_pct, 0) + ' % du scan, creux de ' + fr(r.conversion.profondeur_mm, 0) + ' mm, converti en empreinte unique' + (r.conversion.bords ? ' ; bords gardés jusqu\'à ' + fr(r.conversion.bords.bords_mm, 0) + ' mm au-dessus du pied' : ' ; fond du creux seul') + ')' : '') : 'pied en décharge'),
     'Longueur saisie : ' + fr(a.longueur_pied_mm) + ' mm',
     'Facteur d\'échelle : ×' + fr(a.facteur_echelle, 4) + ' (écart ' + fr(a.ecart_echelle_pct, 2) + ' %)' + (a.unite_probable ? ' · unité probable du fichier : ' + a.unite_probable : ''),
     'Grille : ' + g.nx + ' × ' + g.ny + ' à ' + fr(g.pas_mm) + ' mm · ' + g.cellules_valides.toLocaleString('fr-FR') + ' cellules couvertes',
@@ -290,11 +295,11 @@ function afficherRapport(r) {
   ].concat(r.avertissements.map((t) => '⚠ ' + t)).map((t) => '<div>' + t + '</div>').join('');
   majParcours();
   const c = p.cote;
-  $('prop-cote').textContent = 'Latéralité proposée : ' + (c.valeur || 'indéterminée') + (c.ambigu ? ' — peu fiable (signaux ' + (c.concordants === false ? 'contradictoires' : 'faibles') + ')' : '') + ' — à confirmer';
+  $('prop-cote').textContent = 'Latéralité proposée : ' + (c.valeur || 'indéterminée') + (c.avertissement ? ' — ATTENTION : ' + c.avertissement : (c.ambigu ? ' — peu fiable (signaux ' + (c.concordants === false ? 'contradictoires' : 'faibles') + ')' : '')) + ' — à confirmer';
   for (const rb of document.querySelectorAll('input[name=cote]')) { rb.disabled = false; rb.checked = false; }
   $('btn-cote').disabled = false;
   $('prop-long').textContent = 'Sens talon / avant-pied proposé : talon en Y = 0 (largeur à 25 % : rapport ' + fr(p.sens_longitudinal.confiance, 2) + (p.sens_longitudinal.ambigu ? ', peu fiable' : '') + ') — à confirmer';
-  $('prop-vert').textContent = 'Face plantaire proposée : le côté qui a le plus de surface plane (rapport ' + fr(p.sens_vertical.confiance, 1) + (p.sens_vertical.ambigu ? ', peu fiable' : '') + ') — à confirmer';
+  $('prop-vert').textContent = p.sens_vertical.imposee ? 'Face plantaire : imposée par le type « boîte creusée » (le pied est du côté du bord de la boîte) — modifiable ci-dessous' : 'Face plantaire proposée : le côté qui a le plus de surface plane (rapport ' + fr(p.sens_vertical.confiance, 1) + (p.sens_vertical.ambigu ? ', peu fiable' : '') + ') — à confirmer';
   $('btn-inv-y').disabled = false; $('btn-inv-z').disabled = false;
   if (r.generique) { // mode B : le côté est choisi par le praticien dans la fiche, rien à proposer ni à inverser
     $('prop-cote').textContent = 'Latéralité : ' + c.valeur + ' (choisie dans la fiche « pied générique »)';
@@ -326,6 +331,8 @@ async function importer(buffer, nom) {
     const i = r.info;
     $('info-fichier').innerHTML = '<div class="ok">' + nom + '</div><div>Format reconnu : ' + i.format + ' · ' + (i.octets / 1e6).toFixed(2).replace('.', ',') + ' Mo · ' + i.nbTriangles.toLocaleString('fr-FR') + ' triangles · lu en ' + i.ms_lecture + ' ms</div>' + i.avertissements.map((t) => '<div>⚠ ' + t + '</div>').join('');
     noter('import', nom + ' · ' + i.format + ' · ' + i.nbTriangles + ' triangles');
+    for (const rb of document.querySelectorAll('input[name=typeemp]')) rb.checked = rb.value === (i.type_probable === 'creusee' ? 'creusee' : 'decharge'); // pré-sélection seulement : le praticien choisit
+    majBlocBords();
     scanPret = true; $('btn-analyser').disabled = false;
     $('etat').textContent = 'scan lu : saisissez la longueur du pied';
     deux.surImport();
@@ -338,11 +345,11 @@ async function analyser(confirmeEcart = false) {
   $('confirm-ecart').hidden = true;
   $('etat').textContent = 'analyse en cours (worker)…';
   try {
-    const r = await demander({ type: 'recaler', longueur_mm: L, confirmeEcart, ...opts });
+    const r = await demander({ type: 'recaler', longueur_mm: L, confirmeEcart, type_empreinte: typeEmpreinte(), bords_mm: bordsMm(), ...opts });
     if (r.type === 'confirmation_requise') {
       const e = r.echelle;
       $('confirm-ecart').hidden = false;
-      $('confirm-ecart').innerHTML = '<b>Le scan doit être multiplié par ' + fr(e.facteur_echelle, 3) + '</b> pour mesurer ' + fr(L) + ' mm (écart de ' + fr(e.ecart_echelle_pct, 0) + ' % avec la taille du fichier)' + (e.unite_probable ? ' : le fichier semble être en <b>' + e.unite_probable + '</b>' : '') + '. Confirmez-vous que ' + fr(L) + ' mm est bien la longueur de ce pied ? <br><button id="btn-conf-ecart">Oui, je confirme</button>';
+      $('confirm-ecart').innerHTML = '<b>Changement d\'unité à confirmer.</b> ' + (e.unite_probable ? 'Ce fichier est probablement en <b>' + ({ m: 'mètres', cm: 'centimètres', pouce: 'pouces', mm: 'millimètres' }[e.unite_probable] || e.unite_probable) + '</b>. ' : '') + 'Pour que le pied mesure ' + fr(L) + ' mm, il faut l\'agrandir ×' + fr(e.facteur_echelle, 3) + '. Votre pied mesure-t-il bien ' + fr(L) + ' mm ? <br><button id="btn-conf-ecart">Oui, je confirme</button>';
       $('btn-conf-ecart').onclick = () => { noter('confirmation', 'écart d\'échelle ' + fr(e.ecart_echelle_pct, 1) + ' % confirmé (facteur ' + fr(e.facteur_echelle, 3) + ')'); analyser(true); };
       $('etat').textContent = 'confirmation de l\'échelle requise';
       return;
@@ -352,7 +359,7 @@ async function analyser(confirmeEcart = false) {
     reperes(rapport.boite);
     afficherRapport(rapport);
     coteConfirme = null; majCote();
-    noter('creation', 'H_plantaire · longueur ' + fr(L) + ' mm · facteur ' + fr(rapport.acquisition.facteur_echelle, 4) + ' · écart ' + fr(rapport.acquisition.ecart_echelle_pct, 2) + ' %');
+    noter('creation', 'H_plantaire · ' + (rapport.acquisition.type_empreinte === 'creusee' ? 'boîte creusée convertie · ' : '') + 'longueur ' + fr(L) + ' mm · facteur ' + fr(rapport.acquisition.facteur_echelle, 4) + ' · écart ' + fr(rapport.acquisition.ecart_echelle_pct, 2) + ' %');
     $('etat').textContent = 'affiché';
     apresAnalyse();
   } catch (err) { $('etat').textContent = 'erreur : ' + err.message; }
@@ -380,6 +387,8 @@ $('btn-modeb').onclick = async () => { // mode B : pied générique, sans scan
   } catch (err) { $('etat').textContent = 'erreur : ' + err.message; }
 };
 $('btn-analyser').onclick = () => analyser(false);
+$('bords-mm').addEventListener('change', () => { if (!scanPret || !rapport || typeEmpreinte() !== 'creusee') return; coteConfirme = null; majCote(); noter('modification', 'bords gardés : ' + fr(bordsMm(), 0) + ' mm'); analyser(true); });
+for (const rb of document.querySelectorAll('input[name=typeemp]')) rb.addEventListener('change', () => { majBlocBords(); if (!scanPret) return; coteConfirme = null; majCote(); noter('modification', 'type d\'empreinte : ' + (rb.value === 'creusee' ? 'boîte creusée' : 'pied en décharge') + ' (choisi par le praticien)'); if (rapport) analyser(true); }); // le côté confirmé n'a plus de valeur : il est à reconfirmer
 $('btn-cote').onclick = () => {
   const c = document.querySelector('input[name=cote]:checked');
   if (!c) { $('etat').textContent = 'choisissez D ou G avant de confirmer'; return; }
@@ -1084,7 +1093,7 @@ if (HOTE) {
     const axe = henke.exporter();
     return {
       v: VERSION_ETAT, mode: generique ? 'B' : 'A', cote: coteConfirme,
-      fiche: generique ? clone(ficheB) : { longueur_mm: nombreFr('longueur'), inverser_y: !!opts.inverserY, inverser_z: !!opts.inverserZ },
+      fiche: generique ? clone(ficheB) : { longueur_mm: nombreFr('longueur'), inverser_y: !!opts.inverserY, inverser_z: !!opts.inverserZ, ...(typeEmpreinte() === 'creusee' ? { type_empreinte: 'creusee', bords_mm: bordsMm() } : {}) },
       base: clone(baseParams()), elements: clone(elements), axe: axe && axe[coteConfirme] ? clone(axe[coteConfirme]) : null,
     };
   }
@@ -1128,6 +1137,11 @@ if (HOTE) {
       if (!rapport || rapport.generique) throw new Error('importez et analysez d\'abord le scan (carte 1)');
       if (!coteConfirme) throw new Error('confirmez le côté du pied (carte 1)');
       if (coteConfirme !== aReprendreA.cote) throw new Error('le scan est un pied ' + (coteConfirme === 'D' ? 'droit' : 'gauche') + ' ; le plan enregistré est pour le pied ' + (aReprendreA.cote === 'D' ? 'droit' : 'gauche'));
+      { // le plan a été fait sur UNE empreinte (type + bords) : la même doit être choisie, sinon le relief (donc la base) diffère
+        const f = aReprendreA.fiche || {}, typeP = f.type_empreinte || 'decharge', bordsP = typeP === 'creusee' ? (f.bords_mm === undefined ? 5 : f.bords_mm) : null;
+        if (typeP !== typeEmpreinte()) throw new Error('le plan enregistré a été fait avec « ' + (typeP === 'creusee' ? 'Boîte creusée' : 'Pied en décharge') + ' » : choisissez le même type d\'empreinte (carte 1)');
+        if (bordsP !== null && Math.abs(bordsP - bordsMm()) > 1e-9) throw new Error('le plan enregistré a été fait avec des bords gardés de ' + fr(bordsP, 0) + ' mm : réglez la même valeur (carte 1)');
+      }
       if (aReprendreA.axe) henke.importer(aReprendreA.cote, aReprendreA.axe);
       ecrireBaseParams(aReprendreA.base); await construireLaBase();
       if (!baseAffichee) throw new Error('la base n\'a pas pu être reconstruite');
