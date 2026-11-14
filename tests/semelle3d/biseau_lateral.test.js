@@ -62,7 +62,7 @@ test('biseau latéral : l\'angle compte (30° plus large que 60°, valeur de lar
   assert.ok(m30.largeur_max_mm > m30.lateral.largeur_max_mm, 'médial 30° plus large que latéral 60°');
 }));
 
-test('biseau latéral : le milieu du talon (normale du contour dans l\'axe du pied) n\'est pas biseauté ; les flancs latéral et médial le sont ; au bout des orteils seul le flanc latéral du petit orteil est ajouté', () => garde(() => {
+test('biseau latéral : les flancs latéral et médial sont biseautés ; au bout des orteils seul le flanc latéral du petit orteil est ajouté (le talon : voir les tests « talon »)', () => garde(() => {
   const g = scanPose('D');
   const th = construireBase(g, { type: 'thermoformee', taux: 1, contour_lisse: false }, null);
   const b = base(g, 'D');
@@ -70,11 +70,6 @@ test('biseau latéral : le milieu du talon (normale du contour dans l\'axe du pi
   let j0 = Infinity, j1 = -Infinity;
   for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) if (Number.isFinite(b.haut[j * g.nx + i])) { if (j < j0) j0 = j; if (j > j1) j1 = j; }
   const etendue = (j) => { let a = Infinity, z = -Infinity; for (let i = 0; i < g.nx; i++) if (Number.isFinite(b.haut[j * g.nx + i])) { if (i < a) a = i; if (i > z) z = i; } return [a, z]; };
-  const testBandeCentrale = (j, nom) => {
-    const [a, z] = etendue(j), c = Math.round((a + z) / 2), demi = Math.round(8 / g.pas); // ±8 mm autour du milieu de la rangée
-    for (let i = c - demi; i <= c + demi; i++) assert.ok(!bis(j * g.nx + i), nom + ' : cellule biseautée au milieu (rangée ' + (j - j0) + ', i ' + i + ')');
-  };
-  testBandeCentrale(j0 + 3, 'talon');
   // cellules AJOUTÉES par le biseau latéral (par rapport au médial seul) : toutes du côté latéral (x du côté opposé au médial pour un pied droit : +X)
   const med = base(g, 'D', { biseau_lateral_deg: 0 });
   let ajoutees = 0, ajouteesMediales = 0;
@@ -100,4 +95,92 @@ test('biseau latéral : sans effet sur la base thermoformée et la base plate (l
     for (let k = 0; k < a.haut.length; k += 7) { assert.equal(Object.is(a.bas[k], b.bas[k]) || a.bas[k] === b.bas[k], true); assert.equal(Object.is(a.haut[k], b.haut[k]) || a.haut[k] === b.haut[k], true); }
     assert.equal(a.rapport.biseau, null);
   }
+}));
+
+// TALON (retour de Joël, 14/11/2026 : « le biseau médial va jusqu'au milieu du talon, idem le latéral : on doit voir un talon qui a le biseau »).
+// Empreinte synthétique : ellipse plate à 15 mm sauf une cellule à 0 mm loin devant (le niveau de référence) : sans biseau, la paroi du talon fait ~ 17 mm.
+const ellipse = () => {
+  const nx = 120, ny = 240, pas = 0.5, z = new Float32Array(nx * ny).fill(NaN);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = (i - 60) * pas, y = (j - 120) * pas; if ((x / 25) ** 2 + (y / 55) ** 2 <= 1) z[j * nx + i] = 15; }
+  z[170 * nx + 60] = 0;
+  return { nx, ny, pas, ox: -30, oy: -60, z };
+};
+// épaisseur de la base (haut − bas) aux 5 positions 0, 1/4, 1/2, 3/4, 1 de la rangée dj du talon (de -X à +X)
+const profilTalon = (b, dj) => {
+  let jmin = Infinity; for (let k = 0; k < b.haut.length; k++) if (Number.isFinite(b.haut[k])) jmin = Math.min(jmin, Math.floor(k / b.nx));
+  const j = jmin + dj, ks = []; for (let i = 0; i < b.nx; i++) if (Number.isFinite(b.haut[j * b.nx + i])) ks.push(j * b.nx + i);
+  const e = (k) => b.haut[k] - b.bas[k], m = ks.length;
+  return [e(ks[0]), e(ks[Math.floor(m / 4)]), e(ks[Math.floor(m / 2)]), e(ks[Math.floor((3 * m) / 4)]), e(ks[m - 1])];
+};
+const baseE = (cote, extra = {}) => construireBase(ellipse(), { type: 'pleine_dessous', taux: 1, cote, contour_lisse: false, ...extra }, null);
+for (const cote of ['D', 'G']) {
+  test('talon : pied ' + cote + ' -> avec les deux biseaux le talon est biseauté sur TOUT son pourtour (paroi arrière ~ épaisseur minimum, symétrique), les deux biseaux se rejoignent au milieu', () => garde(() => {
+    const b = baseE(cote), t = b.rapport.biseau.talon;
+    assert.ok(t.noeuds_medial > 50 && t.noeuds_lateral > 50, 'nœuds du talon : médial ' + t.noeuds_medial + ', latéral ' + t.noeuds_lateral);
+    assert.ok(Math.abs(t.noeuds_medial - t.noeuds_lateral) <= 0.15 * t.noeuds_medial, 'chaque biseau va jusqu\'au MILIEU du talon (moitiés égales)');
+    for (const v of profilTalon(b, 1)) assert.ok(v < 3.5, 'paroi arrière du talon (rangée 1) : ' + v.toFixed(1) + ' mm au lieu de ~ 17');
+    const p6 = profilTalon(b, 6); assert.ok(p6[2] > p6[0] + 1, 'la pente monte vers l\'intérieur (rangée 6)');
+    assert.ok(Math.abs(p6[1] - p6[3]) < 0.6, 'symétrie médial/latéral de part et d\'autre du milieu');
+  }));
+  test('talon : pied ' + cote + ' -> latéral = 0 : seule la moitié MÉDIALE du talon est biseautée ; la moitié latérale garde sa paroi', () => garde(() => {
+    const b = baseE(cote, { biseau_lateral_deg: 0 }), t = b.rapport.biseau.talon;
+    assert.ok(t.noeuds_medial > 50 && t.noeuds_lateral === 0);
+    const p = profilTalon(b, 1), [med, lat] = cote === 'G' ? [p[4], p[0]] : [p[0], p[4]]; // G : médial = +X
+    assert.ok(med < 3.5 && lat > 4.5, 'bord médial ' + med.toFixed(1) + ' mm ; bord latéral ' + lat.toFixed(1) + ' mm');
+    const p20 = profilTalon(b, 20), lat20 = cote === 'G' ? p20[0] : p20[4];
+    assert.ok(lat20 > 12, 'plus en avant, la paroi latérale reste haute : ' + lat20.toFixed(1) + ' mm');
+  }));
+}
+test('talon : le biseau du talon n\'enlève rien : dessus et contour inchangés, dessous jamais plus bas qu\'avant, épaisseur >= minimum', () => garde(() => {
+  const g = ellipse(), th = construireBase(g, { type: 'thermoformee', taux: 1, contour_lisse: false }, null), b = baseE('D');
+  for (let k = 0; k < b.haut.length; k++) {
+    assert.equal(Number.isFinite(b.haut[k]), Number.isFinite(th.haut[k]));
+    if (!Number.isFinite(b.haut[k])) continue;
+    assert.equal(b.haut[k], th.haut[k]);
+    assert.ok(b.bas[k] >= 0 && b.bas[k] <= th.bas[k] + 1e-6 && b.haut[k] - b.bas[k] >= 1.5 - 1e-5);
+  }
+}));
+
+// BORDS DENTELÉS (retour de Joël, 14/11/2026) : sur une empreinte creusée, les pointes de contour (dents du scan) retirées par la régularisation
+// laissaient des trous dans le champ du lissage (ni pied ni mur) : la hauteur du bord sautait d'environ 2 mm d'une cellule à la suivante (×3 avec le relief).
+test('bords : empreinte creusée avec contour en dents -> la hauteur du bord arrière est continue (pas de saut entre cellules voisines)', () => garde(() => {
+  const nx = 120, ny = 240, pas = 0.5, z = new Float32Array(nx * ny).fill(NaN), murs = new Float32Array(nx * ny).fill(NaN);
+  const dedans = (i, j, r) => (((i - 60) * pas) / (25 + r)) ** 2 + (((j - 120) * pas) / (55 + r)) ** 2 <= 1;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const pointe = !dedans(i, j, 0) && dedans(i, j, 1.2) && (i + 2 * j) % 3 === 0; // cellules isolées au-delà du contour : dents du scan
+    if (dedans(i, j, 0) || pointe) z[j * nx + i] = 15 - 3 * Math.max(0, (j - 20) / 220);
+    else if (dedans(i, j, 6)) murs[j * nx + i] = 22; // mur gardé autour du pied (jamais sur une cellule du pied)
+  }
+  z[170 * nx + 60] = 0;
+  const g = { nx, ny, pas, ox: -30, oy: -60, z, murs };
+  for (const type of ['thermoformee', 'pleine_dessous']) {
+    const b = construireBase(g, { type, taux: 0.5, cote: 'D', contour_lisse: true }, null);
+    let jmin = Infinity; for (let k = 0; k < b.haut.length; k++) if (Number.isFinite(b.haut[k])) jmin = Math.min(jmin, Math.floor(k / nx));
+    let saut = 0, n = 0, prev = null;
+    for (let i = 20; i < 100; i++) { // 1re cellule valide de chaque colonne dans les 25 premières rangées (bord arrière)
+      let v = null; for (let j = jmin; j < jmin + 25; j++) { const k = j * nx + i; if (Number.isFinite(b.haut[k])) { v = b.haut[k]; break; } }
+      if (v !== null && prev !== null) { saut = Math.max(saut, Math.abs(v - prev)); n++; }
+      prev = v;
+    }
+    assert.ok(n > 40);
+    assert.ok(saut < 0.6, type + ' : plus grand saut de hauteur entre cellules voisines du bord = ' + saut.toFixed(2) + ' mm (dents si > 0,6)');
+  }
+}));
+
+// BORD OBLIQUE (retour de Joël : « les bords sont dentelés », après correction des trous) : le long d'un bord oblique, la hauteur des nœuds du contour
+// montait par marches (chaque nœud glisse vers le vrai bord mais gardait la hauteur de sa cellule). Pied incliné en X, contour en ellipse inclinée.
+test('bords : bord oblique sur un moulage en pente -> la hauteur le long du contour est continue (pas de marches)', () => garde(() => {
+  const nx = 160, ny = 240, pas = 0.5, z = new Float32Array(nx * ny).fill(NaN), a = 0.5;
+  const dedans = (x, y) => { const u = x * Math.cos(a) + y * Math.sin(a), v = -x * Math.sin(a) + y * Math.cos(a); return (u / 28) ** 2 + (v / 60) ** 2 <= 1; };
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = (i - 80) * pas, y = (j - 120) * pas; if (dedans(x, y)) z[j * nx + i] = 15 + 0.3 * x; }
+  const g = { nx, ny, pas, ox: -40, oy: -60, z };
+  const b = construireBase(g, { type: 'thermoformee', taux: 1, cote: 'D', contour_lisse: true, lissage_mm: 2 }, null);
+  let pire = 0, n = 0;
+  for (const cote of [0, 1]) {
+    const hs = [];
+    for (let j = 60; j < ny - 60; j++) { const idx = [...Array(nx).keys()]; if (cote) idx.reverse(); for (const i of idx) { const k = j * nx + i; if (Number.isFinite(b.haut[k])) { hs.push(b.haut[k]); break; } } }
+    for (let i = 1; i < hs.length - 1; i++) { pire = Math.max(pire, Math.abs(hs[i + 1] - 2 * hs[i] + hs[i - 1])); n++; }
+  }
+  assert.ok(n > 200);
+  assert.ok(pire < 0.12, 'plus grande marche (2e différence) de la hauteur le long du contour = ' + pire.toFixed(3) + ' mm (marches si > 0,12)');
 }));

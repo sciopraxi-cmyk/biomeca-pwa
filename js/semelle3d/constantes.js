@@ -51,7 +51,7 @@ export const RECALAGE = Object.freeze({
 // --- Lot 2 : base (moulage, épaisseur, lissage, contour) ---
 export const TYPES_BASE = Object.freeze(['plate', 'thermoformee', 'pleine_dessous']);
 // Réglages par défaut = DÉCISIONS DE JOËL du 31/10/2026 (type thermoformée, taux 50 %, épaisseur 1,5 mm, lissage 3 mm depuis le 31/10 soir, biseau 45°).
-export const BASE_DEFAUTS = Object.freeze({ type: 'thermoformee', taux: 0.5, epaisseur_mm: 1.5, lissage_mm: 3, biseau_deg: 45, biseau_lateral_deg: 45, // biseau latéral (demande de Joël 14/11) : même règle que le médial ; 0 = aucun contour_lisse: true,
+export const BASE_DEFAUTS = Object.freeze({ type: 'thermoformee', taux: 0.5, epaisseur_mm: 1.5, lissage_mm: 3, biseau_deg: 45, biseau_lateral_deg: 45, contour_lisse: true, // biseau latéral (demande de Joël 14/11) : même règle que le médial ; 0 = aucun
   // Lot 3 bis : matériau de la base (tableau PODAXIA), étendue entière ou demi-semelle, 2e matériau devant.
   forme_semelle: false, moulage_tetes: true, materiau_id: null, etendue: 'entiere', limite_pct: 60, devant: 'materiau2', materiau_devant_id: null, epaisseur_devant_mm: null, raccord_devant_mm: 20, arrondi_mm: 8 });
 // Décision de Joël (31/10) : les résines Flex et Flux font de 0,9 à 1,8 mm -> une base est acceptée à partir de 0,9 mm
@@ -64,6 +64,8 @@ export const EPAISSEUR_TOTALE_AVERTISSEMENT_MM = 12; // script §6 : avertisseme
 export const BISEAU_MEDIAL = Object.freeze({
   angle_min_deg: 15, // angle de la face biseautée avec l'horizontale
   angle_max_deg: 75,
+  lissage_mm: 1.2, // flou de la distance au contour : pente du biseau sans dents (marches de 0,5 mm de la grille)
+  talon_pct: 30, // le biseau contourne l'arrière du talon (rangées du premier 30 % de la longueur) jusqu'au milieu du talon
   ouverture_deg: 60, // le contour est « médial » si sa normale sortante est à moins de 60° de la direction médiale
 });
 // Contour lissé (fin des marches de 0,5 mm, dette du lot 0). Paramètres techniques.

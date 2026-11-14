@@ -151,7 +151,8 @@ test('symétrie : le pied gauche et son image miroir en X donnent la même base 
     ecart = Math.max(ecart, Math.abs(a.haut[k] - b.haut[km]), Math.abs(a.bas[k] - b.bas[km]));
     ecartContour = Math.max(ecartContour, Math.abs(a.dx[k] + b.dx[km]), Math.abs(a.dy[k] - b.dy[km]));
   }
-  assert.ok(ecart < 2e-3, 'écart miroir des hauteurs ' + ecart); // une inversion du côté médial donnerait plusieurs mm
+  // la hauteur du bord suit maintenant le déplacement du contour (pente × dx) : le contour n'étant symétrique qu'à ~0,1 mm, les hauteurs le sont à ~0,05 mm (v338)
+  assert.ok(ecart < 0.06, 'écart miroir des hauteurs ' + ecart); // une inversion du côté médial donnerait plusieurs mm
   // le contour (correction des retournements, ordre de parcours) n'est symétrique qu'à ~0,1 mm près
   assert.ok(ecartContour < 0.15, 'écart miroir du contour ' + ecartContour);
 });
