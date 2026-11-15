@@ -12,6 +12,7 @@ import { initDeuxPieds } from './deuxpieds.js';
 import { initEdition3d } from './edition3d.js';
 import { EPAISSEUR_BASE_MIN_MM, EPAISSEUR_BASE_MAX_MM } from '../constantes.js';
 import { initMesure } from './mesure.js';
+import { initRedressement } from './redressement.js';
 import { initImageRapport } from './image_rapport.js';
 import { initPinceau } from './pinceau.js';
 import { initHenke } from './henke.js';
@@ -30,6 +31,7 @@ let transp = { afficher: () => {}, effacer: () => {}, relief: () => {}, reset: (
 let mannequin = { afficher: () => {}, relief: () => {}, reset: () => {} }; // remplacé en fin de fichier (lot 4 bis, étape 5)
 let henke = { afficher: () => {}, relief: () => {}, reset: () => {}, actif: () => false, exporter: () => undefined }; // remplacé en fin de fichier (lot 4 bis : axe de Henke)
 let pinceau = { actif: () => false, reset: () => {} }; // remplacé en fin de fichier (lot 4d : outil Pinceau)
+let redress = { actif: () => false, relief: () => {}, reset: () => {}, majTexte: () => {} }; // étape B : redressement par 3 points (initialisé en fin de fichier)
 let mesure = { actif: () => false, relief: () => {}, reset: () => {}, effacer: () => {} }; // remplacé en fin de fichier (lot 4d : outil Mesure)
 let surimpAff = null; // [{ pied, dx, liste, isthme }] : surimpressions du dernier calcul (une par pied affiché)
 let edition = { surAffichage: () => {}, surCartes: () => {}, reset: () => {}, enregistrer: () => {} }; // remplacé en fin de fichier (lot 4b : Annuler/Rétablir, points curseurs, glisser-déposer)
@@ -164,7 +166,7 @@ function afficher(positions, indices, { couleurHauteur = false, vue = 'trois-qua
   edition.surAffichage();
 }
 
-$('relief').onchange = () => { if (maille) { maille.scale.z = Number($('relief').value); transp.relief(); henke.relief(); mannequin.relief(); mesure.relief(); demanderRendu(); edition.surAffichage(); } };
+$('relief').onchange = () => { if (maille) { maille.scale.z = Number($('relief').value); transp.relief(); henke.relief(); mannequin.relief(); mesure.relief(); redress.relief(); demanderRendu(); edition.surAffichage(); } };
 $('btn-construire').onclick = async () => {
   $('etat').textContent = 'calcul en cours (worker)…';
   $('btn-exporter').disabled = true;
@@ -287,6 +289,7 @@ function afficherRapport(r) {
   ].concat(r.avertissements.map((t) => '⚠ ' + t)).map((t) => '<div>' + t + '</div>').join('') : [
     'Type d\'empreinte : ' + (a.type_empreinte === 'creusee' ? 'boîte creusée' + (r.conversion ? ' (bord ' + fr(r.conversion.plateau_pct, 0) + ' % du scan, creux de ' + fr(r.conversion.profondeur_mm, 0) + ' mm, converti en empreinte unique' + (r.conversion.bords ? ' ; bords gardés jusqu\'à ' + fr(r.conversion.bords.bords_mm, 0) + ' mm au-dessus du pied' : ' ; fond du creux seul') + ')' : '') : 'pied en décharge'),
     'Longueur saisie : ' + fr(a.longueur_pied_mm) + ' mm',
+    r.redressement ? 'Plan d\'appui : redressé par 3 points (talon, M1, M5), empreinte inclinée de ' + fr(r.redressement.angle_deg, 1) + '°' : 'Plan d\'appui : automatique',
     'Facteur d\'échelle : ×' + fr(a.facteur_echelle, 4) + ' (écart ' + fr(a.ecart_echelle_pct, 2) + ' %)' + (a.unite_probable ? ' · unité probable du fichier : ' + a.unite_probable : ''),
     'Grille : ' + g.nx + ' × ' + g.ny + ' à ' + fr(g.pas_mm) + ' mm · ' + g.cellules_valides.toLocaleString('fr-FR') + ' cellules couvertes',
     'Hauteur : de ' + fr(g.hauteur_min_mm, 2) + ' à ' + fr(g.hauteur_max_mm, 2) + ' mm',
@@ -313,7 +316,7 @@ function viderVue() {
   $('bandeau-generique').hidden = true;
   if (maille) { scene.remove(maille); maille.geometry.dispose(); maille.material.dispose(); maille = null; }
   for (const sp of sprites) { scene.remove(sp); sp.material.map.dispose(); sp.material.dispose(); }
-  sprites = []; positionsAff = null; indicesAff = null; rapport = null; couleursAff = null; surimpAff = null; transp.reset(); mesure.reset(); pinceau.reset(); henke.reset(); mannequin.reset(); deux.surReset();
+  sprites = []; positionsAff = null; indicesAff = null; rapport = null; couleursAff = null; surimpAff = null; transp.reset(); mesure.reset(); redress.reset(); pinceau.reset(); henke.reset(); mannequin.reset(); deux.surReset();
   $('prop-cote').textContent = 'Latéralité proposée : —'; $('prop-long').textContent = 'Sens talon / avant-pied proposé : —'; $('prop-vert').textContent = 'Face plantaire proposée : —';
   for (const rb of document.querySelectorAll('input[name=cote]')) { rb.disabled = true; rb.checked = false; }
   for (const id of ['btn-cote', 'btn-inv-y', 'btn-inv-z']) $(id).disabled = true;
@@ -361,8 +364,8 @@ async function analyser(confirmeEcart = false) {
     coteConfirme = null; majCote();
     noter('creation', 'H_plantaire · ' + (rapport.acquisition.type_empreinte === 'creusee' ? 'boîte creusée convertie · ' : '') + 'longueur ' + fr(L) + ' mm · facteur ' + fr(rapport.acquisition.facteur_echelle, 4) + ' · écart ' + fr(rapport.acquisition.ecart_echelle_pct, 2) + ' %');
     $('etat').textContent = 'affiché';
-    apresAnalyse();
-  } catch (err) { $('etat').textContent = 'erreur : ' + err.message; }
+    apresAnalyse(); redress.majTexte(); majBoutonPlanRedress();
+  } catch (err) { $('etat').textContent = 'erreur : ' + err.message; if (opts.redressement) { delete opts.redressement; redress.majTexte(); } }
 }
 
 $('fichier').onchange = async (e) => { const f = e.target.files[0]; if (f) deux.memoriserSuggestion(null); if (f) await importer(await f.arrayBuffer(), f.name); };
@@ -1029,6 +1032,33 @@ deux = initDeuxPieds({
 mesure = initMesure({ THREE, scene, camera, controls, renderer, $, demanderRendu, get: () => ({ baseAffichee }), getMaille: () => maille });
 if (location.search.includes('test4d')) window.__mesure4d = mesure;
 
+// ======================= Étape B : redressement de l'empreinte par 3 points =======================
+let planAReprendre = () => null; // renseigné par le bloc V1 (le plan enregistré à reprendre vit dans sa fermeture)
+function memesPoints(a, b) {
+  if (!a && !b) return true; if (!a || !b) return false;
+  return ['talon', 'm1', 'm5'].every((k) => a[k] && b[k] && ['x', 'y', 'z'].every((c) => Math.abs(a[k][c] - b[k][c]) < 1e-6));
+}
+function majBoutonPlanRedress() {
+  const A = planAReprendre(), f = A && A.fiche, voulu = f && f.redressement;
+  $('btn-redress-plan').hidden = !(A && (voulu || opts.redressement) && !memesPoints(voulu, opts.redressement));
+  $('btn-redress-plan').textContent = voulu ? 'Appliquer le redressement du plan enregistré' : 'Revenir au plan automatique (celui du plan enregistré)';
+}
+const copie = (o) => JSON.parse(JSON.stringify(o));
+async function redresserAvec(points, journalTexte) {
+  if (points) opts.redressement = points; else delete opts.redressement;
+  coteConfirme = null; majCote(); noter('modification', journalTexte);
+  await analyser(true);
+}
+redress = initRedressement({
+  THREE, scene, camera, controls, renderer, $, demanderRendu, getMaille: () => maille,
+  get: () => ({ analyse: !!rapport && !rapport.generique && scanPret, appliquee: !!opts.redressement, base: baseAffichee }),
+  revenirAuto: async () => { await redresserAvec(null, 'plan d\'appui : retour au plan automatique'); },
+  appliquer: async (pts) => { await redresserAvec(pts, 'plan d\'appui redressé par 3 points (talon, M1, M5)'); },
+  arreterAutres: () => { mesure.reset(); },
+});
+$('btn-redress-plan').onclick = async () => { const A = planAReprendre(), f = A && A.fiche; if (!f) return; await redresserAvec(f.redressement ? copie(f.redressement) : null, f.redressement ? 'redressement du plan enregistré appliqué' : 'plan automatique (plan enregistré sans redressement)'); };
+if (location.search.includes('test4d')) window.__redress = redress;
+
 // ======================= Lot 4b : édition dans la 3D (Annuler/Rétablir, points curseurs, glisser-déposer, poignées) =======================
 edition = initEdition3d({
   THREE, scene, camera, controls, renderer, $, noter, fr, echapper, demanderRendu, deux,
@@ -1098,6 +1128,7 @@ const HOTE = new URLSearchParams(location.search).get('hote') === '1' && window.
 if (HOTE) {
   const VERSION_ETAT = 1;
   let journalEnregistre = 0, aReprendreA = null;
+  planAReprendre = () => aReprendreA;
   const dire = (texte, erreur = false) => { const m = $('hote-msg'); m.textContent = texte; m.style.color = erreur ? '#b03030' : '#0f766e'; };
   const versMere = (msg, transferts = []) => window.parent.postMessage({ s3d: true, ...msg }, location.origin, transferts);
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -1115,7 +1146,7 @@ if (HOTE) {
     const axe = henke.exporter();
     return {
       v: VERSION_ETAT, mode: generique ? 'B' : 'A', cote: coteConfirme,
-      fiche: generique ? clone(ficheB) : { longueur_mm: nombreFr('longueur'), inverser_y: !!opts.inverserY, inverser_z: !!opts.inverserZ, ...(typeEmpreinte() === 'creusee' ? { type_empreinte: 'creusee', bords_mm: bordsMm() } : {}) },
+      fiche: generique ? clone(ficheB) : { longueur_mm: nombreFr('longueur'), inverser_y: !!opts.inverserY, inverser_z: !!opts.inverserZ, ...(typeEmpreinte() === 'creusee' ? { type_empreinte: 'creusee', bords_mm: bordsMm() } : {}), ...(opts.redressement ? { redressement: clone(opts.redressement) } : {}) },
       base: clone(baseParams()), elements: clone(elements), axe: axe && axe[coteConfirme] ? clone(axe[coteConfirme]) : null,
     };
   }
@@ -1144,7 +1175,7 @@ if (HOTE) {
       }
       if (etat.v !== VERSION_ETAT) throw new Error('version de plan inconnue (' + etat.v + ')');
       if (etat.mode === 'B') { dire('Réouverture du plan enregistré…'); await restaurerB(etat); dire('Plan enregistré rouvert.'); }
-      else { aReprendreA = etat; dire('Plan enregistré en mode scan : réimportez le même scan (le scan n\'est pas conservé), puis « Reprendre le plan enregistré ».'); $('btn-reprendre').hidden = false; }
+      else { aReprendreA = etat; dire('Plan enregistré en mode scan : réimportez le même scan (le scan n\'est pas conservé), puis « Reprendre le plan enregistré ».'); $('btn-reprendre').hidden = false; majBoutonPlanRedress(); }
       journalEnregistre = journal.length;
     } catch (err) { dire('Réouverture impossible : ' + err.message, true); }
   }
@@ -1162,13 +1193,14 @@ if (HOTE) {
       { // le plan a été fait sur UNE empreinte (type + bords) : la même doit être choisie, sinon le relief (donc la base) diffère
         const f = aReprendreA.fiche || {}, typeP = f.type_empreinte || 'decharge', bordsP = typeP === 'creusee' ? (f.bords_mm === undefined ? 5 : f.bords_mm) : null;
         if (typeP !== typeEmpreinte()) throw new Error('le plan enregistré a été fait avec « ' + (typeP === 'creusee' ? 'Boîte creusée' : 'Pied en décharge') + ' » : choisissez le même type d\'empreinte (carte 1)');
+        if (!memesPoints(f.redressement, opts.redressement)) throw new Error('le plan enregistré a été fait avec un redressement par 3 points : appuyez sur « Appliquer le redressement du plan enregistré » (carte 1), puis confirmez le côté' + (f.redressement ? '' : ' (le plan enregistré n\'en avait pas : utilisez « Effacer / plan automatique »)'));
         if (bordsP !== null && Math.abs(bordsP - bordsMm()) > 1e-9) throw new Error('le plan enregistré a été fait avec des bords gardés de ' + fr(bordsP, 0) + ' mm : réglez la même valeur (carte 1)');
       }
       if (aReprendreA.axe) henke.importer(aReprendreA.cote, aReprendreA.axe);
       ecrireBaseParams(aReprendreA.base); await construireLaBase();
       if (!baseAffichee) throw new Error('la base n\'a pas pu être reconstruite');
       elements = clone(aReprendreA.elements || []); dessinerCartes(); if (elements.length) await appliquerLesElements();
-      aReprendreA = null; $('btn-reprendre').hidden = true; journalEnregistre = journal.length; dire('Plan enregistré réappliqué sur le scan.');
+      aReprendreA = null; $('btn-reprendre').hidden = true; majBoutonPlanRedress(); journalEnregistre = journal.length; dire('Plan enregistré réappliqué sur le scan.');
     } catch (err) { dire(err.message, true); }
   };
 

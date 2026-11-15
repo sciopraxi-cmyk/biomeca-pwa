@@ -9,18 +9,18 @@ import {
   PAR_ID,
   decrire,
   nettoyerValeurs,
-} from './parametres.js?v=v339';
-import { creerMoteur, VUES } from './moteur.js?v=v339';
-import { interpreter, EXEMPLES } from './dictee.js?v=v339';
+} from './parametres.js?v=v340';
+import { creerMoteur, VUES } from './moteur.js?v=v340';
+import { interpreter, EXEMPLES } from './dictee.js?v=v340';
 import {
   evaluer,
   htmlHypothese,
   htmlPrudence,
   htmlSynthese,
   reglesManuelles,
-} from './mecanismes.js?v=v339';
-import { evaluerProfil, htmlProfil } from './chaines.js?v=v339';
-import { calculerReprise } from './reprise-4vues.js?v=v339';
+} from './mecanismes.js?v=v340';
+import { evaluerProfil, htmlProfil } from './chaines.js?v=v340';
+import { calculerReprise } from './reprise-4vues.js?v=v340';
 
 const CSS = `
 .m3d{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}

@@ -4,6 +4,7 @@
 // Les unités du fichier ne sont pas supposées : l'échelle vient de la longueur saisie.
 import { RECALAGE as P } from '../constantes.js';
 import { calculerEchelle, validerLongueurPied } from './echelle.js';
+import { redresserPositions } from './redressement.js';
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const croix = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -204,10 +205,20 @@ export function recaler(mesh, longueur_mm, options = {}) {
   let retourner = !avantEstB;
   if (options.inverserY) retourner = !retourner;
   if (retourner) for (let v = 0; v < nv; v++) { sortie[3 * v] = -sortie[3 * v]; sortie[3 * v + 1] = -sortie[3 * v + 1]; }
-  const bb = { x: bornes(sortie, utilise, (x) => x), y: bornes(sortie, utilise, (x, y) => y), z: bornes(sortie, utilise, (x, y, z) => z) };
-  const tx = -(bb.x.mn + bb.x.mx) / 2, ty = -bb.y.mn;
+  let bb = { x: bornes(sortie, utilise, (x) => x), y: bornes(sortie, utilise, (x, y) => y), z: bornes(sortie, utilise, (x, y, z) => z) };
+  let tx = -(bb.x.mn + bb.x.mx) / 2, ty = -bb.y.mn;
   for (let v = 0; v < nv; v++) { sortie[3 * v] += tx; sortie[3 * v + 1] += ty; }
-  const boite = { x_min: bb.x.mn + tx, x_max: bb.x.mx + tx, y_min: 0, y_max: bb.y.mx + ty, z_min: bb.z.mn, z_max: bb.z.mx };
+  // Étape B : redressement par 3 points (talon, M1, M5) posés dans CE repère (celui du recalage automatique). Rotation autour du talon, puis recentrage.
+  let redressement = null;
+  if (options.redressement) {
+    redressement = redresserPositions(sortie, options.redressement);
+    bb = { x: bornes(sortie, utilise, (x) => x), y: bornes(sortie, utilise, (x, y) => y), z: bornes(sortie, utilise, (x, y, z) => z) };
+    const tx2 = -(bb.x.mn + bb.x.mx) / 2, ty2 = -bb.y.mn;
+    for (let v = 0; v < nv; v++) { sortie[3 * v] += tx2; sortie[3 * v + 1] += ty2; }
+    tx += tx2; ty += ty2;
+  }
+  const bf = { x: bornes(sortie, utilise, (x) => x), y: bornes(sortie, utilise, (x, y) => y), z: bornes(sortie, utilise, (x, y, z) => z) }; // boîte du repère FINAL, relue sur les sommets
+  const boite = { x_min: bf.x.mn, x_max: bf.x.mx, y_min: 0, y_max: bf.y.mx, z_min: bf.z.mn, z_max: bf.z.mx };
 
   // Latéralité : signal « contour » ici ; signal « voûte » après rasterisation (lateralite.js).
   const contour = signalContour(sortie, utilise, L, boite);
@@ -219,6 +230,7 @@ export function recaler(mesh, longueur_mm, options = {}) {
     echelle,
     propositions: { sens_longitudinal: propLong, sens_vertical: propVertical },
     signal_contour: contour,
+    redressement,
     diagnostics: { valeurs_acp: acp.valeurs, ratio_acp, inclinaison_plan_deg: inclinaison, ransac: { score_haut: haut.score, score_bas: bas.score, points: m } },
     avertissements,
   };
