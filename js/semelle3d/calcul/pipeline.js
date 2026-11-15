@@ -9,6 +9,10 @@ import { ecrireSTLBinaire, lireSTLBinaire, indexerSommets } from './stl.js';
 import { importerScan, analyserScan, maillageAffichage, fabriquerDemo, fabriquerDemoDeuxPieds, fabriquerDemoBoite, SCENARIOS_DEMO_2P, SCENARIOS_DEMO_BOITE, COQUE_EMPREINTE_MM } from './modeA.js';
 import { construireBase, extraireCoupe } from './base.js';
 import { maillerBase } from './maillage_base.js';
+import { piecesDeLaSemelle, couverture, nomPiece, controlerSTLPiece, controlerTroisMF } from './pieces.js';
+import { ecrire3MF } from './ecrivain_3mf.js';
+import { ecrireZip } from './zip.js';
+import { lireMaillage } from './lecteurs.js';
 import { EPAISSEUR_BASE_MIN_MM, EPAISSEUR_TOTALE_AVERTISSEMENT_MM } from '../constantes.js';
 import { chargerMateriaux } from './materiaux.js';
 import { appliquerElements, mesurerCoupe } from './elements.js';
@@ -44,13 +48,7 @@ export function traiterMessage(msg, etat) {
   }
   if (msg.type === 'exporter') {
     if (!etat.dernier) throw new Error('rien à exporter : construire d\'abord');
-    if (etat.dernier.base) {
-      // Base du lot 2 : latéralité confirmée obligatoire, épaisseur mini de la décision de Joël (résines 0,9 mm).
-      if (msg.cote !== 'D' && msg.cote !== 'G') throw new Error('export refusé : latéralité non confirmée');
-      const tb = etat.dernier.rapport.torsions_bloquees || [];
-      if (tb.length > 0) throw new Error('export refusé : torsion non appliquée — ' + tb.join(' ; '));
-      if (!(etat.dernier.rapport.epaisseur_min_mm >= EPAISSEUR_BASE_MIN_MM - 1e-3)) throw new Error('export refusé : épaisseur minimale ' + etat.dernier.rapport.epaisseur_min_mm.toFixed(2) + ' mm sous ' + EPAISSEUR_BASE_MIN_MM + ' mm');
-    }
+    controlerExportable(etat, msg);
     const stl = ecrireSTLBinaire(etat.dernier.mesh);
     // Contrôle du fichier réellement produit (relecture), pas du maillage en mémoire.
     const relu = lireSTLBinaire(stl);
@@ -242,6 +240,7 @@ export async function traiterMessageA(msg, etat) {
     c.mesures = mesurerCoupe(etat.finale, msg.mode, msg.position_mm, etat.coteElements); // toujours : épaisseurs réelles min / max de la coupe, avec ou sans élément
     return { type: 'coupe', ...c };
   }
+  if (msg.type === 'exporter_pieces') return exporterPieces(msg, etat);
   return traiterMessage(msg, etat);
 }
 
@@ -262,6 +261,51 @@ function boiteBrute(m) {
   const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
   for (let v = 0; v < m.positions.length; v += 3) for (let k = 0; k < 3; k++) { const x = m.positions[v + k]; if (x < mn[k]) mn[k] = x; if (x > mx[k]) mx[k] = x; }
   return { min: mn, max: mx };
+}
+
+// Refus communs à tous les exports (STL unique, pièces, 3MF) : latéralité confirmée, torsion appliquée, épaisseur minimale (décision du praticien : résines 0,9 mm).
+function controlerExportable(etat, msg) {
+  if (!etat.dernier) throw new Error('rien à exporter : construire d\'abord');
+  if (etat.dernier.base) {
+    if (msg.cote !== 'D' && msg.cote !== 'G') throw new Error('export refusé : latéralité non confirmée');
+    const tb = etat.dernier.rapport.torsions_bloquees || [];
+    if (tb.length > 0) throw new Error('export refusé : torsion non appliquée — ' + tb.join(' ; '));
+    if (!(etat.dernier.rapport.epaisseur_min_mm >= EPAISSEUR_BASE_MIN_MM - 1e-3)) throw new Error('export refusé : épaisseur minimale ' + etat.dernier.rapport.epaisseur_min_mm.toFixed(2) + ' mm sous ' + EPAISSEUR_BASE_MIN_MM + ' mm');
+  }
+}
+
+// Export par pièces (imprimantes multi-matières ou à une bobine) : un STL par pièce (base, devant, éléments, recouvrement) dans un zip + un 3MF multi-volumes.
+// Chaque STL est RELU et doit être fermé ; le 3MF est RELU par notre lecteur (nombre de triangles). La somme des volumes est comparée au volume entier.
+async function exporterPieces(msg, etat) {
+  controlerExportable(etat, msg);
+  if (!etat.finale || !etat.dernier.base) throw new Error('export par pièces : construire la base d\'abord');
+  const cat = etat.materiaux;
+  const infoMateriau = (id) => { try { const m = id && cat && cat.parId ? cat.parId.get(id) : null; return m ? { couleur_hex: m.couleur_hex || null, shore: Number.isFinite(m.shore) ? m.shore : null } : null; } catch { return null; } };
+  const pieces = piecesDeLaSemelle(etat.finale, { zones: etat.dernier.rapport.zones || [], infoMateriau });
+  if (pieces.length === 0) throw new Error('export par pièces : aucune pièce');
+  const maintenantISO = typeof msg.dateISO === 'string' ? msg.dateISO : new Date().toISOString();
+  const sorties = [], fichiers = [];
+  pieces.forEach((p, i) => {
+    if (!p.ferme || p.degeneres > 0 || !(p.volume_mm3 > 0)) throw new Error('export refusé : la pièce « ' + p.libelle + ' » n\'est pas un volume fermé');
+    const stl = ecrireSTLBinaire(p.mesh);
+    const defaut = controlerSTLPiece(stl, p, { lireSTL: lireSTLBinaire, indexer: indexerSommets });
+    if (defaut) throw new Error('export refusé : pièce « ' + p.libelle + ' » — ' + defaut);
+    const nom = nomPiece(i + 1, p) + '_' + msg.cote + '.stl';
+    p.nom = nomPiece(i + 1, p) + '_' + msg.cote;
+    fichiers.push({ nom, donnees: new Uint8Array(stl) });
+    sorties.push({ numero: i + 1, nom, id: p.id, role: p.role, libelle: p.libelle, materiau_libelle: p.materiau_libelle, shore: p.shore, nbTriangles: p.nbTriangles, volume_mm3: p.volume_mm3, octets: stl.byteLength });
+  });
+  const cv = couverture(pieces, etat.dernier.rapport.volume_mm3);
+  const lignes = ['Verticy Semelle 3D — pièces de la semelle (pied ' + msg.cote + ')', 'Un fichier STL par pièce ; chaque pièce est un volume fermé. Le STL ne contient ni matière ni dureté : elles sont listées ici.', ''];
+  for (const o of sorties) lignes.push(String(o.numero).padStart(2, '0') + ' | ' + o.libelle + ' | matériau : ' + (o.materiau_libelle || 'non choisi') + (Number.isFinite(o.shore) ? ' | Shore A ' + o.shore : '') + ' | ' + o.volume_mm3.toFixed(0) + ' mm3 | ' + o.nom);
+  lignes.push('', 'Somme des volumes des pièces : ' + cv.somme_mm3.toFixed(0) + ' mm3 sur ' + cv.total_mm3.toFixed(0) + ' mm3 (écart ' + cv.ecart_pct.toFixed(2) + ' %).');
+  fichiers.push({ nom: 'Liste-des-pieces.txt', donnees: new TextEncoder().encode(lignes.join('\n') + '\n') });
+  const zip = ecrireZip(fichiers, new Date(maintenantISO));
+  const trois = ecrire3MF(pieces, { titre: 'Semelle 3D — pied ' + msg.cote, date: new Date(maintenantISO) });
+  const totalTri = pieces.reduce((a, p) => a + p.nbTriangles, 0);
+  const defaut3 = await controlerTroisMF(trois, totalTri, lireMaillage);
+  if (defaut3) throw new Error('export refusé : ' + defaut3);
+  return { type: 'exporte_pieces', pieces: sorties, zip, troisMF: trois, octets_zip: zip.byteLength, octets_3mf: trois.byteLength, couverture: cv, indicatif: !!etat.generique, nbTriangles: totalTri };
 }
 
 const maintenant = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
