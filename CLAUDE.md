@@ -1107,6 +1107,14 @@ et podopédiatrie (PR #363). Le scan n'est **jamais conservé** : le bilan enreg
   valeur inventée : à calibrer par essais), réglage « Mon imprimante », export des 2 pieds par pièces ; le 3MF n'a pas été essayé dans un
   vrai logiciel de découpe. Sabotage des tests de `pieces.js` : une mutation non détectée = test à renforcer.
 
+- **Redressement par 3 points (PR #370, v340)** : bloc « Redresser l'empreinte (3 points) » (carte 1) : talon, tête M1 et tête M5
+  cliqués sur la vue de dessus ; rotation autour du talon, plan d'appui ramené à z = 0 (`calcul/redressement.js`, `vue/redressement.js`,
+  option `redressement` de `calcul/recalage.js`). Refus : points à moins de 30 mm, alignés (aire < 800 mm²), M1/M5 à moins de 40 mm
+  devant le talon, plan incliné de plus de 25° (seuils à confirmer par le praticien). Le plan enregistré porte `fiche.redressement` ;
+  « Reprendre » refuse s'il diffère ; la latéralité est à reconfirmer et la base à refaire après redressement. Pièges : `Échap` doit
+  appeler `stopPropagation` (sinon la fenêtre se ferme) ; `clone` est local au bloc hôte de `viewer.js`. **Pas codés** : détection
+  automatique des points, réglage en degrés, mode « 2 pieds », torsion avant/arrière-pied, contour par points.
+
 ## Fin de tâche : mise à jour de la documentation
 
 À **chaque fin de tâche** (ou lot de tâches), mettre à jour **CLAUDE.md** (règles et
