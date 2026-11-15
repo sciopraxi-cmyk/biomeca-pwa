@@ -646,9 +646,30 @@ $('coupe-pos').addEventListener('input', dessinerCoupe);
 for (const rb of document.querySelectorAll('input[name=coupe-mode]')) rb.addEventListener('change', dessinerCoupe);
 $('relief').addEventListener('change', () => { dessinerCoupe(); });
 $('btn-cote').addEventListener('click', () => { if (baseAffichee && typeBase() === 'pleine_dessous') construireLaBase(); else if (baseRapport) dessinerCoupe(); });
+// Export par pièces : ZIP (un STL fermé par pièce + liste des matières) ou 3MF (un objet par pièce, nom du matériau). Les fichiers sont relus par le worker avant le téléchargement.
+async function exporterParPieces(format) {
+  $('etat').textContent = 'export par pièces en cours (worker)…';
+  try {
+    const maintenant = new Date().toISOString();
+    const r = await demander({ type: 'exporter_pieces', cote: coteConfirme, dateISO: maintenant });
+    const ref = (rapport && rapport.generique ? 'INDICATIF-Pied-generique-' : '') + 'Semelle-fictive-' + { plate: 'plate', thermoformee: 'thermoformee', pleine_dessous: 'intermediaire' }[baseRapport.type];
+    const a = document.createElement('a');
+    let nom, octets;
+    if (format === '3mf') { nom = nomFichierSTL(ref, coteConfirme, maintenant).replace(/\.stl$/, '.3mf'); octets = r.octets_3mf; a.href = URL.createObjectURL(new Blob([r.troisMF], { type: 'model/3mf' })); }
+    else { nom = nomFichierZip(ref + '-pieces-' + coteConfirme, maintenant); octets = r.octets_zip; a.href = URL.createObjectURL(new Blob([r.zip], { type: 'application/zip' })); }
+    a.download = nom; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    const sans = r.pieces.filter((p) => !p.materiau_libelle).length, mats = new Set(r.pieces.filter((p) => p.materiau_libelle).map((p) => p.materiau_libelle)).size;
+    noter('export', nom + ' · ' + octets + ' octets · ' + r.pieces.length + ' pièce(s) · fichiers relus : fermés');
+    $('etat').textContent = 'exporté : ' + nom + ' (' + r.pieces.length + ' pièce(s), ' + mats + ' matériau(x)' + (sans ? ', ' + sans + ' pièce(s) sans matériau choisi' : '') + ' ; écart de volume avec la semelle entière : ' + fr(Math.abs(r.couverture.ecart_pct), 2) + ' %)';
+    $('base-msg').innerHTML = r.pieces.map((p) => echapper(String(p.numero).padStart(2, '0') + ' ' + p.libelle + ' : ' + (p.materiau_libelle || 'matériau non choisi') + (Number.isFinite(p.shore) ? ' (Shore A ' + p.shore + ')' : ''))).join('<br>') + (Math.abs(r.couverture.ecart_pct) > 1 ? '<br><span style="color:#a15c00">⚠ les pièces ne couvrent pas tout le volume (écart ' + fr(r.couverture.ecart_pct, 1) + ' %) : vérifiez la semelle avant d\'imprimer.</span>' : '');
+  } catch (err) { $('base-msg').innerHTML = '<span style="color:#b03030">' + echapper(err.message) + '</span>'; $('etat').textContent = 'erreur : ' + err.message; }
+}
 $('btn-export-base').onclick = async () => {
   if (deux.actif()) return deux.exporter();
   if (!coteConfirme) { $('base-msg').innerHTML = '<span style="color:#b03030">Confirmez la latéralité (carte 1) avant d\'exporter.</span>'; return; }
+  const format = $('export-format').value;
+  if (format === 'pieces' || format === '3mf') return exporterParPieces(format);
   $('etat').textContent = 'export en cours (worker)…';
   try {
     const r = await demander({ type: 'exporter', cote: coteConfirme });

@@ -9,12 +9,16 @@ function dos(date) { // date/heure MS-DOS (2 s de résolution, année >= 1980)
   return { t: (d.getUTCHours() << 11) | (d.getUTCMinutes() << 5) | (d.getUTCSeconds() >> 1), d: ((an - 1980) << 9) | ((d.getUTCMonth() + 1) << 5) | d.getUTCDate() };
 }
 // entrees : [{ nom, donnees: Uint8Array|ArrayBuffer }] ; renvoie un ArrayBuffer.
-export function ecrireZip(entrees, date = new Date()) {
+// chemins = true : les noms peuvent contenir des dossiers « a/b/c » (3MF : « 3D/3dmodel.model », « _rels/.rels »), jamais « .. », jamais absolus.
+export function ecrireZip(entrees, date = new Date(), { chemins = false } = {}) {
   if (!Array.isArray(entrees) || entrees.length === 0) throw new RangeError('zip : au moins un fichier');
   const noms = new Set(), { t, d } = dos(date), parts = [], central = [];
   let o = 0;
   for (const e of entrees) {
-    if (typeof e.nom !== 'string' || !e.nom || /[\\/:*?"<>|]/.test(e.nom) || e.nom.startsWith('.')) throw new RangeError('zip : nom de fichier invalide « ' + e.nom + ' »');
+    const valide = typeof e.nom === 'string' && !!e.nom && (chemins
+      ? !/[\\:*?"<>|]/.test(e.nom) && e.nom.split('/').every((seg) => seg !== '' && seg !== '.' && seg !== '..' && (!seg.startsWith('.') || seg === '.rels'))
+      : !/[\\/:*?"<>|]/.test(e.nom) && !e.nom.startsWith('.'));
+    if (!valide) throw new RangeError('zip : nom de fichier invalide « ' + e.nom + ' »');
     if (noms.has(e.nom)) throw new RangeError('zip : nom en double « ' + e.nom + ' »');
     noms.add(e.nom);
     const nom = enc.encode(e.nom), donnees = e.donnees instanceof Uint8Array ? e.donnees : new Uint8Array(e.donnees), crc = crc32(donnees);

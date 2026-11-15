@@ -82,7 +82,7 @@ export function initDeuxPieds(P) {
     for (const id of ['inv-A-y', 'inv-A-z', 'inv-B-y', 'inv-B-z']) $(id).disabled = true;
     if (S.mode2) majTexteExport();
   }
-  function majTexteExport() { $('btn-export-base').textContent = S.mode2 ? 'Exporter les 2 STL →' : 'Exporter le STL →'; }
+  function majTexteExport() { $('btn-export-base').textContent = S.mode2 ? 'Exporter les 2 STL →' : 'Exporter →'; $('export-format').hidden = !!S.mode2; if (S.mode2) $('export-format').value = 'stl'; } // 2 pieds : STL unique par pied seulement (pièces et 3MF : pas encore)
 
   // ---------- étape 1 : séparation ----------
   async function separer(coupe = null) {

@@ -184,7 +184,12 @@
   </nav>
   <button class="btn-ic" id="btn-annuler" disabled title="Annuler (Ctrl+Z)">↶</button><button class="btn-ic" id="btn-retablir" disabled title="Rétablir (Ctrl+Maj+Z)">↷</button>
   <button id="btn-image-rapport" disabled title="Image pour le rapport : vue de dessus + vue 3/4 médiale">Image du rapport</button>
-  <button id="btn-export-base" class="plein" disabled>Exporter le STL →</button>
+  <select id="export-format" title="Format d'export selon votre imprimante" style="max-width:230px">
+    <option value="stl">STL unique</option>
+    <option value="pieces">ZIP : 1 STL par pièce</option>
+    <option value="3mf">3MF multi-matières</option>
+  </select>
+  <button id="btn-export-base" class="plein" disabled>Exporter →</button>
   <button id="btn-enregistrer" class="plein" style="background:#0f766e;border-color:#0f766e" hidden title="Enregistrer le plan et son image dans le bilan">Enregistrer</button><button id="btn-fermer" hidden>Fermer</button>
 </header>
 <div id="hote-msg" hidden role="status"></div>

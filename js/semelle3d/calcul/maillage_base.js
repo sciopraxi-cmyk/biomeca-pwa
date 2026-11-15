@@ -4,10 +4,12 @@
 import { estValide } from './grille.js';
 import { EPSILON_HAUTEUR_MM } from '../constantes.js';
 
-export function maillerBase(b, { epsilon = EPSILON_HAUTEUR_MM } = {}) {
+// garder(i, j) (facultatif) : ne garde que les cellules pour lesquelles il renvoie vrai (pièces par zone ou par élément : l'interface entre deux pièces est alors exactement la même).
+export function maillerBase(b, { epsilon = EPSILON_HAUTEUR_MM, garder = null } = {}) {
   const { nx, ny, pas, ox, oy, haut, bas, dx, dy } = b;
   const cellule = (i, j) => {
     if (i < 0 || j < 0 || i > nx - 2 || j > ny - 2) return false;
+    if (garder && !garder(i, j)) return false;
     return estValide(haut[j * nx + i]) && estValide(haut[j * nx + i + 1]) && estValide(haut[(j + 1) * nx + i]) && estValide(haut[(j + 1) * nx + i + 1]);
   };
   const num = new Int32Array(nx * ny).fill(-1);
