@@ -30,7 +30,7 @@ export async function importerScan(buffer, nom = '') {
 // Retour : { confirmation_requise: true, echelle } SANS rasterisation si l'écart d'échelle dépasse 15 % et n'est pas confirmé.
 export const TYPES_EMPREINTE = Object.freeze(['decharge', 'creusee']);
 export const BORDS_DEFAUT_MM = 5; // largeur de la bande de bords gardée autour du pied ET hauteur au-dessus du point le plus haut du pied (boîte creusée)
-export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverserY = false, inverserZ = false, type_empreinte = 'decharge', bords_mm = BORDS_DEFAUT_MM }) {
+export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverserY = false, inverserZ = false, type_empreinte = 'decharge', bords_mm = BORDS_DEFAUT_MM, redressement = null }) {
   const t0 = maintenant();
   if (!TYPES_EMPREINTE.includes(type_empreinte)) throw new TypeError('type d\'empreinte inconnu : ' + type_empreinte + ' (decharge ou creusee)');
   const creusee = type_empreinte === 'creusee';
@@ -38,7 +38,7 @@ export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverse
   const conv = creusee ? convertirCreusee(mesh) : null;
   let boiteProbable = false;
   if (!creusee) { try { boiteProbable = analyserBoite(mesh).creusee; } catch (err) { void err; } }
-  const r = recaler(conv ? conv.mesh : mesh, longueur_mm, { inverserY, inverserZ, versPied: conv ? conv.versPied : undefined });
+  const r = recaler(conv ? conv.mesh : mesh, longueur_mm, { inverserY, inverserZ, versPied: conv ? conv.versPied : undefined, redressement });
   if (r.echelle.confirmation_requise && !confirmeEcart) return { confirmation_requise: true, echelle: r.echelle };
   let g, bordsInfo = null;
   if (conv && bords_mm > 0 && conv.mursIdx.length) {
@@ -84,6 +84,7 @@ export function analyserScan(mesh, { longueur_mm, confirmeEcart = false, inverse
     propositions: { ...r.propositions, cote: lateralite },
     confirmations_requises: ['cote', 'sens_longitudinal', 'sens_vertical'],
     conversion: conv ? { type: 'creusee', bords: bordsInfo, plateau_pct: Math.round(1000 * conv.mesures.plateau_pct) / 10, cavite_pct: Math.round(1000 * conv.mesures.cavite_pct) / 10, profondeur_mm: Math.round(10 * conv.profondeur_brute * r.echelle.facteur_echelle) / 10, triangles_gardes: conv.mesures.triangles_gardes, triangles_total: conv.mesures.triangles_total } : null,
+    redressement: r.redressement ? { points: redressement, angle_deg: r.redressement.angle_deg } : null,
     diagnostics: r.diagnostics,
     avertissements: avert,
     limites: ['La longueur saisie est une référence, pas une garantie : l\'ombre du scan (orteils, bords) peut dépasser le pied réel.',
