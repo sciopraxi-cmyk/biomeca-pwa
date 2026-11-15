@@ -1070,7 +1070,7 @@ sans doublon, et une proposition déjà présente ne consomme pas de ligne.
   ne dit rien si la saisie locale est identique au serveur ou déjà gardée dans une copie `bm4-recuperation`. Aucun dialogue bloquant ne doit
   se déclencher à chaque ouverture.
 
-## Semelle 3D — acquis (PR #363 à #366)
+## Semelle 3D — acquis (PR #363 à #368)
 
 La **Semelle 3D** (`js/semelle3d/`, page `app.html` en iframe plein écran, import dynamique) est intégrée aux bilans sport, postural
 et podopédiatrie (PR #363). Le scan n'est **jamais conservé** : le bilan enregistre les paramètres du plan, une image et un résumé
@@ -1099,9 +1099,13 @@ et podopédiatrie (PR #363). Le scan n'est **jamais conservé** : le bilan enreg
   cas : délai de 30 s (PR #365), sinon échecs intermittents de 5 s qui bloquaient la fusion ; (7) le job `push` saute la garde
   `CACHE_VERSION`, seul le job du run `pull_request` porte « ✓ CACHE_VERSION bump detected » ; (8) `/tmp` est petit sur le serveur
   de développement : rediriger `TMPDIR`.
-- **Export** : le STL ne porte qu'un seul volume, sans matière ni dureté ; les matériaux de chaque zone sont dans le rapport. Les exports
-  multi-imprimantes (STL par matière, 3MF multi-volumes, remplissage par zone) sont décidés mais **pas codés** ; aucune valeur de
-  remplissage ne doit être inventée (à calibrer par essais).
+- **Exports par pièces (PR #368, v339)** : liste `#export-format` dans l'en-tête de `app.html` : STL unique (inchangé), ZIP (un STL par pièce)
+  ou 3MF multi-volumes (un objet par pièce, nom et dureté Shore du matériau). Masquée en mode « 2 pieds » (STL seul). Code :
+  `calcul/pieces.js` (`piecesDeLaSemelle` : base, devant, éléments, recouvrement ; volumes fermés par intervalle [dessous, dessus] ;
+  contrôles des fichiers relus), `calcul/ecrivain_3mf.js`, `zip.js` (option `chemins`), message `exporter_pieces` du worker, refus communs
+  `controlerExportable`. Un trou comblé par un autre matériau reste dans la pièce de base. **Pas codés** : remplissage par zone (aucune
+  valeur inventée : à calibrer par essais), réglage « Mon imprimante », export des 2 pieds par pièces ; le 3MF n'a pas été essayé dans un
+  vrai logiciel de découpe. Sabotage des tests de `pieces.js` : une mutation non détectée = test à renforcer.
 
 ## Fin de tâche : mise à jour de la documentation
 
